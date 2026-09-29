@@ -1,0 +1,34 @@
+Phase E environment. Timed binaries: default repository flags (.cargo/config.toml adds +crc). *churn* binaries: --features churn-counters (never used for a timed headline). *-fp-* binaries: RUSTFLAGS="-C force-frame-pointers=yes" (this drops the +crc flag). *-fpcrc-* binaries: RUSTFLAGS="-C force-frame-pointers=yes -C target-feature=+crc". Sources: /tmp/dodb-e-src-<sha> from git archive of bff651e (Phase D), b783686 (E0), ef99cdb (E1), df2ce35 (E2a), db6499f (E2b), b445043 (E3), 4ead3de (final). Phase C and Phase D release binaries are the Phase D session binaries (same SHA256 as in results/wal-v3-phase-d/environment.txt).
+
+Sun Sep 27 02:48:27 PM UTC 2026
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+dodbbench/db	sync	standard	local
+dodbbench/db	recordsize	4K	local
+dodbbench/db	compression	off	local
+dodbbench/db	atime	off	local
+               total        used        free      shared  buff/cache   available
+Mem:           10898         992        6658          82        3650        9905
+Swap:           4095         201        3894
+2
+rustc 1.98.1 (48a229cea 2026-09-01)
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "target-feature=+crc"]
+b6c74b1c64b6ecd8ec8b12a1f186602b78ae3506a6a1f4ce90638767b8fbd3ff  /tmp/dodb-phase-c-target/release/phase0-bench
+fbb70d7cce5fb34348fec8b9357618a0fe62d9419f4efffeba954c92fe2bc5e7  /tmp/dodb-phase-d-target/release/phase0-bench
+d264fd5a4abf5aeecbb2a62a39d5a659bfc0c248c28f6fcd61f96be484c72434  /tmp/dodb-e-e0churn-target/release/phase0-bench
+bd8507c43cb2fb1efa3987f9db2313a0118d56526885d837e95d750e50a44626  /tmp/dodb-e-e1-target/release/phase0-bench
+d71273e4f19c98617f7cd4d6955c4c44662037ae924ade0206e7ea089258cd97  /tmp/dodb-e-e1churn-target/release/phase0-bench
+be3fbe7fb68aa0f76e1ecdfccc4c1cf430e535e4347b46018aa3b6bcc48e2d54  /tmp/dodb-e-e2a-target/release/phase0-bench
+c978f8d8801b437b92091c8cf565416d6e1ff73ea0bc9e00c03fcbcd1f7012b9  /tmp/dodb-e-e2achurn-target/release/phase0-bench
+afd938a6d6a24f3237cf72c45650693185f08f017612123534d2f57942adac79  /tmp/dodb-e-e2b-target/release/phase0-bench
+ee82c8f98cf6387fb2b47936494b1c1f2a6c279ea221e3754000fcfa1064af3c  /tmp/dodb-e-e2bchurn-target/release/phase0-bench
+f813a4adc606969dfaeb7469c0fbdece494b1f16f2f2c2782f46356b90f3a253  /tmp/dodb-e-e3-target/release/phase0-bench
+f09b4629f763e2b3855d4bcbd6db69b457139c9ebec771f5cbb185b844447181  /tmp/dodb-e-e3churn-target/release/phase0-bench
+6670b610314e75c85f5760b59da300162f007999b25f3b884faf6cf07aa941fe  /tmp/dodb-e-final-target/release/phase0-bench
+89e0ec828df2292072df77f4c7fd63915f8c6e0e8ea651ae34f14ef1b39d1303  /tmp/dodb-e-finalchurn-target/release/phase0-bench
+fd1a322ba671c193301d219f0fefffe7bb1cb08bdd8ae27e1a02405eec5d12d2  /tmp/dodb-e-d-fp-target/release/phase0-bench
+558beb63108924a2b9a305c48616d9df025bb27e6919cc618d53ff1b9ecefa6e  /tmp/dodb-e-e2a-fp-target/release/phase0-bench
+7320ded5761fb3f8d68e8c9aac0378f2b02ec22856b675d14524cdfd2aee4d54  /tmp/dodb-e-final-fp-target/release/phase0-bench
+9e5a723445165096e013702e9e34992b6df5eb660336960601e90489556be2d5  /tmp/dodb-e-d-fpcrc-target/release/phase0-bench
+308b38bfb7c2de7552e6a0827a3a903c08e697ea683f92c58766a9c67fcab39c  /tmp/dodb-e-final-fpcrc-target/release/phase0-bench
+{"e1": ["/tmp/dodb-e-e1-target/release/phase0-bench", 2], "e1-churn": ["/tmp/dodb-e-e1churn-target/release/phase0-bench", 2], "e2a": ["/tmp/dodb-e-e2a-target/release/phase0-bench", 2], "e2a-churn": ["/tmp/dodb-e-e2achurn-target/release/phase0-bench", 2], "e2a-fp": ["/tmp/dodb-e-e2a-fp-target/release/phase0-bench", 2], "e2b": ["/tmp/dodb-e-e2b-target/release/phase0-bench", 2], "e2b-churn": ["/tmp/dodb-e-e2bchurn-target/release/phase0-bench", 2], "e3": ["/tmp/dodb-e-e3-target/release/phase0-bench", 2], "e3-churn": ["/tmp/dodb-e-e3churn-target/release/phase0-bench", 2], "final": ["/tmp/dodb-e-final-target/release/phase0-bench", 2], "final-churn": ["/tmp/dodb-e-finalchurn-target/release/phase0-bench", 2], "final-fp": ["/tmp/dodb-e-final-fp-target/release/phase0-bench", 2], "final-serial": ["/tmp/dodb-e-final-target/release/phase0-bench", 0], "phase-d-fpcrc": ["/tmp/dodb-e-d-fpcrc-target/release/phase0-bench", 2], "final-fpcrc": ["/tmp/dodb-e-final-fpcrc-target/release/phase0-bench", 2]}

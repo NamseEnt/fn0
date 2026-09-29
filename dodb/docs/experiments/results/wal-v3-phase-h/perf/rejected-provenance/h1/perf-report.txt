@@ -1,0 +1,705 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 2K of event 'cycles:Pu'
+# Event count (approx.): 27385031936
+#
+# Overhead  Command          Shared Object                       Symbol
+# ........  ...............  ..................................  ...............................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+     5.61%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal17encode_page_delta
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage3wal17encode_page_delta
+               |
+                --5.51%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+                          _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+                          _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+                          _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+                          _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+
+     4.77%  dodb-blink-leaf  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal17encode_page_delta
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage3wal17encode_page_delta
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+               _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink20parallel_worker_loop
+               _RINvNtNtCsfr5T3GFabw_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1e_18ParallelWorkerPool3new0uEB1g_
+               _RNSNvYNCINvNtNtCsfr5T3GFabw_3std6thread9lifecycle15spawn_uncheckedNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1a_18ParallelWorkerPool3new0uEs_0INtNtNtCskxtBwYRO61I_4core3ops8function6FnOnceuE9call_once6vtableB1c_
+               _RNvNvMs0_NtNtNtCsfr5T3GFabw_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     4.66%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink10plan_batch
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage5blink10plan_batch
+               _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+               _RNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB7_12BlinkAdapter22start_with_read_handle0B7_.llvm.3490602443097542172
+               _RNvMs4_NtNtNtCsaP87UvicxuU_5tokio7runtime4task4coreINtB5_4CoreNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB16_12BlinkAdapter22start_with_read_handle0INtNtCs69KKACWg7bl_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB16_
+
+     3.87%  tokio-rt-worker  phase0-bench                        [.] _RNvMs0_NtCsaKkR0GAH1lF_9dodb_core3keyNtB5_11DocumentKey16validate_encoded
+            |
+            ---_RNvMs0_NtCsaKkR0GAH1lF_9dodb_core3keyNtB5_11DocumentKey16validate_encoded
+               |
+                --3.48%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18ensure_sorted_leaf
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink16leaf_body_layout.llvm.2171859262404888102
+                          |
+                          |--1.88%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink22encode_blink_page_into
+                          |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink21encode_blink_page_arc
+                          |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+                          |          _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+                          |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+                          |          _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+                          |          _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+                          |          _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+                          |
+                           --1.60%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+                                     _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+                                     _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+                                     _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+                                     _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+                                     _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+
+     3.75%  tokio-rt-worker  libc.so.6                           [.] memcmp
+            |
+            ---memcmp
+               |
+               |--2.09%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink10plan_batch
+               |          _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+               |          _RNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB7_12BlinkAdapter22start_with_read_handle0B7_.llvm.3490602443097542172
+               |          _RNvMs4_NtNtNtCsaP87UvicxuU_5tokio7runtime4task4coreINtB5_4CoreNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB16_12BlinkAdapter22start_with_read_handle0INtNtCs69KKACWg7bl_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB16_
+               |
+                --0.91%--_RNvNtCs1xah1QGa2mC_12dodb_storage3wal19page_delta_rebuilds
+
+     3.56%  tokio-rt-worker  libc.so.6                           [.] __GI___memcpy_simd
+            |
+            ---__GI___memcpy_simd
+               |
+               |--1.53%--_RNvXs_NtNtCs1xah1QGa2mC_12dodb_storage5blink4leafNtB4_11LeafEntriesNtNtCskxtBwYRO61I_4core5clone5Clone5clone
+               |          _RNvXs_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB4_9BlinkPageNtNtCskxtBwYRO61I_4core5clone5Clone5clone
+               |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+               |          _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+               |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+               |          _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+               |          _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+               |          _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+               |
+                --0.51%--_mi_theap_realloc_zero
+
+     3.08%  dodb-blink-leaf  phase0-bench                        [.] _RNvMs0_NtCsaKkR0GAH1lF_9dodb_core3keyNtB5_11DocumentKey16validate_encoded
+            |
+            ---_RNvMs0_NtCsaKkR0GAH1lF_9dodb_core3keyNtB5_11DocumentKey16validate_encoded
+               |
+                --2.86%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18ensure_sorted_leaf
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink16leaf_body_layout.llvm.2171859262404888102
+                          |
+                          |--1.49%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+                          |          _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+                          |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+                          |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink20parallel_worker_loop
+                          |          _RINvNtNtCsfr5T3GFabw_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1e_18ParallelWorkerPool3new0uEB1g_
+                          |          _RNSNvYNCINvNtNtCsfr5T3GFabw_3std6thread9lifecycle15spawn_uncheckedNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1a_18ParallelWorkerPool3new0uEs_0INtNtNtCskxtBwYRO61I_4core3ops8function6FnOnceuE9call_once6vtableB1c_
+                          |          _RNvNvMs0_NtNtNtCsfr5T3GFabw_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+                          |          start_thread
+                          |          thread_start
+                          |
+                           --1.37%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink22encode_blink_page_into
+                                     _RNvNtCs1xah1QGa2mC_12dodb_storage5blink21encode_blink_page_arc
+                                     _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+                                     _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+                                     _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+                                     _RNvNtCs1xah1QGa2mC_12dodb_storage5blink20parallel_worker_loop
+                                     _RINvNtNtCsfr5T3GFabw_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1e_18ParallelWorkerPool3new0uEB1g_
+                                     _RNSNvYNCINvNtNtCsfr5T3GFabw_3std6thread9lifecycle15spawn_uncheckedNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1a_18ParallelWorkerPool3new0uEs_0INtNtNtCskxtBwYRO61I_4core3ops8function6FnOnceuE9call_once6vtableB1c_
+                                     _RNvNvMs0_NtNtNtCsfr5T3GFabw_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+                                     start_thread
+                                     thread_start
+
+     3.06%  tokio-rt-worker  phase0-bench                        [.] _mi_page_malloc_zero
+            |
+            ---_mi_page_malloc_zero
+               |
+                --0.77%--_mi_malloc_generic
+                          |
+                           --0.67%--mi_theap_malloc_zero_aligned_at_overalloc
+
+     2.91%  tokio-rt-worker  phase0-bench                        [.] _RINvYINtNtNtCskxtBwYRO61I_4core5slice4iter6ChunksNtNtCs5U8xel564tY_6crc32c4util5U64LeENtNtNtNtBa_4iter6traits8iterator8Iterator4foldmNCNvNtBP_10hw_aarch6417crc_u64_parallel30EBP_
+            |
+            ---_RINvYINtNtNtCskxtBwYRO61I_4core5slice4iter6ChunksNtNtCs5U8xel564tY_6crc32c4util5U64LeENtNtNtNtBa_4iter6traits8iterator8Iterator4foldmNCNvNtBP_10hw_aarch6417crc_u64_parallel30EBP_
+               _RNvNtCs5U8xel564tY_6crc32c10hw_aarch646crc32c
+               |
+               |--1.25%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink22encode_blink_page_into
+               |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink21encode_blink_page_arc
+               |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+               |          _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+               |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+               |          _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+               |          _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+               |          _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+               |
+                --1.25%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+                          _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+                          _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+                          _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+                          _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+
+     2.89%  phase0-bench     phase0-bench                        [.] _RNvMs0_NtCsaKkR0GAH1lF_9dodb_core3keyNtB5_11DocumentKey16validate_encoded
+            |
+            ---_RNvMs0_NtCsaKkR0GAH1lF_9dodb_core3keyNtB5_11DocumentKey16validate_encoded
+               |
+                --2.33%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18ensure_sorted_leaf
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink16leaf_body_layout.llvm.2171859262404888102
+                          |
+                          |--1.29%--_RINvXs0_NtNtNtCskxtBwYRO61I_4core4iter8adapters3mapINtB6_3MapINtNtNtBc_3ops5range5RangejENCINvNvNtNtNtBa_6traits8iterator8Iterator10min_by_key3keyjjNCNvNtCs1xah1QGa2mC_12dodb_storage5blink17choose_leaf_split0E0EB1w_4foldTjjENCINvNvB1w_6min_by4foldB3w_INvB1u_7comparejjEE0EB2s_
+                          |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink17choose_leaf_split
+                          |          _RINvNtCs1xah1QGa2mC_12dodb_storage5blink10split_leafNtB2_17WorkingBlinkStateEB4_
+                          |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink26apply_cached_leaf_mutation
+                          |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink32prepare_planned_serial_execution
+                          |
+                           --0.56%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink26apply_cached_leaf_mutation
+                                     _RNvNtCs1xah1QGa2mC_12dodb_storage5blink32prepare_planned_serial_execution
+
+     2.66%  tokio-rt-worker  phase0-bench                        [.] __aarch64_ldadd8_relax
+            |
+            ---__aarch64_ldadd8_relax
+               |
+               |--1.25%--_RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+               |          _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+               |          _RNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB7_12BlinkAdapter22start_with_read_handle0B7_.llvm.3490602443097542172
+               |          _RNvMs4_NtNtNtCsaP87UvicxuU_5tokio7runtime4task4coreINtB5_4CoreNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB16_12BlinkAdapter22start_with_read_handle0INtNtCs69KKACWg7bl_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB16_
+               |
+                --1.13%--_RNvMsa_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_19GenerationPublisher20prepare_shared_delta
+                          _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+                          _RNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB7_12BlinkAdapter22start_with_read_handle0B7_.llvm.3490602443097542172
+
+     2.59%  tokio-rt-worker  phase0-bench                        [.] __aarch64_ldadd8_rel
+            |
+            ---__aarch64_ldadd8_rel
+               |
+               |--1.01%--_RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+               |          _RNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB7_12BlinkAdapter22start_with_read_handle0B7_.llvm.3490602443097542172
+               |          _RNvMs4_NtNtNtCsaP87UvicxuU_5tokio7runtime4task4coreINtB5_4CoreNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB16_12BlinkAdapter22start_with_read_handle0INtNtCs69KKACWg7bl_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB16_
+               |          _RNvMs0_NtNtNtCsaP87UvicxuU_5tokio7runtime4task7harnessINtB5_7HarnessNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB1c_12BlinkAdapter22start_with_read_handle0INtNtCs69KKACWg7bl_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB1c_
+               |          _RNvMs_NtNtNtNtCsaP87UvicxuU_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               |          _RNvMs_NtNtNtNtCsaP87UvicxuU_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               |
+                --0.57%--_RNvMsn_NtCs69KKACWg7bl_5alloc4syncINtB5_3ArcNtNtCs1xah1QGa2mC_12dodb_storage5blink16PageCatalogChunkE9drop_slowBK_
+                          _RNvMsn_NtCs69KKACWg7bl_5alloc4syncINtB5_3ArcNtNtCs1xah1QGa2mC_12dodb_storage5blink11PageCatalogE9drop_slowBK_
+                          _RNvMsn_NtCs69KKACWg7bl_5alloc4syncINtB5_3ArcNtNtCs1xah1QGa2mC_12dodb_storage5blink19PublishedGenerationE9drop_slowBK_
+                          _RNvMsa_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_19GenerationPublisher7publish
+                          _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+                          _RNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB7_12BlinkAdapter22start_with_read_handle0B7_.llvm.3490602443097542172
+                          _RNvMs4_NtNtNtCsaP87UvicxuU_5tokio7runtime4task4coreINtB5_4CoreNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB16_12BlinkAdapter22start_with_read_handle0INtNtCs69KKACWg7bl_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB16_
+                          _RNvMs0_NtNtNtCsaP87UvicxuU_5tokio7runtime4task7harnessINtB5_7HarnessNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB1c_12BlinkAdapter22start_with_read_handle0INtNtCs69KKACWg7bl_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB1c_
+
+     2.37%  phase0-bench     phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink10plan_batch
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage5blink10plan_batch
+               _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+               _RNCNvCs66xJtbaaV2K_12phase0_bench3runs_0B3_
+
+     1.86%  phase0-bench     libc.so.6                           [.] __GI___memcpy_simd
+            |
+            ---__GI___memcpy_simd
+
+     1.74%  tokio-rt-worker  phase0-bench                        [.] mi_free
+            |
+            ---mi_free
+
+     1.59%  dodb-blink-leaf  libc.so.6                           [.] memcmp
+            |
+            ---memcmp
+               |
+                --0.97%--_RNvNtCs1xah1QGa2mC_12dodb_storage3wal19page_delta_rebuilds
+
+     1.57%  dodb-blink-leaf  libc.so.6                           [.] __GI___memcpy_simd
+            |
+            ---__GI___memcpy_simd
+               |
+                --1.15%--_RNvXs_NtNtCs1xah1QGa2mC_12dodb_storage5blink4leafNtB4_11LeafEntriesNtNtCskxtBwYRO61I_4core5clone5Clone5clone
+                          _RNvXs_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB4_9BlinkPageNtNtCskxtBwYRO61I_4core5clone5Clone5clone
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+                          _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink20parallel_worker_loop
+                          _RINvNtNtCsfr5T3GFabw_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1e_18ParallelWorkerPool3new0uEB1g_
+                          _RNSNvYNCINvNtNtCsfr5T3GFabw_3std6thread9lifecycle15spawn_uncheckedNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1a_18ParallelWorkerPool3new0uEs_0INtNtNtCskxtBwYRO61I_4core3ops8function6FnOnceuE9call_once6vtableB1c_
+                          _RNvNvMs0_NtNtNtCsfr5T3GFabw_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+                          start_thread
+                          thread_start
+
+     1.47%  dodb-blink-leaf  phase0-bench                        [.] _RINvYINtNtNtCskxtBwYRO61I_4core5slice4iter6ChunksNtNtCs5U8xel564tY_6crc32c4util5U64LeENtNtNtNtBa_4iter6traits8iterator8Iterator4foldmNCNvNtBP_10hw_aarch6417crc_u64_parallel30EBP_
+            |
+            ---_RINvYINtNtNtCskxtBwYRO61I_4core5slice4iter6ChunksNtNtCs5U8xel564tY_6crc32c4util5U64LeENtNtNtNtBa_4iter6traits8iterator8Iterator4foldmNCNvNtBP_10hw_aarch6417crc_u64_parallel30EBP_
+               _RNvNtCs5U8xel564tY_6crc32c10hw_aarch646crc32c
+               |
+               |--0.89%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink22encode_blink_page_into
+               |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink21encode_blink_page_arc
+               |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+               |          _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+               |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+               |          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink20parallel_worker_loop
+               |          _RINvNtNtCsfr5T3GFabw_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1e_18ParallelWorkerPool3new0uEB1g_
+               |          _RNSNvYNCINvNtNtCsfr5T3GFabw_3std6thread9lifecycle15spawn_uncheckedNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1a_18ParallelWorkerPool3new0uEs_0INtNtNtCskxtBwYRO61I_4core3ops8function6FnOnceuE9call_once6vtableB1c_
+               |          _RNvNvMs0_NtNtNtCsfr5T3GFabw_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               |          start_thread
+               |          thread_start
+               |
+                --0.58%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+                          _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink20parallel_worker_loop
+                          _RINvNtNtCsfr5T3GFabw_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1e_18ParallelWorkerPool3new0uEB1g_
+                          _RNSNvYNCINvNtNtCsfr5T3GFabw_3std6thread9lifecycle15spawn_uncheckedNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1a_18ParallelWorkerPool3new0uEs_0INtNtNtCskxtBwYRO61I_4core3ops8function6FnOnceuE9call_once6vtableB1c_
+                          _RNvNvMs0_NtNtNtCsfr5T3GFabw_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+                          start_thread
+                          thread_start
+
+     1.31%  phase0-bench     phase0-bench                        [.] _RINvYINtNtNtCskxtBwYRO61I_4core5slice4iter6ChunksNtNtCs5U8xel564tY_6crc32c4util5U64LeENtNtNtNtBa_4iter6traits8iterator8Iterator4foldmNCNvNtBP_10hw_aarch6417crc_u64_parallel30EBP_
+            |
+            ---_RINvYINtNtNtCskxtBwYRO61I_4core5slice4iter6ChunksNtNtCs5U8xel564tY_6crc32c4util5U64LeENtNtNtNtBa_4iter6traits8iterator8Iterator4foldmNCNvNtBP_10hw_aarch6417crc_u64_parallel30EBP_
+               _RNvNtCs5U8xel564tY_6crc32c10hw_aarch646crc32c
+               |
+                --0.91%--_RNvMs1_NtCs1xah1QGa2mC_12dodb_storage3walINtB5_6WalLogNtCs66xJtbaaV2K_12phase0_bench9BenchFileE18append_group_innerBS_.llvm.17708772224900613876
+
+     1.05%  phase0-bench     phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal17encode_page_delta
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage3wal17encode_page_delta
+               _RNvMs1_NtCs1xah1QGa2mC_12dodb_storage3walINtB5_6WalLogNtCs66xJtbaaV2K_12phase0_bench9BenchFileE18append_group_innerBS_.llvm.17708772224900613876
+
+     1.00%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18ensure_sorted_leaf
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18ensure_sorted_leaf
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink16leaf_body_layout.llvm.2171859262404888102
+               |
+                --0.54%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+                          _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+                          _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+                          _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+                          _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+
+     0.99%  phase0-bench     libc.so.6                           [.] memcmp
+            |
+            ---memcmp
+               |
+                --0.56%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18ensure_sorted_leaf
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink16leaf_body_layout.llvm.2171859262404888102
+
+     0.95%  tokio-rt-worker  [vdso]                              [.] 0x00000000000005bc
+            |
+            ---0xffffb8c625bc
+               __kernel_clock_gettime
+               clock_gettime@@GLIBC_2.17
+
+     0.90%  tokio-rt-worker  phase0-bench                        [.] __aarch64_cas8_acq_rel
+            |
+            ---__aarch64_cas8_acq_rel
+               |
+                --0.74%--mi_free
+
+     0.87%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+               _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+               _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+               _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+               _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+
+     0.86%  tokio-rt-worker  phase0-bench                        [.] _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+            |
+            ---_RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+               _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+               _RNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB7_12BlinkAdapter22start_with_read_handle0B7_.llvm.3490602443097542172
+               _RNvMs4_NtNtNtCsaP87UvicxuU_5tokio7runtime4task4coreINtB5_4CoreNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB16_12BlinkAdapter22start_with_read_handle0INtNtCs69KKACWg7bl_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB16_
+
+     0.84%  tokio-rt-worker  [vdso]                              [.] 0x00000000000005b0
+            |
+            ---0xffffb8c625b0
+               __kernel_clock_gettime
+               clock_gettime@@GLIBC_2.17
+
+     0.84%  dodb-blink-leaf  libc.so.6                           [.] __GI___memset_generic
+            |
+            ---__GI___memset_generic
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink21encode_blink_page_arc
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+               _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink20parallel_worker_loop
+               _RINvNtNtCsfr5T3GFabw_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1e_18ParallelWorkerPool3new0uEB1g_
+               _RNSNvYNCINvNtNtCsfr5T3GFabw_3std6thread9lifecycle15spawn_uncheckedNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1a_18ParallelWorkerPool3new0uEs_0INtNtNtCskxtBwYRO61I_4core3ops8function6FnOnceuE9call_once6vtableB1c_
+               _RNvNvMs0_NtNtNtCsfr5T3GFabw_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     0.82%  tokio-rt-worker  phase0-bench                        [.] _RNvMs1_NtCs1xah1QGa2mC_12dodb_storage3walINtB5_6WalLogNtCs66xJtbaaV2K_12phase0_bench9BenchFileE21append_group_preparedBS_
+            |
+            ---_RNvMs1_NtCs1xah1QGa2mC_12dodb_storage3walINtB5_6WalLogNtCs66xJtbaaV2K_12phase0_bench9BenchFileE21append_group_preparedBS_
+               _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+               _RNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB7_12BlinkAdapter22start_with_read_handle0B7_.llvm.3490602443097542172
+               _RNvMs4_NtNtNtCsaP87UvicxuU_5tokio7runtime4task4coreINtB5_4CoreNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB16_12BlinkAdapter22start_with_read_handle0INtNtCs69KKACWg7bl_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB16_
+
+     0.81%  tokio-rt-worker  phase0-bench                        [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdINtNtBb_4sync3ArcNtNtCs1xah1QGa2mC_12dodb_storage5blink9BlinkPageEE6insertCs66xJtbaaV2K_12phase0_bench
+            |
+            ---_RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdINtNtBb_4sync3ArcNtNtCs1xah1QGa2mC_12dodb_storage5blink9BlinkPageEE6insertCs66xJtbaaV2K_12phase0_bench
+               _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+               _RNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB7_12BlinkAdapter22start_with_read_handle0B7_.llvm.3490602443097542172
+               _RNvMs4_NtNtNtCsaP87UvicxuU_5tokio7runtime4task4coreINtB5_4CoreNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB16_12BlinkAdapter22start_with_read_handle0INtNtCs69KKACWg7bl_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB16_
+               _RNvMs0_NtNtNtCsaP87UvicxuU_5tokio7runtime4task7harnessINtB5_7HarnessNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB1c_12BlinkAdapter22start_with_read_handle0INtNtCs69KKACWg7bl_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB1c_
+
+     0.77%  phase0-bench     phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18ensure_sorted_leaf
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18ensure_sorted_leaf
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink16leaf_body_layout.llvm.2171859262404888102
+               |
+                --0.54%--_RINvXs0_NtNtNtCskxtBwYRO61I_4core4iter8adapters3mapINtB6_3MapINtNtNtBc_3ops5range5RangejENCINvNvNtNtNtBa_6traits8iterator8Iterator10min_by_key3keyjjNCNvNtCs1xah1QGa2mC_12dodb_storage5blink17choose_leaf_split0E0EB1w_4foldTjjENCINvNvB1w_6min_by4foldB3w_INvB1u_7comparejjEE0EB2s_
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink17choose_leaf_split
+                          _RINvNtCs1xah1QGa2mC_12dodb_storage5blink10split_leafNtB2_17WorkingBlinkStateEB4_
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink26apply_cached_leaf_mutation
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink32prepare_planned_serial_execution
+
+     0.75%  dodb-blink-leaf  phase0-bench                        [.] _mi_page_malloc_zero
+            |
+            ---_mi_page_malloc_zero
+
+     0.75%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs5U8xel564tY_6crc32c10hw_aarch646crc32c
+            |
+            ---_RNvNtCs5U8xel564tY_6crc32c10hw_aarch646crc32c
+
+     0.74%  tokio-rt-worker  [vdso]                              [.] 0x00000000000005cc
+            |
+            ---0xffffb8c625cc
+               __kernel_clock_gettime
+               clock_gettime@@GLIBC_2.17
+
+     0.71%  dodb-blink-leaf  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18ensure_sorted_leaf
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18ensure_sorted_leaf
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink16leaf_body_layout.llvm.2171859262404888102
+
+     0.69%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink16leaf_body_layout.llvm.2171859262404888102
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage5blink16leaf_body_layout.llvm.2171859262404888102
+               |
+                --0.54%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+                          _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+                          _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+                          _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+                          _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+
+     0.68%  tokio-rt-worker  libc.so.6                           [.] __GI___memset_generic
+            |
+            ---__GI___memset_generic
+               |
+                --0.63%--_RNvNtCs1xah1QGa2mC_12dodb_storage5blink21encode_blink_page_arc
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+                          _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+                          _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+                          _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+                          _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+                          _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+
+     0.67%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22encode_blink_page_into
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage5blink22encode_blink_page_into
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink21encode_blink_page_arc
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+               _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+               _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+               _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+               _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+
+     0.65%  dodb-blink-leaf  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+               _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink20parallel_worker_loop
+               _RINvNtNtCsfr5T3GFabw_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1e_18ParallelWorkerPool3new0uEB1g_
+               _RNSNvYNCINvNtNtCsfr5T3GFabw_3std6thread9lifecycle15spawn_uncheckedNCNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB1a_18ParallelWorkerPool3new0uEs_0INtNtNtCskxtBwYRO61I_4core3ops8function6FnOnceuE9call_once6vtableB1c_
+               _RNvNvMs0_NtNtNtCsfr5T3GFabw_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     0.62%  tokio-rt-worker  phase0-bench                        [.] mi_theap_malloc_aligned
+            |
+            ---mi_theap_malloc_aligned
+
+     0.58%  phase0-bench     phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink32prepare_planned_serial_execution
+            |
+            ---_RNvNtCs1xah1QGa2mC_12dodb_storage5blink32prepare_planned_serial_execution
+
+     0.56%  tokio-rt-worker  phase0-bench                        [.] __aarch64_cas8_acq
+            |
+            ---__aarch64_cas8_acq
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink21encode_blink_page_arc
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink18run_leaf_chain_job
+               _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs1xah1QGa2mC_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCsaKkR0GAH1lF_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+               _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22drain_leaf_chain_queue
+               _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+               _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+               _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+
+     0.50%  tokio-rt-worker  phase0-bench                        [.] _RINvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB6_8BTreeMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdINtNtBc_4sync3ArcNtNtNtCs1xah1QGa2mC_12dodb_storage5btree6format8PageDataEE3getB18_ECs66xJtbaaV2K_12phase0_bench
+            |
+            ---_RINvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB6_8BTreeMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdINtNtBc_4sync3ArcNtNtNtCs1xah1QGa2mC_12dodb_storage5btree6format8PageDataEE3getB18_ECs66xJtbaaV2K_12phase0_bench
+               _RINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEB1b_
+               _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+               _RNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB7_12BlinkAdapter22start_with_read_handle0B7_.llvm.3490602443097542172
+               _RNvMs4_NtNtNtCsaP87UvicxuU_5tokio7runtime4task4coreINtB5_4CoreNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB16_12BlinkAdapter22start_with_read_handle0INtNtCs69KKACWg7bl_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB16_
+
+     0.50%  phase0-bench     phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal29check_page_delta_against_base
+     0.46%  tokio-rt-worker  [unknown]                           [k] 0xffffc967369b96a4
+     0.45%  tokio-rt-worker  phase0-bench                        [.] _RNvXs_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB4_9BlinkPageNtNtCskxtBwYRO61I_4core5clone5Clone5clone
+     0.43%  tokio-rt-worker  phase0-bench                        [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdINtNtBb_4sync3ArcAhj1000_EE6insertCs66xJtbaaV2K_12phase0_bench
+     0.41%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal29check_page_delta_against_base
+     0.39%  tokio-rt-worker  phase0-bench                        [.] _RINvYNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateNtNtCskxtBwYRO61I_4core4hash11BuildHasher8hash_oneRNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdECs1xah1QGa2mC_12dodb_storage
+     0.36%  phase0-bench     phase0-bench                        [.] _mi_page_malloc_zero
+     0.36%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCsaKkR0GAH1lF_9dodb_core3key16encode_component
+     0.36%  dodb-blink-leaf  phase0-bench                        [.] __aarch64_cas8_acq
+     0.34%  dodb-blink-leaf  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal29check_page_delta_against_base
+     0.33%  dodb-blink-leaf  [vdso]                              [.] 0x00000000000005bc
+     0.32%  phase0-bench     phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink16leaf_body_layout.llvm.2171859262404888102
+     0.31%  tokio-rt-worker  phase0-bench                        [.] _mi_theap_malloc_zero
+     0.31%  dodb-blink-leaf  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22encode_blink_page_into
+     0.31%  phase0-bench     phase0-bench                        [.] _RNvMNtNtCs1xah1QGa2mC_12dodb_storage5blink4leafNtB2_11LeafEntries6search
+     0.31%  tokio-rt-worker  phase0-bench                        [.] _RINvMs6_NtCsf73KMPtv2x3_9hashbrown3rawINtB6_8RawTableTNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNtNtCs1xah1QGa2mC_12dodb_storage3wal14PageChainEntryEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1C_NtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE0ECs66xJtbaaV2K_12phase0_bench.llvm.11701689744217628095
+     0.30%  tokio-rt-worker  phase0-bench                        [.] _RINvMs6_NtCsf73KMPtv2x3_9hashbrown3rawINtB6_8RawTableTNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIduEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_uNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE0ECs1xah1QGa2mC_12dodb_storage
+     0.30%  dodb-blink-leaf  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink16leaf_body_layout.llvm.2171859262404888102
+     0.30%  tokio-rt-worker  phase0-bench                        [.] _RNvMs0_NtCsaKkR0GAH1lF_9dodb_core3keyNtB5_11DocumentKey6encode
+     0.29%  tokio-rt-worker  phase0-bench                        [.] _RNvXs1_NtNtNtCskxtBwYRO61I_4core4iter8adapters6filterINtB5_6FilterINtNtNtNtCs69KKACWg7bl_5alloc11collections5btree3set4IterNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdENCNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB2S_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileB3L_E31apply_planned_transaction_groupsb_0ENtNtNtB9_6traits8iterator8Iterator5countB3N_
+     0.29%  tokio-rt-worker  phase0-bench                        [.] _RNvXs2_NtNtCsfr5T3GFabw_3std4hash6randomNtB5_13DefaultHasherNtNtCskxtBwYRO61I_4core4hash6Hasher5write.llvm.16313849373145352296
+     0.26%  tokio-rt-worker  phase0-bench                        [.] _RINvYNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateNtNtCskxtBwYRO61I_4core4hash11BuildHasher8hash_oneRNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdECs66xJtbaaV2K_12phase0_bench
+     0.26%  tokio-rt-worker  phase0-bench                        [.] _RNvMsi_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+     0.25%  tokio-rt-worker  phase0-bench                        [.] _RINvNtNtNtNtCskxtBwYRO61I_4core5slice4sort6shared9smallsort25insertion_sort_shift_leftTmmENCINvMB8_SB1m_20sort_unstable_by_keyNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNCINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEsb_0E0EB40_
+     0.25%  dodb-blink-leaf  phase0-bench                        [.] _RNvXs_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB4_9BlinkPageNtNtCskxtBwYRO61I_4core5clone5Clone5clone
+     0.25%  tokio-rt-worker  phase0-bench                        [.] _RNvMNtNtNtNtCsfr5T3GFabw_3std3sys3pal4unix4timeNtB2_8Timespec3now
+     0.25%  tokio-rt-worker  phase0-bench                        [.] _RNvXs1_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_10BlinkStateNtB5_18BlinkMutationState4page
+     0.25%  tokio-rt-worker  phase0-bench                        [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapINtNtBb_3vec3VechENtNtCs1xah1QGa2mC_12dodb_storage5blink12LogicalEntryE6insertB1t_
+     0.25%  tokio-rt-worker  phase0-bench                        [.] _RINvMsN_NtNtNtCs69KKACWg7bl_5alloc11collections5btree4nodeINtB6_6HandleINtB6_7NodeRefNtNtB6_6marker3MutNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNtNtCs1xah1QGa2mC_12dodb_storage5blink9BlinkPageNtB1n_4LeafENtB1n_4EdgeE16insert_recursingNtNtBc_5alloc6GlobalNCNvMs4_NtNtB8_3map5entryINtB4j_11VacantEntryB1D_B2p_E12insert_entry0EB2t_
+     0.24%  tokio-rt-worker  phase0-bench                        [.] _RNvMsa_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_19GenerationPublisher20prepare_shared_delta
+     0.24%  tokio-rt-worker  phase0-bench                        [.] _RNvMs1_NtCsf73KMPtv2x3_9hashbrown3mapINtB5_7HashMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNtNtCs1xah1QGa2mC_12dodb_storage3wal14PageChainEntryNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE6insertCs66xJtbaaV2K_12phase0_bench
+     0.23%  tokio-rt-worker  phase0-bench                        [.] _mi_page_free_collect
+     0.21%  dodb-blink-leaf  [vdso]                              [.] 0x00000000000005b0
+     0.21%  tokio-rt-worker  [vdso]                              [.] 0x00000000000005c0
+     0.21%  dodb-blink-leaf  phase0-bench                        [.] mi_theap_malloc_zero_aligned_at_generic
+     0.21%  tokio-rt-worker  phase0-bench                        [.] _mi_malloc_generic
+     0.21%  dodb-blink-leaf  phase0-bench                        [.] _mi_page_free_collect
+     0.21%  tokio-rt-worker  [vdso]                              [.] 0x0000000000000600
+     0.21%  phase0-bench     [vdso]                              [.] 0x00000000000005bc
+     0.20%  dodb-blink-leaf  phase0-bench                        [.] __aarch64_cas8_acq_rel
+     0.20%  tokio-rt-worker  phase0-bench                        [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapNtNtCsaKkR0GAH1lF_9dodb_core3key11DocumentKeyNtNtB7_7set_val9SetValZSTE6insertB1b_
+     0.20%  phase0-bench     phase0-bench                        [.] _RNvNtCs5U8xel564tY_6crc32c10hw_aarch646crc32c
+     0.20%  tokio-rt-worker  phase0-bench                        [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNtNtCs1xah1QGa2mC_12dodb_storage5blink9BlinkPageE6insertB1X_
+     0.20%  phase0-bench     phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal17decode_page_delta
+     0.19%  tokio-rt-worker  phase0-bench                        [.] _RNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB5_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+     0.19%  phase0-bench     phase0-bench                        [.] __aarch64_ldadd8_rel
+     0.19%  tokio-rt-worker  phase0-bench                        [.] _RINvNtCskxtBwYRO61I_4core3ptr9drop_glueNtNtCs1xah1QGa2mC_12dodb_storage5blink9BlinkPageEBF_.llvm.10911592750258612359
+     0.18%  tokio-rt-worker  phase0-bench                        [.] _RNvXs2_NtNtCsfr5T3GFabw_3std4hash6randomNtB5_13DefaultHasherNtNtCskxtBwYRO61I_4core4hash6Hasher5write.llvm.3490602443097542172
+     0.17%  tokio-rt-worker  phase0-bench                        [.] _RINvNtNtNtNtCskxtBwYRO61I_4core5slice4sort6stable9quicksort9quicksortNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNvYB15_NtNtBa_3cmp10PartialOrd2ltECs1xah1QGa2mC_12dodb_storage
+     0.16%  tokio-rt-worker  phase0-bench                        [.] _RNvMs1_NtCsf73KMPtv2x3_9hashbrown3mapINtB5_7HashMapNtNtCsaKkR0GAH1lF_9dodb_core3key11DocumentKeyuNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE6insertCs66xJtbaaV2K_12phase0_bench
+     0.16%  tokio-rt-worker  libc.so.6                           [.] clock_gettime@@GLIBC_2.17
+     0.16%  tokio-rt-worker  phase0-bench                        [.] _RNvMs1_NtCsf73KMPtv2x3_9hashbrown3mapINtB5_7HashMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIduNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE6insertCs1xah1QGa2mC_12dodb_storage
+     0.16%  tokio-rt-worker  phase0-bench                        [.] memcmp@plt
+     0.15%  tokio-rt-worker  phase0-bench                        [.] mi_theap_malloc_zero_aligned_at_overalloc
+     0.15%  tokio-rt-worker  phase0-bench                        [.] _mi_bin_size
+     0.15%  tokio-rt-worker  phase0-bench                        [.] _RINvYNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateNtNtCskxtBwYRO61I_4core4hash11BuildHasher8hash_oneRShECs1xah1QGa2mC_12dodb_storage
+     0.15%  tokio-rt-worker  phase0-bench                        [.] _RINvNtNtNtNtCskxtBwYRO61I_4core5slice4sort6shared9smallsort25insertion_sort_shift_leftINtNtCs69KKACWg7bl_5alloc3vec3VechENvYB1m_NtNtBa_3cmp10PartialOrd2ltECs1xah1QGa2mC_12dodb_storage.llvm.12240019334109156071
+     0.15%  dodb-blink-leaf  phase0-bench                        [.] _RNvMNtNtNtNtCsfr5T3GFabw_3std3sys3pal4unix4timeNtB2_8Timespec12sub_timespec
+     0.15%  tokio-rt-worker  phase0-bench                        [.] _RINvMNtNtNtCs69KKACWg7bl_5alloc11collections5btree6appendINtNtB5_4node7NodeRefNtNtBW_6marker5OwnedNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNtNtB5_7set_val9SetValZSTNtB1g_14LeafOrInternalE9bulk_pushINtNtB5_17dedup_sorted_iter15DedupSortedIterB1y_B2k_INtNtNtNtCskxtBwYRO61I_4core4iter8adapters3map3MapINtNtNtB9_3vec9into_iter8IntoIterB1y_ENCINvMse_NtB5_3setINtB5F_8BTreeSetB1y_E16from_sorted_iterB4U_E0EENtNtB9_5alloc6GlobalECs66xJtbaaV2K_12phase0_bench
+     0.15%  tokio-rt-worker  phase0-bench                        [.] _RNvMNtNtCs1xah1QGa2mC_12dodb_storage5blink4leafNtB2_11LeafEntries6search
+     0.14%  phase0-bench     phase0-bench                        [.] _RNvXs1_NtNtNtCskxtBwYRO61I_4core4iter8adapters6filterINtB5_6FilterINtNtNtNtCs69KKACWg7bl_5alloc11collections5btree3set4IterNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdENCNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB2S_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileB3L_E31apply_planned_transaction_groupsb_0ENtNtNtB9_6traits8iterator8Iterator5countB3N_
+     0.14%  tokio-rt-worker  phase0-bench                        [.] _RNvMNtCsfr5T3GFabw_3std4timeNtB2_7Instant7elapsed
+     0.14%  dodb-blink-leaf  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal19page_delta_rebuilds
+     0.14%  phase0-bench     phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink26apply_cached_leaf_mutation
+     0.14%  phase0-bench     phase0-bench                        [.] _mi_theap_realloc_zero
+     0.14%  dodb-blink-leaf  phase0-bench                        [.] _RNvNtCs5U8xel564tY_6crc32c10hw_aarch646crc32c
+     0.13%  tokio-rt-worker  phase0-bench                        [.] mi_bin
+     0.13%  tokio-rt-worker  phase0-bench                        [.] mi_malloc_aligned
+     0.13%  dodb-blink-leaf  phase0-bench                        [.] _mi_theap_malloc_zero
+     0.13%  tokio-rt-worker  phase0-bench                        [.] _RNvMs8_Cs66xJtbaaV2K_12phase0_benchNtB5_17WorkloadGenerator13key_for_index.llvm.17735668245660954485
+     0.12%  dodb-blink-leaf  phase0-bench                        [.] _RNvMNtNtCs1xah1QGa2mC_12dodb_storage5blink4leafNtB2_11LeafEntries6search
+     0.12%  dodb-blink-leaf  phase0-bench                        [.] _mi_malloc_generic
+     0.11%  tokio-rt-worker  phase0-bench                        [.] _RNvMsz_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8IntoIterINtNtBb_3vec3VechENtNtB7_7set_val9SetValZSTE10dying_nextCs1xah1QGa2mC_12dodb_storage.llvm.9990570461144702399
+     0.10%  tokio-rt-worker  phase0-bench                        [.] _RNvMsF_NtCs69KKACWg7bl_5alloc3vecINtB5_3VecNtNtCs1xah1QGa2mC_12dodb_storage5blink15LeafChainResultE8push_mutCs66xJtbaaV2K_12phase0_bench
+     0.10%  tokio-rt-worker  phase0-bench                        [.] _RNvMsn_NtCs69KKACWg7bl_5alloc4syncINtB5_3ArcNtNtCs1xah1QGa2mC_12dodb_storage5blink8PageCellE9drop_slowBK_
+     0.10%  dodb-blink-leaf  phase0-bench                        [.] _RNvXs_NtNtCs1xah1QGa2mC_12dodb_storage5blink4leafNtB4_11LeafEntriesNtNtCskxtBwYRO61I_4core5clone5Clone5clone
+     0.10%  phase0-bench     phase0-bench                        [.] _RNvXs2_NtNtCsfr5T3GFabw_3std4hash6randomNtB5_13DefaultHasherNtNtCskxtBwYRO61I_4core4hash6Hasher5write.llvm.16313849373145352296
+     0.10%  phase0-bench     [vdso]                              [.] 0x00000000000005b0
+     0.10%  tokio-rt-worker  phase0-bench                        [.] __mi_stat_increase
+     0.10%  tokio-rt-worker  phase0-bench                        [.] mi_option_get
+     0.10%  tokio-rt-worker  phase0-bench                        [.] mi_theap_collect_ex
+     0.10%  tokio-rt-worker  phase0-bench                        [.] _RINvMsN_NtNtNtCs69KKACWg7bl_5alloc11collections5btree4nodeINtB6_6HandleINtB6_7NodeRefNtNtB6_6marker3MutINtNtBc_3vec3VechENtNtCs1xah1QGa2mC_12dodb_storage5blink12LogicalEntryNtB1n_4LeafENtB1n_4EdgeE16insert_recursingNtNtBc_5alloc6GlobalNCNvMs4_NtNtB8_3map5entryINtB3T_11VacantEntryB1D_B1V_E12insert_entry0EB1Z_
+     0.10%  phase0-bench     phase0-bench                        [.] _RNvNtCsaKkR0GAH1lF_9dodb_core3key16encode_component
+     0.10%  tokio-rt-worker  phase0-bench                        [.] __aarch64_ldset8_acq_rel
+     0.10%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal20update_record_digest
+     0.10%  tokio-rt-worker  phase0-bench                        [.] _mi_arenas_page_unabandon
+     0.10%  tokio-rt-worker  phase0-bench                        [.] _RNvMsz_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8IntoIterNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNtNtB7_7set_val9SetValZSTE10dying_nextCs66xJtbaaV2K_12phase0_bench.llvm.6421929786715708053
+     0.10%  phase0-bench     phase0-bench                        [.] _RNvMs1_NtCsf73KMPtv2x3_9hashbrown3mapINtB5_7HashMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIduNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE6insertCs1xah1QGa2mC_12dodb_storage
+     0.10%  tokio-rt-worker  phase0-bench                        [.] _RINvMNtNtNtCs69KKACWg7bl_5alloc11collections5btree6appendINtNtB5_4node7NodeRefNtNtBW_6marker5OwnedINtNtB9_3vec3VechENtNtB5_7set_val9SetValZSTNtB1g_14LeafOrInternalE9bulk_pushINtNtB5_17dedup_sorted_iter15DedupSortedIterB1y_B1Q_INtNtNtNtCskxtBwYRO61I_4core4iter8adapters3map3MapINtNtB1B_9into_iter8IntoIterB1y_ENCINvMse_NtB5_3setINtB56_8BTreeSetB1y_E16from_sorted_iterB4q_E0EENtNtB9_5alloc6GlobalECs1xah1QGa2mC_12dodb_storage
+     0.10%  phase0-bench     phase0-bench                        [.] _RNvMs1_NtCs1xah1QGa2mC_12dodb_storage3walINtB5_6WalLogNtCs66xJtbaaV2K_12phase0_bench9BenchFileE18append_group_innerBS_.llvm.17708772224900613876
+     0.10%  tokio-rt-worker  phase0-bench                        [.] _RNvXsf_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_13GenerationPinNtB5_14ReadPageSource4page
+     0.10%  tokio-rt-worker  phase0-bench                        [.] _RINvYINtNtNtNtCs69KKACWg7bl_5alloc11collections5btree3map4KeysNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNtNtCs1xah1QGa2mC_12dodb_storage5blink9BlinkPageENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator8try_folduNCINvNvB2x_3all5checkRBY_NCNvMsd_B1M_INtB1M_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileB4w_E31apply_planned_transaction_groups1_0E0INtNtNtB2F_3ops12control_flow11ControlFlowuEEB4y_
+     0.10%  tokio-rt-worker  phase0-bench                        [.] _RINvNtCskxtBwYRO61I_4core3ptr9drop_glueINtNtCs69KKACWg7bl_5alloc3vec3VecNtNtCs1xah1QGa2mC_12dodb_storage5blink17LeafChainBoundaryEECs66xJtbaaV2K_12phase0_bench
+     0.10%  phase0-bench     phase0-bench                        [.] mi_free
+     0.10%  phase0-bench     [vdso]                              [.] 0x00000000000005cc
+     0.10%  tokio-rt-worker  phase0-bench                        [.] mi_arena_try_alloc_at
+     0.10%  phase0-bench     phase0-bench                        [.] mi_theap_malloc_aligned
+     0.10%  tokio-rt-worker  phase0-bench                        [.] _RNvMNtNtNtNtCsfr5T3GFabw_3std3sys3pal4unix4timeNtB2_8Timespec12sub_timespec
+     0.10%  tokio-rt-worker  phase0-bench                        [.] __mi_stat_counter_increase
+     0.10%  dodb-blink-leaf  phase0-bench                        [.] mi_page_queue_find_free_ex.constprop.0
+     0.10%  dodb-blink-leaf  phase0-bench                        [.] __aarch64_ldadd8_rel
+     0.10%  tokio-rt-worker  phase0-bench                        [.] _RNvMs3_NtNtNtNtCs69KKACWg7bl_5alloc11collections5btree3map5entryINtB5_5EntryjINtNtBd_3vec3VecNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdEE10or_defaultCs1xah1QGa2mC_12dodb_storage
+     0.09%  dodb-blink-leaf  phase0-bench                        [.] __aarch64_cas8_rel
+     0.09%  dodb-blink-leaf  phase0-bench                        [.] memcmp@plt
+     0.09%  phase0-bench     phase0-bench                        [.] memcmp@plt
+     0.09%  phase0-bench     phase0-bench                        [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapINtNtBb_3vec3VechENtNtCs1xah1QGa2mC_12dodb_storage5blink12LogicalEntryE6insertB1t_
+     0.09%  dodb-blink-leaf  phase0-bench                        [.] __aarch64_ldset8_acq_rel
+     0.09%  dodb-blink-leaf  [vdso]                              [.] 0x00000000000005cc
+     0.09%  phase0-bench     phase0-bench                        [.] _RNvXso_NtCs69KKACWg7bl_5alloc3vecINtB5_3VecNtNtCs1xah1QGa2mC_12dodb_storage5blink15PlannedMutationENtNtNtCskxtBwYRO61I_4core3ops4drop4Drop4dropBJ_
+     0.09%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal13elapsed_nanos
+     0.09%  tokio-rt-worker  phase0-bench                        [.] _RINvXs0_NtNtNtCskxtBwYRO61I_4core4iter8adapters3mapINtB6_3MapINtNtB8_9enumerate9EnumerateINtNtNtBc_5slice4iter4IterNtNtCsaKkR0GAH1lF_9dodb_core3key11DocumentKeyEENCNvMs8_Cs66xJtbaaV2K_12phase0_benchNtB2I_17WorkloadGenerator16next_transaction0ENtNtNtBa_6traits8iterator8Iterator4folduNCINvNvB3T_8for_each4callNtNtB1T_11transaction19TransactionMutationNCINvMsj_NtCs69KKACWg7bl_5alloc3vecINtB5L_3VecB4W_E14extend_trustedBN_E0E0EB2I_
+     0.07%  tokio-rt-worker  phase0-bench                        [.] _RNvMs8_Cs66xJtbaaV2K_12phase0_benchNtB5_17WorkloadGenerator16next_transaction
+     0.07%  dodb-blink-leaf  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal17decode_page_delta
+     0.06%  dodb-blink-leaf  phase0-bench                        [.] _RNvMNtNtNtNtCsfr5T3GFabw_3std3sys3pal4unix4timeNtB2_8Timespec3now
+     0.06%  dodb-blink-leaf  phase0-bench                        [.] _RNvMs1_NtNtNtCsfr5T3GFabw_3std4sync4mpmc4listINtB5_7ChannelNtNtCs1xah1QGa2mC_12dodb_storage5blink21ParallelWorkerCommandE4recvBZ_
+     0.06%  dodb-blink-leaf  [vdso]                              [.] 0x00000000000005c0
+     0.06%  dodb-blink-leaf  phase0-bench                        [.] _mi_bin_size
+     0.06%  tokio-rt-worker  phase0-bench                        [.] mi_theap_malloc_zero_aligned_at_generic
+     0.06%  dodb-blink-leaf  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink21encode_blink_page_arc
+     0.06%  tokio-rt-worker  phase0-bench                        [.] _RINvMNtNtNtCs69KKACWg7bl_5alloc11collections5btree6appendINtNtB5_4node7NodeRefNtNtBW_6marker5OwnedNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdINtNtB9_4sync3ArcNtNtCs1xah1QGa2mC_12dodb_storage5blink9BlinkPageENtB1g_14LeafOrInternalE9bulk_pushINtNtB5_17dedup_sorted_iter15DedupSortedIterB1y_B2k_INtNtNtB9_3vec9into_iter8IntoIterTB1y_B2k_EEENtNtB9_5alloc6GlobalEB2F_
+     0.06%  tokio-rt-worker  phase0-bench                        [.] _RNvMs2_NtNtNtNtCsaP87UvicxuU_5tokio7runtime9scheduler12multi_thread6workerNtNtB7_6handle6Handle14schedule_local
+     0.06%  tokio-rt-worker  phase0-bench                        [.] _RINvXs0_NtNtNtCskxtBwYRO61I_4core4iter8adapters3mapINtB6_3MapINtNtNtBc_5slice4iter4IterTmmEENCNCNvMsd_NtCs1xah1QGa2mC_12dodb_storage5blinkINtB1C_10BlinkStoreNtCs66xJtbaaV2K_12phase0_bench9BenchFileB2v_E31apply_planned_transaction_groups6_00ENtNtNtBa_6traits8iterator8Iterator4folduNCINvNvB3R_8for_each4callNtNtB1E_3wal17PreparedWalRecordNCINvMsj_NtCs69KKACWg7bl_5alloc3vecINtB5y_3VecB4U_E14extend_trustedBN_E0E0EB2x_
+     0.06%  tokio-rt-worker  phase0-bench                        [.] _RNvMsn_NtCs69KKACWg7bl_5alloc4syncINtB5_3ArcNtNtCs1xah1QGa2mC_12dodb_storage5blink9BatchPlanE9drop_slowBK_
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvNtNtNtCsaP87UvicxuU_5tokio7runtime4task5waker11wake_by_ref
+     0.05%  dodb-blink-leaf  [vdso]                              [.] __kernel_clock_gettime
+     0.05%  dodb-blink-leaf  [unknown]                           [k] 0xffffc967369b96a4
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal25append_frame_parts_direct
+     0.05%  dodb-blink-leaf  phase0-bench                        [.] _mi_theap_page_reclaim
+     0.05%  tokio-rt-worker  phase0-bench                        [.] __aarch64_cas8_rel
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdINtNtBb_4sync3ArcNtNtCs1xah1QGa2mC_12dodb_storage5blink9BlinkPageEE6insertCs66xJtbaaV2K_12phase0_bench
+     0.05%  phase0-bench     phase0-bench                        [.] _RINvMNtNtNtCs69KKACWg7bl_5alloc11collections5btree6appendINtNtB5_4node7NodeRefNtNtBW_6marker5OwnedINtNtB9_3vec3VechENtNtB5_7set_val9SetValZSTNtB1g_14LeafOrInternalE9bulk_pushINtNtB5_17dedup_sorted_iter15DedupSortedIterB1y_B1Q_INtNtNtNtCskxtBwYRO61I_4core4iter8adapters3map3MapINtNtB1B_9into_iter8IntoIterB1y_ENCINvMse_NtB5_3setINtB56_8BTreeSetB1y_E16from_sorted_iterB4q_E0EENtNtB9_5alloc6GlobalECs1xah1QGa2mC_12dodb_storage
+     0.05%  tokio-rt-worker  [unknown]                           [k] 0xffffc96737e7d074
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvMs0_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_9BlinkPage7restamp
+     0.05%  phase0-bench     phase0-bench                        [.] mi_theap_umalloc
+     0.05%  phase0-bench     phase0-bench                        [.] _RINvNtNtNtNtCskxtBwYRO61I_4core5slice4sort6shared9smallsort31small_sort_general_with_scratchINtNtCs69KKACWg7bl_5alloc3vec3VechENvYB1s_NtNtBa_3cmp10PartialOrd2ltECs1xah1QGa2mC_12dodb_storage
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvMs1_NtCsf73KMPtv2x3_9hashbrown3mapINtB5_7HashMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdjNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE6insertCs1xah1QGa2mC_12dodb_storage
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvXsa_NtCs69KKACWg7bl_5alloc3vecINtB5_3VecNtNtNtCs1xah1QGa2mC_12dodb_storage5btree6format13InternalEntryENtNtCskxtBwYRO61I_4core5clone5Clone5cloneBL_
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RINvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB6_8BTreeMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNtNtB8_7set_val9SetValZSTE27bulk_build_from_sorted_iterINtNtNtNtCskxtBwYRO61I_4core4iter8adapters3map3MapINtNtNtBc_3vec9into_iter8IntoIterB18_ENCINvMse_NtB8_3setINtB4m_8BTreeSetB18_E16from_sorted_iterB3B_E0EECs66xJtbaaV2K_12phase0_bench
+     0.05%  phase0-bench     phase0-bench                        [.] _RINvMsN_NtNtNtCs69KKACWg7bl_5alloc11collections5btree4nodeINtB6_6HandleINtB6_7NodeRefNtNtB6_6marker3MutNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdINtNtBc_4sync3ArcNtNtCs1xah1QGa2mC_12dodb_storage5blink9BlinkPageENtB1n_4LeafENtB1n_4EdgeE16insert_recursingNtNtBc_5alloc6GlobalNCNvMs4_NtNtB8_3map5entryINtB4B_11VacantEntryB1D_B2p_E12insert_entry0ECs66xJtbaaV2K_12phase0_bench
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapNtNtCsaKkR0GAH1lF_9dodb_core3key11DocumentKeyNtNtB7_7set_val9SetValZSTE6insertB1b_
+     0.05%  phase0-bench     phase0-bench                        [.] _RINvNtCskxtBwYRO61I_4core3ptr9drop_glueINtNtCs69KKACWg7bl_5alloc3vec3VecNtNtCs1xah1QGa2mC_12dodb_storage5blink19AdmittedTransactionEECs66xJtbaaV2K_12phase0_bench
+     0.05%  tokio-rt-worker  phase0-bench                        [.] memmove@plt
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RINvYNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateNtNtCskxtBwYRO61I_4core4hash11BuildHasher8hash_oneRRShECs1xah1QGa2mC_12dodb_storage
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RINvNtNtNtNtCskxtBwYRO61I_4core5slice4sort6shared9smallsort31small_sort_general_with_scratchNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNvYB1s_NtNtBa_3cmp10PartialOrd2ltECs1xah1QGa2mC_12dodb_storage
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvXsF_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_4KeysNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNtNtCs1xah1QGa2mC_12dodb_storage5blink9BlinkPageENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4nextCs66xJtbaaV2K_12phase0_bench
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal19page_delta_rebuilds
+     0.05%  tokio-rt-worker  phase0-bench                        [.] clock_gettime@plt
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvMsn_NtCs69KKACWg7bl_5alloc4syncINtB5_3ArcNtNtCs1xah1QGa2mC_12dodb_storage5blink11PageCatalogE9drop_slowBK_
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RINvNtCskxtBwYRO61I_4core3ptr9drop_glueNtNtCs1xah1QGa2mC_12dodb_storage5blink23PhysicalTransactionPlanEBF_.llvm.12518066144097033718
+     0.05%  tokio-rt-worker  [vdso]                              [.] 0x00000000000005e0
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _mi_page_free
+     0.05%  phase0-bench     phase0-bench                        [.] _RINvNtNtNtNtCskxtBwYRO61I_4core5slice4sort8unstable9quicksort9quicksortNtNtBa_4time8DurationNvYB17_NtNtBa_3cmp10PartialOrd2ltECs66xJtbaaV2K_12phase0_bench
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvMsz_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8IntoIterINtNtBb_3vec3VechENtNtCs1xah1QGa2mC_12dodb_storage5blink12LogicalEntryE10dying_nextCs66xJtbaaV2K_12phase0_bench.llvm.6421929786715708053
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvXs1_NtCs1xah1QGa2mC_12dodb_storage5blinkNtB5_10BlinkStateNtB5_18BlinkMutationState4page
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvMs0_NtCsaKkR0GAH1lF_9dodb_core11transactionNtB5_18TransactionRequest8validate
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvMsn_NtCs69KKACWg7bl_5alloc4syncINtB5_3ArcShE9drop_slowCs1xah1QGa2mC_12dodb_storage
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal13elapsed_nanos
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvMs4_NtCs69KKACWg7bl_5alloc7raw_vecINtB5_6RawVecTjNtNtNtCsfr5T3GFabw_3std6thread2id8ThreadIdEE8grow_oneCs1xah1QGa2mC_12dodb_storage
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RINvMsa_NtCsf73KMPtv2x3_9hashbrown3rawNtB6_13RawTableInner22fallible_with_capacityNtNtCs69KKACWg7bl_5alloc5alloc6GlobalECs1xah1QGa2mC_12dodb_storage.llvm.10185398891190870519
+     0.05%  tokio-rt-worker  [vdso]                              [.] 0x0000000000000664
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RINvMsN_NtNtNtCs69KKACWg7bl_5alloc11collections5btree4nodeINtB6_6HandleINtB6_7NodeRefNtNtB6_6marker3MutNtNtCsaKkR0GAH1lF_9dodb_core3key11DocumentKeyNtNtB8_7set_val9SetValZSTNtB1n_4LeafENtB1n_4EdgeE16insert_recursingNtNtBc_5alloc6GlobalNCNvMs4_NtNtB8_3map5entryINtB3T_11VacantEntryB1D_B2m_E12insert_entry0EB1H_
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvMs0_NtCsaKkR0GAH1lF_9dodb_core3keyNtB5_11DocumentKey6encode
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvMNtNtCs1xah1QGa2mC_12dodb_storage5blink4leafNtB2_11LeafEntries7replace
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvMs5_NtCs69KKACWg7bl_5alloc7raw_vecNtB5_11RawVecInner11finish_growCs1xah1QGa2mC_12dodb_storage.llvm.10185398891190870519
+     0.05%  tokio-rt-worker  phase0-bench                        [.] memcpy@plt
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink21encode_blink_page_arc
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal16apply_page_delta
+     0.05%  dodb-blink-leaf  phase0-bench                        [.] _RNvMs5_NtCs69KKACWg7bl_5alloc7raw_vecNtB5_11RawVecInner11finish_growCs1xah1QGa2mC_12dodb_storage.llvm.10185398891190870519
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvMs1_NtCs1xah1QGa2mC_12dodb_storage3walINtB5_6WalLogNtCs66xJtbaaV2K_12phase0_bench9BenchFileE21encode_prepared_groupBS_
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvMs4_NtCs69KKACWg7bl_5alloc7raw_vecINtB5_6RawVecTjNtNtNtCsfr5T3GFabw_3std6thread2id8ThreadIdEE8grow_oneCs1xah1QGa2mC_12dodb_storage
+     0.05%  phase0-bench     phase0-bench                        [.] _RINvMNtNtNtCs69KKACWg7bl_5alloc11collections5btree6appendINtNtB5_4node7NodeRefNtNtBW_6marker5OwnedNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdNtNtB5_7set_val9SetValZSTNtB1g_14LeafOrInternalE9bulk_pushINtNtB5_17dedup_sorted_iter15DedupSortedIterB1y_B2k_INtNtNtNtCskxtBwYRO61I_4core4iter8adapters3map3MapINtNtNtB9_3vec9into_iter8IntoIterB1y_ENCINvMse_NtB5_3setINtB5F_8BTreeSetB1y_E16from_sorted_iterB4U_E0EENtNtB9_5alloc6GlobalECs66xJtbaaV2K_12phase0_bench
+     0.05%  tokio-rt-worker  phase0-bench                        [.] mi_theap_umalloc
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvMs1_NtCsf73KMPtv2x3_9hashbrown3mapINtB5_7HashMapRShjNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE6insertCs1xah1QGa2mC_12dodb_storage
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvMs1_NtCsf73KMPtv2x3_9hashbrown3mapINtB5_7HashMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdTNtNtCs1xah1QGa2mC_12dodb_storage3wal14PageChainEntryRAhj1000_ENtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE6insertCs66xJtbaaV2K_12phase0_bench
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvMsn_NtCs69KKACWg7bl_5alloc4syncINtB5_3ArcAhj1000_E9drop_slowCs1xah1QGa2mC_12dodb_storage
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNCNvMsc_Cs66xJtbaaV2K_12phase0_benchNtB7_12BlinkAdapter22start_with_read_handle0B7_.llvm.3490602443097542172
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal23validate_page_image_lsn
+     0.05%  phase0-bench     [unknown]                           [k] 0xffffc967369b96a4
+     0.05%  tokio-rt-worker  phase0-bench                        [.] mi_arena_from_index
+     0.05%  phase0-bench     phase0-bench                        [.] _RNvMNtNtCs1xah1QGa2mC_12dodb_storage5blink4leafNtB2_11LeafEntries17stored_slot_value.llvm.2763801909956355092
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvXNtNtCs69KKACWg7bl_5alloc3vec14spec_from_iterINtB4_3VecNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdEINtB2_12SpecFromIterBU_INtNtNtNtCskxtBwYRO61I_4core4iter8adapters3map3MapINtNtNtB2d_5slice4iter4IterTmmEENCINvNtCs1xah1QGa2mC_12dodb_storage5blink31prepare_leaf_parallel_executionNtCs66xJtbaaV2K_12phase0_bench9BenchFileEse_0EE9from_iterB4C_
+     0.05%  dodb-blink-leaf  [vdso]                              [.] 0x00000000000005a0
+     0.05%  dodb-blink-leaf  phase0-bench                        [.] _RNvMNtNtCs1xah1QGa2mC_12dodb_storage5blink4leafNtB2_11LeafEntries7replace
+     0.05%  dodb-blink-leaf  phase0-bench                        [.] mi_arena_try_claim_abandoned
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal17decode_page_delta
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvXs_NtNtCs1xah1QGa2mC_12dodb_storage5blink4leafNtB4_11LeafEntriesNtNtCskxtBwYRO61I_4core5clone5Clone5clone
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvMs1_NtCsf73KMPtv2x3_9hashbrown3mapINtB5_7HashMapNtNtCsaKkR0GAH1lF_9dodb_core11identifiers6PageIdjNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE6insertCs1xah1QGa2mC_12dodb_storage
+     0.05%  dodb-blink-leaf  phase0-bench                        [.] mi_free
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RINvYNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateNtNtCskxtBwYRO61I_4core4hash11BuildHasher8hash_oneRNtNtCsaKkR0GAH1lF_9dodb_core3key11DocumentKeyECs66xJtbaaV2K_12phase0_bench
+     0.05%  phase0-bench     phase0-bench                        [.] _RINvYNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateNtNtCskxtBwYRO61I_4core4hash11BuildHasher8hash_oneRRShECs1xah1QGa2mC_12dodb_storage
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage3wal19append_frame_direct
+     0.05%  tokio-rt-worker  phase0-bench                        [.] _RNvMs_NtNtNtNtCsaP87UvicxuU_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+     0.05%  phase0-bench     phase0-bench                        [.] mi_bbitmap_try_find_and_clear
+     0.04%  phase0-bench     phase0-bench                        [.] _RNvNtCs1xah1QGa2mC_12dodb_storage5blink22encode_blink_page_into
+     0.04%  phase0-bench     phase0-bench                        [.] _RNvMsn_NtCs69KKACWg7bl_5alloc4syncINtB5_3ArcNtNtCs1xah1QGa2mC_12dodb_storage5blink8PageCellE9drop_slowBK_
+     0.04%  dodb-blink-leaf  phase0-bench                        [.] _RINvMNtNtNtCsfr5T3GFabw_3std4sync4mpmc7counterINtB3_6SenderINtNtB5_4list7ChannelNtNtCs1xah1QGa2mC_12dodb_storage5blink20ParallelWorkerResultEE7releaseNCNvXs4_B5_INtB5_6SenderB1g_ENtNtNtCskxtBwYRO61I_4core3ops4drop4Drop4drops_0EB1k_
+     0.04%  phase0-bench     phase0-bench                        [.] _RNvCs1njKG4L9aB3_7___rustc35___rust_no_alloc_shim_is_unstable_v2
+     0.04%  tokio-rt-worker  libc.so.6                           [.] __GI___memmove_simd
+     0.04%  tokio-rt-worker  phase0-bench                        [.] _RNvMsz_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8IntoIterNtNtCsaKkR0GAH1lF_9dodb_core3key11DocumentKeyNtNtB7_7set_val9SetValZSTE10dying_nextB1b_
+     0.04%  phase0-bench     phase0-bench                        [.] _mi_theap_malloc_zero
+     0.04%  tokio-rt-worker  phase0-bench                        [.] _RNvNtCs69KKACWg7bl_5alloc4sync32arcinner_layout_for_value_layout
+     0.04%  tokio-rt-worker  phase0-bench                        [.] mi_bbitmap_chunkmap_try_clear.isra.0
+     0.04%  tokio-rt-worker  [vdso]                              [.] __kernel_clock_gettime
+     0.04%  tokio-rt-worker  phase0-bench                        [.] _mi_page_stats_bin
+     0.04%  tokio-rt-worker  phase0-bench                        [.] mi_option_get_size
+     0.04%  phase0-bench     phase0-bench                        [.] _RINvNtCs1xah1QGa2mC_12dodb_storage5blink17install_separatorNtB2_17WorkingBlinkStateEB4_
+     0.04%  tokio-rt-worker  phase0-bench                        [.] _mi_arenas_page_abandon
+     0.04%  tokio-rt-worker  phase0-bench                        [.] mi_page_free_list_extend
+     0.04%  tokio-rt-worker  phase0-bench                        [.] _mi_page_free_collect_partly
+     0.04%  phase0-bench     phase0-bench                        [.] mi_page_queue_find_free_ex.constprop.0
+     0.04%  phase0-bench     phase0-bench                        [.] _RINvNtCskxtBwYRO61I_4core3ptr9drop_glueNtNtCs1xah1QGa2mC_12dodb_storage5blink9BlinkPageEBF_.llvm.10911592750258612359
+     0.04%  phase0-bench     phase0-bench                        [.] _RNvMs0_NtCsaKkR0GAH1lF_9dodb_core11transactionNtB5_18TransactionRequest8validate
+     0.04%  phase0-bench     phase0-bench                        [.] mi_page_queue_remove
+     0.04%  tokio-rt-worker  phase0-bench                        [.] epoll_wait@plt
+     0.04%  phase0-bench     phase0-bench                        [.] _mi_page_free_collect
+     0.03%  tokio-rt-worker  phase0-bench                        [.] __aarch64_ldset8_rel
+     0.03%  tokio-rt-worker  phase0-bench                        [.] __aarch64_cas4_acq
+     0.03%  phase0-bench     phase0-bench                        [.] _RNvMNtNtNtNtCsfr5T3GFabw_3std3sys3pal4unix4timeNtB2_8Timespec12sub_timespec
+     0.03%  phase0-bench     phase0-bench                        [.] mi_theap_malloc_zero_aligned_at_overalloc
+     0.03%  dodb-blink-leaf  phase0-bench                        [.] clock_gettime@plt
+     0.03%  tokio-rt-worker  phase0-bench                        [.] _RNvMs_NtNtNtNtCsaP87UvicxuU_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+     0.03%  dodb-blink-leaf  phase0-bench                        [.] _RNvMNtCsfr5T3GFabw_3std4timeNtB2_7Instant7elapsed
+     0.02%  rustc            libLLVM.so.22.1-rust-1.98.1-stable  [.] llvm::cl::Option::addArgument()
+     0.02%  rustc            libc.so.6                           [.] _int_malloc
+     0.01%  rustc            ld-linux-aarch64.so.1               [.] _dl_relocate_object_no_relro
+     0.00%  rustc            ld-linux-aarch64.so.1               [.] check_match
+     0.00%  uname            ld-linux-aarch64.so.1               [.] _dl_lookup_symbol_x
+     0.00%  phase0-bench     phase0-bench                        [.] _RNvMNtNtNtNtCsaP87UvicxuU_5tokio7runtime9scheduler12multi_thread4parkNtB2_6Parker3new
+     0.00%  rustc            [unknown]                           [k] 0xffffc96737e7d074
+     0.00%  env              ld-linux-aarch64.so.1               [.] _dl_check_map_versions
+     0.00%  phase0-bench     [unknown]                           [k] 0xffffc96737e7dbd8
+     0.00%  phase0-bench     phase0-bench                        [.] read@plt
+     0.00%  env              ld-linux-aarch64.so.1               [.] _dl_start
+     0.00%  phase0-bench     [unknown]                           [k] 0xffffc96737e7d074
+     0.00%  phase0-bench     libc.so.6                           [.] __poll
+     0.00%  phase0-bench     libc.so.6                           [.] __spawni_child
+     0.00%  rustc            ld-linux-aarch64.so.1               [.] _dl_start
+     0.00%  phase0-bench     libc.so.6                           [.] __clone
+     0.00%  env              ld-linux-aarch64.so.1               [.] _start
+     0.00%  rustc            ld-linux-aarch64.so.1               [.] _start
+     0.00%  env              [unknown]                           [k] 0xffffc96737e7d658
+     0.00%  rustc            [unknown]                           [k] 0xffffc96737e7d658
+
+
+#
+# (Tip: To filter subset of samples with report or script add --time X-Y or --cpu A,B,C or --socket-filter ...)
+#

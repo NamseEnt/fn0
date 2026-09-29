@@ -1,0 +1,10 @@
+[package]
+name = "crossver"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dodb-core = { path = "../src-fe9dfad/crates/dodb-core" }
+dodb-storage = { path = "../src-fe9dfad/crates/dodb-storage" }
+
+[workspace]

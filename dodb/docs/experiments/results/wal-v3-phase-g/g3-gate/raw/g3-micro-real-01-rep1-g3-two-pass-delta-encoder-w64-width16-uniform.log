@@ -1,0 +1,8 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /tmp/dodb-phase-g-g3-micro-results/g3-micro-real-01-rep1-g3-two-pass-delta-encoder-w64-width16-uniform.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-uniform                          rep=0 tx/s=     4922 mut/s=    78755 read/s=        0 agg/s=     4922 p50= 10655.2us p95= 19135.2us p99= 23119.4us groups=  558 avg_group=44.22
+completed 1 scenarios x 1 repetitions
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html

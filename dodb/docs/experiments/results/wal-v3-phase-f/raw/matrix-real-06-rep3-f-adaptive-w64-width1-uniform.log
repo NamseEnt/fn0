@@ -1,0 +1,5 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /tmp/dodb-f-results/raw/matrix-real-06-rep3-f-adaptive-w64-width1-uniform.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width1-uniform                           rep=0 tx/s=    28906 mut/s=    28906 read/s=        0 agg/s=    28906 p50=  1972.6us p95=  3778.4us p99=  4883.5us groups= 2521 avg_group=57.37
+completed 1 scenarios x 1 repetitions

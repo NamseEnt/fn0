@@ -1,5 +1,16 @@
 # Durable dodb Benchmark on OCI A1 with OpenZFS
 
+## Provenance correction (added 2026-09-25)
+
+Every column labelled "Planned" in this document is **actually experiment main-btree due missing --engine argument**. It is not the planned Blink engine.
+
+- `scripts/run_core_matrix.py` never passed `--engine`. The `phase0-bench` default is `EngineKind::MainBtree`, so both binaries ran the baseline `BTreeStore`.
+- All 84 raw rows in `raw/*.jsonl` record `"engine":"main-btree"`, including the 42 rows named `*-planned-*`. Every Blink counter in those rows is zero (`superblock_images_emitted`, `superblock_images_elided`, `leaf_splits_total`, `logical_groups`).
+- The measured comparison is therefore main-btree built from the experiment source `0d310da` against main-btree built from main `ac45cf5`. The 1.131× geometric mean is a main-btree to main-btree ratio. The ExactMain column is correct as labelled.
+- The group-size table below prints `planned-blink` as a row label. Those rows are also main-btree.
+- The 8,380 WAL bytes per width-1 transaction come from main-btree: one leaf image and one superblock image per commit (2 × 4,156-byte frames + a 68-byte commit frame).
+- The numbers below are kept unchanged. The true planned-blink durable baseline, re-measured with `--engine planned-blink` on the same host, dataset and binary, is in `planned-blink-durable-baseline-results.md`.
+
 ## Environment
 
 - OCI A1, 2 OCPU, AArch64 Neoverse-N1, Oracle Linux Server 9.8, 12 GiB configured RAM.

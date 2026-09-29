@@ -1,0 +1,18 @@
+scenario=100%-write successful_transactions=56070
+logical_tx_per_second=11201.492599
+stage,alloc_calls_per_tx,free_calls_per_tx,allocated_bytes_per_tx,freed_bytes_per_tx,arena_calls_per_tx,arena_bytes_per_tx
+admission,70.194,53.134,4872.938,3879.470,0.000,0.000
+catalog_publication,39.079,85.698,5225.369,42992.110,0.000,0.000
+dirty_tracking,0.077,47.555,315.425,68872.319,0.000,0.000
+harness,166.068,166.098,7979.416,8200.424,0.000,0.000
+job_result_collection,7.105,1.486,6135.426,4671.274,0.000,0.000
+leaf_job_construction,0.854,0.771,2787.354,6555.663,0.000,0.000
+leaf_lane_execution,15.337,0.001,1280.000,0.686,0.000,0.000
+other_storage,1.800,91.356,1137.614,8994.231,0.000,0.000
+packed_leaf_mutation_cow,62.338,0.081,101657.594,4.151,0.000,0.000
+page_delta_generation,47.948,32.611,4261.367,5215.350,0.000,0.000
+planner,103.517,34.120,9869.158,4086.512,0.030,15.337
+planner_arena,0.030,0.000,15.337,0.000,0.000,0.000
+state_install,0.000,1.445,0.003,292.036,0.000,0.000
+wal_append,0.589,0.589,3970.940,4533.943,0.000,0.000
+wal_preparation,1.065,1.025,1226.873,1184.805,0.000,0.000

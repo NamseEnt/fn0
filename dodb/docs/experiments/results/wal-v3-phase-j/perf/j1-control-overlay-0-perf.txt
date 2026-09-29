@@ -1,0 +1,5 @@
+Events disabled
+Events enabled
+Events disabled
+392860243,,cycles:u,134591360,100.00,,
+829493034,,instructions:u,134591360,100.00,2.11,insn per cycle

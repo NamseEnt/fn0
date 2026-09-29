@@ -1,0 +1,10 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /tmp/dodb-phase-h-interleaved/controls/disabled/g0-disabled-controls-02-rep1-w64-width16-different-leaf-heavy.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-different-leaf-heavy             rep=0 tx/s=    17911 mut/s=   286572 read/s=        0 agg/s=    17911 p50=  3325.5us p95=  5595.4us p99=  7705.5us groups= 2675 avg_group=33.51
+completed 1 scenarios x 1 repetitions
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+25270289415,,cycles:u,9581624520,100.00,,
+48608903662,,instructions:u,9581624520,100.00,1.92,insn per cycle

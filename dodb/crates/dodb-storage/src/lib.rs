@@ -2,6 +2,7 @@
 
 pub mod blink;
 pub mod btree;
+pub mod churn;
 pub mod durable_file;
 pub mod fault;
 pub mod page;
@@ -9,9 +10,10 @@ pub mod superblock;
 pub mod wal;
 
 pub use blink::{
-    BatchPlan, BlinkBatchMetrics, BlinkCheckpointReport, BlinkReadHandle, BlinkSplitMetrics,
-    BlinkStore, BlinkVersionedReadMetrics, DependencyEdge, DependencyKind, DependencyMetadata,
-    LeafGroupPlan, PhysicalTransactionPlan, PlannedMutation, ProvisionalRevisionToken, RouteHint,
+    BatchPlan, BlinkBatchMetrics, BlinkCheckpointMetrics, BlinkCheckpointReport, BlinkReadHandle,
+    BlinkSplitMetrics, BlinkStore, BlinkVersionedReadMetrics, DependencyEdge, DependencyKind,
+    DependencyMetadata, LeafGroupPlan, PhysicalTransactionPlan, PlannedMutation, PlannedWrite,
+    ProvisionalRevisionToken, RouteHint,
 };
 pub use btree::{
     AsyncShard, BTreeStore, BatchRequest, BatchResponse, CheckpointReport, CoordinatorConfig,
@@ -29,7 +31,7 @@ pub use superblock::{
     decode_superblock, encode_superblock,
 };
 pub use wal::{
-    CommittedWalBatch, WAL_FORMAT_VERSION, WAL_HEADER_SIZE, WAL_MAGIC, WalAppendReport, WalCommit,
-    WalIdentity, WalLog, WalMetrics, WalPageImage, WalPageImageFormat, WalRecordType,
-    WalScanReport,
+    CommittedWalBatch, RecoveredWalPage, WAL_FORMAT_VERSION, WAL_HEADER_SIZE, WAL_MAGIC,
+    WAL_PAGE_IMAGE_FORMAT_VERSION, WalAppendReport, WalCommit, WalIdentity, WalLog, WalMetrics,
+    WalPageImage, WalPageImageFormat, WalRecordType, WalRedoKind, WalRedoStats, WalScanReport,
 };

@@ -1,0 +1,7 @@
+
+running 1 test
+{"record_type":"write_cpu","git_commit":"824188d906b367e57d5b94df11096015a0cdf26f","engine":"logical_overlay_cpu","segments_before":1,"iterations":128,"transactions":8192,"cpu_ns_per_tx":15329.81,"wall_ns_per_tx":15357.74,"allocations_per_tx":87.734,"admission_ns_per_tx":11661.72,"condition_lookup_ns_per_tx":35.49,"group_mutation_ns_per_tx":6214.93,"segment_build_ns_per_tx":2331.94,"publication_ns_per_tx":9.58}
+test blink::tests::measure_logical_overlay_write_cpu ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 152 filtered out; finished in 0.57s
+

@@ -67,11 +67,14 @@ fn apply_result_to_reference(
     match actual {
         Ok(TransactionResult {
             commit_lsn: Some(actual_lsn),
+            ..
         }) => assert_eq!(
             reference.transact_at(request, *actual_lsn).unwrap(),
             Some(*actual_lsn)
         ),
-        Ok(TransactionResult { commit_lsn: None }) => {
+        Ok(TransactionResult {
+            commit_lsn: None, ..
+        }) => {
             assert_eq!(reference.transact(request).unwrap(), None)
         }
         Err(Error::Conflict(_)) => {
@@ -682,6 +685,7 @@ fn formal_contract_randomized_transaction_groups_match_reference() {
                 match result {
                     Ok(TransactionResult {
                         commit_lsn: Some(lsn),
+                        ..
                     }) => {
                         assert!(
                             *lsn > last_commit_lsn,
@@ -689,7 +693,9 @@ fn formal_contract_randomized_transaction_groups_match_reference() {
                         );
                         last_commit_lsn = *lsn;
                     }
-                    Ok(TransactionResult { commit_lsn: None }) => condition_only_count += 1,
+                    Ok(TransactionResult {
+                        commit_lsn: None, ..
+                    }) => condition_only_count += 1,
                     Err(Error::Conflict(_)) => conflict_count += 1,
                     Err(Error::InvalidRequest(_)) => invalid_count += 1,
                     Err(error) => {

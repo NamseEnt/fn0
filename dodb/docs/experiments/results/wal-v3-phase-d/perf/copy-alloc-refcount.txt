@@ -1,0 +1,49 @@
+{
+  "phase-c": {
+    "event_count": 39579326411,
+    "transactions_estimate": 28995.0,
+    "shares_percent": {
+      "memcpy / memmove": 15.82,
+      "malloc / free": 25.240000000000002,
+      "Arc refcount atomics (ldadd8)": 10.08,
+      "memcmp": 5.35
+    },
+    "total_percent": 56.49,
+    "cycles_per_tx": {
+      "memcpy / memmove": 215949.28222866703,
+      "malloc / free": 344536.0229741818,
+      "Arc refcount atomics (ldadd8)": 137596.0028359648,
+      "memcmp": 73029.62452107259
+    },
+    "all_cycles_per_tx": 1365039.7106742542,
+    "copy_alloc_refcount_cycles_per_tx": 771110.9325598862
+  },
+  "phase-d": {
+    "event_count": 45169168602,
+    "transactions_estimate": 34770.0,
+    "shares_percent": {
+      "memcpy / memmove": 14.39,
+      "malloc / free": 26.159999999999997,
+      "Arc refcount atomics (ldadd8)": 10.68,
+      "memcmp": 5.02
+    },
+    "total_percent": 56.25,
+    "cycles_per_tx": {
+      "memcpy / memmove": 186938.2617724418,
+      "malloc / free": 339840.5092402415,
+      "Arc refcount atomics (ldadd8)": 138742.2262494564,
+      "memcmp": 65214.04267530629
+    },
+    "all_cycles_per_tx": 1299084.5154443486,
+    "copy_alloc_refcount_cycles_per_tx": 730735.0399374461
+  }
+}
+
+| Category | phase-c % | phase-c cycles/tx | phase-d % | phase-d cycles/tx |
+|---|---|---|---|---|
+| memcpy / memmove | 15.8% | 215,949 | 14.4% | 186,938 |
+| malloc / free | 25.2% | 344,536 | 26.2% | 339,841 |
+| Arc refcount atomics (ldadd8) | 10.1% | 137,596 | 10.7% | 138,742 |
+| memcmp | 5.3% | 73,030 | 5.0% | 65,214 |
+| **total copy/alloc/refcount** | 56.5% | 771,111 | 56.2% | 730,735 |
+| all samples | 100% | 1,365,040 | 100% | 1,299,085 |

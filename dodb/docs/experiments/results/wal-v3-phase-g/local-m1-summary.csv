@@ -1,0 +1,7 @@
+sync_mode,writers,width,distribution,g0_repetitions,g12_repetitions,g12_over_g0_geomean
+disabled,64,1,uniform,159781,161513,1.0108
+disabled,64,16,different-leaf-heavy,43379,42289,0.9749
+disabled,64,16,same-leaf-heavy,52613,52176,0.9917
+disabled,64,16,uniform,13451,13376,0.9944
+real,64,1,uniform,6207,5959,0.9600
+real,64,16,uniform,4544,4557,1.0029

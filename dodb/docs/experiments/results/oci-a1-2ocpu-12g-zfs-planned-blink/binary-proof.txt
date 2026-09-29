@@ -1,0 +1,16 @@
+binary proof
+79122436e330be122059f8a4bf5908406e55b74596bfab2ee3cf745dd17fb6cb  /tmp/dodb-zfs-exp-target/release/phase0-bench
+fba986d4dea7d306b4fb814e4cd82c468f427572362e95a9c1e06e5525304999  /tmp/dodb-crossdb-window-target/release/phase0-bench
+d32ced9744fd16f7949bca0d263ce8f6de3d0d9b38ac3ed655da81bd63e77417  /tmp/dodb-zfs-main-target/release/phase0-bench
+core cwd
+0d310da32af5dfaa9df6469788998dacccebb841
+?? crates/dodb-storage/src/bin/zfs-reopen-check.rs
+window cwd
+0d310da32af5dfaa9df6469788998dacccebb841
+ M crates/dodb-storage/src/bin/phase0-bench.rs
+ crates/dodb-storage/src/bin/phase0-bench.rs | 52 ++++++++++++++++++++++++++++-
+ 1 file changed, 51 insertions(+), 1 deletion(-)
+-rwxr-xr-x. 2 opc opc 2435984 2026-09-25 12:54:20.552727463 +0000 /tmp/dodb-crossdb-window-target/release/phase0-bench
+-rwxr-xr-x. 2 opc opc 2427600 2026-09-25 10:49:46.147693589 +0000 /tmp/dodb-zfs-exp-target/release/phase0-bench
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "target-feature=+crc"]

@@ -1,0 +1,5 @@
+run=0 data_pages=6759 open_ms=35.45 allocations=274632 allocated_bytes=79502778
+run=1 data_pages=6759 open_ms=33.98 allocations=274632 allocated_bytes=79502778
+run=2 data_pages=6759 open_ms=34.46 allocations=274632 allocated_bytes=79502778
+run=3 data_pages=6759 open_ms=33.44 allocations=274632 allocated_bytes=79502778
+run=4 data_pages=6759 open_ms=34.69 allocations=274632 allocated_bytes=79502778

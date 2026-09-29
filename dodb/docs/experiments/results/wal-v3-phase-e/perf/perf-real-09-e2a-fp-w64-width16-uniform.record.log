@@ -1,0 +1,2 @@
+[ perf record: Woken up 8 times to write data ]
+[ perf record: Captured and wrote 1.928 MB /tmp/dodb-e-results/perf/perf-real-09-e2a-fp-w64-width16-uniform.perf.data (8808 samples) ]

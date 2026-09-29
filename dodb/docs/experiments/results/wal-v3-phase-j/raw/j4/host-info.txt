@@ -1,0 +1,13 @@
+Host: OCI instance instance-20260923-1013
+Architecture: aarch64
+CPU model: ARM Neoverse-N1
+Visible CPUs: 2
+Visible RAM from free: 10 GiB (OCI target specification supplied for this host: 12 GiB)
+Kernel: Linux 6.12.0-206.104.4.4.el9uek.aarch64
+Rust: rustc 1.98.1 (48a229cea 2026-09-01)
+Data target: /bench/zfs/db/phase-j-data
+Filesystem: ZFS dataset dodbbench/db
+H1 source: 29f4f4bbc3172e7ef8c09e7bfcfa00b3bb54e814
+H1 binary SHA256: 422a4635d67bd08fb0dcfc2839727838fe539cd28b5518fc8684b19e411f8b76
+Phase J source: 0ec2528a7513e507b2033aba095a937373e754b7
+Phase J binary SHA256: bcbf337ce4713b7294fac1d494f2ba853c132bdb6ee59f8fd588a60a62d2cd16

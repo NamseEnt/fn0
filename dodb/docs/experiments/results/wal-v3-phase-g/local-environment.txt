@@ -1,0 +1,11 @@
+Local development diagnostic only; this is not OCI or durable ZFS evidence.
+
+Host: Apple M1, macOS 15.4, arm64
+Rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+Cargo: 1.97.1 (c980f4866 2026-06-30)
+Allocator: mimalloc 0.1.52
+Arena: bumpalo 3.20.3
+Source: Phase G in-progress worktree, based on b4889043bc9c8179ec4a5b523fb644a9da732714
+Workload: planned-blink, 64 writers, width 16, uniform, sync disabled, two parallel workers, 100,000-key working set; 1 s warmup, 5 s measurement, one repetition; churn-counters enabled.
+
+This run includes arena and leaf-job changes, so it is not G0 mimalloc-only. It is preserved only as a local instrumentation smoke result.

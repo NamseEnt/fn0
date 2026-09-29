@@ -1,0 +1,23 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 6K of event 'cycles:P'
+# Event count (approx.): 27400219282
+#
+# Overhead  Shared Object    
+# ........  .................
+#
+    48.40%  phase0-bench     
+    40.45%  libc.so.6        
+     4.07%  [kernel.kallsyms]
+     3.69%  [vdso]           
+     2.84%  [zfs]            
+     0.52%  [spl]            
+     0.04%  libm.so.6        
+
+
+#
+# (Tip: To set sampling period of individual events use perf record -e cpu/cpu-cycles,period=100001/,cpu/branches,period=10001/ ...)
+#

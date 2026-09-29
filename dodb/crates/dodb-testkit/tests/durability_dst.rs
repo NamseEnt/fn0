@@ -123,9 +123,9 @@ fn every_unsynced_wal_prefix_recovers_only_a_logical_commit_prefix() {
         identity(&config()),
     )
     .unwrap();
-    assert_eq!(full_store.committed_batches().len(), 2);
+    assert_eq!(full_store.recovery_batches().len(), 2);
     let full_commit_lsns: Vec<_> = full_store
-        .committed_batches()
+        .recovery_batches()
         .iter()
         .map(|batch| batch.commit_lsn)
         .collect();
@@ -147,7 +147,7 @@ fn every_unsynced_wal_prefix_recovers_only_a_logical_commit_prefix() {
             identity(&config()),
         )
         .unwrap_or_else(|error| panic!("WalLog open failed at prefix {prefix_len}: {error}"));
-        let commits = wal.committed_batches().len();
+        let commits = wal.recovery_batches().len();
         let next_lsn = wal.next_lsn();
         assert!(commits <= 2, "prefix_len={prefix_len} count={commits}");
         assert!(
@@ -163,7 +163,7 @@ fn every_unsynced_wal_prefix_recovers_only_a_logical_commit_prefix() {
             complete_uncommitted_frame_advanced_lsn = true;
         }
         let expected_batches: Vec<_> = wal
-            .committed_batches()
+            .recovery_batches()
             .iter()
             .enumerate()
             .map(|(commit_index, batch)| {
@@ -260,7 +260,7 @@ fn wal_sync_errors_allow_none_partial_or_full_persistence() {
             identity(&config()),
         )
         .unwrap();
-        if wal.committed_batches().len() == 1 {
+        if wal.recovery_batches().len() == 1 {
             only_a = Some(prefix_len);
             break;
         }

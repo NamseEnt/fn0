@@ -1,0 +1,5 @@
+phase0-bench engine=parallel-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=10s warmup=2s repetitions=1
+raw output: /home/opc/phase-j-results-0ec2528/06-h1-64w-width16-uniform-rep0.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-uniform                          rep=0 tx/s=     6518 mut/s=   104288 read/s=        0 agg/s=     6518 p50= 11186.3us p95= 15889.5us p99= 18077.9us groups= 1581 avg_group=41.26
+completed 1 scenarios x 1 repetitions

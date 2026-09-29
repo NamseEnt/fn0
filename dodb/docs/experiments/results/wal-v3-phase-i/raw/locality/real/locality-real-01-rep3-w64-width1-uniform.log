@@ -1,0 +1,8 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /home/opc/phase-i-build/locality/locality-real-01-rep3-w64-width1-uniform.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width1-uniform                           rep=0 tx/s=    24738 mut/s=    24738 read/s=        0 agg/s=    24738 p50=  2661.9us p95=  3129.0us p99=  4816.3us groups= 3553 avg_group=34.84
+completed 1 scenarios x 1 repetitions
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html

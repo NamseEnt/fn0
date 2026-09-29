@@ -1,0 +1,7 @@
+step,stage,alloc_calls_per_tx,alloc_bytes_per_tx,free_calls_per_tx,free_bytes_per_tx,source
+G0,page_delta_generation,32.174928,2745.045412,16.087464,1032.103466,three-run G0 allocation attribution
+G3,page_delta_generation,16.047991,1710.961614,0,0,one-run counted candidate diagnostic
+G0,job_result_collection,7.037984,6052.957303,1.624522,4572.201476,three-run G0 allocation attribution
+G4,job_result_collection,6.088338,6052.278093,1.119837,4075.361060,one-run counted candidate diagnostic
+G0,storage total excluding harness,361.688336,141995.286467,*,*,three-run G0 allocation attribution
+G4,storage total excluding harness,359.604103,140764.795011,359.581647,149051.777198,one-run counted candidate diagnostic

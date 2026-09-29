@@ -1924,6 +1924,7 @@ dependencies = [
  "crc32c",
  "dodb-core",
  "libc",
+ "mimalloc",
  "proptest",
  "tokio",
 ]

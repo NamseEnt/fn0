@@ -1,0 +1,5 @@
+9e5a723445165096e013702e9e34992b6df5eb660336960601e90489556be2d5  /tmp/dodb-e-d-fpcrc-target/release/phase0-bench
+308b38bfb7c2de7552e6a0827a3a903c08e697ea683f92c58766a9c67fcab39c  /tmp/dodb-e-final-fpcrc-target/release/phase0-bench
+perf-real-09-phase-d-fpcrc-w64-width16-uniform: tx/s=2279
+perf-real-09-final-fpcrc-w64-width16-uniform: tx/s=3032
+FPDONE

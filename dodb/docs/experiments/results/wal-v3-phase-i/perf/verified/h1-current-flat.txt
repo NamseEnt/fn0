@@ -1,0 +1,150 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cycles:Pu'
+# Event count (approx.): 38040389458
+#
+# Overhead  Command          Shared Object          Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  ...............  .....................  ...............................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+     6.72%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink10plan_batch
+     4.80%  tokio-rt-worker  libc.so.6              [.] memcmp
+     4.48%  dodb-blink-leaf  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage3wal17encode_page_delta
+     4.43%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage3wal17encode_page_delta
+     3.41%  tokio-rt-worker  phase0-phase-i-h1      [.] _mi_page_malloc_zero
+     3.25%  tokio-rt-worker  libc.so.6              [.] __GI___memcpy_simd
+     3.21%  tokio-rt-worker  phase0-phase-i-h1      [.] __aarch64_ldadd8_rel
+     3.05%  dodb-blink-leaf  phase0-phase-i-h1      [.] _RNvMs0_NtCs62JHnPRiHMN_9dodb_core3keyNtB5_11DocumentKey16validate_encoded
+     2.81%  tokio-rt-worker  phase0-phase-i-h1      [.] __aarch64_ldadd8_relax
+     2.55%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMs0_NtCs62JHnPRiHMN_9dodb_core3keyNtB5_11DocumentKey16validate_encoded
+     2.44%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvMs0_NtCs62JHnPRiHMN_9dodb_core3keyNtB5_11DocumentKey16validate_encoded
+     2.24%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvYINtNtNtCskxtBwYRO61I_4core5slice4iter6ChunksNtNtCsjuMeleVu5ga_6crc32c4util5U64LeENtNtNtNtBa_4iter6traits8iterator8Iterator4foldmNCNvNtBP_10hw_aarch6417crc_u64_parallel30EBP_
+     2.23%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink10plan_batch
+     2.07%  tokio-rt-worker  phase0-phase-i-h1      [.] mi_free
+     1.99%  dodb-blink-leaf  libc.so.6              [.] __GI___memcpy_simd
+     1.83%  tokio-rt-worker  phase0-phase-i-h1      [.] __aarch64_cas8_acq_rel
+     1.73%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage3wal17encode_page_delta
+     1.57%  tokio-rt-worker  [vdso]                 [.] 0x00000000000005cc
+     1.42%  dodb-blink-leaf  libc.so.6              [.] memcmp
+     1.34%  dodb-blink-leaf  phase0-phase-i-h1      [.] _RINvYINtNtNtCskxtBwYRO61I_4core5slice4iter6ChunksNtNtCsjuMeleVu5ga_6crc32c4util5U64LeENtNtNtNtBa_4iter6traits8iterator8Iterator4foldmNCNvNtBP_10hw_aarch6417crc_u64_parallel30EBP_
+     1.24%  tokio-rt-worker  libc.so.6              [.] __GI___memset_generic
+     1.16%  phase0-phase-i-  libc.so.6              [.] __GI___memcpy_simd
+     1.13%  tokio-rt-worker  [vdso]                 [.] 0x00000000000005bc
+     1.05%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvNtCs640e9Z0Gv6D_12dodb_storage5blink31prepare_leaf_parallel_executionNtCslv9DBRgz7tV_12phase0_bench9BenchFileEB1b_
+     0.97%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdINtNtBb_4sync3ArcAhj1000_EE6insertCslv9DBRgz7tV_12phase0_bench
+     0.93%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdINtNtBb_4sync3ArcNtNtCs640e9Z0Gv6D_12dodb_storage5blink9BlinkPageEE6insertCslv9DBRgz7tV_12phase0_bench
+     0.86%  dodb-blink-leaf  phase0-phase-i-h1      [.] _mi_page_malloc_zero
+     0.81%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMs1_NtCs640e9Z0Gv6D_12dodb_storage3walINtB5_6WalLogNtCslv9DBRgz7tV_12phase0_bench9BenchFileE21append_group_preparedBS_
+     0.79%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink18ensure_sorted_leaf
+     0.77%  dodb-blink-leaf  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink18ensure_sorted_leaf
+     0.74%  dodb-blink-leaf  libc.so.6              [.] __GI___memset_generic
+     0.71%  tokio-rt-worker  [vdso]                 [.] 0x00000000000005b0
+     0.70%  tokio-rt-worker  phase0-phase-i-h1      [.] mi_theap_malloc_aligned
+     0.68%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvNtCsjuMeleVu5ga_6crc32c10hw_aarch646crc32c
+     0.66%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMsa_NtCs640e9Z0Gv6D_12dodb_storage5blinkNtB5_19GenerationPublisher20prepare_shared_delta
+     0.60%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapINtNtBb_3vec3VechENtNtCs640e9Z0Gv6D_12dodb_storage5blink12LogicalEntryE6insertB1t_
+     0.60%  dodb-blink-leaf  phase0-phase-i-h1      [.] _mi_page_free_collect
+     0.60%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink18run_leaf_chain_job
+     0.55%  dodb-blink-leaf  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink18run_leaf_chain_job
+     0.52%  phase0-phase-i-  phase0-phase-i-h1      [.] _RINvYINtNtNtCskxtBwYRO61I_4core5slice4iter6ChunksNtNtCsjuMeleVu5ga_6crc32c4util5U64LeENtNtNtNtBa_4iter6traits8iterator8Iterator4foldmNCNvNtBP_10hw_aarch6417crc_u64_parallel30EBP_
+     0.51%  tokio-rt-worker  phase0-phase-i-h1      [.] __aarch64_cas8_acq
+     0.48%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvXs2_NtNtCsfr5T3GFabw_3std4hash6randomNtB5_13DefaultHasherNtNtCskxtBwYRO61I_4core4hash6Hasher5write.llvm.4933260163247793539
+     0.47%  phase0-phase-i-  libc.so.6              [.] memcmp
+     0.44%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMs1_NtCsf73KMPtv2x3_9hashbrown3mapINtB5_7HashMapNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIduNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE6insertCs640e9Z0Gv6D_12dodb_storage
+     0.44%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvXs_NtCs640e9Z0Gv6D_12dodb_storage5blinkNtB4_9BlinkPageNtNtCskxtBwYRO61I_4core5clone5Clone5clone
+     0.42%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMs1_NtCsf73KMPtv2x3_9hashbrown3mapINtB5_7HashMapNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdNtNtCs640e9Z0Gv6D_12dodb_storage3wal14PageChainEntryNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE6insertCslv9DBRgz7tV_12phase0_bench
+     0.41%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink22encode_blink_page_into
+     0.40%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink32prepare_planned_serial_execution
+     0.40%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB6_8BTreeMapNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdINtNtBc_4sync3ArcNtNtNtCs640e9Z0Gv6D_12dodb_storage5btree6format8PageDataEE3getB18_ECslv9DBRgz7tV_12phase0_bench
+     0.38%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMsd_NtCs640e9Z0Gv6D_12dodb_storage5blinkINtB5_10BlinkStoreNtCslv9DBRgz7tV_12phase0_bench9BenchFileBX_E23apply_transaction_groupBZ_
+     0.37%  tokio-rt-worker  [vdso]                 [.] 0x00000000000005c0
+     0.37%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvXsf_NtCs640e9Z0Gv6D_12dodb_storage5blinkNtB5_13GenerationPinNtB5_14ReadPageSource4page
+     0.37%  tokio-rt-worker  phase0-phase-i-h1      [.] _mi_theap_malloc_zero
+     0.37%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdNtNtCs640e9Z0Gv6D_12dodb_storage5blink9BlinkPageE6insertB1X_
+     0.36%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvMs6_NtCsf73KMPtv2x3_9hashbrown3rawINtB6_8RawTableTNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIduEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_uNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE0ECs640e9Z0Gv6D_12dodb_storage
+     0.35%  dodb-blink-leaf  phase0-phase-i-h1      [.] mi_free
+     0.34%  tokio-rt-worker  phase0-phase-i-h1      [.] _mi_page_free_collect
+     0.31%  dodb-blink-leaf  phase0-phase-i-h1      [.] mi_theap_malloc_aligned
+     0.31%  dodb-blink-leaf  [vdso]                 [.] 0x00000000000005bc
+     0.30%  dodb-blink-leaf  phase0-phase-i-h1      [.] __aarch64_cas8_acq_rel
+     0.30%  dodb-blink-leaf  [vdso]                 [.] 0x00000000000005cc
+     0.30%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvXs1_NtCs640e9Z0Gv6D_12dodb_storage5blinkNtB5_10BlinkStateNtB5_18BlinkMutationState4page
+     0.29%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvXs1_NtNtNtCskxtBwYRO61I_4core4iter8adapters6filterINtB5_6FilterINtNtNtNtCs69KKACWg7bl_5alloc11collections5btree3set4IterNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdENCNvMsd_NtCs640e9Z0Gv6D_12dodb_storage5blinkINtB2S_10BlinkStoreNtCslv9DBRgz7tV_12phase0_bench9BenchFileB3L_E31apply_planned_transaction_groupsb_0ENtNtNtB9_6traits8iterator8Iterator5countB3N_
+     0.28%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvYNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateNtNtCskxtBwYRO61I_4core4hash11BuildHasher8hash_oneRNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdECs640e9Z0Gv6D_12dodb_storage
+     0.28%  dodb-blink-leaf  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink22encode_blink_page_into
+     0.27%  dodb-blink-leaf  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink16leaf_body_layout.llvm.8123407709782351115
+     0.27%  dodb-blink-leaf  phase0-phase-i-h1      [.] __aarch64_cas8_acq
+     0.26%  dodb-blink-leaf  phase0-phase-i-h1      [.] __aarch64_ldadd8_rel
+     0.26%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink16leaf_body_layout.llvm.8123407709782351115
+     0.25%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvCs1njKG4L9aB3_7___rustc35___rust_no_alloc_shim_is_unstable_v2
+     0.25%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMNtNtCs640e9Z0Gv6D_12dodb_storage5blink4leafNtB2_11LeafEntries6search
+     0.23%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMsi_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8BTreeMapNtNtCs62JHnPRiHMN_9dodb_core3key11DocumentKeyNtNtB7_7set_val9SetValZSTE6insertB1b_
+     0.23%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage3wal29check_page_delta_against_base
+     0.22%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink16leaf_body_layout.llvm.8123407709782351115
+     0.22%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvNtCskxtBwYRO61I_4core3ptr9drop_glueINtNtCs69KKACWg7bl_5alloc3vec3VecNtNtCs640e9Z0Gv6D_12dodb_storage5blink17LeafChainBoundaryEECslv9DBRgz7tV_12phase0_bench
+     0.22%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvMsa_NtCsf73KMPtv2x3_9hashbrown3rawNtB6_13RawTableInner22fallible_with_capacityNtNtCs69KKACWg7bl_5alloc5alloc6GlobalECs640e9Z0Gv6D_12dodb_storage.llvm.15197092012353684878
+     0.22%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvMsN_NtNtNtCs69KKACWg7bl_5alloc11collections5btree4nodeINtB6_6HandleINtB6_7NodeRefNtNtB6_6marker3MutINtNtBc_3vec3VechENtNtCs640e9Z0Gv6D_12dodb_storage5blink12LogicalEntryNtB1n_4LeafENtB1n_4EdgeE16insert_recursingNtNtBc_5alloc6GlobalNCNvMs4_NtNtB8_3map5entryINtB3T_11VacantEntryB1D_B1V_E12insert_entry0EB1Z_
+     0.22%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage3wal29check_page_delta_against_base
+     0.22%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage3wal19page_delta_rebuilds
+     0.22%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMNtNtNtNtCsfr5T3GFabw_3std3sys3pal4unix4timeNtB2_8Timespec12sub_timespec
+     0.22%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMsn_NtCs69KKACWg7bl_5alloc4syncINtB5_3ArcNtNtCs640e9Z0Gv6D_12dodb_storage5blink8PageCellE9drop_slowBK_
+     0.21%  dodb-blink-leaf  [vdso]                 [.] 0x00000000000005c0
+     0.20%  tokio-rt-worker  phase0-phase-i-h1      [.] mi_theap_malloc_zero_aligned_at_generic
+     0.20%  phase0-phase-i-  [vdso]                 [.] 0x00000000000005bc
+     0.20%  phase0-phase-i-  phase0-phase-i-h1      [.] _mi_page_malloc_zero
+     0.20%  dodb-blink-leaf  phase0-phase-i-h1      [.] _RNvMNtNtCs640e9Z0Gv6D_12dodb_storage5blink4leafNtB2_11LeafEntries6search
+     0.20%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink18ensure_sorted_leaf
+     0.20%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvXs2_NtNtCsfr5T3GFabw_3std4hash6randomNtB5_13DefaultHasherNtNtCskxtBwYRO61I_4core4hash6Hasher5write.llvm.9260462539645159962
+     0.19%  dodb-blink-leaf  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage3wal19page_delta_rebuilds
+     0.19%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvYINtNtNtNtCs69KKACWg7bl_5alloc11collections5btree3map4KeysNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdNtNtCs640e9Z0Gv6D_12dodb_storage5blink9BlinkPageENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator8try_folduNCINvNvB2x_3all5checkRBY_NCNvMsd_B1M_INtB1M_10BlinkStoreNtCslv9DBRgz7tV_12phase0_bench9BenchFileB4w_E31apply_planned_transaction_groups1_0E0INtNtNtB2F_3ops12control_flow11ControlFlowuEEB4y_
+     0.18%  dodb-blink-leaf  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage3wal29check_page_delta_against_base
+     0.16%  tokio-rt-worker  phase0-phase-i-h1      [.] _mi_bin_size
+     0.16%  tokio-rt-worker  [unknown]              [k] 0xffffc967369b96a4
+     0.16%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMs0_NtNtNtCsa4R5nOzXtex_5tokio4sync4mpsc4listINtB5_2RxNtCslv9DBRgz7tV_12phase0_bench9BlinkWorkE3popBV_
+     0.15%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvMs6_NtCsf73KMPtv2x3_9hashbrown3rawINtB6_8RawTableTNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdNtNtCs640e9Z0Gv6D_12dodb_storage3wal14PageChainEntryEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1C_NtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE0ECslv9DBRgz7tV_12phase0_bench.llvm.17707280643556039379
+     0.15%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvMNtNtNtCs69KKACWg7bl_5alloc11collections5btree6appendINtNtB5_4node7NodeRefNtNtBW_6marker5OwnedINtNtB9_3vec3VechENtNtB5_7set_val9SetValZSTNtB1g_14LeafOrInternalE9bulk_pushINtNtB5_17dedup_sorted_iter15DedupSortedIterB1y_B1Q_INtNtNtNtCskxtBwYRO61I_4core4iter8adapters3map3MapINtNtB1B_9into_iter8IntoIterB1y_ENCINvMse_NtB5_3setINtB56_8BTreeSetB1y_E16from_sorted_iterB4q_E0EENtNtB9_5alloc6GlobalECs640e9Z0Gv6D_12dodb_storage
+     0.15%  dodb-blink-leaf  phase0-phase-i-h1      [.] _mi_theap_malloc_zero
+     0.15%  tokio-rt-worker  libc.so.6              [.] __GI___memmove_simd
+     0.15%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvYNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateNtNtCskxtBwYRO61I_4core4hash11BuildHasher8hash_oneRNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdECslv9DBRgz7tV_12phase0_bench
+     0.15%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMs1_NtCsf73KMPtv2x3_9hashbrown3mapINtB5_7HashMapRShjNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateE6insertCs640e9Z0Gv6D_12dodb_storage
+     0.15%  tokio-rt-worker  phase0-phase-i-h1      [.] __aarch64_ldset8_acq_rel
+     0.15%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMsz_NtNtNtCs69KKACWg7bl_5alloc11collections5btree3mapINtB5_8IntoIterNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdNtNtB7_7set_val9SetValZSTE10dying_nextCslv9DBRgz7tV_12phase0_bench.llvm.1548798671949415858
+     0.15%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMsi_NtCs640e9Z0Gv6D_12dodb_storage5blinkNtB5_18ParallelWorkerPool7execute
+     0.15%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMsF_NtCs69KKACWg7bl_5alloc3vecINtB5_3VecNtNtCs640e9Z0Gv6D_12dodb_storage5blink15LeafChainResultE8push_mutCslv9DBRgz7tV_12phase0_bench
+     0.15%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNCNvMsc_Cslv9DBRgz7tV_12phase0_benchNtB7_12BlinkAdapter22start_with_read_handle0B7_.llvm.378857597364127101
+     0.15%  tokio-rt-worker  [vdso]                 [.] 0x00000000000005e0
+     0.15%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvXs0_NtNtNtCskxtBwYRO61I_4core4iter8adapters3mapINtB6_3MapINtNtNtBc_5slice4iter4IterTmmEENCNCNvMsd_NtCs640e9Z0Gv6D_12dodb_storage5blinkINtB1C_10BlinkStoreNtCslv9DBRgz7tV_12phase0_bench9BenchFileB2v_E31apply_planned_transaction_groups6_00ENtNtNtBa_6traits8iterator8Iterator4folduNCINvNvB3R_8for_each4callNtNtB1E_3wal17PreparedWalRecordNCINvMsj_NtCs69KKACWg7bl_5alloc3vecINtB5y_3VecB4U_E14extend_trustedBN_E0E0EB2x_
+     0.14%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvYNtNtNtCsfr5T3GFabw_3std4hash6random11RandomStateNtNtCskxtBwYRO61I_4core4hash11BuildHasher8hash_oneRRShECs640e9Z0Gv6D_12dodb_storage
+     0.14%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMNtNtNtNtCsfr5T3GFabw_3std3sys3pal4unix4timeNtB2_8Timespec3now
+     0.14%  tokio-rt-worker  libc.so.6              [.] clock_gettime@@GLIBC_2.17
+     0.14%  tokio-rt-worker  phase0-phase-i-h1      [.] _mi_malloc_generic
+     0.14%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvXs1_NtNtNtCskxtBwYRO61I_4core4iter8adapters6filterINtB5_6FilterINtNtNtNtCs69KKACWg7bl_5alloc11collections5btree3set4IterNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdENCNvMsd_NtCs640e9Z0Gv6D_12dodb_storage5blinkINtB2S_10BlinkStoreNtCslv9DBRgz7tV_12phase0_bench9BenchFileB3L_E31apply_planned_transaction_groupsb_0ENtNtNtB9_6traits8iterator8Iterator5countB3N_
+     0.14%  phase0-phase-i-  [vdso]                 [.] 0x00000000000005c0
+     0.14%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvMs5_NtCs69KKACWg7bl_5alloc7raw_vecNtB5_11RawVecInner11finish_growCs640e9Z0Gv6D_12dodb_storage.llvm.15197092012353684878
+     0.14%  tokio-rt-worker  phase0-phase-i-h1      [.] clock_gettime@plt
+     0.14%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvYINtNtNtCskxtBwYRO61I_4core5slice4iter7WindowsTmmEENtNtNtNtBa_4iter6traits8iterator8Iterator8try_folduNCINvNvBR_3any5checkRSBM_NCINvNtCs640e9Z0Gv6D_12dodb_storage5blink31prepare_leaf_parallel_executionNtCslv9DBRgz7tV_12phase0_bench9BenchFileEsc_0E0INtNtNtBa_3ops12control_flow11ControlFlowuEEB3j_
+     0.14%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink26apply_cached_leaf_mutation
+     0.14%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvXNtNtCs69KKACWg7bl_5alloc3vec14spec_from_iterINtB4_3VecNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdEINtB2_12SpecFromIterBU_INtNtNtNtCskxtBwYRO61I_4core4iter8adapters3map3MapINtNtNtB2d_5slice4iter4IterTmmEENCINvNtCs640e9Z0Gv6D_12dodb_storage5blink31prepare_leaf_parallel_executionNtCslv9DBRgz7tV_12phase0_bench9BenchFileEse_0EE9from_iterB4C_
+     0.13%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage5blink22encode_blink_page_into
+     0.13%  dodb-blink-leaf  phase0-phase-i-h1      [.] _RNvXs_NtCs640e9Z0Gv6D_12dodb_storage5blinkNtB4_9BlinkPageNtNtCskxtBwYRO61I_4core5clone5Clone5clone
+     0.13%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvNtCsjuMeleVu5ga_6crc32c10hw_aarch646crc32c
+     0.13%  dodb-blink-leaf  phase0-phase-i-h1      [.] __aarch64_ldset8_acq_rel
+     0.13%  tokio-rt-worker  phase0-phase-i-h1      [.] _RNvNtCs62JHnPRiHMN_9dodb_core3key16encode_component
+     0.13%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvMNtNtCs640e9Z0Gv6D_12dodb_storage5blink4leafNtB2_11LeafEntries6search
+     0.13%  dodb-blink-leaf  phase0-phase-i-h1      [.] mi_page_queue_find_free_ex.constprop.0
+     0.13%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvXs4_NtNtCs69KKACWg7bl_5alloc3vec9into_iterINtB6_8IntoIterNtNtCs640e9Z0Gv6D_12dodb_storage5blink12LeafChainJobENtNtNtNtCskxtBwYRO61I_4core4iter6traits8iterator8Iterator4folduNCINvNtNtB1U_8adapters3map8map_foldBX_INtNtB1W_6result6ResultNtBZ_16LeafChainOutcomeNtNtCs62JHnPRiHMN_9dodb_core5error5ErrorEuNvBZ_18run_leaf_chain_jobNCINvNvB1O_8for_each4callB3r_NCINvMsj_B8_INtB8_3VecB3r_E14extend_trustedINtB2U_3MapBI_B4R_EE0E0E0EB11_
+     0.13%  tokio-rt-worker  phase0-phase-i-h1      [.] _mi_page_free_collect_partly
+     0.13%  dodb-blink-leaf  phase0-phase-i-h1      [.] mi_arenas_page_regular_alloc
+     0.13%  tokio-rt-worker  phase0-phase-i-h1      [.] _RINvNtNtNtNtCskxtBwYRO61I_4core5slice4sort6shared9smallsort31small_sort_general_with_scratchNtNtCs62JHnPRiHMN_9dodb_core11identifiers6PageIdNvYB1s_NtNtBa_3cmp10PartialOrd2ltECs640e9Z0Gv6D_12dodb_storage
+     0.13%  dodb-blink-leaf  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage3wal17decode_page_delta
+     0.13%  dodb-blink-leaf  phase0-phase-i-h1      [.] mi_page_queue_remove
+     0.13%  tokio-rt-worker  phase0-phase-i-h1      [.] memcpy@plt
+     0.11%  tokio-rt-worker  phase0-phase-i-h1      [.] mi_malloc_aligned
+     0.11%  phase0-phase-i-  phase0-phase-i-h1      [.] _RNvNtCs640e9Z0Gv6D_12dodb_storage3wal23validate_page_image_lsn
+
+
+#
+# (Tip: If you prefer Intel style assembly, try: perf annotate -M intel)
+#

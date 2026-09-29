@@ -1,0 +1,20 @@
+candidate,workload,g0_median_tx_per_second,candidate_median_tx_per_second,ratio,decision,reason
+G1a planner dependency flags,64w width16 uniform sync-disabled,6144,5661,0.921,reject,planner scratch arena reduced neither CPU nor throughput
+G1a planner dependency flags,64w width16 uniform real-sync,4788,4534,0.947,reject,real-sync throughput regressed
+G1a planner dependency flags,64w width1 uniform real-sync,25550,25172,0.985,reject,width1 below target and no material width16 gain
+G1b transaction leaf grouping,64w width16 uniform sync-disabled,6144,5832,0.949,reject,planner allocation reduction did not improve CPU work
+G1b transaction leaf grouping,64w width16 uniform real-sync,4788,4585,0.958,reject,real-sync throughput regressed
+G1b transaction leaf grouping,64w width1 uniform real-sync,25550,24658,0.965,reject,width1 regression
+G1c admission overlay keys,64w width16 uniform sync-disabled,6188,6231,1.007,reject,storage allocations fell about 10 percent but bytes and throughput were nearly unchanged
+G1c admission overlay keys,64w width16 uniform real-sync,4828,4841,1.003,reject,throughput below the meaningful threshold
+G1c admission overlay keys,64w width1 uniform real-sync,25299,25498,1.008,reject,throughput below the meaningful threshold
+G2 shared operation descriptors Arc slice,64w width16 uniform sync-disabled,6355,5852,0.921,reject,shared descriptor conversion increased total CPU
+G2 shared operation descriptors Arc slice,64w width16 uniform real-sync,4747,4640,0.977,reject,real-sync throughput regressed
+G2 shared operation descriptors Arc slice,64w width1 uniform real-sync,25564,24958,0.976,reject,width1 regressed
+G2b shared operation descriptors Arc Vec,64w width16 uniform sync-disabled,6264,6227,0.994,reject,no material total CPU benefit
+G2b shared operation descriptors Arc Vec,64w width16 uniform real-sync,4873,4622,0.949,reject,real-sync throughput regressed
+G2b shared operation descriptors Arc Vec,64w width1 uniform real-sync,25628,25097,0.979,reject,width1 below protection threshold
+G3 two-pass PageDelta span encoder,64w width16 uniform sync-disabled,6362,6102,0.959,reject,halved PageDelta allocation calls but extra scan increased total CPU
+G3 two-pass PageDelta span encoder,64w width16 uniform real-sync,4935,4856,0.984,reject,primary gate already failed; diagnostic only
+G3 two-pass PageDelta span encoder,64w width1 uniform real-sync,25666,24902,0.970,reject,primary gate already failed; diagnostic stopped at two repetitions
+G4 contiguous result metadata,64w width16 uniform sync-disabled,6411,6245,0.974,reject,small allocation reduction did not offset CPU cost

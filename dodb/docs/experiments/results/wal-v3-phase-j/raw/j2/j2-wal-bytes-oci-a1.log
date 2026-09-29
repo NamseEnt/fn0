@@ -1,0 +1,13 @@
+command: cargo test -p dodb-storage --release measure_logical_wal_v4_write_bytes -- --ignored --nocapture
+source_checkout: /home/opc/phase-j-build/src-j2-control
+source_branch: experiment/phase-j-bounded-overlay
+source_git_commit: 81a64e01ead3bb58dde74f17e8d11adb737e5915
+source_worktree: clean
+rustc: rustc 1.98.1 (48a229cea 2026-09-01)
+target: aarch64-unknown-linux-gnu
+host: OCI Ampere A1, 2 OCPU, 12 GiB RAM, Neoverse N1
+binary: target/release/deps/dodb_storage-dd2a279e5276e4c9
+binary_sha256: ffb4726bc22d97a059074cc3c5357e48bea02f5ef42e771ed51c7c4a9d34e3cb
+storage: MemoryFile; this is logical WAL byte accounting, not a durable throughput benchmark
+result: {"record_type":"logical_wal_bytes","git_commit":"81a64e01ead3bb58dde74f17e8d11adb737e5915","transactions":64,"mutations":1024,"mutation_width":16,"records":1088,"records_per_tx":17.000,"wal_bytes":173060,"wal_bytes_per_tx":2704.062,"syncs":1,"transactions_per_sync":64}
+test_result: 1 passed, 0 failed

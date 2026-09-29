@@ -1,0 +1,4 @@
+Command:
+cargo check --workspace --release --all-targets --target aarch64-unknown-linux-gnu
+
+Result: failed in macOS host C compilation for libmimalloc-sys and ring because the machine has no AArch64 Linux sysroot / system headers. First error: fatal error: 'wchar.h' file not found. ring also reports 'assert.h' file not found. The Linux target is installed in rustup, but this is not evidence of a successful AArch64 Linux build.

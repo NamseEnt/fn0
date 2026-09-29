@@ -1,0 +1,5 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /tmp/dodb-e-results/raw/stepe3-disabled-09-rep3-e2b-w64-width16-uniform.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-uniform                          rep=0 tx/s=     3331 mut/s=    53293 read/s=        0 agg/s=     3331 p50= 18142.5us p95= 25930.4us p99= 33837.6us groups=  289 avg_group=57.84
+completed 1 scenarios x 1 repetitions

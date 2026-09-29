@@ -1,0 +1,5 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /tmp/dodb-e-results/raw/retention-real-06-rep2-final-w64-width1-uniform.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width1-uniform                           rep=0 tx/s=    27037 mut/s=    27037 read/s=        0 agg/s=    27037 p50=  2163.0us p95=  3820.4us p99=  5280.8us groups= 2265 avg_group=59.86
+completed 1 scenarios x 1 repetitions

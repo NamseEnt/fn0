@@ -1,0 +1,14 @@
+M1 allocation counter diagnostic, 64 writers / width 16 / uniform / sync disabled
+
+Both rows are one 5-second churn-counters run with mimalloc underneath the counting global allocator. These runs are local diagnostics, not OCI evidence. The G0 binary is Phase F source with only the benchmark binary's global allocator changed to mimalloc. The G12 candidate includes the group planner arena and contiguous leaf-job operation storage.
+
+Metric                                  G0 mimalloc       G12 candidate
+Successful tx/s                        3,329              11,201
+Storage alloc calls / tx               364.06             349.93
+Storage allocated bytes / tx           143,364            142,755
+Storage free calls / tx                 364.03             349.87
+Harness alloc calls / tx                166.03             166.07
+Planner arena logical calls / tx        0                  0.030
+Planner arena logical bytes / tx        0                  15.34
+
+Caution: the G0 instrumentation predates the G0 stage-name and size-bucket extension, and its instrumented throughput was heavily affected by instrumentation overhead. Use the non-instrumented three-repetition local gate in `local-m1-summary.csv` for a less-intrusive local throughput diagnostic. Neither local series establishes retained-step performance.

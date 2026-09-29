@@ -1,0 +1,29 @@
+counters-disabled-09-rep1-phase-e-churn-w64-width16-uniform: tx/s=3346 p99=43872us par_groups=300 fallback=4
+counters-disabled-06-rep1-phase-e-churn-w64-width1-uniform: tx/s=42958 p99=3399us par_groups=4181 fallback=0
+counters-disabled-09-rep2-phase-e-churn-w64-width16-uniform: tx/s=3204 p99=45962us par_groups=304 fallback=4
+counters-disabled-06-rep2-phase-e-churn-w64-width1-uniform: tx/s=41659 p99=4879us par_groups=3956 fallback=0
+counters-disabled-09-rep1-f1-churn-w64-width16-uniform: tx/s=4054 p99=38636us par_groups=364 fallback=4
+counters-disabled-06-rep1-f1-churn-w64-width1-uniform: tx/s=49849 p99=4439us par_groups=4916 fallback=0
+counters-disabled-09-rep2-f1-churn-w64-width16-uniform: tx/s=4195 p99=41407us par_groups=378 fallback=3
+counters-disabled-06-rep2-f1-churn-w64-width1-uniform: tx/s=51422 p99=3024us par_groups=4932 fallback=0
+stepf1-disabled-09-rep1-phase-e-w64-width16-uniform: tx/s=3683 p99=52579us par_groups=328 fallback=4
+stepf1-disabled-09-rep1-f1-w64-width16-uniform: tx/s=4449 p99=40034us par_groups=408 fallback=5
+stepf1-real-09-rep1-f1-w64-width16-uniform: tx/s=3988 p99=31022us par_groups=318 fallback=4
+stepf1-real-09-rep1-phase-e-w64-width16-uniform: tx/s=3513 p99=34839us par_groups=282 fallback=4
+stepf1-real-06-rep1-phase-e-w64-width1-uniform: tx/s=28548 p99=4805us par_groups=2330 fallback=0
+stepf1-real-06-rep1-f1-w64-width1-uniform: tx/s=30533 p99=4676us par_groups=2574 fallback=0
+stepf1-disabled-09-rep2-f1-w64-width16-uniform: tx/s=3952 p99=53837us par_groups=386 fallback=3
+stepf1-disabled-09-rep2-phase-e-w64-width16-uniform: tx/s=3810 p99=34701us par_groups=343 fallback=3
+stepf1-real-09-rep2-phase-e-w64-width16-uniform: tx/s=3669 p99=31459us par_groups=297 fallback=4
+stepf1-real-09-rep2-f1-w64-width16-uniform: tx/s=3950 p99=30920us par_groups=317 fallback=3
+stepf1-real-06-rep2-f1-w64-width1-uniform: tx/s=30229 p99=5065us par_groups=2541 fallback=0
+stepf1-real-06-rep2-phase-e-w64-width1-uniform: tx/s=28771 p99=4314us par_groups=2328 fallback=0
+stepf1-disabled-09-rep3-phase-e-w64-width16-uniform: tx/s=3772 p99=38190us par_groups=339 fallback=1
+stepf1-disabled-09-rep3-f1-w64-width16-uniform: tx/s=4359 p99=33830us par_groups=393 fallback=2
+stepf1-real-09-rep3-f1-w64-width16-uniform: tx/s=4028 p99=29693us par_groups=321 fallback=2
+stepf1-real-09-rep3-phase-e-w64-width16-uniform: tx/s=3386 p99=33257us par_groups=273 fallback=1
+stepf1-real-06-rep3-phase-e-w64-width1-uniform: tx/s=27873 p99=5076us par_groups=2337 fallback=0
+stepf1-real-06-rep3-f1-w64-width1-uniform: tx/s=29978 p99=4575us par_groups=2600 fallback=0
+perf-real-09-phase-e-fpcrc-w64-width16-uniform: tx/s=3302
+perf-real-09-f1-fpcrc-w64-width16-uniform: tx/s=3830
+ALLDONE

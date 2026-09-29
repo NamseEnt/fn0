@@ -1,0 +1,5 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /tmp/dodb-phase-d-results/raw/gate-real-06-rep3-phase-c-w64-width1-uniform.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width1-uniform                           rep=0 tx/s=    22980 mut/s=    22980 read/s=        0 agg/s=    22980 p50=  2533.5us p95=  4390.6us p99=  5242.0us groups= 2062 avg_group=55.77
+completed 1 scenarios x 1 repetitions

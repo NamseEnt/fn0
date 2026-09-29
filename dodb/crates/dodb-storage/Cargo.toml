@@ -10,7 +10,12 @@ repository.workspace = true
 crc32c.workspace = true
 dodb-core.workspace = true
 libc.workspace = true
+mimalloc.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "process", "rt", "rt-multi-thread", "sync", "time"] }
+
+[features]
+churn-counters = []
+phase-i-instrumentation = []
 
 [dev-dependencies]
 proptest.workspace = true

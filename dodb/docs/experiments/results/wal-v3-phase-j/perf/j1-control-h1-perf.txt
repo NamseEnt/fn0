@@ -1,0 +1,5 @@
+Events disabled
+Events enabled
+Events disabled
+3948734301,,cycles:u,1337641040,100.00,,
+7790256938,,instructions:u,1337641040,100.00,1.97,insn per cycle

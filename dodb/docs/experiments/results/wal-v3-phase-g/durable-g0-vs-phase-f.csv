@@ -1,0 +1,7 @@
+writers,width,distribution,g0_mimalloc_tx_per_second,phase_f_historical_tx_per_second,g0_over_phase_f,g_final_over_g0
+16,1,uniform,8692.219,8454.000,1.028,1.000
+16,16,uniform,3361.063,3016.000,1.114,1.000
+64,1,uniform,25627.605,30501.000,0.840,1.000
+64,16,uniform,4994.301,4031.000,1.239,1.000
+64,16,same-leaf-heavy,16372.735,13298.000,1.231,1.000
+64,16,different-leaf-heavy,10369.516,8268.000,1.254,1.000

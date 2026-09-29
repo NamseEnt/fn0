@@ -1,0 +1,1 @@
+env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS -u CARGO_BUILD_RUSTFLAGS cargo build --release --bin phase0-bench --target aarch64-unknown-linux-gnu --target-dir /tmp/dodb-phase-h1/target -vv

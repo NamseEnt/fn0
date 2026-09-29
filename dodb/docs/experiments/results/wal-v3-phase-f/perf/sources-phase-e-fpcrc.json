@@ -1,0 +1,367 @@
+{
+ "samples": 8707,
+ "transactions": 1.0,
+ "category_share": {
+  "memcpy / memmove": 0.05627655909038704,
+  "CRC32C": 0.06018146319053635,
+  "Arc refcount atomics (ldadd8)": 0.11599862179855289,
+  "malloc / free": 0.29309750775238314,
+  "planner (plan_batch self)": 0.04605489835764327,
+  "PageDelta encode/apply": 0.04973010221660733,
+  "memcmp": 0.06408636729068566
+ },
+ "stages": {
+  "memcpy / memmove": {
+   "lane: leaf clone": 0.04123119329275296,
+   "harness": 0.0055128057884460775,
+   "group (apply_planned_transaction_group)": 0.0028712530148156654,
+   "dispatch": 0.0022970024118525324,
+   "planner": 0.0017227518088893993,
+   "admission": 0.0011485012059262662,
+   "WAL": 0.0010336510853336397,
+   "serial execution": 0.0004594004823705065
+  },
+  "CRC32C": {
+   "lane: leaf clone": 0.0530607557137935,
+   "WAL": 0.006891007235557597,
+   "serial execution": 0.00022970024118525325
+  },
+  "Arc refcount atomics (ldadd8)": {
+   "lane: leaf clone": 0.04375789594579074,
+   "publication": 0.03434018605719536,
+   "group (apply_planned_transaction_group)": 0.027678879062823018,
+   "dispatch": 0.010106810612151143,
+   "serial execution": 0.00011485012059262662
+  },
+  "malloc / free": {
+   "harness": 0.13035488687263122,
+   "group (apply_planned_transaction_group)": 0.06052601355231423,
+   "lane: leaf clone": 0.035373837142529,
+   "planner": 0.024692775927414725,
+   "publication": 0.020673021706672793,
+   "WAL": 0.007235557597335477,
+   "admission": 0.0071207074767428505,
+   "dispatch": 0.00677615711496497,
+   "serial execution": 0.00034455036177787984
+  },
+  "planner (plan_batch self)": {
+   "group (apply_planned_transaction_group)": 0.04605489835764327
+  },
+  "PageDelta encode/apply": {
+   "lane: leaf clone": 0.049041001493051566,
+   "WAL": 0.0006891007235557597
+  },
+  "memcmp": {
+   "lane: leaf clone": 0.024922476168599977,
+   "planner": 0.022855173997932698,
+   "WAL": 0.012978063626966808,
+   "admission": 0.0027564028942230387,
+   "group (apply_planned_transaction_group)": 0.00034455036177787984,
+   "serial execution": 0.00022970024118525325
+  }
+ },
+ "direct_callers": {
+  "memcpy / memmove": [
+   [
+    "dodb_storage::blink::encode_blink_page_into",
+    0.03767083955438153
+   ],
+   [
+    "<dodb_core::key::DocumentKey as core::clone::Clone>::clone",
+    0.003675203858964052
+   ],
+   [
+    "<dodb_storage::blink::BlinkPage as core::clone::Clone>::clone",
+    0.0027564028942230387
+   ],
+   [
+    "dodb_storage::blink::drain_leaf_chain_queue",
+    0.0016079016882967728
+   ],
+   [
+    "<dodb_core::transaction::TransactionRequest>::validate",
+    0.0016079016882967728
+   ],
+   [
+    "dodb_storage::blink::plan_batch",
+    0.0013782014471115194
+   ],
+   [
+    "<alloc::vec::Vec<dodb_core::transaction::TransactionMutation> as core::clone::Clone>::clone",
+    0.0013782014471115194
+   ],
+   [
+    "<alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, alloc::vec::Vec<u8>, dodb_storag",
+    0.0011485012059262662
+   ],
+   [
+    "<alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, dodb_core::identifiers::PageId, ",
+    0.0010336510853336397
+   ],
+   [
+    "dodb_storage::wal::encode_page_delta",
+    0.0006891007235557597
+   ],
+   [
+    "<dodb_storage::blink::GenerationPublisher>::prepare_shared_delta",
+    0.0005742506029631331
+   ],
+   [
+    "<alloc::raw_vec::RawVec<dodb_storage::blink::LeafChainOutcome>>::grow_one",
+    0.0004594004823705065
+   ],
+   [
+    "<dodb_storage::blink::BlinkStore<phase0_bench::BenchFile, phase0_bench::BenchFile>>::apply_transaction_group",
+    0.00034455036177787984
+   ],
+   [
+    "<phase0_bench::WorkloadGenerator>::key_for_index",
+    0.00034455036177787984
+   ],
+   [
+    "<alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, dodb_core::key::DocumentKey, all",
+    0.00034455036177787984
+   ],
+   [
+    "dodb_storage::blink::prepare_planned_serial_execution",
+    0.00022970024118525325
+   ],
+   [
+    "dodb_storage::blink::run_leaf_chain_job",
+    0.00022970024118525325
+   ],
+   [
+    "<alloc::vec::Vec<alloc::vec::Vec<u8>> as alloc::vec::spec_from_iter::SpecFromIter<alloc::vec::Vec<u8>, core::iter::adapters::map::Map<core::slice::iter::Iter<do",
+    0.00022970024118525325
+   ],
+   [
+    "<alloc::raw_vec::RawVec<(dodb_core::identifiers::PageId, &alloc::boxed::Box<[u8; 4096]>)>>::grow_one",
+    0.00011485012059262662
+   ],
+   [
+    "<dodb_storage::wal::WalLog<phase0_bench::BenchFile>>::append_group_inner",
+    0.00011485012059262662
+   ]
+  ],
+  "CRC32C": [
+   [
+    "dodb_storage::blink::run_leaf_chain_job",
+    0.04123119329275296
+   ],
+   [
+    "dodb_storage::blink::encode_blink_page_into",
+    0.011944412541633169
+   ],
+   [
+    "<dodb_storage::wal::WalLog<phase0_bench::BenchFile>>::encode_prepared_group",
+    0.004134604341334559
+   ],
+   [
+    "dodb_storage::wal::update_record_digest",
+    0.0020673021706672794
+   ],
+   [
+    "<dodb_storage::wal::WalLog<phase0_bench::BenchFile>>::append_group_inner",
+    0.0004594004823705065
+   ],
+   [
+    "dodb_storage::wal::append_frame_parts_direct",
+    0.00022970024118525325
+   ],
+   [
+    "dodb_storage::blink::encode_blink_page_arc",
+    0.00011485012059262662
+   ]
+  ],
+  "Arc refcount atomics (ldadd8)": [
+   [
+    "<alloc::vec::Vec<dodb_storage::blink::LeafEntry> as core::clone::Clone>::clone",
+    0.03927874124267831
+   ],
+   [
+    "core::ptr::drop_glue::<dodb_storage::blink::BlinkPage>",
+    0.026989778339267256
+   ],
+   [
+    "<dodb_storage::blink::GenerationPublisher>::prepare_shared_delta",
+    0.014815665556448834
+   ],
+   [
+    "<dodb_storage::blink::BlinkStore<phase0_bench::BenchFile, phase0_bench::BenchFile>>::apply_transaction_group",
+    0.009647410129780636
+   ],
+   [
+    "dodb_storage::blink::prepare_leaf_parallel_execution::<phase0_bench::BenchFile>",
+    0.006316756632594464
+   ],
+   [
+    "dodb_storage::blink::run_leaf_chain_job",
+    0.004594004823705065
+   ],
+   [
+    "<alloc::sync::Arc<dodb_storage::blink::PageCatalogChunk>>::drop_slow",
+    0.0035603537383714252
+   ],
+   [
+    "<dodb_storage::blink::GenerationPin as dodb_storage::blink::ReadPageSource>::page",
+    0.003330653497186172
+   ],
+   [
+    "<alloc::vec::Vec<dodb_storage::blink::PlannedMutation> as core::ops::drop::Drop>::drop",
+    0.0032158033765935456
+   ],
+   [
+    "<alloc::sync::Arc<dodb_storage::blink::PageCell>>::drop_slow",
+    0.002986103135408292
+   ],
+   [
+    "<alloc::sync::Arc<dodb_storage::blink::BlinkPage>>::drop_slow",
+    0.0006891007235557597
+   ],
+   [
+    "<alloc::vec::Vec<dodb_storage::blink::LeafEntry> as core::ops::drop::Drop>::drop",
+    0.0004594004823705065
+   ],
+   [
+    "<alloc::sync::Arc<dodb_storage::blink::PageCatalog>>::drop_slow",
+    0.00011485012059262662
+   ]
+  ],
+  "malloc / free": [
+   [
+    "<alloc::raw_vec::RawVec<dodb_core::transaction::TransactionMutation>>::grow_one",
+    0.036866888710233144
+   ],
+   [
+    "<dodb_storage::blink::BlinkStore<phase0_bench::BenchFile, phase0_bench::BenchFile>>::apply_transaction_group",
+    0.024003675203858963
+   ],
+   [
+    "<phase0_bench::BlinkAdapter>::start_with_read_handle::{closure#0}",
+    0.02342942460089583
+   ],
+   [
+    "<phase0_bench::WorkloadGenerator>::next_transaction",
+    0.022625473756747446
+   ],
+   [
+    "core::ptr::drop_glue::<dodb_core::transaction::TransactionRequest>",
+    0.0176869185712645
+   ],
+   [
+    "dodb_storage::blink::plan_batch",
+    0.015849316641782473
+   ],
+   [
+    "core::ptr::drop_glue::<dodb_storage::blink::BlinkPage>",
+    0.01458596531526358
+   ],
+   [
+    "dodb_storage::blink::run_leaf_chain_job",
+    0.011714712300447915
+   ],
+   [
+    "<core::iter::adapters::map::Map<core::iter::adapters::enumerate::Enumerate<core::slice::iter::Iter<dodb_core::key::DocumentKey>>, <phase0_bench::WorkloadGenerat",
+    0.011714712300447915
+   ],
+   [
+    "dodb_storage::blink::encode_blink_page_arc",
+    0.009302859768002757
+   ],
+   [
+    "<dodb_core::transaction::TransactionRequest>::validate",
+    0.007235557597335477
+   ],
+   [
+    "dodb_storage::blink::drain_leaf_chain_queue",
+    0.007235557597335477
+   ],
+   [
+    "core::ptr::drop_glue::<dodb_storage::blink::PhysicalTransactionPlan>",
+    0.006201906512001838
+   ],
+   [
+    "dodb_storage::wal::encode_page_delta",
+    0.006087056391409211
+   ],
+   [
+    "<hashbrown::raw::RawTable<(dodb_core::identifiers::PageId, ())>>::reserve_rehash::<hashbrown::map::make_hasher<dodb_core::identifiers::PageId, (), std::hash::ra",
+    0.005168255426668198
+   ],
+   [
+    "<alloc::vec::Vec<dodb_storage::blink::LeafEntry> as core::clone::Clone>::clone",
+    0.0050534053060755715
+   ],
+   [
+    "<dodb_core::key::DocumentKey as core::clone::Clone>::clone",
+    0.0050534053060755715
+   ],
+   [
+    "<core::iter::adapters::map::Map<alloc::collections::btree::map::IntoIter<dodb_core::identifiers::PageId, dodb_storage::blink::BlinkPage>, <dodb_storage::blink::",
+    0.004594004823705065
+   ],
+   [
+    "core::ptr::drop_glue::<alloc::vec::Vec<dodb_storage::blink::AdmittedTransaction>>",
+    0.0039049041001493054
+   ],
+   [
+    "dodb_storage::blink::prepare_leaf_parallel_execution::<phase0_bench::BenchFile>",
+    0.003675203858964052
+   ]
+  ],
+  "planner (plan_batch self)": [
+   [
+    "<dodb_storage::blink::BlinkStore<phase0_bench::BenchFile, phase0_bench::BenchFile>>::apply_transaction_group",
+    0.04605489835764327
+   ]
+  ],
+  "PageDelta encode/apply": [
+   [
+    "dodb_storage::blink::run_leaf_chain_job",
+    0.049041001493051566
+   ],
+   [
+    "<dodb_storage::wal::WalLog<phase0_bench::BenchFile>>::append_group_inner",
+    0.0006891007235557597
+   ]
+  ],
+  "memcmp": [
+   [
+    "dodb_storage::blink::plan_batch",
+    0.022280923394969565
+   ],
+   [
+    "dodb_storage::blink::ensure_sorted_leaf",
+    0.01630871712415298
+   ],
+   [
+    "dodb_storage::wal::page_delta_rebuilds",
+    0.012978063626966808
+   ],
+   [
+    "dodb_storage::blink::run_leaf_chain_job",
+    0.008613759044446997
+   ],
+   [
+    "<alloc::collections::btree::map::BTreeMap<alloc::vec::Vec<u8>, dodb_storage::blink::LogicalEntry>>::insert",
+    0.0027564028942230387
+   ],
+   [
+    "<alloc::collections::btree::set::BTreeSet<alloc::vec::Vec<u8>> as core::iter::traits::collect::FromIterator<alloc::vec::Vec<u8>>>::from_iter::<core::iter::adapt",
+    0.0005742506029631331
+   ],
+   [
+    "<alloc::collections::btree::map::BTreeMap<dodb_core::key::DocumentKey, alloc::collections::btree::set_val::SetValZST>>::insert",
+    0.00034455036177787984
+   ],
+   [
+    "dodb_storage::blink::prepare_planned_serial_execution",
+    0.00011485012059262662
+   ],
+   [
+    "dodb_storage::blink::apply_cached_leaf_mutation",
+    0.00011485012059262662
+   ]
+  ]
+ }
+}

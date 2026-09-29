@@ -12,7 +12,7 @@ use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -23,8 +23,119 @@ use dodb_core::{
 use dodb_storage::{
     AsyncShard, BTreeStore, BatchRequest, BatchResponse, BlinkBatchMetrics, BlinkReadHandle,
     BlinkSplitMetrics, BlinkStore, BlinkVersionedReadMetrics, CoordinatorConfig, DatabaseConfig,
-    DurableFile, ProductionFile, StorageMetrics, WalMetrics,
+    DurableFile, ProductionFile, StorageMetrics, WalMetrics, WalRedoStats,
 };
+
+#[cfg(feature = "churn-counters")]
+mod churn_allocator {
+    use std::alloc::{GlobalAlloc, Layout};
+
+    struct CountingAllocator;
+
+    unsafe impl GlobalAlloc for CountingAllocator {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            dodb_storage::churn::record_alloc(layout.size());
+            unsafe { mimalloc::MiMalloc.alloc(layout) }
+        }
+
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            dodb_storage::churn::record_alloc(layout.size());
+            unsafe { mimalloc::MiMalloc.alloc_zeroed(layout) }
+        }
+
+        unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
+            dodb_storage::churn::record_free(layout.size());
+            unsafe { mimalloc::MiMalloc.dealloc(pointer, layout) }
+        }
+
+        unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+            dodb_storage::churn::record_realloc(new_size);
+            unsafe { mimalloc::MiMalloc.realloc(pointer, layout, new_size) }
+        }
+    }
+
+    #[global_allocator]
+    static GLOBAL: CountingAllocator = CountingAllocator;
+}
+
+#[cfg(not(feature = "churn-counters"))]
+#[global_allocator]
+static GLOBAL_ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+fn churn_delta(
+    before: &[(
+        dodb_storage::churn::ChurnSite,
+        dodb_storage::churn::ChurnCounter,
+        u64,
+    )],
+    after: &[(
+        dodb_storage::churn::ChurnSite,
+        dodb_storage::churn::ChurnCounter,
+        u64,
+    )],
+) -> Vec<(String, u64)> {
+    before
+        .iter()
+        .zip(after)
+        .filter_map(|((site, counter, before_value), (_, _, after_value))| {
+            let delta = after_value.saturating_sub(*before_value);
+            (delta > 0).then(|| (format!("churn_{}_{}", site.name(), counter.name()), delta))
+        })
+        .collect()
+}
+
+fn leaf_sample_summary(samples: &[[u32; 3]]) -> Vec<(String, u64)> {
+    let mut summary = vec![("leaf_samples".to_owned(), samples.len() as u64)];
+    for (column, name) in ["entries", "key_bytes", "value_bytes", "payload_bytes"]
+        .iter()
+        .enumerate()
+    {
+        let mut values = samples
+            .iter()
+            .map(|sample| match column {
+                3 => u64::from(sample[1]) + u64::from(sample[2]),
+                _ => u64::from(sample[column]),
+            })
+            .collect::<Vec<_>>();
+        if values.is_empty() {
+            continue;
+        }
+        values.sort_unstable();
+        let sum = values.iter().sum::<u64>();
+        let at = |fraction: f64| values[((values.len() - 1) as f64 * fraction).round() as usize];
+        summary.push((format!("leaf_{name}_sum"), sum));
+        summary.push((format!("leaf_{name}_p50"), at(0.5)));
+        summary.push((format!("leaf_{name}_p95"), at(0.95)));
+        summary.push((format!("leaf_{name}_max"), *values.last().unwrap()));
+    }
+    summary
+}
+
+static CHECKPOINT_WAL_BYTES: AtomicU64 = AtomicU64::new(0);
+static CHECKPOINT_EVENTS: Mutex<Vec<CheckpointEvent>> = Mutex::new(Vec::new());
+
+#[derive(Clone, Copy, Debug)]
+struct CheckpointEvent {
+    finished: Instant,
+    duration_nanos: u64,
+    wal_bytes_before: u64,
+    wal_bytes_reclaimed: u64,
+}
+
+fn checkpoint_blink_store(store: &mut BlinkStore<BenchFile, BenchFile>) -> Result<()> {
+    let started = Instant::now();
+    let wal_bytes_before = store.wal_metrics()?.map_or(0, |metrics| metrics.wal_bytes);
+    let report = store.checkpoint()?;
+    if let Ok(mut events) = CHECKPOINT_EVENTS.lock() {
+        events.push(CheckpointEvent {
+            finished: Instant::now(),
+            duration_nanos: started.elapsed().as_nanos() as u64,
+            wal_bytes_before,
+            wal_bytes_reclaimed: report.wal_bytes_reclaimed,
+        });
+    }
+    Ok(())
+}
 
 const BASELINE_COMMIT: &str = "1ff96e1b3d205074d4c1b820f5f2680bd3226a8b";
 const DEFAULT_OUTPUT: &str = "target/phase0/phase0-results.jsonl";
@@ -93,8 +204,8 @@ impl Distribution {
             "uniform" => Self::Uniform,
             "sequential" => Self::Sequential,
             "hotspot" => Self::Hotspot,
-            "same-leaf-heavy" | "same_leaf_heavy" | "same" => Self::SameLeafHeavy,
-            "different-leaf-heavy" | "different_leaf_heavy" | "different" => {
+            "same-leaf-heavy" | "same_leaf_heavy" | "same" | "compact" => Self::SameLeafHeavy,
+            "different-leaf-heavy" | "different_leaf_heavy" | "different" | "spread" => {
                 Self::DifferentLeafHeavy
             }
             other => panic!("unknown key distribution {other:?}"),
@@ -175,6 +286,7 @@ enum EngineKind {
     VersionedBlink,
     PlannedBlink,
     ParallelBlink,
+    LogicalOverlayBlink,
 }
 
 impl EngineKind {
@@ -185,6 +297,7 @@ impl EngineKind {
             "versioned-blink" | "blink-versioned" | "phase2" => Self::VersionedBlink,
             "planned-blink" | "blink-planned" | "phase3" => Self::PlannedBlink,
             "parallel-blink" | "blink-parallel" | "phase4" => Self::ParallelBlink,
+            "logical-overlay-blink" | "blink-logical" | "phase-j" => Self::LogicalOverlayBlink,
             other => panic!("unknown engine {other:?}"),
         }
     }
@@ -196,6 +309,7 @@ impl EngineKind {
             Self::VersionedBlink => "versioned-blink",
             Self::PlannedBlink => "planned-blink",
             Self::ParallelBlink => "parallel-blink",
+            Self::LogicalOverlayBlink => "logical-overlay-blink",
         }
     }
 }
@@ -281,8 +395,11 @@ struct Args {
     transaction_mode: TransactionMode,
     tokio_workers: usize,
     blink_workers: usize,
+    parallel_workers: usize,
+    parallel_min_mutations: usize,
     seed: u64,
     output: PathBuf,
+    window_seconds: Option<u64>,
 }
 
 impl Default for Args {
@@ -314,8 +431,11 @@ impl Default for Args {
             tokio_workers: std::thread::available_parallelism()
                 .map_or(1, std::num::NonZeroUsize::get),
             blink_workers: 2,
+            parallel_workers: 0,
+            parallel_min_mutations: 0,
             seed: 0xd0db_2026_0000_0001,
             output: PathBuf::from(DEFAULT_OUTPUT),
+            window_seconds: None,
         }
     }
 }
@@ -388,6 +508,14 @@ impl Args {
                 "--queue-capacity" => {
                     args.queue_capacity = parse_usize(&take_value(&mut values, &flag), &flag)
                 }
+                "--window-seconds" => {
+                    args.window_seconds =
+                        Some(parse_usize(&take_value(&mut values, &flag), &flag).max(1) as u64)
+                }
+                "--checkpoint-wal-bytes" => CHECKPOINT_WAL_BYTES.store(
+                    parse_usize(&take_value(&mut values, &flag), &flag) as u64,
+                    Ordering::Relaxed,
+                ),
                 "--collection-delay" => {
                     args.collection_delay = Some(parse_duration(&take_value(&mut values, &flag)))
                 }
@@ -398,6 +526,13 @@ impl Args {
                 }
                 "--tokio-workers" => {
                     args.tokio_workers = parse_usize(&take_value(&mut values, &flag), &flag)
+                }
+                "--parallel-workers" => {
+                    args.parallel_workers = parse_usize(&take_value(&mut values, &flag), &flag)
+                }
+                "--parallel-min-mutations" => {
+                    args.parallel_min_mutations =
+                        parse_usize(&take_value(&mut values, &flag), &flag)
                 }
                 "--blink-workers" => {
                     args.blink_workers = parse_usize(&take_value(&mut values, &flag), &flag)
@@ -473,7 +608,7 @@ fn print_help() {
     println!(
         "phase0-bench sustained baseline\n\n\
          Usage: cargo run --release -p dodb-storage --bin phase0-bench -- [options]\n\n\
-         --engine main-btree|serial-blink|versioned-blink|planned-blink|parallel-blink\n\
+         --engine main-btree|serial-blink|versioned-blink|planned-blink|parallel-blink|logical-overlay-blink\n\
          Suites: write, read, mixed, delay-sweep, sync-sweep, all\n\
          Options: --writers 1,4 --readers 1,4 --widths 1,16\n\
          --distributions uniform,same-leaf-heavy,different-leaf-heavy\n\
@@ -483,7 +618,8 @@ fn print_help() {
          --group-limit 64 --group-bytes 4194304 --queue-capacity 256\n\
          --collection-delay 500us --sync-mode real|injected|disabled --sync-delay 1ms\n\
          --transaction-mode unconditional|insert-if-absent\n\
-         --tokio-workers 12 --blink-workers 2 --seed 0xd0db2026 --output target/phase0/results.jsonl"
+         --tokio-workers 12 --blink-workers 2 --parallel-workers 0|1|2 (planned-blink leaf workers, 0 = serial) --seed 0xd0db2026 --output target/phase0/results.jsonl\n\
+         --window-seconds 10 (per-window tx/s and latency, periodic WAL/RSS/dirty-page samples)"
     );
 }
 
@@ -1005,6 +1141,8 @@ struct EngineSnapshot {
     blink: Option<BlinkSplitMetrics>,
     batch: Option<BlinkBatchMetrics>,
     versioned: Option<BlinkVersionedReadMetrics>,
+    checkpoint: Option<dodb_storage::BlinkCheckpointMetrics>,
+    dirty_pages: Option<usize>,
 }
 
 trait EngineAdapter: Send + Sync {
@@ -1014,6 +1152,7 @@ trait EngineAdapter: Send + Sync {
     ) -> BoxFuture<'a, Result<TransactionResult>>;
     fn execute<'a>(&'a self, request: BatchRequest) -> BoxFuture<'a, Result<BatchResponse>>;
     fn snapshot(&self) -> EngineSnapshot;
+    fn reset_checkpoint_metrics(&self) {}
     fn shutdown<'a>(&'a self) -> BoxFuture<'a, Result<()>>;
 }
 
@@ -1041,6 +1180,8 @@ impl EngineAdapter for BaselineAdapter {
             blink: None,
             batch: None,
             versioned: None,
+            checkpoint: None,
+            dirty_pages: None,
         }
     }
 
@@ -1113,7 +1254,22 @@ impl BlinkAdapter {
                     .collect::<Vec<_>>();
                 let processing_started = Instant::now();
                 let results = match worker_store.lock() {
-                    Ok(mut store) => store.apply_transaction_group(&requests),
+                    Ok(mut store) => {
+                        let results = store.apply_transaction_group(&requests);
+                        let threshold = CHECKPOINT_WAL_BYTES.load(Ordering::Relaxed);
+                        let wal_bytes = store
+                            .wal_metrics()
+                            .ok()
+                            .flatten()
+                            .map_or(0, |metrics| metrics.wal_bytes);
+                        if results.is_ok() && threshold > 0 && wal_bytes >= threshold {
+                            results.and_then(|results| {
+                                checkpoint_blink_store(&mut store).map(|()| results)
+                            })
+                        } else {
+                            results
+                        }
+                    }
                     Err(_) => Err(Error::invariant("serial Blink benchmark mutex poisoned")),
                 };
                 let processing_nanos = processing_started.elapsed().as_nanos() as u64;
@@ -1238,6 +1394,8 @@ impl EngineAdapter for BlinkAdapter {
                 blink: None,
                 batch: None,
                 versioned: None,
+                checkpoint: None,
+                dirty_pages: None,
             };
         };
         EngineSnapshot {
@@ -1254,6 +1412,14 @@ impl EngineAdapter for BlinkAdapter {
                 .read_handle
                 .as_ref()
                 .map(|_| store.versioned_read_metrics()),
+            checkpoint: Some(store.checkpoint_metrics()),
+            dirty_pages: Some(store.dirty_page_count()),
+        }
+    }
+
+    fn reset_checkpoint_metrics(&self) {
+        if let Ok(mut store) = self.store.lock() {
+            store.reset_checkpoint_metrics();
         }
     }
 
@@ -1326,6 +1492,7 @@ struct WorkerStats {
     e2e_latency: LatencySamples,
     write_latency: LatencySamples,
     read_latency: LatencySamples,
+    window_timeline: Vec<(u64, u64)>,
 }
 
 impl WorkerStats {
@@ -1347,6 +1514,7 @@ impl WorkerStats {
             e2e_latency: LatencySamples::with_seed(seed),
             write_latency: LatencySamples::with_seed(seed ^ 0x1111),
             read_latency: LatencySamples::with_seed(seed ^ 0x2222),
+            window_timeline: Vec::new(),
         }
     }
 
@@ -1373,6 +1541,7 @@ impl WorkerStats {
         for value in other.read_latency.values {
             self.read_latency.push(value);
         }
+        self.window_timeline.extend(other.window_timeline);
     }
 
     fn attempted_operations(&self) -> u64 {
@@ -1409,8 +1578,17 @@ struct MetricDelta {
     publication_nanos: u64,
     wal_bytes: u64,
     wal_syncs: u64,
+    materializations: u64,
+    materialization_total_nanos: u64,
+    materialization_max_nanos: u64,
+    materialized_segments: u64,
+    materialized_overlay_bytes: u64,
+    materialized_data_bytes: u64,
+    materialization_wal_bytes_reclaimed: u64,
+    materialization_max_lag_transactions: u64,
     wal_committed_batches: u64,
     page_images: u64,
+    wal_redo: WalRedoStats,
     wal_append_nanos: u64,
     wal_sync_nanos: u64,
     wal_group_encode_nanos: u64,
@@ -1520,11 +1698,27 @@ struct MetricDelta {
     parallel_worker_nanos: u64,
     parallel_join_nanos: u64,
     parallel_fallback_groups: u64,
-    parallel_fallback_multi_leaf: u64,
-    parallel_fallback_dependency: u64,
+    parallel_job_operations: u64,
+    parallel_dispatch_nanos: u64,
+    parallel_collect_nanos: u64,
+    parallel_worker_slot_nanos: u64,
+    parallel_coordinator_lane_nanos: u64,
+    parallel_worker_base_nanos: u64,
+    parallel_worker_mutation_nanos: u64,
+    parallel_worker_encode_nanos: u64,
+    parallel_worker_delta_nanos: u64,
+    parallel_fallback_after_dispatch: u64,
+    parallel_fallback_no_delta_wal: u64,
+    parallel_fallback_route: u64,
     parallel_fallback_overflow: u64,
     parallel_fallback_structural: u64,
     parallel_skipped_single_leaf: u64,
+    parallel_skipped_small_group: u64,
+    structural_transactions: u64,
+    transaction_mutation_histogram: Vec<u64>,
+    transaction_dirty_page_histogram: Vec<u64>,
+    transaction_leaf_page_histogram: Vec<u64>,
+    wal_redo_plan_nanos: u64,
 }
 
 impl MetricDelta {
@@ -1540,6 +1734,8 @@ impl MetricDelta {
         let batch_after = after.batch.clone().unwrap_or_default();
         let versioned_before = before.versioned.clone().unwrap_or_default();
         let versioned_after = after.versioned.clone().unwrap_or_default();
+        let checkpoint_before = before.checkpoint.clone().unwrap_or_default();
+        let checkpoint_after = after.checkpoint.clone().unwrap_or_default();
         Self {
             groups: subtraction(after.coordinator.groups, before.coordinator.groups),
             queued_requests: subtraction(
@@ -1578,11 +1774,40 @@ impl MetricDelta {
             ),
             wal_bytes: wal_after.wal_bytes.saturating_sub(wal_before.wal_bytes),
             wal_syncs: subtraction(wal_after.wal_syncs, wal_before.wal_syncs),
+            materializations: subtraction(
+                checkpoint_after.materializations,
+                checkpoint_before.materializations,
+            ),
+            materialization_total_nanos: subtraction(
+                checkpoint_after.total_duration_nanos,
+                checkpoint_before.total_duration_nanos,
+            ),
+            materialization_max_nanos: checkpoint_after.max_duration_nanos,
+            materialized_segments: subtraction(
+                checkpoint_after.segments_materialized,
+                checkpoint_before.segments_materialized,
+            ),
+            materialized_overlay_bytes: subtraction(
+                checkpoint_after.overlay_bytes_materialized,
+                checkpoint_before.overlay_bytes_materialized,
+            ),
+            materialized_data_bytes: subtraction(
+                checkpoint_after.bytes_written,
+                checkpoint_before.bytes_written,
+            ),
+            materialization_wal_bytes_reclaimed: subtraction(
+                checkpoint_after.wal_bytes_reclaimed,
+                checkpoint_before.wal_bytes_reclaimed,
+            ),
+            materialization_max_lag_transactions: checkpoint_after
+                .max_materialization_lag_transactions,
             wal_committed_batches: subtraction(
                 wal_after.committed_batches as u64,
                 wal_before.committed_batches as u64,
             ),
             page_images: subtraction(wal_after.page_images as u64, wal_before.page_images as u64),
+            wal_redo: redo_delta(&wal_after.redo, &wal_before.redo),
+            wal_redo_plan_nanos: subtraction(wal_after.redo_plan_nanos, wal_before.redo_plan_nanos),
             wal_append_nanos: subtraction(wal_after.append_nanos, wal_before.append_nanos),
             wal_sync_nanos: subtraction(wal_after.sync_nanos, wal_before.sync_nanos),
             wal_group_encode_nanos: subtraction(
@@ -1941,13 +2166,53 @@ impl MetricDelta {
                 batch_after.parallel_fallback_groups,
                 batch_before.parallel_fallback_groups,
             ),
-            parallel_fallback_multi_leaf: subtraction(
-                batch_after.parallel_fallback_multi_leaf,
-                batch_before.parallel_fallback_multi_leaf,
+            parallel_job_operations: subtraction(
+                batch_after.parallel_job_operations,
+                batch_before.parallel_job_operations,
             ),
-            parallel_fallback_dependency: subtraction(
-                batch_after.parallel_fallback_dependency,
-                batch_before.parallel_fallback_dependency,
+            parallel_dispatch_nanos: subtraction(
+                batch_after.parallel_dispatch_nanos,
+                batch_before.parallel_dispatch_nanos,
+            ),
+            parallel_collect_nanos: subtraction(
+                batch_after.parallel_collect_nanos,
+                batch_before.parallel_collect_nanos,
+            ),
+            parallel_worker_slot_nanos: subtraction(
+                batch_after.parallel_worker_slot_nanos,
+                batch_before.parallel_worker_slot_nanos,
+            ),
+            parallel_coordinator_lane_nanos: subtraction(
+                batch_after.parallel_coordinator_lane_nanos,
+                batch_before.parallel_coordinator_lane_nanos,
+            ),
+            parallel_worker_base_nanos: subtraction(
+                batch_after.parallel_worker_base_nanos,
+                batch_before.parallel_worker_base_nanos,
+            ),
+            parallel_worker_mutation_nanos: subtraction(
+                batch_after.parallel_worker_mutation_nanos,
+                batch_before.parallel_worker_mutation_nanos,
+            ),
+            parallel_worker_encode_nanos: subtraction(
+                batch_after.parallel_worker_encode_nanos,
+                batch_before.parallel_worker_encode_nanos,
+            ),
+            parallel_worker_delta_nanos: subtraction(
+                batch_after.parallel_worker_delta_nanos,
+                batch_before.parallel_worker_delta_nanos,
+            ),
+            parallel_fallback_after_dispatch: subtraction(
+                batch_after.parallel_fallback_after_dispatch,
+                batch_before.parallel_fallback_after_dispatch,
+            ),
+            parallel_fallback_no_delta_wal: subtraction(
+                batch_after.parallel_fallback_no_delta_wal,
+                batch_before.parallel_fallback_no_delta_wal,
+            ),
+            parallel_fallback_route: subtraction(
+                batch_after.parallel_fallback_route,
+                batch_before.parallel_fallback_route,
             ),
             parallel_fallback_overflow: subtraction(
                 batch_after.parallel_fallback_overflow,
@@ -1957,9 +2222,29 @@ impl MetricDelta {
                 batch_after.parallel_fallback_structural,
                 batch_before.parallel_fallback_structural,
             ),
+            parallel_skipped_small_group: subtraction(
+                batch_after.parallel_skipped_small_group,
+                batch_before.parallel_skipped_small_group,
+            ),
             parallel_skipped_single_leaf: subtraction(
                 batch_after.parallel_skipped_single_leaf,
                 batch_before.parallel_skipped_single_leaf,
+            ),
+            structural_transactions: subtraction(
+                batch_after.structural_transactions,
+                batch_before.structural_transactions,
+            ),
+            transaction_mutation_histogram: histogram_delta(
+                &batch_after.transaction_mutation_histogram,
+                &batch_before.transaction_mutation_histogram,
+            ),
+            transaction_dirty_page_histogram: histogram_delta(
+                &batch_after.transaction_dirty_page_histogram,
+                &batch_before.transaction_dirty_page_histogram,
+            ),
+            transaction_leaf_page_histogram: histogram_delta(
+                &batch_after.transaction_leaf_page_histogram,
+                &batch_before.transaction_leaf_page_histogram,
             ),
         }
     }
@@ -2100,7 +2385,7 @@ fn process_cpu_ticks() -> Option<u64> {
         let user_micros = usage.ru_utime.tv_sec as u64 * 1_000_000 + usage.ru_utime.tv_usec as u64;
         let system_micros =
             usage.ru_stime.tv_sec as u64 * 1_000_000 + usage.ru_stime.tv_usec as u64;
-        return Some(user_micros.saturating_add(system_micros));
+        Some(user_micros.saturating_add(system_micros))
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -2168,6 +2453,7 @@ async fn writer_loop(
     deadline: Instant,
     quota: Option<MixQuota>,
     warmup: bool,
+    timeline_start: Option<Instant>,
 ) -> WorkerStats {
     let mut generator = WorkloadGenerator::new(workload, seed, worker_id);
     let mut stats = WorkerStats::new(seed ^ worker_id as u64);
@@ -2190,6 +2476,12 @@ async fn writer_loop(
                 Ok(_) => {
                     stats.successful_transactions += 1;
                     stats.mutation_ops += width;
+                    if let Some(timeline_start) = timeline_start {
+                        stats.window_timeline.push((
+                            (started + elapsed - timeline_start).as_nanos() as u64,
+                            elapsed.as_nanos() as u64,
+                        ));
+                    }
                 }
                 Err(Error::Conflict(_)) => stats.conflicts += 1,
                 Err(Error::Overloaded(_)) => stats.overloads += 1,
@@ -2258,7 +2550,9 @@ async fn run_interval(
     duration: Duration,
     warmup: bool,
 ) -> WorkerStats {
-    let deadline = Instant::now() + duration;
+    let interval_start = Instant::now();
+    let deadline = interval_start + duration;
+    let timeline_start = (!warmup && args.window_seconds.is_some()).then_some(interval_start);
     let workload = WorkloadConfig {
         distribution: scenario.distribution,
         working_set: args.working_set,
@@ -2279,6 +2573,7 @@ async fn run_interval(
             deadline,
             quota.clone(),
             warmup,
+            timeline_start,
         )));
     }
     for worker_id in 0..scenario.readers {
@@ -2298,6 +2593,177 @@ async fn run_interval(
         stats.merge(task.await.expect("benchmark worker task should not panic"));
     }
     stats
+}
+
+#[derive(Clone, Debug)]
+struct ResourceSample {
+    label: String,
+    taken_at: Instant,
+    unix_ms: u128,
+    rss_kib: u64,
+    wal_bytes: u64,
+    wal_committed_batches: u64,
+    wal_page_images: u64,
+    retained_recovery_batches: u64,
+    retained_recovery_page_images: u64,
+    wal_page_image_records: u64,
+    wal_page_delta_records: u64,
+    wal_syncs: u64,
+    wal_sync_nanos: u64,
+    dirty_pages: u64,
+    logical_transactions: u64,
+}
+
+impl ResourceSample {
+    fn capture(adapter: &dyn EngineAdapter, label: String) -> Self {
+        let snapshot = adapter.snapshot();
+        let wal = snapshot.wal.unwrap_or_default();
+        let sample = Self {
+            label,
+            taken_at: Instant::now(),
+            unix_ms: unix_timestamp_ms(),
+            rss_kib: process_rss_kib(),
+            wal_bytes: wal.wal_bytes,
+            wal_committed_batches: wal.committed_batches as u64,
+            wal_page_images: wal.page_images as u64,
+            retained_recovery_batches: wal.retained_recovery_batches as u64,
+            retained_recovery_page_images: wal.retained_recovery_page_images as u64,
+            wal_page_image_records: wal.redo.page_image_records,
+            wal_page_delta_records: wal.redo.page_delta_records,
+            wal_syncs: wal.wal_syncs,
+            wal_sync_nanos: wal.sync_nanos,
+            dirty_pages: snapshot.dirty_pages.unwrap_or_default() as u64,
+            logical_transactions: snapshot.coordinator.logical_transactions,
+        };
+        println!(
+            "resource_sample label={} unix_ms={} rss_kib={} wal_bytes={} wal_committed_batches={} wal_page_images={} retained_recovery_batches={} retained_recovery_page_images={} wal_page_image_records={} wal_page_delta_records={} wal_syncs={} wal_sync_nanos={} dirty_pages={} logical_transactions={}",
+            sample.label,
+            sample.unix_ms,
+            sample.rss_kib,
+            sample.wal_bytes,
+            sample.wal_committed_batches,
+            sample.wal_page_images,
+            sample.retained_recovery_batches,
+            sample.retained_recovery_page_images,
+            sample.wal_page_image_records,
+            sample.wal_page_delta_records,
+            sample.wal_syncs,
+            sample.wal_sync_nanos,
+            sample.dirty_pages,
+            sample.logical_transactions,
+        );
+        sample
+    }
+}
+
+fn process_rss_kib() -> u64 {
+    std::fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|status| {
+            status
+                .lines()
+                .find_map(|status_line| status_line.strip_prefix("VmRSS:"))
+                .and_then(|value| value.split_whitespace().next()?.parse().ok())
+        })
+        .unwrap_or(0)
+}
+
+struct ResourceSampler {
+    stop: Arc<AtomicBool>,
+    handle: std::thread::JoinHandle<Vec<ResourceSample>>,
+}
+
+impl ResourceSampler {
+    fn start(adapter: Arc<dyn EngineAdapter>, started: Instant, window: Duration) -> Self {
+        let stop = Arc::new(AtomicBool::new(false));
+        let thread_stop = Arc::clone(&stop);
+        let handle = std::thread::spawn(move || {
+            let mut samples = Vec::new();
+            let mut window_index = 0u32;
+            loop {
+                let window_end = started + window * (window_index + 1);
+                loop {
+                    if thread_stop.load(Ordering::Acquire) {
+                        return samples;
+                    }
+                    let now = Instant::now();
+                    if now >= window_end {
+                        break;
+                    }
+                    std::thread::sleep((window_end - now).min(Duration::from_millis(50)));
+                }
+                samples.push(ResourceSample::capture(
+                    &*adapter,
+                    format!("window_{window_index:02}_end"),
+                ));
+                window_index += 1;
+            }
+        });
+        Self { stop, handle }
+    }
+
+    fn finish(self) -> Vec<ResourceSample> {
+        self.stop.store(true, Ordering::Release);
+        self.handle
+            .join()
+            .expect("resource sampler thread should not panic")
+    }
+}
+
+fn histogram_delta(after: &[u64], before: &[u64]) -> Vec<u64> {
+    after
+        .iter()
+        .enumerate()
+        .map(|(bucket, count)| count.saturating_sub(before.get(bucket).copied().unwrap_or(0)))
+        .collect()
+}
+
+fn histogram_text(histogram: &[u64]) -> String {
+    histogram
+        .iter()
+        .enumerate()
+        .filter(|(_, count)| **count > 0)
+        .map(|(bucket, count)| format!("{bucket}:{count}"))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn redo_delta(after: &WalRedoStats, before: &WalRedoStats) -> WalRedoStats {
+    WalRedoStats {
+        page_image_records: u64::saturating_sub(
+            after.page_image_records,
+            before.page_image_records,
+        ),
+        page_delta_records: u64::saturating_sub(
+            after.page_delta_records,
+            before.page_delta_records,
+        ),
+        page_delta_payload_bytes: u64::saturating_sub(
+            after.page_delta_payload_bytes,
+            before.page_delta_payload_bytes,
+        ),
+        page_delta_spans: u64::saturating_sub(after.page_delta_spans, before.page_delta_spans),
+        page_delta_changed_bytes: u64::saturating_sub(
+            after.page_delta_changed_bytes,
+            before.page_delta_changed_bytes,
+        ),
+        image_superblock: u64::saturating_sub(after.image_superblock, before.image_superblock),
+        image_not_requested: u64::saturating_sub(
+            after.image_not_requested,
+            before.image_not_requested,
+        ),
+        image_page_image_format: u64::saturating_sub(
+            after.image_page_image_format,
+            before.image_page_image_format,
+        ),
+        image_ineligible_commit: u64::saturating_sub(
+            after.image_ineligible_commit,
+            before.image_ineligible_commit,
+        ),
+        image_first_touch: u64::saturating_sub(after.image_first_touch, before.image_first_touch),
+        image_no_base: u64::saturating_sub(after.image_no_base, before.image_no_base),
+        image_not_smaller: u64::saturating_sub(after.image_not_smaller, before.image_not_smaller),
+    }
 }
 
 fn benchmark_config(args: &Args, scenario: &Scenario) -> CoordinatorConfig {
@@ -2321,14 +2787,82 @@ fn effective_sync(args: &Args, scenario: &Scenario) -> (SyncMode, Duration) {
     }
 }
 
+#[cfg(feature = "phase-i-instrumentation")]
+fn write_phase_i_locality_samples(args: &Args, scenario: &Scenario, repetition: usize, seed: u64) {
+    use std::io::Write;
+
+    let Some(path) = env::var_os("DODB_PHASE_I_LOCALITY_OUTPUT") else {
+        let _ = dodb_storage::blink::take_phase_i_group_locality_samples();
+        return;
+    };
+    let path = PathBuf::from(path);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).expect("locality output directory should be creatable");
+    }
+    let mut output = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .expect("locality output should open");
+    let encode_array = |values: &[usize]| {
+        values
+            .iter()
+            .map(usize::to_string)
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    let git_commit = current_git_commit();
+    for (group_index, sample) in dodb_storage::blink::take_phase_i_group_locality_samples()
+        .into_iter()
+        .enumerate()
+    {
+        writeln!(
+            output,
+            "{{\"record_type\":\"group_locality\",\"git_commit\":{},\"sync_mode\":{},\"writers\":{},\"width\":{},\"distribution\":{},\"repetition\":{},\"seed\":{},\"group_index\":{},\"requested_transactions\":{},\"successful_transactions\":{},\"failed_transactions\":{},\"logical_mutations\":{},\"unique_keys\":{},\"boundary_materializations\":{},\"page_encodes\":{},\"page_delta_records\":{},\"distinct_touched_leaves\":{},\"mutations_per_leaf\":[{}],\"transactions_per_leaf\":[{}],\"leaves_by_transaction_touch_count\":[{},{},{}]}}",
+            json_string(&git_commit),
+            json_string(effective_sync(args, scenario).0.as_str()),
+            scenario.writers,
+            scenario.width,
+            json_string(scenario.distribution.as_str()),
+            repetition,
+            seed,
+            group_index,
+            sample.requested_transactions,
+            sample.successful_transactions,
+            sample.failed_transactions,
+            sample.logical_mutations,
+            sample.unique_keys,
+            sample.boundary_materializations,
+            sample.page_encodes,
+            sample.page_delta_records,
+            sample.distinct_touched_leaves,
+            encode_array(&sample.mutations_per_leaf),
+            encode_array(&sample.transactions_per_leaf),
+            sample.leaves_by_transaction_touch_count[0],
+            sample.leaves_by_transaction_touch_count[1],
+            sample.leaves_by_transaction_touch_count[2],
+        )
+        .expect("locality event should write");
+    }
+    output.flush().expect("locality output should flush");
+}
+
 fn benchmark_path(scenario: &Scenario, repetition: usize, seed: u64) -> PathBuf {
     let scenario_name = scenario.name().replace(['/', '\\'], "_");
-    env::temp_dir().join(format!(
+    let directory = benchmark_directory();
+    std::fs::create_dir_all(&directory).expect("benchmark data directory should be creatable");
+    directory.join(format!(
         "dodb-phase0-{}-{}-{}-{seed:016x}.db",
         std::process::id(),
         scenario_name,
         repetition
     ))
+}
+
+fn benchmark_directory() -> PathBuf {
+    env::var_os("DODB_BENCH_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(env::temp_dir)
 }
 
 fn seed_store(
@@ -2463,6 +2997,13 @@ async fn open_adapter(
             for chunk in requests.chunks(64) {
                 store.apply_transaction_group(chunk)?;
             }
+            if args.parallel_workers > 0 {
+                store.enable_parallel_execution(args.parallel_workers)?;
+                store.set_parallel_min_group_mutations(args.parallel_min_mutations);
+            }
+            if CHECKPOINT_WAL_BYTES.load(Ordering::Relaxed) > 0 {
+                checkpoint_blink_store(&mut store)?;
+            }
             let adapter = BlinkAdapter::start_versioned(store, benchmark_config(args, scenario));
             Ok((Arc::new(adapter), data_path, seeded))
         }
@@ -2479,6 +3020,20 @@ async fn open_adapter(
                 store.apply_transaction_group(chunk)?;
             }
             store.enable_parallel_execution(args.blink_workers)?;
+            let adapter = BlinkAdapter::start_versioned(store, benchmark_config(args, scenario));
+            Ok((Arc::new(adapter), data_path, seeded))
+        }
+        EngineKind::LogicalOverlayBlink => {
+            let mut store = BlinkStore::open_with_logical_wal(
+                BenchFile::open(&data_path, sync_mode, sync_delay)?,
+                BenchFile::open(&wal_path, sync_mode, sync_delay)?,
+                config,
+            )?;
+            let requests = seed_requests(args, scenario);
+            let seeded = requests.iter().map(|request| request.mutations.len()).sum();
+            for chunk in requests.chunks(64) {
+                store.apply_transaction_group(chunk)?;
+            }
             let adapter = BlinkAdapter::start_versioned(store, benchmark_config(args, scenario));
             Ok((Arc::new(adapter), data_path, seeded))
         }
@@ -2583,6 +3138,9 @@ fn build_record(
     wall: Duration,
     cpu_start: &ProcessCpuSample,
     cpu_end: &ProcessCpuSample,
+    measurement_started: Instant,
+    samples: &[ResourceSample],
+    churn: &[(String, u64)],
 ) -> String {
     let mut json = JsonObject::new();
     let seconds = wall.as_secs_f64().max(f64::EPSILON);
@@ -2599,6 +3157,10 @@ fn build_record(
     json.string("record_type", "run");
     json.u64("timestamp_unix_ms", unix_timestamp_ms() as u64);
     json.string("git_commit", &current_git_commit());
+    json.string(
+        "benchmark_data_dir",
+        &benchmark_directory().display().to_string(),
+    );
     json.string("baseline_commit", BASELINE_COMMIT);
     json.string("engine", args.engine.as_str());
     json.string(
@@ -2619,6 +3181,8 @@ fn build_record(
     json.string("rust_version", &machine.rust_version);
     json.usize("tokio_workers", args.tokio_workers);
     json.usize("blink_workers", args.blink_workers);
+    json.usize("parallel_workers", args.parallel_workers);
+    json.usize("parallel_min_mutations", args.parallel_min_mutations);
     json.string("suite", scenario.suite.as_str());
     json.string("workload", scenario.workload);
     json.usize("writers", scenario.writers);
@@ -2717,8 +3281,56 @@ fn build_record(
     json.u64("publication_nanos_total", delta.publication_nanos);
     json.u64("wal_bytes_delta", delta.wal_bytes);
     json.u64("wal_syncs_delta", delta.wal_syncs);
+    json.u64("materializations_delta", delta.materializations);
+    json.u64(
+        "materialization_total_nanos_delta",
+        delta.materialization_total_nanos,
+    );
+    json.u64("materialization_max_nanos", delta.materialization_max_nanos);
+    json.u64("materialized_segments_delta", delta.materialized_segments);
+    json.u64(
+        "materialized_overlay_bytes_delta",
+        delta.materialized_overlay_bytes,
+    );
+    json.u64(
+        "materialized_data_bytes_delta",
+        delta.materialized_data_bytes,
+    );
+    json.u64(
+        "materialization_wal_bytes_reclaimed_delta",
+        delta.materialization_wal_bytes_reclaimed,
+    );
+    json.u64(
+        "materialization_max_lag_transactions",
+        delta.materialization_max_lag_transactions,
+    );
     json.u64("wal_committed_batches_delta", delta.wal_committed_batches);
     json.u64("page_images_delta", delta.page_images);
+    let redo = &delta.wal_redo;
+    json.u64("wal_page_image_records_delta", redo.page_image_records);
+    json.u64("wal_page_delta_records_delta", redo.page_delta_records);
+    json.u64(
+        "wal_page_delta_payload_bytes_delta",
+        redo.page_delta_payload_bytes,
+    );
+    json.u64("wal_page_delta_spans_delta", redo.page_delta_spans);
+    json.u64(
+        "wal_page_delta_changed_bytes_delta",
+        redo.page_delta_changed_bytes,
+    );
+    json.u64("wal_image_superblock_delta", redo.image_superblock);
+    json.u64("wal_image_not_requested_delta", redo.image_not_requested);
+    json.u64(
+        "wal_image_page_image_format_delta",
+        redo.image_page_image_format,
+    );
+    json.u64(
+        "wal_image_ineligible_commit_delta",
+        redo.image_ineligible_commit,
+    );
+    json.u64("wal_image_first_touch_delta", redo.image_first_touch);
+    json.u64("wal_image_no_base_delta", redo.image_no_base);
+    json.u64("wal_image_not_smaller_delta", redo.image_not_smaller);
     json.u64("wal_append_nanos_total", delta.wal_append_nanos);
     json.u64("wal_sync_nanos_total", delta.wal_sync_nanos);
     json.u64("wal_group_encode_nanos_total", delta.wal_group_encode_nanos);
@@ -2954,12 +3566,49 @@ fn build_record(
         delta.parallel_fallback_groups,
     );
     json.u64(
-        "parallel_fallback_multi_leaf_delta",
-        delta.parallel_fallback_multi_leaf,
+        "parallel_job_operations_delta",
+        delta.parallel_job_operations,
     );
     json.u64(
-        "parallel_fallback_dependency_delta",
-        delta.parallel_fallback_dependency,
+        "parallel_dispatch_nanos_total",
+        delta.parallel_dispatch_nanos,
+    );
+    json.u64("parallel_collect_nanos_total", delta.parallel_collect_nanos);
+    json.u64(
+        "parallel_worker_slot_nanos_total",
+        delta.parallel_worker_slot_nanos,
+    );
+    json.u64(
+        "parallel_coordinator_lane_nanos_total",
+        delta.parallel_coordinator_lane_nanos,
+    );
+    json.u64(
+        "parallel_worker_base_nanos_total",
+        delta.parallel_worker_base_nanos,
+    );
+    json.u64(
+        "parallel_worker_mutation_nanos_total",
+        delta.parallel_worker_mutation_nanos,
+    );
+    json.u64(
+        "parallel_worker_encode_nanos_total",
+        delta.parallel_worker_encode_nanos,
+    );
+    json.u64(
+        "parallel_worker_delta_nanos_total",
+        delta.parallel_worker_delta_nanos,
+    );
+    json.u64(
+        "parallel_fallback_after_dispatch_delta",
+        delta.parallel_fallback_after_dispatch,
+    );
+    json.u64(
+        "parallel_fallback_no_delta_wal_delta",
+        delta.parallel_fallback_no_delta_wal,
+    );
+    json.u64(
+        "parallel_fallback_route_delta",
+        delta.parallel_fallback_route,
     );
     json.u64(
         "parallel_fallback_overflow_delta",
@@ -2973,10 +3622,205 @@ fn build_record(
         "parallel_skipped_single_leaf_delta",
         delta.parallel_skipped_single_leaf,
     );
+    json.u64(
+        "parallel_skipped_small_group_delta",
+        delta.parallel_skipped_small_group,
+    );
+    json.u64(
+        "structural_transactions_delta",
+        delta.structural_transactions,
+    );
+    json.u64("wal_redo_plan_nanos_total", delta.wal_redo_plan_nanos);
+    json.string(
+        "tx_mutation_histogram",
+        &histogram_text(&delta.transaction_mutation_histogram),
+    );
+    json.string(
+        "tx_dirty_page_histogram",
+        &histogram_text(&delta.transaction_dirty_page_histogram),
+    );
+    json.string(
+        "tx_leaf_page_histogram",
+        &histogram_text(&delta.transaction_leaf_page_histogram),
+    );
     json.string(
         "component_timing_scope",
         "existing cumulative coordinator/storage/WAL metrics; per-request component percentiles unavailable without production hot-path instrumentation",
     );
+    json.string(
+        "churn_counters",
+        if dodb_storage::churn::ENABLED {
+            "enabled"
+        } else {
+            "disabled"
+        },
+    );
+    for (name, value) in churn {
+        json.u64(name, *value);
+    }
+    if let Some(window_seconds) = args.window_seconds {
+        let mut timeline = measured.window_timeline.clone();
+        timeline.sort_unstable();
+        let window_nanos = window_seconds * 1_000_000_000;
+        let wall_nanos = wall.as_nanos() as u64;
+        let window_count = wall_nanos.div_ceil(window_nanos);
+        json.u64("window_seconds", window_seconds);
+        json.u64("window_count", window_count);
+        for window_index in 0..window_count {
+            let start = window_index * window_nanos;
+            let end = start + window_nanos;
+            let mut latencies: Vec<u64> = timeline
+                .iter()
+                .filter(|(finish, _)| *finish >= start && *finish < end)
+                .map(|(_, latency)| *latency)
+                .collect();
+            latencies.sort_unstable();
+            let span = (end.min(wall_nanos) - start) as f64 / 1e9;
+            let percentile = |fraction: f64| {
+                if latencies.is_empty() {
+                    0.0
+                } else {
+                    latencies[((latencies.len() - 1) as f64 * fraction).round() as usize] as f64
+                        / 1_000.0
+                }
+            };
+            json.u64(
+                &format!("window_{window_index:02}_successful_transactions"),
+                latencies.len() as u64,
+            );
+            json.f64(&format!("window_{window_index:02}_span_seconds"), span);
+            json.f64(
+                &format!("window_{window_index:02}_logical_tx_per_second"),
+                latencies.len() as f64 / span,
+            );
+            json.f64(
+                &format!("window_{window_index:02}_p50_us"),
+                percentile(0.50),
+            );
+            json.f64(
+                &format!("window_{window_index:02}_p95_us"),
+                percentile(0.95),
+            );
+            json.f64(
+                &format!("window_{window_index:02}_p99_us"),
+                percentile(0.99),
+            );
+        }
+        let checkpoint_events = CHECKPOINT_EVENTS
+            .lock()
+            .map(|events| {
+                events
+                    .iter()
+                    .filter(|event| event.finished >= measurement_started)
+                    .map(|event| {
+                        (
+                            (event.finished - measurement_started).as_nanos() as u64,
+                            *event,
+                        )
+                    })
+                    .filter(|(offset, _)| *offset <= wall_nanos)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        json.u64(
+            "checkpoint_wal_bytes_threshold",
+            CHECKPOINT_WAL_BYTES.load(Ordering::Relaxed),
+        );
+        json.u64("checkpoint_count", checkpoint_events.len() as u64);
+        json.u64(
+            "checkpoint_total_nanos",
+            checkpoint_events
+                .iter()
+                .map(|(_, event)| event.duration_nanos)
+                .sum(),
+        );
+        json.u64(
+            "checkpoint_max_nanos",
+            checkpoint_events
+                .iter()
+                .map(|(_, event)| event.duration_nanos)
+                .max()
+                .unwrap_or(0),
+        );
+        json.u64(
+            "checkpoint_wal_bytes_reclaimed",
+            checkpoint_events
+                .iter()
+                .map(|(_, event)| event.wal_bytes_reclaimed)
+                .sum(),
+        );
+        json.string(
+            "checkpoint_events",
+            &checkpoint_events
+                .iter()
+                .map(|(offset, event)| {
+                    format!(
+                        "{:.3}s:{:.1}ms:{}B",
+                        *offset as f64 / 1e9,
+                        event.duration_nanos as f64 / 1e6,
+                        event.wal_bytes_before
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+        for window_index in 0..window_count {
+            let start = window_index * window_nanos;
+            let end = start + window_nanos;
+            json.u64(
+                &format!("window_{window_index:02}_checkpoints"),
+                checkpoint_events
+                    .iter()
+                    .filter(|(offset, _)| *offset >= start && *offset < end)
+                    .count() as u64,
+            );
+        }
+        json.u64("resource_sample_count", samples.len() as u64);
+        for (sample_index, sample) in samples.iter().enumerate() {
+            let prefix = format!("resource_sample_{sample_index:02}");
+            let since_measurement_start = if sample.taken_at >= measurement_started {
+                (sample.taken_at - measurement_started).as_secs_f64()
+            } else {
+                -(measurement_started - sample.taken_at).as_secs_f64()
+            };
+            json.string(&format!("{prefix}_label"), &sample.label);
+            json.f64(
+                &format!("{prefix}_since_measurement_start_seconds"),
+                since_measurement_start,
+            );
+            json.u64(&format!("{prefix}_unix_ms"), sample.unix_ms as u64);
+            json.u64(&format!("{prefix}_rss_kib"), sample.rss_kib);
+            json.u64(&format!("{prefix}_wal_bytes"), sample.wal_bytes);
+            json.u64(
+                &format!("{prefix}_wal_committed_batches"),
+                sample.wal_committed_batches,
+            );
+            json.u64(&format!("{prefix}_wal_page_images"), sample.wal_page_images);
+            json.u64(
+                &format!("{prefix}_retained_recovery_batches"),
+                sample.retained_recovery_batches,
+            );
+            json.u64(
+                &format!("{prefix}_retained_recovery_page_images"),
+                sample.retained_recovery_page_images,
+            );
+            json.u64(
+                &format!("{prefix}_wal_page_image_records"),
+                sample.wal_page_image_records,
+            );
+            json.u64(
+                &format!("{prefix}_wal_page_delta_records"),
+                sample.wal_page_delta_records,
+            );
+            json.u64(&format!("{prefix}_wal_syncs"), sample.wal_syncs);
+            json.u64(&format!("{prefix}_wal_sync_nanos"), sample.wal_sync_nanos);
+            json.u64(&format!("{prefix}_dirty_pages"), sample.dirty_pages);
+            json.u64(
+                &format!("{prefix}_logical_transactions"),
+                sample.logical_transactions,
+            );
+        }
+    }
     json.finish()
 }
 
@@ -3017,6 +3861,10 @@ async fn run_repetition(
     output: &mut std::fs::File,
 ) -> Result<()> {
     let (adapter, data_path, seeded_rows) = open_adapter(args, scenario, repetition, seed).await?;
+    let mut samples = Vec::new();
+    if args.window_seconds.is_some() {
+        samples.push(ResourceSample::capture(&*adapter, "seeded".to_string()));
+    }
     let warmup_stats = run_interval(
         Arc::clone(&adapter),
         args,
@@ -3027,9 +3875,27 @@ async fn run_repetition(
     )
     .await;
     let _ = warmup_stats;
+    #[cfg(feature = "phase-i-instrumentation")]
+    let _ = dodb_storage::blink::take_phase_i_group_locality_samples();
+    if args.window_seconds.is_some() {
+        samples.push(ResourceSample::capture(
+            &*adapter,
+            "measurement_start".to_string(),
+        ));
+    }
+    adapter.reset_checkpoint_metrics();
     let before = adapter.snapshot();
+    let churn_before = dodb_storage::churn::snapshot();
+    let (leaf_sample_start, _) = dodb_storage::churn::leaf_samples_since(usize::MAX);
     let cpu_start = ProcessCpuSample::capture();
     let started = Instant::now();
+    let sampler = args.window_seconds.map(|window_seconds| {
+        ResourceSampler::start(
+            Arc::clone(&adapter),
+            started,
+            Duration::from_secs(window_seconds),
+        )
+    });
     let measured = run_interval(
         Arc::clone(&adapter),
         args,
@@ -3041,8 +3907,19 @@ async fn run_repetition(
     .await;
     let wall = started.elapsed();
     let cpu_end = ProcessCpuSample::capture();
+    if let Some(sampler) = sampler {
+        samples.extend(sampler.finish());
+        samples.push(ResourceSample::capture(
+            &*adapter,
+            "measurement_end".to_string(),
+        ));
+    }
+    let churn_after = dodb_storage::churn::snapshot();
     let after = adapter.snapshot();
     let delta = MetricDelta::from(&before, &after);
+    let mut churn = churn_delta(&churn_before, &churn_after);
+    let (_, leaf_samples) = dodb_storage::churn::leaf_samples_since(leaf_sample_start);
+    churn.extend(leaf_sample_summary(&leaf_samples));
     print_run_summary(scenario, repetition, &measured, wall, &delta);
     let line = build_record(
         machine,
@@ -3056,7 +3933,12 @@ async fn run_repetition(
         wall,
         &cpu_start,
         &cpu_end,
+        started,
+        &samples,
+        &churn,
     );
+    #[cfg(feature = "phase-i-instrumentation")]
+    write_phase_i_locality_samples(args, scenario, repetition, seed);
     use std::io::Write;
     writeln!(output, "{line}")?;
     output.flush()?;

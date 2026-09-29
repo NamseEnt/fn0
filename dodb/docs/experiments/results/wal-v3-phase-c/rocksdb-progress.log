@@ -1,0 +1,12 @@
+confirm-real-06-rep1-page-delta-w64-width1-uniform: tx/s=24368 p99=5001us wal_b_per_tx=226.7
+confirm-rocksdb-06-rep1-w64-width1-uniform: tx/s=26096 p99=3918us
+confirm-rocksdb-09-rep1-w64-width16-uniform: tx/s=9736 p99=16983us
+confirm-real-09-rep1-page-delta-w64-width16-uniform: tx/s=2058 p99=56963us wal_b_per_tx=2610.1
+confirm-rocksdb-06-rep2-w64-width1-uniform: tx/s=26477 p99=3885us
+confirm-real-06-rep2-page-delta-w64-width1-uniform: tx/s=23531 p99=5225us wal_b_per_tx=226.7
+confirm-real-09-rep2-page-delta-w64-width16-uniform: tx/s=2046 p99=58978us wal_b_per_tx=2624.0
+confirm-rocksdb-09-rep2-w64-width16-uniform: tx/s=9591 p99=15106us
+confirm-real-06-rep3-page-delta-w64-width1-uniform: tx/s=24058 p99=5219us wal_b_per_tx=226.7
+confirm-rocksdb-06-rep3-w64-width1-uniform: tx/s=26050 p99=3977us
+confirm-rocksdb-09-rep3-w64-width16-uniform: tx/s=10087 p99=12589us
+confirm-real-09-rep3-page-delta-w64-width16-uniform: tx/s=2076 p99=57637us wal_b_per_tx=2602.0

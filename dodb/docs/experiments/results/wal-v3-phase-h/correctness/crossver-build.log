@@ -1,0 +1,4 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/dodb-wal-v3/crates/dodb-storage)
+   Compiling phase-g-crossver v0.1.0 (/Users/namse/dodb-wal-v3/docs/experiments/results/wal-v3-phase-g/crossver)
+    Finished `release` profile [optimized] target(s) in 9.24s
+     Running `docs/experiments/results/wal-v3-phase-g/crossver/target/release/phase-g-crossver`

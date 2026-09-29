@@ -1,0 +1,12 @@
+[package]
+name = "wal-v3-phase-i-overlay-prototype"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+dodb-core = { path = "../../../../../crates/dodb-core" }
+dodb-storage = { path = "../../../../../crates/dodb-storage" }
+libc = "0.2"
+mimalloc = "0.1.52"

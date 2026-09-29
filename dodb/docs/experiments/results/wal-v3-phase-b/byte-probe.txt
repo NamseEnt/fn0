@@ -1,0 +1,11 @@
+phase-b byte probe (docs/experiments/results/wal-v3-phase-a/scripts/wal_byte_probe.rs) on 6bcf8bb
+blink_checkpoint_lsn=7527
+blink_width1_existing_update_wal_bytes min=158 median=225 max=226
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.01s
+8f76b74ed48ffdb34a32baa6bfddd68b245ea5f3062db5c396bdc98a9da2f0dc  btree.wal
+af5cc20d2977f14103c9ed414b6b70964e0531f3cdd4ab64f9ff981daa9483ef  btree.db
+3818d473e2cd6edb2008426517d4000579f644ff194e00c3571915145a787467  blink.wal
+fc9a84f357a0314d78bffb68e010ecff88c12ca4879efdbf48198f229da86e8d  blink.db
+283140 blink.wal
+2514104 btree.wal
+phase-a reference (wal-v3-phase-a/wal-byte-probe.txt): btree.wal 8f76b74e..., btree.db af5cc20d..., blink.wal 02c0da2a... 2534504 B, blink.db fc9a84f3...

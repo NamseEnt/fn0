@@ -1,0 +1,2351 @@
+{
+  "core": [
+    {
+      "distribution": "uniform",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 58.074071,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 2.365857963800905,
+        "mutation_ops_per_second": 3219.848596,
+        "overloads": 0,
+        "p50_us": 4631.632666666666,
+        "p95_us": 6685.088333333333,
+        "p99_us": 9164.371,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 761.03515625,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 3219.848596,
+        "tx_per_second_runs": [
+          3211.912868,
+          3244.461347,
+          3203.171573
+        ],
+        "tx_per_sync": 15.626050420168067,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 25.73628933034725
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 44.04341266666667,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 2.687321926253687,
+        "mutation_ops_per_second": 3534.4709143333334,
+        "overloads": 0,
+        "p50_us": 4313.965333333334,
+        "p95_us": 6090.207,
+        "p99_us": 8065.249666666667,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 787.98046875,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 3534.4709143333334,
+        "tx_per_second_runs": [
+          3541.949077,
+          3583.520269,
+          3477.943397
+        ],
+        "tx_per_sync": 15.64749262536873,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 28.248471825337496
+      },
+      "experiment_main_btree_vs_rocksdb": 0.3522645173092275,
+      "experiment_main_btree_vs_turso_mvcc_gc": 6.168301416685203,
+      "experiment_main_btree_vs_turso_wal": 3.1663549204606953,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 21.586542666666666,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 1.731304844930972,
+        "mutation_ops_per_second": 3968.9898040000003,
+        "overloads": 0,
+        "p50_us": 3654.324,
+        "p95_us": 6992.742,
+        "p99_us": 12883.002,
+        "page_images_per_tx": 1.0,
+        "peak_rss_mib": 710.71875,
+        "superblock_images_elided": 59572,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 3968.9898040000003,
+        "tx_per_second_runs": [
+          3084.470246,
+          4421.015601,
+          4401.483565
+        ],
+        "tx_per_sync": 8.307349044763631,
+        "wal_bytes_per_mutation": 4224.0,
+        "wal_bytes_per_tx": 4224.0,
+        "wal_write_mib_per_second": 15.989574527427811
+      },
+      "ratio_vs_exact_main": 1.2326634888766679,
+      "ratio_vs_experiment_main_btree": 1.1229374636822058,
+      "ratio_vs_rocksdb": 0.3955710236124603,
+      "ratio_vs_turso_mvcc_gc": 6.926616748079839,
+      "ratio_vs_turso_wal": 3.5556185634998054,
+      "rocksdb": {
+        "cpu_percent_one_core": 31.456960281030813,
+        "mutation_ops_per_second": 10033.570628490743,
+        "p99_us": 2330.5363333333335,
+        "tx_per_second": 10033.570628490743
+      },
+      "scenario_index": 0,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 184.38268998118033,
+        "mutation_ops_per_second": 573.0055448932212,
+        "p99_us": 88038.82633333333,
+        "tx_per_second": 573.0055448932212
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 23.32960193831155,
+        "mutation_ops_per_second": 1116.2586011738313,
+        "p99_us": 48045.657999999996,
+        "tx_per_second": 1116.2586011738313
+      },
+      "width": 1,
+      "writers": 16
+    },
+    {
+      "distribution": "same-leaf-heavy",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 49.112201999999996,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 2.3181590636087175,
+        "mutation_ops_per_second": 4096.972764,
+        "overloads": 0,
+        "p50_us": 3539.5106666666666,
+        "p95_us": 5583.860000000001,
+        "p99_us": 7574.716,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 395.01171875,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 4096.972764,
+        "tx_per_second_runs": [
+          4145.329168,
+          4049.679328,
+          4095.909796
+        ],
+        "tx_per_sync": 15.580587937151545,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 32.74527900122564
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 24.124538,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 3.2875032157450286,
+        "mutation_ops_per_second": 3851.4569043333336,
+        "overloads": 0,
+        "p50_us": 3564.0716666666667,
+        "p95_us": 9682.411666666667,
+        "p99_us": 12236.294666666667,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 404.3984375,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 3851.4569043333336,
+        "tx_per_second_runs": [
+          4421.396047,
+          2719.262673,
+          4413.711993
+        ],
+        "tx_per_sync": 15.743121765186597,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 30.781893366422132
+      },
+      "experiment_main_btree_vs_rocksdb": 0.3529344787972146,
+      "experiment_main_btree_vs_turso_mvcc_gc": 10.35750141651917,
+      "experiment_main_btree_vs_turso_wal": 2.5800533551174203,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 18.058464333333333,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 1.4267633333697196,
+        "mutation_ops_per_second": 4756.902889,
+        "overloads": 0,
+        "p50_us": 3221.47,
+        "p95_us": 4681.152,
+        "p99_us": 6011.527666666667,
+        "page_images_per_tx": 1.0,
+        "peak_rss_mib": 320.0859375,
+        "superblock_images_elided": 71386,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 4756.902889,
+        "tx_per_second_runs": [
+          4758.859497,
+          4906.781065,
+          4605.068105
+        ],
+        "tx_per_sync": 7.792380744460211,
+        "wal_bytes_per_mutation": 4224.0,
+        "wal_bytes_per_tx": 4224.0,
+        "wal_write_mib_per_second": 19.164615844784798
+      },
+      "ratio_vs_exact_main": 1.161077498683611,
+      "ratio_vs_experiment_main_btree": 1.2350918125678454,
+      "ratio_vs_rocksdb": 0.43590648513533964,
+      "ratio_vs_turso_mvcc_gc": 12.792465198202688,
+      "ratio_vs_turso_wal": 3.186602774893726,
+      "rocksdb": {
+        "cpu_percent_one_core": 31.324739245714408,
+        "mutation_ops_per_second": 10912.668315827152,
+        "p99_us": 2312.563,
+        "tx_per_second": 10912.668315827152
+      },
+      "scenario_index": 1,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 183.79237736923636,
+        "mutation_ops_per_second": 371.85193121872504,
+        "p99_us": 227857.475,
+        "tx_per_second": 371.85193121872504
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 19.759871099834584,
+        "mutation_ops_per_second": 1492.781882473144,
+        "p99_us": 30629.583666666666,
+        "tx_per_second": 1492.781882473144
+      },
+      "width": 1,
+      "writers": 16
+    },
+    {
+      "distribution": "different-leaf-heavy",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 54.44153633333333,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 2.3208580253344717,
+        "mutation_ops_per_second": 3664.248947,
+        "overloads": 0,
+        "p50_us": 4027.711333333333,
+        "p95_us": 6005.194333333333,
+        "p99_us": 8257.703,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 375.71875,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 3664.248947,
+        "tx_per_second_runs": [
+          3664.66607,
+          3625.454821,
+          3702.62595
+        ],
+        "tx_per_sync": 15.653003131226871,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 29.287651074552645
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 35.11726766666667,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 2.7328516026075618,
+        "mutation_ops_per_second": 4005.193173333333,
+        "overloads": 0,
+        "p50_us": 3908.058,
+        "p95_us": 4664.4856666666665,
+        "p99_us": 6760.341333333333,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 383.90234375,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 4005.193173333333,
+        "tx_per_second_runs": [
+          4031.023908,
+          4040.85445,
+          3943.701162
+        ],
+        "tx_per_sync": 15.672750977835724,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 32.01025998839564
+      },
+      "experiment_main_btree_vs_rocksdb": 0.37735511604639865,
+      "experiment_main_btree_vs_turso_mvcc_gc": 1.1941216059112132,
+      "experiment_main_btree_vs_turso_wal": 2.5278459798604476,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 21.514352666666667,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 1.453448429349085,
+        "mutation_ops_per_second": 4592.489958333334,
+        "overloads": 0,
+        "p50_us": 3397.3373333333334,
+        "p95_us": 4967.966,
+        "p99_us": 6233.807333333333,
+        "page_images_per_tx": 1.0,
+        "peak_rss_mib": 320.16796875,
+        "superblock_images_elided": 68948,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 4592.489958333334,
+        "tx_per_second_runs": [
+          4633.239508,
+          4568.374521,
+          4575.855846
+        ],
+        "tx_per_sync": 7.985638174658328,
+        "wal_bytes_per_mutation": 4224.0,
+        "wal_bytes_per_tx": 4224.0,
+        "wal_write_mib_per_second": 18.502770440735585
+      },
+      "ratio_vs_exact_main": 1.2533236755361026,
+      "ratio_vs_experiment_main_btree": 1.1466338225357608,
+      "ratio_vs_rocksdb": 0.4326881391657077,
+      "ratio_vs_turso_mvcc_gc": 1.3692202215585156,
+      "ratio_vs_turso_wal": 2.8985136986690407,
+      "rocksdb": {
+        "cpu_percent_one_core": 31.058629188052823,
+        "mutation_ops_per_second": 10613.85682350432,
+        "p99_us": 2245.162333333333,
+        "tx_per_second": 10613.85682350432
+      },
+      "scenario_index": 2,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 136.36129489591747,
+        "mutation_ops_per_second": 3354.0915376680086,
+        "p99_us": 80460.804,
+        "tx_per_second": 3354.0915376680086
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 19.274879969390295,
+        "mutation_ops_per_second": 1584.4292750598847,
+        "p99_us": 24187.336,
+        "tx_per_second": 1584.4292750598847
+      },
+      "width": 1,
+      "writers": 16
+    },
+    {
+      "distribution": "uniform",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 83.041738,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 6.458261997792494,
+        "mutation_ops_per_second": 7498.782950333333,
+        "overloads": 0,
+        "p50_us": 31706.278000000002,
+        "p95_us": 47645.564,
+        "p99_us": 69082.843,
+        "page_images_per_tx": 16.98683838097934,
+        "peak_rss_mib": 836.49609375,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 468.6739346666667,
+        "tx_per_second_runs": [
+          461.483357,
+          470.305131,
+          474.233316
+        ],
+        "tx_per_sync": 15.59823399558499,
+        "wal_bytes_per_mutation": 4416.581269459383,
+        "wal_bytes_per_tx": 70665.30031135013,
+        "wal_write_mib_per_second": 31.58845953924859
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 76.040731,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 8.863572959660297,
+        "mutation_ops_per_second": 7983.996988,
+        "overloads": 0,
+        "p50_us": 30684.463666666667,
+        "p95_us": 40532.995,
+        "p99_us": 63042.16966666666,
+        "page_images_per_tx": 16.986801759765363,
+        "peak_rss_mib": 863.5078125,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 498.9998116666667,
+        "tx_per_second_runs": [
+          517.450387,
+          485.6503,
+          493.898748
+        ],
+        "tx_per_sync": 15.925690021231423,
+        "wal_bytes_per_mutation": 4416.571757099054,
+        "wal_bytes_per_tx": 70665.14811358486,
+        "wal_write_mib_per_second": 33.63182030402055
+      },
+      "experiment_main_btree_vs_rocksdb": 0.08718465750141073,
+      "experiment_main_btree_vs_turso_mvcc_gc": 1.0472793477260933,
+      "experiment_main_btree_vs_turso_wal": 1.5578179605851667,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 57.083045,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 4,
+        "mean_sync_ms": 7.190015942561206,
+        "mutation_ops_per_second": 16184.439046666666,
+        "overloads": 0,
+        "p50_us": 14149.337,
+        "p95_us": 26715.832333333336,
+        "p99_us": 33625.280666666666,
+        "page_images_per_tx": 15.985990528808209,
+        "peak_rss_mib": 1073.4453125,
+        "superblock_images_elided": 15200,
+        "superblock_images_emitted": 4,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 1011.5274406666667,
+        "tx_per_second_runs": [
+          1021.850672,
+          991.137455,
+          1021.594195
+        ],
+        "tx_per_sync": 14.31638418079096,
+        "wal_bytes_per_mutation": 4156.611039857932,
+        "wal_bytes_per_tx": 66505.77663772691,
+        "wal_write_mib_per_second": 64.16316420477388
+      },
+      "ratio_vs_exact_main": 2.1582754359618734,
+      "ratio_vs_experiment_main_btree": 2.0271098646072634,
+      "ratio_vs_rocksdb": 0.17673287926351536,
+      "ratio_vs_turso_mvcc_gc": 2.1229502967750244,
+      "ratio_vs_turso_wal": 3.157868155164561,
+      "rocksdb": {
+        "cpu_percent_one_core": 62.04584686975915,
+        "mutation_ops_per_second": 91575.71085873083,
+        "p99_us": 6714.221333333334,
+        "tx_per_second": 5723.481928670677
+      },
+      "scenario_index": 3,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 190.69238895842483,
+        "mutation_ops_per_second": 7623.560040596552,
+        "p99_us": 107065.98266666666,
+        "tx_per_second": 476.4725025372845
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 42.722434212305515,
+        "mutation_ops_per_second": 5125.115506864242,
+        "p99_us": 87973.106,
+        "tx_per_second": 320.3197191790151
+      },
+      "width": 16,
+      "writers": 16
+    },
+    {
+      "distribution": "same-leaf-heavy",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 72.47417800000001,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 2.665809843035343,
+        "mutation_ops_per_second": 32262.69767,
+        "overloads": 0,
+        "p50_us": 7311.889,
+        "p95_us": 10219.799333333332,
+        "p99_us": 13562.19,
+        "page_images_per_tx": 3.0,
+        "peak_rss_mib": 324.69921875,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 2016.4186043333332,
+        "tx_per_second_runs": [
+          1973.099057,
+          2031.419982,
+          2044.736774
+        ],
+        "tx_per_sync": 15.733367983367984,
+        "wal_bytes_per_mutation": 783.5,
+        "wal_bytes_per_tx": 12536.0,
+        "wal_write_mib_per_second": 24.109007054548066
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 61.14738233333333,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 3.242745881800198,
+        "mutation_ops_per_second": 34376.87052966667,
+        "overloads": 0,
+        "p50_us": 6829.6483333333335,
+        "p95_us": 11178.226333333332,
+        "p99_us": 12595.708333333334,
+        "page_images_per_tx": 3.0,
+        "peak_rss_mib": 343.7734375,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 2148.554408,
+        "tx_per_second_runs": [
+          2085.790862,
+          2083.016105,
+          2276.856257
+        ],
+        "tx_per_sync": 15.952522255192878,
+        "wal_bytes_per_mutation": 783.5,
+        "wal_bytes_per_tx": 12536.0,
+        "wal_write_mib_per_second": 25.68834752039514
+      },
+      "experiment_main_btree_vs_rocksdb": 0.31473672617585036,
+      "experiment_main_btree_vs_turso_mvcc_gc": 4.867459033847395,
+      "experiment_main_btree_vs_turso_wal": 2.155151834253579,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 38.37710166666667,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 2.0782051593515223,
+        "mutation_ops_per_second": 53730.06511933333,
+        "overloads": 0,
+        "p50_us": 5299.073,
+        "p95_us": 6662.195000000001,
+        "p99_us": 7795.383,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 374.41796875,
+        "superblock_images_elided": 50402,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 3358.12907,
+        "tx_per_second_runs": [
+          3353.506477,
+          3406.828377,
+          3314.052356
+        ],
+        "tx_per_sync": 9.964808224594702,
+        "wal_bytes_per_mutation": 523.75,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 26.839165847271563
+      },
+      "ratio_vs_exact_main": 1.6653928220972063,
+      "ratio_vs_experiment_main_btree": 1.562971390203678,
+      "ratio_vs_rocksdb": 0.49192449845922315,
+      "ratio_vs_turso_mvcc_gc": 7.607699212891914,
+      "ratio_vs_turso_wal": 3.3684406584833226,
+      "rocksdb": {
+        "cpu_percent_one_core": 48.781270042524206,
+        "mutation_ops_per_second": 109224.21080529662,
+        "p99_us": 4128.538333333333,
+        "tx_per_second": 6826.513175331039
+      },
+      "scenario_index": 4,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 169.1292169133355,
+        "mutation_ops_per_second": 7062.590622530092,
+        "p99_us": 134944.536,
+        "tx_per_second": 441.41191390813077
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 29.734596013078747,
+        "mutation_ops_per_second": 15951.020239790287,
+        "p99_us": 71837.38,
+        "tx_per_second": 996.9387649868929
+      },
+      "width": 16,
+      "writers": 16
+    },
+    {
+      "distribution": "different-leaf-heavy",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 77.20041633333334,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 2.5873786610677865,
+        "mutation_ops_per_second": 28141.215742666667,
+        "overloads": 0,
+        "p50_us": 8508.770666666667,
+        "p95_us": 11138.813666666667,
+        "p99_us": 14135.283666666668,
+        "page_images_per_tx": 3.0,
+        "peak_rss_mib": 311.13671875,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 1758.825984,
+        "tx_per_second_runs": [
+          1709.828707,
+          1790.442575,
+          1776.20667
+        ],
+        "tx_per_sync": 15.83983203359328,
+        "wal_bytes_per_mutation": 783.5,
+        "wal_bytes_per_tx": 12536.0,
+        "wal_write_mib_per_second": 21.028444438455203
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 67.43607933333334,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 3.196092069357589,
+        "mutation_ops_per_second": 29930.381249333335,
+        "overloads": 0,
+        "p50_us": 7990.436000000001,
+        "p95_us": 11766.361,
+        "p99_us": 14603.577666666666,
+        "page_images_per_tx": 3.0,
+        "peak_rss_mib": 323.6875,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 1870.6488283333333,
+        "tx_per_second_runs": [
+          1825.738212,
+          1900.743918,
+          1885.464355
+        ],
+        "tx_per_sync": 15.974985787379193,
+        "wal_bytes_per_mutation": 783.5,
+        "wal_bytes_per_tx": 12536.0,
+        "wal_write_mib_per_second": 22.366486521569847
+      },
+      "experiment_main_btree_vs_rocksdb": 0.2625251116214672,
+      "experiment_main_btree_vs_turso_mvcc_gc": 5.6677055843024196,
+      "experiment_main_btree_vs_turso_wal": 1.8693634320611725,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 47.495972333333334,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 2.6742494881796692,
+        "mutation_ops_per_second": 50677.98124066667,
+        "overloads": 0,
+        "p50_us": 4352.098333333333,
+        "p95_us": 8355.263333333334,
+        "p99_us": 10618.426333333335,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 375.41015625,
+        "superblock_images_elided": 47548,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 3167.373827666667,
+        "tx_per_second_runs": [
+          3156.755995,
+          3200.357487,
+          3145.008001
+        ],
+        "tx_per_sync": 14.05082742316785,
+        "wal_bytes_per_mutation": 523.75,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 25.31601630764293
+      },
+      "ratio_vs_exact_main": 1.8008454824298676,
+      "ratio_vs_experiment_main_btree": 1.6931953126064068,
+      "ratio_vs_rocksdb": 0.44450628843894197,
+      "ratio_vs_turso_mvcc_gc": 9.596532528574013,
+      "ratio_vs_turso_wal": 3.1651974007238026,
+      "rocksdb": {
+        "cpu_percent_one_core": 50.91762768340556,
+        "mutation_ops_per_second": 114009.59347648885,
+        "p99_us": 3624.4576666666667,
+        "tx_per_second": 7125.599592280553
+      },
+      "scenario_index": 5,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 187.58894183215295,
+        "mutation_ops_per_second": 5280.86380072919,
+        "p99_us": 877353.885,
+        "tx_per_second": 330.0539875455744
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 31.198806607504615,
+        "mutation_ops_per_second": 16011.001788096333,
+        "p99_us": 72678.11466666666,
+        "tx_per_second": 1000.6876117560208
+      },
+      "width": 16,
+      "writers": 16
+    },
+    {
+      "distribution": "uniform",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 76.60497866666667,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 4.4252890113852,
+        "mutation_ops_per_second": 4374.400068666667,
+        "overloads": 0,
+        "p50_us": 14103.003666666667,
+        "p95_us": 18357.342,
+        "p99_us": 26979.126,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 848.64453125,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 4374.400068666667,
+        "tx_per_second_runs": [
+          4290.28797,
+          4332.438402,
+          4500.473834
+        ],
+        "tx_per_sync": 62.35768500948767,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 34.961962675114506
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 62.89143466666667,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 5.061075654952076,
+        "mutation_ops_per_second": 5288.944462666666,
+        "overloads": 0,
+        "p50_us": 11377.320666666667,
+        "p95_us": 17059.727666666666,
+        "p99_us": 22323.38666666667,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 888.80078125,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 5288.944462666666,
+        "tx_per_second_runs": [
+          5269.426971,
+          5311.465787,
+          5285.94063
+        ],
+        "tx_per_sync": 63.47523961661342,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 42.270590995403325
+      },
+      "experiment_main_btree_vs_rocksdb": 0.20145121965057108,
+      "experiment_main_btree_vs_turso_mvcc_gc": 16.329676681213204,
+      "experiment_main_btree_vs_turso_wal": 5.619465867421948,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 45.776473333333335,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 3.1746270126409293,
+        "mutation_ops_per_second": 11617.302862666666,
+        "overloads": 0,
+        "p50_us": 4998.979333333334,
+        "p95_us": 8390.343666666668,
+        "p99_us": 10904.44,
+        "page_images_per_tx": 1.0,
+        "peak_rss_mib": 930.2578125,
+        "superblock_images_elided": 174349,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 11617.302862666666,
+        "tx_per_second_runs": [
+          11670.704385,
+          11527.476378,
+          11653.727825
+        ],
+        "tx_per_sync": 59.56576699692518,
+        "wal_bytes_per_mutation": 4224.0,
+        "wal_bytes_per_tx": 4224.0,
+        "wal_write_mib_per_second": 46.803592010235356
+      },
+      "ratio_vs_exact_main": 2.6557476866096663,
+      "ratio_vs_experiment_main_btree": 2.1965257802705804,
+      "ratio_vs_rocksdb": 0.4424927974294307,
+      "ratio_vs_turso_mvcc_gc": 35.86855581376814,
+      "ratio_vs_turso_wal": 12.343301649142889,
+      "rocksdb": {
+        "cpu_percent_one_core": 66.17167686110874,
+        "mutation_ops_per_second": 26254.219119847723,
+        "p99_us": 4102.725,
+        "tx_per_second": 26254.219119847723
+      },
+      "scenario_index": 6,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 195.13784479608552,
+        "mutation_ops_per_second": 323.8854366756346,
+        "p99_us": 822699.0986666668,
+        "tx_per_second": 323.8854366756346
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 42.73092307333197,
+        "mutation_ops_per_second": 941.1827720724433,
+        "p99_us": 94820.42066666666,
+        "tx_per_second": 941.1827720724433
+      },
+      "width": 1,
+      "writers": 64
+    },
+    {
+      "distribution": "same-leaf-heavy",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 68.54441533333333,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 4.381861407760381,
+        "mutation_ops_per_second": 5845.674896333333,
+        "overloads": 0,
+        "p50_us": 10278.319,
+        "p95_us": 16226.006000000001,
+        "p99_us": 23827.988333333335,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 501.05859375,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 5845.674896333333,
+        "tx_per_second_runs": [
+          5901.862639,
+          5688.277941,
+          5946.884109
+        ],
+        "tx_per_sync": 59.794417971409125,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 46.72583661788293
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 45.367947666666666,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 4.852265523243801,
+        "mutation_ops_per_second": 8116.170435,
+        "overloads": 0,
+        "p50_us": 7347.648666666667,
+        "p95_us": 11546.853666666666,
+        "p99_us": 14263.390333333333,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 616.0859375,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 8116.170435,
+        "tx_per_second_runs": [
+          8303.51984,
+          8106.867282,
+          7938.124183
+        ],
+        "tx_per_sync": 62.92820247933884,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 64.87339478026564
+      },
+      "experiment_main_btree_vs_rocksdb": 0.29644657663911095,
+      "experiment_main_btree_vs_turso_mvcc_gc": 30.199367204221886,
+      "experiment_main_btree_vs_turso_wal": 3.756625297661775,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 27.706833,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 2.981132312158809,
+        "mutation_ops_per_second": 11780.461768666666,
+        "overloads": 0,
+        "p50_us": 4259.3516666666665,
+        "p95_us": 7924.502666666666,
+        "p99_us": 9183.317666666668,
+        "page_images_per_tx": 1.0,
+        "peak_rss_mib": 513.5390625,
+        "superblock_images_elided": 176876,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 11780.461768666666,
+        "tx_per_second_runs": [
+          11788.724293,
+          11693.816946,
+          11858.844067
+        ],
+        "tx_per_sync": 43.88982630272953,
+        "wal_bytes_per_mutation": 4224.0,
+        "wal_bytes_per_tx": 4224.0,
+        "wal_write_mib_per_second": 47.45975131267394
+      },
+      "ratio_vs_exact_main": 2.0152440868813786,
+      "ratio_vs_experiment_main_btree": 1.4514803333681676,
+      "ratio_vs_rocksdb": 0.4302863758859888,
+      "ratio_vs_turso_mvcc_gc": 43.83378757709169,
+      "ratio_vs_turso_wal": 5.452667739389405,
+      "rocksdb": {
+        "cpu_percent_one_core": 62.245598449141305,
+        "mutation_ops_per_second": 27378.189105824924,
+        "p99_us": 3885.6846666666665,
+        "tx_per_second": 27378.189105824924
+      },
+      "scenario_index": 7,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 178.30835522973612,
+        "mutation_ops_per_second": 268.7529967139628,
+        "p99_us": 554755.6416666666,
+        "tx_per_second": 268.7529967139628
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 41.03329093962385,
+        "mutation_ops_per_second": 2160.495069884059,
+        "p99_us": 85115.48966666668,
+        "tx_per_second": 2160.495069884059
+      },
+      "width": 1,
+      "writers": 64
+    },
+    {
+      "distribution": "different-leaf-heavy",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 72.70947,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 4.338157787878788,
+        "mutation_ops_per_second": 5059.185828,
+        "overloads": 0,
+        "p50_us": 11509.32,
+        "p95_us": 17693.47433333333,
+        "p99_us": 27441.792666666668,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 460.42578125,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 5059.185828,
+        "tx_per_second_runs": [
+          5369.32101,
+          4751.099581,
+          5057.136893
+        ],
+        "tx_per_sync": 62.286650286650286,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 40.435383811125774
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 54.52975433333334,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 4.8735455806853585,
+        "mutation_ops_per_second": 6768.400232333333,
+        "overloads": 0,
+        "p50_us": 8897.357666666667,
+        "p95_us": 13077.535333333333,
+        "p99_us": 15494.538333333334,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 559.75390625,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 6768.400232333333,
+        "tx_per_second_runs": [
+          6764.93144,
+          6644.827297,
+          6895.44196
+        ],
+        "tx_per_sync": 63.337694704049845,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 54.096243335153865
+      },
+      "experiment_main_btree_vs_rocksdb": 0.25206221908559356,
+      "experiment_main_btree_vs_turso_mvcc_gc": 0.9360384855771003,
+      "experiment_main_btree_vs_turso_wal": 5.07284625633887,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 42.775503666666665,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 3.2390165522188856,
+        "mutation_ops_per_second": 11914.073029333334,
+        "overloads": 0,
+        "p50_us": 4845.419,
+        "p95_us": 8676.796999999999,
+        "p99_us": 12805.695333333333,
+        "page_images_per_tx": 1.0,
+        "peak_rss_mib": 543.546875,
+        "superblock_images_elided": 178813,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 11914.073029333334,
+        "tx_per_second_runs": [
+          11825.564543,
+          12323.214754,
+          11593.439791
+        ],
+        "tx_per_sync": 59.663997330663996,
+        "wal_bytes_per_mutation": 4224.0,
+        "wal_bytes_per_tx": 4224.0,
+        "wal_write_mib_per_second": 47.998889732839146
+      },
+      "ratio_vs_exact_main": 2.3549388052510443,
+      "ratio_vs_experiment_main_btree": 1.7602494859004645,
+      "ratio_vs_rocksdb": 0.4436923915603463,
+      "ratio_vs_turso_mvcc_gc": 1.6476612630201402,
+      "ratio_vs_turso_wal": 8.929475014772592,
+      "rocksdb": {
+        "cpu_percent_one_core": 63.71192552184255,
+        "mutation_ops_per_second": 26852.10126645345,
+        "p99_us": 3836.5246666666667,
+        "tx_per_second": 26852.10126645345
+      },
+      "scenario_index": 8,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 143.69415506159862,
+        "mutation_ops_per_second": 7230.899516017634,
+        "p99_us": 26109.524666666668,
+        "tx_per_second": 7230.899516017634
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 39.2268353805438,
+        "mutation_ops_per_second": 1334.2411518732215,
+        "p99_us": 86120.25033333334,
+        "tx_per_second": 1334.2411518732215
+      },
+      "width": 1,
+      "writers": 64
+    },
+    {
+      "distribution": "uniform",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 83.42441866666667,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 24.08375320610687,
+        "mutation_ops_per_second": 8520.130276333333,
+        "overloads": 0,
+        "p50_us": 116598.97733333334,
+        "p95_us": 159714.121,
+        "p99_us": 205993.269,
+        "page_images_per_tx": 16.983017230692948,
+        "peak_rss_mib": 901.55078125,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 532.508142,
+        "tx_per_second_runs": [
+          527.160209,
+          523.802822,
+          546.561395
+        ],
+        "tx_per_sync": 61.58015267175573,
+        "wal_bytes_per_mutation": 4415.588725672493,
+        "wal_bytes_per_tx": 70649.41961075988,
+        "wal_write_mib_per_second": 35.88042569552054
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 76.626596,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 28.841801523809522,
+        "mutation_ops_per_second": 9794.611382,
+        "overloads": 0,
+        "p50_us": 103147.45433333333,
+        "p95_us": 119823.154,
+        "p99_us": 216045.48066666667,
+        "page_images_per_tx": 16.982240878269295,
+        "peak_rss_mib": 952.3828125,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 612.1632113333334,
+        "tx_per_second_runs": [
+          607.430195,
+          619.942658,
+          609.116781
+        ],
+        "tx_per_sync": 63.204081632653065,
+        "wal_bytes_per_mutation": 4415.387068130449,
+        "wal_bytes_per_tx": 70646.19309008718,
+        "wal_write_mib_per_second": 41.245724986822495
+      },
+      "experiment_main_btree_vs_rocksdb": 0.06394953411781287,
+      "experiment_main_btree_vs_turso_mvcc_gc": 2.118884356226311,
+      "experiment_main_btree_vs_turso_wal": 2.1834978578727786,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 63.00145633333333,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 4,
+        "mean_sync_ms": 23.752167920415225,
+        "mutation_ops_per_second": 18107.026318333334,
+        "overloads": 0,
+        "p50_us": 55651.159999999996,
+        "p95_us": 68736.13566666667,
+        "p99_us": 101395.34833333333,
+        "page_images_per_tx": 15.982223261797555,
+        "peak_rss_mib": 1147.40234375,
+        "superblock_images_elided": 17097,
+        "superblock_images_emitted": 4,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 1131.689145,
+        "tx_per_second_runs": [
+          1124.151145,
+          1138.34976,
+          1132.56653
+        ],
+        "tx_per_sync": 59.173010380622834,
+        "wal_bytes_per_mutation": 4155.632492251915,
+        "wal_bytes_per_tx": 66490.11987603064,
+        "wal_write_mib_per_second": 71.76500089571738
+      },
+      "ratio_vs_exact_main": 2.125205336296999,
+      "ratio_vs_experiment_main_btree": 1.848672256104877,
+      "ratio_vs_rocksdb": 0.11822172951443294,
+      "ratio_vs_turso_mvcc_gc": 3.9171227232502246,
+      "ratio_vs_turso_wal": 4.036571911113836,
+      "rocksdb": {
+        "cpu_percent_one_core": 90.25978544047713,
+        "mutation_ops_per_second": 153161.57523976528,
+        "p99_us": 14653.110999999999,
+        "tx_per_second": 9572.59845248533
+      },
+      "scenario_index": 9,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 191.11846443191817,
+        "mutation_ops_per_second": 4622.53230222405,
+        "p99_us": 811649.2179999999,
+        "tx_per_second": 288.9082688890031
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 61.24028474938489,
+        "mutation_ops_per_second": 4485.743526616281,
+        "p99_us": 99846.21366666666,
+        "tx_per_second": 280.35897041351757
+      },
+      "width": 16,
+      "writers": 64
+    },
+    {
+      "distribution": "same-leaf-heavy",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 86.045892,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 5.272091610726643,
+        "mutation_ops_per_second": 38153.980373666665,
+        "overloads": 0,
+        "p50_us": 25112.043,
+        "p95_us": 34400.28,
+        "p99_us": 52801.67533333333,
+        "page_images_per_tx": 3.0,
+        "peak_rss_mib": 365.63671875,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 2384.6237736666667,
+        "tx_per_second_runs": [
+          2363.939495,
+          2355.849161,
+          2434.082665
+        ],
+        "tx_per_sync": 62.04325259515571,
+        "wal_bytes_per_mutation": 783.5,
+        "wal_bytes_per_tx": 12536.0,
+        "wal_write_mib_per_second": 28.51167142273468
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 76.079202,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 6.7956516818873665,
+        "mutation_ops_per_second": 43955.491098,
+        "overloads": 0,
+        "p50_us": 21930.97266666667,
+        "p95_us": 31209.196666666667,
+        "p99_us": 40223.954333333335,
+        "page_images_per_tx": 3.0,
+        "peak_rss_mib": 388.13671875,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 2747.2181936666666,
+        "tx_per_second_runs": [
+          2716.095219,
+          2731.56459,
+          2793.994772
+        ],
+        "tx_per_sync": 62.93150684931507,
+        "wal_bytes_per_mutation": 783.5,
+        "wal_bytes_per_tx": 12536.0,
+        "wal_write_mib_per_second": 32.84577509682974
+      },
+      "experiment_main_btree_vs_rocksdb": 0.23681186606186658,
+      "experiment_main_btree_vs_turso_mvcc_gc": 12.206097491400698,
+      "experiment_main_btree_vs_turso_wal": 3.0169723203389864,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 55.331596,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 4.575079720840244,
+        "mutation_ops_per_second": 88831.013123,
+        "overloads": 0,
+        "p50_us": 10056.865333333333,
+        "p95_us": 19703.13,
+        "p99_us": 26873.085666666666,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 506.37890625,
+        "superblock_images_elided": 83382,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 5551.93832,
+        "tx_per_second_runs": [
+          5638.374241,
+          5594.969574,
+          5422.471145
+        ],
+        "tx_per_sync": 46.09286898839137,
+        "wal_bytes_per_mutation": 523.75,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 44.37484234836663
+      },
+      "ratio_vs_exact_main": 2.328224008042652,
+      "ratio_vs_experiment_main_btree": 2.020930966750013,
+      "ratio_vs_rocksdb": 0.47858043341828255,
+      "ratio_vs_turso_mvcc_gc": 24.667680403541315,
+      "ratio_vs_turso_wal": 6.097092788000697,
+      "rocksdb": {
+        "cpu_percent_one_core": 79.27625726577756,
+        "mutation_ops_per_second": 185613.54981757287,
+        "p99_us": 10869.053,
+        "tx_per_second": 11600.846863598304
+      },
+      "scenario_index": 10,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 179.38888110429022,
+        "mutation_ops_per_second": 3601.1092922724642,
+        "p99_us": 251714.22333333333,
+        "tx_per_second": 225.06933076702902
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 49.04845442351232,
+        "mutation_ops_per_second": 14569.404830909365,
+        "p99_us": 95432.955,
+        "tx_per_second": 910.5878019318353
+      },
+      "width": 16,
+      "writers": 64
+    },
+    {
+      "distribution": "different-leaf-heavy",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 88.96488966666666,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 5.162228117241379,
+        "mutation_ops_per_second": 29223.576685,
+        "overloads": 0,
+        "p50_us": 33389.532666666666,
+        "p95_us": 46359.748,
+        "p99_us": 70938.65666666666,
+        "page_images_per_tx": 3.0,
+        "peak_rss_mib": 338.96875,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 1826.473543,
+        "tx_per_second_runs": [
+          1766.243357,
+          1896.888357,
+          1816.288915
+        ],
+        "tx_per_sync": 63.241379310344826,
+        "wal_bytes_per_mutation": 783.5,
+        "wal_bytes_per_tx": 12536.0,
+        "wal_write_mib_per_second": 21.838094892135214
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 82.87020433333333,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 6.982168542372881,
+        "mutation_ops_per_second": 31677.639967333333,
+        "overloads": 0,
+        "p50_us": 31261.543333333335,
+        "p95_us": 40014.20733333333,
+        "p99_us": 44265.505333333334,
+        "page_images_per_tx": 3.0,
+        "peak_rss_mib": 359.13671875,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 1979.852498,
+        "tx_per_second_runs": [
+          1925.854481,
+          2019.211779,
+          1994.491234
+        ],
+        "tx_per_sync": 63.16525423728814,
+        "wal_bytes_per_mutation": 783.5,
+        "wal_bytes_per_tx": 12536.0,
+        "wal_write_mib_per_second": 23.671572041326574
+      },
+      "experiment_main_btree_vs_rocksdb": 0.17442066271983542,
+      "experiment_main_btree_vs_turso_mvcc_gc": 2.8503289287496574,
+      "experiment_main_btree_vs_turso_wal": 1.8950868929482045,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 72.05536866666667,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 5.076244042016807,
+        "mutation_ops_per_second": 69508.95644633334,
+        "overloads": 0,
+        "p50_us": 13623.710000000001,
+        "p95_us": 21256.492,
+        "p99_us": 30709.237,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 471.06640625,
+        "superblock_images_elided": 65296,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 4344.309778,
+        "tx_per_second_runs": [
+          4337.781082,
+          4358.106929,
+          4337.041323
+        ],
+        "tx_per_sync": 60.967320261437905,
+        "wal_bytes_per_mutation": 523.75,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 34.719424022154286
+      },
+      "ratio_vs_exact_main": 2.3785232447793523,
+      "ratio_vs_experiment_main_btree": 2.1942593109277175,
+      "ratio_vs_rocksdb": 0.38272416319118185,
+      "ratio_vs_turso_mvcc_gc": 6.254360791115562,
+      "ratio_vs_turso_wal": 4.158312059868676,
+      "rocksdb": {
+        "cpu_percent_one_core": 77.23236409074285,
+        "mutation_ops_per_second": 181616.3261510046,
+        "p99_us": 12420.602,
+        "tx_per_second": 11351.020384437788
+      },
+      "scenario_index": 11,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 184.9331727220883,
+        "mutation_ops_per_second": 11113.67872265041,
+        "p99_us": 346463.53733333334,
+        "tx_per_second": 694.6049201656506
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 52.05278773246818,
+        "mutation_ops_per_second": 16715.666224000313,
+        "p99_us": 95387.08833333333,
+        "tx_per_second": 1044.7291390000196
+      },
+      "width": 16,
+      "writers": 64
+    },
+    {
+      "distribution": "uniform",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 24.32682833333333,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 0.8561353144114099,
+        "mutation_ops_per_second": 939.279605,
+        "overloads": 0,
+        "p50_us": 981.668,
+        "p95_us": 1607.5083333333332,
+        "p99_us": 2134.5756666666666,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 620.078125,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 939.279605,
+        "tx_per_second_runs": [
+          967.536441,
+          965.794865,
+          884.507509
+        ],
+        "tx_per_sync": 1.0,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 7.507008193052261
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 20.97408666666667,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 0.7627301852011318,
+        "mutation_ops_per_second": 1082.528519,
+        "overloads": 0,
+        "p50_us": 867.3343333333333,
+        "p95_us": 1171.348,
+        "p99_us": 1740.002,
+        "page_images_per_tx": 2.0,
+        "peak_rss_mib": 633.203125,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 1082.528519,
+        "tx_per_second_runs": [
+          1091.318169,
+          1080.97868,
+          1075.288708
+        ],
+        "tx_per_sync": 1.0,
+        "wal_bytes_per_mutation": 8380.0,
+        "wal_bytes_per_tx": 8380.0,
+        "wal_write_mib_per_second": 8.652235275253192
+      },
+      "experiment_main_btree_vs_rocksdb": 0.716152188305213,
+      "experiment_main_btree_vs_turso_mvcc_gc": 0.8382772514894571,
+      "experiment_main_btree_vs_turso_wal": 0.9042114685066316,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 13.795058,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 0.7219349679218968,
+        "mutation_ops_per_second": 1242.3551486666668,
+        "overloads": 0,
+        "p50_us": 749.361,
+        "p95_us": 1051.7476666666666,
+        "p99_us": 1651.5616666666667,
+        "page_images_per_tx": 1.0,
+        "peak_rss_mib": 611.94140625,
+        "superblock_images_elided": 18642,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 1242.3551486666668,
+        "tx_per_second_runs": [
+          1284.028646,
+          1221.878165,
+          1221.158635
+        ],
+        "tx_per_sync": 1.0,
+        "wal_bytes_per_mutation": 4224.0,
+        "wal_bytes_per_tx": 4224.0,
+        "wal_write_mib_per_second": 5.005067481956989
+      },
+      "ratio_vs_exact_main": 1.3226680767402235,
+      "ratio_vs_experiment_main_btree": 1.1476419575664472,
+      "ratio_vs_rocksdb": 0.8218862993020895,
+      "ratio_vs_turso_mvcc_gc": 0.9620421458827815,
+      "ratio_vs_turso_wal": 1.0377110197709825,
+      "rocksdb": {
+        "cpu_percent_one_core": 6.799362909038667,
+        "mutation_ops_per_second": 1511.590045632372,
+        "p99_us": 968.2146666666667,
+        "tx_per_second": 1511.590045632372
+      },
+      "scenario_index": 12,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 14.26488109281676,
+        "mutation_ops_per_second": 1291.3728925323398,
+        "p99_us": 1242.0946666666669,
+        "tx_per_second": 1291.3728925323398
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 16.130758552986116,
+        "mutation_ops_per_second": 1197.207242668434,
+        "p99_us": 1279.1886666666667,
+        "tx_per_second": 1197.207242668434
+      },
+      "width": 1,
+      "writers": 1
+    },
+    {
+      "distribution": "uniform",
+      "exact_main": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 55.03638133333334,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 1.6302502686041391,
+        "mutation_ops_per_second": 4842.133475333333,
+        "overloads": 0,
+        "p50_us": 2927.616666666667,
+        "p95_us": 4365.565,
+        "p99_us": 5569.513333333333,
+        "page_images_per_tx": 16.985028621752534,
+        "peak_rss_mib": 723.80859375,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 302.6333423333333,
+        "tx_per_second_runs": [
+          298.180191,
+          299.515714,
+          310.204122
+        ],
+        "tx_per_sync": 1.0,
+        "wal_bytes_per_mutation": 4416.111184500221,
+        "wal_bytes_per_tx": 70657.77895200353,
+        "wal_write_mib_per_second": 20.39448383499905
+      },
+      "experiment_main_btree": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 43.365336,
+        "engine_field": [
+          "main-btree"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 0,
+        "mean_sync_ms": 2.1505016888835993,
+        "mutation_ops_per_second": 4477.491621,
+        "overloads": 0,
+        "p50_us": 3271.937,
+        "p95_us": 4482.965333333334,
+        "p99_us": 5598.073333333333,
+        "page_images_per_tx": 16.985479647702928,
+        "peak_rss_mib": 718.09375,
+        "superblock_images_elided": 0,
+        "superblock_images_emitted": 0,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 279.84322633333335,
+        "tx_per_second_runs": [
+          277.117256,
+          279.711571,
+          282.700852
+        ],
+        "tx_per_sync": 1.0,
+        "wal_bytes_per_mutation": 4416.228338490835,
+        "wal_bytes_per_tx": 70659.65341585336,
+        "wal_write_mib_per_second": 18.858823218345755
+      },
+      "experiment_main_btree_vs_rocksdb": 0.20685618364902958,
+      "experiment_main_btree_vs_turso_mvcc_gc": 0.3189612470269174,
+      "experiment_main_btree_vs_turso_wal": 0.9009450660697904,
+      "planned_blink": {
+        "conflicts": 0,
+        "cpu_percent_one_core": 25.03530333333333,
+        "engine_field": [
+          "planned-blink"
+        ],
+        "errors": 0,
+        "git_commit_field": [
+          "0d310da32af5dfaa9df6469788998dacccebb841"
+        ],
+        "leaf_splits": 1,
+        "mean_sync_ms": 2.0975864270814917,
+        "mutation_ops_per_second": 6026.577259333333,
+        "overloads": 0,
+        "p50_us": 2533.3496666666665,
+        "p95_us": 2988.550333333333,
+        "p99_us": 4162.618333333334,
+        "page_images_per_tx": 15.985504684461729,
+        "peak_rss_mib": 763.59765625,
+        "superblock_images_elided": 5656,
+        "superblock_images_emitted": 1,
+        "sync_mode_field": [
+          "real"
+        ],
+        "tx_per_second": 376.66107866666664,
+        "tx_per_second_runs": [
+          376.792266,
+          364.186682,
+          389.004288
+        ],
+        "tx_per_sync": 1.0,
+        "wal_bytes_per_mutation": 4156.484841788934,
+        "wal_bytes_per_tx": 66503.75746862295,
+        "wal_write_mib_per_second": 23.890229955711494
+      },
+      "ratio_vs_exact_main": 1.2446119643082685,
+      "ratio_vs_experiment_main_btree": 1.345971755692987,
+      "ratio_vs_rocksdb": 0.2784225806820353,
+      "ratio_vs_turso_mvcc_gc": 0.42931282965884454,
+      "ratio_vs_turso_wal": 1.21264661236089,
+      "rocksdb": {
+        "cpu_percent_one_core": 15.53149229939017,
+        "mutation_ops_per_second": 21645.432794652348,
+        "p99_us": 1135.3746666666666,
+        "tx_per_second": 1352.8395496657718
+      },
+      "scenario_index": 13,
+      "turso_mvcc_gc": {
+        "cpu_percent_one_core": 36.32882637411077,
+        "mutation_ops_per_second": 14037.729232214453,
+        "p99_us": 1478.6016666666667,
+        "tx_per_second": 877.3580770134033
+      },
+      "turso_wal": {
+        "cpu_percent_one_core": 30.149945031800762,
+        "mutation_ops_per_second": 4969.772064866928,
+        "p99_us": 23873.428333333333,
+        "tx_per_second": 310.610754054183
+      },
+      "width": 16,
+      "writers": 1
+    }
+  ],
+  "geometric_means": {
+    "compact locality": {
+      "experiment_main_btree_vs_exact_main": 1.1250695031048072,
+      "experiment_main_btree_vs_rocksdb": 0.2971651337497435,
+      "experiment_main_btree_vs_turso_mvcc_gc": 11.675701838615339,
+      "experiment_main_btree_vs_turso_wal": 2.8175325435881273,
+      "planned_blink_vs_exact_main": 1.735531813431768,
+      "planned_blink_vs_experiment_main_btree": 1.5425996426374493,
+      "planned_blink_vs_rocksdb": 0.45840682912666414,
+      "planned_blink_vs_turso_mvcc_gc": 18.010933483789433,
+      "planned_blink_vs_turso_wal": 4.346324694858429
+    },
+    "overall (12)": {
+      "experiment_main_btree_vs_exact_main": 1.1311538578933675,
+      "experiment_main_btree_vs_rocksdb": 0.22081464335077478,
+      "experiment_main_btree_vs_turso_mvcc_gc": 4.53166143999587,
+      "experiment_main_btree_vs_turso_wal": 2.7325015756425506,
+      "planned_blink_vs_exact_main": 1.8606928075272076,
+      "planned_blink_vs_experiment_main_btree": 1.6449511218504924,
+      "planned_blink_vs_rocksdb": 0.3632292953008733,
+      "planned_blink_vs_turso_mvcc_gc": 7.4543615695678245,
+      "planned_blink_vs_turso_wal": 4.494831532311451
+    },
+    "spread locality": {
+      "experiment_main_btree_vs_exact_main": 1.1394838774606626,
+      "experiment_main_btree_vs_rocksdb": 0.2568956174713785,
+      "experiment_main_btree_vs_turso_mvcc_gc": 2.0613945861141088,
+      "experiment_main_btree_vs_turso_wal": 2.5961590480139463,
+      "planned_blink_vs_exact_main": 1.8856308728768112,
+      "planned_blink_vs_experiment_main_btree": 1.6548113669488116,
+      "planned_blink_vs_rocksdb": 0.4251137879109708,
+      "planned_blink_vs_turso_mvcc_gc": 3.4112191928683684,
+      "planned_blink_vs_turso_wal": 4.296153503060483
+    },
+    "uniform": {
+      "experiment_main_btree_vs_exact_main": 1.1289572732340838,
+      "experiment_main_btree_vs_rocksdb": 0.14103570147946684,
+      "experiment_main_btree_vs_turso_mvcc_gc": 3.866591054730285,
+      "experiment_main_btree_vs_turso_wal": 2.7892088022069643,
+      "planned_blink_vs_exact_main": 1.968497091726269,
+      "planned_blink_vs_experiment_main_btree": 1.7436417997354186,
+      "planned_blink_vs_rocksdb": 0.24591574435460475,
+      "planned_blink_vs_turso_mvcc_gc": 6.741949785510786,
+      "planned_blink_vs_turso_wal": 4.863381055718022
+    },
+    "width 1": {
+      "experiment_main_btree_vs_exact_main": 1.1675539879796255,
+      "experiment_main_btree_vs_rocksdb": 0.29841653794134904,
+      "experiment_main_btree_vs_turso_mvcc_gc": 5.725187484749828,
+      "experiment_main_btree_vs_turso_wal": 3.6095017037520964,
+      "planned_blink_vs_exact_main": 1.681552817577762,
+      "planned_blink_vs_experiment_main_btree": 1.4402355992869995,
+      "planned_blink_vs_rocksdb": 0.4297901213591105,
+      "planned_blink_vs_turso_mvcc_gc": 8.245618828129098,
+      "planned_blink_vs_turso_wal": 5.198532849430846
+    },
+    "width 16": {
+      "experiment_main_btree_vs_exact_main": 1.0958885528207172,
+      "experiment_main_btree_vs_rocksdb": 0.16339277660178805,
+      "experiment_main_btree_vs_turso_mvcc_gc": 3.5869489796529863,
+      "experiment_main_btree_vs_turso_wal": 2.068586046968058,
+      "planned_blink_vs_exact_main": 2.058917024664541,
+      "planned_blink_vs_experiment_main_btree": 1.8787649705483978,
+      "planned_blink_vs_rocksdb": 0.3069766251200792,
+      "planned_blink_vs_turso_mvcc_gc": 6.739034094116348,
+      "planned_blink_vs_turso_wal": 3.88638700360877
+    },
+    "writers 16": {
+      "experiment_main_btree_vs_exact_main": 1.0527106327550897,
+      "experiment_main_btree_vs_rocksdb": 0.26392382399796527,
+      "experiment_main_btree_vs_turso_mvcc_gc": 3.6075044762612016,
+      "experiment_main_btree_vs_turso_wal": 2.24959602188675,
+      "planned_blink_vs_exact_main": 1.5047978613923212,
+      "planned_blink_vs_experiment_main_btree": 1.4294506149843442,
+      "planned_blink_vs_rocksdb": 0.3772660725229113,
+      "planned_blink_vs_turso_mvcc_gc": 5.1567494921503485,
+      "planned_blink_vs_turso_wal": 3.2156864169523494
+    },
+    "writers 64": {
+      "experiment_main_btree_vs_exact_main": 1.2154423166396602,
+      "experiment_main_btree_vs_rocksdb": 0.18474689393143137,
+      "experiment_main_btree_vs_turso_mvcc_gc": 5.6925654678684685,
+      "experiment_main_btree_vs_turso_wal": 3.3190691965336807,
+      "planned_blink_vs_exact_main": 2.300759333070879,
+      "planned_blink_vs_experiment_main_btree": 1.8929399623272953,
+      "planned_blink_vs_rocksdb": 0.3497147784386485,
+      "planned_blink_vs_turso_mvcc_gc": 10.775684662292601,
+      "planned_blink_vs_turso_wal": 6.282798719848152
+    }
+  },
+  "sustained": {
+    "alignment": {
+      "seed_wal_bytes_estimate": 4809739366.719212,
+      "w16_derived_vs_measured_max_window_deviation": 0.023848605015009086,
+      "w16_derived_vs_measured_total_deviation": 0.002022537921787156
+    },
+    "runs": {
+      "16": {
+        "completed": true,
+        "cpu_percent_one_core": 28.621833,
+        "derived_tx_per_second": 4360.105158122,
+        "engine_field": "planned-blink",
+        "errors": 0,
+        "max_wal_bytes": 7214471900,
+        "mean_sync_ms": 1.5208686527920805,
+        "measured_rss_growth_kib": 2244224.7376780445,
+        "measured_seconds_covered": 120,
+        "measured_wal_growth_bytes": 2210050102.5488796,
+        "measurement_start_s_since_process_start": 106.74784326171876,
+        "min_mem_available_kib": 1757864,
+        "p50_us": 3614.524,
+        "p95_us": 5411.206,
+        "p99_us": 7269.128,
+        "page_images_per_tx": 1.0,
+        "peak_rss_kib": 8265268,
+        "process_seconds": 230.00889904799988,
+        "rss_bytes_per_wal_byte": 1.0398344040851857,
+        "rss_kib_at_measurement_start": 6017568.683217478,
+        "rss_kib_at_seed_end": 5788604.985221675,
+        "seed_seconds": 96.74784326171876,
+        "successful_transactions": 524331,
+        "sync_mode_field": "real",
+        "tx_per_second": 4368.941508,
+        "tx_per_sync": 8.708949274158721,
+        "wal_bytes_at_measurement_start": 5000990446.812314,
+        "wal_bytes_delta": 2214774144,
+        "wal_bytes_per_tx": 4224.0,
+        "windows": [
+          {
+            "derived_tx_per_second": 4314.408949777009,
+            "mem_available_kib_end": 1928002.3499005963,
+            "p50_us": 3628.605,
+            "p99_us": 7014.968,
+            "rss_growth_kib": 203983.96489385422,
+            "rss_kib_end": 6221552.648111332,
+            "tx_per_second": 4316.2,
+            "wal_bytes_end": 5183231080.850895,
+            "wal_growth_bytes": 182240634.0385809,
+            "window_index": 0
+          },
+          {
+            "derived_tx_per_second": 4289.664711729618,
+            "mem_available_kib_end": 1944095.2286282305,
+            "p50_us": 3640.004,
+            "p99_us": 7565.29,
+            "rss_growth_kib": 193644.18687872775,
+            "rss_kib_end": 6415196.83499006,
+            "tx_per_second": 4292.4,
+            "wal_bytes_end": 5364426518.274354,
+            "wal_growth_bytes": 181195437.42345905,
+            "window_index": 1
+          },
+          {
+            "derived_tx_per_second": 4415.790719965913,
+            "mem_available_kib_end": 1950937.0,
+            "p50_us": 3569.684,
+            "p99_us": 7300.769,
+            "rss_growth_kib": 195639.0697718449,
+            "rss_kib_end": 6610835.904761905,
+            "tx_per_second": 4416.1,
+            "wal_bytes_end": 5550949518.285714,
+            "wal_growth_bytes": 186523000.01136017,
+            "window_index": 2
+          },
+          {
+            "derived_tx_per_second": 4296.699339676242,
+            "mem_available_kib_end": 1924939.801192843,
+            "p50_us": 3639.044,
+            "p99_us": 6702.008,
+            "rss_growth_kib": 186350.8069677176,
+            "rss_kib_end": 6797186.711729622,
+            "tx_per_second": 4290.6,
+            "wal_bytes_end": 5732442098.393639,
+            "wal_growth_bytes": 181492580.10792446,
+            "window_index": 3
+          },
+          {
+            "derived_tx_per_second": 4416.044100252042,
+            "mem_available_kib_end": 1910299.0962343097,
+            "p50_us": 3593.004,
+            "p99_us": 6878.329,
+            "rss_growth_kib": 185748.55186870415,
+            "rss_kib_end": 6982935.263598327,
+            "tx_per_second": 4411.2,
+            "wal_bytes_end": 5918975801.188285,
+            "wal_growth_bytes": 186533702.79464626,
+            "window_index": 4
+          },
+          {
+            "derived_tx_per_second": 4392.800683126892,
+            "mem_available_kib_end": 1888033.3425742574,
+            "p50_us": 3607.684,
+            "p99_us": 7268.529,
+            "rss_growth_kib": 187014.83937197085,
+            "rss_kib_end": 7169950.102970297,
+            "tx_per_second": 4397.2,
+            "wal_bytes_end": 6104527702.043565,
+            "wal_growth_bytes": 185551900.85527992,
+            "window_index": 5
+          },
+          {
+            "derived_tx_per_second": 4477.189211460361,
+            "mem_available_kib_end": 1909572.611717974,
+            "p50_us": 3564.764,
+            "p99_us": 7203.048,
+            "rss_growth_kib": 184850.05194529332,
+            "rss_kib_end": 7354800.154915591,
+            "tx_per_second": 4480.9,
+            "wal_bytes_end": 6293644174.33565,
+            "wal_growth_bytes": 189116472.29208565,
+            "window_index": 6
+          },
+          {
+            "derived_tx_per_second": 4434.722390431166,
+            "mem_available_kib_end": 1905004.5850746268,
+            "p50_us": 3575.004,
+            "p99_us": 7262.728,
+            "rss_growth_kib": 194506.81821873784,
+            "rss_kib_end": 7549306.973134329,
+            "tx_per_second": 4435.1,
+            "wal_bytes_end": 6480966848.107463,
+            "wal_growth_bytes": 187322673.77181244,
+            "window_index": 7
+          },
+          {
+            "derived_tx_per_second": 4393.728300755629,
+            "mem_available_kib_end": 1938981.3640167364,
+            "p50_us": 3657.445,
+            "p99_us": 7275.649,
+            "rss_growth_kib": 180674.25699119456,
+            "rss_kib_end": 7729981.230125523,
+            "tx_per_second": 4393.0,
+            "wal_bytes_end": 6666557931.531381,
+            "wal_growth_bytes": 185591083.42391777,
+            "window_index": 8
+          },
+          {
+            "derived_tx_per_second": 4288.303584351639,
+            "mem_available_kib_end": 1942339.4671968191,
+            "p50_us": 3664.605,
+            "p99_us": 6966.448,
+            "rss_growth_kib": 176491.4060573792,
+            "rss_kib_end": 7906472.636182902,
+            "tx_per_second": 4301.0,
+            "wal_bytes_end": 6847695874.934394,
+            "wal_growth_bytes": 181137943.40301323,
+            "window_index": 9
+          },
+          {
+            "derived_tx_per_second": 4326.757256461228,
+            "mem_available_kib_end": 1935520.023856859,
+            "p50_us": 3617.005,
+            "p99_us": 8381.09,
+            "rss_growth_kib": 177992.2624254478,
+            "rss_kib_end": 8084464.89860835,
+            "tx_per_second": 4318.2,
+            "wal_bytes_end": 7030458101.447316,
+            "wal_growth_bytes": 182762226.5129223,
+            "window_index": 10
+          },
+          {
+            "derived_tx_per_second": 4275.152649476267,
+            "mem_available_kib_end": 1848116.8597014926,
+            "p50_us": 3610.244,
+            "p99_us": 7371.769,
+            "rss_growth_kib": 177328.52228717227,
+            "rss_kib_end": 8261793.420895522,
+            "tx_per_second": 4379.6,
+            "wal_bytes_end": 7211040549.361194,
+            "wal_growth_bytes": 180582447.9138775,
+            "window_index": 11
+          }
+        ],
+        "writers": 16
+      },
+      "64": {
+        "completed": false,
+        "derived_tx_per_second": 9598.309136625876,
+        "max_wal_bytes": 8719913948,
+        "measured_rss_growth_kib": 3315874.97531732,
+        "measured_seconds_covered": 80,
+        "measured_wal_growth_bytes": 3243460623.448616,
+        "measurement_start_s_since_process_start": 107.47797412109375,
+        "min_mem_available_kib": 280484,
+        "peak_rss_kib": 9876232,
+        "process_seconds": 194.02840013502282,
+        "rss_bytes_per_wal_byte": 1.0468620923520602,
+        "rss_kib_at_measurement_start": 6337509.141723391,
+        "rss_kib_at_seed_end": 5791641.19495494,
+        "seed_seconds": 97.47797412109375,
+        "wal_bytes_at_measurement_start": 5244877647.691585,
+        "windows": [
+          {
+            "derived_tx_per_second": 9917.794582117054,
+            "mem_available_kib_end": 606900.0449917682,
+            "rss_growth_kib": 450734.2395242797,
+            "rss_kib_end": 6788243.38124767,
+            "wal_bytes_end": 5663805290.840209,
+            "wal_growth_bytes": 418927643.1486244,
+            "window_index": 0
+          },
+          {
+            "derived_tx_per_second": 10153.597604827042,
+            "mem_available_kib_end": 564168.9433410071,
+            "rss_growth_kib": 440614.15164319985,
+            "rss_kib_end": 7228857.53289087,
+            "wal_bytes_end": 6092693253.668103,
+            "wal_growth_bytes": 428887962.8278942,
+            "window_index": 1
+          },
+          {
+            "derived_tx_per_second": 9561.422216899287,
+            "mem_available_kib_end": 490161.3440945492,
+            "rss_growth_kib": 406363.9438551171,
+            "rss_kib_end": 7635221.476745987,
+            "wal_bytes_end": 6496567728.109929,
+            "wal_growth_bytes": 403874474.44182587,
+            "window_index": 2
+          },
+          {
+            "derived_tx_per_second": 9664.918225098401,
+            "mem_available_kib_end": 482394.2942077637,
+            "rss_growth_kib": 401704.4007727299,
+            "rss_kib_end": 8036925.877518717,
+            "wal_bytes_end": 6904813873.938086,
+            "wal_growth_bytes": 408246145.8281565,
+            "window_index": 3
+          },
+          {
+            "derived_tx_per_second": 9468.657722204629,
+            "mem_available_kib_end": 515491.87821133237,
+            "rss_growth_kib": 383466.15288538113,
+            "rss_kib_end": 8420392.030404098,
+            "wal_bytes_end": 7304769976.124009,
+            "wal_growth_bytes": 399956102.1859236,
+            "window_index": 4
+          },
+          {
+            "derived_tx_per_second": 9656.4187652636,
+            "mem_available_kib_end": 538703.7481108801,
+            "rss_growth_kib": 452496.7973795403,
+            "rss_kib_end": 8872888.827783639,
+            "wal_bytes_end": 7712657104.7687435,
+            "wal_growth_bytes": 407887128.6447344,
+            "window_index": 5
+          },
+          {
+            "derived_tx_per_second": 9155.05611874109,
+            "mem_available_kib_end": 533349.0093311662,
+            "rss_growth_kib": 400411.71785199083,
+            "rss_kib_end": 9273300.54563563,
+            "wal_bytes_end": 8099366675.224367,
+            "wal_growth_bytes": 386709570.4556236,
+            "window_index": 6
+          },
+          {
+            "derived_tx_per_second": 9208.607857855906,
+            "mem_available_kib_end": 447522.08928717056,
+            "rss_growth_kib": 380083.5714050811,
+            "rss_kib_end": 9653384.11704071,
+            "wal_bytes_end": 8488338271.140201,
+            "wal_growth_bytes": 388971595.9158335,
+            "window_index": 7
+          }
+        ],
+        "writers": 64
+      }
+    }
+  },
+  "sustained_reused_references": {
+    "experiment-main-btree|16": {
+      "engine_field": "main-btree",
+      "p99_us": 10259.212,
+      "tx_per_second": 2882.927526,
+      "wal_bytes_per_tx": 8380.0
+    },
+    "experiment-main-btree|64": {
+      "engine_field": "main-btree",
+      "p99_us": 30477.196,
+      "tx_per_second": 3943.996167,
+      "wal_bytes_per_tx": 8380.0
+    },
+    "rocksdb|16": {
+      "p99_us": 2331.483,
+      "tx_per_second": 10367.468056900145
+    },
+    "rocksdb|64": {
+      "p99_us": 4915.125999999999,
+      "tx_per_second": 25767.890974223297
+    }
+  },
+  "validity": {
+    "exact_main_engine_fields": [
+      "main-btree"
+    ],
+    "experiment_main_btree_engine_fields": [
+      "main-btree"
+    ],
+    "planned_blink_conflicts": 0,
+    "planned_blink_engine_fields": [
+      "planned-blink"
+    ],
+    "planned_blink_errors": 0,
+    "planned_blink_measured_leaf_splits": 9,
+    "planned_blink_overloads": 0,
+    "planned_blink_rows": 42,
+    "planned_blink_superblock_images_elided": 1033167,
+    "planned_blink_superblock_images_emitted": 9,
+    "planned_blink_sync_mode_fields": [
+      "real"
+    ],
+    "scenario0_control": {
+      "control_engine_fields": [
+        "planned-blink"
+      ],
+      "control_sync_mode_fields": [
+        "real"
+      ],
+      "control_tx_per_second_mean": 4540.734647,
+      "control_tx_per_second_runs": [
+        4594.889152,
+        4476.835524,
+        4550.479265
+      ],
+      "overall_gm_vs_exact_main": 1.8816774940972731,
+      "overall_gm_vs_experiment_main_btree": 1.663502697680457,
+      "overall_gm_vs_rocksdb": 0.36732575490136177
+    }
+  }
+}

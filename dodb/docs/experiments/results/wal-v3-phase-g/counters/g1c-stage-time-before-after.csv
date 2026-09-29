@@ -1,0 +1,3 @@
+measurement,coordinator_us_per_tx,lane_us_per_tx,planner_us_per_tx,admission_us_per_tx,tx_per_second_median
+g0,152.779,124.613,27.578,7.169,6201.257
+g1c,161.506,129.309,29.294,6.037,5703.720

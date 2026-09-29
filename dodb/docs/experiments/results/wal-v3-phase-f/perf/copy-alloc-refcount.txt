@@ -1,0 +1,72 @@
+{
+  "phase-e": {
+    "event_count": 46398099028,
+    "transactions_estimate": 49527.292935,
+    "shares_percent": {
+      "memcpy / memmove": 5.6499999999999995,
+      "malloc / free": 28.76,
+      "Arc refcount atomics (ldadd8)": 11.79,
+      "memcmp": 6.43
+    },
+    "total_percent": 52.63,
+    "cycles_per_tx": {
+      "memcpy / memmove": 52930.26207837499,
+      "malloc / free": 269429.0862608964,
+      "Arc refcount atomics (ldadd8)": 110450.93626620196,
+      "memcmp": 60237.448701584275
+    },
+    "all_cycles_per_tx": 936818.797847345,
+    "copy_alloc_refcount_cycles_per_tx": 493047.7333070577,
+    "extra_shares_percent": {
+      "CRC32C": 6.180000000000001,
+      "planner (plan_batch self)": 4.47,
+      "PageDelta (spans, encode, decode, apply, check)": 5.62
+    },
+    "extra_cycles_per_tx": {
+      "CRC32C": 57895.401706965924,
+      "planner (plan_batch self)": 41875.80026377632,
+      "PageDelta (spans, encode, decode, apply, check)": 52649.21643902079
+    }
+  },
+  "f1": {
+    "event_count": 45495962165,
+    "transactions_estimate": 57454.541205,
+    "shares_percent": {
+      "memcpy / memmove": 4.8100000000000005,
+      "malloc / free": 30.630000000000003,
+      "Arc refcount atomics (ldadd8)": 4.53,
+      "memcmp": 5.07
+    },
+    "total_percent": 45.040000000000006,
+    "cycles_per_tx": {
+      "memcpy / memmove": 38088.4736739671,
+      "malloc / free": 242546.76686769482,
+      "Arc refcount atomics (ldadd8)": 35871.26522724967,
+      "memcmp": 40147.310088776125
+    },
+    "all_cycles_per_tx": 791860.1595419353,
+    "copy_alloc_refcount_cycles_per_tx": 356653.8158576878,
+    "extra_shares_percent": {
+      "CRC32C": 8.35,
+      "planner (plan_batch self)": 5.21,
+      "PageDelta (spans, encode, decode, apply, check)": 6.680000000000001
+    },
+    "extra_cycles_per_tx": {
+      "CRC32C": 66120.32332175161,
+      "planner (plan_batch self)": 41255.914312134824,
+      "PageDelta (spans, encode, decode, apply, check)": 52896.25865740128
+    }
+  }
+}
+
+| Category | phase-e % | phase-e cycles/tx | f1 % | f1 cycles/tx |
+|---|---|---|---|---|
+| memcpy / memmove | 5.6% | 52,930 | 4.8% | 38,088 |
+| malloc / free | 28.8% | 269,429 | 30.6% | 242,547 |
+| Arc refcount atomics (ldadd8) | 11.8% | 110,451 | 4.5% | 35,871 |
+| memcmp | 6.4% | 60,237 | 5.1% | 40,147 |
+| **total copy/alloc/refcount** | 52.6% | 493,048 | 45.0% | 356,654 |
+| CRC32C | 6.2% | 57,895 | 8.3% | 66,120 |
+| planner (plan_batch self) | 4.5% | 41,876 | 5.2% | 41,256 |
+| PageDelta (spans, encode, decode, apply, check) | 5.6% | 52,649 | 6.7% | 52,896 |
+| all samples | 100% | 936,819 | 100% | 791,860 |

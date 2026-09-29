@@ -1,5 +1,15 @@
 # Durable dodb vs Turso vs RocksDB on OCI A1 with OpenZFS
 
+## Provenance correction (added 2026-09-25)
+
+Every dodb result labelled "Planned" or "dodb Planned" in this document is **actually experiment main-btree due missing --engine argument**. It is not the planned Blink engine.
+
+- The core matrix reused `../oci-a1-2ocpu-12g-zfs-real-sync/raw/*-planned-*.jsonl`. All 42 of those rows record `"engine":"main-btree"`, because that runner never passed `--engine` and the `phase0-bench` default is `main-btree`.
+- The two sustained runs (`raw/sustained-dodb-planned-*.jsonl`) were started by `scripts/run_crossdb_matrix.py` without `--engine`, and both rows also record `"engine":"main-btree"`.
+- The following figures therefore describe main-btree built from the experiment source, not planned-blink: Planned / RocksDB 0.221×, Planned / Turso WAL 2.733×, Planned / Turso MVCC 4.532×, about 8.4 KB of WAL per transaction, 2,883 and 3,944 sustained tx/s, and WAL/RSS growth to 8–9 GB.
+- The Turso and RocksDB results are unaffected, and so are the workload equivalence, syscall verification and harness evidence for those engines.
+- The numbers below are kept unchanged. The true planned-blink durable baseline and its comparison with these same Turso/RocksDB rows is in `planned-blink-durable-baseline-results.md`.
+
 This compares the durable dodb Planned result with Turso (WAL and MVCC with group commit) and RocksDB on the same host, pool and dataset, with every successful write returned only after its log was synchronized. It is a durable-write and concurrency comparison on a memory-resident working set. It is not a larger-than-memory benchmark.
 
 ## Environment

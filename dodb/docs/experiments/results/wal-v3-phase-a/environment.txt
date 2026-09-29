@@ -1,0 +1,15 @@
+Sat Sep 26 02:36:22 AM UTC 2026
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+dodbbench/db	sync	standard	local
+dodbbench/db	recordsize	4K	local
+dodbbench/db	compression	off	local
+dodbbench/db	atime	off	local
+dodbbench	ashift	12	local
+               total        used        free      shared  buff/cache   available
+Mem:           10898         691        9013          20        1441       10206
+Swap:           4095         200        3895
+2
+79122436e330be122059f8a4bf5908406e55b74596bfab2ee3cf745dd17fb6cb  /tmp/dodb-zfs-exp-target/release/phase0-bench
+fba986d4dea7d306b4fb814e4cd82c468f427572362e95a9c1e06e5525304999  /tmp/dodb-crossdb-window-target/release/phase0-bench
+f9d5199f98ca9acff230186fa9fd2804b00057fa9b9b339fcf3107277605632b  /tmp/dodb-phase-a-target/release/phase0-bench
+16a5b207fc9d4076fd0a43d4adc539a5d6825904

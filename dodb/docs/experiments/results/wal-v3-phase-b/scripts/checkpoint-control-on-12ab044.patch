@@ -1,0 +1,158 @@
+diff --git a/crates/dodb-storage/src/bin/phase0-bench.rs b/crates/dodb-storage/src/bin/phase0-bench.rs
+index 40aea8d..06667e2 100644
+--- a/crates/dodb-storage/src/bin/phase0-bench.rs
++++ b/crates/dodb-storage/src/bin/phase0-bench.rs
+@@ -26,6 +26,32 @@ use dodb_storage::{
+     DurableFile, ProductionFile, StorageMetrics, WalMetrics,
+ };
+ 
++static CHECKPOINT_WAL_BYTES: AtomicU64 = AtomicU64::new(0);
++static CHECKPOINT_EVENTS: Mutex<Vec<CheckpointEvent>> = Mutex::new(Vec::new());
++
++#[derive(Clone, Copy, Debug)]
++struct CheckpointEvent {
++    finished: Instant,
++    duration_nanos: u64,
++    wal_bytes_before: u64,
++    wal_bytes_reclaimed: u64,
++}
++
++fn checkpoint_blink_store(store: &mut BlinkStore<BenchFile, BenchFile>) -> Result<()> {
++    let started = Instant::now();
++    let wal_bytes_before = store.wal_metrics()?.map_or(0, |metrics| metrics.wal_bytes);
++    let report = store.checkpoint()?;
++    if let Ok(mut events) = CHECKPOINT_EVENTS.lock() {
++        events.push(CheckpointEvent {
++            finished: Instant::now(),
++            duration_nanos: started.elapsed().as_nanos() as u64,
++            wal_bytes_before,
++            wal_bytes_reclaimed: report.wal_bytes_reclaimed,
++        });
++    }
++    Ok(())
++}
++
+ const BASELINE_COMMIT: &str = "1ff96e1b3d205074d4c1b820f5f2680bd3226a8b";
+ const DEFAULT_OUTPUT: &str = "target/phase0/phase0-results.jsonl";
+ const DEFAULT_DURATION: Duration = Duration::from_secs(2);
+@@ -394,6 +420,10 @@ impl Args {
+                     args.window_seconds =
+                         Some(parse_usize(&take_value(&mut values, &flag), &flag).max(1) as u64)
+                 }
++                "--checkpoint-wal-bytes" => CHECKPOINT_WAL_BYTES.store(
++                    parse_usize(&take_value(&mut values, &flag), &flag) as u64,
++                    Ordering::Relaxed,
++                ),
+                 "--collection-delay" => {
+                     args.collection_delay = Some(parse_duration(&take_value(&mut values, &flag)))
+                 }
+@@ -1122,7 +1152,22 @@ impl BlinkAdapter {
+                     .collect::<Vec<_>>();
+                 let processing_started = Instant::now();
+                 let results = match worker_store.lock() {
+-                    Ok(mut store) => store.apply_transaction_group(&requests),
++                    Ok(mut store) => {
++                        let results = store.apply_transaction_group(&requests);
++                        let threshold = CHECKPOINT_WAL_BYTES.load(Ordering::Relaxed);
++                        let wal_bytes = store
++                            .wal_metrics()
++                            .ok()
++                            .flatten()
++                            .map_or(0, |metrics| metrics.wal_bytes);
++                        if results.is_ok() && threshold > 0 && wal_bytes >= threshold {
++                            results.and_then(|results| {
++                                checkpoint_blink_store(&mut store).map(|()| results)
++                            })
++                        } else {
++                            results
++                        }
++                    }
+                     Err(_) => Err(Error::invariant("serial Blink benchmark mutex poisoned")),
+                 };
+                 let processing_nanos = processing_started.elapsed().as_nanos() as u64;
+@@ -2590,6 +2635,9 @@ async fn open_adapter(
+             for chunk in requests.chunks(64) {
+                 store.apply_transaction_group(chunk)?;
+             }
++            if CHECKPOINT_WAL_BYTES.load(Ordering::Relaxed) > 0 {
++                checkpoint_blink_store(&mut store)?;
++            }
+             let adapter = BlinkAdapter::start_versioned(store, benchmark_config(args, scenario));
+             Ok((Arc::new(adapter), data_path, seeded))
+         }
+@@ -3154,6 +3202,75 @@ fn build_record(
+                 percentile(0.99),
+             );
+         }
++        let checkpoint_events = CHECKPOINT_EVENTS
++            .lock()
++            .map(|events| {
++                events
++                    .iter()
++                    .filter(|event| event.finished >= measurement_started)
++                    .map(|event| {
++                        (
++                            (event.finished - measurement_started).as_nanos() as u64,
++                            *event,
++                        )
++                    })
++                    .filter(|(offset, _)| *offset <= wall_nanos)
++                    .collect::<Vec<_>>()
++            })
++            .unwrap_or_default();
++        json.u64(
++            "checkpoint_wal_bytes_threshold",
++            CHECKPOINT_WAL_BYTES.load(Ordering::Relaxed),
++        );
++        json.u64("checkpoint_count", checkpoint_events.len() as u64);
++        json.u64(
++            "checkpoint_total_nanos",
++            checkpoint_events
++                .iter()
++                .map(|(_, event)| event.duration_nanos)
++                .sum(),
++        );
++        json.u64(
++            "checkpoint_max_nanos",
++            checkpoint_events
++                .iter()
++                .map(|(_, event)| event.duration_nanos)
++                .max()
++                .unwrap_or(0),
++        );
++        json.u64(
++            "checkpoint_wal_bytes_reclaimed",
++            checkpoint_events
++                .iter()
++                .map(|(_, event)| event.wal_bytes_reclaimed)
++                .sum(),
++        );
++        json.string(
++            "checkpoint_events",
++            &checkpoint_events
++                .iter()
++                .map(|(offset, event)| {
++                    format!(
++                        "{:.3}s:{:.1}ms:{}B",
++                        *offset as f64 / 1e9,
++                        event.duration_nanos as f64 / 1e6,
++                        event.wal_bytes_before
++                    )
++                })
++                .collect::<Vec<_>>()
++                .join(","),
++        );
++        for window_index in 0..window_count {
++            let start = window_index * window_nanos;
++            let end = start + window_nanos;
++            json.u64(
++                &format!("window_{window_index:02}_checkpoints"),
++                checkpoint_events
++                    .iter()
++                    .filter(|(offset, _)| *offset >= start && *offset < end)
++                    .count() as u64,
++            );
++        }
+         json.u64("resource_sample_count", samples.len() as u64);
+         for (sample_index, sample) in samples.iter().enumerate() {
+             let prefix = format!("resource_sample_{sample_index:02}");

@@ -1,0 +1,7 @@
+Host: OCI A1, aarch64-unknown-linux-gnu
+rustc: 1.98.1 (48a229cea 2026-09-01)
+Cargo environment: RUSTFLAGS, CARGO_ENCODED_RUSTFLAGS, and CARGO_BUILD_RUSTFLAGS were empty.
+Repository .cargo/config.toml adds -C target-feature=+crc to aarch64-unknown-linux-gnu. The crc32c 0.6.8 rustc invocation also enabled cfg armsimd.
+Host /proc/cpuinfo reports crc32.
+objdump of the benchmark binary contains crc32cb and crc32cx instructions in linked hot CRC code. crc32ch and crc32cw were not found in this binary.
+Baseline binary SHA256: f63694a4b49f3485ac2b4af79aadb225800488a7a69a5a3e5a519d79bc112964

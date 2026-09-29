@@ -1,0 +1,20 @@
+Phase F environment. Timed binaries use the repository flags (.cargo/config.toml adds +crc). *churn* binaries: --features churn-counters (never used for a timed headline). *-fpcrc* binaries: RUSTFLAGS='-C force-frame-pointers=yes -C target-feature=+crc'. Sources are git archives of the named commits: 9d9927a (F0 probe), fe9dfad (F1), 74d65b6 (final Phase F, adaptive threshold). phase-e = the Phase E final binary (4ead3de); phase-c = the Phase C binary used since Phase D. f-adaptive = 74d65b6 with --parallel-workers 2 --parallel-min-mutations 32; f-2lane = same binary without the threshold; f-serial = same binary with --parallel-workers 0.
+Mon Sep 28 02:08:54 AM UTC 2026
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+dodbbench/db	sync	standard	local
+dodbbench/db	recordsize	4K	local
+dodbbench/db	compression	off	local
+dodbbench/db	atime	off	local
+2
+rustc 1.98.1 (48a229cea 2026-09-01)
+b6c74b1c64b6ecd8ec8b12a1f186602b78ae3506a6a1f4ce90638767b8fbd3ff  /tmp/dodb-phase-c-target/release/phase0-bench
+6670b610314e75c85f5760b59da300162f007999b25f3b884faf6cf07aa941fe  /tmp/dodb-e-final-target/release/phase0-bench
+89e0ec828df2292072df77f4c7fd63915f8c6e0e8ea651ae34f14ef1b39d1303  /tmp/dodb-e-finalchurn-target/release/phase0-bench
+308b38bfb7c2de7552e6a0827a3a903c08e697ea683f92c58766a9c67fcab39c  /tmp/dodb-e-final-fpcrc-target/release/phase0-bench
+44fbb759e1a347a040ac0a291091332406ffa74797162ccfb5c56fb175a76e97  /tmp/dodb-f-probe-target/release/phase0-bench
+d83205b6464296462bc17d7cfb47e57869216f4ee4d2b794280e6f581aeb9739  /tmp/dodb-f-f1-target/release/phase0-bench
+3c58aa008e7e729abdb9cfe97fcb34253a34c313dc7c0c7f0aff9c30c61d121a  /tmp/dodb-f-f1churn-target/release/phase0-bench
+bf48750f4027135242e9781772dc30f4d3378de1b3d5a91deae5fd1fa70eb4f9  /tmp/dodb-f-f1-fpcrc-target/release/phase0-bench
+e9a80e6edf1b9d022e9f80af10154402b5bf7b241c01dfd999f36d2c6660cb04  /tmp/dodb-f-adaptive-target/release/phase0-bench
+78f222f2214701a42b9f255b3b5044936e0dfb9be63bec1f0f01997e8ee9195a  /tmp/crossdb-rocksdb-target/release/rocksdb-bench
+{"probe": ["/tmp/dodb-f-probe-target/release/phase0-bench", 2], "phase-c": ["/tmp/dodb-phase-c-target/release/phase0-bench", null], "phase-e": ["/tmp/dodb-e-final-target/release/phase0-bench", 2], "phase-e-churn": ["/tmp/dodb-e-finalchurn-target/release/phase0-bench", 2], "phase-e-fpcrc": ["/tmp/dodb-e-final-fpcrc-target/release/phase0-bench", 2], "f1": ["/tmp/dodb-f-f1-target/release/phase0-bench", 2], "f1-churn": ["/tmp/dodb-f-f1churn-target/release/phase0-bench", 2], "f1-fpcrc": ["/tmp/dodb-f-f1-fpcrc-target/release/phase0-bench", 2], "f-serial": ["/tmp/dodb-f-adaptive-target/release/phase0-bench", 0], "f-2lane": ["/tmp/dodb-f-adaptive-target/release/phase0-bench", 2], "f-adaptive": ["/tmp/dodb-f-adaptive-target/release/phase0-bench", 2, ["--parallel-min-mutations", "32"]]}

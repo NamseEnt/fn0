@@ -1,0 +1,17 @@
+Sun Sep 27 05:55:33 AM UTC 2026
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+dodbbench/db	sync	standard	local
+dodbbench/db	recordsize	4K	local
+dodbbench/db	compression	off	local
+dodbbench/db	atime	off	local
+               total        used        free      shared  buff/cache   available
+Mem:           10898         860        8013          43        2371       10037
+Swap:           4095         202        3893
+2
+rustc 1.98.1 (48a229cea 2026-09-01)
+df8b8f4
+b6c74b1c64b6ecd8ec8b12a1f186602b78ae3506a6a1f4ce90638767b8fbd3ff  /tmp/dodb-phase-c-target/release/phase0-bench
+0db4bd76297a143d43cdae6af24d2defe9a380347d566bd554efefd6ec7d6056  /tmp/dodb-phase-c-fp-target/release/phase0-bench
+fbb70d7cce5fb34348fec8b9357618a0fe62d9419f4efffeba954c92fe2bc5e7  /tmp/dodb-phase-d-target/release/phase0-bench
+990ba79aa229132a7073a2967f6be2286772ad2fc6849eba4c90a4b0590f056a  /tmp/dodb-phase-d-fp-target/release/phase0-bench
+78f222f2214701a42b9f255b3b5044936e0dfb9be63bec1f0f01997e8ee9195a  /tmp/crossdb-rocksdb-target/release/rocksdb-bench

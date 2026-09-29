@@ -1,0 +1,17 @@
+planned-blink real-sync syscall probe (16 writers, width 1, uniform, working set 1,000, 1 s, sync-mode real)
+binary: /tmp/dodb-zfs-exp-target/release/phase0-bench (sha256 79122436e330be122059f8a4bf5908406e55b74596bfab2ee3cf745dd17fb6cb), --engine planned-blink
+command: strace -f -tt -y -e trace=fdatasync,fsync,openat
+row: engine planned-blink sync_mode real successful_transactions 4792 wal_syncs_delta 492 wal_bytes_per_tx 4224.0 superblock_images_elided 4792
+successful fdatasync on the .wal file: 494
+successful fsync on the .db file: 1 (data-file initialization)
+successful fdatasync on the .db file: 1 (shutdown flush after the measured interval)
+failed sync calls: 0
+sync calls on files outside /bench/zfs/db: 0
+The WAL fdatasync count exceeds wal_syncs_delta by the WAL initialization sync and the untimed seeding group.
+
+first sync lines:
+376729 14:30:37.287712 fdatasync(5</bench/zfs/db/dodb-phase0-376729-100%-write-16w-0r-width1-uniform-0-000000003a5a5ac0.wal>) = 0
+376729 14:30:37.289146 fsync(4</bench/zfs/db/dodb-phase0-376729-100%-write-16w-0r-width1-uniform-0-000000003a5a5ac0.db>) = 0
+376729 14:30:37.300646 fdatasync(5</bench/zfs/db/dodb-phase0-376729-100%-write-16w-0r-width1-uniform-0-000000003a5a5ac0.wal>) = 0
+376735 14:30:37.316941 fdatasync(5</bench/zfs/db/dodb-phase0-376729-100%-write-16w-0r-width1-uniform-0-000000003a5a5ac0.wal>) = 0
+376735 14:30:37.318643 fdatasync(5</bench/zfs/db/dodb-phase0-376729-100%-write-16w-0r-width1-uniform-0-000000003a5a5ac0.wal>) = 0

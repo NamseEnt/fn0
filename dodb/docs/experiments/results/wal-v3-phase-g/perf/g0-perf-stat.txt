@@ -1,0 +1,12 @@
+# started on Mon Sep 28 08:38:03 2026
+
+
+ Performance counter stats for 'target/g0-plain/release/phase0-bench --engine planned-blink --suite write --writers 64 --widths 16 --distributions uniform --duration 5s --warmup 2s --repetitions 1 --cache-capacity 256 --working-set 100000 --key-size 16 --value-size 64 --group-limit 64 --group-bytes 4194304 --queue-capacity 256 --collection-delay 0us --transaction-mode unconditional --tokio-workers 2 --sync-mode disabled --parallel-workers 2 --parallel-min-mutations 32 --seed 979110001 --output /tmp/phase-g0-perf-run.jsonl':
+
+    32,073,945,063      cycles:u
+    52,777,731,924      instructions:u                   #    1.65  insn per cycle
+
+       8.664955115 seconds time elapsed
+
+      10.841730000 seconds user
+       0.353236000 seconds sys

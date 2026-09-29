@@ -1,0 +1,5 @@
+phase0-bench engine=planned-blink build=release cpu="Apple M1" logical_cpus=8 tokio_workers=2 duration=2s warmup=1s repetitions=1
+raw output: docs/experiments/results/wal-v3-phase-g/raw/local-disabled-02-rep3-g0-mimalloc-w64-width16-same-leaf-heavy.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-same-leaf-heavy                  rep=0 tx/s=    52613 mut/s=   841811 read/s=        0 agg/s=    52613 p50=  1173.9us p95=  1523.3us p99=  1991.8us groups= 3325 avg_group=31.70
+completed 1 scenarios x 1 repetitions

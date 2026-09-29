@@ -1,0 +1,7 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /tmp/dodb-phase-h-h0/profile.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-uniform                          rep=0 tx/s=     5943 mut/s=    95089 read/s=        0 agg/s=     5943 p50= 10581.6us p95= 17760.1us p99= 23333.7us groups=  796 avg_group=37.39
+completed 1 scenarios x 1 repetitions
+[ perf record: Woken up 69 times to write data ]
+[ perf record: Captured and wrote 17.221 MB /tmp/dodb-phase-h-h0/perf.data (2109 samples) ]

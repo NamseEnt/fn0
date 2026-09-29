@@ -1,0 +1,40 @@
+blink_checkpoint_lsn=7527
+blink_width1_existing_update_wal_bytes min=4224 median=4224 max=4224
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.22s
+02c0da2ab5eecd4711fdfb6a3b1f1327dc82803a1ae34bb0b5ecf748f871247d  blink.wal
+fc9a84f357a0314d78bffb68e010ecff88c12ca4879efdbf48198f229da86e8d  blink.db
+8f76b74ed48ffdb34a32baa6bfddd68b245ea5f3062db5c396bdc98a9da2f0dc  btree.wal
+af5cc20d2977f14103c9ed414b6b70964e0531f3cdd4ab64f9ff981daa9483ef  btree.db
+2534504 blink.wal
+2514104 btree.wal
+== old-v2
+blink_checkpoint_lsn=7527
+blink_width1_existing_update_wal_bytes min=4224 median=4224 max=4224
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.97s
+02c0da2ab5eecd4711fdfb6a3b1f1327dc82803a1ae34bb0b5ecf748f871247d  blink.wal
+fc9a84f357a0314d78bffb68e010ecff88c12ca4879efdbf48198f229da86e8d  blink.db
+8f76b74ed48ffdb34a32baa6bfddd68b245ea5f3062db5c396bdc98a9da2f0dc  btree.wal
+af5cc20d2977f14103c9ed414b6b70964e0531f3cdd4ab64f9ff981daa9483ef  btree.db
+2534504 blink.wal
+2514104 btree.wal
+== new-v2
+blink_checkpoint_lsn=7527
+blink_width1_existing_update_wal_bytes min=4224 median=4224 max=4224
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.96s
+02c0da2ab5eecd4711fdfb6a3b1f1327dc82803a1ae34bb0b5ecf748f871247d  blink.wal
+fc9a84f357a0314d78bffb68e010ecff88c12ca4879efdbf48198f229da86e8d  blink.db
+8f76b74ed48ffdb34a32baa6bfddd68b245ea5f3062db5c396bdc98a9da2f0dc  btree.wal
+af5cc20d2977f14103c9ed414b6b70964e0531f3cdd4ab64f9ff981daa9483ef  btree.db
+2534504 blink.wal
+2514104 btree.wal
+== old-v2-repeat
+blink_checkpoint_lsn=7527
+blink_width1_existing_update_wal_bytes min=4224 median=4224 max=4224
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.58s
+02c0da2ab5eecd4711fdfb6a3b1f1327dc82803a1ae34bb0b5ecf748f871247d  blink.wal
+fc9a84f357a0314d78bffb68e010ecff88c12ca4879efdbf48198f229da86e8d  blink.db
+8f76b74ed48ffdb34a32baa6bfddd68b245ea5f3062db5c396bdc98a9da2f0dc  btree.wal
+af5cc20d2977f14103c9ed414b6b70964e0531f3cdd4ab64f9ff981daa9483ef  btree.db
+2534504 blink.wal
+2514104 btree.wal
+== new-v2-repeat

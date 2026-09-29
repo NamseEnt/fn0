@@ -1,0 +1,5 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /tmp/planned-blink-results/raw/04-rep2-planned-blink-w16-width16-same-leaf-heavy.jsonl
+scenario                                                       repetition throughput summary
+100%-write-16w-0r-width16-same-leaf-heavy                  rep=0 tx/s=     3407 mut/s=    54509 read/s=        0 agg/s=     3407 p50=  5248.9us p95=  6630.7us p99=  7657.0us groups= 1688 avg_group=10.10
+completed 1 scenarios x 1 repetitions

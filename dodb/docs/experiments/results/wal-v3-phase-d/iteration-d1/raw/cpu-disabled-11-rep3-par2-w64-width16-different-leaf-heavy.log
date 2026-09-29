@@ -1,0 +1,5 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /tmp/dodb-phase-d-results/raw/cpu-disabled-11-rep3-par2-w64-width16-different-leaf-heavy.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-different-leaf-heavy             rep=0 tx/s=     8336 mut/s=   133383 read/s=        0 agg/s=     8336 p50=  7324.2us p95= 11850.5us p99= 14553.5us groups=  775 avg_group=53.86
+completed 1 scenarios x 1 repetitions

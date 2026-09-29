@@ -1,0 +1,3038 @@
+{
+  "gate": {
+    "entries": [
+      {
+        "distribution": "uniform",
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 31.521729666666666,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.7376849758302089,
+          "mutation_ops_per_second": 8297.610739,
+          "overloads": 0,
+          "p50_us": 1923.669,
+          "p95_us": 2681.2563333333333,
+          "p99_us": 3343.4436666666666,
+          "page_delta_frame_bytes_per_record": 158.76621958075657,
+          "page_delta_payload_bytes_per_record": 106.76621958075657,
+          "page_delta_records_per_tx": 1.0,
+          "page_delta_spans_per_record": 3.996361738013011,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 159.71484375,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 8297.610739,
+          "tx_per_second_runs": [
+            8414.235888,
+            8112.422424,
+            8366.173905
+          ],
+          "tx_per_sync": 8.336234600964113,
+          "wal_bytes_per_tx": 226.76621958075657,
+          "wal_syncs": 4978.666666666667,
+          "wal_write_mib_per_second": 1.7947525149511112
+        },
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 21.920657,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 1.4188375191474814,
+          "mutation_ops_per_second": 4597.140203333333,
+          "overloads": 0,
+          "p50_us": 3368.2973333333334,
+          "p95_us": 4867.618666666667,
+          "p99_us": 6076.620333333333,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 1.0,
+          "peak_rss_mib": 155.58203125,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 4597.140203333333,
+          "tx_per_second_runs": [
+            4538.366685,
+            4620.32931,
+            4632.724615
+          ],
+          "tx_per_sync": 7.8638021426943245,
+          "wal_bytes_per_tx": 4224.0,
+          "wal_syncs": 2924.6666666666665,
+          "wal_write_mib_per_second": 18.51957488666536
+        },
+        "ratio_vs_phase_a": 1.8049505501232044,
+        "scenario_index": 0,
+        "width": 1,
+        "writers": 16
+      },
+      {
+        "distribution": "uniform",
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 74.47676,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 108,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 6
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 6,
+          "mean_sync_ms": 2.3383185482832616,
+          "mutation_ops_per_second": 29265.666097666668,
+          "overloads": 0,
+          "p50_us": 7662.209333333333,
+          "p95_us": 21276.291666666668,
+          "p99_us": 27016.818333333333,
+          "page_delta_frame_bytes_per_record": 158.73340984024628,
+          "page_delta_payload_bytes_per_record": 106.73340984024628,
+          "page_delta_records_per_tx": 15.980496324867186,
+          "page_delta_spans_per_record": 4.000505492103394,
+          "page_image_records_per_tx": 0.004148169711083618,
+          "peak_rss_mib": 188.2890625,
+          "superblock_images_emitted": 6,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 1829.104131,
+          "tx_per_second_runs": [
+            1961.076759,
+            1921.704475,
+            1604.531159
+          ],
+          "tx_per_sync": 14.743562231759658,
+          "wal_bytes_per_tx": 2621.878465904956,
+          "wal_syncs": 621.3333333333334,
+          "wal_write_mib_per_second": 4.574176631116498
+        },
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 54.93184466666667,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 4,
+          "mean_sync_ms": 7.165120018867925,
+          "mutation_ops_per_second": 17405.731215,
+          "overloads": 0,
+          "p50_us": 13268.935666666666,
+          "p95_us": 24497.855333333333,
+          "p99_us": 33600.945999999996,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 15.986044803525523,
+          "peak_rss_mib": 184.375,
+          "superblock_images_emitted": 4,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 1087.858201,
+          "tx_per_second_runs": [
+            1078.544316,
+            1104.381912,
+            1080.648375
+          ],
+          "tx_per_sync": 14.679245283018869,
+          "wal_bytes_per_tx": 66506.00220345208,
+          "wal_syncs": 371.0,
+          "wal_write_mib_per_second": 69.00939034751605
+        },
+        "ratio_vs_phase_a": 1.6813810194367418,
+        "scenario_index": 3,
+        "width": 16,
+        "writers": 16
+      },
+      {
+        "distribution": "uniform",
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 68.15233766666667,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.8913742021103896,
+          "mutation_ops_per_second": 24111.408435333335,
+          "overloads": 0,
+          "p50_us": 2471.576,
+          "p95_us": 3972.8979999999997,
+          "p99_us": 5153.699,
+          "page_delta_frame_bytes_per_record": 158.73902532023297,
+          "page_delta_payload_bytes_per_record": 106.73902532023298,
+          "page_delta_records_per_tx": 1.0,
+          "page_delta_spans_per_record": 3.9961704667278215,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 184.01171875,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 24111.408435333335,
+          "tx_per_second_runs": [
+            23687.97363,
+            24825.217461,
+            23821.034215
+          ],
+          "tx_per_sync": 58.7538961038961,
+          "wal_bytes_per_tx": 226.73902532023297,
+          "wal_syncs": 2053.3333333333335,
+          "wal_write_mib_per_second": 5.214253618140785
+        },
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 43.561742,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 3.0306382368503937,
+          "mutation_ops_per_second": 12655.170636333334,
+          "overloads": 0,
+          "p50_us": 4741.179,
+          "p95_us": 7178.595333333334,
+          "p99_us": 9751.518333333333,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 1.0,
+          "peak_rss_mib": 167.30078125,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 12655.170636333334,
+          "tx_per_second_runs": [
+            12401.799645,
+            12929.239466,
+            12634.472798
+          ],
+          "tx_per_sync": 59.84094488188976,
+          "wal_bytes_per_tx": 4224.0,
+          "wal_syncs": 1058.3333333333333,
+          "wal_write_mib_per_second": 50.98660718570507
+        },
+        "ratio_vs_phase_a": 1.9052614246155508,
+        "scenario_index": 6,
+        "width": 1,
+        "writers": 64
+      },
+      {
+        "distribution": "uniform",
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 92.56803533333333,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 72,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 4
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 4,
+          "mean_sync_ms": 3.2304509207317076,
+          "mutation_ops_per_second": 32521.350411666666,
+          "overloads": 0,
+          "p50_us": 30774.636333333332,
+          "p95_us": 34327.40033333333,
+          "p99_us": 54227.943666666666,
+          "page_delta_frame_bytes_per_record": 158.55091788663395,
+          "page_delta_payload_bytes_per_record": 106.55091788663395,
+          "page_delta_records_per_tx": 15.98034670758382,
+          "page_delta_spans_per_record": 3.998367702157738,
+          "page_image_records_per_tx": 0.0024811465508798275,
+          "peak_rss_mib": 213.9453125,
+          "superblock_images_emitted": 4,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 2032.5844006666666,
+          "tx_per_second_runs": [
+            2045.516699,
+            2014.822483,
+            2037.41402
+          ],
+          "tx_per_sync": 62.25813008130081,
+          "wal_bytes_per_tx": 2612.01028369952,
+          "wal_syncs": 164.0,
+          "wal_write_mib_per_second": 5.063850716904759
+        },
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 61.14645,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 4,
+          "mean_sync_ms": 24.687199680555555,
+          "mutation_ops_per_second": 18697.269989333334,
+          "overloads": 0,
+          "p50_us": 52865.942,
+          "p95_us": 68142.96033333334,
+          "p99_us": 143130.90133333334,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 15.982256879697124,
+          "peak_rss_mib": 215.3125,
+          "superblock_images_emitted": 4,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 1168.5793743333334,
+          "tx_per_second_runs": [
+            1158.621231,
+            1163.392625,
+            1183.724267
+          ],
+          "tx_per_sync": 61.447916666666664,
+          "wal_bytes_per_tx": 66490.25959202125,
+          "wal_syncs": 96.0,
+          "wal_write_mib_per_second": 74.1039996664577
+        },
+        "ratio_vs_phase_a": 1.7393635771008216,
+        "scenario_index": 9,
+        "width": 16,
+        "writers": 64
+      }
+    ],
+    "geometric_mean_ratio": 1.780816203694529
+  },
+  "matrix": {
+    "entries": [
+      {
+        "distribution": "uniform",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 58.074071,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 2.365857963800905,
+          "mutation_ops_per_second": 3219.848596,
+          "overloads": 0,
+          "p50_us": 4631.632666666666,
+          "p95_us": 6685.088333333333,
+          "p99_us": 9164.371,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 2.0,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 3219.848596,
+          "tx_per_second_runs": [
+            3211.912868,
+            3244.461347,
+            3203.171573
+          ],
+          "tx_per_sync": 15.626050420168067,
+          "wal_bytes_per_tx": 8380.0,
+          "wal_syncs": 1031.3333333333333,
+          "wal_write_mib_per_second": 25.73628933034725
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 31.987132666666668,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.7248612681946914,
+          "mutation_ops_per_second": 8211.097021666666,
+          "overloads": 0,
+          "p50_us": 1905.7353333333333,
+          "p95_us": 2690.083666666667,
+          "p99_us": 3239.5503333333336,
+          "page_delta_frame_bytes_per_record": 158.76572036099208,
+          "page_delta_payload_bytes_per_record": 106.76572036099208,
+          "page_delta_records_per_tx": 1.0,
+          "page_delta_spans_per_record": 3.996347876899104,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 159.3046875,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 8211.097021666666,
+          "tx_per_second_runs": [
+            8596.400623,
+            8059.991138,
+            7976.899304
+          ],
+          "tx_per_sync": 8.115392214977277,
+          "wal_bytes_per_tx": 226.76572036099208,
+          "wal_syncs": 5061.0,
+          "wal_write_mib_per_second": 1.7758573146831487
+        },
+        "page_delta_confirm": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 31.722769666666668,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.7231980062307339,
+          "mutation_ops_per_second": 8256.381745666667,
+          "overloads": 0,
+          "p50_us": 1889.162,
+          "p95_us": 2672.163,
+          "p99_us": 3271.5106666666666,
+          "page_delta_frame_bytes_per_record": 158.75720616368142,
+          "page_delta_payload_bytes_per_record": 106.75720616368142,
+          "page_delta_records_per_tx": 1.0,
+          "page_delta_spans_per_record": 3.9962788670320535,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 157.9296875,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 8256.381745666667,
+          "tx_per_second_runs": [
+            8093.283088,
+            8457.14956,
+            8218.712589
+          ],
+          "tx_per_sync": 8.125336131698038,
+          "wal_bytes_per_tx": 226.75720616368142,
+          "wal_syncs": 5082.333333333333,
+          "wal_write_mib_per_second": 1.7855828269406486
+        },
+        "page_delta_vs_exact_main": 2.5501500386904112,
+        "page_delta_vs_rocksdb_confirm": 0.8172171033747798,
+        "page_delta_vs_rocksdb_reused": 0.818362408129257,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 21.31887,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 1.4469343297134936,
+          "mutation_ops_per_second": 4476.892156,
+          "overloads": 0,
+          "p50_us": 3409.9506666666666,
+          "p95_us": 5284.753,
+          "p99_us": 6307.914,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 1.0,
+          "peak_rss_mib": 155.78125,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 4476.892156,
+          "tx_per_second_runs": [
+            4525.137928,
+            4428.321386,
+            4477.217154
+          ],
+          "tx_per_sync": 7.763285582255083,
+          "wal_bytes_per_tx": 4224.0,
+          "wal_syncs": 2885.3333333333335,
+          "wal_write_mib_per_second": 18.03696092974431
+        },
+        "phase_a_vs_exact_main": 1.3904045555314677,
+        "phase_a_vs_rocksdb_reused": 0.44619132328502054,
+        "ratio_vs_phase_a": 1.8341065041430644,
+        "rocksdb_confirm": {
+          "cpu_percent_one_core": 30.455339063715602,
+          "mutation_ops_per_second": 10103.045704221207,
+          "p50_us": 1647.5486666666668,
+          "p95_us": 2050.656,
+          "p99_us": 2357.909666666667,
+          "tx_per_second": 10103.045704221207,
+          "tx_per_second_runs": [
+            9725.451134266246,
+            10889.75521262124,
+            9693.930765776135
+          ]
+        },
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 31.456960281030813,
+          "mutation_ops_per_second": 10033.570628490743,
+          "p50_us": 1655.9886666666666,
+          "p95_us": 2012.8690000000001,
+          "p99_us": 2330.5363333333335,
+          "tx_per_second": 10033.570628490743,
+          "tx_per_second_runs": [
+            10077.713811000232,
+            9965.985817487459,
+            10057.012256984537
+          ]
+        },
+        "scenario_index": 0,
+        "width": 1,
+        "writers": 16
+      },
+      {
+        "distribution": "same-leaf-heavy",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 49.112201999999996,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 2.3181590636087175,
+          "mutation_ops_per_second": 4096.972764,
+          "overloads": 0,
+          "p50_us": 3539.5106666666666,
+          "p95_us": 5583.860000000001,
+          "p99_us": 7574.716,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 2.0,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 4096.972764,
+          "tx_per_second_runs": [
+            4145.329168,
+            4049.679328,
+            4095.909796
+          ],
+          "tx_per_sync": 15.580587937151545,
+          "wal_bytes_per_tx": 8380.0,
+          "wal_syncs": 1315.3333333333333,
+          "wal_write_mib_per_second": 32.74527900122564
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 22.059941666666667,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.6899957200464012,
+          "mutation_ops_per_second": 9473.976311333334,
+          "overloads": 0,
+          "p50_us": 1615.4686666666666,
+          "p95_us": 2406.296,
+          "p99_us": 2826.963333333333,
+          "page_delta_frame_bytes_per_record": 92.55265805153603,
+          "page_delta_payload_bytes_per_record": 40.55265805153602,
+          "page_delta_records_per_tx": 1.0,
+          "page_delta_spans_per_record": 3.062861846039127,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 115.87109375,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 9473.976311333334,
+          "tx_per_second_runs": [
+            9631.596161,
+            9496.665243,
+            9293.66753
+          ],
+          "tx_per_sync": 7.852455394133569,
+          "wal_bytes_per_tx": 160.552658051536,
+          "wal_syncs": 6034.333333333333,
+          "wal_write_mib_per_second": 1.4507597798880978
+        },
+        "page_delta_vs_exact_main": 2.312433315295853,
+        "page_delta_vs_rocksdb_reused": 0.8681631327136357,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 16.458121333333334,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 1.4074782791336502,
+          "mutation_ops_per_second": 4900.058430666667,
+          "overloads": 0,
+          "p50_us": 3125.484,
+          "p95_us": 4830.992,
+          "p99_us": 6315.260333333333,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 1.0,
+          "peak_rss_mib": 114.55078125,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 4900.058430666667,
+          "tx_per_second_runs": [
+            4937.429309,
+            4850.950859,
+            4911.795124
+          ],
+          "tx_per_sync": 7.769572107765452,
+          "wal_bytes_per_tx": 4224.0,
+          "wal_syncs": 3155.0,
+          "wal_write_mib_per_second": 19.740021183594134
+        },
+        "phase_a_vs_exact_main": 1.1960192837314811,
+        "phase_a_vs_rocksdb_reused": 0.44902477458788737,
+        "ratio_vs_phase_a": 1.933441497766869,
+        "rocksdb_confirm": null,
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 31.324739245714408,
+          "mutation_ops_per_second": 10912.668315827152,
+          "p50_us": 1544.5216666666668,
+          "p95_us": 1921.7756666666667,
+          "p99_us": 2312.563,
+          "tx_per_second": 10912.668315827152,
+          "tx_per_second_runs": [
+            11332.90557166226,
+            11175.052803084292,
+            10230.046572734902
+          ]
+        },
+        "scenario_index": 1,
+        "width": 1,
+        "writers": 16
+      },
+      {
+        "distribution": "different-leaf-heavy",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 54.44153633333333,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 2.3208580253344717,
+          "mutation_ops_per_second": 3664.248947,
+          "overloads": 0,
+          "p50_us": 4027.711333333333,
+          "p95_us": 6005.194333333333,
+          "p99_us": 8257.703,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 2.0,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 3664.248947,
+          "tx_per_second_runs": [
+            3664.66607,
+            3625.454821,
+            3702.62595
+          ],
+          "tx_per_sync": 15.653003131226871,
+          "wal_bytes_per_tx": 8380.0,
+          "wal_syncs": 1171.0,
+          "wal_write_mib_per_second": 29.287651074552645
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 27.51602,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.7220266576816075,
+          "mutation_ops_per_second": 8523.506354333334,
+          "overloads": 0,
+          "p50_us": 1815.3353333333334,
+          "p95_us": 2609.5763333333334,
+          "p99_us": 3051.6703333333335,
+          "page_delta_frame_bytes_per_record": 133.36712966943634,
+          "page_delta_payload_bytes_per_record": 81.36712966943635,
+          "page_delta_records_per_tx": 1.0,
+          "page_delta_spans_per_record": 3.6415623803084425,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 120.046875,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 8523.506354333334,
+          "tx_per_second_runs": [
+            8725.050541,
+            8490.173328,
+            8355.295194
+          ],
+          "tx_per_sync": 7.909304482225657,
+          "wal_bytes_per_tx": 201.36712966943634,
+          "wal_syncs": 5391.666666666667,
+          "wal_write_mib_per_second": 1.637002653853124
+        },
+        "page_delta_vs_exact_main": 2.3261264389014054,
+        "page_delta_vs_rocksdb_reused": 0.8030545819553626,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 19.190612666666667,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 1.414658697766531,
+          "mutation_ops_per_second": 4712.295863,
+          "overloads": 0,
+          "p50_us": 3257.4573333333333,
+          "p95_us": 4965.326,
+          "p99_us": 6855.341333333333,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 1.0,
+          "peak_rss_mib": 118.0078125,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 4712.295863,
+          "tx_per_second_runs": [
+            4750.508532,
+            4666.003675,
+            4720.375382
+          ],
+          "tx_per_sync": 7.780723952029926,
+          "wal_bytes_per_tx": 4224.0,
+          "wal_syncs": 3029.6666666666665,
+          "wal_write_mib_per_second": 18.98430258974534
+        },
+        "phase_a_vs_exact_main": 1.2860195721303431,
+        "phase_a_vs_rocksdb_reused": 0.44397582720021717,
+        "ratio_vs_phase_a": 1.808779966737274,
+        "rocksdb_confirm": null,
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 31.058629188052823,
+          "mutation_ops_per_second": 10613.85682350432,
+          "p50_us": 1582.4686666666666,
+          "p95_us": 1962.2556666666667,
+          "p99_us": 2245.162333333333,
+          "tx_per_second": 10613.85682350432,
+          "tx_per_second_runs": [
+            10284.351758642097,
+            10718.671926796396,
+            10838.54678507447
+          ]
+        },
+        "scenario_index": 2,
+        "width": 1,
+        "writers": 16
+      },
+      {
+        "distribution": "uniform",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 83.041738,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 6.458261997792494,
+          "mutation_ops_per_second": 7498.782950333333,
+          "overloads": 0,
+          "p50_us": 31706.278000000002,
+          "p95_us": 47645.564,
+          "p99_us": 69082.843,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 16.98683838097934,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 468.6739346666667,
+          "tx_per_second_runs": [
+            461.483357,
+            470.305131,
+            474.233316
+          ],
+          "tx_per_sync": 15.59823399558499,
+          "wal_bytes_per_tx": 70665.30031135013,
+          "wal_syncs": 151.0,
+          "wal_write_mib_per_second": 31.58845953924859
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 78.60443233333334,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 108,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 6
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 6,
+          "mean_sync_ms": 1.904497073073073,
+          "mutation_ops_per_second": 30772.064712,
+          "overloads": 0,
+          "p50_us": 7802.462333333333,
+          "p95_us": 14038.656333333332,
+          "p99_us": 16019.525333333333,
+          "page_delta_frame_bytes_per_record": 158.75415683132294,
+          "page_delta_payload_bytes_per_record": 106.75415683132296,
+          "page_delta_records_per_tx": 15.980412513842746,
+          "page_delta_spans_per_record": 4.000690820105247,
+          "page_image_records_per_tx": 0.0039451827242524915,
+          "peak_rss_mib": 187.28125,
+          "superblock_images_emitted": 6,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 1923.2540443333332,
+          "tx_per_second_runs": [
+            1900.689069,
+            1975.544731,
+            1893.528333
+          ],
+          "tx_per_sync": 14.462462462462462,
+          "wal_bytes_per_tx": 2621.3530938538206,
+          "wal_syncs": 666.0,
+          "wal_write_mib_per_second": 4.808496571003175
+        },
+        "page_delta_confirm": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 77.63103633333333,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 108,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 6
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 6,
+          "mean_sync_ms": 1.9573378189568706,
+          "mutation_ops_per_second": 30769.08139766667,
+          "overloads": 0,
+          "p50_us": 7810.343,
+          "p95_us": 14272.323666666667,
+          "p99_us": 16146.912333333334,
+          "page_delta_frame_bytes_per_record": 158.7562259114908,
+          "page_delta_payload_bytes_per_record": 106.75622591149077,
+          "page_delta_records_per_tx": 15.980438997368786,
+          "page_delta_spans_per_record": 4.000691105964526,
+          "page_image_records_per_tx": 0.0039468217698379725,
+          "peak_rss_mib": 190.0390625,
+          "superblock_images_emitted": 6,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 1923.0675873333334,
+          "tx_per_second_runs": [
+            1937.508501,
+            1913.387696,
+            1918.306565
+          ],
+          "tx_per_sync": 14.485456369107322,
+          "wal_bytes_per_tx": 2621.3971749065227,
+          "wal_syncs": 664.6666666666666,
+          "wal_write_mib_per_second": 4.808151359303924
+        },
+        "page_delta_vs_exact_main": 4.103607864818005,
+        "page_delta_vs_rocksdb_confirm": 0.31283332116574314,
+        "page_delta_vs_rocksdb_reused": 0.336028674206022,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 56.647842,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 5,
+          "mean_sync_ms": 6.578576960270499,
+          "mutation_ops_per_second": 17932.253911333333,
+          "overloads": 0,
+          "p50_us": 12946.575333333332,
+          "p95_us": 24394.095333333335,
+          "p99_us": 29966.248333333333,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 15.9858050721625,
+          "peak_rss_mib": 185.0,
+          "superblock_images_emitted": 5,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 1120.7658693333333,
+          "tx_per_second_runs": [
+            1157.026828,
+            1100.557745,
+            1104.713035
+          ],
+          "tx_per_sync": 14.232459847844463,
+          "wal_bytes_per_tx": 66505.00587990734,
+          "wal_syncs": 394.3333333333333,
+          "wal_write_mib_per_second": 71.09095355397663
+        },
+        "phase_a_vs_exact_main": 2.391355239609072,
+        "phase_a_vs_rocksdb_reused": 0.1958188884495421,
+        "ratio_vs_phase_a": 1.716017677695115,
+        "rocksdb_confirm": {
+          "cpu_percent_one_core": 62.43814643963673,
+          "mutation_ops_per_second": 98356.15107327866,
+          "p50_us": 2519.269333333333,
+          "p95_us": 3388.377,
+          "p99_us": 5135.2863333333335,
+          "tx_per_second": 6147.259442079916,
+          "tx_per_second_runs": [
+            6175.051557377558,
+            6184.739642901242,
+            6081.987125960948
+          ]
+        },
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 62.04584686975915,
+          "mutation_ops_per_second": 91575.71085873083,
+          "p50_us": 2632.123,
+          "p95_us": 3907.8846666666664,
+          "p99_us": 6714.221333333334,
+          "tx_per_second": 5723.481928670677,
+          "tx_per_second_runs": [
+            5884.352340154291,
+            5524.609342126472,
+            5761.484103731269
+          ]
+        },
+        "scenario_index": 3,
+        "width": 16,
+        "writers": 16
+      },
+      {
+        "distribution": "same-leaf-heavy",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 72.47417800000001,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 2.665809843035343,
+          "mutation_ops_per_second": 32262.69767,
+          "overloads": 0,
+          "p50_us": 7311.889,
+          "p95_us": 10219.799333333332,
+          "p99_us": 13562.19,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 3.0,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 2016.4186043333332,
+          "tx_per_second_runs": [
+            1973.099057,
+            2031.419982,
+            2044.736774
+          ],
+          "tx_per_sync": 15.733367983367984,
+          "wal_bytes_per_tx": 12536.0,
+          "wal_syncs": 641.3333333333334,
+          "wal_write_mib_per_second": 24.109007054548066
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 56.033405,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.8421104968180346,
+          "mutation_ops_per_second": 96255.37562833334,
+          "overloads": 0,
+          "p50_us": 2943.9629999999997,
+          "p95_us": 3452.684,
+          "p99_us": 4059.3246666666664,
+          "page_delta_frame_bytes_per_record": 404.80619206361513,
+          "page_delta_payload_bytes_per_record": 352.80619206361513,
+          "page_delta_records_per_tx": 2.0,
+          "page_delta_spans_per_record": 10.545368965479051,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 115.69921875,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 6015.960976666667,
+          "tx_per_second_runs": [
+            6025.75888,
+            6107.743784,
+            5914.380266
+          ],
+          "tx_per_sync": 9.73929457447956,
+          "wal_bytes_per_tx": 877.6123841272303,
+          "wal_syncs": 3090.3333333333335,
+          "wal_write_mib_per_second": 5.035731931397947
+        },
+        "page_delta_vs_exact_main": 2.983488132740999,
+        "page_delta_vs_rocksdb_reused": 0.8812640981059755,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 34.91087666666667,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 1.9823536132366273,
+          "mutation_ops_per_second": 53089.05191266666,
+          "overloads": 0,
+          "p50_us": 5097.952666666666,
+          "p95_us": 6130.527666666667,
+          "p99_us": 7896.662333333334,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 2.0,
+          "peak_rss_mib": 115.49609375,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 3318.0657443333334,
+          "tx_per_second_runs": [
+            3301.702578,
+            3320.018801,
+            3332.475854
+          ],
+          "tx_per_sync": 9.030462375339981,
+          "wal_bytes_per_tx": 8380.0,
+          "wal_syncs": 1838.3333333333333,
+          "wal_write_mib_per_second": 26.520200700127567
+        },
+        "phase_a_vs_exact_main": 1.6455242662424998,
+        "phase_a_vs_rocksdb_reused": 0.48605571528431574,
+        "ratio_vs_phase_a": 1.8130927595213746,
+        "rocksdb_confirm": null,
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 48.781270042524206,
+          "mutation_ops_per_second": 109224.21080529662,
+          "p50_us": 2268.349333333333,
+          "p95_us": 2870.3106666666667,
+          "p99_us": 4128.538333333333,
+          "tx_per_second": 6826.513175331039,
+          "tx_per_second_runs": [
+            6996.94737813928,
+            6951.680634173379,
+            6530.9115136804585
+          ]
+        },
+        "scenario_index": 4,
+        "width": 16,
+        "writers": 16
+      },
+      {
+        "distribution": "different-leaf-heavy",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 77.20041633333334,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 2.5873786610677865,
+          "mutation_ops_per_second": 28141.215742666667,
+          "overloads": 0,
+          "p50_us": 8508.770666666667,
+          "p95_us": 11138.813666666667,
+          "p99_us": 14135.283666666668,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 3.0,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 1758.825984,
+          "tx_per_second_runs": [
+            1709.828707,
+            1790.442575,
+            1776.20667
+          ],
+          "tx_per_sync": 15.83983203359328,
+          "wal_bytes_per_tx": 12536.0,
+          "wal_syncs": 555.6666666666666,
+          "wal_write_mib_per_second": 21.028444438455203
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 69.08543166666666,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.9770940247482506,
+          "mutation_ops_per_second": 88507.438083,
+          "overloads": 0,
+          "p50_us": 2579.9230000000002,
+          "p95_us": 4889.152333333333,
+          "p99_us": 5898.460333333333,
+          "page_delta_frame_bytes_per_record": 643.3115869594017,
+          "page_delta_payload_bytes_per_record": 591.3115869594017,
+          "page_delta_records_per_tx": 2.0,
+          "page_delta_spans_per_record": 10.992316307973939,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 131.6640625,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 5531.714880333333,
+          "tx_per_second_runs": [
+            5389.30731,
+            5569.887978,
+            5635.949353
+          ],
+          "tx_per_sync": 14.171872333162655,
+          "wal_bytes_per_tx": 1354.6231739188033,
+          "wal_syncs": 1953.0,
+          "wal_write_mib_per_second": 7.146940270404109
+        },
+        "page_delta_vs_exact_main": 3.1451177834846753,
+        "page_delta_vs_rocksdb_reused": 0.7763157063057627,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 45.71322433333333,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 2.5810180253793105,
+          "mutation_ops_per_second": 53507.05269966667,
+          "overloads": 0,
+          "p50_us": 4137.485000000001,
+          "p95_us": 7920.436333333333,
+          "p99_us": 9730.651333333333,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 2.0,
+          "peak_rss_mib": 128.2734375,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 3344.190794,
+          "tx_per_second_runs": [
+            3248.714796,
+            3404.729455,
+            3379.128131
+          ],
+          "tx_per_sync": 13.844137931034483,
+          "wal_bytes_per_tx": 8380.0,
+          "wal_syncs": 1208.3333333333333,
+          "wal_write_mib_per_second": 26.728907423513814
+        },
+        "phase_a_vs_exact_main": 1.9013767276706324,
+        "phase_a_vs_rocksdb_reused": 0.4693206165587659,
+        "ratio_vs_phase_a": 1.6541265798165858,
+        "rocksdb_confirm": null,
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 50.91762768340556,
+          "mutation_ops_per_second": 114009.59347648885,
+          "p50_us": 2191.175333333333,
+          "p95_us": 2739.8696666666665,
+          "p99_us": 3624.4576666666667,
+          "tx_per_second": 7125.599592280553,
+          "tx_per_second_runs": [
+            7054.290946621153,
+            7144.933743110224,
+            7177.5740871102835
+          ]
+        },
+        "scenario_index": 5,
+        "width": 16,
+        "writers": 16
+      },
+      {
+        "distribution": "uniform",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 76.60497866666667,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 4.4252890113852,
+          "mutation_ops_per_second": 4374.400068666667,
+          "overloads": 0,
+          "p50_us": 14103.003666666667,
+          "p95_us": 18357.342,
+          "p99_us": 26979.126,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 2.0,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 4374.400068666667,
+          "tx_per_second_runs": [
+            4290.28797,
+            4332.438402,
+            4500.473834
+          ],
+          "tx_per_sync": 62.35768500948767,
+          "wal_bytes_per_tx": 8380.0,
+          "wal_syncs": 351.3333333333333,
+          "wal_write_mib_per_second": 34.961962675114506
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 68.86932933333334,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.8936760586286849,
+          "mutation_ops_per_second": 24234.366715666667,
+          "overloads": 0,
+          "p50_us": 2497.549666666667,
+          "p95_us": 3837.138,
+          "p99_us": 5057.806,
+          "page_delta_frame_bytes_per_record": 158.732034640363,
+          "page_delta_payload_bytes_per_record": 106.732034640363,
+          "page_delta_records_per_tx": 1.0,
+          "page_delta_spans_per_record": 3.996157788997205,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 183.05078125,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 24234.366715666667,
+          "tx_per_second_runs": [
+            24088.811489,
+            24265.547652,
+            24348.741006
+          ],
+          "tx_per_sync": 60.260516727393174,
+          "wal_bytes_per_tx": 226.732034640363,
+          "wal_syncs": 2012.6666666666667,
+          "wal_write_mib_per_second": 5.240834885543465
+        },
+        "page_delta_confirm": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 67.67575599999999,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.8886907714058777,
+          "mutation_ops_per_second": 24071.361678666668,
+          "overloads": 0,
+          "p50_us": 2458.283,
+          "p95_us": 4205.698,
+          "p99_us": 5125.1393333333335,
+          "page_delta_frame_bytes_per_record": 158.7319925396676,
+          "page_delta_payload_bytes_per_record": 106.7319925396676,
+          "page_delta_records_per_tx": 1.0,
+          "page_delta_spans_per_record": 3.99618405104904,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 183.1875,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 24071.361678666668,
+          "tx_per_second_runs": [
+            23861.087227,
+            24165.457209,
+            24187.5406
+          ],
+          "tx_per_sync": 57.407148530579825,
+          "wal_bytes_per_tx": 226.7319925396676,
+          "wal_syncs": 2098.3333333333335,
+          "wal_write_mib_per_second": 5.205178831934624
+        },
+        "page_delta_vs_exact_main": 5.540043511167324,
+        "page_delta_vs_rocksdb_confirm": 0.8981139935795485,
+        "page_delta_vs_rocksdb_reused": 0.9230656072854179,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 41.178537,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 3.1515794638324874,
+          "mutation_ops_per_second": 12065.900482,
+          "overloads": 0,
+          "p50_us": 4677.272333333333,
+          "p95_us": 8337.41,
+          "p99_us": 14460.803333333333,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 1.0,
+          "peak_rss_mib": 175.51171875,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 12065.900482,
+          "tx_per_second_runs": [
+            11413.302908,
+            12412.805059,
+            12371.593479
+          ],
+          "tx_per_sync": 57.45019035532995,
+          "wal_bytes_per_tx": 4224.0,
+          "wal_syncs": 1050.6666666666667,
+          "wal_write_mib_per_second": 48.61150109091621
+        },
+        "phase_a_vs_exact_main": 2.7582983477955483,
+        "phase_a_vs_rocksdb_reused": 0.45957948423148465,
+        "ratio_vs_phase_a": 2.008500463916446,
+        "rocksdb_confirm": {
+          "cpu_percent_one_core": 65.30129746257569,
+          "mutation_ops_per_second": 26802.122949590364,
+          "p50_us": 2339.1363333333334,
+          "p95_us": 3209.057,
+          "p99_us": 4154.338,
+          "tx_per_second": 26802.122949590364,
+          "tx_per_second_runs": [
+            27111.125240606463,
+            26730.005161445846,
+            26565.23844671878
+          ]
+        },
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 66.17167686110874,
+          "mutation_ops_per_second": 26254.219119847723,
+          "p50_us": 2388.3363333333336,
+          "p95_us": 3266.9773333333333,
+          "p99_us": 4102.725,
+          "tx_per_second": 26254.219119847723,
+          "tx_per_second_runs": [
+            26432.976412663244,
+            25734.004231980856,
+            26595.67671489907
+          ]
+        },
+        "scenario_index": 6,
+        "width": 1,
+        "writers": 64
+      },
+      {
+        "distribution": "same-leaf-heavy",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 68.54441533333333,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 4.381861407760381,
+          "mutation_ops_per_second": 5845.674896333333,
+          "overloads": 0,
+          "p50_us": 10278.319,
+          "p95_us": 16226.006000000001,
+          "p99_us": 23827.988333333335,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 2.0,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 5845.674896333333,
+          "tx_per_second_runs": [
+            5901.862639,
+            5688.277941,
+            5946.884109
+          ],
+          "tx_per_sync": 59.794417971409125,
+          "wal_bytes_per_tx": 8380.0,
+          "wal_syncs": 489.6666666666667,
+          "wal_write_mib_per_second": 46.72583661788293
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 46.963136666666664,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.808894534833677,
+          "mutation_ops_per_second": 32896.65396266667,
+          "overloads": 0,
+          "p50_us": 1651.5486666666666,
+          "p95_us": 2880.483333333333,
+          "p99_us": 3772.351666666667,
+          "page_delta_frame_bytes_per_record": 89.13634863325348,
+          "page_delta_payload_bytes_per_record": 37.13634863325348,
+          "page_delta_records_per_tx": 1.0,
+          "page_delta_spans_per_record": 3.0154686667868145,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 122.10546875,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 32896.65396266667,
+          "tx_per_second_runs": [
+            33041.890528,
+            32784.865711,
+            32863.205649
+          ],
+          "tx_per_sync": 44.278400430377474,
+          "wal_bytes_per_tx": 157.13634863325348,
+          "wal_syncs": 3717.6666666666665,
+          "wal_write_mib_per_second": 4.930373002897302
+        },
+        "page_delta_vs_exact_main": 5.6275202685836865,
+        "page_delta_vs_rocksdb_reused": 1.2015642756908145,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 23.845136666666665,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 2.9271645585690904,
+          "mutation_ops_per_second": 11426.284013999999,
+          "overloads": 0,
+          "p50_us": 6386.727666666667,
+          "p95_us": 7458.649,
+          "p99_us": 9672.545,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 1.0,
+          "peak_rss_mib": 116.34375,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 11426.284013999999,
+          "tx_per_second_runs": [
+            11615.511885,
+            11238.320235,
+            11425.019922
+          ],
+          "tx_per_sync": 40.10965630114566,
+          "wal_bytes_per_tx": 4224.0,
+          "wal_syncs": 1425.6666666666667,
+          "wal_write_mib_per_second": 46.033461316883994
+        },
+        "phase_a_vs_exact_main": 1.9546560861889655,
+        "phase_a_vs_rocksdb_reused": 0.4173498827783671,
+        "ratio_vs_phase_a": 2.8790334567528872,
+        "rocksdb_confirm": null,
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 62.245598449141305,
+          "mutation_ops_per_second": 27378.189105824924,
+          "p50_us": 2267.776,
+          "p95_us": 3095.8973333333333,
+          "p99_us": 3885.6846666666665,
+          "tx_per_second": 27378.189105824924,
+          "tx_per_second_runs": [
+            26582.756435982097,
+            27641.246686085928,
+            27910.564195406747
+          ]
+        },
+        "scenario_index": 7,
+        "width": 1,
+        "writers": 64
+      },
+      {
+        "distribution": "different-leaf-heavy",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 72.70947,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 4.338157787878788,
+          "mutation_ops_per_second": 5059.185828,
+          "overloads": 0,
+          "p50_us": 11509.32,
+          "p95_us": 17693.47433333333,
+          "p99_us": 27441.792666666668,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 2.0,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 5059.185828,
+          "tx_per_second_runs": [
+            5369.32101,
+            4751.099581,
+            5057.136893
+          ],
+          "tx_per_sync": 62.286650286650286,
+          "wal_bytes_per_tx": 8380.0,
+          "wal_syncs": 407.0,
+          "wal_write_mib_per_second": 40.435383811125774
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 64.55926666666667,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.9087690841121495,
+          "mutation_ops_per_second": 26521.718674,
+          "overloads": 0,
+          "p50_us": 2239.4823333333334,
+          "p95_us": 3850.5376666666666,
+          "p99_us": 5312.179666666667,
+          "page_delta_frame_bytes_per_record": 131.41811760036376,
+          "page_delta_payload_bytes_per_record": 79.41811760036374,
+          "page_delta_records_per_tx": 1.0,
+          "page_delta_spans_per_record": 3.6004541834871144,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 139.3125,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 26521.718674,
+          "tx_per_second_runs": [
+            25955.280091,
+            26880.445483,
+            26729.430448
+          ],
+          "tx_per_sync": 60.00557732891167,
+          "wal_bytes_per_tx": 199.41811760036376,
+          "wal_syncs": 2211.3333333333335,
+          "wal_write_mib_per_second": 5.0443857704804165
+        },
+        "page_delta_vs_exact_main": 5.242289881351241,
+        "page_delta_vs_rocksdb_reused": 0.9876962108411903,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 38.907685666666666,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 2.9139165566143497,
+          "mutation_ops_per_second": 12481.040310333334,
+          "overloads": 0,
+          "p50_us": 4522.511666666667,
+          "p95_us": 8177.049,
+          "p99_us": 9238.024333333333,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 1.0,
+          "peak_rss_mib": 139.61328125,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 12481.040310333334,
+          "tx_per_second_runs": [
+            12599.754013,
+            12357.602438,
+            12485.76448
+          ],
+          "tx_per_sync": 52.50532511210762,
+          "wal_bytes_per_tx": 4224.0,
+          "wal_syncs": 1189.3333333333333,
+          "wal_write_mib_per_second": 50.28398448262058
+        },
+        "phase_a_vs_exact_main": 2.4670057069770346,
+        "phase_a_vs_rocksdb_reused": 0.46480683900615255,
+        "ratio_vs_phase_a": 2.12496058137414,
+        "rocksdb_confirm": null,
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 63.71192552184255,
+          "mutation_ops_per_second": 26852.10126645345,
+          "p50_us": 2339.323,
+          "p95_us": 3194.990333333333,
+          "p99_us": 3836.5246666666667,
+          "tx_per_second": 26852.10126645345,
+          "tx_per_second_runs": [
+            26738.591148167146,
+            26862.404136521927,
+            26955.308514671276
+          ]
+        },
+        "scenario_index": 8,
+        "width": 1,
+        "writers": 64
+      },
+      {
+        "distribution": "uniform",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 83.42441866666667,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 24.08375320610687,
+          "mutation_ops_per_second": 8520.130276333333,
+          "overloads": 0,
+          "p50_us": 116598.97733333334,
+          "p95_us": 159714.121,
+          "p99_us": 205993.269,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 16.983017230692948,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 532.508142,
+          "tx_per_second_runs": [
+            527.160209,
+            523.802822,
+            546.561395
+          ],
+          "tx_per_sync": 61.58015267175573,
+          "wal_bytes_per_tx": 70649.41961075988,
+          "wal_syncs": 43.666666666666664,
+          "wal_write_mib_per_second": 35.88042569552054
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 92.38690733333334,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 72,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 4
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 4,
+          "mean_sync_ms": 3.235335663366337,
+          "mutation_ops_per_second": 32420.50114533333,
+          "overloads": 0,
+          "p50_us": 30585.249333333333,
+          "p95_us": 35893.882,
+          "p99_us": 59504.523,
+          "page_delta_frame_bytes_per_record": 158.5518669729196,
+          "page_delta_payload_bytes_per_record": 106.5518669729196,
+          "page_delta_records_per_tx": 15.98041724070065,
+          "page_delta_spans_per_record": 3.998413314202788,
+          "page_image_records_per_tx": 0.0024929475824968838,
+          "peak_rss_mib": 213.77734375,
+          "superblock_images_emitted": 4,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 2026.2813216666666,
+          "tx_per_second_runs": [
+            2011.678127,
+            2054.948286,
+            2012.217552
+          ],
+          "tx_per_sync": 60.36831683168317,
+          "wal_bytes_per_tx": 2612.0856786721774,
+          "wal_syncs": 168.33333333333334,
+          "wal_write_mib_per_second": 5.048067174882051
+        },
+        "page_delta_confirm": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 92.121165,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 72,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 4
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 4,
+          "mean_sync_ms": 3.2333385848303395,
+          "mutation_ops_per_second": 32858.954051,
+          "overloads": 0,
+          "p50_us": 30418.035666666667,
+          "p95_us": 34661.68066666667,
+          "p99_us": 50105.699,
+          "page_delta_frame_bytes_per_record": 158.55803785398368,
+          "page_delta_payload_bytes_per_record": 106.55803785398369,
+          "page_delta_records_per_tx": 15.980318650421744,
+          "page_delta_spans_per_record": 3.9985439219865757,
+          "page_image_records_per_tx": 0.002456129011408073,
+          "peak_rss_mib": 213.83984375,
+          "superblock_images_emitted": 4,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 2053.684628,
+          "tx_per_second_runs": [
+            2057.28229,
+            2043.37944,
+            2060.392154
+          ],
+          "tx_per_sync": 61.762475049900196,
+          "wal_bytes_per_tx": 2612.015641663704,
+          "wal_syncs": 167.0,
+          "wal_write_mib_per_second": 5.116459429685779
+        },
+        "page_delta_vs_exact_main": 3.8051649577719817,
+        "page_delta_vs_rocksdb_confirm": 0.2084620473046454,
+        "page_delta_vs_rocksdb_reused": 0.21167516131845934,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 61.66195,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 4,
+          "mean_sync_ms": 24.075877079310345,
+          "mutation_ops_per_second": 18750.578545333334,
+          "overloads": 0,
+          "p50_us": 52919.14233333334,
+          "p95_us": 73227.95300000001,
+          "p99_us": 95087.07166666667,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 15.982253871368826,
+          "peak_rss_mib": 215.63671875,
+          "superblock_images_emitted": 4,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 1171.9111593333334,
+          "tx_per_second_runs": [
+            1169.612253,
+            1172.570445,
+            1173.55078
+          ],
+          "tx_per_sync": 61.01379310344828,
+          "wal_bytes_per_tx": 66490.24708940883,
+          "wal_syncs": 96.66666666666667,
+          "wal_write_mib_per_second": 74.31753600321214
+        },
+        "phase_a_vs_exact_main": 2.2007384806021113,
+        "phase_a_vs_rocksdb_reused": 0.12242351595026642,
+        "ratio_vs_phase_a": 1.72904004329079,
+        "rocksdb_confirm": {
+          "cpu_percent_one_core": 87.05449580394779,
+          "mutation_ops_per_second": 157625.5940726711,
+          "p50_us": 6193.981,
+          "p95_us": 9461.864666666666,
+          "p99_us": 14374.710000000001,
+          "tx_per_second": 9851.599629541945,
+          "tx_per_second_runs": [
+            10024.068098784343,
+            9628.020576670553,
+            9902.710213170938
+          ]
+        },
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 90.25978544047713,
+          "mutation_ops_per_second": 153161.57523976528,
+          "p50_us": 6360.074,
+          "p95_us": 9734.144666666667,
+          "p99_us": 14653.110999999999,
+          "tx_per_second": 9572.59845248533,
+          "tx_per_second_runs": [
+            9585.429749712022,
+            9712.537296687235,
+            9419.828311056735
+          ]
+        },
+        "scenario_index": 9,
+        "width": 16,
+        "writers": 64
+      },
+      {
+        "distribution": "same-leaf-heavy",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 86.045892,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 5.272091610726643,
+          "mutation_ops_per_second": 38153.980373666665,
+          "overloads": 0,
+          "p50_us": 25112.043,
+          "p95_us": 34400.28,
+          "p99_us": 52801.67533333333,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 3.0,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 2384.6237736666667,
+          "tx_per_second_runs": [
+            2363.939495,
+            2355.849161,
+            2434.082665
+          ],
+          "tx_per_sync": 62.04325259515571,
+          "wal_bytes_per_tx": 12536.0,
+          "wal_syncs": 192.66666666666666,
+          "wal_write_mib_per_second": 28.51167142273468
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 87.51197866666666,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.9814269103151091,
+          "mutation_ops_per_second": 172294.08580033333,
+          "overloads": 0,
+          "p50_us": 5135.846333333334,
+          "p95_us": 8141.7029999999995,
+          "p99_us": 9796.838333333333,
+          "page_delta_frame_bytes_per_record": 171.74337303943398,
+          "page_delta_payload_bytes_per_record": 119.74337303943398,
+          "page_delta_records_per_tx": 2.0,
+          "page_delta_spans_per_record": 10.093723714808768,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 119.3359375,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 10768.380362666667,
+          "tx_per_second_runs": [
+            10703.284755,
+            10767.238001,
+            10834.618332
+          ],
+          "tx_per_sync": 43.5464583894425,
+          "wal_bytes_per_tx": 411.48674607886795,
+          "wal_syncs": 1237.6666666666667,
+          "wal_write_mib_per_second": 4.22610902509295
+        },
+        "page_delta_vs_exact_main": 4.515756523767643,
+        "page_delta_vs_rocksdb_reused": 0.9282408852802125,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 53.708158,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 4.280420478411911,
+          "mutation_ops_per_second": 92466.53197466666,
+          "overloads": 0,
+          "p50_us": 11226.533,
+          "p95_us": 17942.887666666666,
+          "p99_us": 21860.612666666668,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 2.0,
+          "peak_rss_mib": 119.23828125,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 5779.158248333333,
+          "tx_per_second_runs": [
+            5762.416193,
+            5775.115884,
+            5799.942668
+          ],
+          "tx_per_sync": 43.09478908188586,
+          "wal_bytes_per_tx": 8380.0,
+          "wal_syncs": 671.6666666666666,
+          "wal_write_mib_per_second": 46.191190362338816
+        },
+        "phase_a_vs_exact_main": 2.4235094492273435,
+        "phase_a_vs_rocksdb_reused": 0.49816692835308896,
+        "ratio_vs_phase_a": 1.86331294281,
+        "rocksdb_confirm": null,
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 79.27625726577756,
+          "mutation_ops_per_second": 185613.54981757287,
+          "p50_us": 5251.593,
+          "p95_us": 8092.356000000001,
+          "p99_us": 10869.053,
+          "tx_per_second": 11600.846863598304,
+          "tx_per_second_runs": [
+            11503.63813648389,
+            11520.284885109735,
+            11778.61756920129
+          ]
+        },
+        "scenario_index": 10,
+        "width": 16,
+        "writers": 64
+      },
+      {
+        "distribution": "different-leaf-heavy",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 88.96488966666666,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 5.162228117241379,
+          "mutation_ops_per_second": 29223.576685,
+          "overloads": 0,
+          "p50_us": 33389.532666666666,
+          "p95_us": 46359.748,
+          "p99_us": 70938.65666666666,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 3.0,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 1826.473543,
+          "tx_per_second_runs": [
+            1766.243357,
+            1896.888357,
+            1816.288915
+          ],
+          "tx_per_sync": 63.241379310344826,
+          "wal_bytes_per_tx": 12536.0,
+          "wal_syncs": 145.0,
+          "wal_write_mib_per_second": 21.838094892135214
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 85.25828333333334,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 2.350064617667357,
+          "mutation_ops_per_second": 95051.70581366666,
+          "overloads": 0,
+          "p50_us": 10368.318666666666,
+          "p95_us": 12711.935,
+          "p99_us": 19583.809333333335,
+          "page_delta_frame_bytes_per_record": 648.0726425346463,
+          "page_delta_payload_bytes_per_record": 596.0726425346463,
+          "page_delta_records_per_tx": 2.0,
+          "page_delta_spans_per_record": 10.995725921195621,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 156.52734375,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 5940.731613333333,
+          "tx_per_second_runs": [
+            5899.691401,
+            5948.822973,
+            5973.680466
+          ],
+          "tx_per_sync": 61.60041407867495,
+          "wal_bytes_per_tx": 1364.1452850692926,
+          "wal_syncs": 483.0,
+          "wal_write_mib_per_second": 7.729085440978433
+        },
+        "page_delta_vs_exact_main": 3.2525692124593415,
+        "page_delta_vs_rocksdb_reused": 0.5233654254976104,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 71.232251,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 4.761197884228188,
+          "mutation_ops_per_second": 75627.00068033334,
+          "overloads": 0,
+          "p50_us": 12536.095,
+          "p95_us": 19520.00966666667,
+          "p99_us": 25979.243666666665,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 2.0,
+          "peak_rss_mib": 157.23828125,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 4726.687542666667,
+          "tx_per_second_runs": [
+            4724.303185,
+            4721.596668,
+            4734.162775
+          ],
+          "tx_per_sync": 59.564597315436245,
+          "wal_bytes_per_tx": 8380.0,
+          "wal_syncs": 397.3333333333333,
+          "wal_write_mib_per_second": 37.777994417859176
+        },
+        "phase_a_vs_exact_main": 2.587876271617402,
+        "phase_a_vs_rocksdb_reused": 0.41641080560007976,
+        "ratio_vs_phase_a": 1.2568488100192332,
+        "rocksdb_confirm": null,
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 77.23236409074285,
+          "mutation_ops_per_second": 181616.3261510046,
+          "p50_us": 5251.886666666667,
+          "p95_us": 8210.65,
+          "p99_us": 12420.602,
+          "tx_per_second": 11351.020384437788,
+          "tx_per_second_runs": [
+            11164.637883444182,
+            11425.655636223855,
+            11462.767633645326
+          ]
+        },
+        "scenario_index": 11,
+        "width": 16,
+        "writers": 64
+      },
+      {
+        "distribution": "uniform",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 24.32682833333333,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.8561353144114099,
+          "mutation_ops_per_second": 939.279605,
+          "overloads": 0,
+          "p50_us": 981.668,
+          "p95_us": 1607.5083333333332,
+          "p99_us": 2134.5756666666666,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 2.0,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 939.279605,
+          "tx_per_second_runs": [
+            967.536441,
+            965.794865,
+            884.507509
+          ],
+          "tx_per_sync": 1.0,
+          "wal_bytes_per_tx": 8380.0,
+          "wal_syncs": 4697.666666666667,
+          "wal_write_mib_per_second": 7.507008193052261
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 12.728765666666666,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.6545265132683911,
+          "mutation_ops_per_second": 1388.7703886666666,
+          "overloads": 0,
+          "p50_us": 699.4276666666667,
+          "p95_us": 912.521,
+          "p99_us": 1072.748,
+          "page_delta_frame_bytes_per_record": 158.94927779643936,
+          "page_delta_payload_bytes_per_record": 106.94927779643938,
+          "page_delta_records_per_tx": 1.0,
+          "page_delta_spans_per_record": 3.9964969528288306,
+          "page_image_records_per_tx": 0.0,
+          "peak_rss_mib": 142.6484375,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 1388.7703886666666,
+          "tx_per_second_runs": [
+            1361.610109,
+            1412.952549,
+            1391.748508
+          ],
+          "tx_per_sync": 1.0,
+          "wal_bytes_per_tx": 226.94927779643936,
+          "wal_syncs": 6946.333333333333,
+          "wal_write_mib_per_second": 0.30060712957732905
+        },
+        "page_delta_vs_exact_main": 1.4785484335802934,
+        "page_delta_vs_rocksdb_reused": 0.9187480379878236,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 12.661973999999999,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 0.6898944716170449,
+          "mutation_ops_per_second": 1318.3764496666665,
+          "overloads": 0,
+          "p50_us": 721.4676666666667,
+          "p95_us": 972.2946666666667,
+          "p99_us": 1299.935,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 1.0,
+          "peak_rss_mib": 142.75390625,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 1318.3764496666665,
+          "tx_per_second_runs": [
+            1288.193304,
+            1316.322177,
+            1350.613868
+          ],
+          "tx_per_sync": 1.0,
+          "wal_bytes_per_tx": 4224.0,
+          "wal_syncs": 6594.333333333333,
+          "wal_write_mib_per_second": 5.311392378333484
+        },
+        "phase_a_vs_exact_main": 1.4036038285603643,
+        "phase_a_vs_rocksdb_reused": 0.8721785734670707,
+        "ratio_vs_phase_a": 1.0533944147878234,
+        "rocksdb_confirm": null,
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 6.799362909038667,
+          "mutation_ops_per_second": 1511.590045632372,
+          "p50_us": 643.3476666666667,
+          "p95_us": 822.5876666666667,
+          "p99_us": 968.2146666666667,
+          "tx_per_second": 1511.590045632372,
+          "tx_per_second_runs": [
+            1533.4165475645489,
+            1496.9127296884765,
+            1504.4408596440906
+          ]
+        },
+        "scenario_index": 12,
+        "width": 1,
+        "writers": 1
+      },
+      {
+        "distribution": "uniform",
+        "exact_main": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 55.03638133333334,
+          "engine_field": [
+            "main-btree"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "ac45cf519d6cd008dfbc5362f72561f9092a7b11"
+          ],
+          "leaf_splits": 0,
+          "mean_sync_ms": 1.6302502686041391,
+          "mutation_ops_per_second": 4842.133475333333,
+          "overloads": 0,
+          "p50_us": 2927.616666666667,
+          "p95_us": 4365.565,
+          "p99_us": 5569.513333333333,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 16.985028621752534,
+          "peak_rss_mib": null,
+          "superblock_images_emitted": 0,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 302.6333423333333,
+          "tx_per_second_runs": [
+            298.180191,
+            299.515714,
+            310.204122
+          ],
+          "tx_per_sync": 1.0,
+          "wal_bytes_per_tx": 70657.77895200353,
+          "wal_syncs": 1514.0,
+          "wal_write_mib_per_second": 20.39448383499905
+        },
+        "page-delta": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 39.68933766666667,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 36,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 2
+          },
+          "git_commit_field": [
+            "6bcf8bb364149f3ae881a332cfcae62faf15d745"
+          ],
+          "leaf_splits": 2,
+          "mean_sync_ms": 0.7791587633024515,
+          "mutation_ops_per_second": 12995.720951333333,
+          "overloads": 0,
+          "p50_us": 1185.0013333333334,
+          "p95_us": 1422.4283333333333,
+          "p99_us": 1730.2686666666666,
+          "page_delta_frame_bytes_per_record": 158.69131558966572,
+          "page_delta_payload_bytes_per_record": 106.69131558966572,
+          "page_delta_records_per_tx": 15.981306878740673,
+          "page_delta_spans_per_record": 3.9997024481336316,
+          "page_image_records_per_tx": 0.003115520209887677,
+          "peak_rss_mib": 157.359375,
+          "superblock_images_emitted": 2,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 812.2325593333333,
+          "tx_per_second_runs": [
+            813.186757,
+            810.274105,
+            813.236816
+          ],
+          "tx_per_sync": 1.0,
+          "wal_bytes_per_tx": 2617.042715421825,
+          "wal_syncs": 4065.6666666666665,
+          "wal_write_mib_per_second": 2.0273956159940387
+        },
+        "page_delta_vs_exact_main": 2.6838832531502943,
+        "page_delta_vs_rocksdb_reused": 0.6003909033661833,
+        "phase-a": {
+          "conflicts": 0,
+          "cpu_percent_one_core": 22.779403000000002,
+          "engine_field": [
+            "planned-blink"
+          ],
+          "errors": 0,
+          "fallback_counts": {
+            "first_touch": 0,
+            "ineligible_commit": 0,
+            "no_base": 0,
+            "not_requested": 0,
+            "not_smaller": 0,
+            "page_image_format": 0,
+            "superblock": 0
+          },
+          "git_commit_field": [
+            "12ab0443b61f5dccd24668c2a5d089de47c8110f"
+          ],
+          "leaf_splits": 1,
+          "mean_sync_ms": 2.097675717935528,
+          "mutation_ops_per_second": 6215.189156666667,
+          "overloads": 0,
+          "p50_us": 2506.803,
+          "p95_us": 2842.336333333333,
+          "p99_us": 3265.163666666667,
+          "page_delta_frame_bytes_per_record": 0.0,
+          "page_delta_payload_bytes_per_record": 0.0,
+          "page_delta_records_per_tx": 0.0,
+          "page_delta_spans_per_record": 0.0,
+          "page_image_records_per_tx": 15.985082304526749,
+          "peak_rss_mib": 155.12890625,
+          "superblock_images_emitted": 1,
+          "sync_mode_field": [
+            "real"
+          ],
+          "tx_per_second": 388.4493223333333,
+          "tx_per_second_runs": [
+            390.258724,
+            385.944175,
+            389.145068
+          ],
+          "tx_per_sync": 1.0,
+          "wal_bytes_per_tx": 66502.00205761316,
+          "wal_syncs": 1944.0,
+          "wal_write_mib_per_second": 24.638457931319337
+        },
+        "phase_a_vs_exact_main": 1.2835641946731653,
+        "phase_a_vs_rocksdb_reused": 0.2871362848826399,
+        "ratio_vs_phase_a": 2.0909614527177527,
+        "rocksdb_confirm": null,
+        "rocksdb_reused": {
+          "cpu_percent_one_core": 15.53149229939017,
+          "mutation_ops_per_second": 21645.432794652348,
+          "p50_us": 699.2276666666667,
+          "p95_us": 925.3476666666667,
+          "p99_us": 1135.3746666666666,
+          "tx_per_second": 1352.8395496657718,
+          "tx_per_second_runs": [
+            1394.6358954256027,
+            1295.4511314196013,
+            1368.4316221521112
+          ]
+        },
+        "scenario_index": 13,
+        "width": 16,
+        "writers": 1
+      }
+    ],
+    "geometric_means": {
+      "compact locality": {
+        "page_delta_vs_exact_main": 3.6388175409081005,
+        "page_delta_vs_phase_a": 2.0824323074334736,
+        "page_delta_vs_rocksdb_reused": 0.961122577983643,
+        "phase_a_vs_exact_main": 1.7473881517871852,
+        "phase_a_vs_rocksdb_reused": 0.46153844931852483
+      },
+      "overall (12)": {
+        "page_delta_vs_exact_main": 3.6054247165829207,
+        "page_delta_vs_phase_a": 1.8533521178967427,
+        "page_delta_vs_rocksdb_reused": 0.7038216484563994,
+        "phase_a_vs_exact_main": 1.9453533312787314,
+        "phase_a_vs_rocksdb_reused": 0.37975603322218343
+      },
+      "spread locality": {
+        "page_delta_vs_exact_main": 3.341984664794723,
+        "page_delta_vs_phase_a": 1.6813073015085154,
+        "page_delta_vs_rocksdb_reused": 0.75344744320172,
+        "phase_a_vs_exact_main": 1.9877298229753728,
+        "phase_a_vs_rocksdb_reused": 0.4481319045755087
+      },
+      "uniform": {
+        "page_delta_vs_exact_main": 3.8539365713593083,
+        "page_delta_vs_phase_a": 1.8182593270620917,
+        "page_delta_vs_rocksdb_reused": 0.4814554639804604,
+        "phase_a_vs_exact_main": 2.1195747570212795,
+        "phase_a_vs_rocksdb_reused": 0.2647892172555974
+      },
+      "width 1": {
+        "page_delta_vs_exact_main": 3.6177336602318295,
+        "page_delta_vs_phase_a": 2.070626694899254,
+        "page_delta_vs_rocksdb_reused": 0.9246609280556086,
+        "phase_a_vs_exact_main": 1.747168463124566,
+        "phase_a_vs_rocksdb_reused": 0.44656090367877627
+      },
+      "width 16": {
+        "page_delta_vs_exact_main": 3.5931576527703903,
+        "page_delta_vs_phase_a": 1.658876552385734,
+        "page_delta_vs_rocksdb_reused": 0.5357260135102113,
+        "phase_a_vs_exact_main": 2.1660187116412284,
+        "phase_a_vs_rocksdb_reused": 0.32294507553304685
+      },
+      "writers 16": {
+        "page_delta_vs_exact_main": 2.8431464133739004,
+        "page_delta_vs_phase_a": 1.7910538402242009,
+        "page_delta_vs_rocksdb_reused": 0.7128018377091021,
+        "phase_a_vs_exact_main": 1.587415380554948,
+        "phase_a_vs_rocksdb_reused": 0.3979790119653102
+      },
+      "writers 64": {
+        "page_delta_vs_exact_main": 4.5720780772318,
+        "page_delta_vs_phase_a": 1.9178173183684781,
+        "page_delta_vs_rocksdb_reused": 0.6949545955548508,
+        "phase_a_vs_exact_main": 2.3840008291933406,
+        "phase_a_vs_rocksdb_reused": 0.36236746268724973
+      }
+    }
+  },
+  "rocksdb_confirm_geometric_mean": 0.4677375415319727
+}

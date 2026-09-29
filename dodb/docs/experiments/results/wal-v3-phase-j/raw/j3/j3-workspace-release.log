@@ -1,0 +1,387 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/dodb-phase-j/crates/dodb-storage)
+   Compiling dodb-testkit v0.1.0 (/Users/namse/dodb-phase-j/crates/dodb-testkit)
+   Compiling dodb-server v0.1.0 (/Users/namse/dodb-phase-j/crates/dodb-server)
+    Finished `release` profile [optimized] target(s) in 29.74s
+     Running unittests src/lib.rs (target/release/deps/dodb_client-99e0c6f8a217ad99)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/release/deps/dodb_core-4c2944fba3d5c45b)
+
+running 6 tests
+test key::tests::validator_matches_decode_for_malformed_and_boundary_encodings ... ok
+test key::tests::encoded_len_matches_canonical_encoding_and_counts_zero_escapes ... ok
+test key::tests::malformed_encodings_are_rejected ... ok
+test key::tests::encoding_preserves_document_order ... ok
+test key::tests::validator_matches_decode_for_arbitrary_bytes ... ok
+test key::tests::round_trip_arbitrary_binary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/release/deps/dodb_protocol-71a6b6f3a9ac2569)
+
+running 10 tests
+test tests::core_error_mapping_preserves_conflict ... ok
+test tests::canonical_key_limit_accounts_for_zero_byte_escaping ... ok
+test tests::application_error_round_trip_preserves_unknown_mutation_outcome ... ok
+test tests::every_request_round_trips ... ok
+test tests::every_response_round_trips ... ok
+test tests::malformed_frames_are_rejected ... ok
+test tests::conflict_and_error_round_trip ... ok
+test tests::oversized_values_are_rejected_before_allocation ... ok
+test tests::response_type_mismatch_is_rejected ... ok
+test tests::values_at_the_configured_limit_round_trip ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/release/deps/dodb_server-fa1761cf99a7e158)
+
+running 2 tests
+test tests::database_uuid_includes_all_shard_bits ... ok
+test tests::logical_database_uuid_is_stable_for_reopen ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/phase6_quic.rs (target/release/deps/phase6_quic-2165d2703d41fdbe)
+
+running 11 tests
+test idle_connection_does_not_hoard_global_request_capacity ... ok
+test global_request_backpressure_preserves_unrelated_in_flight_streams ... ok
+test abrupt_disconnects_do_not_trigger_implicit_mutation_retries ... ok
+test loopback_protocol_preserves_storage_semantics_and_lazy_creation ... ok
+test synthesized_missing_transact_get_respects_response_budget ... ok
+test concurrent_streams_and_tenant_isolation_are_preserved ... ok
+test tenant_handles_share_one_connection_and_close_independently ... ok
+test wal_durability_failure_is_unknown_over_the_real_client_path ... ok
+test aggregate_read_budget_returns_structured_result_too_large_errors ... ok
+test persisted_state_is_available_after_server_reopen ... ok
+test conflict_does_not_materialize_large_value_or_exceed_small_response_budget ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running unittests src/lib.rs (target/release/deps/dodb_service-f3dd27448db56eb4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/release/deps/dodb_storage-830e8f044ca324b1)
+
+running 166 tests
+test blink::tests::cpu_overlay_group_preserves_ordered_conditions_failed_isolation_and_pins ... ok
+test blink::tests::borrowed_planner_routing_matches_generic_routing ... ok
+test blink::tests::baseline_and_experimental_formats_reject_each_other ... ok
+test blink::tests::commit_digest_binds_the_exact_redo_record_sequence ... ok
+test blink::tests::bounded_overlay_view_merges_get_query_scan_and_keeps_pins_immutable ... ok
+test blink::tests::experimental_superblock_is_not_baseline_format ... ok
+test blink::tests::direct_wal_group_encoding_matches_reference_for_blink_page_shapes ... ok
+test blink::tests::direct_blink_encoding_matches_reference_for_required_shapes ... ok
+test blink::tests::first_redo_after_wal_reset_is_a_full_image_then_deltas ... ok
+test blink::tests::high_key_right_link_correction_finds_stale_route ... ok
+test blink::tests::leaf_page_clone_copies_packed_entries_into_its_own_buffer ... ok
+test blink::tests::leaf_layout_matches_encoder_acceptance ... ok
+test blink::tests::internal_layout_matches_encoder_acceptance ... ok
+test blink::tests::logical_wal_commit_survives_failure_before_view_publication ... ok
+test blink::tests::logical_materialization_faults_recover_from_base_or_unreclaimed_wal ... ok
+test blink::tests::logical_wal_group_publishes_after_sync_and_recovers_repeated_writes ... ok
+test blink::tests::logical_wal_materializes_before_publishing_a_fifth_overlay ... ok
+test blink::tests::logical_wal_sync_failure_never_publishes_before_the_durability_result ... ok
+test blink::tests::measure_bounded_overlay_read_path ... ignored, J0 read-path microbenchmark; run explicitly with --ignored --nocapture
+test blink::tests::measure_logical_overlay_write_cpu ... ignored, J1 CPU gate; run with PHASE_J_CPU_MODE and optional perf control FIFOs
+test blink::tests::measure_logical_wal_v4_write_bytes ... ignored, J2 WAL v4 byte-accounting control; run explicitly with --ignored --nocapture
+test blink::tests::malformed_page_deltas_are_rejected_by_the_codec ... ok
+test blink::tests::concurrent_versioned_readers_survive_serial_writer_publications ... ok
+test blink::tests::malformed_page_delta_records_are_rejected_on_scan ... ok
+test blink::tests::page_catalog_lookup_crosses_chunk_boundaries ... ok
+test blink::tests::page_codec_rejects_version_checksum_and_reserved_bytes ... ok
+test blink::tests::page_delta_base_mismatch_is_an_invariant_error ... ok
+test blink::tests::logical_materialization_preserves_pins_reopen_and_reuses_page_capacity ... ok
+test blink::tests::logical_wal_randomized_differential_matches_physical_engine ... ok
+test blink::tests::checker_rejects_sibling_cycle_wrong_level_and_unordered_separator ... ok
+test blink::tests::page_delta_spans_merge_only_small_unchanged_gaps ... ok
+test blink::tests::checkpoint_uses_last_commit_lsn_without_retained_payload ... ok
+test blink::tests::page_delta_round_trips_randomized_raw_byte_edits ... ok
+test blink::tests::page_deltas_skip_superblocks_ineligible_commits_and_page_image_wals ... ok
+test blink::tests::page_encoder_rejects_noncanonical_leaf_key ... ok
+test blink::tests::page_reuse_is_delayed_until_pinned_generation_releases ... ok
+test blink::tests::parallel_cross_leaf_condition_dependency_keeps_fifo_results ... ok
+test blink::tests::parallel_generation_publication_is_atomic_across_independent_leaves ... ok
+test blink::tests::page_deltas_after_flush_and_from_parallel_execution_recover ... ok
+test blink::tests::page_delta_rebuild_check_matches_apply_and_compare ... ok
+test blink::tests::parallel_min_group_mutations_sends_small_groups_to_the_serial_executor ... ok
+test blink::tests::parallel_multi_leaf_transaction_runs_on_leaf_workers ... ok
+test blink::tests::parallel_same_leaf_chain_preserves_order_and_wal_boundaries ... ok
+test blink::tests::parallel_overflow_and_split_candidates_fall_back_as_whole_groups ... ok
+test blink::tests::persistent_parallel_pool_reuses_worker_threads_across_execute_cycles ... ok
+test blink::tests::phase_b0_encoded_size_probe ... ignored, B0 encoded-size probe; run explicitly with --ignored --nocapture
+test blink::tests::parallel_planned_executes_independent_leaf_jobs ... ok
+test blink::tests::parallel_wal_failure_does_not_install_working_delta ... ok
+test blink::tests::page_delta_round_trips_randomized_blink_page_mutations ... ok
+test blink::tests::phase_d_mixed_leaf_chains_match_serial ... ok
+test blink::tests::phase_d_prepared_redo_with_wrong_chain_base_writes_nothing ... ok
+test blink::tests::phase_d_independent_sixteen_leaf_transaction_matches_serial ... ok
+test blink::tests::phase_d_parallel_wal_recovers_like_serial ... ok
+test blink::tests::phase_d_same_leaf_chain_keeps_fifo_and_delta_bases ... ok
+test blink::tests::phase_d_worker_failure_is_atomic_and_leaves_store_usable ... ok
+test blink::tests::planned_admission_stages_dependencies_and_skips_failed_deltas ... ok
+test blink::tests::planned_checkpoint_after_superblock_elision_reopens ... ok
+test blink::tests::planned_group_uses_sparse_working_state ... ok
+test blink::tests::planned_independent_leaf_groups_are_exposed ... ok
+test blink::tests::planned_key_copy_cleanup_preserves_routes_dependencies_and_key_set ... ok
+test blink::tests::planned_metadata_stable_transactions_elide_superblocks_and_recover ... ok
+test blink::tests::pinned_generation_pages_entries_and_values_survive_later_writes ... ok
+test blink::tests::planned_oversize_existing_key_update_does_not_publish_overlay ... ok
+test blink::tests::planned_multi_leaf_transaction_has_one_commit_and_atomic_publication ... ok
+test blink::tests::planned_same_leaf_chain_preserves_wal_boundaries_and_revisions ... ok
+test blink::tests::planned_stale_route_reroutes_after_a_split ... ok
+test blink::tests::planned_randomized_transaction_differential_reports_seed_and_operation ... ok
+test blink::tests::planned_structural_transactions_emit_superblocks_and_later_updates_elide ... ok
+test blink::tests::planned_superblock_elision_wal_sync_failure_does_not_install_state ... ok
+test blink::tests::planned_wal_failure_does_not_install_working_delta ... ok
+test blink::tests::planned_wal_tail_keeps_the_first_logical_commit_boundary ... ok
+test blink::tests::prepare_delta_clones_each_dirty_chunk_once ... ok
+test blink::tests::prepare_delta_extends_catalog_directory_and_rejects_missing_pages ... ok
+test blink::tests::prepare_delta_reuses_untouched_catalog_chunks ... ok
+test blink::tests::prepared_mutation_keys_match_existing_encoding_and_preserve_limits ... ok
+test blink::tests::public_wal_append_rejects_malformed_blink_images ... ok
+test blink::tests::query_and_scan_keep_one_generation_during_publication ... ok
+test blink::tests::query_scan_tombstone_overflow_checkpoint_and_reopen ... ok
+test blink::tests::randomized_concurrent_reads_and_serial_writes_preserve_ordering ... ok
+test blink::tests::randomized_differential_seed_is_reproducible ... ok
+test blink::tests::randomized_direct_blink_encoding_matches_reference ... ok
+test blink::tests::randomized_page_layouts_match_encoder_acceptance ... ok
+test blink::tests::reader_during_unpublished_install_sees_only_old_generation ... ok
+test blink::tests::reopen_without_checkpoint_replays_every_commit_and_drops_payload ... ok
+test blink::tests::root_split_and_leaf_links_are_safe_for_pinned_reader ... ok
+test blink::tests::runtime_commits_do_not_retain_wal_page_images ... ok
+test blink::tests::same_page_transactions_in_one_group_chain_in_fifo_order ... ok
+test blink::tests::serial_insert_reopen_and_checker ... ok
+test blink::tests::planned_structural_fallback_handles_internal_and_root_splits ... ok
+test blink::tests::torn_checkpoint_data_page_is_rebuilt_from_wal_image_and_deltas ... ok
+test blink::tests::structural_stress_reaches_internal_and_root_splits ... ok
+test blink::tests::transaction_group_preserves_logical_order_and_failed_atomicity ... ok
+test blink::tests::torn_final_commit_is_discarded_on_reopen_without_retained_payload ... ok
+test blink::tests::trusted_page_fingerprint_stays_associated_with_immutable_image ... ok
+test blink::tests::trusted_wal_images_match_strict_blink_encoding ... ok
+test blink::tests::wal_sync_failure_does_not_publish_a_generation ... ok
+test blink::tests::working_overlay_isolates_packed_entries_and_restamps ... ok
+test btree::coordinator::tests::full_request_channel_returns_overloaded_without_waiting ... ok
+test blink::tests::versioned_generation_is_atomic_for_multi_page_transaction ... ok
+test btree::coordinator::tests::group_collection_is_bounded_and_deterministic ... ok
+test btree::format::tests::malformed_slotted_offsets_return_corruption ... ok
+test btree::format::tests::random_leaf_body_is_rejected_without_panic ... ok
+test btree::tests::ambiguous_transaction_mutations_are_rejected_without_changes ... ok
+test btree::tests::async_checkpoint_is_fifo_and_reads_remain_available ... ok
+test blink::tests::page_delta_checkpoint_fault_matrix_preserves_acknowledged_writes ... ok
+test btree::tests::async_shard_groups_mutations_around_checkpoint_barriers ... ok
+test btree::tests::async_shard_keeps_logical_transaction_lsns_distinct ... ok
+test btree::tests::async_shard_makes_committed_writes_visible_after_success ... ok
+test btree::tests::all_cache_sizes_use_the_same_results ... ok
+test btree::tests::basic_operations_preserve_missing_revisions_and_order ... ok
+test btree::tests::canonical_key_boundary_includes_zero_byte_expansion ... ok
+test btree::tests::checkpoint_flushes_state_resets_wal_and_preserves_lsn_monotonicity ... ok
+test btree::tests::async_shard_groups_mutations_around_transact_get_barriers ... ok
+test btree::tests::failed_batch_does_not_publish_earlier_requests ... ok
+test btree::tests::insert_if_absent_race_has_one_winner_in_one_coordinator_group ... ok
+test btree::tests::large_value_replacement_reclaims_overflow_pages ... ok
+test btree::tests::malformed_page_is_corruption_not_a_panic ... ok
+test btree::tests::deleting_all_entries_keeps_empty_leaves_searchable ... ok
+test btree::tests::prepared_batch_is_private_until_published ... ok
+test blink::tests::page_delta_append_fault_matrix_keeps_transactions_atomic ... ok
+test btree::tests::revision_equals_distinguishes_never_existing_from_deleted_and_not_exists_does_not ... ok
+test btree::tests::same_group_revision_dependency_conflicts_against_the_staged_commit ... ok
+test btree::tests::response_budgets_bound_query_scan_and_transact_get_without_truncation ... ok
+test btree::tests::transact_get_preserves_input_order_and_revisions ... ok
+test btree::tests::transaction_conflict_on_a_read_only_dependency_rolls_back_all_mutations ... ok
+test btree::tests::transaction_group_assigns_separate_lsns_and_stages_shared_pages_in_order ... ok
+test btree::tests::transaction_workflow_validates_all_point_dependencies_and_commits_atomically ... ok
+test btree::tests::wal_backed_store_reopens_from_committed_page_images ... ok
+test page::tests::generic_encode_page_matches_legacy_bytes ... ok
+test page::tests::generic_encode_page_preserves_header_validation_order ... ok
+test page::tests::malformed_headers_are_rejected ... ok
+test page::tests::one_bit_corruption_is_detected ... ok
+test page::tests::page_round_trip ... ok
+test page::tests::random_garbage_does_not_panic ... ok
+test superblock::tests::round_trip_and_nullable_pages ... ok
+test superblock::tests::selects_valid_highest_generation ... ok
+test superblock::tests::unsupported_format_is_explicit ... ok
+test btree::tests::async_shard_reads_use_one_committed_view_and_bypass_write_queue ... ok
+test wal::tests::appended_commits_keep_only_metadata_and_reopen_hands_payload_once ... ok
+test wal::tests::direct_group_encoding_matches_reference_for_randomized_valid_groups ... ok
+test wal::tests::fast_group_torn_tail_keeps_only_complete_commits ... ok
+test wal::tests::framed_commit_round_trips_and_assigns_monotonic_lsns ... ok
+test wal::tests::group_fast_path_handles_short_writes ... ok
+test wal::tests::group_fast_path_is_byte_identical_to_fault_injectable_path ... ok
+test wal::tests::group_fast_path_uses_one_physical_write ... ok
+test wal::tests::impossible_frame_length_is_rejected ... ok
+test wal::tests::incomplete_final_frame_is_truncated ... ok
+test wal::tests::logical_wal_discards_an_incomplete_transaction_and_reuses_its_sequence ... ok
+test wal::tests::logical_wal_discards_torn_put_and_delete_records_and_keeps_complete_group_prefix ... ok
+test wal::tests::logical_wal_group_round_trips_and_separates_commit_sequence_from_frame_lsn ... ok
+test wal::tests::logical_wal_rejects_corrupt_commit_digest_and_mixed_v3_dispatch ... ok
+test wal::tests::logical_wal_retries_short_writes_and_fails_before_commit_without_appending ... ok
+test wal::tests::payload_corruption_is_not_treated_as_a_torn_tail ... ok
+test wal::tests::split_page_payload_crc_and_incremental_digest_match_contiguous_crc ... ok
+test wal::tests::trusted_internal_fault_injection_delegates_to_the_strict_path ... ok
+test wal::tests::trusted_internal_fault_injection_still_rejects_invalid_images ... ok
+test wal::tests::trusted_internal_valid_images_are_byte_identical_to_strict_images ... ok
+test wal::tests::unsupported_version_is_rejected ... ok
+test wal::tests::wrong_magic_is_rejected ... ok
+test btree::tests::one_near_maximum_value_remains_readable_with_a_response_budget ... ok
+test btree::tests::splits_root_and_internal_pages_and_reopens ... ok
+test blink::tests::phase_d_randomized_differential_serial_one_and_two_workers ... ok
+test blink::tests::page_delta_torn_wal_tail_never_exposes_partial_transactions ... ok
+test wal::tests::combined_payload_digest_matches_direct_digest_for_randomized_records ... ok
+test blink::tests::packed_leaf_matches_reference_model_randomized ... ok
+test blink::tests::phase_d_fault_matrix_keeps_acknowledged_durability ... ok
+
+test result: ok. 162 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 4.82s
+
+     Running unittests src/bin/phase0-bench.rs (target/release/deps/phase0_bench-596190e76d6666b2)
+
+running 10 tests
+test tests::disabled_benchmark_sync_does_not_call_real_sync ... ok
+test tests::real_benchmark_sync_calls_real_sync_once ... ok
+test tests::disabled_sync_mode_aliases_parse_and_report_canonical_name ... ok
+test tests::parallel_engine_aliases_and_worker_default_are_stable ... ok
+test tests::duration_parser_supports_required_units ... ok
+test tests::locality_generators_have_distinct_pk_shapes ... ok
+test tests::injected_benchmark_sync_calls_real_sync_once ... ok
+test tests::json_string_escapes_control_characters ... ok
+test tests::same_seed_produces_same_transaction_sequence ... ok
+test tests::transaction_width_and_key_uniqueness_are_preserved ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/phase1-bench.rs (target/release/deps/phase1_bench-d7985af57f120eeb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/phase2-crash-child.rs (target/release/deps/phase2_crash_child-374a500a7f566474)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/phase4-bench.rs (target/release/deps/phase4_bench-9e775bb3c3bf4075)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/phase5-bench.rs (target/release/deps/phase5_bench-f606239dad578b23)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/phase2_recovery.rs (target/release/deps/phase2_recovery-d78a04d83f85da26)
+
+running 8 tests
+test wrong_wal_identity_is_rejected ... ok
+test corrupted_wal_middle_is_not_silently_skipped ... ok
+test corrupt_initial_data_without_a_committed_wal_image_fails_open ... ok
+test wrong_identity_does_not_initialize_an_empty_wal_for_an_existing_database ... ok
+test repaired_database_page_uses_the_committed_wal_image ... ok
+test recovery_page_write_failure_is_recoverable_on_retry ... ok
+test checkpoint_boundaries_survive_sigkill_and_restart ... ok
+test successful_write_survives_sigkill_and_restart ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 26.87s
+
+     Running unittests src/lib.rs (target/release/deps/dodb_testkit-9d5b53e62413d72c)
+
+running 16 tests
+test crashable_file::tests::crash_can_persist_a_prefix_of_unsynced_writes ... ok
+test crash::tests::named_nth_hit_is_reproducible ... ok
+test crashable_file::tests::crash_discards_unsynced_writes ... ok
+test crashable_file::tests::deterministic_short_write_and_sync_failure ... ok
+test crashable_file::tests::sync_makes_writes_survive_crash ... ok
+test reference::tests::disjoint_transactions_do_not_conflict ... ok
+test crashable_file::tests::legacy_shadow_reset_window_loses_state_when_main_file_is_stale ... ok
+test reference::tests::explicit_conditions_report_structured_conflicts_and_missing_semantics ... ok
+test reference::tests::missing_aba_is_detected ... ok
+test reference::tests::missing_state_has_zero_revision_until_deleted ... ok
+test reference::tests::multi_key_commit_is_atomic_and_uses_one_lsn ... ok
+test reference::tests::query_and_scan_are_ordered_and_exclusive ... ok
+test reference::tests::multiple_read_dependencies_are_all_validated ... ok
+test reference::tests::read_write_conflict_is_detected_even_when_writing_another_key ... ok
+test reference::tests::write_write_conflict_is_detected ... ok
+test reference::tests::deterministic_randomized_reference_sequence ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/phase1_btree.rs (target/release/deps/phase1_btree-4f7706483291c675)
+
+running 14 tests
+test named_crash_injector_covers_the_commit_boundary ... ok
+test partial_data_page_flush_is_repaired_from_wal_after_crash ... ok
+test reference_missing_state_is_retained_after_reopen ... ok
+test short_file_io_is_retried_by_the_storage_boundary ... ok
+test checkpoint_fault_matrix_preserves_the_last_successful_commit ... ok
+test wal_commit_survives_without_checkpoint_before_data_flush ... ok
+test synced_transaction_group_recovers_after_publication_is_interrupted ... ok
+test wal_commit_without_a_commit_record_is_ignored_after_crash ... ok
+test torn_wal_reset_init_prefixes_recover_the_checkpointed_database ... ok
+test wal_write_and_sync_fault_matrix_never_exposes_a_partial_commit ... ok
+test wal_recovery_restores_splits_allocator_and_overflow_pages_atomically ... ok
+test deterministic_crash_recovery_differential_sequence_matches_reference_values ... ok
+test randomized_transaction_groups_match_the_reference_model ... ok
+test deterministic_differential_sequences_match_reference ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.88s
+
+     Running tests/phase_j_materialization.rs (target/release/deps/phase_j_materialization-b46c8164f89ececa)
+
+running 2 tests
+test logical_checkpoint_write_and_data_sync_io_failures_keep_wal_recoverable ... ok
+test logical_checkpoint_crashes_recover_before_and_after_watermark_and_wal_reclaim ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests dodb_client
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests dodb_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests dodb_protocol
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests dodb_server
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests dodb_service
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests dodb_storage
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests dodb_testkit
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

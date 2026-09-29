@@ -1,0 +1,3 @@
+The benchmark host is 217.142.246.204, using user opc and `/Users/namse/Downloads/ssh-key-2026-09-23.key` with `IdentitiesOnly=yes`. Strict SSH host-key verification used the existing known_hosts entry. The ED25519 fingerprint is SHA256:to2a1t2vJUzw51vmw69WEXRKEdpCjQPeBCMxCo5O3xM. SSH login succeeded and identified the OCI instance as instance-20260923-1013.
+
+The earlier address 138.2.42.237 was not the benchmark host for this identity. Its host-key and public-key authentication results are unrelated to the successful benchmark connection. The private key file contents were not printed or copied. OCI benchmarks ran in detached temporary worktrees so the existing `/home/opc/dodb` checkout on experiment/b-link-batched-engine remained untouched.

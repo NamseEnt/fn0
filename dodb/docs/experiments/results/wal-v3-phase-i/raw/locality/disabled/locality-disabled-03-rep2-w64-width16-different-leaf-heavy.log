@@ -1,0 +1,8 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /home/opc/phase-i-build/locality/locality-disabled-03-rep2-w64-width16-different-leaf-heavy.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-different-leaf-heavy             rep=0 tx/s=    18622 mut/s=   297946 read/s=        0 agg/s=    18622 p50=  3417.8us p95=  4640.3us p99=  6426.5us groups= 2193 avg_group=42.51
+completed 1 scenarios x 1 repetitions
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html

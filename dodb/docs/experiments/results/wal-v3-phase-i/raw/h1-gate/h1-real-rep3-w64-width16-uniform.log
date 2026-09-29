@@ -1,0 +1,8 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /home/opc/phase-i-build/h1-gate/h1-real-rep3-w64-width16-uniform.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-uniform                          rep=0 tx/s=     4614 mut/s=    73831 read/s=        0 agg/s=     4614 p50= 14440.3us p95= 19183.7us p99= 26293.9us groups=  629 avg_group=36.76
+completed 1 scenarios x 1 repetitions
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html

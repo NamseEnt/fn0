@@ -1,0 +1,27 @@
+Sat Sep 26 04:49:15 AM UTC 2026
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+dodbbench/db	sync	standard	local
+dodbbench/db	recordsize	4K	local
+dodbbench/db	compression	off	local
+dodbbench/db	atime	off	local
+dodbbench	ashift	12	local
+               total        used        free      shared  buff/cache   available
+Mem:           10898         755        9002          23        1455       10142
+Swap:           4095         203        3892
+2
+rustc 1.98.1 (48a229cea 2026-09-01)
+12ab0443b61f5dccd24668c2a5d089de47c8110f
+f9d5199f98ca9acff230186fa9fd2804b00057fa9b9b339fcf3107277605632b  /tmp/dodb-phase-b-base-target/release/phase0-bench
+6bcf8bb364149f3ae881a332cfcae62faf15d745
+0dc74cc6de8e2682a99b730f730da01059aa5c2c94db7a0c0d4fcdef6736119b  /tmp/dodb-phase-b-cand-target/release/phase0-bench
+checkpoint-control binaries Sat Sep 26 07:12:13 AM UTC 2026
+12ab0443b61f5dccd24668c2a5d089de47c8110f
+M  crates/dodb-storage/src/bin/phase0-bench.rs
+d46f07654cdfcd496f6d8df9b7d90681d8fb319fa2e3048e7409d96d77a20676  /tmp/checkpoint-control-on-12ab044.patch
+fa8c833450ef1020bb185ea75fb93563dc1b2e90b6a30a4a5aa1b9e68939e604  /tmp/dodb-phase-b-base-ckpt-target/release/phase0-bench
+def6f7e9e94c2a29ca4db04c219cdd286f316ba7
+119538166c31fa74902c9a81bc3d003ea9f2cd1d938720a3cf3183a77f4cf53a  /tmp/dodb-phase-b-cand-ckpt-target/release/phase0-bench
+78f222f2214701a42b9f255b3b5044936e0dfb9be63bec1f0f01997e8ee9195a  /tmp/crossdb-rocksdb-target/release/rocksdb-bench
+               total        used        free      shared  buff/cache   available
+Mem:           10898         826        8439          23        1951       10071
+Swap:           4095         202        3893

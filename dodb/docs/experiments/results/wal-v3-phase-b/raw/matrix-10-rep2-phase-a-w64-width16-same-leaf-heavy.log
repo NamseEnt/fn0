@@ -1,0 +1,5 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /tmp/dodb-phase-b-results/raw/matrix-10-rep2-phase-a-w64-width16-same-leaf-heavy.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-same-leaf-heavy                  rep=0 tx/s=     5775 mut/s=    92402 read/s=        0 agg/s=     5775 p50= 11430.9us p95= 18280.2us p99= 21638.5us groups=  680 avg_group=42.58
+completed 1 scenarios x 1 repetitions

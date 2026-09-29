@@ -1,0 +1,43 @@
+
+running 1 test
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":0,"case":"base_hit","j0_ns":401,"h1_ns":397,"ratio":1.0101,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":0,"case":"miss","j0_ns":394,"h1_ns":389,"ratio":1.0129,"j0_allocations_per_op":2.000,"h1_allocations_per_op":2.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":0,"operation":"query","limit":8,"j0_ns":2194,"h1_ns":2192,"ratio":1.0009,"j0_allocations_per_op":38.000,"h1_allocations_per_op":38.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":0,"operation":"query","limit":128,"j0_ns":35643,"h1_ns":35519,"ratio":1.0035,"j0_allocations_per_op":523.000,"h1_allocations_per_op":523.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":0,"operation":"scan","limit":8,"j0_ns":1857,"h1_ns":1850,"ratio":1.0038,"j0_allocations_per_op":35.000,"h1_allocations_per_op":35.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":0,"operation":"scan","limit":128,"j0_ns":34225,"h1_ns":34253,"ratio":0.9992,"j0_allocations_per_op":520.000,"h1_allocations_per_op":520.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":0,"operation":"scan","limit":4096,"j0_ns":1110078,"h1_ns":1112628,"ratio":0.9977,"j0_allocations_per_op":16402.000,"h1_allocations_per_op":16402.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":1,"case":"newest_hit","j0_ns":237,"h1_ns":392,"ratio":0.6046,"j0_allocations_per_op":2.000,"h1_allocations_per_op":2.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":1,"case":"oldest_hit","j0_ns":238,"h1_ns":392,"ratio":0.6071,"j0_allocations_per_op":2.000,"h1_allocations_per_op":2.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":1,"case":"tombstone","j0_ns":217,"h1_ns":465,"ratio":0.4667,"j0_allocations_per_op":1.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":1,"case":"base_hit","j0_ns":422,"h1_ns":398,"ratio":1.0603,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":1,"case":"miss","j0_ns":418,"h1_ns":392,"ratio":1.0663,"j0_allocations_per_op":2.000,"h1_allocations_per_op":2.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":1,"operation":"query","limit":8,"j0_ns":3196,"h1_ns":2202,"ratio":1.4514,"j0_allocations_per_op":44.000,"h1_allocations_per_op":38.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":1,"operation":"query","limit":128,"j0_ns":47879,"h1_ns":35859,"ratio":1.3352,"j0_allocations_per_op":556.000,"h1_allocations_per_op":523.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":1,"operation":"scan","limit":8,"j0_ns":2764,"h1_ns":1855,"ratio":1.4900,"j0_allocations_per_op":41.000,"h1_allocations_per_op":35.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":1,"operation":"scan","limit":128,"j0_ns":46749,"h1_ns":34446,"ratio":1.3572,"j0_allocations_per_op":553.000,"h1_allocations_per_op":520.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":1,"operation":"scan","limit":4096,"j0_ns":1443608,"h1_ns":1111396,"ratio":1.2989,"j0_allocations_per_op":16627.000,"h1_allocations_per_op":16402.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":2,"case":"newest_hit","j0_ns":235,"h1_ns":388,"ratio":0.6057,"j0_allocations_per_op":2.000,"h1_allocations_per_op":2.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":2,"case":"oldest_hit","j0_ns":361,"h1_ns":388,"ratio":0.9304,"j0_allocations_per_op":2.000,"h1_allocations_per_op":2.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":2,"case":"tombstone","j0_ns":210,"h1_ns":458,"ratio":0.4585,"j0_allocations_per_op":1.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":2,"case":"base_hit","j0_ns":432,"h1_ns":396,"ratio":1.0909,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":2,"case":"miss","j0_ns":430,"h1_ns":388,"ratio":1.1082,"j0_allocations_per_op":2.000,"h1_allocations_per_op":2.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":2,"operation":"query","limit":8,"j0_ns":3385,"h1_ns":2188,"ratio":1.5471,"j0_allocations_per_op":44.000,"h1_allocations_per_op":38.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":2,"operation":"query","limit":128,"j0_ns":50631,"h1_ns":35933,"ratio":1.4090,"j0_allocations_per_op":556.000,"h1_allocations_per_op":523.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":2,"operation":"scan","limit":8,"j0_ns":2918,"h1_ns":1853,"ratio":1.5747,"j0_allocations_per_op":41.000,"h1_allocations_per_op":35.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":2,"operation":"scan","limit":128,"j0_ns":49266,"h1_ns":34572,"ratio":1.4250,"j0_allocations_per_op":553.000,"h1_allocations_per_op":520.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":2,"operation":"scan","limit":4096,"j0_ns":1493881,"h1_ns":1111399,"ratio":1.3441,"j0_allocations_per_op":16627.000,"h1_allocations_per_op":16402.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":4,"case":"newest_hit","j0_ns":235,"h1_ns":389,"ratio":0.6041,"j0_allocations_per_op":2.000,"h1_allocations_per_op":2.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":4,"case":"oldest_hit","j0_ns":566,"h1_ns":388,"ratio":1.4588,"j0_allocations_per_op":2.000,"h1_allocations_per_op":2.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":4,"case":"tombstone","j0_ns":211,"h1_ns":459,"ratio":0.4597,"j0_allocations_per_op":1.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":4,"case":"base_hit","j0_ns":464,"h1_ns":394,"ratio":1.1777,"j0_allocations_per_op":3.000,"h1_allocations_per_op":3.000}
+{"record_type":"get","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":4,"case":"miss","j0_ns":461,"h1_ns":388,"ratio":1.1881,"j0_allocations_per_op":2.000,"h1_allocations_per_op":2.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":4,"operation":"query","limit":8,"j0_ns":3798,"h1_ns":2176,"ratio":1.7454,"j0_allocations_per_op":44.000,"h1_allocations_per_op":38.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":4,"operation":"query","limit":128,"j0_ns":55423,"h1_ns":35937,"ratio":1.5422,"j0_allocations_per_op":556.000,"h1_allocations_per_op":523.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":4,"operation":"scan","limit":8,"j0_ns":3182,"h1_ns":1861,"ratio":1.7098,"j0_allocations_per_op":41.000,"h1_allocations_per_op":35.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":4,"operation":"scan","limit":128,"j0_ns":54306,"h1_ns":34605,"ratio":1.5693,"j0_allocations_per_op":553.000,"h1_allocations_per_op":520.000}
+{"record_type":"range","git_commit":"ffe774c58da1157f6e735ee75262efd978022757","segments":4,"operation":"scan","limit":4096,"j0_ns":1609537,"h1_ns":1116343,"ratio":1.4418,"j0_allocations_per_op":16627.000,"h1_allocations_per_op":16402.000}
+test blink::tests::measure_bounded_overlay_read_path ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 150 filtered out; finished in 3.84s
+

@@ -1,0 +1,14 @@
+G0 source: /tmp/dodb-phase-h-baseline
+G0 source SHA: a78472377fa16ed491c18bd2d6770f7dba7e9311
+G0 command: env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS -u CARGO_BUILD_RUSTFLAGS cargo build --release --bin phase0-bench --target aarch64-unknown-linux-gnu --target-dir /tmp/dodb-phase-h-g0-target -vv
+G0 binary: /tmp/dodb-phase-h-g0
+G0 binary SHA256: 33be90a6707544a7725acdb140da8394c4de5affdd5266675720c61ed7499e83
+
+H1 source: /home/opc/dodb-wal-v3
+H1 source SHA: 5998f7c47a15850c40bb40c8c378ac5c0deca061
+H1 command: env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS -u CARGO_BUILD_RUSTFLAGS cargo build --release --bin phase0-bench --target aarch64-unknown-linux-gnu --target-dir /tmp/dodb-phase-h-h1-target -vv
+H1 binary: /tmp/dodb-phase-h-h1
+H1 binary SHA256: 0ac99953510c5f0977b96fd2883547140a284719f45458d5a62869ab8c69badc
+
+rustc 1.98.1 (48a229cea 2026-09-01)
+Effective RUSTFLAGS variables were unset. The repository target configuration supplied -C target-feature=+crc. The crc32c 0.6.8 invocation used cfg armsimd.

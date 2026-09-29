@@ -119,6 +119,7 @@ impl TransactionRequest {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TransactionResult {
     pub commit_lsn: Option<Lsn>,
+    pub revision: Option<Revision>,
 }
 
 /// Structured expected-vs-actual information for an optimistic conflict.
