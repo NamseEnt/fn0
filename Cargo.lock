@@ -1885,6 +1885,7 @@ dependencies = [
  "quinn",
  "rcgen",
  "reqwest",
+ "rustls",
  "rustls-pemfile",
  "tempfile",
  "tokio",

@@ -67,6 +67,7 @@ impl Args {
 
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let args = Args::parse();
     let service = Arc::new(build_service(&args)?);
     let server = Arc::new(build_server(&args, Arc::clone(&service))?);
