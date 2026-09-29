@@ -14,6 +14,9 @@ need ssh
 need scp
 need ssh-keygen
 need python3
+need file
+need sha256sum
+need git
 
 temporary_dir="$(mktemp -d)"
 chmod 700 "${temporary_dir}"
@@ -31,10 +34,24 @@ require_pulumi_output \
   dodbPrivateIp
 
 dodb_private_ip="$(pulumi_pick dodbPrivateIp)"
+source_commit_sha="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
+if [[ -n "$(git -C "${REPO_ROOT}" status --porcelain)" ]]; then
+  echo "refusing to deploy dodb-server from a dirty worktree" >&2
+  exit 1
+fi
+echo ">> Production source commit: ${source_commit_sha}"
 
 binary_dir="${temporary_dir}/bin"
 mkdir -p "${binary_dir}"
 "${REPO_ROOT}/scripts/build-rust-linux-arm64-bin.sh" dodb-server "${binary_dir}"
+binary_sha256="$(sha256sum "${binary_dir}/dodb-server" | awk '{print $1}')"
+binary_description="$(file "${binary_dir}/dodb-server")"
+if ! grep -Eqi 'ARM aarch64|arm64' <<<"${binary_description}"; then
+  echo "built dodb-server is not an ARM64 binary: ${binary_description}" >&2
+  exit 1
+fi
+echo ">> Built dodb-server SHA-256: ${binary_sha256}"
+echo ">> Built dodb-server architecture: ${binary_description}"
 
 target_ssh_key_file="${temporary_dir}/target-ssh-key"
 pulumi_pick workerSshPrivateKey >"${target_ssh_key_file}"
@@ -57,15 +74,16 @@ scp_options=(
 )
 echo ">> Copying dodb-server to ${dodb_private_ip} through localhost:${local_port}"
 scp "${scp_options[@]}" "${binary_dir}/dodb-server" "opc@127.0.0.1:/tmp/dodb-server.new"
+scp "${scp_options[@]}" "${REPO_ROOT}/scripts/lib/dodb-deploy-transaction.sh" "opc@127.0.0.1:/tmp/dodb-deploy-transaction.sh"
 
-ssh "${ssh_options[@]}" opc@127.0.0.1 bash -s <<'REMOTE_INSTALL'
+ssh "${ssh_options[@]}" opc@127.0.0.1 'sudo bash -s' <<'REMOTE_INSTALL'
 set -euo pipefail
-sudo install -o root -g root -m 0755 /tmp/dodb-server.new /usr/local/bin/dodb-server
-rm -f /tmp/dodb-server.new
-sudo systemctl daemon-reload
-sudo systemctl enable dodb.service
-sudo systemctl restart dodb.service
-sudo systemctl is-active dodb.service
+cleanup() {
+  rm -f /tmp/dodb-server.new /tmp/dodb-deploy-transaction.sh
+}
+trap cleanup EXIT
+chmod 0600 /tmp/dodb-server.new /tmp/dodb-deploy-transaction.sh
+bash /tmp/dodb-deploy-transaction.sh
 REMOTE_INSTALL
 
 ssh "${ssh_options[@]}" opc@127.0.0.1 bash -s <<'REMOTE_VERIFY'

@@ -14,10 +14,10 @@ served through the Signy Tunnel.
 ## Pinned production resources
 
 - collecty image:
-  `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:249ba93f391d71db4bd4ae8826eac12cf5c80e57b878c6672cbb46014da86866`
+  `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:10e14acafb8d7a367b0d0b3bf9269fa925ff788e23dbeb76326725f2854e6620`
 - Signy image:
   `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:8212e26d9e46e5d52ff9ee8c498673959347f5cb0a705a7057f0a3b78eed357d`
-- Obsy source revision for the collecty image: `406a55fca23c433a05c772510e96d9c6ebb5e0e4`
+- Obsy source revision for the collecty image: `c6c7d5c8fada9f05be31c418a5e673fbe25476a9`
 - Obsy source revision for the Signy image: `4da304fb9c1ada8d8871076fae92bae402f39317`
   (built on the x86_64 Signy node from `signy/Dockerfile`)
 - R2 bucket: `fn0-signy-u35twkcf`

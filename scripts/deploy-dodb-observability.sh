@@ -138,9 +138,17 @@ WantedBy=multi-user.target
 EOF_COLLECTY_UNIT
 
 sudo systemctl daemon-reload
+expected_image_ref="$(sudo sed -n 's/^COLLECTY_IMAGE_REF=//p' /etc/fn0-collecty/env)"
+sudo podman pull "${expected_image_ref}"
+expected_image_id="$(sudo podman image inspect "${expected_image_ref}" --format '{{.Id}}')"
 sudo systemctl enable --now fn0-collecty.service
+running_image_id="$(sudo podman inspect --format '{{.Image}}' fn0-collecty)"
+if [[ "${running_image_id}" != "${expected_image_id}" ]]; then
+  sudo systemctl restart fn0-collecty.service
+fi
 sudo systemctl is-active fn0-collecty.service
 sudo systemctl is-enabled fn0-collecty.service
+test "$(sudo podman inspect --format '{{.Image}}' fn0-collecty)" = "${expected_image_id}"
 sudo test "$(stat -c '%a:%U:%G' /etc/fn0-collecty/env)" = "600:root:root"
 sudo test "$(stat -c '%u:%g' /var/lib/collecty)" = "10002:10002"
 REMOTE_INSTALL
