@@ -180,6 +180,25 @@ fn register_counters(meter: &Meter, metrics: ServerMetrics) -> Vec<ObservableCou
         metrics.clone(),
         |snapshot| snapshot.transport_errors,
     ));
+    let transport_event_metrics = metrics.clone();
+    counters.push(
+        meter
+            .u64_observable_counter("dodb.server.transport.events")
+            .with_unit("{event}")
+            .with_callback(move |observer| {
+                for event in transport_event_metrics.snapshot().transport_events {
+                    observer.observe(
+                        event.value,
+                        &[
+                            KeyValue::new("stage", event.stage),
+                            KeyValue::new("reason", event.reason),
+                            KeyValue::new("outcome", event.outcome),
+                        ],
+                    );
+                }
+            })
+            .build(),
+    );
     counters.push(observable_counter(
         meter,
         "dodb.server.application.errors",
@@ -434,6 +453,18 @@ mod tests {
         }));
         assert!(points.contains_key("dodb.storage.shards.persisted"));
         assert!(points.contains_key("dodb.storage.shards.open"));
+        assert_eq!(
+            points
+                .get("dodb.server.transport.errors")
+                .expect("transport error baseline")
+                .as_slice(),
+            &[(Vec::new(), 0)]
+        );
+        assert!(
+            points
+                .get("dodb.server.transport.events")
+                .is_none_or(Vec::is_empty)
+        );
         drop(points);
         provider.shutdown().expect("shutdown test meter provider");
     }

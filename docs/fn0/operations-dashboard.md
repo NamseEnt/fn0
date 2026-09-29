@@ -22,6 +22,20 @@ down. The browser only ever talks to the ops Worker; the Worker holds the
 Signy and canary credentials and sends only the fixed queries in
 `ops/console/src`.
 
+## DODB transport telemetry
+
+`dodb.server.transport.errors` counts actionable QUIC transport failures only.
+Expected peer closes, resets, stopped streams, incomplete client headers, and
+idle connection timeouts are excluded. `dodb.server.transport.events` records
+the bounded `stage`, `reason`, and `outcome` diagnostic combinations, including
+benign disconnects. Diagnostic series are emitted only after that event occurs;
+the aggregate error counter still exports a zero baseline at startup.
+
+The earlier `transport.errors` total of 10 was collected before this meaning
+was introduced and combined normal disconnects with actionable failures. It
+must not be compared with post-restart totals. Reclassify only events observed
+by the new process and distinguish restart warm-up from steady-state traffic.
+
 ## Canary
 
 `ops/canary` is an ordinary Forte app deployed as project `1lmlydc3` at
