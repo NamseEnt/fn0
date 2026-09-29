@@ -14,7 +14,8 @@ fn main() {
         let generated = fs::read_to_string(&generated_file).expect("generated routes are missing");
         let normalized = generated.replace("/api/dodb_write", "/api/dodb-write");
         if generated != normalized {
-            fs::write(generated_file, normalized).expect("could not normalize the DODB write route");
+            fs::write(generated_file, normalized)
+                .expect("could not normalize the DODB write route");
         }
     }
 }

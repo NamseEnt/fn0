@@ -22,3 +22,6 @@ object-storage = { package = "fn0-object-storage", version = "=0.5.9" }
 
 [build-dependencies]
 forte-codegen = "=0.5.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }

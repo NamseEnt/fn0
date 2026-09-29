@@ -47,7 +47,7 @@ limit and make the console report a false outage.
 |---|---|---|
 | `/api/runtime` | Cloudflare → NLB → worker-proxy → worker → routing → bundle → wasm | `{"ok":true}` |
 | `/api/dodb` | the runtime path + `DocDbHijack` → dodb | reads pk `fn0-ops-canary/known-value`, sk `health`, expects `fn0-canary-v1` |
-| `/api/dodb-write` | the runtime path + `DocDbHijack` → dodb | writes a random nonce to a unique key in pk `fn0-ops-canary/write-probe`, reads the same key and compares the exact value, then attempts a best-effort delete |
+| `/api/dodb-write` | the runtime path + `DocDbHijack` → dodb | uses one fixed state row, performs an OCC mutation at most once every five minutes, then reads the written value back exactly |
 | `/api/storage` | the runtime path + `ObjectStorageHijack` → project private R2 bucket | reads `canary/known-object-v1.txt`, expects `fn0-canary-v1\n` |
 
 The runtime probe has no dependency on the known dodb or storage values. A
@@ -55,12 +55,14 @@ non-success runtime response means the fn0 serving path is down; dodb and
 storage are then unknown because their probes use that same path.
 
 The runtime, dodb read, and storage probes do not change state. The dodb write
-probe temporarily changes the canary project's DODB state: it writes a random
-nonce under a unique sort key, reads the same key and compares the exact bytes,
-then attempts to delete that key. This checks that a current DODB mutation and
-subsequent read path are functioning; it is not an independent durability or
-fsync verification. Cleanup is best effort, and stale probe keys are bounded
-by age-based cleanup and a per-partition capacity guard.
+probe maintains at most one row in the canary project's DODB write-health
+partition. It stores a format version, the last successful write timestamp,
+and a random nonce. An OCC transaction reads the row and either returns the
+recent successful write or replaces the state when it is at least five minutes
+old. A mutation is followed by an exact readback of the version, timestamp,
+and nonce. This checks that a current DODB mutation and subsequent read path
+are functioning; it is not an independent durability or fsync verification.
+Repeated probes may therefore return success without performing a mutation.
 
 A probe that finds a problem answers 503 with a bounded failure such as
 `missing`, `mismatch`, `unavailable`, `write_failed`, or `read_failed`. Only
