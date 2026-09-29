@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-08-18T01:53:58Z",
+  "revision": "e79e78c",
+  "branch": "master",
+  "machine": "Linux 6.12.57+deb13-amd64; 12 logical CPUs; 31.3 GiB RAM",
+  "docker": "29.1.3",
+  "compose": "5.0.1",
+  "loki_image": "grafana/loki:3.3.2",
+  "victorialogs_image": "victoriametrics/victoria-logs:v1.52.0",
+  "memory_limit": "2g",
+  "memory_limit_attempts": [{"limit":"2g","signy_survived":true,"signy_oom_killed":false,"loki_survived":true,"loki_oom_killed":false,"victorialogs_survived":true,"victorialogs_oom_killed":false}],
+  "memory_limit_bytes": 2147483648,
+  "settle_seconds": 150,
+  "verify_anchor_ns": 1787016850000000000,
+  "matrix_primary_limit": 20000,
+  "matrix_runs": [{"limit":20000,"suffix":"_l20000"},{"limit":100,"suffix":"_l100"}],
+  "object_store": "none: every system is on its local filesystem",
+  "peak_bytes": {
+    "signy": { "ingest": 1100193792, "query": 292184064, "oom_killed": false },
+    "loki": { "ingest": 1908891648, "query": 291880960, "oom_killed": false },
+    "victorialogs": { "ingest": 586215424, "query": 305037312, "oom_killed": false }
+  },
+  "disk_bytes": {
+    "signy": { "settled": 92829249, "after_queries": 92825153, "breakdown": "/data/journal.ckpt:8,/data/journal.wal:10987399,/data/parts:81833650,/data/traces:4096" },
+    "loki": { "settled": 123506219, "after_queries": 123558479, "breakdown": "/data/chunks:123349567,/data/compactor:4096,/data/rules:4096,/data/rules-temp:4096,/data/tsdb-shipper-active:107500,/data/tsdb-shipper-cache:24576,/data/wal:8192" },
+    "victorialogs": { "settled": 57951783, "after_queries": 57951783, "breakdown": "/data/flock.lock:0,/data/partitions:57947687" }
+  }
+}

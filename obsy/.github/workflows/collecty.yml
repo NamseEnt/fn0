@@ -1,0 +1,111 @@
+name: collecty
+
+on:
+  push:
+    paths:
+      - 'collecty/**'
+      - '.github/workflows/collecty.yml'
+  pull_request:
+    paths:
+      - 'collecty/**'
+      - '.github/workflows/collecty.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  collecty-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: collecty
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        run: |
+          rustup toolchain install --profile minimal \
+            --component rustfmt --component clippy \
+            "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)"
+          rustc --version && cargo --version
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: collecty
+
+      - name: cargo fmt
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: cargo test
+        run: |
+          set -o pipefail
+          cargo test --locked --no-fail-fast 2>&1 | tee target/test-output.log
+
+      - name: Preserve the full test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-${{ github.run_id }}-${{ github.run_attempt }}
+          path: collecty/target/test-output.log
+          if-no-files-found: ignore
+
+  collecty-bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: collecty
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        run: |
+          rustup toolchain install --profile minimal \
+            --component rustfmt --component clippy \
+            "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: collecty
+
+      - name: cargo bench --no-run
+        run: cargo bench --locked --no-run
+
+      - name: Bench smoke run
+        run: cargo bench --locked --benches -- --test
+
+  collecty-image:
+    needs: collecty-check
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/namse/collecty
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to the registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build
+        run: |
+          docker build \
+            --tag "${IMAGE}:${GITHUB_SHA}" \
+            --tag "${IMAGE}:latest" \
+            collecty
+
+      - name: Push
+        run: |
+          docker push "${IMAGE}:${GITHUB_SHA}"
+          docker push "${IMAGE}:latest"

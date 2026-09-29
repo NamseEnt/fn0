@@ -1,0 +1,362 @@
+# Prometheus alerting rules for signy.
+#
+# This file is the machine-readable form of the "What to alert on" table in
+# docs/RUNBOOK.md. The table is the decisions -- which signal, what condition,
+# what it means -- and it was written first; this is the same content in the
+# form a Prometheus can load. Nothing here is a new judgement about what
+# matters, and where the two disagree the runbook is right.
+#
+# `query::tests::every_alert_signal_in_the_runbook_has_a_rule` fails the build
+# if a row is added to that table without a rule here, if a rule names a metric
+# this engine does not export, or if a rule's metric is not in the table. That
+# tie is the point: a rules file that silently falls behind the runbook is worse
+# than none, because the operator believes they are covered.
+#
+# Thresholds are deliberately trend-based rather than absolute wherever an
+# absolute one would be a guess about a deployment this project has not seen.
+# Two of them cannot be written without a deployment's own numbers, and say so
+# in their annotations rather than shipping a number nobody measured.
+#
+# `for:` durations assume a scrape interval well under a minute.
+
+groups:
+  - name: signy-ingest
+    rules:
+      - alert: SignyIngestThrottled
+        expr: increase(signy_ingest_throttled_total[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "signy is returning 429 to pushes"
+          description: >-
+            Flush cannot keep up with ingest, so the memtable or WAL backlog
+            limit is refusing writes. Backpressure working, not backpressure
+            failing -- but the sender is losing headroom.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyIngestResourcesDropped
+        expr: increase(signy_ingest_dropped_resources_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Exports are naming a tenant this instance will not file them under"
+          description: >-
+            An export named no tenant this instance serves, so those resources
+            were dropped -- and the sender was told its body arrived, because an
+            ingest answers whether the body arrived and nothing about whose it
+            was. This counter is the only signal that loss produces. The reason
+            label says where to go: no_tenant is an exporter with no tenant.id
+            resource attribute, invalid_tenant is one set to something outside
+            [a-zA-Z0-9_-]{1,64}, and tenant_not_served is a well-formed tenant
+            the control plane never pushed a policy for -- push it.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyCollectRecordsDropped
+        expr: increase(signy_collect_dropped_records_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "The collect route is dropping records it will never accept"
+          description: >-
+            A batch from the collector carried whole records this instance
+            cannot take -- an undecodable body, one past a limit -- and they
+            were dropped here. Deliberate: the collector keeps one queue per
+            machine, so holding them would stop every other application on that
+            host. But it is still data loss, and this counter,
+            signy_collect_dropped_bytes_total and the warning log beside them
+            are the only places it shows. A tenant problem is not here; that is
+            SignyIngestResourcesDropped.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyWalBacklogGrowing
+        expr: deriv(signy_wal_backlog_bytes[15m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "signy WAL backlog is trending up"
+          description: >-
+            The same cause as SignyIngestThrottled and the earlier signal:
+            the backlog grows before the refusals start.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyFlushStopped
+        expr: >-
+          increase(signy_flush_errors_total[10m]) > 0
+          and increase(signy_flush_success_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "signy flush is failing and not succeeding"
+          description: >-
+            The most dangerous state this engine has: accepted data is not
+            reaching durable storage, and errors alone would not say that --
+            it is errors with no success between them.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyRemoteStoreUnreachable
+        expr: signy_remote_healthy == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "signy cannot reach the object store"
+          description: >-
+            Set by three consecutive failures with no success between them, so
+            an isolated failed request does not trip it.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyRemoteStoreDegrading
+        expr: >-
+          signy_remote_consecutive_failures > 0
+          and signy_remote_consecutive_failures < 3
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The object store is failing requests without being declared down"
+          description: >-
+            The early signal the health flag deliberately hides: it takes three
+            consecutive failures to clear signy_remote_healthy, and this
+            fires below that.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyWalReplayedEntries
+        expr: signy_wal_replayed_entries > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "signy replayed WAL entries after a restart"
+          description: >-
+            The previous run did not shut down cleanly. This is the upper bound
+            on log lines this restart may have duplicated -- delivery is
+            at-least-once, so records the WAL still held may already have been
+            durable, and the next merge collapses the twins.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyDrainNotReachingDurability
+        expr: signy_drain_in_progress == 1 and signy_pending_flush_bytes > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "A shutdown drain is not reaching durability"
+          description: >-
+            pending_flush_bytes must reach 0 while draining. It has not, and the
+            orchestrator's termination grace is finite.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+  - name: signy-retention-and-tenancy
+    rules:
+      - alert: SignyRetentionRewriteSkipped
+        expr: increase(signy_retention_rewrite_skipped_total[1h]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "A retention rewrite was skipped: tenant deletion is not complete"
+          description: >-
+            Rows a tenant asked to have deleted are masked at read time but
+            still on disk and still in object storage. This is the one alert
+            here whose meaning is a commitment to someone outside the system.
+            Not a size problem -- the rewrite streams, so it cannot fail for
+            want of memory at any part size; reaching this counter means I/O or
+            a corrupt input.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyUnknownTenants
+        expr: signy_tenant_policy_unknown_tenants > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tenants are accumulating data with no policy pushed for them"
+          description: >-
+            Unknown from the control plane's perspective: the instance is
+            holding their data and has no retention or quota to apply to it.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyDeleteHiddenRowsNotRemoved
+        expr: deriv(signy_delete_hidden_rows_total[6h]) > 0
+        for: 6h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Deleted rows are still being hidden rather than removed"
+          description: >-
+            Rising steadily long after a request means no rewrite has reached
+            the parts holding those rows. They are invisible to queries and
+            still present on disk.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyDeleteRequestsRejected
+        expr: increase(signy_delete_requests_rejected_total[1h]) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A tenant is at its outstanding delete-request limit"
+          description: >-
+            Each outstanding request is a predicate every one of that tenant's
+            scans evaluates per row, which is why the limit exists.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+  - name: signy-read-path
+    rules:
+      - alert: SignyQueryMemoryExhausted
+        expr: increase(signy_query_memory_exhausted_total[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "signy refused a query it was willing to serve"
+          description: >-
+            The query memory pool had no room. The read side's
+            ingest_throttled_total. The client is correctly told 429 and will
+            retry, so nothing looks broken from outside and this counter is the
+            only place the event is visible. It does not say which of three
+            causes -- too many concurrent queries, one query too greedy, or
+            SIGNY_MEMORY_ACCOUNT_BYTES too small for this deployment -- so
+            plot signy_memory_account_in_use_bytes against
+            signy_memory_account_budget_bytes and start there.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyMemoryAccountSaturated
+        expr: >-
+          signy_memory_account_in_use_bytes
+            / signy_memory_account_budget_bytes > 0.9
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "signy's shared memory account is at its ceiling"
+          description: >-
+            Work in flight -- queries, metric flush, metric compaction -- has
+            held over 90% of the account for a quarter of an hour. Arriving
+            queries are being refused with 429 and background passes are
+            postponing. Fires before the refusals do, which is the point:
+            SignyQueryMemoryExhausted says it already happened.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyMemoryAccountStarvingCompaction
+        expr: increase(signy_memory_account_deferred_total[30m]) > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Metric compaction keeps finding no room in the memory account"
+          description: >-
+            Flush and compaction have no client to refuse, so a full account
+            makes them postpone silently rather than fail. Half an hour of
+            unbroken postponement is compaction debt that will show up as disk
+            growth later. Either queries hold the account continuously, or
+            MERGE_MAX_MEMORY_BYTES is too large a share of
+            SIGNY_MEMORY_ACCOUNT_BYTES for the two to overlap.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyBloomCacheThrashing
+        expr: >-
+          increase(signy_part_sidecar_misses_total[15m]) > 0
+            and
+          (increase(signy_part_sidecar_redecode_gap_nanos_total[15m])
+             / clamp_min(increase(signy_part_sidecar_redecodes_total[15m]), 1)) < 1e9
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "signy is decoding the same part's blooms over and over"
+          description: >-
+            Parts are losing their bloom index and asking for it back inside a
+            second, which means the cache is smaller than the working set. The
+            hit rate will look healthy while this fires: hits are the queries
+            that land inside each residency. Before the cache held offsets into
+            a mapped index.bin this shape cost four megabytes per re-decode and
+            was what filled the allocator's dirty pages until the 2 GiB soak was
+            OOM-killed; it is cheap now, so this is a sizing signal rather than
+            an emergency. Read signy_part_sidecar_resident_bytes against
+            SIGNY_SIDECAR_CACHE_MAX_BYTES.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyQueryQuotaRejecting
+        expr: increase(signy_query_quota_rejected_total[15m]) > 0
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "A tenant is over its read quota"
+          description: >-
+            Scan rate or concurrency. Like the ingest one: a plan question, not
+            a scaling one.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+  - name: signy-layout
+    rules:
+      - alert: SignyMergeDebtGrowing
+        expr: deriv(signy_merge_debt_parts[30m]) > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "signy merge cannot keep up"
+          description: >-
+            Parts are accumulating faster than merge consolidates them, and
+            query-planning cost rises with the part count.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignySidecarResidentGrowing
+        expr: deriv(signy_part_sidecar_resident_bytes[1h]) > 0
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Part sidecars are growing resident without being evicted"
+          description: >-
+            Resident memory linear in part count. The runbook's condition is
+            "rising relative to the RSS budget", and this engine exports no
+            budget gauge to divide by -- so this fires on the trend alone. A
+            deployment that knows its container limit should replace this with
+            a ratio against it.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyTenantsScatteredAcrossParts
+        expr: >-
+          signy_tenant_policy_known_tenants > 0
+          and signy_part_count > 0
+          and (signy_part_tenant_segments / signy_part_count)
+              > 0.8 * signy_tenant_policy_known_tenants
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "Nearly every tenant is in nearly every part"
+          description: >-
+            part_tenant_segments is the number of (tenant, part) pairs, and each
+            pair costs one row group, two blooms and one metadata segment. When
+            the average tenant width of a part approaches the tenant count, a
+            nearly idle tenant costs as much as a busy one. The 0.8 here is the
+            only invented number in this file: the shape is the signal, the
+            fraction is where a deployment decides it minds.
+          runbook: docs/RUNBOOK.md#what-to-alert-on
+
+      - alert: SignyDataDirRunningOut
+        expr: >-
+          signy_data_dir_total_bytes > 0
+          and signy_data_dir_free_bytes < 4294967296
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The data directory's filesystem is running out of room"
+          description: >-
+            Fires at twice SIGNY_MIN_FREE_DISK_BYTES, not at it: at the
+            floor ingest is already being refused, and this is the warning
+            before that. The 4 GiB literal is twice the *default* floor -- a
+            deployment that moved the knob has to move this number with it,
+            because Prometheus cannot read the process's configuration. Divide
+            by signy_data_dir_total_bytes for a percentage.
+          runbook: docs/RUNBOOK.md#what-to-alert-on

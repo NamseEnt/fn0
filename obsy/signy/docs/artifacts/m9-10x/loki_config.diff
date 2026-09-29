@@ -1,0 +1,217 @@
+--- /dev/fd/63	2026-08-12 21:31:24.820931298 +0900
++++ /dev/fd/62	2026-08-12 21:31:24.820931298 +0900
+@@ -7 +7 @@
+-  http_listen_address: ""
++  http_listen_address: 0.0.0.0
+@@ -41,2 +41,2 @@
+-  grpc_server_max_recv_msg_size: 4194304
+-  grpc_server_max_send_msg_size: 4194304
++  grpc_server_max_recv_msg_size: 104857600
++  grpc_server_max_send_msg_size: 104857600
+@@ -55 +55 @@
+-  log_level: info
++  log_level: warn
+@@ -127 +127 @@
+-      store: consul
++      store: inmemory
+@@ -156 +156 @@
+-    heartbeat_period: 5s
++    heartbeat_period: 15s
+@@ -160,0 +161 @@
++    - lo
+@@ -241 +242 @@
+-  use_scheduler_ring: false
++  use_scheduler_ring: true
+@@ -244 +245 @@
+-      store: consul
++      store: inmemory
+@@ -281,0 +283 @@
++    - lo
+@@ -322,0 +325 @@
++  - lo
+@@ -384,0 +388 @@
++        enabled: true
+@@ -440,0 +445 @@
++        enabled: true
+@@ -492,0 +498 @@
++        enabled: true
+@@ -544,0 +551 @@
++        enabled: true
+@@ -597,0 +605 @@
++        enabled: true
+@@ -649,0 +658 @@
++        enabled: true
+@@ -685 +694 @@
+-    type: ""
++    type: local
+@@ -794,2 +803,2 @@
+-      directory: ""
+-  rule_path: /rules
++      directory: /loki/rules
++  rule_path: /loki/rules-temp
+@@ -822,2 +831,2 @@
+-      store: consul
+-      prefix: rulers/
++      store: inmemory
++      prefix: collectors/
+@@ -851 +860 @@
+-    heartbeat_period: 5s
++    heartbeat_period: 15s
+@@ -855,0 +865 @@
++    - lo
+@@ -991 +1001 @@
+-        store: consul
++        store: inmemory
+@@ -1021 +1031 @@
+-      replication_factor: 3
++      replication_factor: 1
+@@ -1025 +1035 @@
+-    heartbeat_period: 5s
++    heartbeat_period: 15s
+@@ -1031,0 +1042 @@
++    - lo
+@@ -1058 +1069 @@
+-  query_store_max_look_back_period: 0s
++  query_store_max_look_back_period: 2h41m0s
+@@ -1061 +1072 @@
+-    dir: wal
++    dir: /loki/wal
+@@ -1067 +1078 @@
+-  shutdown_marker_path: ""
++  shutdown_marker_path: /loki
+@@ -1109 +1120 @@
+-        store: consul
++        store: inmemory
+@@ -1143 +1154 @@
+-    heartbeat_period: 5s
++    heartbeat_period: 15s
+@@ -1149,0 +1161 @@
++    - lo
+@@ -1213 +1225 @@
+-      store: consul
++      store: inmemory
+@@ -1247 +1259 @@
+-    replication_factor: 3
++    replication_factor: 1
+@@ -1250,0 +1263 @@
++    - lo
+@@ -1539 +1552 @@
+-    directory: ""
++    directory: /loki/chunks
+@@ -1769,3 +1782,3 @@
+-    ingestername: ""
+-    mode: ""
+-    ingesterdbretainperiod: 0s
++    ingestername: a73253e7b1eb
++    mode: RW
++    ingesterdbretainperiod: 20m0s
+@@ -1774,2 +1787,2 @@
+-    active_index_directory: ""
+-    cache_location: ""
++    active_index_directory: /loki/tsdb-shipper-active
++    cache_location: /loki/tsdb-shipper-cache
+@@ -1805,3 +1818,3 @@
+-    ingestername: ""
+-    mode: ""
+-    ingesterdbretainperiod: 0s
++    ingestername: a73253e7b1eb
++    mode: RW
++    ingesterdbretainperiod: 20m0s
+@@ -1809 +1822 @@
+-    working_directory: /data/blooms
++    working_directory: /loki/blooms
+@@ -1917,0 +1931 @@
++      enabled: true
+@@ -2021,0 +2036,16 @@
++schema_config:
++  configs:
++  - from: "2024-01-01"
++    store: tsdb
++    object_store: filesystem
++    schema: v13
++    index:
++      path_prefix: index/
++      prefix: index_
++      period: 1d
++      tags: {}
++    chunks:
++      prefix: ""
++      period: 0s
++      tags: {}
++    row_shards: 16
+@@ -2023,2 +2053,2 @@
+-  working_directory: ""
+-  compaction_interval: 10m0s
++  working_directory: /loki/compactor
++  compaction_interval: 1m0s
+@@ -2043 +2073 @@
+-      store: consul
++      store: inmemory
+@@ -2080,0 +2111 @@
++    - lo
+@@ -2114,2 +2145,2 @@
+-  ingestion_rate_mb: 4
+-  ingestion_burst_size_mb: 6
++  ingestion_rate_mb: 1024
++  ingestion_burst_size_mb: 2048
+@@ -2142 +2173 @@
+-  max_global_streams_per_user: 5000
++  max_global_streams_per_user: 0
+@@ -2144,2 +2175,2 @@
+-  per_stream_rate_limit: 3MB
+-  per_stream_rate_limit_burst: 15MB
++  per_stream_rate_limit: 512MB
++  per_stream_rate_limit_burst: 1GB
+@@ -2147 +2178 @@
+-  max_query_series: 500
++  max_query_series: 100000
+@@ -2159 +2190 @@
+-  max_entries_limit_per_query: 5000
++  max_entries_limit_per_query: 100000
+@@ -2206 +2237 @@
+-  index_gateway_shard_size: 0
++  index_gateway_shard_size: 1
+@@ -2223 +2254,23 @@
+-  otlp_config: {}
++  otlp_config:
++    resource_attributes:
++      attributes_config:
++      - action: index_label
++        attributes:
++        - service.name
++        - service.namespace
++        - service.instance.id
++        - deployment.environment
++        - cloud.region
++        - cloud.availability_zone
++        - k8s.cluster.name
++        - k8s.namespace.name
++        - k8s.pod.name
++        - k8s.container.name
++        - container.name
++        - k8s.replicaset.name
++        - k8s.deployment.name
++        - k8s.statefulset.name
++        - k8s.daemonset.name
++        - k8s.cronjob.name
++        - k8s.job.name
++        regex: null
+@@ -2502 +2555 @@
+-  reporting_enabled: true
++  reporting_enabled: false
+@@ -2505 +2558 @@
+-  path_prefix: ""
++  path_prefix: /loki
+@@ -2595,2 +2648,2 @@
+-      chunks_directory: ""
+-      rules_directory: ""
++      chunks_directory: /loki/chunks
++      rules_directory: /loki/rules
+@@ -2710 +2763 @@
+-  replication_factor: 3
++  replication_factor: 1
+@@ -2713 +2766 @@
+-      store: consul
++      store: inmemory
+@@ -2750,0 +2804 @@
++    - lo

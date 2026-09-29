@@ -1,0 +1,151 @@
+name: signy
+
+# signy is one component of this repository; a commit that does not touch it
+# has nothing to prove here. collecty gets its own workflow beside this one.
+on:
+  push:
+    paths:
+      - 'signy/**'
+      - '.github/workflows/signy.yml'
+  pull_request:
+    paths:
+      - 'signy/**'
+      - '.github/workflows/signy.yml'
+
+# The answer to a commit that has already been superseded is not worth a runner.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # A failing build should say what failed, not print a megabyte of backtrace.
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Format, lint and the test suite. All three share one debug build of the
+  # dependency tree, which is the expensive part.
+  signy-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: signy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        # `rust-toolchain.toml` is the single source of truth for the version;
+        # the components are repeated because `rustup toolchain install <ver>`
+        # does not read them from the file. Installing explicitly means a failed
+        # toolchain download reports itself as one, instead of surfacing as an
+        # unexplained failure in whichever step happened to compile first.
+        run: |
+          rustup toolchain install --profile minimal \
+            --component rustfmt --component clippy \
+            "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)"
+          rustc --version && cargo --version
+
+      # The tree pulls in arrow, parquet, tonic and object_store; uncached, a
+      # run spends most of its time compiling code that did not change.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: signy
+
+      - name: cargo fmt
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        # `--all-targets` so benches and tests are linted too, and `-D warnings`
+        # because the tree is at zero warnings and that is a maintained property.
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: cargo test
+        # The full output is written to a file and uploaded on failure, because
+        # a flaky failure's one useful fact is the panic message of the run
+        # that failed — a rerun that passes destroys it. `--no-fail-fast` so a
+        # flake does not hide whatever else failed in the same run.
+        run: |
+          set -o pipefail
+          cargo test --locked --no-fail-fast 2>&1 | tee target/test-output.log
+
+      - name: Preserve the full test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-${{ github.run_id }}-${{ github.run_attempt }}
+          path: signy/target/test-output.log
+          if-no-files-found: ignore
+
+  # Separate job: the benches build under the `bench` profile, so they share no
+  # compiled artifacts with `check` and there is nothing to gain by serializing
+  # them behind it.
+  signy-bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: signy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the pinned toolchain
+        run: |
+          rustup toolchain install --profile minimal \
+            --component rustfmt --component clippy \
+            "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)"
+          rustc --version && cargo --version
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: signy
+
+      - name: cargo bench --no-run
+        # `benches/` is a separate crate against the `[lib]` target, so nothing
+        # else in CI compiles it. Without this it rots silently.
+        run: cargo bench --locked --no-run
+
+      - name: Bench smoke run
+        # NOT A MEASUREMENT either. `--test` runs each benchmark body exactly
+        # once with no timing loop and no statistics, which is the whole point:
+        # it proves the bench code executes, on hardware whose timings nobody
+        # should quote. `--benches` restricts this to the `[[bench]]` targets --
+        # without it, `cargo bench -- --test` would also re-run the unit tests
+        # under the bench profile.
+        run: cargo bench --locked --benches -- --test
+
+  signy-image:
+    # Only after the tests pass, and only for what is actually deployed. A pull
+    # request does not need a published image.
+    needs: signy-check
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/namse/signy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to the registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # The revision is baked in rather than inferred at runtime: `build_info`
+      # on /metrics is how a scraped series is attributed to code, which is the
+      # first question asked when two deployments behave differently.
+      - name: Build
+        run: |
+          docker build \
+            --build-arg SIGNY_BUILD_REVISION="${GITHUB_SHA}" \
+            --build-arg SIGNY_BUILD_BRANCH="${GITHUB_REF_NAME}" \
+            --tag "${IMAGE}:${GITHUB_SHA}" \
+            --tag "${IMAGE}:latest" \
+            signy
+
+      # Both tags, because the immutable one is what a deployment should pin to
+      # and the moving one is what a person types.
+      - name: Push
+        run: |
+          docker push "${IMAGE}:${GITHUB_SHA}"
+          docker push "${IMAGE}:latest"

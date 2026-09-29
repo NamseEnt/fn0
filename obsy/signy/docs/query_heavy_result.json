@@ -1,0 +1,195 @@
+{
+  "achieved_eps": 661.7468123385644,
+  "ack_latency_ms": {
+    "count": 800,
+    "p50_ms": 25.058207999999997,
+    "p95_ms": 74.503458,
+    "p99_ms": 125.95899999999999
+  },
+  "ack_warmup_latency_ms": {
+    "count": 800,
+    "p50_ms": 20.637542,
+    "p95_ms": 58.910333,
+    "p99_ms": 104.008084
+  },
+  "behavioral": {
+    "cache_healthy_end": true,
+    "flush_progressing": true,
+    "flush_success_delta": 44,
+    "measured_what_it_claimed": true,
+    "no_ingest_errors": true,
+    "recovered_flush_errors": 12,
+    "recovered_merge_errors": 0,
+    "remote_healthy_end": true,
+    "remote_healthy_fraction": 0.9976303317535545,
+    "restore_errors": 11,
+    "restore_observed": true,
+    "restore_probe_rows": 4000,
+    "restore_probes_with_rows": 40,
+    "restore_read_rows": true,
+    "retention_observed": true,
+    "scan_slots_saturated": true,
+    "wal_backlog_bounded": true,
+    "wal_backlog_peak_bytes": 19533980,
+    "wal_backlog_trough_bytes": 0
+  },
+  "behavioral_pass": true,
+  "build_revision": "add7d33",
+  "concurrent_queries": {
+    "errors": 41,
+    "limit": 5000,
+    "log_latency_ms": {
+      "count": 2271,
+      "p50_ms": 109.610125,
+      "p95_ms": 391.659166,
+      "p99_ms": 1606.02975
+    },
+    "log_queries": 16827,
+    "metric_latency_ms": {
+      "count": 2254,
+      "p50_ms": 295.256542,
+      "p95_ms": 2348.482958,
+      "p99_ms": 9237.713667
+    },
+    "metric_queries": 16786,
+    "quota_throttled": 176,
+    "range_seconds": 120,
+    "rows_read": 17847400,
+    "worker_interval_ms": 0,
+    "workers": 24
+  },
+  "duration_seconds": 150,
+  "ended_on": "duration_cap",
+  "events": 160000,
+  "eviction_delta": 42,
+  "flush_errors_delta": 12,
+  "ingest_errors_delta": 0,
+  "machine_profile": "Darwin arm64; 8 logical CPUs; 16 GiB RAM (developer laptop, not 4-vCPU/16-GiB reference)",
+  "memory_budget": {
+    "configured_peak_materialized_bytes": 5368709120,
+    "rss_peak_bytes": 496418816,
+    "rss_peak_fraction_of_budget": 0.0924652099609375,
+    "sample_interval_ms": 500,
+    "samples": 422
+  },
+  "merge_errors_delta": 0,
+  "metric_errors": 2,
+  "metric_latency_ms": {
+    "count": 38,
+    "p50_ms": 333.522542,
+    "p95_ms": 7939.341458999999,
+    "p99_ms": 13993.274208
+  },
+  "metric_queries": 78,
+  "numeric_pass": false,
+  "object_store_operations": {
+    "copies": 0,
+    "cycles": {
+      "flush": 44,
+      "merge": 16,
+      "retention": 6
+    },
+    "deletes": 75,
+    "gets": 752,
+    "listed_objects": 0,
+    "lists": 0,
+    "puts": 422
+  },
+  "offered_eps": 2000,
+  "otlp_errors": 0,
+  "otlp_requests": 80,
+  "push_errors": 0,
+  "push_throttled": 0,
+  "pushes": 1600,
+  "queries": 79,
+  "query_errors": 1,
+  "query_latency_ms": {
+    "count": 40,
+    "p50_ms": 41.975417,
+    "p95_ms": 6456.52975,
+    "p99_ms": 8588.858583000001
+  },
+  "restore_errors_delta": 11,
+  "restore_probe_latency_ms": {
+    "count": 40,
+    "p50_ms": 33.16725,
+    "p95_ms": 199.224375,
+    "p99_ms": 451.413292
+  },
+  "restore_probes": 40,
+  "restore_success_delta": 212,
+  "retention_errors_delta": 0,
+  "retention_success_delta": 6,
+  "rss_peak_bytes": 496418816,
+  "scan_scheduler": {
+    "contended": true,
+    "in_flight_peak": 8,
+    "queue_wait_ms_total": 163182.986501,
+    "queued_total": 2403,
+    "saturated": true,
+    "slots": 8
+  },
+  "seed": 1592598566,
+  "target_events": 0,
+  "targets": {
+    "ack_p95": {
+      "measured": 74.503458,
+      "pass": true,
+      "target": 250.0
+    },
+    "ack_p99": {
+      "measured": 125.95899999999999,
+      "pass": true,
+      "target": 1000.0
+    },
+    "concurrent_query_p95": {
+      "measured": 391.659166,
+      "pass": true,
+      "target": 5000.0
+    },
+    "error_rate": {
+      "measured": 0.0,
+      "pass": true,
+      "target": 0.0
+    },
+    "query_p95": {
+      "measured": 6456.52975,
+      "pass": false,
+      "target": 2000.0
+    },
+    "rss_peak_bytes": {
+      "measured": 496418816.0,
+      "pass": true,
+      "target": 4294967296.0
+    },
+    "wal_backlog_bytes": {
+      "measured": 19533980.0,
+      "pass": true,
+      "target": 1073741824.0
+    }
+  },
+  "tempo_errors": 0,
+  "tempo_latency_ms": {
+    "count": 40,
+    "p50_ms": 12.160874999999999,
+    "p95_ms": 263.648792,
+    "p99_ms": 74818.066375
+  },
+  "tempo_searches": 80,
+  "tenants": 24,
+  "terminal_gauges": {
+    "memtable_bytes": 2048000,
+    "memtable_entries": 2000,
+    "merge_debt_parts": 6,
+    "part_bytes": 190001,
+    "part_count": 7,
+    "part_meta_bytes": 27508,
+    "part_sidecar_resident_bytes": 93931,
+    "part_tenant_segments": 130,
+    "trace_part_count": 44,
+    "wal_backlog_bytes": 2089052
+  },
+  "tier": "B",
+  "verdict": "PASS_BEHAVIORAL_ONLY",
+  "warmup_seconds": 45
+}

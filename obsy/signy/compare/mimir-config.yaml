@@ -1,0 +1,62 @@
+# Grafana Mimir 3.1.4, monolithic mode for the metrics capacity bed.
+#
+# This is deliberately a local-filesystem demonstration configuration, not a
+# production deployment. A single process owns every component and every
+# trial gets a fresh `mimir-data` volume. Multitenancy is disabled so the
+# capacity result measures one logical tenant; the harness still sends the
+# same X-Scope-OrgID header it uses for the VictoriaMetrics leg.
+multitenancy_enabled: false
+
+# Remove Mimir's cardinality and rate admission policies from this memory bed.
+# The benchmark's stopping condition is memory pressure, not a product limit.
+# Mimir defaults conceptually to 150000 global series per user, 0 per metric,
+# a 10000/s ingestion rate, and a 200000 ingestion burst.
+limits:
+  max_global_series_per_user: 0
+  max_global_series_per_metric: 0
+  ingestion_rate: 1000000000
+  ingestion_burst_size: 1000000000
+
+blocks_storage:
+  backend: filesystem
+  bucket_store:
+    sync_dir: /data/tsdb-sync
+  filesystem:
+    dir: /data/blocks
+  tsdb:
+    dir: /data/ingester
+
+compactor:
+  data_dir: /data/compactor
+  sharding_ring:
+    kvstore:
+      store: memberlist
+
+distributor:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: memberlist
+
+ingester:
+  instance_limits:
+    max_ingestion_rate: 0
+    max_series: 0
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: memberlist
+    replication_factor: 1
+
+ruler_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/rules
+
+server:
+  http_listen_port: 9009
+  log_level: error
+
+store_gateway:
+  sharding_ring:
+    replication_factor: 1

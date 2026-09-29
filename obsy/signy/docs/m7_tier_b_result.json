@@ -1,0 +1,132 @@
+{
+  "_retired": {
+    "status": "RETIRED 2026-07-29 — do not cite any value in this file as an engine result.",
+    "why": "Produced by the original src/bin/load.rs: one connection, one request in flight, Connection: close per request, latency timed from the actual send rather than the intended one (uncorrected coordinated omission), one hardcoded label set over padded lines, queries issued inline on the push thread, and rss_peak_bytes read from the harness's own process ID rather than the server's.",
+    "kept_because": "It is the only checked-in evidence of those defects — see offered_eps against achieved_eps, the sample counts in the *_latency_ms blocks, and rss_peak_bytes passed against a 4 GiB target. docs/VISION.md cites it as exactly that.",
+    "disagrees_with": "docs/M7_LOAD_RESULTS.md describes a FAIL at build 782e7ff. This file is a later run: build d2f2c4f, verdict PASS. Neither describes the other.",
+    "note": "scripts/run_load_local.sh writes this path by default, so a rerun replaces this header along with the data. That is correct: a regenerated artifact is not a retired one.",
+    "see": ["docs/VISION.md", "docs/M7_LOAD_RESULTS.md", "todo.md M8"]
+  },
+  "achieved_eps": 478.0021100678179,
+  "ack_latency_ms": {
+    "count": 167,
+    "p50_ms": 209.86274999999998,
+    "p95_ms": 248.69845800000002,
+    "p99_ms": 257.056208
+  },
+  "ack_warmup_latency_ms": {
+    "count": 49,
+    "p50_ms": 209.786458,
+    "p95_ms": 216.840666,
+    "p99_ms": 249.686916
+  },
+  "behavioral": {
+    "cache_healthy_end": true,
+    "flush_progressing": true,
+    "flush_success_delta": 16,
+    "no_ingest_errors": true,
+    "recovered_flush_errors": 3,
+    "recovered_merge_errors": 0,
+    "remote_healthy_end": true,
+    "restore_errors": 0,
+    "restore_observed": false,
+    "retention_observed": true,
+    "wal_backlog_bounded": true
+  },
+  "behavioral_pass": true,
+  "build_revision": "d2f2c4f",
+  "duration_seconds": 45,
+  "events": 21600,
+  "eviction_delta": 15,
+  "flush_errors_delta": 3,
+  "ingest_errors_delta": 0,
+  "machine_profile": "Darwin arm64; 8 logical CPUs; 16 GiB RAM (developer laptop, not 4-vCPU/16-GiB reference)",
+  "merge_errors_delta": 0,
+  "metric_errors": 0,
+  "metric_latency_ms": {
+    "count": 8,
+    "p50_ms": 39.73458299999999,
+    "p95_ms": 65.35725000000001,
+    "p99_ms": 65.35725000000001
+  },
+  "metric_queries": 10,
+  "numeric_pass": true,
+  "offered_eps": 3000,
+  "otlp_errors": 0,
+  "otlp_requests": 10,
+  "push_errors": 0,
+  "pushes": 216,
+  "queries": 10,
+  "query_errors": 0,
+  "query_latency_ms": {
+    "count": 8,
+    "p50_ms": 16.502917,
+    "p95_ms": 70.852666,
+    "p99_ms": 70.852666
+  },
+  "restore_errors_delta": 0,
+  "restore_probe_latency_ms": {
+    "count": 8,
+    "p50_ms": 11.738541999999999,
+    "p95_ms": 17.750291,
+    "p99_ms": 17.750291
+  },
+  "restore_probes": 8,
+  "restore_success_delta": 0,
+  "retention_errors_delta": 4,
+  "retention_success_delta": 5,
+  "rss_peak_bytes": 4440064,
+  "seed": 1592598566,
+  "targets": {
+    "ack_p95": {
+      "measured": 248.69845800000002,
+      "pass": true,
+      "target": 250.0
+    },
+    "ack_p99": {
+      "measured": 257.056208,
+      "pass": true,
+      "target": 1000.0
+    },
+    "error_rate": {
+      "measured": 0.0,
+      "pass": true,
+      "target": 0.0
+    },
+    "query_p95": {
+      "measured": 70.852666,
+      "pass": true,
+      "target": 2000.0
+    },
+    "rss_peak_bytes": {
+      "measured": 4440064.0,
+      "pass": true,
+      "target": 4294967296.0
+    },
+    "wal_backlog_bytes": {
+      "measured": 1671149.0,
+      "pass": true,
+      "target": 16777216.0
+    }
+  },
+  "tempo_errors": 0,
+  "tempo_latency_ms": {
+    "count": 8,
+    "p50_ms": 1.082458,
+    "p95_ms": 1.158,
+    "p99_ms": 1.158
+  },
+  "tempo_searches": 10,
+  "terminal_gauges": {
+    "memtable_bytes": 1638400,
+    "memtable_entries": 1600,
+    "merge_debt_parts": 4,
+    "part_bytes": 97483,
+    "part_count": 3,
+    "trace_part_count": 4,
+    "wal_backlog_bytes": 1671149
+  },
+  "tier": "B",
+  "verdict": "PASS",
+  "warmup_seconds": 10
+}

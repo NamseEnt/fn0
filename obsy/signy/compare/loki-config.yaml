@@ -1,0 +1,125 @@
+# Loki 3.3.2, single binary, local filesystem storage.
+#
+# The rule this file is written under: **Loki must not lose because it was
+# misconfigured.** Every setting below is either a compatibility requirement
+# (the bed cannot run without it) or a deliberate removal of a limit that
+# signy does not apply either. Everything that is a tuning choice is left
+# at Loki's own default, because it is their engine and their tuning.
+#
+# `compare/run.sh` captures `GET /config?mode=diff` from the running process
+# into the result JSON, so the published comparison shows the deviations as
+# Loki itself reports them rather than as this file claims them.
+
+# Compatibility: the harness sends `X-Scope-OrgID` on every request to Loki.
+# This is Loki's default. signy no longer reads a header on a write at all --
+# its tenant is the `tenant.id` resource attribute inside the export -- so the
+# harness stamps one or sends the other depending on the target, and the two
+# beds are no longer byte-identical on the wire. What is *stored* still is:
+# signy strips the attribute before storage.
+auth_enabled: true
+
+server:
+  # Compatibility: the container has to be reachable from the harness.
+  http_listen_address: 0.0.0.0
+  http_listen_port: 3100
+  grpc_listen_port: 9095
+  # Deviation. Default is `info`, which at the offered rate writes a line per
+  # request and turns the log into a second workload. signy is at its own
+  # default here, which is quiet.
+  log_level: warn
+  # Compatibility, measured on 2026-08-02: at limit 20000 a `label_only`
+  # answer's internal querier-to-frontend result frame is 4,233,058 bytes —
+  # 1% over the 4 MiB default — and Loki's querier then cannot deliver a
+  # query it has already finished ("received message larger than max"), so
+  # the client sees a 504 at the HTTP timeout. The OTLP migration pushed the
+  # frame over the line because the promoted semconv label names
+  # (`service_name`, `deployment_environment`, ...) are repeated per stream
+  # in the response, and one stream per structured-metadata combination
+  # means thousands of repetitions. Raised so Loki can answer at all; this
+  # helps Loki, not its competitors.
+  grpc_server_max_recv_msg_size: 104857600
+  grpc_server_max_send_msg_size: 104857600
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  # Compatibility: one process, so one replica and an in-process ring.
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+# Loki 3.x's own recommended schema: TSDB index, v13, 24h index period.
+# v13 is also a compatibility requirement — the corpus carries structured
+# metadata, which Loki only accepts on v13 + TSDB.
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # Deviation, and the most important one. signy applies **no per-tenant
+  # ingest rate by default** (`default_tenant_ingest_bytes_per_second: None` in
+  # `src/config.rs`), so leaving Loki's 4 MB/s per tenant in place would
+  # throttle one system where the other is unthrottled and the ingest column
+  # would be measuring this file. Set far above anything the bed offers.
+  ingestion_rate_mb: 1024
+  ingestion_burst_size_mb: 2048
+  # Same reason, per stream. signy has no per-stream rate at all.
+  per_stream_rate_limit: 512MB
+  per_stream_rate_limit_burst: 1024MB
+  # Deviation. signy's `default_tenant_max_streams` is `None` (unbounded).
+  # The corpus is 256 streams over 4 tenants, so Loki's 5000-per-tenant global
+  # default would not have bound — this is removed so that the two systems
+  # refuse cardinality at the same point (neither of them) rather than so that
+  # a number moves.
+  max_streams_per_user: 0
+  max_global_streams_per_user: 0
+  # Deviation, matched to signy's equivalents rather than raised past
+  # them: `max_log_limit` is 100_000 and `max_metric_series` is 100_000. Loki's
+  # defaults are 5_000 and 500. The harness asks for 100 rows, so neither binds
+  # in this run; they are set so that a query one system answers cannot be
+  # refused by the other's limit.
+  max_entries_limit_per_query: 100000
+  max_query_series: 100000
+  # Default, stated because the corpus deliberately contains late arrivals.
+  # signy's `max_timestamp_age` is 7 days and Loki's
+  # `reject_old_samples_max_age` default is 1w — the same window, so both
+  # systems accept and reject exactly the same entries. The harness's late
+  # fraction reaches 30 s behind the clock, far inside both.
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  # Default on v13 + TSDB. Stated because the corpus carries structured
+  # metadata on every entry and a run where one system stored it and the other
+  # dropped it would not be comparing the same bytes.
+  allow_structured_metadata: true
+  # Default (`true` since 2.4). Stated because the corpus is deliberately
+  # unsorted within a push: `entry_spread_ms` jitters every entry backwards and
+  # `late_fraction` puts 2% of them up to 30 s behind. With this off, Loki
+  # would reject what signy accepts and the comparison would be of two
+  # different corpora.
+  unordered_writes: true
+
+compactor:
+  working_directory: /loki/compactor
+  # Deviation: 10m -> 1m. This is a *settling* change, not a tuning one. The
+  # bytes-on-disk axis is measured after both systems settle, and signy's
+  # merge runs every 30 s by default. At Loki's 10m default the index would
+  # still be uncompacted when the run ends, and Loki's disk number would be an
+  # artefact of the run being shorter than one compaction interval. This makes
+  # the axis measurable inside a run that takes minutes; it costs Loki some CPU
+  # and memory during settling, which is the honest trade and is disclosed.
+  compaction_interval: 1m
+
+# Deviation: Loki reports usage statistics to grafana.com by default. A
+# comparison bed should not depend on, or generate, outbound traffic.
+analytics:
+  reporting_enabled: false

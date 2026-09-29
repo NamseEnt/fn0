@@ -1,0 +1,5 @@
+SIGNY_OTLP_GRPC_ADDR=0.0.0.0:4317
+SIGNY_DATA_DIR=/var/lib/signy
+SIGNY_LISTEN_ADDR=0.0.0.0:3100
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+

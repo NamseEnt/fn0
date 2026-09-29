@@ -1,0 +1,62 @@
+[package]
+name = "collecty"
+version = "0.1.0"
+edition = "2024"
+autobenches = false
+
+[lib]
+name = "collecty"
+path = "src/lib.rs"
+
+[[bin]]
+name = "collecty"
+path = "src/main.rs"
+
+[features]
+default = []
+# The arena instrument of `src/memprof.rs`. Default off: with it off the
+# guards compile to nothing and the process keeps whatever allocator the
+# build selected.
+memprof = []
+# mimalloc as the global allocator. Orthogonal to `memprof` on purpose -- with
+# both on, the tagging wrapper sits over mimalloc, so attribution and the
+# shipped memory system are the same experiment rather than two.
+mimalloc = ["dep:mimalloc"]
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "signal", "process", "io-util"] }
+http = "1"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["client", "server", "http1"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "http1", "tokio"] }
+hyper-rustls = { version = "=0.27.7", default-features = false, features = ["webpki-roots", "http1", "ring", "tls12"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+bytes = "1"
+libc = "0.2"
+prost = "0.14.4"
+opentelemetry-proto = { version = "0.32.0", default-features = false, features = ["gen-tonic-messages", "logs", "metrics"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+parking_lot = "0.12"
+crc32fast = "1"
+memmap2 = "0.9"
+zstd = "0.13"
+mimalloc = { version = "0.1", default-features = false, optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+criterion = { version = "0.8.2", default-features = false, features = ["cargo_bench_support"] }
+opentelemetry-proto = { version = "0.32.0", features = ["gen-tonic", "logs", "trace", "metrics"] }
+rcgen = "0.14"
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+
+[[bench]]
+name = "queue"
+harness = false
+
+[[bench]]
+name = "wire"
+harness = false
