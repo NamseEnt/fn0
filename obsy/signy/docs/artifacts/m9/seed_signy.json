@@ -1,0 +1,113 @@
+{
+  "config": {
+    "cgroup_path": "/sys/fs/cgroup/system.slice/docker-c87c24cac0a12607073bcc99249bc4ff373a6ae44413f6fa9ad897322cb0e04b.scope",
+    "corpus_rows": 50000,
+    "duration_seconds": 60,
+    "entries_per_push": 100,
+    "entry_spread_ms": 250,
+    "heavy_limit": 20000,
+    "heavy_window_seconds": 3600,
+    "http_address": "127.0.0.1:3110",
+    "ingest_connections": 8,
+    "json_weight": 5,
+    "labels_per_stream": 6,
+    "late_fraction": 0.02,
+    "late_max_ms": 30000,
+    "logfmt_weight": 2,
+    "metadata_pairs": 2,
+    "otlp_address": "127.0.0.1:4317",
+    "otlp_eps": 5.0,
+    "phase": "seed",
+    "plain_weight": 3,
+    "query_connections": 4,
+    "query_eps": 5.0,
+    "query_limit": 100,
+    "query_weights": [
+      3,
+      3,
+      3,
+      2,
+      1,
+      0
+    ],
+    "query_window_seconds": 60,
+    "request_timeout_seconds": 60,
+    "restore_lookback_seconds": 60,
+    "result_path": "/home/namse/obsy/signy/target/compare/seed_signy.json",
+    "sample_interval_ms": 1000,
+    "seed": 1592598566,
+    "server_pid": null,
+    "streams": 256,
+    "streams_per_push": 4,
+    "target": "signy",
+    "target_eps": 3000.0,
+    "target_events": 0,
+    "targets": {
+      "max_error_rate": 0.0,
+      "max_throttled_rate": 0.05,
+      "min_backlog_samples": 8,
+      "push_response_p95_ms": 250.0,
+      "push_response_p99_ms": 1000.0,
+      "query_response_p95_ms": 2000.0,
+      "rss_max_bytes": 4294967296,
+      "wal_backlog_max_bytes": 1073741824
+    },
+    "tenants": 4,
+    "tier": "B",
+    "verify": {
+      "anchor_ns": 1787016850000000000,
+      "entries_per_push": 100,
+      "labels_per_stream": 6,
+      "limit": 20000,
+      "push_connections": 4,
+      "repeats": 5,
+      "rows": 150000,
+      "step_ns": 1000000,
+      "step_seconds": 10,
+      "streams": 32,
+      "tenant_prefix": "verify-tenant",
+      "windows": 3
+    },
+    "warmup_seconds": 10
+  },
+  "memory": {
+    "anon_bytes_end": 323768320,
+    "anon_peak_bytes": 327192576,
+    "current_bytes": 605806592,
+    "error": null,
+    "file_bytes_end": 92913664,
+    "peak_bytes": 1100193792,
+    "peak_bytes_before": 1100193792,
+    "source": "/sys/fs/cgroup/system.slice/docker-c87c24cac0a12607073bcc99249bc4ff373a6ae44413f6fa9ad897322cb0e04b.scope/memory.peak"
+  },
+  "phase": "seed",
+  "run": {
+    "build_revision": "e79e78c",
+    "machine_profile": "6.12.57+deb13-amd64; 12 logical CPUs; 31.3 GiB RAM",
+    "seed": 1592598566
+  },
+  "seed": {
+    "complete": true,
+    "elapsed_seconds": 4.90056181,
+    "errors": 0,
+    "first_error": null,
+    "line_bytes": 49029829,
+    "pushes": 1504,
+    "retries": 0,
+    "rows": 150000,
+    "statuses": {
+      "200": 1504
+    },
+    "wire_bytes": 63003360
+  },
+  "target": "signy",
+  "verdict": "PASS",
+  "verify": {
+    "anchor_ns": 1787016850000000000,
+    "line_bytes": 49029829,
+    "rows": 150000,
+    "span_ns": 150000000000,
+    "streams": 32,
+    "tenant": "verify-tenant-000"
+  }
+}

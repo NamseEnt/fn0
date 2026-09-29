@@ -197,7 +197,7 @@ export class Fn0OpsConsole extends pulumi.ComponentResource {
         name: pulumi.interpolate`fn0 ops console ${args.suffix}`,
         domain: args.hostname,
         type: "self_hosted",
-        sessionDuration: "24h",
+        sessionDuration: "720h",
         allowedIdps: [oneTimePinId],
         autoRedirectToIdentity: true,
         policies: [

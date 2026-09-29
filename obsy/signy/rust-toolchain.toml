@@ -1,0 +1,10 @@
+# Pinned here rather than inside the CI workflow so that the toolchain which
+# gates a pull request is the same one `cargo` selects on a developer's machine.
+# A version pinned only in the workflow gates nothing locally, and the first
+# symptom of the drift is a clippy failure nobody can reproduce.
+#
+# Edition 2024 needs >= 1.85; this is the version the tree is developed against
+# and the one every check in `../../.github/workflows/signy.yml` was verified under.
+[toolchain]
+channel = "1.92.0"
+components = ["rustfmt", "clippy"]

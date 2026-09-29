@@ -1,0 +1,9 @@
+# The image build copies `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` and
+# `src`; everything else is only build context to ship over to the daemon, and
+# `target/` alone is tens of gigabytes.
+target
+docs
+compare
+scripts
+deploy
+todo.md

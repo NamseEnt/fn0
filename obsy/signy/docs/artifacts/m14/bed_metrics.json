@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-08-27T02:45:10Z",
+  "revision": "91a1495",
+  "branch": "master",
+  "machine": "Linux 6.12.57+deb13-amd64; 12 logical CPUs; 31.3 GiB RAM",
+  "docker": "29.1.3",
+  "compose": "5.0.1",
+  "victoriametrics_image": "victoriametrics/victoria-metrics:v1.150.0",
+  "targets": ["signy","victoriametrics"],
+  "memory_limit": "2g",
+  "settle_seconds": 60,
+  "metric_anchor_ns": 1787793720000000000,
+  "metric_scrapes": 360,
+  "metric_scrape_seconds": 10,
+  "object_store": "none: every system is on its local filesystem",
+  "peak_bytes": {
+    "signy": { "ingest": 1081638912, "query": 192430080, "churn": 1081638912, "oom_killed": false },
+    "victoriametrics": { "ingest": 687702016, "query": 144551936, "churn": 687702016, "oom_killed": false }
+  },
+  "churn_survival": {
+    "signy": { "survived": true, "oom_killed": false },
+    "victoriametrics": { "survived": true, "oom_killed": false }
+  },
+  "disk_bytes": {
+    "signy": { "settled": 87545770, "after_queries": 87541674 },
+    "victoriametrics": { "settled": 24637710, "after_queries": 43056108 }
+  }
+}

@@ -93,12 +93,25 @@ impl DodbTelemetry {
         })
     }
 
-    pub fn shutdown(&self) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
-        self.provider.shutdown()
-    }
-
     pub async fn force_flush_before_accept(&self, timeout: Duration) -> Result<(), String> {
         force_flush_with_timeout(self.provider.clone(), timeout).await
+    }
+
+    pub async fn shutdown_with_timeout(&self, timeout: Duration) -> Result<(), String> {
+        match tokio::time::timeout(
+            timeout,
+            tokio::task::spawn_blocking({
+                let provider = self.provider.clone();
+                move || provider.shutdown()
+            }),
+        )
+        .await
+        {
+            Ok(Ok(Ok(()))) => Ok(()),
+            Ok(Ok(Err(error))) => Err(error.to_string()),
+            Ok(Err(error)) => Err(error.to_string()),
+            Err(_) => Err(format!("shutdown timed out after {timeout:?}")),
+        }
     }
 }
 
@@ -167,6 +180,25 @@ fn register_counters(meter: &Meter, metrics: ServerMetrics) -> Vec<ObservableCou
         metrics.clone(),
         |snapshot| snapshot.transport_errors,
     ));
+    let transport_event_metrics = metrics.clone();
+    counters.push(
+        meter
+            .u64_observable_counter("dodb.server.transport.events")
+            .with_unit("{event}")
+            .with_callback(move |observer| {
+                for event in transport_event_metrics.snapshot().transport_events {
+                    observer.observe(
+                        event.value,
+                        &[
+                            KeyValue::new("stage", event.stage),
+                            KeyValue::new("reason", event.reason),
+                            KeyValue::new("outcome", event.outcome),
+                        ],
+                    );
+                }
+            })
+            .build(),
+    );
     counters.push(observable_counter(
         meter,
         "dodb.server.application.errors",
@@ -298,9 +330,13 @@ mod tests {
     use std::collections::BTreeMap;
     use std::time::Duration;
 
+    type MetricAttributes = Vec<(String, String)>;
+    type MetricPoint = (MetricAttributes, u64);
+    type ExportedMetrics = BTreeMap<String, Vec<MetricPoint>>;
+
     #[derive(Clone, Default)]
     struct SchemaExporter {
-        points: Arc<Mutex<BTreeMap<String, Vec<(Vec<(String, String)>, u64)>>>>,
+        points: Arc<Mutex<ExportedMetrics>>,
     }
 
     impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for SchemaExporter {
@@ -417,6 +453,18 @@ mod tests {
         }));
         assert!(points.contains_key("dodb.storage.shards.persisted"));
         assert!(points.contains_key("dodb.storage.shards.open"));
+        assert_eq!(
+            points
+                .get("dodb.server.transport.errors")
+                .expect("transport error baseline")
+                .as_slice(),
+            &[(Vec::new(), 0)]
+        );
+        assert!(
+            points
+                .get("dodb.server.transport.events")
+                .is_none_or(Vec::is_empty)
+        );
         drop(points);
         provider.shutdown().expect("shutdown test meter provider");
     }

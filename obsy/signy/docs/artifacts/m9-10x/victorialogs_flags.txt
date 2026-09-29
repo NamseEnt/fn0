@@ -1,0 +1,1 @@
+-storageDataPath="/victoria-logs-data"

@@ -36,7 +36,7 @@ need npm
 need pulumi
 
 CANARY_DIR="${REPO_ROOT}/ops/canary"
-PROBES=(runtime dodb storage)
+PROBES=(runtime dodb dodb-write storage)
 PROBE_ATTEMPTS=30
 PROBE_RETRY_SECONDS=5
 
@@ -97,15 +97,17 @@ echo "   without the service token: ${unguarded_status}"
 for probe in "${PROBES[@]}"; do
   answer=""
   for attempt in $(seq 1 "$PROBE_ATTEMPTS"); do
-    answer="$(curl -sS -H @"$access_headers_file" -w ' %{http_code}' \
+    answer="$(curl -sS -H @"$access_headers_file" -w $'\n%{http_code}' \
       "https://${canary_hostname}/api/${probe}" || true)"
-    if [[ "$answer" == '{"ok":true} 200' ]]; then
+    response_body="${answer%$'\n'*}"
+    response_status="${answer##*$'\n'}"
+    if [[ "$response_status" == "200" ]] && jq -e '.ok == true' <<<"$response_body" >/dev/null 2>&1; then
       break
     fi
     # A fresh deploy reaches the worker on its next manifest poll.
     sleep "$PROBE_RETRY_SECONDS"
   done
-  if [[ "$answer" != '{"ok":true} 200' ]]; then
+  if [[ "$response_status" != "200" ]] || ! jq -e '.ok == true' <<<"$response_body" >/dev/null 2>&1; then
     probe_failed "/api/${probe} answered: ${answer} after ${attempt} attempts"
   fi
   echo "   /api/${probe}: ok"

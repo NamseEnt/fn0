@@ -22,6 +22,20 @@ down. The browser only ever talks to the ops Worker; the Worker holds the
 Signy and canary credentials and sends only the fixed queries in
 `ops/console/src`.
 
+## DODB transport telemetry
+
+`dodb.server.transport.errors` counts actionable QUIC transport failures only.
+Expected peer closes, resets, stopped streams, incomplete client headers, and
+idle connection timeouts are excluded. `dodb.server.transport.events` records
+the bounded `stage`, `reason`, and `outcome` diagnostic combinations, including
+benign disconnects. Diagnostic series are emitted only after that event occurs;
+the aggregate error counter still exports a zero baseline at startup.
+
+The earlier `transport.errors` total of 10 was collected before this meaning
+was introduced and combined normal disconnects with actionable failures. It
+must not be compared with post-restart totals. Reclassify only events observed
+by the new process and distinguish restart warm-up from steady-state traffic.
+
 ## Canary
 
 `ops/canary` is an ordinary Forte app deployed as project `1lmlydc3` at
@@ -33,15 +47,36 @@ limit and make the console report a false outage.
 |---|---|---|
 | `/api/runtime` | Cloudflare → NLB → worker-proxy → worker → routing → bundle → wasm | `{"ok":true}` |
 | `/api/dodb` | the runtime path + `DocDbHijack` → dodb | reads pk `fn0-ops-canary/known-value`, sk `health`, expects `fn0-canary-v1` |
+| `/api/dodb-write` | the runtime path + `DocDbHijack` → dodb | observes one fixed state row; OCC permits an actual mutation at most once every five minutes, and a mutation is followed by exact readback |
 | `/api/storage` | the runtime path + `ObjectStorageHijack` → project private R2 bucket | reads `canary/known-object-v1.txt`, expects `fn0-canary-v1\n` |
 
 The runtime probe has no dependency on the known dodb or storage values. A
 non-success runtime response means the fn0 serving path is down; dodb and
 storage are then unknown because their probes use that same path.
 
-A probe that finds a problem answers 503 `{"ok":false,"failure":"missing" |
-"mismatch" | "unavailable"}` and changes nothing. Only the admin task
-`seed_known_values` writes the known values, and only
+The runtime, dodb read, and storage probes do not change state. The dodb write
+probe maintains one fixed row in the canary project's DODB write-health
+partition. It stores a format version, the last write timestamp, and a random
+nonce. `/api/live` may call `/api/dodb-write` on its approximately 12-second
+refresh cycle; the canary's OCC transaction limits actual mutations to at most
+one every five minutes across concurrent requests and Worker isolates. Calls
+within that interval return cached success after observing the row. A new
+mutation is followed by an exact readback of the version, timestamp, and nonce.
+This checks that a current DODB mutation and subsequent read path are
+functioning; it is not an independent durability or fsync verification.
+
+The write health can therefore take up to about five minutes to detect a write
+path failure after a successful write. Failures while reading the OCC state or
+reading back a new write are detected by that invocation. The fixed state row
+count is one. In the 2026-09-29 production canary check, the actual write-health
+mutation added about 8,380 B to the canary shard WAL; cached invocations added
+0 B. At one mutation per five minutes, a simple linear estimate is about
+2.41 MB of WAL per day. This is a single-mutation operating estimate, not a
+long-term WAL forecast.
+
+A probe that finds a problem answers 503 with a bounded failure such as
+`missing`, `mismatch`, `unavailable`, `write_failed`, or `read_failed`. Only
+the admin task `seed_known_values` writes the known read-probe values, and only
 `scripts/bootstrap-fn0-ops-canary.sh` runs it. The script exits 1 for a
 bootstrap failure and 2 when the bootstrap succeeded but a probe then failed.
 
@@ -135,7 +170,13 @@ Capacity is `degraded` when the last five minutes saw a `queue_full` or
 ## Deployment
 
 The console is the `fn0-ops-console-u35twkcf` Cloudflare Worker. Build and
-check it locally, then preview and deploy only its script from `infra/cloud`:
+check it locally, then review the full production preview. The previously
+scoped final rollout has two intentional CustomResource changes: create the `analytics-read-token`
+Cloudflare AccountToken with the account-scoped `Account Analytics Read`
+permission, and update the Ops Console WorkersScript. The account token is
+passed to the Worker only as the secret `CLOUDFLARE_ANALYTICS_API_TOKEN`
+binding. The token-minting credential is used by Pulumi to create the
+AccountToken and is never a Worker binding.
 
 ```sh
 cd ops/console
@@ -144,20 +185,28 @@ npm test
 npx tsc --noEmit
 npm run build
 cd ../../infra/cloud
-pulumi preview --diff --target 'urn:pulumi:prod::fn0Cloud::pkg:index:fn0-ops-console$cloudflare:index/workersScript:WorkersScript::script'
-pulumi up --yes --target 'urn:pulumi:prod::fn0Cloud::pkg:index:fn0-ops-console$cloudflare:index/workersScript:WorkersScript::script'
+pulumi preview --refresh --diff
 ```
 
-Review the targeted preview and confirm that it contains only the Worker
-script before applying it. Production has unrelated Pulumi drift; do not run
-an untargeted `pulumi up` or use `--target-dependents`. The Worker serves the
-static UI and API behind the same Cloudflare Access and JWT checks. Its
-Signy and canary service credentials stay in Worker bindings and never go to
-the browser.
+Read the exact AccountToken and WorkersScript URNs from the current preview or
+Pulumi state, then run a targeted preview containing only those two targets.
+Apply only after it shows one token create and one Worker script update, with
+no other resource actions. Do not run an untargeted `pulumi up` or use
+`--target-dependents`. The accepted R2 event notification `missing ID` state
+identity drift is excluded from both targets and must not be applied, deleted,
+recreated, or removed from state. The Worker serves the static UI and API
+behind the same Cloudflare Access and JWT checks. Signy and canary service
+credentials remain in their existing bindings and never go to the browser.
+
+The AccessApplication session duration is a separate change: its configured
+duration is moving from `24h` to `720h`. This produces an AccessApplication
+update and is not part of the two-resource token-and-Worker target unless that
+change is separately approved for application.
 
 The canary source and its known dodb/storage values are deployed or restored
 with `scripts/bootstrap-fn0-ops-canary.sh`. The script is idempotent and
-checks all three probes through the protected hostname.
+checks all four probes through the protected hostname: runtime, dodb read,
+dodb write, and storage.
 
 ## Production verification record
 
@@ -202,8 +251,8 @@ rejections were not induced.
   degraded based on runtime and other components; Signy being unavailable
   does not by itself mean fn0 is down.
 - Production Pulumi drift remains outside this console deployment. Apply
-  future console updates only through the targeted Worker script procedure
-  above.
+  future console updates only through the targeted AccountToken and Worker
+  script procedure above.
 
 ## Known Pulumi drift
 
@@ -237,7 +286,7 @@ answers 200 with `"telemetry": "unavailable"` and `null` numbers, never zeros.
 
 | Route | Answers |
 |---|---|
-| `/api/live` | the health state, each component, the three canary probes, Signy readiness, telemetry freshness, worker instances, rejections in the last 5 minutes |
+| `/api/live` | the health state, each component, runtime/dodb-read/dodb-write/storage canary results, Signy readiness, telemetry freshness, worker instances, rejections in the last 5 minutes |
 | `/api/overview?window=` | invocations by outcome, 504s, rejections by reason, the two ratios, p50/p95/p99, instance CPU budget exceeded |
 | `/api/series?window=` | the same, per step |
 | `/api/errors?window=` | up to 50 newest `ERROR` log records from the platform tenant |

@@ -14,7 +14,7 @@ use dodb_service::{
 };
 use dodb_storage::FaultInjector;
 use quinn::rustls::pki_types::CertificateDer;
-use quinn::{ClientConfig as QuinnClientConfig, Endpoint};
+use quinn::{ClientConfig as QuinnClientConfig, Endpoint, VarInt};
 use rcgen::generate_simple_self_signed;
 
 struct TestTls {
@@ -239,6 +239,71 @@ async fn abruptly_disconnect(
     }
     connection.close(quinn::VarInt::from_u32(0), b"abrupt test disconnect");
     endpoint.close(quinn::VarInt::from_u32(0), b"abrupt test disconnect");
+}
+
+#[tokio::test]
+async fn peer_close_and_stream_reset_are_diagnostic_not_actionable_transport_errors() {
+    let directory = tempfile::tempdir().unwrap();
+    let tls = test_tls();
+    let (server, task) = start_server(directory.path().to_owned(), &tls).await;
+
+    abruptly_disconnect(&server, &tls, None).await;
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            if !server.metrics().snapshot().transport_events.is_empty() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("peer close diagnostic event");
+
+    let mut endpoint = Endpoint::client("0.0.0.0:0".parse().unwrap()).unwrap();
+    let mut roots = quinn::rustls::RootCertStore::empty();
+    roots
+        .add(CertificateDer::from(tls.certificate.clone()))
+        .unwrap();
+    endpoint.set_default_client_config(
+        QuinnClientConfig::with_root_certificates(Arc::new(roots)).unwrap(),
+    );
+    let connection = endpoint
+        .connect(server.local_addr().unwrap(), "localhost")
+        .unwrap()
+        .await
+        .unwrap();
+    let (mut send, _receive) = connection.open_bi().await.unwrap();
+    send.reset(VarInt::from_u32(7)).unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            if server
+                .metrics()
+                .snapshot()
+                .transport_events
+                .iter()
+                .any(|event| event.reason == "peer_reset" && event.outcome == "benign")
+            {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("peer stream reset diagnostic event");
+
+    let snapshot = server.metrics().snapshot();
+    assert_eq!(snapshot.transport_errors, 0);
+    assert!(
+        snapshot
+            .transport_events
+            .iter()
+            .all(|event| event.outcome == "benign")
+    );
+    connection.close(VarInt::from_u32(0), b"test complete");
+    endpoint.close(VarInt::from_u32(0), b"test complete");
+    server.close();
+    task.await.unwrap().unwrap();
 }
 
 #[tokio::test]

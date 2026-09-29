@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["fn0/*", "forte/*", "doc-db", "object-storage", "dodb/crates/*"]
-exclude = ["vendor", "forte/rs-to-ts", "fn0/control"]
+exclude = ["vendor", "forte/rs-to-ts", "fn0/control", "obsy/signy", "obsy/collecty"]
 
 # deno_core is vendored because the upstream crate serializes the snapshot
 # module map in HashMap iteration order, which differs between processes and

@@ -21,6 +21,11 @@ pub const REQUEST_OPERATIONS: [(&str, usize); 6] = [
 ];
 
 const REQUEST_LATENCY_BUCKET_COUNT: usize = REQUEST_LATENCY_BUCKETS_SECONDS.len() + 1;
+const TRANSPORT_STAGE_COUNT: usize = 5;
+const TRANSPORT_REASON_COUNT: usize = 14;
+const TRANSPORT_OUTCOME_COUNT: usize = 2;
+const TRANSPORT_EVENT_COUNT: usize =
+    TRANSPORT_STAGE_COUNT * TRANSPORT_REASON_COUNT * TRANSPORT_OUTCOME_COUNT;
 
 use dodb_core::{
     Error, ObservedState, RevisionState, ShardId, TenantId, TransactionCondition,
@@ -39,8 +44,165 @@ use dodb_storage::{
     DatabaseConfig, FaultInjector, InvariantReport, ProductionFile,
 };
 use quinn::rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use quinn::{Connection, Endpoint, Incoming, ServerConfig as QuinnServerConfig, VarInt};
+use quinn::{
+    Connection, ConnectionError, Endpoint, Incoming, ReadError, ReadExactError,
+    ServerConfig as QuinnServerConfig, VarInt, WriteError,
+};
 use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TransportStage {
+    Handshake,
+    AcceptStream,
+    ReadHeader,
+    WriteResponse,
+    FinishResponse,
+}
+
+impl TransportStage {
+    const ALL: [Self; TRANSPORT_STAGE_COUNT] = [
+        Self::Handshake,
+        Self::AcceptStream,
+        Self::ReadHeader,
+        Self::WriteResponse,
+        Self::FinishResponse,
+    ];
+
+    const fn index(self) -> usize {
+        match self {
+            Self::Handshake => 0,
+            Self::AcceptStream => 1,
+            Self::ReadHeader => 2,
+            Self::WriteResponse => 3,
+            Self::FinishResponse => 4,
+        }
+    }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Handshake => "handshake",
+            Self::AcceptStream => "accept_stream",
+            Self::ReadHeader => "read_header",
+            Self::WriteResponse => "write_response",
+            Self::FinishResponse => "finish_response",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TransportReason {
+    ApplicationClosed,
+    LocallyClosed,
+    TimedOut,
+    Reset,
+    ConnectionClosed,
+    TransportError,
+    VersionMismatch,
+    CidsExhausted,
+    PeerReset,
+    PeerStopped,
+    PeerFinishedEarly,
+    ClosedStream,
+    ZeroRttRejected,
+    IllegalOrderedRead,
+}
+
+impl TransportReason {
+    const ALL: [Self; TRANSPORT_REASON_COUNT] = [
+        Self::ApplicationClosed,
+        Self::LocallyClosed,
+        Self::TimedOut,
+        Self::Reset,
+        Self::ConnectionClosed,
+        Self::TransportError,
+        Self::VersionMismatch,
+        Self::CidsExhausted,
+        Self::PeerReset,
+        Self::PeerStopped,
+        Self::PeerFinishedEarly,
+        Self::ClosedStream,
+        Self::ZeroRttRejected,
+        Self::IllegalOrderedRead,
+    ];
+
+    const fn index(self) -> usize {
+        match self {
+            Self::ApplicationClosed => 0,
+            Self::LocallyClosed => 1,
+            Self::TimedOut => 2,
+            Self::Reset => 3,
+            Self::ConnectionClosed => 4,
+            Self::TransportError => 5,
+            Self::VersionMismatch => 6,
+            Self::CidsExhausted => 7,
+            Self::PeerReset => 8,
+            Self::PeerStopped => 9,
+            Self::PeerFinishedEarly => 10,
+            Self::ClosedStream => 11,
+            Self::ZeroRttRejected => 12,
+            Self::IllegalOrderedRead => 13,
+        }
+    }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::ApplicationClosed => "application_closed",
+            Self::LocallyClosed => "locally_closed",
+            Self::TimedOut => "timed_out",
+            Self::Reset => "reset",
+            Self::ConnectionClosed => "connection_closed",
+            Self::TransportError => "transport_error",
+            Self::VersionMismatch => "version_mismatch",
+            Self::CidsExhausted => "cids_exhausted",
+            Self::PeerReset => "peer_reset",
+            Self::PeerStopped => "peer_stopped",
+            Self::PeerFinishedEarly => "peer_finished_early",
+            Self::ClosedStream => "closed_stream",
+            Self::ZeroRttRejected => "zero_rtt_rejected",
+            Self::IllegalOrderedRead => "illegal_ordered_read",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TransportOutcome {
+    Benign,
+    Error,
+}
+
+impl TransportOutcome {
+    const fn index(self) -> usize {
+        match self {
+            Self::Benign => 0,
+            Self::Error => 1,
+        }
+    }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Benign => "benign",
+            Self::Error => "error",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct TransportClassification {
+    reason: TransportReason,
+    outcome: TransportOutcome,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ConnectionFailureKind {
+    ApplicationClosed,
+    LocallyClosed,
+    TimedOut,
+    Reset,
+    ConnectionClosed,
+    TransportError,
+    VersionMismatch,
+    CidsExhausted,
+}
 
 #[derive(Debug)]
 pub enum ServerError {
@@ -174,6 +336,7 @@ struct ServerMetricsInner {
     response_bytes: AtomicU64,
     protocol_errors: AtomicU64,
     transport_errors: AtomicU64,
+    transport_events: [AtomicU64; TRANSPORT_EVENT_COUNT],
     application_errors: AtomicU64,
     overloaded_responses: AtomicU64,
     request_latency_nanos: AtomicU64,
@@ -192,6 +355,7 @@ impl Default for ServerMetricsInner {
             response_bytes: AtomicU64::new(0),
             protocol_errors: AtomicU64::new(0),
             transport_errors: AtomicU64::new(0),
+            transport_events: std::array::from_fn(|_| AtomicU64::new(0)),
             application_errors: AtomicU64::new(0),
             overloaded_responses: AtomicU64::new(0),
             request_latency_nanos: AtomicU64::new(0),
@@ -213,11 +377,20 @@ pub struct ServerMetricsSnapshot {
     pub response_bytes: u64,
     pub protocol_errors: u64,
     pub transport_errors: u64,
+    pub transport_events: Vec<TransportEventSnapshot>,
     pub application_errors: u64,
     pub overloaded_responses: u64,
     pub request_latency_nanos: u64,
     pub operations: [u64; 8],
     pub request_latency_buckets: [[u64; REQUEST_LATENCY_BUCKET_COUNT]; 8],
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransportEventSnapshot {
+    pub stage: &'static str,
+    pub reason: &'static str,
+    pub outcome: &'static str,
+    pub value: u64,
 }
 
 impl ServerMetrics {
@@ -232,6 +405,7 @@ impl ServerMetrics {
             response_bytes: inner.response_bytes.load(Ordering::Relaxed),
             protocol_errors: inner.protocol_errors.load(Ordering::Relaxed),
             transport_errors: inner.transport_errors.load(Ordering::Relaxed),
+            transport_events: snapshot_transport_events(inner),
             application_errors: inner.application_errors.load(Ordering::Relaxed),
             overloaded_responses: inner.overloaded_responses.load(Ordering::Relaxed),
             request_latency_nanos: inner.request_latency_nanos.load(Ordering::Relaxed),
@@ -259,6 +433,156 @@ impl ServerMetrics {
             }
         }
         operation_buckets[REQUEST_LATENCY_BUCKETS_SECONDS.len()].fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_transport_event(
+        &self,
+        stage: TransportStage,
+        classification: TransportClassification,
+        error_detail: &str,
+    ) {
+        let TransportClassification { reason, outcome } = classification;
+        self.inner.transport_events[transport_event_index(stage, reason, outcome)]
+            .fetch_add(1, Ordering::Relaxed);
+        if outcome == TransportOutcome::Error {
+            self.inner.transport_errors.fetch_add(1, Ordering::Relaxed);
+            eprintln!(
+                "WARN dodb QUIC transport failure stage={} reason={} error={error_detail}",
+                stage.as_str(),
+                reason.as_str()
+            );
+        }
+    }
+}
+
+fn snapshot_transport_events(inner: &ServerMetricsInner) -> Vec<TransportEventSnapshot> {
+    let mut events = Vec::new();
+    for stage in TransportStage::ALL {
+        for reason in TransportReason::ALL {
+            for outcome in [TransportOutcome::Benign, TransportOutcome::Error] {
+                let value = inner.transport_events[transport_event_index(stage, reason, outcome)]
+                    .load(Ordering::Relaxed);
+                if value > 0 {
+                    events.push(TransportEventSnapshot {
+                        stage: stage.as_str(),
+                        reason: reason.as_str(),
+                        outcome: outcome.as_str(),
+                        value,
+                    });
+                }
+            }
+        }
+    }
+    events
+}
+
+fn transport_event_index(
+    stage: TransportStage,
+    reason: TransportReason,
+    outcome: TransportOutcome,
+) -> usize {
+    (stage.index() * TRANSPORT_REASON_COUNT + reason.index()) * TRANSPORT_OUTCOME_COUNT
+        + outcome.index()
+}
+
+// Quinn reports peer closes and stream cancellation as errors, so classify peer-driven shutdowns as diagnostic events.
+fn classify_connection_error(
+    stage: TransportStage,
+    error: &ConnectionError,
+) -> TransportClassification {
+    let kind = match error {
+        ConnectionError::ApplicationClosed(_) => ConnectionFailureKind::ApplicationClosed,
+        ConnectionError::LocallyClosed => ConnectionFailureKind::LocallyClosed,
+        ConnectionError::TimedOut => ConnectionFailureKind::TimedOut,
+        ConnectionError::Reset => ConnectionFailureKind::Reset,
+        ConnectionError::ConnectionClosed(_) => ConnectionFailureKind::ConnectionClosed,
+        ConnectionError::TransportError(_) => ConnectionFailureKind::TransportError,
+        ConnectionError::VersionMismatch => ConnectionFailureKind::VersionMismatch,
+        ConnectionError::CidsExhausted => ConnectionFailureKind::CidsExhausted,
+    };
+    classify_connection_failure(stage, kind)
+}
+
+fn classify_connection_failure(
+    stage: TransportStage,
+    kind: ConnectionFailureKind,
+) -> TransportClassification {
+    let (reason, outcome) = match kind {
+        ConnectionFailureKind::ApplicationClosed => {
+            (TransportReason::ApplicationClosed, TransportOutcome::Benign)
+        }
+        ConnectionFailureKind::LocallyClosed => {
+            (TransportReason::LocallyClosed, TransportOutcome::Benign)
+        }
+        ConnectionFailureKind::TimedOut
+            if matches!(
+                stage,
+                TransportStage::Handshake | TransportStage::AcceptStream
+            ) =>
+        {
+            (TransportReason::TimedOut, TransportOutcome::Benign)
+        }
+        ConnectionFailureKind::TimedOut => (TransportReason::TimedOut, TransportOutcome::Error),
+        ConnectionFailureKind::Reset => (TransportReason::Reset, TransportOutcome::Benign),
+        ConnectionFailureKind::ConnectionClosed => {
+            (TransportReason::ConnectionClosed, TransportOutcome::Error)
+        }
+        ConnectionFailureKind::TransportError => {
+            (TransportReason::TransportError, TransportOutcome::Error)
+        }
+        ConnectionFailureKind::VersionMismatch => {
+            (TransportReason::VersionMismatch, TransportOutcome::Error)
+        }
+        ConnectionFailureKind::CidsExhausted => {
+            (TransportReason::CidsExhausted, TransportOutcome::Error)
+        }
+    };
+    TransportClassification { reason, outcome }
+}
+
+fn classify_read_error(stage: TransportStage, error: &ReadExactError) -> TransportClassification {
+    match error {
+        ReadExactError::FinishedEarly(_) => TransportClassification {
+            reason: TransportReason::PeerFinishedEarly,
+            outcome: TransportOutcome::Benign,
+        },
+        ReadExactError::ReadError(ReadError::Reset(_)) => TransportClassification {
+            reason: TransportReason::PeerReset,
+            outcome: TransportOutcome::Benign,
+        },
+        ReadExactError::ReadError(ReadError::ConnectionLost(error)) => {
+            classify_connection_error(stage, error)
+        }
+        ReadExactError::ReadError(ReadError::ClosedStream) => TransportClassification {
+            reason: TransportReason::ClosedStream,
+            outcome: TransportOutcome::Error,
+        },
+        ReadExactError::ReadError(ReadError::IllegalOrderedRead) => TransportClassification {
+            reason: TransportReason::IllegalOrderedRead,
+            outcome: TransportOutcome::Error,
+        },
+        ReadExactError::ReadError(ReadError::ZeroRttRejected) => TransportClassification {
+            reason: TransportReason::ZeroRttRejected,
+            outcome: TransportOutcome::Error,
+        },
+    }
+}
+
+fn classify_write_error(stage: TransportStage, error: &WriteError) -> TransportClassification {
+    match error {
+        WriteError::Stopped(_) => TransportClassification {
+            reason: TransportReason::PeerStopped,
+            outcome: TransportOutcome::Benign,
+        },
+        WriteError::ConnectionLost(error) => classify_connection_error(stage, error),
+        WriteError::ClosedStream => TransportClassification {
+            reason: TransportReason::ClosedStream,
+            outcome: TransportOutcome::Error,
+        },
+        WriteError::ZeroRttRejected => TransportClassification {
+            reason: TransportReason::ZeroRttRejected,
+            outcome: TransportOutcome::Error,
+        },
     }
 }
 
@@ -346,11 +670,13 @@ async fn serve_connection<S: DodbService + 'static>(
 ) {
     let connection = match incoming.await {
         Ok(connection) => connection,
-        Err(_) => {
-            metrics
-                .inner
-                .transport_errors
-                .fetch_add(1, Ordering::Relaxed);
+        Err(error) => {
+            let classification = classify_connection_error(TransportStage::Handshake, &error);
+            metrics.record_transport_event(
+                TransportStage::Handshake,
+                classification,
+                &error.to_string(),
+            );
             return;
         }
     };
@@ -378,21 +704,46 @@ async fn accept_streams<S: DodbService + 'static>(
 ) {
     loop {
         let stream = match tokio::select! {
-            stream = connection.accept_bi() => stream,
-            _ = connection.closed() => return,
+        stream = connection.accept_bi() => stream,
+            _ = connection.closed() => {
+                if let Some(error) = connection.close_reason() {
+                    let classification =
+                        classify_connection_error(TransportStage::AcceptStream, &error);
+                    metrics.record_transport_event(
+                        TransportStage::AcceptStream,
+                        classification,
+                        &error.to_string(),
+                    );
+                }
+                return;
+            },
         } {
             Ok(stream) => stream,
-            Err(_) => {
-                metrics
-                    .inner
-                    .transport_errors
-                    .fetch_add(1, Ordering::Relaxed);
+            Err(error) => {
+                let classification =
+                    classify_connection_error(TransportStage::AcceptStream, &error);
+                metrics.record_transport_event(
+                    TransportStage::AcceptStream,
+                    classification,
+                    &error.to_string(),
+                );
                 return;
             }
         };
         let stream_permit = match tokio::select! {
             permit = request_slots.clone().acquire_owned() => permit,
-            _ = connection.closed() => return,
+            _ = connection.closed() => {
+                if let Some(error) = connection.close_reason() {
+                    let classification =
+                        classify_connection_error(TransportStage::AcceptStream, &error);
+                    metrics.record_transport_event(
+                        TransportStage::AcceptStream,
+                        classification,
+                        &error.to_string(),
+                    );
+                }
+                return;
+            },
         } {
             Ok(permit) => permit,
             Err(_) => return,
@@ -415,11 +766,13 @@ async fn serve_stream<S: DodbService + 'static>(
     metrics: ServerMetrics,
 ) {
     let mut header_bytes = [0u8; dodb_protocol::HEADER_SIZE];
-    if receive.read_exact(&mut header_bytes).await.is_err() {
-        metrics
-            .inner
-            .transport_errors
-            .fetch_add(1, Ordering::Relaxed);
+    if let Err(error) = receive.read_exact(&mut header_bytes).await {
+        let classification = classify_read_error(TransportStage::ReadHeader, &error);
+        metrics.record_transport_event(
+            TransportStage::ReadHeader,
+            classification,
+            &error.to_string(),
+        );
         return;
     }
     let header = match decode_header(&header_bytes) {
@@ -525,11 +878,24 @@ async fn serve_stream<S: DodbService + 'static>(
             return;
         }
     };
-    if send.write_all(&encoded).await.is_err() || send.finish().is_err() {
-        metrics
-            .inner
-            .transport_errors
-            .fetch_add(1, Ordering::Relaxed);
+    if let Err(error) = send.write_all(&encoded).await {
+        let classification = classify_write_error(TransportStage::WriteResponse, &error);
+        metrics.record_transport_event(
+            TransportStage::WriteResponse,
+            classification,
+            &error.to_string(),
+        );
+        return;
+    }
+    if let Err(error) = send.finish() {
+        metrics.record_transport_event(
+            TransportStage::FinishResponse,
+            TransportClassification {
+                reason: TransportReason::ClosedStream,
+                outcome: TransportOutcome::Error,
+            },
+            &error.to_string(),
+        );
         return;
     }
     metrics
@@ -1075,6 +1441,103 @@ mod tests {
             1
         );
         assert_eq!(snapshot.request_latency_buckets[0][1], 0);
+    }
+
+    #[test]
+    fn transport_classification_separates_disconnects_from_actionable_failures() {
+        let application_closed = classify_connection_error(
+            TransportStage::AcceptStream,
+            &ConnectionError::ApplicationClosed(quinn::ApplicationClose {
+                error_code: VarInt::from_u32(0),
+                reason: bytes::Bytes::new(),
+            }),
+        );
+        assert_eq!(
+            application_closed.reason,
+            TransportReason::ApplicationClosed
+        );
+        assert_eq!(application_closed.outcome, TransportOutcome::Benign);
+
+        let locally_closed =
+            classify_connection_error(TransportStage::Handshake, &ConnectionError::LocallyClosed);
+        assert_eq!(locally_closed.reason, TransportReason::LocallyClosed);
+        assert_eq!(locally_closed.outcome, TransportOutcome::Benign);
+
+        let transport_failure = classify_connection_failure(
+            TransportStage::Handshake,
+            ConnectionFailureKind::TransportError,
+        );
+        assert_eq!(transport_failure.reason, TransportReason::TransportError);
+        assert_eq!(transport_failure.outcome, TransportOutcome::Error);
+
+        let idle_timeout =
+            classify_connection_error(TransportStage::AcceptStream, &ConnectionError::TimedOut);
+        assert_eq!(idle_timeout.reason, TransportReason::TimedOut);
+        assert_eq!(idle_timeout.outcome, TransportOutcome::Benign);
+
+        let active_request_timeout =
+            classify_connection_error(TransportStage::ReadHeader, &ConnectionError::TimedOut);
+        assert_eq!(active_request_timeout.outcome, TransportOutcome::Error);
+    }
+
+    #[test]
+    fn peer_stream_reset_and_stop_are_benign_diagnostic_events() {
+        let read_reset = classify_read_error(
+            TransportStage::ReadHeader,
+            &ReadExactError::ReadError(ReadError::Reset(VarInt::from_u32(7))),
+        );
+        assert_eq!(read_reset.reason, TransportReason::PeerReset);
+        assert_eq!(read_reset.outcome, TransportOutcome::Benign);
+
+        let write_stopped = classify_write_error(
+            TransportStage::WriteResponse,
+            &WriteError::Stopped(VarInt::from_u32(8)),
+        );
+        assert_eq!(write_stopped.reason, TransportReason::PeerStopped);
+        assert_eq!(write_stopped.outcome, TransportOutcome::Benign);
+    }
+
+    #[test]
+    fn transport_metric_labels_are_bounded_and_only_actionable_events_raise_errors() {
+        for stage in TransportStage::ALL {
+            assert!(!stage.as_str().is_empty());
+        }
+        for reason in TransportReason::ALL {
+            assert!(!reason.as_str().is_empty());
+        }
+
+        let metrics = ServerMetrics::default();
+        let benign = TransportClassification {
+            reason: TransportReason::PeerReset,
+            outcome: TransportOutcome::Benign,
+        };
+        metrics.record_transport_event(TransportStage::ReadHeader, benign, "peer reset");
+        assert_eq!(metrics.snapshot().transport_errors, 0);
+
+        let actionable = TransportClassification {
+            reason: TransportReason::TransportError,
+            outcome: TransportOutcome::Error,
+        };
+        metrics.record_transport_event(
+            TransportStage::Handshake,
+            actionable,
+            "bounded test detail",
+        );
+        let snapshot = metrics.snapshot();
+        assert_eq!(snapshot.transport_errors, 1);
+        assert_eq!(snapshot.transport_events.len(), 2);
+        assert!(snapshot.transport_events.iter().any(|event| {
+            event.stage == "read_header"
+                && event.reason == "peer_reset"
+                && event.outcome == "benign"
+                && event.value == 1
+        }));
+        assert!(snapshot.transport_events.iter().any(|event| {
+            event.stage == "handshake"
+                && event.reason == "transport_error"
+                && event.outcome == "error"
+                && event.value == 1
+        }));
     }
 
     #[test]

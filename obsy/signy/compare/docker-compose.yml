@@ -1,0 +1,120 @@
+# The comparison bed: signy, Loki and VictoriaLogs side by side, same
+# machine, same container memory limit, each on local filesystem storage, each
+# with its own volume so disk usage is separately measurable.
+#
+# What is deliberately identical: the memory limit, the storage medium, the
+# absence of a CPU limit, and the fact that both are single-process. What is
+# deliberately *not* identical is the configuration inside each process — each
+# runs at its own defaults, and every deviation from those is documented in
+# `loki-config.yaml` and reproduced into `docs/COMPARISON.md`.
+#
+# Driven by `run.sh`, which is the one-command reproduction.
+
+name: signy-compare
+
+x-memory: &memory
+  # The same number for both, and the number `docs/VISION.md` invariant I says
+  # an operator would also give the engine. Override with COMPARE_MEMORY.
+  mem_limit: ${COMPARE_MEMORY:-2g}
+  # Swap capped at the memory limit means zero swap on cgroup v2, so a process
+  # that wants more than the limit is refused or killed rather than quietly
+  # paging. A comparison in which one system swapped is not a comparison.
+  memswap_limit: ${COMPARE_MEMORY:-2g}
+
+services:
+  signy:
+    <<: *memory
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        SIGNY_BUILD_REVISION: ${SIGNY_BUILD_REVISION:-unknown}
+        SIGNY_BUILD_BRANCH: ${SIGNY_BUILD_BRANCH:-unknown}
+    image: signy-compare:${SIGNY_BUILD_REVISION:-dev}
+    ports:
+      - "${SIGNY_PORT:-3110}:3100"
+    volumes:
+      - signy-data:/var/lib/signy
+    environment:
+      # Local-only, i.e. no object store. Loki's filesystem backend keeps one
+      # durable copy on local disk; pointing signy at a `file://` object
+      # store would keep a local part *and* a remote copy of it, and the
+      # bytes-on-disk axis would be measuring the bed rather than the engine.
+      # Everything else is the engine's own default on purpose — see the
+      # fairness rules in `docs/COMPARISON.md`.
+      SIGNY_LISTEN_ADDR: 0.0.0.0:3100
+      SIGNY_DATA_DIR: /var/lib/signy
+      # Optional emergency cardinality guard. An empty value leaves the
+      # byte-budget admission policy in charge; capacity experiments must not
+      # inherit the old 500,000-series policy cap.
+      SIGNY_MAX_ACTIVE_SERIES: ${SIGNY_MAX_ACTIVE_SERIES:-}
+      # The capacity sweep supplies this only for the disposable Signy probe
+      # mode. Empty is the normal, unchanged runtime behavior.
+      SIGNY_CAPACITY_PROBE: ${SIGNY_CAPACITY_PROBE:-}
+    stop_grace_period: 120s
+
+  loki:
+    <<: *memory
+    image: grafana/loki:3.3.2
+    command: -config.file=/etc/loki/config.yaml
+    ports:
+      - "${LOKI_PORT:-3120}:3100"
+    volumes:
+      - ./loki-config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    stop_grace_period: 120s
+
+  victorialogs:
+    <<: *memory
+    image: victoriametrics/victoria-logs:v1.52.0
+    # The one non-default flag is where the data lives, so the disk axis has a
+    # directory to measure. Everything else runs at VictoriaLogs' own defaults,
+    # captured from its /flags endpoint by run.sh the same way Loki's config is
+    # captured from /config.
+    command: -storageDataPath=/victoria-logs-data
+    ports:
+      - "${VICTORIALOGS_PORT:-3130}:9428"
+    volumes:
+      - victorialogs-data:/victoria-logs-data
+    stop_grace_period: 120s
+
+  # The metrics bed's competitor (M14, issue #8), driven by run_metrics.sh.
+  # Same fairness contract as the log targets: the shared memory limit, one
+  # volume, and the single non-default flag that names where the data lives —
+  # everything else at its own defaults, captured from /flags by the run.
+  victoriametrics:
+    <<: *memory
+    # Profiled so the log bed's `docker compose up -d` does not start a fourth
+    # container on the same cores it is measuring the other three on;
+    # run_metrics.sh opts in with `--profile metrics`.
+    profiles: ["metrics"]
+    image: victoriametrics/victoria-metrics:v1.150.0
+    command: -storageDataPath=/victoria-metrics-data
+    ports:
+      - "${VICTORIAMETRICS_PORT:-3140}:8428"
+    volumes:
+      - victoriametrics-data:/victoria-metrics-data
+    stop_grace_period: 120s
+
+  # Grafana Mimir's monolithic, local-filesystem deployment. It is kept in the
+  # metrics profile so the log comparison does not start an unrelated metrics
+  # process. The image is pinned: a capacity number must identify the server
+  # version it measured.
+  mimir:
+    <<: *memory
+    profiles: ["metrics"]
+    image: grafana/mimir:3.1.4
+    command: -config.file=/etc/mimir/mimir.yaml
+    ports:
+      - "${MIMIR_PORT:-3150}:9009"
+    volumes:
+      - ./mimir-config.yaml:/etc/mimir/mimir.yaml:ro
+      - mimir-data:/data
+    stop_grace_period: 120s
+
+volumes:
+  signy-data:
+  loki-data:
+  victorialogs-data:
+  victoriametrics-data:
+  mimir-data:

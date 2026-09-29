@@ -67,6 +67,7 @@ impl Args {
 
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let args = Args::parse();
     let service = Arc::new(build_service(&args)?);
     let server = Arc::new(build_server(&args, Arc::clone(&service))?);
@@ -94,7 +95,13 @@ async fn main() -> Result<(), BoxError> {
     );
     let result = run_until_shutdown(server).await;
     storage_sampling.abort();
-    telemetry.shutdown()?;
+    let _ = storage_sampling.await;
+    if let Err(error) = telemetry
+        .shutdown_with_timeout(Duration::from_secs(2))
+        .await
+    {
+        eprintln!("dodb telemetry shutdown failed; exiting anyway: {error}");
+    }
     result
 }
 

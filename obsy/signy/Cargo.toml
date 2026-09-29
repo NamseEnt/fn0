@@ -1,0 +1,132 @@
+[package]
+name = "signy"
+version = "0.1.0"
+edition = "2024"
+default-run = "signy"
+# `benches/corpus/` is a shared module, not a bench. Auto-discovery would have
+# to be told that anyway, and every target here is declared below.
+autobenches = false
+
+[lib]
+name = "signy"
+path = "src/lib.rs"
+
+[features]
+default = []
+# Arena-tagged global allocator plus its `/metrics` families, for measuring
+# where resident memory actually goes (`docs/MEMORY_ATTRIBUTION.md`). Off by
+# default and absent from a release build: with it off, `memprof::enter` is an
+# inlined no-op and the process keeps the system allocator.
+memprof = []
+# Build the shipped binary against jemalloc instead of mimalloc. Both are
+# decay-based allocators taken for the same reason -- glibc's retained free
+# crept until the 2 GiB kill -- and which one this engine should ship is a
+# measurement, not a preference, so both stay buildable on the same rig.
+jemalloc = ["dep:tikv-jemallocator", "dep:tikv-jemalloc-ctl", "dep:tikv-jemalloc-sys"]
+# jemalloc with its sampling heap profiler compiled in. Profiling still has to
+# be turned on at run time (`_RJEM_MALLOC_CONF=prof:true`), so the cost of the
+# feature is the build, not the run. This is the one instrument that names the
+# call stack holding memory rather than the size class -- the last question
+# after the gauges have said how much and the bin table has said what size.
+jemalloc-prof = ["jemalloc", "tikv-jemallocator/profiling", "tikv-jemalloc-ctl/profiling"]
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.8", features = ["ws"] }
+bytes = "1"
+prost014 = { package = "prost", version = "0.14.4" }
+# Messages, not services. `gen-tonic` would also generate the OTLP service
+# traits and servers and pull tonic's transport in with them; nothing serves
+# gRPC here — the collect route is the whole ingest surface — so what is wanted
+# is the generated `ExportLogsServiceRequest` and its siblings and nothing
+# else. The module they live under is still called `tonic`.
+opentelemetry-proto = { version = "0.32.0", features = ["gen-tonic-messages", "trace", "logs", "metrics", "with-serde"] }
+regex = "1"
+regex-syntax = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["arbitrary_precision"] }
+sha2 = "0.10"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+crc32fast = "1"
+url = "2"
+chrono = "0.4"
+arrow = { version = "59.1.0", default-features = false }
+parquet = { version = "59.1.0", default-features = false, features = ["arrow", "zstd"] }
+zstd = "0.13"
+roaring = "0.11.4"
+# The only outbound HTTP client in the process. Retention policies arrive by
+# push, so nothing else here calls out.
+object_store = { version = "0.12", features = ["aws"] }
+futures-util = "0.3"
+uuid = { version = "1", features = ["v4"] }
+async-trait = "0.1"
+mimalloc = { version = "0.1", default-features = false }
+# The allocator's own view of what it holds, for the build that actually runs
+# it. `extended` adds FFI declarations only -- it does not change how mimalloc
+# is compiled or how it behaves -- and `mi_process_info` is the one call that
+# tells a production binary apart from a memprof one: what is resident against
+# what the allocator has committed and not given back.
+libmimalloc-sys = { version = "0.1", default-features = false, features = ["extended"] }
+# The other decaying allocator, kept buildable so the two can be compared on
+# one rig rather than argued about. jemalloc held the role from 2026-08-09
+# until mimalloc took it on 2026-08-31, and that swap was never put through a
+# long run. It also answers a question mimalloc cannot: `stats.allocated` is
+# live bytes, which a release-built mimalloc compiles out.
+tikv-jemallocator = { version = "0.6", optional = true }
+tikv-jemalloc-ctl = { version = "0.6", features = ["stats"], optional = true }
+tikv-jemalloc-sys = { version = "0.6", optional = true }
+# The metric catalog is read through a mapping rather than into the heap: a
+# part's rows stay addressable for as long as the part is registered, and page
+# cache the kernel can reclaim is not the same resource as anonymous memory it
+# can only OOM on.
+memmap2 = "0.9"
+# `statvfs`, for the one thing this process measures about the machine under it:
+# how much room is left on the disk the WAL cannot do without.
+libc = "0.2"
+# Locks without poisoning. A panic under a read guard — a Parquet decode, an
+# arithmetic edge — poisons a std lock, and every later `.read().unwrap()` on it
+# panics too, so one bad query takes the whole process down with it while the
+# process stays up. What the poison flag warns about is a half-written
+# structure, and the guards here that write are the ones this codebase already
+# treats as fatal; the guards that read cannot leave anything half-written.
+parking_lot = "0.12"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+# Virtual time. Elapsed-time decisions — the flush cadence, the force-flush
+# backoff, the startup retry budget — are logic, and testing logic by waiting
+# out a real clock is how they ended up untested.
+tokio = { version = "1", features = ["test-util"] }
+# The regression gate. `docs/VISION.md` — "the ruler comes before the work".
+# Plotters and rayon are off: these run in CI to detect a regression, not to
+# draw a distribution.
+criterion = { version = "0.8.2", default-features = false, features = ["cargo_bench_support", "async_tokio"] }
+
+[[bench]]
+name = "wal"
+harness = false
+
+[[bench]]
+name = "memtable"
+harness = false
+
+[[bench]]
+name = "rows"
+harness = false
+
+[[bench]]
+name = "bloom"
+harness = false
+
+[[bench]]
+name = "part"
+harness = false
+
+[[bench]]
+name = "query"
+harness = false
+
+[[bench]]
+name = "scan_scaling"
+harness = false
