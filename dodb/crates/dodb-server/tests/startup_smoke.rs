@@ -80,7 +80,8 @@ fn binary_starts_without_an_otlp_receiver_in_a_fresh_process() {
         .status()
         .expect("send SIGTERM to dodb-server");
     assert!(terminate_status.success(), "SIGTERM command failed");
-    let shutdown_deadline = Instant::now() + Duration::from_secs(10);
+    let shutdown_started = Instant::now();
+    let shutdown_deadline = shutdown_started + Duration::from_secs(5);
     let shutdown_status = loop {
         if let Some(status) = child.try_wait().expect("check graceful server shutdown") {
             break status;
@@ -110,11 +111,10 @@ fn binary_starts_without_an_otlp_receiver_in_a_fresh_process() {
         "missing OTLP receiver did not exercise the best-effort baseline flush path: {output:?}"
     );
     assert!(
-        shutdown_status.success()
-            || (shutdown_status.code() == Some(1)
-                && output.iter().any(|line| line.contains("Failed to flush"))),
-        "server shutdown failed for a reason other than the absent OTLP receiver: {output:?}"
+        shutdown_status.success(),
+        "server did not exit successfully after SIGTERM: {output:?}"
     );
+    assert!(shutdown_started.elapsed() < Duration::from_secs(5));
 }
 
 fn forward_lines<R: Read + Send + 'static>(output: R, output_sender: Sender<String>) {

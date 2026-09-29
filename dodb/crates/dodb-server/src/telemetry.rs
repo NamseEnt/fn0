@@ -93,12 +93,25 @@ impl DodbTelemetry {
         })
     }
 
-    pub fn shutdown(&self) -> Result<(), opentelemetry_sdk::error::OTelSdkError> {
-        self.provider.shutdown()
-    }
-
     pub async fn force_flush_before_accept(&self, timeout: Duration) -> Result<(), String> {
         force_flush_with_timeout(self.provider.clone(), timeout).await
+    }
+
+    pub async fn shutdown_with_timeout(&self, timeout: Duration) -> Result<(), String> {
+        match tokio::time::timeout(
+            timeout,
+            tokio::task::spawn_blocking({
+                let provider = self.provider.clone();
+                move || provider.shutdown()
+            }),
+        )
+        .await
+        {
+            Ok(Ok(Ok(()))) => Ok(()),
+            Ok(Ok(Err(error))) => Err(error.to_string()),
+            Ok(Err(error)) => Err(error.to_string()),
+            Err(_) => Err(format!("shutdown timed out after {timeout:?}")),
+        }
     }
 }
 
@@ -298,9 +311,13 @@ mod tests {
     use std::collections::BTreeMap;
     use std::time::Duration;
 
+    type MetricAttributes = Vec<(String, String)>;
+    type MetricPoint = (MetricAttributes, u64);
+    type ExportedMetrics = BTreeMap<String, Vec<MetricPoint>>;
+
     #[derive(Clone, Default)]
     struct SchemaExporter {
-        points: Arc<Mutex<BTreeMap<String, Vec<(Vec<(String, String)>, u64)>>>>,
+        points: Arc<Mutex<ExportedMetrics>>,
     }
 
     impl opentelemetry_sdk::metrics::exporter::PushMetricExporter for SchemaExporter {
