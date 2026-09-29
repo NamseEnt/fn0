@@ -142,7 +142,7 @@ sudo systemctl enable --now fn0-collecty.service
 sudo systemctl is-active fn0-collecty.service
 sudo systemctl is-enabled fn0-collecty.service
 sudo test "$(stat -c '%a:%U:%G' /etc/fn0-collecty/env)" = "600:root:root"
-sudo test "$(stat -c '%U:%G' /var/lib/collecty)" = "10002:10002"
+sudo test "$(stat -c '%u:%g' /var/lib/collecty)" = "10002:10002"
 REMOTE_INSTALL
 
 echo ">> dodb collecty host telemetry is installed; dodb-server was not restarted"
