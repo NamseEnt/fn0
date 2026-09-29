@@ -26,11 +26,11 @@ Implementation and deterministic local tests are present. Phase K is not perform
 
 The requested dodb release package gate passed. `dodb-storage` passed 174 library tests and 10 benchmark tests, with four existing microbenchmarks ignored; its eight recovery integration tests passed. The full command also passed the selected `dodb-core`, `dodb-testkit`, `dodb-service`, `dodb-protocol`, `dodb-client`, `dodb-server`, and `dodb-soak` unit, integration, recovery, and doc-test targets. `cargo fmt --check` passed. Deterministic tests cover commits during a paused materializer, same-key writes, suffix preservation, pinned readers, WAL retention, reopen recovery, and a pre-checkpoint materialization write failure.
 
-This is local correctness evidence, not OCI performance or durability evidence. The full requested dodb package set and six-scenario gate have not yet run.
+The local M1 smoke used one second per mode, working set 512, and real sync to the laptop filesystem. It showed 99.84% lower writer-blocked time for K, but K had a worse p50, one background request remained outstanding at the end of the window, and the worker CPU counter is unavailable on macOS. It is instrumentation smoke evidence only, not OCI performance or durability evidence. Exact rows and binary provenance are under `raw/local-smoke/`.
 
 ## Pending Gates
 
-1. On the exact OCI A1/ZFS host, run the short 64-writer width-16 uniform J/K diagnostic. Require at least a 90% reduction in materialization-related writer-blocked time before proceeding.
+1. On the exact OCI A1/ZFS host, run the short 64-writer width-16 uniform J/K diagnostic. Require at least a 90% reduction in materialization-related writer-blocked time before proceeding. The local smoke does not count toward this gate.
 2. If that passes, run three real-sync repetitions for all six required workloads against H1 and synchronous J.
 3. Apply the H1 throughput and width-1 protection thresholds before sustained or RocksDB runs.
 4. Run the complete dodb release correctness gate after the performance implementation settles.

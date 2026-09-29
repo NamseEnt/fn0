@@ -1,0 +1,1 @@
+Local smoke host: Apple M1, 8 logical CPUs, macOS 26.4, Darwin 25.4.0, rustc 1.97.1. This host is not the OCI A1 Neoverse-N1, two-OCPU target. No `perf stat` capture was made. Worker thread CPU time is reported as zero on this non-Linux host.
