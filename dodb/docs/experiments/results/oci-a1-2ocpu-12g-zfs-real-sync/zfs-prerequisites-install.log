@@ -1,0 +1,13 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+Last metadata expiration check: 2:24:19 ago on Fri 25 Sep 2026 08:01:11 AM GMT.
+Package gcc-11.5.0-14.0.1.el9.aarch64 is already installed.
+Package make-1:4.3-8.el9.aarch64 is already installed.
+Package zlib-devel-1.2.11-40.el9.aarch64 is already installed.
+No match for argument: libtirpc-devel
+Package elfutils-libelf-devel-0.194-1.el9.aarch64 is already installed.
+Package python3-cffi-1.14.5-5.0.1.el9.aarch64 is already installed.
+Package python3-setuptools-53.0.0-15.el9.noarch is already installed.
+Package git-2.52.0-1.el9.aarch64 is already installed.
+Error: Unable to find a match: libtirpc-devel

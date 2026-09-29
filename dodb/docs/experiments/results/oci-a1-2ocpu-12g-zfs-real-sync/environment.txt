@@ -1,0 +1,120 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+2026-09-25T11:05:48+00:00
+instance-20260923-1013
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+NAME="Oracle Linux Server"
+VERSION="9.8"
+ID="ol"
+ID_LIKE="fedora"
+VARIANT="Server"
+VARIANT_ID="server"
+VERSION_ID="9.8"
+PLATFORM_ID="platform:el9"
+PRETTY_NAME="Oracle Linux Server 9.8"
+ANSI_COLOR="0;31"
+CPE_NAME="cpe:/o:oracle:linux:9:8:server"
+HOME_URL="https://linux.oracle.com/"
+BUG_REPORT_URL="https://github.com/oracle/oracle-linux"
+
+ORACLE_BUGZILLA_PRODUCT="Oracle Linux 9"
+ORACLE_BUGZILLA_PRODUCT_VERSION=9.8
+ORACLE_SUPPORT_PRODUCT="Oracle Linux"
+ORACLE_SUPPORT_PRODUCT_VERSION=9.8
+Architecture:                            aarch64
+CPU op-mode(s):                          32-bit, 64-bit
+Byte Order:                              Little Endian
+CPU(s):                                  2
+On-line CPU(s) list:                     0,1
+Vendor ID:                               ARM
+Model name:                              Neoverse-N1
+Model:                                   1
+Thread(s) per core:                      1
+Core(s) per socket:                      2
+Socket(s):                               1
+Stepping:                                r3p1
+BogoMIPS:                                50.00
+Flags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0,1
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; CSV2, BHB
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+               total        used        free      shared  buff/cache   available
+Mem:            10Gi       2.2Gi       1.1Gi        58Mi       7.6Gi       8.4Gi
+Swap:          4.0Gi          0B       4.0Gi
+Disk /dev/sda: 200 GiB, 214748364800 bytes, 419430400 sectors
+Disk model: BlockVolume     
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
+Disklabel type: gpt
+Disk identifier: DA43F94F-6C02-4ECE-B6E2-9B7D31FB591A
+
+Device        Start       End   Sectors   Size Type
+/dev/sda1      2048    206847    204800   100M EFI System
+/dev/sda2    206848   4401151   4194304     2G Linux filesystem
+/dev/sda3   4401152  97726463  93325312  44.5G Linux LVM
+/dev/sda4  97726464 419430366 321703903 153.4G Solaris /usr & Apple ZFS
+NAME               PATH                               SIZE TYPE FSTYPE      MOUNTPOINTS MODEL       SERIAL
+sda                /dev/sda                   214748364800 disk                         BlockVolume 60ba43efbab54a7abcbde96cc745906e
+├─sda1             /dev/sda1                     104857600 part vfat        /boot/efi               
+├─sda2             /dev/sda2                    2147483648 part xfs         /boot                   
+├─sda3             /dev/sda3                   47782559744 part LVM2_member                         
+│ ├─ocivolume-root /dev/mapper/ocivolume-root  31675383808 lvm  xfs         /                       
+│ └─ocivolume-oled /dev/mapper/ocivolume-oled  16106127360 lvm  xfs         /var/oled               
+└─sda4             /dev/sda4                  164712398336 part zfs_member                          
+  pool: dodbbench
+ state: ONLINE
+config:
+
+	NAME        STATE     READ WRITE CKSUM
+	dodbbench   ONLINE       0     0     0
+	  sda4      ONLINE       0     0     0
+
+errors: No known data errors
+NAME       PROPERTY  VALUE   SOURCE
+dodbbench  ashift    12      local
+NAME          PROPERTY     VALUE           SOURCE
+dodbbench     recordsize   4K              local
+dodbbench     compression  off             local
+dodbbench     atime        off             local
+dodbbench     sync         standard        local
+dodbbench     mountpoint   /bench/zfs      local
+dodbbench/db  recordsize   4K              local
+dodbbench/db  compression  off             local
+dodbbench/db  atime        off             local
+dodbbench/db  sync         standard        local
+dodbbench/db  mountpoint   /bench/zfs/db   local
+TARGET     SOURCE    FSTYPE OPTIONS
+/bench/zfs dodbbench zfs    rw,noatime,seclabel,xattr,noacl,casesensitive
+TARGET        SOURCE       FSTYPE OPTIONS
+/bench/zfs/db dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive
+zfs-2.2.11-1
+zfs-kmod-2.2.11-1
+2.2.11-1
+6.12.0-206.104.4.4.el9uek.aarch64 SMP mod_unload modversions aarch64
+openzfs_tag=zfs-2.2.11
+openzfs_commit=f2d87f5c724ccdbb27a11fb84c4a185e0a917598
+openzfs_tag_object=4fa710fed6f6669cc34872236f43907ef751356c
+experiment_HEAD=0d310da32af5dfaa9df6469788998dacccebb841
+experiment_worktree_status=0
+main_HEAD=ac45cf519d6cd008dfbc5362f72561f9092a7b11
+main_harness_sha256=2f198ed066e0407b567d1e712ae0ce721321de453a22aa19887d020789825daf  crates/dodb-storage/src/bin/phase0-bench.rs
+main_worktree_status=?? .cargo/
+?? crates/dodb-storage/src/bin/phase0-bench.rs

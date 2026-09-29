@@ -1,0 +1,329 @@
+[generic] dodb_crc_specialization_prototype::measure_specialized: instructions=76 branches=8 calls=6 direct_crc_instructions=0
+0000000100000adc <dodb_crc_specialization_prototype::measure_specialized>:
+100000adc: d10203ff    	sub	sp, sp, #0x80
+100000ae0: a9026ffc    	stp	x28, x27, [sp, #0x20]
+100000ae4: a90367fa    	stp	x26, x25, [sp, #0x30]
+100000ae8: a9045ff8    	stp	x24, x23, [sp, #0x40]
+100000aec: a90557f6    	stp	x22, x21, [sp, #0x50]
+100000af0: a9064ff4    	stp	x20, x19, [sp, #0x60]
+100000af4: a9077bfd    	stp	x29, x30, [sp, #0x70]
+100000af8: 9101c3fd    	add	x29, sp, #0x70
+100000afc: aa0103f4    	mov	x20, x1
+100000b00: aa0003f5    	mov	x21, x0
+100000b04: 94003d86    	bl	0x10001011c <<std::time::Instant>::now>
+100000b08: 52800013    	mov	w19, #0x0               ; =0
+100000b0c: d2800016    	mov	x22, #0x0               ; =0
+100000b10: f90003e0    	str	x0, [sp]
+100000b14: b9000be1    	str	w1, [sp, #0x8]
+100000b18: 910043f7    	add	x23, sp, #0x10
+100000b1c: 900002b8    	adrp	x24, 0x100054000 <dyld_stub_binder+0x100054000>
+100000b20: 91342318    	add	x24, x24, #0xd08
+100000b24: 529a1219    	mov	w25, #0xd090            ; =53392
+100000b28: 72a00079    	movk	w25, #0x3, lsl #16
+100000b2c: 14000008    	b	0x100000b4c <dodb_crc_specialization_prototype::measure_specialized+0x70>
+100000b30: 940001f2    	bl	0x1000012f8 <crc32c::hw_aarch64::crc32c>
+100000b34: 4b1603e8    	neg	w8, w22
+100000b38: 910006d6    	add	x22, x22, #0x1
+100000b3c: 1ac82c08    	ror	w8, w0, w8
+100000b40: 4a130113    	eor	w19, w8, w19
+100000b44: eb1902df    	cmp	x22, x25
+100000b48: 54000320    	b.eq	0x100000bac <dodb_crc_specialization_prototype::measure_specialized+0xd0>
+100000b4c: a90153f5    	stp	x21, x20, [sp, #0x10]
+100000b50: a9410be1    	ldp	x1, x2, [sp, #0x10]
+100000b54: f9400308    	ldr	x8, [x24]
+100000b58: b4000188    	cbz	x8, 0x100000b88 <dodb_crc_specialization_prototype::measure_specialized+0xac>
+100000b5c: 12001d08    	and	w8, w8, #0xff
+100000b60: 52800000    	mov	w0, #0x0                ; =0
+100000b64: 3737fe68    	tbnz	w8, #0x6, 0x100000b30 <dodb_crc_specialization_prototype::measure_specialized+0x54>
+100000b68: 94000239    	bl	0x10000144c <crc32c::sw::crc32c>
+100000b6c: 4b1603e8    	neg	w8, w22
+100000b70: 910006d6    	add	x22, x22, #0x1
+100000b74: 1ac82c08    	ror	w8, w0, w8
+100000b78: 4a130113    	eor	w19, w8, w19
+100000b7c: eb1902df    	cmp	x22, x25
+100000b80: 54fffe61    	b.ne	0x100000b4c <dodb_crc_specialization_prototype::measure_specialized+0x70>
+100000b84: 1400000a    	b	0x100000bac <dodb_crc_specialization_prototype::measure_specialized+0xd0>
+100000b88: aa0203fa    	mov	x26, x2
+100000b8c: aa0103fb    	mov	x27, x1
+100000b90: 9400e1ce    	bl	0x1000392c8 <std_detect::detect::cache::detect_and_initialize>
+100000b94: aa1b03e1    	mov	x1, x27
+100000b98: aa1a03e2    	mov	x2, x26
+100000b9c: 12001c08    	and	w8, w0, #0xff
+100000ba0: 52800000    	mov	w0, #0x0                ; =0
+100000ba4: 3737fc68    	tbnz	w8, #0x6, 0x100000b30 <dodb_crc_specialization_prototype::measure_specialized+0x54>
+100000ba8: 17fffff0    	b	0x100000b68 <dodb_crc_specialization_prototype::measure_specialized+0x8c>
+100000bac: b90013f3    	str	w19, [sp, #0x10]
+100000bb0: 910043e8    	add	x8, sp, #0x10
+100000bb4: 910003e0    	mov	x0, sp
+100000bb8: 94003d5b    	bl	0x100010124 <<std::time::Instant>::elapsed>
+100000bbc: 52994008    	mov	w8, #0xca00             ; =51712
+100000bc0: 72a77348    	movk	w8, #0x3b9a, lsl #16
+100000bc4: 9bc87c09    	umulh	x9, x0, x8
+100000bc8: 9b087c08    	mul	x8, x0, x8
+100000bcc: ab214100    	adds	x0, x8, w1, uxtw
+100000bd0: 9a893521    	cinc	x1, x9, hs
+100000bd4: 9400d1c2    	bl	0x1000352dc <___floatuntidf>
+100000bd8: d2d09008    	mov	x8, #0x848000000000     ; =145685290680320
+100000bdc: f2e821c8    	movk	x8, #0x410e, lsl #48
+100000be0: 9e670101    	fmov	d1, x8
+100000be4: 1e611800    	fdiv	d0, d0, d1
+100000be8: aa1303e0    	mov	x0, x19
+100000bec: a9477bfd    	ldp	x29, x30, [sp, #0x70]
+100000bf0: a9464ff4    	ldp	x20, x19, [sp, #0x60]
+100000bf4: a94557f6    	ldp	x22, x21, [sp, #0x50]
+100000bf8: a9445ff8    	ldp	x24, x23, [sp, #0x40]
+100000bfc: a94367fa    	ldp	x26, x25, [sp, #0x30]
+100000c00: a9426ffc    	ldp	x28, x27, [sp, #0x20]
+100000c04: 910203ff    	add	sp, sp, #0x80
+100000c08: d65f03c0    	ret
+
+
+[generic] crc32c::hw_aarch64::crc32c: instructions=79 branches=2 calls=5 direct_crc_instructions=0
+00000001000012f8 <crc32c::hw_aarch64::crc32c>:
+1000012f8: d101c3ff    	sub	sp, sp, #0x70
+1000012fc: a9035ff8    	stp	x24, x23, [sp, #0x30]
+100001300: a90457f6    	stp	x22, x21, [sp, #0x40]
+100001304: a9054ff4    	stp	x20, x19, [sp, #0x50]
+100001308: a9067bfd    	stp	x29, x30, [sp, #0x60]
+10000130c: 910183fd    	add	x29, sp, #0x60
+100001310: 91001c28    	add	x8, x1, #0x7
+100001314: 927df108    	and	x8, x8, #0xfffffffffffffff8
+100001318: cb010108    	sub	x8, x8, x1
+10000131c: eb08005f    	cmp	x2, x8
+100001320: 9a883048    	csel	x8, x2, x8, lo
+100001324: 8b080033    	add	x19, x1, x8
+100001328: cb080054    	sub	x20, x2, x8
+10000132c: 2a2003e0    	mvn	w0, w0
+100001330: aa0803e2    	mov	x2, x8
+100001334: 94000040    	bl	0x100001434 <crc32c::hw_aarch64::crc_u8>
+100001338: aa0003e1    	mov	x1, x0
+10000133c: d343fe88    	lsr	x8, x20, #3
+100001340: b201f3e9    	mov	x9, #-0x5555555555555556 ; =-6148914691236517206
+100001344: f2955569    	movk	x9, #0xaaab
+100001348: f2e15549    	movk	x9, #0xaaa, lsl #48
+10000134c: 9bc97d09    	umulh	x9, x8, x9
+100001350: d347fd29    	lsr	x9, x9, #7
+100001354: 8b090536    	add	x22, x9, x9, lsl #1
+100001358: d376d6c9    	lsl	x9, x22, #10
+10000135c: cb090117    	sub	x23, x8, x9
+100001360: f00001ca    	adrp	x10, 0x10003c000 <dyld_stub_binder+0x10003c000>
+100001364: 912e514a    	add	x10, x10, #0xb94
+100001368: f9000bea    	str	x10, [sp, #0x10]
+10000136c: 5280010a    	mov	w10, #0x8               ; =8
+100001370: 5281800b    	mov	w11, #0xc00             ; =3072
+100001374: f90007eb    	str	x11, [sp, #0x8]
+100001378: f100011f    	cmp	x8, #0x0
+10000137c: 9a930155    	csel	x21, x10, x19, eq
+100001380: a901a7f5    	stp	x21, x9, [sp, #0x18]
+100001384: f90017eb    	str	x11, [sp, #0x28]
+100001388: 910063e0    	add	x0, sp, #0x18
+10000138c: 910023e2    	add	x2, sp, #0x8
+100001390: 910043e3    	add	x3, sp, #0x10
+100001394: 97ffff55    	bl	0x1000010e8 <<core::slice::iter::Chunks<crc32c::util::U64Le> as core::iter::traits::iterator::Iterator>::fold::<u32, crc32c::hw_aarch64::crc_u64_parallel3::{closure#0}>>
+100001398: aa0003e1    	mov	x1, x0
+10000139c: 52815568    	mov	w8, #0xaab              ; =2731
+1000013a0: 1b087ee8    	mul	w8, w23, w8
+1000013a4: 53127d08    	lsr	w8, w8, #18
+1000013a8: 52800c09    	mov	w9, #0x60               ; =96
+1000013ac: 1b09dd08    	msub	w8, w8, w9, w23
+1000013b0: cb2822f7    	sub	x23, x23, w8, uxth
+1000013b4: 900001e8    	adrp	x8, 0x10003d000 <dyld_stub_binder+0x10003d000>
+1000013b8: 912e5108    	add	x8, x8, #0xb94
+1000013bc: d373cad8    	lsl	x24, x22, #13
+1000013c0: a900a3e9    	stp	x9, x8, [sp, #0x8]
+1000013c4: 8b1802a8    	add	x8, x21, x24
+1000013c8: a901dfe8    	stp	x8, x23, [sp, #0x18]
+1000013cc: f90017e9    	str	x9, [sp, #0x28]
+1000013d0: 910063e0    	add	x0, sp, #0x18
+1000013d4: 910023e2    	add	x2, sp, #0x8
+1000013d8: 910043e3    	add	x3, sp, #0x10
+1000013dc: 97ffff43    	bl	0x1000010e8 <<core::slice::iter::Chunks<crc32c::util::U64Le> as core::iter::traits::iterator::Iterator>::fold::<u32, crc32c::hw_aarch64::crc_u64_parallel3::{closure#0}>>
+1000013e0: 927dee96    	and	x22, x20, #0x7ffffffffffffff8
+1000013e4: 8b170f08    	add	x8, x24, x23, lsl #3
+1000013e8: eb16011f    	cmp	x8, x22
+1000013ec: 54000100    	b.eq	0x10000140c <crc32c::hw_aarch64::crc32c+0x114>
+1000013f0: cb080289    	sub	x9, x20, x8
+1000013f4: cb490ff7    	neg	x23, x9, lsr #3
+1000013f8: 8b0802b5    	add	x21, x21, x8
+1000013fc: f84086a1    	ldr	x1, [x21], #0x8
+100001400: 94000081    	bl	0x100001604 <core::core_arch::aarch64::neon::generated::__crc32cd>
+100001404: b10006f7    	adds	x23, x23, #0x1
+100001408: 54ffffa3    	b.lo	0x1000013fc <crc32c::hw_aarch64::crc32c+0x104>
+10000140c: 8b160261    	add	x1, x19, x22
+100001410: 92400a82    	and	x2, x20, #0x7
+100001414: 94000008    	bl	0x100001434 <crc32c::hw_aarch64::crc_u8>
+100001418: 2a2003e0    	mvn	w0, w0
+10000141c: a9467bfd    	ldp	x29, x30, [sp, #0x60]
+100001420: a9454ff4    	ldp	x20, x19, [sp, #0x50]
+100001424: a94457f6    	ldp	x22, x21, [sp, #0x40]
+100001428: a9435ff8    	ldp	x24, x23, [sp, #0x30]
+10000142c: 9101c3ff    	add	sp, sp, #0x70
+100001430: d65f03c0    	ret
+
+
+[global +crc] dodb_crc_specialization_prototype::measure_default: instructions=51 branches=1 calls=4 direct_crc_instructions=0
+00000001000008d8 <dodb_crc_specialization_prototype::measure_default>:
+1000008d8: d101c3ff    	sub	sp, sp, #0x70
+1000008dc: a90267fa    	stp	x26, x25, [sp, #0x20]
+1000008e0: a9035ff8    	stp	x24, x23, [sp, #0x30]
+1000008e4: a90457f6    	stp	x22, x21, [sp, #0x40]
+1000008e8: a9054ff4    	stp	x20, x19, [sp, #0x50]
+1000008ec: a9067bfd    	stp	x29, x30, [sp, #0x60]
+1000008f0: 910183fd    	add	x29, sp, #0x60
+1000008f4: aa0103f4    	mov	x20, x1
+1000008f8: aa0003f5    	mov	x21, x0
+1000008fc: 94003da2    	bl	0x10000ff84 <<std::time::Instant>::now>
+100000900: 52800013    	mov	w19, #0x0               ; =0
+100000904: d2800016    	mov	x22, #0x0               ; =0
+100000908: f90003e0    	str	x0, [sp]
+10000090c: b9000be1    	str	w1, [sp, #0x8]
+100000910: 910043f7    	add	x23, sp, #0x10
+100000914: 529a1218    	mov	w24, #0xd090            ; =53392
+100000918: 72a00078    	movk	w24, #0x3, lsl #16
+10000091c: 910006d9    	add	x25, x22, #0x1
+100000920: a90153f5    	stp	x21, x20, [sp, #0x10]
+100000924: a9410be1    	ldp	x1, x2, [sp, #0x10]
+100000928: 52800000    	mov	w0, #0x0                ; =0
+10000092c: 94000265    	bl	0x1000012c0 <crc32c::hw_aarch64::crc32c>
+100000930: 4b1603e8    	neg	w8, w22
+100000934: 1ac82c08    	ror	w8, w0, w8
+100000938: 4a130113    	eor	w19, w8, w19
+10000093c: aa1903f6    	mov	x22, x25
+100000940: eb18033f    	cmp	x25, x24
+100000944: 54fffec1    	b.ne	0x10000091c <dodb_crc_specialization_prototype::measure_default+0x44>
+100000948: b90013f3    	str	w19, [sp, #0x10]
+10000094c: 910043e8    	add	x8, sp, #0x10
+100000950: 910003e0    	mov	x0, sp
+100000954: 94003d8e    	bl	0x10000ff8c <<std::time::Instant>::elapsed>
+100000958: 52994008    	mov	w8, #0xca00             ; =51712
+10000095c: 72a77348    	movk	w8, #0x3b9a, lsl #16
+100000960: 9bc87c09    	umulh	x9, x0, x8
+100000964: 9b087c08    	mul	x8, x0, x8
+100000968: ab214100    	adds	x0, x8, w1, uxtw
+10000096c: 9a893521    	cinc	x1, x9, hs
+100000970: 9400d1f5    	bl	0x100035144 <___floatuntidf>
+100000974: d2d09008    	mov	x8, #0x848000000000     ; =145685290680320
+100000978: f2e821c8    	movk	x8, #0x410e, lsl #48
+10000097c: 9e670101    	fmov	d1, x8
+100000980: 1e611800    	fdiv	d0, d0, d1
+100000984: aa1303e0    	mov	x0, x19
+100000988: a9467bfd    	ldp	x29, x30, [sp, #0x60]
+10000098c: a9454ff4    	ldp	x20, x19, [sp, #0x50]
+100000990: a94457f6    	ldp	x22, x21, [sp, #0x40]
+100000994: a9435ff8    	ldp	x24, x23, [sp, #0x30]
+100000998: a94267fa    	ldp	x26, x25, [sp, #0x20]
+10000099c: 9101c3ff    	add	sp, sp, #0x70
+1000009a0: d65f03c0    	ret
+
+
+[global +crc] crc32c::hw_aarch64::crc32c: instructions=109 branches=11 calls=2 direct_crc_instructions=9
+00000001000012c0 <crc32c::hw_aarch64::crc32c>:
+1000012c0: d10203ff    	sub	sp, sp, #0x80
+1000012c4: a90367fa    	stp	x26, x25, [sp, #0x30]
+1000012c8: a9045ff8    	stp	x24, x23, [sp, #0x40]
+1000012cc: a90557f6    	stp	x22, x21, [sp, #0x50]
+1000012d0: a9064ff4    	stp	x20, x19, [sp, #0x60]
+1000012d4: a9077bfd    	stp	x29, x30, [sp, #0x70]
+1000012d8: 9101c3fd    	add	x29, sp, #0x70
+1000012dc: aa0103e8    	mov	x8, x1
+1000012e0: 2a2003e1    	mvn	w1, w0
+1000012e4: 91001d09    	add	x9, x8, #0x7
+1000012e8: 927df129    	and	x9, x9, #0xfffffffffffffff8
+1000012ec: cb080129    	sub	x9, x9, x8
+1000012f0: eb09005f    	cmp	x2, x9
+1000012f4: 9a89304a    	csel	x10, x2, x9, lo
+1000012f8: 8b0a0114    	add	x20, x8, x10
+1000012fc: cb0a0056    	sub	x22, x2, x10
+100001300: 927deed5    	and	x21, x22, #0x7ffffffffffffff8
+100001304: 92400ad3    	and	x19, x22, #0x7
+100001308: d343fec9    	lsr	x9, x22, #3
+10000130c: 5280010b    	mov	w11, #0x8               ; =8
+100001310: f100013f    	cmp	x9, #0x0
+100001314: 9a940177    	csel	x23, x11, x20, eq
+100001318: b40000aa    	cbz	x10, 0x10000132c <crc32c::hw_aarch64::crc32c+0x6c>
+10000131c: 3840150b    	ldrb	w11, [x8], #0x1
+100001320: 1acb5021    	crc32cb	w1, w1, w11
+100001324: f100054a    	subs	x10, x10, #0x1
+100001328: 54ffffa1    	b.ne	0x10000131c <crc32c::hw_aarch64::crc32c+0x5c>
+10000132c: b201f3e8    	mov	x8, #-0x5555555555555556 ; =-6148914691236517206
+100001330: f2955568    	movk	x8, #0xaaab
+100001334: f2e15548    	movk	x8, #0xaaa, lsl #48
+100001338: 9bc87d28    	umulh	x8, x9, x8
+10000133c: d347fd08    	lsr	x8, x8, #7
+100001340: 8b080518    	add	x24, x8, x8, lsl #1
+100001344: 52818008    	mov	w8, #0xc00              ; =3072
+100001348: 900001ca    	adrp	x10, 0x100039000 <<std::sys::sync::rwlock::queue::PanicGuard as core::ops::drop::Drop>::drop+0x1c>
+10000134c: 9136a14a    	add	x10, x10, #0xda8
+100001350: a900abe8    	stp	x8, x10, [sp, #0x8]
+100001354: d376d70a    	lsl	x10, x24, #10
+100001358: cb0a0139    	sub	x25, x9, x10
+10000135c: a901abf7    	stp	x23, x10, [sp, #0x18]
+100001360: f90017e8    	str	x8, [sp, #0x28]
+100001364: 910063e0    	add	x0, sp, #0x18
+100001368: 910023e2    	add	x2, sp, #0x8
+10000136c: 910043e3    	add	x3, sp, #0x10
+100001370: 97ffff6b    	bl	0x10000111c <<core::slice::iter::Chunks<crc32c::util::U64Le> as core::iter::traits::iterator::Iterator>::fold::<u32, crc32c::hw_aarch64::crc_u64_parallel3::{closure#0}>>
+100001374: aa0003e1    	mov	x1, x0
+100001378: 52815568    	mov	w8, #0xaab              ; =2731
+10000137c: 1b087f28    	mul	w8, w25, w8
+100001380: 53127d08    	lsr	w8, w8, #18
+100001384: 52800c09    	mov	w9, #0x60               ; =96
+100001388: 1b09e508    	msub	w8, w8, w9, w25
+10000138c: cb282339    	sub	x25, x25, w8, uxth
+100001390: b00001c8    	adrp	x8, 0x10003a000 <dyld_stub_binder+0x10003a000>
+100001394: 9136a108    	add	x8, x8, #0xda8
+100001398: d373cb18    	lsl	x24, x24, #13
+10000139c: a900a3e9    	stp	x9, x8, [sp, #0x8]
+1000013a0: 8b1802e8    	add	x8, x23, x24
+1000013a4: a901e7e8    	stp	x8, x25, [sp, #0x18]
+1000013a8: f90017e9    	str	x9, [sp, #0x28]
+1000013ac: 910063e0    	add	x0, sp, #0x18
+1000013b0: 910023e2    	add	x2, sp, #0x8
+1000013b4: 910043e3    	add	x3, sp, #0x10
+1000013b8: 97ffff59    	bl	0x10000111c <<core::slice::iter::Chunks<crc32c::util::U64Le> as core::iter::traits::iterator::Iterator>::fold::<u32, crc32c::hw_aarch64::crc_u64_parallel3::{closure#0}>>
+1000013bc: 8b190f09    	add	x9, x24, x25, lsl #3
+1000013c0: eb15013f    	cmp	x9, x21
+1000013c4: 54000100    	b.eq	0x1000013e4 <crc32c::hw_aarch64::crc32c+0x124>
+1000013c8: cb0902c8    	sub	x8, x22, x9
+1000013cc: cb480fe8    	neg	x8, x8, lsr #3
+1000013d0: 8b0902e9    	add	x9, x23, x9
+1000013d4: f840852a    	ldr	x10, [x9], #0x8
+1000013d8: 9aca5c00    	crc32cx	w0, w0, x10
+1000013dc: b1000508    	adds	x8, x8, #0x1
+1000013e0: 54ffffa3    	b.lo	0x1000013d4 <crc32c::hw_aarch64::crc32c+0x114>
+1000013e4: b4000393    	cbz	x19, 0x100001454 <crc32c::hw_aarch64::crc32c+0x194>
+1000013e8: 8b150288    	add	x8, x20, x21
+1000013ec: 39400109    	ldrb	w9, [x8]
+1000013f0: 1ac95000    	crc32cb	w0, w0, w9
+1000013f4: f100067f    	cmp	x19, #0x1
+1000013f8: 540002e0    	b.eq	0x100001454 <crc32c::hw_aarch64::crc32c+0x194>
+1000013fc: 39400509    	ldrb	w9, [x8, #0x1]
+100001400: 1ac95000    	crc32cb	w0, w0, w9
+100001404: f1000a7f    	cmp	x19, #0x2
+100001408: 54000260    	b.eq	0x100001454 <crc32c::hw_aarch64::crc32c+0x194>
+10000140c: 39400909    	ldrb	w9, [x8, #0x2]
+100001410: 1ac95000    	crc32cb	w0, w0, w9
+100001414: f1000e7f    	cmp	x19, #0x3
+100001418: 540001e0    	b.eq	0x100001454 <crc32c::hw_aarch64::crc32c+0x194>
+10000141c: 39400d09    	ldrb	w9, [x8, #0x3]
+100001420: 1ac95000    	crc32cb	w0, w0, w9
+100001424: f100127f    	cmp	x19, #0x4
+100001428: 54000160    	b.eq	0x100001454 <crc32c::hw_aarch64::crc32c+0x194>
+10000142c: 39401109    	ldrb	w9, [x8, #0x4]
+100001430: 1ac95000    	crc32cb	w0, w0, w9
+100001434: f100167f    	cmp	x19, #0x5
+100001438: 540000e0    	b.eq	0x100001454 <crc32c::hw_aarch64::crc32c+0x194>
+10000143c: 39401509    	ldrb	w9, [x8, #0x5]
+100001440: 1ac95000    	crc32cb	w0, w0, w9
+100001444: f1001a7f    	cmp	x19, #0x6
+100001448: 54000060    	b.eq	0x100001454 <crc32c::hw_aarch64::crc32c+0x194>
+10000144c: 39401908    	ldrb	w8, [x8, #0x6]
+100001450: 1ac85000    	crc32cb	w0, w0, w8
+100001454: 2a2003e0    	mvn	w0, w0
+100001458: a9477bfd    	ldp	x29, x30, [sp, #0x70]
+10000145c: a9464ff4    	ldp	x20, x19, [sp, #0x60]
+100001460: a94557f6    	ldp	x22, x21, [sp, #0x50]
+100001464: a9445ff8    	ldp	x24, x23, [sp, #0x40]
+100001468: a94367fa    	ldp	x26, x25, [sp, #0x30]
+10000146c: 910203ff    	add	sp, sp, #0x80
+100001470: d65f03c0    	ret

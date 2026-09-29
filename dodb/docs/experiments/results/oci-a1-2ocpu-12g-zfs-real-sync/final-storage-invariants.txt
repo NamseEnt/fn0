@@ -1,0 +1,153 @@
+NAME               PATH                               SIZE TYPE FSTYPE      MOUNTPOINTS UUID                                   PARTUUID
+sda                /dev/sda                   214748364800 disk                                                                
+├─sda1             /dev/sda1                     104857600 part vfat        /boot/efi   7049-BB0F                              12f9b35f-a9d4-4e97-8b1d-e34d65ef3a10
+├─sda2             /dev/sda2                    2147483648 part xfs         /boot       88d3ee9a-b987-45cc-a3ce-75aebba9bccd   b2e7eccf-eabb-4934-a8dd-f7279f5ff6c6
+├─sda3             /dev/sda3                   47782559744 part LVM2_member             rY0mAV-gwvu-O1b3-CPU8-24It-03qY-hM3O1m 3d4b764e-19c5-4e3d-999a-1782b23f522a
+│ ├─ocivolume-root /dev/mapper/ocivolume-root  31675383808 lvm  xfs         /           e88e4336-832e-412f-a155-50bf9bd7451b   
+│ └─ocivolume-oled /dev/mapper/ocivolume-oled  16106127360 lvm  xfs         /var/oled   2ca3994a-8c94-41cb-9f1c-16a43132bfde   
+└─sda4             /dev/sda4                  164712398336 part zfs_member              15928435012812578211                   83f10ca6-016c-4894-85a0-0b67fadf20aa
+Disk /dev/sda: 419430400 sectors, 200.0 GiB
+Model: BlockVolume     
+Sector size (logical/physical): 512/4096 bytes
+Disk identifier (GUID): DA43F94F-6C02-4ECE-B6E2-9B7D31FB591A
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 419430366
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 2014 sectors (1007.0 KiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048          206847   100.0 MiB   EF00  EFI System Partition
+   2          206848         4401151   2.0 GiB     8300  
+   3         4401152        97726463   44.5 GiB    8E00  
+   4        97726464       419430366   153.4 GiB   BF01  dodb-zfs
+
+No problems found. 2014 free sectors (1007.0 KiB) available in 1
+segments, the largest of which is 2014 (1007.0 KiB) in size.
+DEVICE OFFSET       TYPE       UUID                 LABEL
+sda4   0x3f000      zfs_member 15928435012812578211 dodbbench
+sda4   0x3e000      zfs_member 15928435012812578211 dodbbench
+sda4   0x3d000      zfs_member 15928435012812578211 dodbbench
+sda4   0x3c000      zfs_member 15928435012812578211 dodbbench
+sda4   0x3b000      zfs_member 15928435012812578211 dodbbench
+sda4   0x3a000      zfs_member 15928435012812578211 dodbbench
+sda4   0x39000      zfs_member 15928435012812578211 dodbbench
+sda4   0x38000      zfs_member 15928435012812578211 dodbbench
+sda4   0x37000      zfs_member 15928435012812578211 dodbbench
+sda4   0x36000      zfs_member 15928435012812578211 dodbbench
+sda4   0x35000      zfs_member 15928435012812578211 dodbbench
+sda4   0x34000      zfs_member 15928435012812578211 dodbbench
+sda4   0x33000      zfs_member 15928435012812578211 dodbbench
+sda4   0x32000      zfs_member 15928435012812578211 dodbbench
+sda4   0x31000      zfs_member 15928435012812578211 dodbbench
+sda4   0x30000      zfs_member 15928435012812578211 dodbbench
+sda4   0x2f000      zfs_member 15928435012812578211 dodbbench
+sda4   0x2e000      zfs_member 15928435012812578211 dodbbench
+sda4   0x2d000      zfs_member 15928435012812578211 dodbbench
+sda4   0x2c000      zfs_member 15928435012812578211 dodbbench
+sda4   0x2b000      zfs_member 15928435012812578211 dodbbench
+sda4   0x2a000      zfs_member 15928435012812578211 dodbbench
+sda4   0x29000      zfs_member 15928435012812578211 dodbbench
+sda4   0x28000      zfs_member 15928435012812578211 dodbbench
+sda4   0x27000      zfs_member 15928435012812578211 dodbbench
+sda4   0x26000      zfs_member 15928435012812578211 dodbbench
+sda4   0x25000      zfs_member 15928435012812578211 dodbbench
+sda4   0x24000      zfs_member 15928435012812578211 dodbbench
+sda4   0x23000      zfs_member 15928435012812578211 dodbbench
+sda4   0x7f000      zfs_member 15928435012812578211 dodbbench
+sda4   0x7e000      zfs_member 15928435012812578211 dodbbench
+sda4   0x7d000      zfs_member 15928435012812578211 dodbbench
+sda4   0x7c000      zfs_member 15928435012812578211 dodbbench
+sda4   0x7b000      zfs_member 15928435012812578211 dodbbench
+sda4   0x7a000      zfs_member 15928435012812578211 dodbbench
+sda4   0x79000      zfs_member 15928435012812578211 dodbbench
+sda4   0x78000      zfs_member 15928435012812578211 dodbbench
+sda4   0x77000      zfs_member 15928435012812578211 dodbbench
+sda4   0x76000      zfs_member 15928435012812578211 dodbbench
+sda4   0x75000      zfs_member 15928435012812578211 dodbbench
+sda4   0x74000      zfs_member 15928435012812578211 dodbbench
+sda4   0x73000      zfs_member 15928435012812578211 dodbbench
+sda4   0x72000      zfs_member 15928435012812578211 dodbbench
+sda4   0x71000      zfs_member 15928435012812578211 dodbbench
+sda4   0x70000      zfs_member 15928435012812578211 dodbbench
+sda4   0x6f000      zfs_member 15928435012812578211 dodbbench
+sda4   0x6e000      zfs_member 15928435012812578211 dodbbench
+sda4   0x6d000      zfs_member 15928435012812578211 dodbbench
+sda4   0x6c000      zfs_member 15928435012812578211 dodbbench
+sda4   0x6b000      zfs_member 15928435012812578211 dodbbench
+sda4   0x6a000      zfs_member 15928435012812578211 dodbbench
+sda4   0x69000      zfs_member 15928435012812578211 dodbbench
+sda4   0x68000      zfs_member 15928435012812578211 dodbbench
+sda4   0x67000      zfs_member 15928435012812578211 dodbbench
+sda4   0x66000      zfs_member 15928435012812578211 dodbbench
+sda4   0x65000      zfs_member 15928435012812578211 dodbbench
+sda4   0x64000      zfs_member 15928435012812578211 dodbbench
+sda4   0x63000      zfs_member 15928435012812578211 dodbbench
+sda4   0x62000      zfs_member 15928435012812578211 dodbbench
+sda4   0x61000      zfs_member 15928435012812578211 dodbbench
+sda4   0x60000      zfs_member 15928435012812578211 dodbbench
+sda4   0x265997f000 zfs_member 15928435012812578211 dodbbench
+sda4   0x265997e000 zfs_member 15928435012812578211 dodbbench
+sda4   0x265997d000 zfs_member 15928435012812578211 dodbbench
+sda4   0x265997c000 zfs_member 15928435012812578211 dodbbench
+sda4   0x265997b000 zfs_member 15928435012812578211 dodbbench
+sda4   0x265997a000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659979000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659978000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659977000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659976000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659975000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659974000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659973000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659972000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659971000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659970000 zfs_member 15928435012812578211 dodbbench
+sda4   0x265996f000 zfs_member 15928435012812578211 dodbbench
+sda4   0x265996e000 zfs_member 15928435012812578211 dodbbench
+sda4   0x265996d000 zfs_member 15928435012812578211 dodbbench
+sda4   0x265996c000 zfs_member 15928435012812578211 dodbbench
+sda4   0x265996b000 zfs_member 15928435012812578211 dodbbench
+sda4   0x265996a000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659969000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659968000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659967000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659966000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659965000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659964000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659963000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659962000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659961000 zfs_member 15928435012812578211 dodbbench
+sda4   0x2659960000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599bf000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599be000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599bd000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599bc000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599bb000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599ba000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599b9000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599b8000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599b7000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599b6000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599b5000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599b4000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599b3000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599b2000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599b1000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599b0000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599af000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599ae000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599ad000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599ac000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599ab000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599aa000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599a9000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599a8000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599a7000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599a6000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599a5000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599a4000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599a3000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599a2000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599a1000 zfs_member 15928435012812578211 dodbbench
+sda4   0x26599a0000 zfs_member 15928435012812578211 dodbbench
+/dev/sda4: LABEL="dodbbench" UUID="15928435012812578211" UUID_SUB="447279619806208375" TYPE="zfs_member" PARTLABEL="dodb-zfs" PARTUUID="83f10ca6-016c-4894-85a0-0b67fadf20aa"

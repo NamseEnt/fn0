@@ -1,0 +1,15 @@
+Workload equivalence summary
+
+Shared generator: harness/common/workload.rs
+Reference: WorkloadConfig..value_bytes and the Distribution/ReadKind/TransactionMode enums extracted verbatim from crates/dodb-storage/src/bin/phase0-bench.rs at 0d310da32af5dfaa9df6469788998dacccebb841 (SHA256 678e8c0b980e541c2c9a16a9abfde3f2efbc3f79f685399c649f6b480dd80bdc) by harness/workload-equivalence/build.rs
+
+1. Synthetic comparison (workload-equivalence-synthetic.txt)
+writer streams compared=3372 mismatched_streams_or_seed_sets=0
+scenario-phase and seed-row lines with equal=true: 102
+lines with equal=false: 0
+
+2. Every trace recorded by the actual crossdb runs, recomputed with the original generator (workload-equivalence-raw.txt)
+raw records=186 writer_streams=13008 generated_transactions=13170086 failures=0
+
+3. Seeds: every crossdb run's seed equals invocation_seed(scenario_index, repetition - 1), checked by verify-raw; the analysis found 0 scenarios whose seed set differs from the dodb Planned raw files for the same scenario (analysis.json seed_mismatches).
+seed_mismatches = 0

@@ -1,0 +1,12 @@
+base width=1 repetition=0 seed=973348902 binary=/home/opc/dodb-forensic-binaries/base-phase0-bench
+candidate width=1 repetition=0 seed=973348902 binary=/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench
+base width=16 repetition=0 seed=973283366 binary=/home/opc/dodb-forensic-binaries/base-phase0-bench
+candidate width=16 repetition=0 seed=973283366 binary=/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench
+candidate width=1 repetition=1 seed=973348903 binary=/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench
+base width=1 repetition=1 seed=973348903 binary=/home/opc/dodb-forensic-binaries/base-phase0-bench
+candidate width=16 repetition=1 seed=973283367 binary=/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench
+base width=16 repetition=1 seed=973283367 binary=/home/opc/dodb-forensic-binaries/base-phase0-bench
+base width=1 repetition=2 seed=973348904 binary=/home/opc/dodb-forensic-binaries/base-phase0-bench
+candidate width=1 repetition=2 seed=973348904 binary=/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench
+base width=16 repetition=2 seed=973283368 binary=/home/opc/dodb-forensic-binaries/base-phase0-bench
+candidate width=16 repetition=2 seed=973283368 binary=/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench

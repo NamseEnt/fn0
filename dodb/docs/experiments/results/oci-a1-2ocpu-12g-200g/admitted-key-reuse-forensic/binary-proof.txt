@@ -1,0 +1,24 @@
+/tmp/dodb-forensic-target-base-20260925/release/phase0-bench
+/tmp/dodb-forensic-target-base-20260925/release/phase0-bench size=2427072 mtime=2026-09-25 06:01:27.678937436 +0000 mode=755
+8f402d6b3660e8b16d8899b49830bc4b6bb93d70398aa66e56cdc3e7fff0baa3  /tmp/dodb-forensic-target-base-20260925/release/phase0-bench
+/tmp/dodb-forensic-target-candidate-a-20260925/release/phase0-bench
+/tmp/dodb-forensic-target-candidate-a-20260925/release/phase0-bench size=2427600 mtime=2026-09-25 06:01:57.186972902 +0000 mode=755
+79122436e330be122059f8a4bf5908406e55b74596bfab2ee3cf745dd17fb6cb  /tmp/dodb-forensic-target-candidate-a-20260925/release/phase0-bench
+/tmp/dodb-forensic-target-candidate-b-20260925/release/phase0-bench
+/tmp/dodb-forensic-target-candidate-b-20260925/release/phase0-bench size=2427600 mtime=2026-09-25 06:02:29.007011147 +0000 mode=755
+79122436e330be122059f8a4bf5908406e55b74596bfab2ee3cf745dd17fb6cb  /tmp/dodb-forensic-target-candidate-b-20260925/release/phase0-bench
+COPIED_IMMUTABLE_EXECUTABLES
+/home/opc/dodb-forensic-binaries/base-phase0-bench
+/home/opc/dodb-forensic-binaries/base-phase0-bench size=2427072 mtime=2026-09-25 06:02:50.283036719 +0000 mode=555
+8f402d6b3660e8b16d8899b49830bc4b6bb93d70398aa66e56cdc3e7fff0baa3  /home/opc/dodb-forensic-binaries/base-phase0-bench
+/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench
+/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench size=2427600 mtime=2026-09-25 06:02:50.283036719 +0000 mode=555
+79122436e330be122059f8a4bf5908406e55b74596bfab2ee3cf745dd17fb6cb  /home/opc/dodb-forensic-binaries/candidate-a-phase0-bench
+/home/opc/dodb-forensic-binaries/candidate-b-phase0-bench
+/home/opc/dodb-forensic-binaries/candidate-b-phase0-bench size=2427600 mtime=2026-09-25 06:02:50.295036733 +0000 mode=555
+79122436e330be122059f8a4bf5908406e55b74596bfab2ee3cf745dd17fb6cb  /home/opc/dodb-forensic-binaries/candidate-b-phase0-bench
+PREVIOUS_SUSPECT_TARGET
+/home/opc/dodb-target-admitted-key-reuse-final/release/phase0-bench
+/home/opc/dodb-target-admitted-key-reuse-final/release/phase0-bench size=2428920 mtime=2026-09-25 05:41:49.757517637 +0000 mode=755
+3899baaff31950565f21eed0d832b29fe2f1df268299ac7a740aba57619aa53f  /home/opc/dodb-target-admitted-key-reuse-final/release/phase0-bench
+{"rustc":9796743202043143334,"features":"[]","declared_features":"[]","target":4505529013784913448,"profile":2040997289075261528,"path":13957902974241946755,"deps":[[2145939652136225981,"tokio",false,12415851460180561009],[9503466367316232320,"crc32c",false,4073255598597085738],[10504718112287328430,"libc",false,11829358786370702521],[12832252190799008630,"dodb_core",false,6256429623045548383],[16908866860801189344,"dodb_storage",false,12114683748895897201]],"local":[{"CheckDepInfo":{"dep_info":"release/.fingerprint/dodb-storage-67529ba8b5e69211/dep-bin-phase0-bench","checksum":false}}],"rustflags":[],"config":9396254390672932401,"compile_kind":0}SANITY=PASS

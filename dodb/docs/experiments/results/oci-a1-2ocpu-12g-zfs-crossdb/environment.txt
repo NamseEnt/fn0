@@ -1,0 +1,19 @@
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+2
+Architecture:                            aarch64
+CPU(s):                                  2
+On-line CPU(s) list:                     0,1
+Model name:                              Neoverse-N1
+NUMA node0 CPU(s):                       0,1
+               total        used        free      shared  buff/cache   available
+Mem:           10898         748        8495          11        1923       10149
+Swap:           4095         200        3895
+dodbbench/db	sync	standard	local
+dodbbench/db	recordsize	4K	local
+dodbbench/db	compression	off	local
+dodbbench/db	atime	off	local
+dodbbench	ashift	12	local
+zfs-2.2.11-1
+zfs-kmod-2.2.11-1
+Filesystem      Size  Used Avail Use% Mounted on
+dodbbench/db    149G  120K  149G   1% /bench/zfs/db

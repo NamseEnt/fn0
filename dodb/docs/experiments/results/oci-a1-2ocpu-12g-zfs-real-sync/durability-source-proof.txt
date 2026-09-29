@@ -1,0 +1,13 @@
+Source proof for both source commits: planned 0d310da32af5dfaa9df6469788998dacccebb841; exact main ac45cf519d6cd008dfbc5362f72561f9092a7b11.
+
+The benchmark BenchFile sync_data implementation is crates/dodb-storage/src/bin/phase0-bench.rs:987-991. In real mode it delegates to inner.sync_data().
+
+ProductionFile implements sync_data with std::fs::File::sync_data at crates/dodb-storage/src/durable_file.rs:70-73.
+
+WAL group append encodes and writes the group, then calls self.file.sync_data and returns an error if syncing fails at crates/dodb-storage/src/wal.rs:580-655. The success path updates the sync count/timing only after that call returns successfully.
+
+Planned Blink builds the WAL commits and calls append_group_trusted_internal at crates/dodb-storage/src/blink/mod.rs:1988-2030. It installs page/state deltas only after the append call returns at crates/dodb-storage/src/blink/mod.rs:2052-2070, and publishes the generation after installation at 2067-2077.
+
+The coordinator runs process_segment before sending any successful response at crates/dodb-storage/src/btree/coordinator.rs:426-461. process_segment delegates each transaction to store.transact at 557-610. Therefore the response is sent after WAL sync and planned state/generation publication.
+
+Independent syscall evidence: sync-strace.txt shows a benchmark DB and WAL opened under /bench/zfs/db, fdatasync on the WAL returning 0, and fsync on the database returning 0. The WAL smoke JSON records sync_mode=real, 829 WAL syncs, and nonzero sync time.

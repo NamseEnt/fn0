@@ -1,0 +1,29 @@
+OCI A1 benchmark host environment
+
+host: instance-20260923-1013
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+Architecture:                            aarch64
+CPU(s):                                  2
+Model name:                              Neoverse-N1
+Thread(s) per core:                      1
+Core(s) per socket:                      2
+Socket(s):                               1
+               total        used        free      shared  buff/cache   available
+Mem:            10Gi       1.3Gi       3.8Gi        50Mi       5.8Gi       9.3Gi
+Swap:          4.0Gi          0B       4.0Gi
+/dev/mapper/ocivolume-root xfs    29.4G 16.8G
+rustc 1.98.1 (48a229cea 2026-09-01)
+binary: rustc
+commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985
+commit-date: 2026-09-01
+host: aarch64-unknown-linux-gnu
+release: 1.98.1
+LLVM version: 22.1.8
+cargo 1.98.1 (797e8a9bc 2026-08-05)
+experiment HEAD: 93b1e7546710ef4863398c36464595c912f85dc4
+experiment status: main HEAD: ac45cf519d6cd008dfbc5362f72561f9092a7b11
+main temporary status: ?? .cargo/
+?? crates/dodb-storage/src/bin/phase0-bench.rs
+
+Repository policy: .cargo/config.toml in experiment HEAD applies -C target-feature=+crc to aarch64-unknown-linux-gnu.
+Filesystem mode: current root XFS only; no separate 200 GiB filesystem or ZFS.

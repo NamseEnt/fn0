@@ -1,0 +1,16 @@
+experiment HEAD: 93b1e7546710ef4863398c36464595c912f85dc4
+main HEAD: ac45cf519d6cd008dfbc5362f72561f9092a7b11
+merge base: 1ff96e1b3d205074d4c1b820f5f2680bd3226a8b
+
+The branches are diverged. Their public transaction contracts differ:
+- main accepts condition-only requests and returns TransactionResult.commit_lsn: Option<Lsn>.
+- experiment rejects requests without mutations and returns TransactionResult.commit_lsn: Lsn.
+The matrix contains only unconditional mutation transactions, supported by both.
+
+The checked source diffs also show branch-local changes in dodb-storage/src/btree/coordinator.rs, btree/mod.rs, and wal.rs. Main's coordinator and tree source have changes relative to the merge base while experiment's WAL has substantial branch-local changes. Ratios therefore answer separate questions: experiment-local engine comparison and exact-main branch comparison.
+
+Additional confirmed implementation/build differences relevant to interpretation:
+- Experiment WAL adds an explicit page-image format and grouped frame encoding/write path with per-stage attribution counters. Exact main does not contain those experiment-side changes.
+- The BTree transaction preparation path differs: experiment returns a non-optional prepared mutation and requires an LSN, while main can return a condition-only result without a commit. Experiment also changes an existing-value leaf update to validate leaf fit and replace the page directly.
+- Verbose rustc logs confirm different compiled Tokio feature sets despite using the same Tokio version: exact main compiled `fs`, `io-util`, `net`, and `process` support; the experiment build did not. Both builds used the same locked Rust toolchain and the required `+crc` target flag; the exact feature union follows each branch dependency graph.
+These are observed source/config differences. They are plausible contributors to a gap between the comparison ratios, but the benchmark does not isolate their individual performance effects.

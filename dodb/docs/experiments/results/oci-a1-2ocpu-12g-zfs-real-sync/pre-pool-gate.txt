@@ -1,0 +1,29 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+NAME               PATH                               SIZE TYPE FSTYPE      MOUNTPOINTS
+sda                /dev/sda                   214748364800 disk             
+├─sda1             /dev/sda1                     104857600 part vfat        /boot/efi
+├─sda2             /dev/sda2                    2147483648 part xfs         /boot
+├─sda3             /dev/sda3                   47782559744 part LVM2_member 
+│ ├─ocivolume-root /dev/mapper/ocivolume-root  31675383808 lvm  xfs         /
+│ └─ocivolume-oled /dev/mapper/ocivolume-oled  16106127360 lvm  xfs         /var/oled
+└─sda4             /dev/sda4                  164712398336 part             
+Disk /dev/sda: 419430400 sectors, 200.0 GiB
+Model: BlockVolume     
+Sector size (logical/physical): 512/4096 bytes
+Disk identifier (GUID): DA43F94F-6C02-4ECE-B6E2-9B7D31FB591A
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 419430366
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 2014 sectors (1007.0 KiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048          206847   100.0 MiB   EF00  EFI System Partition
+   2          206848         4401151   2.0 GiB     8300  
+   3         4401152        97726463   44.5 GiB    8E00  
+   4        97726464       419430366   153.4 GiB   BF01  dodb-zfs
+
+No problems found. 2014 free sectors (1007.0 KiB) available in 1
+segments, the largest of which is 2014 (1007.0 KiB) in size.

@@ -1,0 +1,15 @@
+TARGET SOURCE                     FSTYPE OPTIONS
+/      /dev/mapper/ocivolume-root xfs    rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota
+TARGET SOURCE    FSTYPE OPTIONS
+/boot  /dev/sda2 xfs    rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota
+TARGET    SOURCE    FSTYPE OPTIONS
+/boot/efi /dev/sda1 vfat   rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=winnt,errors=remount-ro
+TARGET    SOURCE                     FSTYPE OPTIONS
+/var/oled /dev/mapper/ocivolume-oled xfs    rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota
+  PV         PSize        PFree VG       
+  /dev/sda3  47781511168B    0B ocivolume
+  VG        #PV #LV #SN Attr   VSize        VFree
+  ocivolume   1   2   0 wz--n- 47781511168B    0B
+  LV   VG        Attr       LSize        Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  oled ocivolume -wi-ao---- 16106127360B                                                    
+  root ocivolume -wi-ao---- 31675383808B                                                    

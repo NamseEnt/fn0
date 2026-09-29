@@ -1,0 +1,21 @@
+turso-bench binary
+fb19b7ad13fbed66d50b33ba3f3ee47da94afc9cb442a5619750021b7402b99e  /tmp/crossdb-turso-target/release/turso-bench
+/tmp/crossdb-turso-target/release/turso-bench: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=d107c859bfd1dc8d10aef5880e45a33c4de68c88, for GNU/Linux 3.7.0, with debug_info, not stripped
+build: cargo build --release in harness/turso-bench, CARGO_TARGET_DIR=/tmp/crossdb-turso-target, RUSTFLAGS=-C target-cpu=native
+release profile (mirrors upstream Turso release profile): opt-level=3, codegen-units=4, lto=thin, panic=abort, debug=line-tables-only
+turso crate features: default (mimalloc global allocator, fts)
+rustc flags seen for turso_core:
+      1 -C codegen-units=4
+      1 -C opt-level=3
+      1 -C panic=abort
+      1 -C target-cpu=native
+harness sources:
+dfa45f5a4ee41d6588948187f1cda65f3ac6a1a0db37360d450e3595805d6823  common/driver.rs
+8321d6e72d1eb9c9c26ddf0ccb64355c61064a9de38f9aed9ba80217bfabca7f  common/mod.rs
+38d3b047d0029f3e3d13a7bff5a411fd785e63b5b3c8191b21a8d6216be8f82f  common/workload.rs
+1b87918e58b2a104e6f69bee17b285d11f43c16ee8496cbe5ada9c0c5968d0c4  turso-bench/src/main.rs
+7f69e818378b7a2ea9c9984fbceaca14344420a4e4fe0c8cffa4bf2e9b1afeca  turso-bench/Cargo.toml
+b33a04abaf0397b4f6775c48314a4e928a8027c5c42c00d27ccea0db7eef0953  turso-bench/Cargo.lock
+842e15dfa0996a89c1065603be76dcc75ba5af4c9ba7162773228bdb34f158c8  turso-bench/build.rs
+turso source tree used by the path dependency:
+64b8ef5742fc18937f9c89806c81e3f6475dc7a3

@@ -1,0 +1,47 @@
+# rocksdb durability syscall probe
+verdict: VERIFIED
+successful commits with a successful fsync/fdatasync on a database file under /bench/zfs/db/probe-rocksdb, between the commit-begin marker and the commit-returned marker: 4/4
+close/reopen value verification passed: True (verified 19 of 19, rows 19)
+
+## Per-transaction result
+{"committed": true, "markers_found": true, "successful_sync_calls_on_database_files": 2, "sync_call_kinds": ["fdatasync", "fsync"], "sync_calls_between_begin_and_return": 2, "sync_paths": ["/bench/zfs/db/probe-rocksdb/rocksdb", "/bench/zfs/db/probe-rocksdb/rocksdb/000004.log"], "transaction": 0, "verified": true, "width": 1}
+{"committed": true, "markers_found": true, "successful_sync_calls_on_database_files": 1, "sync_call_kinds": ["fdatasync"], "sync_calls_between_begin_and_return": 1, "sync_paths": ["/bench/zfs/db/probe-rocksdb/rocksdb/000004.log"], "transaction": 1, "verified": true, "width": 1}
+{"committed": true, "markers_found": true, "successful_sync_calls_on_database_files": 1, "sync_call_kinds": ["fdatasync"], "sync_calls_between_begin_and_return": 1, "sync_paths": ["/bench/zfs/db/probe-rocksdb/rocksdb/000004.log"], "transaction": 2, "verified": true, "width": 1}
+{"committed": true, "markers_found": true, "successful_sync_calls_on_database_files": 1, "sync_call_kinds": ["fdatasync"], "sync_calls_between_begin_and_return": 1, "sync_paths": ["/bench/zfs/db/probe-rocksdb/rocksdb/000004.log"], "transaction": 3, "verified": true, "width": 16}
+
+## Effective settings reported by the probe
+{"allow_concurrent_memtable_write": true, "block_cache_bytes": 67108864, "block_size": 4096, "compression": "kNoCompression", "enable_pipelined_write": false, "enable_write_thread_adaptive_yield": true, "level0_file_num_compaction_trigger": 4, "level0_slowdown_writes_trigger": 20, "level0_stop_writes_trigger": 36, "manual_wal_flush": false, "max_background_jobs": 2, "max_write_buffer_number": 2, "rocksdb_version": "11.8.1", "use_fsync": false, "write_buffer_size": 67108864, "write_options_disable_wal": false, "write_options_sync": true}
+
+## Marker and sync events in order
+359521 12:53:48.199593 fdatasync(6</bench/zfs/db/probe-rocksdb/rocksdb/000000.dbtmp>) = 0
+359521 12:53:48.200773 fsync(6</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.201914 fdatasync(6</bench/zfs/db/probe-rocksdb/rocksdb/MANIFEST-000001>) = 0
+359521 12:53:48.202948 fdatasync(6</bench/zfs/db/probe-rocksdb/rocksdb/000001.dbtmp>) = 0
+359521 12:53:48.203800 fsync(4</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.210302 fdatasync(8</bench/zfs/db/probe-rocksdb/rocksdb/MANIFEST-000005>) = 0
+359521 12:53:48.211802 fdatasync(9</bench/zfs/db/probe-rocksdb/rocksdb/000005.dbtmp>) = 0
+359521 12:53:48.212730 fsync(4</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.214266 fsync(9</bench/zfs/db/probe-rocksdb/rocksdb/OPTIONS-000006.dbtmp>) = 0
+359521 12:53:48.216746 fsync(9</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.218796 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-begin-0", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.219089 fdatasync(7</bench/zfs/db/probe-rocksdb/rocksdb/000004.log>) = 0
+359521 12:53:48.220250 fsync(4</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.220365 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-returned-0", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.220431 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-begin-1", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.220509 fdatasync(7</bench/zfs/db/probe-rocksdb/rocksdb/000004.log>) = 0
+359521 12:53:48.221617 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-returned-1", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.221705 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-begin-2", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.221777 fdatasync(7</bench/zfs/db/probe-rocksdb/rocksdb/000004.log>) = 0
+359521 12:53:48.222713 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-returned-2", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.222788 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-begin-3", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.222868 fdatasync(7</bench/zfs/db/probe-rocksdb/rocksdb/000004.log>) = 0
+359521 12:53:48.223755 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-returned-3", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.223823 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-close-begin", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.224824 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-reopen-begin", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.234876 fdatasync(7</bench/zfs/db/probe-rocksdb/rocksdb/000008.sst>) = 0
+359521 12:53:48.236830 fsync(6</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.237828 fdatasync(9</bench/zfs/db/probe-rocksdb/rocksdb/MANIFEST-000010>) = 0
+359521 12:53:48.238896 fdatasync(10</bench/zfs/db/probe-rocksdb/rocksdb/000010.dbtmp>) = 0
+359521 12:53:48.239900 fsync(4</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.241250 fsync(10</bench/zfs/db/probe-rocksdb/rocksdb/OPTIONS-000011.dbtmp>) = 0
+359521 12:53:48.243160 fsync(10</bench/zfs/db/probe-rocksdb/rocksdb>) = 0

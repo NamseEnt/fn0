@@ -1,0 +1,22 @@
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+binary: rustc
+commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452
+commit-date: 2026-07-14
+host: aarch64-apple-darwin
+release: 1.97.1
+LLVM version: 22.1.6
+
+Darwin namseui-MacBookPro.local 25.4.0 Darwin Kernel Version 25.4.0: Thu Mar 19 19:32:36 PDT 2026; root:xnu-12377.101.15~1/RELEASE_ARM64_T8103 arm64
+
+   Compiling dodb-crc-specialization-prototype v0.1.0 (/tmp/dodb-crc-specialization)
+    Finished `release` profile [optimized] target(s) in 0.19s
+     Running `/tmp/dodb-crc-specialization/target-generic/release/dodb-crc-specialization-prototype`
+crc_feature=true
+default: 420.1 ns/payload 9.098 GiB/s checksum=0x5b165b16 samples=[419.746668, 419.819164, 420.071332, 420.115668, 420.209668, 421.526168, 607.1965]
+portable_specialized: 420.3 ns/payload 9.093 GiB/s checksum=0x5b165b16 samples=[419.927668, 420.083832, 420.197168, 420.339, 420.444836, 421.367, 422.435]
+
+   Compiling dodb-crc-specialization-prototype v0.1.0 (/tmp/dodb-crc-specialization)
+    Finished `release` profile [optimized] target(s) in 0.18s
+     Running `/tmp/dodb-crc-specialization/target-crc/release/dodb-crc-specialization-prototype`
+crc_feature=true
+global_plus_crc: 216.8 ns/payload 17.626 GiB/s checksum=0x5b165b16 samples=[206.0, 207.029668, 209.097, 216.8495, 218.329, 218.575332, 385.481]

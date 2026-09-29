@@ -1,0 +1,5 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=2s warmup=1s repetitions=1
+raw output: /tmp/admitted-key-reuse-forensic-candidate-width16-seed973283368.jsonl
+scenario                                                       repetition throughput summary
+100%-write-16w-0r-width16-uniform                          rep=0 tx/s=     2637 mut/s=    42198 read/s=        0 agg/s=     2637 p50=  5698.8us p95= 10675.0us p99= 11696.7us groups=  366 avg_group=14.44
+completed 1 scenarios x 1 repetitions

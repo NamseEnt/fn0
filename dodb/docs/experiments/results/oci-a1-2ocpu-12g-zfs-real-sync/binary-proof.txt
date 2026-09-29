@@ -1,0 +1,26 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+EXACT MAIN
+ac45cf519d6cd008dfbc5362f72561f9092a7b11
+?? .cargo/
+?? crates/dodb-storage/src/bin/phase0-bench.rs
+?? crates/dodb-storage/src/bin/zfs-reopen-check.rs
+d32ced9744fd16f7949bca0d263ce8f6de3d0d9b38ac3ed655da81bd63e77417  /tmp/dodb-zfs-main-target/release/phase0-bench
+2f198ed066e0407b567d1e712ae0ce721321de453a22aa19887d020789825daf  /tmp/dodb-zfs-main/crates/dodb-storage/src/bin/phase0-bench.rs
+5a2f45392a7b26ab285c5f30acc6ed0356f14f9f53ca668b9d02e6455f78fe22  /tmp/dodb-zfs-main/crates/dodb-storage/src/bin/zfs-reopen-check.rs
+/tmp/dodb-zfs-main-target/release/phase0-bench: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=d2e65c4941f001552cd83ad37f12345e46f4acbb, for GNU/Linux 3.7.0, not stripped
+PLANNED
+0d310da32af5dfaa9df6469788998dacccebb841
+?? crates/dodb-storage/src/bin/zfs-reopen-check.rs
+79122436e330be122059f8a4bf5908406e55b74596bfab2ee3cf745dd17fb6cb  /tmp/dodb-zfs-exp-target/release/phase0-bench
+678e8c0b980e541c2c9a16a9abfde3f2efbc3f79f685399c649f6b480dd80bdc  /tmp/dodb-zfs-experiment/crates/dodb-storage/src/bin/phase0-bench.rs
+79f93957562dcdfa67d0c510f6601e1cb9246ee0b21b4a2e23bed5faad9f69b0  /tmp/dodb-zfs-experiment/crates/dodb-storage/src/bin/zfs-reopen-check.rs
+/tmp/dodb-zfs-exp-target/release/phase0-bench: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=69a22f985747da198757198d5acaab6c0f04dea3, for GNU/Linux 3.7.0, not stripped
+ZDB CONFIG
+            type: 'root'
+                type: 'disk'
+                path: '/dev/sda4'
+                ashift: 12
+RUN COUNTS
+84

@@ -1,0 +1,39 @@
+Repository-default build rustc invocations (RUSTFLAGS unset):
+/home/opc/.rustup/toolchains/stable-aarch64-unknown-linux-gnu/bin/rustc --crate-name crc32c --edition=2018 /home/opc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crc32c-0.6.8/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C embed-bitcode=no --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=828ee86b05a8fb0f -C extra-filename=-69ebafb06e375743 --out-dir /home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps -C strip=debuginfo -L dependency=/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps --cap-lints warn -C target-feature=+crc --cfg armsimd --check-cfg 'cfg(armsimd)'
+/home/opc/.rustup/toolchains/stable-aarch64-unknown-linux-gnu/bin/rustc --crate-name dodb_storage --edition=2024 crates/dodb-storage/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C embed-bitcode=no --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=121a7f787a431651 -C extra-filename=-0408be5b5d8cc870 --out-dir /home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps -C strip=debuginfo -L dependency=/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps --extern crc32c=/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps/libcrc32c-69ebafb06e375743.rmeta --extern dodb_core=/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps/libdodb_core-585f87153826674a.rmeta --extern libc=/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps/liblibc-7e56d0c548266280.rmeta --extern tokio=/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps/libtokio-55349523162055fd.rmeta -C target-feature=+crc
+/home/opc/.rustup/toolchains/stable-aarch64-unknown-linux-gnu/bin/rustc --crate-name phase0_bench --edition=2024 crates/dodb-storage/src/bin/phase0-bench.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C opt-level=3 -C embed-bitcode=no --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=8cfd1d25ea41d3b7 -C extra-filename=-4aa568adb0eb958c --out-dir /home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps -C strip=debuginfo -L dependency=/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps --extern crc32c=/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps/libcrc32c-69ebafb06e375743.rlib --extern dodb_core=/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps/libdodb_core-585f87153826674a.rlib --extern dodb_storage=/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps/libdodb_storage-0408be5b5d8cc870.rlib --extern libc=/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps/liblibc-7e56d0c548266280.rlib --extern tokio=/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/deps/libtokio-55349523162055fd.rlib -C target-feature=+crc
+\nDisassembly from repository-default phase0-bench:
+
+/home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/phase0-bench:     file format elf64-littleaarch64
+
+
+Disassembly of section .text:
+
+00000000000d2ac4 <_RNvNtCsjuMeleVu5ga_6crc32c10hw_aarch646crc32c>:
+   d2ac4:	d101c3ff 	sub	sp, sp, #0x70
+   d2ac8:	a9027bfd 	stp	x29, x30, [sp, #32]
+   d2acc:	f9001bf9 	str	x25, [sp, #48]
+   d2ad0:	a9045ff8 	stp	x24, x23, [sp, #64]
+   d2ad4:	a90557f6 	stp	x22, x21, [sp, #80]
+   d2ad8:	a9064ff4 	stp	x20, x19, [sp, #96]
+   d2adc:	910083fd 	add	x29, sp, #0x20
+   d2ae0:	91001c29 	add	x9, x1, #0x7
+   d2ae4:	aa0103e8 	mov	x8, x1
+   d2ae8:	5280010b 	mov	w11, #0x8                   	// #8
+   d2aec:	927df129 	and	x9, x9, #0xfffffffffffffff8
+   d2af0:	cb010129 	sub	x9, x9, x1
+   d2af4:	2a2003e1 	mvn	w1, w0
+   d2af8:	eb09005f 	cmp	x2, x9
+   d2afc:	9a89304a 	csel	x10, x2, x9, cc  // cc = lo, ul, last
+   d2b00:	cb0a0056 	sub	x22, x2, x10
+   d2b04:	8b0a0114 	add	x20, x8, x10
+   d2b08:	d343fec9 	lsr	x9, x22, #3
+   d2b0c:	927deed5 	and	x21, x22, #0x7ffffffffffffff8
+   d2b10:	92400ad3 	and	x19, x22, #0x7
+   d2b14:	f100013f 	cmp	x9, #0x0
+   d2b18:	9a940177 	csel	x23, x11, x20, eq  // eq = none
+   d2b1c:	b40000aa 	cbz	x10, d2b30 <_RNvNtCsjuMeleVu5ga_6crc32c10hw_aarch646crc32c+0x6c>
+   d2b20:	3840150b 	ldrb	w11, [x8], #1
+   d2b24:	f100054a 	subs	x10, x10, #0x1
+   d2b28:	1acb5021 	crc32cb	w1, w1, w11
+   d2b2c:	54ffffa1 	b.ne	d2b20 <_RNvNtCsjuMeleVu5ga_6crc32c10hw_aarch646crc32c+0x5c>  // b.any

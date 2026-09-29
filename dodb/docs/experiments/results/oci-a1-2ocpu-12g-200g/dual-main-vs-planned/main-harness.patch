@@ -1,0 +1,2176 @@
+diff --git a/crates/dodb-storage/src/bin/phase0-bench.rs b/crates/dodb-storage/src/bin/phase0-bench.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/dodb-storage/src/bin/phase0-bench.rs
+--- /dev/null
++++ b/crates/dodb-storage/src/bin/phase0-bench.rs
+@@ -0,0 +1,2169 @@
++//! Sustained Phase 0 baseline benchmark for the current main B+Tree.
++//!
++//! This binary intentionally lives beside (rather than inside) the storage
++//! implementation. It uses the public AsyncShard/BTreeStore boundary and
++//! existing cumulative metrics, so the production hot path does not gain
++//! benchmark-only timestamps or counters.
++
++use std::collections::HashSet;
++use std::env;
++use std::fmt::Write as _;
++use std::future::Future;
++use std::path::{Path, PathBuf};
++use std::pin::Pin;
++use std::process::Command;
++use std::sync::atomic::{AtomicU64, Ordering};
++use std::sync::Arc;
++use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
++
++use dodb_core::{
++    DocumentKey, Error, PrimaryKey, Result, TransactionCondition, TransactionMutation,
++    TransactionRequest, TransactionResult,
++};
++use dodb_storage::{
++    AsyncShard, BTreeStore, BatchRequest, BatchResponse, CoordinatorConfig, DatabaseConfig,
++    DurableFile, ProductionFile, StorageMetrics, WalMetrics,
++};
++
++const BASELINE_COMMIT: &str = "ac45cf519d6cd008dfbc5362f72561f9092a7b11";
++const DEFAULT_OUTPUT: &str = "target/phase0/phase0-results.jsonl";
++const DEFAULT_DURATION: Duration = Duration::from_secs(2);
++const DEFAULT_WARMUP: Duration = Duration::from_secs(1);
++const DEFAULT_REPETITIONS: usize = 3;
++const DEFAULT_WORKING_SET: usize = 4_096;
++const DEFAULT_KEY_SIZE: usize = 16;
++const DEFAULT_VALUE_SIZE: usize = 64;
++const DEFAULT_READ_LIMIT: usize = 16;
++const DEFAULT_MAX_GROUP_REQUESTS: usize = 64;
++const DEFAULT_MAX_GROUP_BYTES: usize = 4 * 1024 * 1024;
++const DEFAULT_QUEUE_CAPACITY: usize = 256;
++const LATENCY_RESERVOIR_LIMIT: usize = 1_000_000;
++
++type BenchShard = AsyncShard<BenchFile, BenchFile>;
++type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++enum Suite {
++    Write,
++    Read,
++    Mixed,
++    DelaySweep,
++    SyncSweep,
++    All,
++}
++
++impl Suite {
++    fn parse(value: &str) -> Self {
++        match value {
++            "write" | "write-scaling" | "core-write" => Self::Write,
++            "read" | "read-scaling" | "core-read" => Self::Read,
++            "mixed" | "core-mixed" => Self::Mixed,
++            "delay" | "delay-sweep" => Self::DelaySweep,
++            "sync" | "sync-sweep" => Self::SyncSweep,
++            "all" | "core" => Self::All,
++            other => panic!("unknown suite {other:?}"),
++        }
++    }
++
++    fn as_str(self) -> &'static str {
++        match self {
++            Self::Write => "write-scaling",
++            Self::Read => "read-scaling",
++            Self::Mixed => "mixed",
++            Self::DelaySweep => "delay-sweep",
++            Self::SyncSweep => "sync-sweep",
++            Self::All => "all",
++        }
++    }
++}
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++enum Distribution {
++    Uniform,
++    Sequential,
++    Hotspot,
++    SameLeafHeavy,
++    DifferentLeafHeavy,
++}
++
++impl Distribution {
++    fn parse(value: &str) -> Self {
++        match value {
++            "uniform" => Self::Uniform,
++            "sequential" => Self::Sequential,
++            "hotspot" => Self::Hotspot,
++            "same-leaf-heavy" | "same_leaf_heavy" | "same" => Self::SameLeafHeavy,
++            "different-leaf-heavy" | "different_leaf_heavy" | "different" => {
++                Self::DifferentLeafHeavy
++            }
++            other => panic!("unknown key distribution {other:?}"),
++        }
++    }
++
++    fn as_str(self) -> &'static str {
++        match self {
++            Self::Uniform => "uniform",
++            Self::Sequential => "sequential",
++            Self::Hotspot => "hotspot",
++            Self::SameLeafHeavy => "same-leaf-heavy",
++            Self::DifferentLeafHeavy => "different-leaf-heavy",
++        }
++    }
++}
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++enum ReadKind {
++    Get,
++    Query,
++    Scan,
++}
++
++impl ReadKind {
++    fn parse(value: &str) -> Self {
++        match value {
++            "get" => Self::Get,
++            "query" => Self::Query,
++            "scan" => Self::Scan,
++            other => panic!("unknown read kind {other:?}"),
++        }
++    }
++
++    fn as_str(self) -> &'static str {
++        match self {
++            Self::Get => "get",
++            Self::Query => "query",
++            Self::Scan => "scan",
++        }
++    }
++}
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++enum TransactionMode {
++    Unconditional,
++    InsertIfAbsent,
++}
++
++impl TransactionMode {
++    fn parse(value: &str) -> Self {
++        match value {
++            "unconditional" | "put" => Self::Unconditional,
++            "insert-if-absent" | "insert_if_absent" => Self::InsertIfAbsent,
++            other => panic!("unknown transaction mode {other:?}"),
++        }
++    }
++
++    fn as_str(self) -> &'static str {
++        match self {
++            Self::Unconditional => "unconditional",
++            Self::InsertIfAbsent => "insert-if-absent",
++        }
++    }
++}
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++enum SyncMode {
++    Real,
++    Injected,
++    Disabled,
++}
++
++impl SyncMode {
++    fn parse(value: &str) -> Self {
++        match value {
++            "real" => Self::Real,
++            "delay" | "injected" => Self::Injected,
++            "disabled" | "none" | "no-sync" => Self::Disabled,
++            other => panic!("unknown sync mode {other:?}"),
++        }
++    }
++
++    fn as_str(self) -> &'static str {
++        match self {
++            Self::Real => "real",
++            Self::Injected => "injected",
++            Self::Disabled => "disabled",
++        }
++    }
++}
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++enum EngineKind {
++    MainBtree,
++}
++
++impl EngineKind {
++    fn parse(value: &str) -> Self {
++        match value {
++            "main-btree" | "btree" | "main" => Self::MainBtree,
++            other => panic!("unknown engine {other:?}"),
++        }
++    }
++
++    fn as_str(self) -> &'static str {
++        "main-btree"
++    }
++}
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++enum Role {
++    Reader,
++    Writer,
++}
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++struct Mix {
++    read_percent: u8,
++}
++
++impl Mix {
++    const READ_HEAVY: Self = Self { read_percent: 95 };
++    const BALANCED: Self = Self { read_percent: 50 };
++    const WRITE_HEAVY: Self = Self { read_percent: 20 };
++
++    fn parse(value: &str) -> Self {
++        match value {
++            "95/5" | "95-5" | "read-heavy" => Self::READ_HEAVY,
++            "50/50" | "50-50" | "balanced" => Self::BALANCED,
++            "write-heavy" | "20/80" | "20-80" => Self::WRITE_HEAVY,
++            other => panic!("unknown operation mix {other:?}"),
++        }
++    }
++
++    fn as_str(self) -> &'static str {
++        match self.read_percent {
++            95 => "95/5",
++            50 => "50/50",
++            20 => "20/80-write-heavy",
++            _ => "custom",
++        }
++    }
++}
++
++#[derive(Clone, Debug)]
++struct Args {
++    engine: EngineKind,
++    suite: Suite,
++    writers: Option<Vec<usize>>,
++    readers: Option<Vec<usize>>,
++    widths: Option<Vec<usize>>,
++    distributions: Option<Vec<Distribution>>,
++    read_kinds: Option<Vec<ReadKind>>,
++    mixes: Option<Vec<Mix>>,
++    duration: Duration,
++    warmup: Duration,
++    repetitions: usize,
++    cache_capacity: usize,
++    working_set: usize,
++    key_size: usize,
++    value_size: usize,
++    read_limit: usize,
++    max_group_requests: usize,
++    max_group_bytes: usize,
++    queue_capacity: usize,
++    collection_delay: Option<Duration>,
++    sync_mode: SyncMode,
++    sync_delay: Duration,
++    transaction_mode: TransactionMode,
++    tokio_workers: usize,
++    seed: u64,
++    output: PathBuf,
++}
++
++impl Default for Args {
++    fn default() -> Self {
++        Self {
++            engine: EngineKind::MainBtree,
++            suite: Suite::Write,
++            writers: None,
++            readers: None,
++            widths: None,
++            distributions: None,
++            read_kinds: None,
++            mixes: None,
++            duration: DEFAULT_DURATION,
++            warmup: DEFAULT_WARMUP,
++            repetitions: DEFAULT_REPETITIONS,
++            cache_capacity: 256,
++            working_set: DEFAULT_WORKING_SET,
++            key_size: DEFAULT_KEY_SIZE,
++            value_size: DEFAULT_VALUE_SIZE,
++            read_limit: DEFAULT_READ_LIMIT,
++            max_group_requests: DEFAULT_MAX_GROUP_REQUESTS,
++            max_group_bytes: DEFAULT_MAX_GROUP_BYTES,
++            queue_capacity: DEFAULT_QUEUE_CAPACITY,
++            collection_delay: None,
++            sync_mode: SyncMode::Real,
++            sync_delay: Duration::ZERO,
++            transaction_mode: TransactionMode::Unconditional,
++            tokio_workers: std::thread::available_parallelism()
++                .map_or(1, std::num::NonZeroUsize::get),
++            seed: 0xd0db_2026_0000_0001,
++            output: PathBuf::from(DEFAULT_OUTPUT),
++        }
++    }
++}
++
++impl Args {
++    fn parse() -> Self {
++        let mut args = Self::default();
++        let mut values = env::args().skip(1);
++        while let Some(flag) = values.next() {
++            match flag.as_str() {
++                "--help" | "-h" => {
++                    print_help();
++                    std::process::exit(0);
++                }
++                "--suite" => args.suite = Suite::parse(&take_value(&mut values, &flag)),
++                "--engine" => args.engine = EngineKind::parse(&take_value(&mut values, &flag)),
++                "--writers" => args.writers = Some(parse_list(&take_value(&mut values, &flag))),
++                "--readers" => args.readers = Some(parse_list(&take_value(&mut values, &flag))),
++                "--widths" | "--transaction-widths" => {
++                    args.widths = Some(parse_list(&take_value(&mut values, &flag)))
++                }
++                "--distribution" | "--distributions" => {
++                    args.distributions = Some(
++                        take_value(&mut values, &flag)
++                            .split(',')
++                            .map(Distribution::parse)
++                            .collect(),
++                    )
++                }
++                "--read-kind" | "--read-kinds" => {
++                    args.read_kinds = Some(
++                        take_value(&mut values, &flag)
++                            .split(',')
++                            .map(ReadKind::parse)
++                            .collect(),
++                    )
++                }
++                "--mix" | "--mixes" => {
++                    args.mixes = Some(
++                        take_value(&mut values, &flag)
++                            .split(',')
++                            .map(Mix::parse)
++                            .collect(),
++                    )
++                }
++                "--duration" => args.duration = parse_duration(&take_value(&mut values, &flag)),
++                "--warmup" => args.warmup = parse_duration(&take_value(&mut values, &flag)),
++                "--repetitions" | "--reps" => {
++                    args.repetitions = parse_usize(&take_value(&mut values, &flag), &flag)
++                }
++                "--cache-capacity" => {
++                    args.cache_capacity = parse_usize(&take_value(&mut values, &flag), &flag)
++                }
++                "--working-set" => {
++                    args.working_set = parse_usize(&take_value(&mut values, &flag), &flag)
++                }
++                "--key-size" => args.key_size = parse_usize(&take_value(&mut values, &flag), &flag),
++                "--value-size" => {
++                    args.value_size = parse_usize(&take_value(&mut values, &flag), &flag)
++                }
++                "--read-limit" => {
++                    args.read_limit = parse_usize(&take_value(&mut values, &flag), &flag)
++                }
++                "--group-limit" | "--max-group-requests" => {
++                    args.max_group_requests = parse_usize(&take_value(&mut values, &flag), &flag)
++                }
++                "--group-bytes" | "--max-group-bytes" => {
++                    args.max_group_bytes = parse_usize(&take_value(&mut values, &flag), &flag)
++                }
++                "--queue-capacity" => {
++                    args.queue_capacity = parse_usize(&take_value(&mut values, &flag), &flag)
++                }
++                "--collection-delay" => {
++                    args.collection_delay = Some(parse_duration(&take_value(&mut values, &flag)))
++                }
++                "--sync-mode" => args.sync_mode = SyncMode::parse(&take_value(&mut values, &flag)),
++                "--sync-delay" => args.sync_delay = parse_duration(&take_value(&mut values, &flag)),
++                "--transaction-mode" => {
++                    args.transaction_mode = TransactionMode::parse(&take_value(&mut values, &flag))
++                }
++                "--tokio-workers" => {
++                    args.tokio_workers = parse_usize(&take_value(&mut values, &flag), &flag)
++                }
++                "--seed" => args.seed = parse_u64(&take_value(&mut values, &flag), &flag),
++                "--output" => args.output = PathBuf::from(take_value(&mut values, &flag)),
++                other => panic!("unknown argument {other:?}; use --help"),
++            }
++        }
++        args.validate();
++        args
++    }
++
++    fn validate(&self) {
++        assert!(self.repetitions > 0, "repetitions must be positive");
++        assert!(self.tokio_workers > 0, "tokio-workers must be positive");
++        assert!(self.working_set > 0, "working-set must be positive");
++        assert!(self.key_size >= 2, "key-size must be at least 2 bytes");
++        assert!(self.read_limit > 0, "read-limit must be positive");
++        assert!(self.max_group_requests > 0, "group-limit must be positive");
++        assert!(self.max_group_bytes > 0, "group-bytes must be positive");
++        assert!(self.queue_capacity > 0, "queue-capacity must be positive");
++        if let Some(widths) = &self.widths {
++            assert!(
++                widths.iter().all(|width| *width > 0),
++                "widths must be positive"
++            );
++            assert!(widths.iter().all(|width| *width <= self.working_set));
++        }
++    }
++
++    fn writers(&self) -> Vec<usize> {
++        self.writers
++            .clone()
++            .unwrap_or_else(|| vec![1, 4, 16, 32, 64, 128])
++    }
++
++    fn readers(&self) -> Vec<usize> {
++        self.readers
++            .clone()
++            .unwrap_or_else(|| vec![1, 4, 16, 32, 64, 128])
++    }
++
++    fn widths(&self) -> Vec<usize> {
++        self.widths.clone().unwrap_or_else(|| vec![1, 16])
++    }
++
++    fn distributions(&self) -> Vec<Distribution> {
++        self.distributions.clone().unwrap_or_else(|| {
++            vec![
++                Distribution::Uniform,
++                Distribution::SameLeafHeavy,
++                Distribution::DifferentLeafHeavy,
++            ]
++        })
++    }
++
++    fn read_kinds(&self) -> Vec<ReadKind> {
++        self.read_kinds
++            .clone()
++            .unwrap_or_else(|| vec![ReadKind::Get, ReadKind::Query, ReadKind::Scan])
++    }
++
++    fn mixes(&self) -> Vec<Mix> {
++        self.mixes
++            .clone()
++            .unwrap_or_else(|| vec![Mix::READ_HEAVY, Mix::BALANCED])
++    }
++}
++
++fn print_help() {
++    println!(
++        "phase0-bench sustained baseline\n\n\
++         Usage: cargo run --release -p dodb-storage --bin phase0-bench -- [options]\n\n\
++         --engine main-btree\n\
++         Suites: write, read, mixed, delay-sweep, sync-sweep, all\n\
++         Options: --writers 1,4 --readers 1,4 --widths 1,16\n\
++         --distributions uniform,same-leaf-heavy,different-leaf-heavy\n\
++         --read-kinds get,query,scan --mixes 95/5,50/50\n\
++         --duration 2s --warmup 1s --repetitions 3\n\
++         --cache-capacity 256 --working-set 4096 --key-size 16 --value-size 64\n\
++         --group-limit 64 --group-bytes 4194304 --queue-capacity 256\n\
++         --collection-delay 500us --sync-mode real|injected|disabled --sync-delay 1ms\n\
++         --transaction-mode unconditional|insert-if-absent\n\
++         --tokio-workers 12 --seed 0xd0db2026 --output target/phase0/results.jsonl"
++    );
++}
++
++fn parse_usize(value: &str, flag: &str) -> usize {
++    value
++        .parse()
++        .unwrap_or_else(|_| panic!("{flag} expects an unsigned integer, got {value:?}"))
++}
++
++fn take_value<I>(values: &mut I, flag: &str) -> String
++where
++    I: Iterator<Item = String>,
++{
++    values
++        .next()
++        .unwrap_or_else(|| panic!("{flag} requires a value"))
++}
++
++fn parse_u64(value: &str, flag: &str) -> u64 {
++    let trimmed = value.trim();
++    if let Some(hex) = trimmed
++        .strip_prefix("0x")
++        .or_else(|| trimmed.strip_prefix("0X"))
++    {
++        u64::from_str_radix(hex, 16).unwrap_or_else(|_| {
++            panic!("{flag} expects a decimal or hexadecimal unsigned integer, got {value:?}")
++        })
++    } else {
++        trimmed.parse().unwrap_or_else(|_| {
++            panic!("{flag} expects a decimal or hexadecimal unsigned integer, got {value:?}")
++        })
++    }
++}
++
++fn parse_list(value: &str) -> Vec<usize> {
++    value
++        .split(',')
++        .map(|item| parse_usize(item.trim(), "list"))
++        .collect()
++}
++
++fn parse_duration(value: &str) -> Duration {
++    let value = value.trim();
++    let (number, unit) = if let Some(number) = value.strip_suffix("us") {
++        (number, "us")
++    } else if let Some(number) = value.strip_suffix("ms") {
++        (number, "ms")
++    } else if let Some(number) = value.strip_suffix('s') {
++        (number, "s")
++    } else {
++        (value, "ms")
++    };
++    let number: u64 = number
++        .parse()
++        .unwrap_or_else(|_| panic!("invalid duration {value:?}"));
++    match unit {
++        "us" => Duration::from_micros(number),
++        "ms" => Duration::from_millis(number),
++        "s" => Duration::from_secs(number),
++        _ => unreachable!(),
++    }
++}
++
++#[derive(Clone, Debug)]
++struct Scenario {
++    suite: Suite,
++    workload: &'static str,
++    writers: usize,
++    readers: usize,
++    width: usize,
++    distribution: Distribution,
++    read_kind: Option<ReadKind>,
++    mix: Option<Mix>,
++    collection_delay: Duration,
++    sync_delay: Duration,
++}
++
++impl Scenario {
++    fn name(&self) -> String {
++        let mut name = format!("{}-{}w-{}r", self.workload, self.writers, self.readers);
++        if let Some(read_kind) = self.read_kind {
++            let _ = write!(name, "-{read_kind}", read_kind = read_kind.as_str());
++        }
++        if let Some(mix) = self.mix {
++            let _ = write!(name, "-{}", mix.as_str());
++        }
++        let _ = write!(name, "-width{}-{}", self.width, self.distribution.as_str());
++        name
++    }
++}
++
++fn scenarios(args: &Args) -> Vec<Scenario> {
++    let delay_values = [
++        Duration::ZERO,
++        Duration::from_micros(50),
++        Duration::from_micros(100),
++        Duration::from_micros(250),
++        Duration::from_micros(500),
++        Duration::from_millis(1),
++        Duration::from_millis(2),
++        Duration::from_millis(5),
++    ];
++    let selected_delay = args.collection_delay.unwrap_or(Duration::ZERO);
++    let distributions = args.distributions();
++    let widths = args.widths();
++    let writers = args.writers();
++    let readers = args.readers();
++    let read_kinds = args.read_kinds();
++    let mixes = args.mixes();
++    let mut output = Vec::new();
++
++    let include = |suite: Suite, selected: Suite| {
++        args.suite == Suite::All || args.suite == selected || args.suite == suite
++    };
++
++    if include(Suite::Write, Suite::Write) {
++        for writer in &writers {
++            for width in &widths {
++                for distribution in &distributions {
++                    output.push(Scenario {
++                        suite: Suite::Write,
++                        workload: "100%-write",
++                        writers: *writer,
++                        readers: 0,
++                        width: *width,
++                        distribution: *distribution,
++                        read_kind: None,
++                        mix: None,
++                        collection_delay: selected_delay,
++                        sync_delay: args.sync_delay,
++                    });
++                }
++            }
++        }
++    }
++
++    if include(Suite::Read, Suite::Read) {
++        for reader in &readers {
++            for read_kind in &read_kinds {
++                output.push(Scenario {
++                    suite: Suite::Read,
++                    workload: match read_kind {
++                        ReadKind::Get => "100%-read-get",
++                        ReadKind::Query => "100%-read-query",
++                        ReadKind::Scan => "100%-read-scan",
++                    },
++                    writers: 0,
++                    readers: *reader,
++                    width: 1,
++                    distribution: Distribution::Uniform,
++                    read_kind: Some(*read_kind),
++                    mix: None,
++                    collection_delay: Duration::ZERO,
++                    sync_delay: Duration::ZERO,
++                });
++            }
++        }
++    }
++
++    if include(Suite::Mixed, Suite::Mixed) {
++        let mixed_readers = args.readers.clone().unwrap_or_else(|| vec![16, 64]);
++        let mixed_writers = args.writers.clone().unwrap_or_else(|| vec![16, 64]);
++        for readers in &mixed_readers {
++            for writers in &mixed_writers {
++                for mix in &mixes {
++                    output.push(Scenario {
++                        suite: Suite::Mixed,
++                        workload: "mixed",
++                        writers: *writers,
++                        readers: *readers,
++                        width: 1,
++                        distribution: Distribution::Uniform,
++                        read_kind: Some(ReadKind::Get),
++                        mix: Some(*mix),
++                        collection_delay: selected_delay,
++                        sync_delay: args.sync_delay,
++                    });
++                }
++            }
++        }
++    }
++
++    if args.suite == Suite::DelaySweep || args.suite == Suite::All {
++        let delays = if args.collection_delay.is_some() {
++            vec![selected_delay]
++        } else {
++            delay_values.to_vec()
++        };
++        for delay in delays {
++            output.push(Scenario {
++                suite: Suite::DelaySweep,
++                workload: "delay-write-control",
++                writers: 64,
++                readers: 0,
++                width: 1,
++                distribution: Distribution::Uniform,
++                read_kind: None,
++                mix: None,
++                collection_delay: delay,
++                sync_delay: args.sync_delay,
++            });
++            output.push(Scenario {
++                suite: Suite::DelaySweep,
++                workload: "delay-mixed-control",
++                writers: 64,
++                readers: 16,
++                width: 1,
++                distribution: Distribution::Uniform,
++                read_kind: Some(ReadKind::Get),
++                mix: Some(Mix::BALANCED),
++                collection_delay: delay,
++                sync_delay: args.sync_delay,
++            });
++        }
++    }
++
++    if args.suite == Suite::SyncSweep || args.suite == Suite::All {
++        let sync_values = [
++            Duration::ZERO,
++            Duration::from_micros(100),
++            Duration::from_millis(1),
++            Duration::from_millis(5),
++            Duration::from_millis(10),
++        ];
++        for sync_delay in sync_values {
++            output.push(Scenario {
++                suite: Suite::SyncSweep,
++                workload: "sync-write-control",
++                writers: 64,
++                readers: 0,
++                width: 1,
++                distribution: Distribution::Uniform,
++                read_kind: None,
++                mix: None,
++                collection_delay: Duration::ZERO,
++                sync_delay,
++            });
++        }
++    }
++
++    assert!(!output.is_empty(), "selected suite produced no scenarios");
++    output
++}
++
++#[derive(Clone, Debug)]
++struct WorkloadConfig {
++    distribution: Distribution,
++    working_set: usize,
++    key_size: usize,
++    value_size: usize,
++    width: usize,
++    transaction_mode: TransactionMode,
++    read_limit: usize,
++}
++
++#[derive(Clone, Debug)]
++struct WorkloadGenerator {
++    config: WorkloadConfig,
++    worker_id: usize,
++    operation: u64,
++    state: u64,
++}
++
++impl WorkloadGenerator {
++    fn new(config: WorkloadConfig, seed: u64, worker_id: usize) -> Self {
++        Self {
++            config,
++            worker_id,
++            operation: 0,
++            state: seed ^ (worker_id as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15),
++        }
++    }
++
++    fn next_transaction(&mut self) -> TransactionRequest {
++        let mut keys = Vec::with_capacity(self.config.width);
++        let mut seen = HashSet::with_capacity(self.config.width);
++        for offset in 0..self.config.width {
++            let index = self.next_index(offset);
++            let key = match self.config.transaction_mode {
++                TransactionMode::Unconditional => self.key_for_index(index),
++                TransactionMode::InsertIfAbsent => self.key_for_index(
++                    self.config
++                        .working_set
++                        .saturating_add(self.worker_id.saturating_mul(1_000_000))
++                        .saturating_add((self.operation as usize).saturating_mul(self.config.width))
++                        .saturating_add(offset),
++                ),
++            };
++            if seen.insert(key.clone()) {
++                keys.push(key);
++            } else {
++                let fallback = self.key_for_index(
++                    self.config
++                        .working_set
++                        .saturating_add(self.worker_id.saturating_mul(1_000_000))
++                        .saturating_add((self.operation as usize).saturating_mul(self.config.width))
++                        .saturating_add(offset),
++                );
++                assert!(
++                    seen.insert(fallback.clone()),
++                    "transaction key generator duplicated a key"
++                );
++                keys.push(fallback);
++            }
++        }
++        self.operation = self.operation.wrapping_add(1);
++        let mutations = keys
++            .iter()
++            .enumerate()
++            .map(|(offset, key)| TransactionMutation::Put {
++                key: key.clone(),
++                value: value_bytes(self.config.value_size, self.operation, offset),
++            })
++            .collect::<Vec<_>>();
++        let conditions = match self.config.transaction_mode {
++            TransactionMode::Unconditional => Vec::new(),
++            TransactionMode::InsertIfAbsent => keys
++                .into_iter()
++                .map(|key| TransactionCondition::NotExists { key })
++                .collect(),
++        };
++        TransactionRequest::new(conditions, mutations)
++    }
++
++    fn next_read(&mut self, kind: ReadKind) -> BatchRequest {
++        let index = self.next_index(0);
++        self.operation = self.operation.wrapping_add(1);
++        match kind {
++            ReadKind::Get => BatchRequest::Get {
++                key: self.key_for_index(index),
++            },
++            ReadKind::Query => BatchRequest::Query {
++                pk: PrimaryKey::new(query_pk(self.config.key_size)),
++                exclusive_after_sk: None,
++                limit: self.config.read_limit,
++            },
++            ReadKind::Scan => BatchRequest::Scan {
++                exclusive_after_key: None,
++                limit: self.config.read_limit,
++            },
++        }
++    }
++
++    fn next_index(&mut self, offset: usize) -> usize {
++        let working_set = self.config.working_set;
++        match self.config.distribution {
++            Distribution::Uniform => self.random_bounded(working_set),
++            Distribution::Sequential => {
++                ((self.operation as usize)
++                    .saturating_mul(self.config.width)
++                    .saturating_add(offset))
++                    % working_set
++            }
++            Distribution::Hotspot => {
++                let hotset = (working_set / 100).max(self.config.width);
++                if self.random_bounded(100) < 80 {
++                    self.random_bounded(hotset.min(working_set))
++                } else {
++                    self.random_bounded(working_set)
++                }
++            }
++            Distribution::SameLeafHeavy => {
++                let span = working_set.min(64).max(self.config.width);
++                ((self.operation as usize)
++                    .saturating_mul(self.config.width)
++                    .saturating_add(offset))
++                    % span.min(working_set)
++            }
++            Distribution::DifferentLeafHeavy => {
++                (self
++                    .worker_id
++                    .saturating_mul(1_009)
++                    .saturating_add((self.operation as usize).saturating_mul(self.config.width))
++                    .saturating_add(offset))
++                    % working_set
++            }
++        }
++    }
++
++    fn random_bounded(&mut self, bound: usize) -> usize {
++        assert!(bound > 0);
++        self.state = splitmix64(self.state);
++        (self.state as usize) % bound
++    }
++
++    fn key_for_index(&self, index: usize) -> DocumentKey {
++        let (pk_len, sk_len) = key_component_lengths(self.config.key_size);
++        match self.config.distribution {
++            Distribution::SameLeafHeavy => DocumentKey::new(
++                component_bytes(0x11, 0, pk_len),
++                component_bytes(0x21, index as u64, sk_len),
++            ),
++            Distribution::DifferentLeafHeavy => DocumentKey::new(
++                component_bytes(0x31, index as u64, pk_len),
++                component_bytes(0x41, index as u64, sk_len),
++            ),
++            Distribution::Uniform | Distribution::Sequential | Distribution::Hotspot => {
++                DocumentKey::new(
++                    component_bytes(0x51, (index % 128) as u64, pk_len),
++                    component_bytes(0x61, index as u64, sk_len),
++                )
++            }
++        }
++    }
++
++    fn seed_keys(&self) -> impl Iterator<Item = DocumentKey> + '_ {
++        (0..self.config.working_set).map(|index| self.key_for_index(index))
++    }
++}
++
++fn splitmix64(mut state: u64) -> u64 {
++    state = state.wrapping_add(0x9e37_79b9_7f4a_7c15);
++    let mut value = state;
++    value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
++    value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
++    value ^ (value >> 31)
++}
++
++fn key_component_lengths(key_size: usize) -> (usize, usize) {
++    let pk_len = (key_size / 2).max(1);
++    let sk_len = key_size.saturating_sub(pk_len).max(1);
++    (pk_len, sk_len)
++}
++
++fn component_bytes(tag: u8, value: u64, length: usize) -> Vec<u8> {
++    let mut bytes = vec![tag; length];
++    let encoded = value.to_be_bytes();
++    let copy_len = encoded.len().min(length);
++    bytes[length - copy_len..].copy_from_slice(&encoded[encoded.len() - copy_len..]);
++    bytes
++}
++
++fn query_pk(key_size: usize) -> Vec<u8> {
++    let (pk_len, _) = key_component_lengths(key_size);
++    component_bytes(0x33, 0, pk_len)
++}
++
++fn query_key(key_size: usize, index: usize) -> DocumentKey {
++    let (_, sk_len) = key_component_lengths(key_size);
++    DocumentKey::new(
++        query_pk(key_size),
++        component_bytes(0x43, index as u64, sk_len),
++    )
++}
++
++fn value_bytes(length: usize, operation: u64, offset: usize) -> Vec<u8> {
++    let byte = (operation.wrapping_add(offset as u64) & 0xff) as u8;
++    vec![byte; length]
++}
++
++struct BenchFile {
++    inner: ProductionFile,
++    sync_mode: SyncMode,
++    sync_delay: Duration,
++}
++
++impl BenchFile {
++    fn open(path: &Path, sync_mode: SyncMode, sync_delay: Duration) -> Result<Self> {
++        Ok(Self {
++            inner: ProductionFile::open(path)?,
++            sync_mode,
++            sync_delay,
++        })
++    }
++}
++
++fn perform_benchmark_sync(
++    mode: SyncMode,
++    delay: Duration,
++    real_sync: impl FnOnce() -> Result<()>,
++) -> Result<()> {
++    match mode {
++        SyncMode::Real => real_sync(),
++        SyncMode::Injected => {
++            if !delay.is_zero() {
++                std::thread::sleep(delay);
++            }
++            real_sync()
++        }
++        SyncMode::Disabled => Ok(()),
++    }
++}
++
++impl DurableFile for BenchFile {
++    fn read_at(&mut self, offset: u64, buffer: &mut [u8]) -> Result<usize> {
++        self.inner.read_at(offset, buffer)
++    }
++
++    fn write_at(&mut self, offset: u64, bytes: &[u8]) -> Result<usize> {
++        self.inner.write_at(offset, bytes)
++    }
++
++    fn len(&self) -> Result<u64> {
++        self.inner.len()
++    }
++
++    fn set_len(&mut self, length: u64) -> Result<()> {
++        self.inner.set_len(length)
++    }
++
++    fn sync_data(&mut self) -> Result<()> {
++        let mode = self.sync_mode;
++        let delay = self.sync_delay;
++        perform_benchmark_sync(mode, delay, || self.inner.sync_data())
++    }
++
++    fn sync_all(&mut self) -> Result<()> {
++        let mode = self.sync_mode;
++        let delay = self.sync_delay;
++        perform_benchmark_sync(mode, delay, || self.inner.sync_all())
++    }
++}
++
++#[derive(Clone)]
++struct EngineSnapshot {
++    coordinator: dodb_storage::CoordinatorMetrics,
++    storage: Option<StorageMetrics>,
++    wal: Option<WalMetrics>,
++}
++
++trait EngineAdapter: Send + Sync {
++    fn execute_transaction<'a>(
++        &'a self,
++        request: TransactionRequest,
++    ) -> BoxFuture<'a, Result<TransactionResult>>;
++    fn execute<'a>(&'a self, request: BatchRequest) -> BoxFuture<'a, Result<BatchResponse>>;
++    fn snapshot(&self) -> EngineSnapshot;
++    fn shutdown<'a>(&'a self) -> BoxFuture<'a, Result<()>>;
++}
++
++struct BaselineAdapter {
++    shard: Arc<BenchShard>,
++}
++
++impl EngineAdapter for BaselineAdapter {
++    fn execute_transaction<'a>(
++        &'a self,
++        request: TransactionRequest,
++    ) -> BoxFuture<'a, Result<TransactionResult>> {
++        Box::pin(async move {
++            let result = self.shard.execute_transaction(request).await?;
++            if result.commit_lsn.is_none() {
++                return Err(Error::invariant("successful mutation omitted commit LSN"));
++            }
++            Ok(result)
++        })
++    }
++
++    fn execute<'a>(&'a self, request: BatchRequest) -> BoxFuture<'a, Result<BatchResponse>> {
++        Box::pin(self.shard.execute(request))
++    }
++
++    fn snapshot(&self) -> EngineSnapshot {
++        EngineSnapshot {
++            coordinator: self.shard.coordinator_metrics(),
++            storage: self.shard.storage_metrics(),
++            wal: self.shard.wal_metrics(),
++        }
++    }
++
++    fn shutdown<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
++        Box::pin(self.shard.shutdown())
++    }
++}
++
++#[derive(Clone, Debug, Default)]
++struct LatencySamples {
++    values: Vec<Duration>,
++    seen: u64,
++    state: u64,
++}
++
++impl LatencySamples {
++    fn with_seed(seed: u64) -> Self {
++        Self {
++            values: Vec::new(),
++            seen: 0,
++            state: seed,
++        }
++    }
++
++    fn push(&mut self, value: Duration) {
++        self.seen = self.seen.saturating_add(1);
++        if self.values.len() < LATENCY_RESERVOIR_LIMIT {
++            self.values.push(value);
++            return;
++        }
++        self.state = splitmix64(self.state);
++        let index = (self.state % self.seen) as usize;
++        if index < LATENCY_RESERVOIR_LIMIT {
++            self.values[index] = value;
++        }
++    }
++
++    fn percentile_us(&self, fraction: f64) -> f64 {
++        if self.values.is_empty() {
++            return 0.0;
++        }
++        let mut values = self.values.clone();
++        values.sort_unstable();
++        let index = ((values.len().saturating_sub(1)) as f64 * fraction).round() as usize;
++        values[index].as_secs_f64() * 1_000_000.0
++    }
++}
++
++#[derive(Clone, Debug)]
++struct WorkerStats {
++    attempted_transactions: u64,
++    successful_transactions: u64,
++    attempted_gets: u64,
++    successful_gets: u64,
++    attempted_queries: u64,
++    successful_queries: u64,
++    attempted_scans: u64,
++    successful_scans: u64,
++    returned_rows: u64,
++    mutation_ops: u64,
++    conflicts: u64,
++    overloads: u64,
++    errors: u64,
++    e2e_latency: LatencySamples,
++    write_latency: LatencySamples,
++    read_latency: LatencySamples,
++}
++
++impl WorkerStats {
++    fn new(seed: u64) -> Self {
++        Self {
++            attempted_transactions: 0,
++            successful_transactions: 0,
++            attempted_gets: 0,
++            successful_gets: 0,
++            attempted_queries: 0,
++            successful_queries: 0,
++            attempted_scans: 0,
++            successful_scans: 0,
++            returned_rows: 0,
++            mutation_ops: 0,
++            conflicts: 0,
++            overloads: 0,
++            errors: 0,
++            e2e_latency: LatencySamples::with_seed(seed),
++            write_latency: LatencySamples::with_seed(seed ^ 0x1111),
++            read_latency: LatencySamples::with_seed(seed ^ 0x2222),
++        }
++    }
++
++    fn merge(&mut self, other: Self) {
++        self.attempted_transactions += other.attempted_transactions;
++        self.successful_transactions += other.successful_transactions;
++        self.attempted_gets += other.attempted_gets;
++        self.successful_gets += other.successful_gets;
++        self.attempted_queries += other.attempted_queries;
++        self.successful_queries += other.successful_queries;
++        self.attempted_scans += other.attempted_scans;
++        self.successful_scans += other.successful_scans;
++        self.returned_rows += other.returned_rows;
++        self.mutation_ops += other.mutation_ops;
++        self.conflicts += other.conflicts;
++        self.overloads += other.overloads;
++        self.errors += other.errors;
++        for value in other.e2e_latency.values {
++            self.e2e_latency.push(value);
++        }
++        for value in other.write_latency.values {
++            self.write_latency.push(value);
++        }
++        for value in other.read_latency.values {
++            self.read_latency.push(value);
++        }
++    }
++
++    fn attempted_operations(&self) -> u64 {
++        self.attempted_transactions
++            + self.attempted_gets
++            + self.attempted_queries
++            + self.attempted_scans
++    }
++
++    fn successful_operations(&self) -> u64 {
++        self.successful_transactions
++            + self.successful_gets
++            + self.successful_queries
++            + self.successful_scans
++    }
++
++    fn successful_reads(&self) -> u64 {
++        self.successful_gets + self.successful_queries + self.successful_scans
++    }
++}
++
++#[derive(Clone, Debug, Default)]
++struct MetricDelta {
++    groups: u64,
++    queued_requests: u64,
++    logical_transactions: u64,
++    queue_wait_nanos: u64,
++    collection_nanos: u64,
++    processing_nanos: u64,
++    max_group_requests: usize,
++    max_group_bytes: usize,
++    validation_nanos: u64,
++    btree_preparation_nanos: u64,
++    publication_nanos: u64,
++    wal_bytes: u64,
++    wal_syncs: u64,
++    wal_committed_batches: u64,
++    page_images: u64,
++    wal_append_nanos: u64,
++    wal_sync_nanos: u64,
++}
++
++impl MetricDelta {
++    fn from(before: &EngineSnapshot, after: &EngineSnapshot) -> Self {
++        let subtraction = |after: u64, before: u64| after.saturating_sub(before);
++        let storage_before = before.storage.clone().unwrap_or_default();
++        let storage_after = after.storage.clone().unwrap_or_default();
++        let wal_before = before.wal.clone().unwrap_or_default();
++        let wal_after = after.wal.clone().unwrap_or_default();
++        Self {
++            groups: subtraction(after.coordinator.groups, before.coordinator.groups),
++            queued_requests: subtraction(after.coordinator.queued_requests, before.coordinator.queued_requests),
++            logical_transactions: subtraction(after.coordinator.logical_transactions, before.coordinator.logical_transactions),
++            queue_wait_nanos: subtraction(after.coordinator.queue_wait_nanos, before.coordinator.queue_wait_nanos),
++            collection_nanos: subtraction(after.coordinator.batch_collection_nanos, before.coordinator.batch_collection_nanos),
++            processing_nanos: subtraction(after.coordinator.processing_nanos, before.coordinator.processing_nanos),
++            max_group_requests: after.coordinator.max_group_requests,
++            max_group_bytes: after.coordinator.max_group_bytes,
++            validation_nanos: subtraction(storage_after.validation_nanos, storage_before.validation_nanos),
++            btree_preparation_nanos: subtraction(storage_after.btree_preparation_nanos, storage_before.btree_preparation_nanos),
++            publication_nanos: subtraction(storage_after.publication_nanos, storage_before.publication_nanos),
++            wal_bytes: wal_after.wal_bytes.saturating_sub(wal_before.wal_bytes),
++            wal_syncs: subtraction(wal_after.wal_syncs, wal_before.wal_syncs),
++            wal_committed_batches: subtraction(wal_after.committed_batches as u64, wal_before.committed_batches as u64),
++            page_images: subtraction(wal_after.page_images as u64, wal_before.page_images as u64),
++            wal_append_nanos: subtraction(wal_after.append_nanos, wal_before.append_nanos),
++            wal_sync_nanos: subtraction(wal_after.sync_nanos, wal_before.sync_nanos),
++        }
++    }
++
++    fn avg_group_requests(&self) -> f64 {
++        self.queued_requests as f64 / self.groups.max(1) as f64
++    }
++
++    fn avg_transactions_per_group(&self) -> f64 {
++        self.logical_transactions as f64 / self.groups.max(1) as f64
++    }
++
++    fn transactions_per_sync(&self) -> f64 {
++        self.wal_committed_batches as f64 / self.wal_syncs.max(1) as f64
++    }
++}
++
++#[derive(Clone, Debug)]
++struct ProcessCpuSample {
++    ticks: Option<u64>,
++    ticks_per_second: u64,
++}
++
++impl ProcessCpuSample {
++    fn capture() -> Self {
++        Self {
++            ticks: process_cpu_ticks(),
++            ticks_per_second: clock_ticks_per_second(),
++        }
++    }
++
++    fn utilization(
++        &self,
++        end: &Self,
++        wall: Duration,
++        logical_cpus: usize,
++    ) -> (Option<f64>, Option<f64>) {
++        let Some(start) = self.ticks else {
++            return (None, None);
++        };
++        let Some(end) = end.ticks else {
++            return (None, None);
++        };
++        if end < start || self.ticks_per_second == 0 || wall.is_zero() {
++            return (None, None);
++        }
++        let cpu_seconds = (end - start) as f64 / self.ticks_per_second as f64;
++        let one_core = cpu_seconds / wall.as_secs_f64() * 100.0;
++        let machine = one_core / logical_cpus.max(1) as f64;
++        (Some(one_core), Some(machine))
++    }
++}
++
++#[derive(Clone, Debug)]
++struct MachineInfo {
++    cpu_model: String,
++    logical_cpus: usize,
++    cpu_cores: Option<usize>,
++    os: String,
++    kernel: String,
++    rust_version: String,
++}
++
++impl MachineInfo {
++    fn collect() -> Self {
++        let cpuinfo = std::fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
++        let cpu_model = if cfg!(target_os = "macos") {
++            command_output("sysctl", &["-n", "machdep.cpu.brand_string"])
++        } else {
++            cpuinfo
++                .lines()
++                .find_map(|line| line.strip_prefix("model name\t: "))
++                .or_else(|| {
++                    cpuinfo
++                        .lines()
++                        .find_map(|line| line.strip_prefix("Model\t\t: "))
++                })
++                .unwrap_or("unknown")
++                .to_owned()
++        };
++        let cpu_cores = if cfg!(target_os = "macos") {
++            command_output("sysctl", &["-n", "hw.physicalcpu"])
++                .parse()
++                .ok()
++        } else {
++            cpuinfo
++                .lines()
++                .find_map(|line| line.strip_prefix("cpu cores\t: "))
++                .and_then(|value| value.parse().ok())
++        };
++        let os = if cfg!(target_os = "macos") {
++            let product_name = command_output("sw_vers", &["-productName"]);
++            let product_version = command_output("sw_vers", &["-productVersion"]);
++            format!("{product_name} {product_version}")
++        } else {
++            std::fs::read_to_string("/etc/os-release")
++                .ok()
++                .and_then(|contents| {
++                    contents
++                        .lines()
++                        .find_map(|line| line.strip_prefix("PRETTY_NAME="))
++                        .map(|value| value.trim_matches('"').to_owned())
++                })
++                .unwrap_or_else(|| "unknown".to_owned())
++        };
++        Self {
++            cpu_model,
++            logical_cpus: std::thread::available_parallelism()
++                .map_or(1, std::num::NonZeroUsize::get),
++            cpu_cores,
++            os,
++            kernel: command_output("uname", &["-srvm"]),
++            rust_version: command_output("rustc", &["--version"]),
++        }
++    }
++}
++
++fn command_output(command: &str, args: &[&str]) -> String {
++    Command::new(command)
++        .args(args)
++        .output()
++        .ok()
++        .filter(|output| output.status.success())
++        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
++        .filter(|output| !output.is_empty())
++        .unwrap_or_else(|| "unknown".to_owned())
++}
++
++fn process_cpu_ticks() -> Option<u64> {
++    #[cfg(target_os = "macos")]
++    {
++        let mut usage = std::mem::MaybeUninit::<libc::rusage>::zeroed();
++        let result = unsafe { libc::getrusage(libc::RUSAGE_SELF, usage.as_mut_ptr()) };
++        if result != 0 {
++            return None;
++        }
++        let usage = unsafe { usage.assume_init() };
++        let user_micros = usage.ru_utime.tv_sec as u64 * 1_000_000 + usage.ru_utime.tv_usec as u64;
++        let system_micros =
++            usage.ru_stime.tv_sec as u64 * 1_000_000 + usage.ru_stime.tv_usec as u64;
++        return Some(user_micros.saturating_add(system_micros));
++    }
++
++    #[cfg(not(target_os = "macos"))]
++    {
++        let stat = std::fs::read_to_string("/proc/self/stat").ok()?;
++        let after_command = stat.rsplit_once(") ")?.1;
++        let fields: Vec<_> = after_command.split_whitespace().collect();
++        let user_ticks = fields.get(11)?.parse::<u64>().ok()?;
++        let system_ticks = fields.get(12)?.parse::<u64>().ok()?;
++        Some(user_ticks.saturating_add(system_ticks))
++    }
++}
++
++fn clock_ticks_per_second() -> u64 {
++    if cfg!(target_os = "macos") {
++        return 1_000_000;
++    }
++    command_output("getconf", &["CLK_TCK"])
++        .parse()
++        .unwrap_or(100)
++}
++
++#[derive(Clone)]
++struct MixQuota {
++    next: Arc<AtomicU64>,
++    read_percent: u8,
++}
++
++impl MixQuota {
++    fn new(read_percent: u8) -> Self {
++        Self {
++            next: Arc::new(AtomicU64::new(0)),
++            read_percent,
++        }
++    }
++
++    async fn claim(&self, role: Role, deadline: Instant) -> bool {
++        loop {
++            if Instant::now() >= deadline {
++                return false;
++            }
++            let slot = self.next.load(Ordering::Relaxed);
++            let read_slot = (slot % 100) < u64::from(self.read_percent);
++            let wanted = matches!(role, Role::Reader) == read_slot;
++            if !wanted {
++                tokio::task::yield_now().await;
++                continue;
++            }
++            if self
++                .next
++                .compare_exchange(slot, slot + 1, Ordering::Relaxed, Ordering::Relaxed)
++                .is_ok()
++            {
++                return true;
++            }
++        }
++    }
++}
++
++async fn writer_loop(
++    adapter: Arc<dyn EngineAdapter>,
++    workload: WorkloadConfig,
++    seed: u64,
++    worker_id: usize,
++    deadline: Instant,
++    quota: Option<MixQuota>,
++    warmup: bool,
++) -> WorkerStats {
++    let mut generator = WorkloadGenerator::new(workload, seed, worker_id);
++    let mut stats = WorkerStats::new(seed ^ worker_id as u64);
++    while Instant::now() < deadline {
++        if let Some(quota) = &quota
++            && !quota.claim(Role::Writer, deadline).await
++        {
++            break;
++        }
++        let request = generator.next_transaction();
++        let width = request.mutations.len() as u64;
++        let started = Instant::now();
++        let result = adapter.execute_transaction(request).await;
++        let elapsed = started.elapsed();
++        if !warmup {
++            stats.attempted_transactions += 1;
++            stats.e2e_latency.push(elapsed);
++            stats.write_latency.push(elapsed);
++            match result {
++                Ok(_) => {
++                    stats.successful_transactions += 1;
++                    stats.mutation_ops += width;
++                }
++                Err(Error::Conflict(_)) => stats.conflicts += 1,
++                Err(Error::Overloaded(_)) => stats.overloads += 1,
++                Err(_) => stats.errors += 1,
++            }
++        }
++    }
++    stats
++}
++
++async fn reader_loop(
++    adapter: Arc<dyn EngineAdapter>,
++    workload: WorkloadConfig,
++    read_kind: ReadKind,
++    seed: u64,
++    worker_id: usize,
++    deadline: Instant,
++    quota: Option<MixQuota>,
++    warmup: bool,
++) -> WorkerStats {
++    let mut generator = WorkloadGenerator::new(workload, seed, worker_id);
++    let mut stats = WorkerStats::new(seed ^ worker_id as u64 ^ 0xfeed);
++    while Instant::now() < deadline {
++        if let Some(quota) = &quota
++            && !quota.claim(Role::Reader, deadline).await
++        {
++            break;
++        }
++        let request = generator.next_read(read_kind);
++        let started = Instant::now();
++        let result = adapter.execute(request).await;
++        let elapsed = started.elapsed();
++        if warmup {
++            continue;
++        }
++        stats.e2e_latency.push(elapsed);
++        stats.read_latency.push(elapsed);
++        match read_kind {
++            ReadKind::Get => stats.attempted_gets += 1,
++            ReadKind::Query => stats.attempted_queries += 1,
++            ReadKind::Scan => stats.attempted_scans += 1,
++        }
++        match result {
++            Ok(BatchResponse::Get(_)) => stats.successful_gets += 1,
++            Ok(BatchResponse::Query(rows)) => {
++                stats.successful_queries += 1;
++                stats.returned_rows += rows.len() as u64;
++            }
++            Ok(BatchResponse::Scan(rows)) => {
++                stats.successful_scans += 1;
++                stats.returned_rows += rows.len() as u64;
++            }
++            Ok(_) => stats.errors += 1,
++            Err(Error::Overloaded(_)) => stats.overloads += 1,
++            Err(_) => stats.errors += 1,
++        }
++    }
++    stats
++}
++
++async fn run_interval(
++    adapter: Arc<dyn EngineAdapter>,
++    args: &Args,
++    scenario: &Scenario,
++    seed: u64,
++    duration: Duration,
++    warmup: bool,
++) -> WorkerStats {
++    let deadline = Instant::now() + duration;
++    let workload = WorkloadConfig {
++        distribution: scenario.distribution,
++        working_set: args.working_set,
++        key_size: args.key_size,
++        value_size: args.value_size,
++        width: scenario.width,
++        transaction_mode: args.transaction_mode,
++        read_limit: args.read_limit,
++    };
++    let quota = scenario.mix.map(|mix| MixQuota::new(mix.read_percent));
++    let mut tasks = Vec::with_capacity(scenario.writers + scenario.readers);
++    for worker_id in 0..scenario.writers {
++        tasks.push(tokio::spawn(writer_loop(
++            Arc::clone(&adapter),
++            workload.clone(),
++            seed ^ 0x1000_0000,
++            worker_id,
++            deadline,
++            quota.clone(),
++            warmup,
++        )));
++    }
++    for worker_id in 0..scenario.readers {
++        tasks.push(tokio::spawn(reader_loop(
++            Arc::clone(&adapter),
++            workload.clone(),
++            scenario.read_kind.unwrap_or(ReadKind::Get),
++            seed ^ 0x2000_0000,
++            worker_id,
++            deadline,
++            quota.clone(),
++            warmup,
++        )));
++    }
++    let mut stats = WorkerStats::new(seed ^ 0xabcd);
++    for task in tasks {
++        stats.merge(task.await.expect("benchmark worker task should not panic"));
++    }
++    stats
++}
++
++fn benchmark_config(args: &Args, scenario: &Scenario) -> CoordinatorConfig {
++    CoordinatorConfig {
++        queue_capacity: args.queue_capacity,
++        max_group_requests: args.max_group_requests,
++        max_group_bytes: args.max_group_bytes,
++        max_collection_delay: scenario.collection_delay,
++    }
++}
++
++fn effective_sync(args: &Args, scenario: &Scenario) -> (SyncMode, Duration) {
++    if scenario.suite == Suite::SyncSweep {
++        (SyncMode::Injected, scenario.sync_delay)
++    } else {
++        match args.sync_mode {
++            SyncMode::Real => (SyncMode::Real, Duration::ZERO),
++            SyncMode::Injected => (SyncMode::Injected, scenario.sync_delay),
++            SyncMode::Disabled => (SyncMode::Disabled, Duration::ZERO),
++        }
++    }
++}
++
++fn benchmark_path(scenario: &Scenario, repetition: usize, seed: u64) -> PathBuf {
++    let scenario_name = scenario.name().replace(['/', '\\'], "_");
++    env::temp_dir().join(format!(
++        "dodb-phase0-{}-{}-{}-{seed:016x}.db",
++        std::process::id(),
++        scenario_name,
++        repetition
++    ))
++}
++
++fn seed_store(
++    store: &mut BTreeStore<BenchFile, BenchFile>,
++    args: &Args,
++    scenario: &Scenario,
++) -> Result<usize> {
++    let requests = seed_requests(args, scenario);
++    let seeded = requests.iter().map(|request| request.mutations.len()).sum();
++    for chunk in requests.chunks(64) {
++        store.apply_transaction_group(chunk)?;
++    }
++    Ok(seeded)
++}
++
++fn seed_requests(args: &Args, scenario: &Scenario) -> Vec<TransactionRequest> {
++    let workload = WorkloadConfig {
++        distribution: scenario.distribution,
++        working_set: args.working_set,
++        key_size: args.key_size,
++        value_size: args.value_size,
++        width: 25.min(args.working_set),
++        transaction_mode: TransactionMode::Unconditional,
++        read_limit: args.read_limit,
++    };
++    let generator = WorkloadGenerator::new(workload.clone(), args.seed, 0);
++    let mut requests = Vec::new();
++    let mut mutations = Vec::new();
++    for (index, key) in generator.seed_keys().enumerate() {
++        mutations.push(TransactionMutation::Put {
++            key,
++            value: value_bytes(args.value_size, index as u64, 0),
++        });
++        if mutations.len() >= 25 {
++            requests.push(TransactionRequest::new(
++                Vec::new(),
++                std::mem::take(&mut mutations),
++            ));
++        }
++    }
++    if !mutations.is_empty() {
++        requests.push(TransactionRequest::new(Vec::new(), mutations));
++    }
++
++    // Query/scan rows use a separate PK so that every read scenario returns a
++    // stable, non-empty result without changing the write key distribution.
++    if scenario.read_kind.is_some() || scenario.mix.is_some() {
++        let query_rows = args.working_set.min(256);
++        let mut query_mutations = Vec::new();
++        for index in 0..query_rows {
++            query_mutations.push(TransactionMutation::Put {
++                key: query_key(args.key_size, index),
++                value: value_bytes(args.value_size, index as u64, 0),
++            });
++            if query_mutations.len() >= 25 {
++                requests.push(TransactionRequest::new(
++                    Vec::new(),
++                    std::mem::take(&mut query_mutations),
++                ));
++            }
++        }
++        if !query_mutations.is_empty() {
++            requests.push(TransactionRequest::new(Vec::new(), query_mutations));
++        }
++    }
++
++    requests
++}
++
++async fn open_adapter(
++    args: &Args,
++    scenario: &Scenario,
++    repetition: usize,
++    seed: u64,
++) -> Result<(Arc<dyn EngineAdapter>, PathBuf, usize)> {
++    let data_path = benchmark_path(scenario, repetition, seed);
++    let wal_path = data_path.with_extension("wal");
++    remove_database_files(&data_path);
++    let (sync_mode, sync_delay) = effective_sync(args, scenario);
++    let config = DatabaseConfig::default().with_cache_capacity(args.cache_capacity);
++    let mut store = BTreeStore::open_with_wal(
++        BenchFile::open(&data_path, sync_mode, sync_delay)?,
++        BenchFile::open(&wal_path, sync_mode, sync_delay)?,
++        config,
++    )?;
++    let seeded = seed_store(&mut store, args, scenario)?;
++    let shard = Arc::new(AsyncShard::start_with_config(
++        store,
++        benchmark_config(args, scenario),
++    ));
++    Ok((Arc::new(BaselineAdapter { shard }), data_path, seeded))
++}
++
++fn remove_database_files(data_path: &Path) {
++    let _ = std::fs::remove_file(data_path);
++    let _ = std::fs::remove_file(data_path.with_extension("wal"));
++}
++
++fn unix_timestamp_ms() -> u128 {
++    SystemTime::now()
++        .duration_since(UNIX_EPOCH)
++        .unwrap_or_default()
++        .as_millis()
++}
++
++#[derive(Clone, Debug)]
++struct JsonObject {
++    fields: Vec<(String, String)>,
++}
++
++impl JsonObject {
++    fn new() -> Self {
++        Self { fields: Vec::new() }
++    }
++
++    fn string(&mut self, key: &str, value: &str) {
++        self.fields.push((key.to_owned(), json_string(value)));
++    }
++
++    fn usize(&mut self, key: &str, value: usize) {
++        self.fields.push((key.to_owned(), value.to_string()));
++    }
++
++    fn u64(&mut self, key: &str, value: u64) {
++        self.fields.push((key.to_owned(), value.to_string()));
++    }
++
++    fn f64(&mut self, key: &str, value: f64) {
++        self.fields.push((
++            key.to_owned(),
++            if value.is_finite() {
++                format!("{value:.6}")
++            } else {
++                "null".to_owned()
++            },
++        ));
++    }
++
++    fn optional_f64(&mut self, key: &str, value: Option<f64>) {
++        match value {
++            Some(value) => self.f64(key, value),
++            None => self.fields.push((key.to_owned(), "null".to_owned())),
++        }
++    }
++
++    fn finish(self) -> String {
++        let fields = self
++            .fields
++            .into_iter()
++            .map(|(key, value)| format!("{}:{value}", json_string(&key)))
++            .collect::<Vec<_>>();
++        format!("{{{}}}", fields.join(","))
++    }
++}
++
++fn json_string(value: &str) -> String {
++    let mut output = String::with_capacity(value.len() + 2);
++    output.push('"');
++    for character in value.chars() {
++        match character {
++            '"' => output.push_str("\\\""),
++            '\\' => output.push_str("\\\\"),
++            '\n' => output.push_str("\\n"),
++            '\r' => output.push_str("\\r"),
++            '\t' => output.push_str("\\t"),
++            character if character.is_control() => {
++                let _ = write!(output, "\\u{:04x}", character as u32);
++            }
++            character => output.push(character),
++        }
++    }
++    output.push('"');
++    output
++}
++
++fn metric_field_name(prefix: &str, field: &str) -> String {
++    format!("{prefix}_{field}")
++}
++
++fn build_record(
++    machine: &MachineInfo,
++    args: &Args,
++    scenario: &Scenario,
++    repetition: usize,
++    seed: u64,
++    seeded_rows: usize,
++    measured: &WorkerStats,
++    delta: &MetricDelta,
++    wall: Duration,
++    cpu_start: &ProcessCpuSample,
++    cpu_end: &ProcessCpuSample,
++) -> String {
++    let mut json = JsonObject::new();
++    let seconds = wall.as_secs_f64().max(f64::EPSILON);
++    let logical_tx_per_second = measured.successful_transactions as f64 / seconds;
++    let mutation_ops_per_second = measured.mutation_ops as f64 / seconds;
++    let get_ops_per_second = measured.successful_gets as f64 / seconds;
++    let query_ops_per_second = measured.successful_queries as f64 / seconds;
++    let scan_ops_per_second = measured.successful_scans as f64 / seconds;
++    let read_ops_per_second = measured.successful_reads() as f64 / seconds;
++    let aggregate_ops_per_second = measured.successful_operations() as f64 / seconds;
++    let rows_per_second = measured.returned_rows as f64 / seconds;
++    let (cpu_one_core, cpu_machine) = cpu_start.utilization(cpu_end, wall, machine.logical_cpus);
++
++    json.string("record_type", "run");
++    json.u64("timestamp_unix_ms", unix_timestamp_ms() as u64);
++    json.string("git_commit", &current_git_commit());
++    json.string("baseline_commit", BASELINE_COMMIT);
++    json.string("engine", args.engine.as_str());
++    json.string(
++        "build_mode",
++        if cfg!(debug_assertions) {
++            "debug"
++        } else {
++            "release"
++        },
++    );
++    json.string("cpu_model", &machine.cpu_model);
++    json.usize("logical_cpus", machine.logical_cpus);
++    if let Some(cpu_cores) = machine.cpu_cores {
++        json.usize("cpu_cores", cpu_cores);
++    }
++    json.string("os", &machine.os);
++    json.string("kernel", &machine.kernel);
++    json.string("rust_version", &machine.rust_version);
++    json.usize("tokio_workers", args.tokio_workers);
++    json.string("suite", scenario.suite.as_str());
++    json.string("workload", scenario.workload);
++    json.usize("writers", scenario.writers);
++    json.usize("readers", scenario.readers);
++    json.usize("transaction_width", scenario.width);
++    json.string("distribution", scenario.distribution.as_str());
++    json.string(
++        "read_kind",
++        scenario.read_kind.map_or("none", ReadKind::as_str),
++    );
++    json.string("mix", scenario.mix.map_or("none", Mix::as_str));
++    json.string("transaction_mode", args.transaction_mode.as_str());
++    json.usize("cache_capacity", args.cache_capacity);
++    json.usize("working_set", args.working_set);
++    json.usize("seeded_rows", seeded_rows);
++    json.usize("key_size", args.key_size);
++    json.usize("value_size", args.value_size);
++    json.usize("read_limit", args.read_limit);
++    json.usize("queue_capacity", args.queue_capacity);
++    json.usize("max_group_requests", args.max_group_requests);
++    json.usize("max_group_bytes", args.max_group_bytes);
++    json.u64(
++        "collection_delay_us",
++        scenario.collection_delay.as_micros() as u64,
++    );
++    let (sync_mode, sync_delay) = effective_sync(args, scenario);
++    json.string("sync_mode", sync_mode.as_str());
++    json.u64("sync_delay_us", sync_delay.as_micros() as u64);
++    json.u64("seed", seed);
++    json.u64("duration_ms", wall.as_millis() as u64);
++    json.u64("warmup_ms", args.warmup.as_millis() as u64);
++    json.usize("repetition", repetition);
++    json.u64("attempted_operations", measured.attempted_operations());
++    json.u64("successful_operations", measured.successful_operations());
++    json.u64("attempted_transactions", measured.attempted_transactions);
++    json.u64("successful_transactions", measured.successful_transactions);
++    json.u64("attempted_gets", measured.attempted_gets);
++    json.u64("successful_gets", measured.successful_gets);
++    json.u64("attempted_queries", measured.attempted_queries);
++    json.u64("successful_queries", measured.successful_queries);
++    json.u64("attempted_scans", measured.attempted_scans);
++    json.u64("successful_scans", measured.successful_scans);
++    json.u64("conflicts", measured.conflicts);
++    json.u64("overloads", measured.overloads);
++    json.u64("errors", measured.errors);
++    json.u64("mutation_ops", measured.mutation_ops);
++    json.u64("returned_rows", measured.returned_rows);
++    json.f64("logical_tx_per_second", logical_tx_per_second);
++    json.f64("mutation_ops_per_second", mutation_ops_per_second);
++    json.f64("get_ops_per_second", get_ops_per_second);
++    json.f64("query_ops_per_second", query_ops_per_second);
++    json.f64("scan_ops_per_second", scan_ops_per_second);
++    json.f64("read_ops_per_second", read_ops_per_second);
++    json.f64("aggregate_ops_per_second", aggregate_ops_per_second);
++    json.f64("returned_rows_per_second", rows_per_second);
++    for (prefix, samples) in [
++        ("e2e", &measured.e2e_latency),
++        ("write", &measured.write_latency),
++        ("read", &measured.read_latency),
++    ] {
++        json.f64(
++            &metric_field_name(prefix, "p50_us"),
++            samples.percentile_us(0.50),
++        );
++        json.f64(
++            &metric_field_name(prefix, "p95_us"),
++            samples.percentile_us(0.95),
++        );
++        json.f64(
++            &metric_field_name(prefix, "p99_us"),
++            samples.percentile_us(0.99),
++        );
++        json.u64(&metric_field_name(prefix, "latency_samples"), samples.seen);
++    }
++    json.optional_f64("cpu_utilization_percent_one_core", cpu_one_core);
++    json.optional_f64("cpu_utilization_percent_machine", cpu_machine);
++
++    json.u64("groups", delta.groups);
++    json.u64("queued_requests", delta.queued_requests);
++    json.u64("logical_transactions_metric", delta.logical_transactions);
++    json.f64("avg_group_requests", delta.avg_group_requests());
++    json.f64("avg_transactions_per_group", delta.avg_transactions_per_group());
++    json.usize("max_actual_group_requests", delta.max_group_requests);
++    json.usize("max_actual_group_bytes", delta.max_group_bytes);
++    json.u64("queue_wait_nanos_total", delta.queue_wait_nanos);
++    json.u64("collection_nanos_total", delta.collection_nanos);
++    json.u64("processing_nanos_total", delta.processing_nanos);
++    json.u64("validation_nanos_total", delta.validation_nanos);
++    json.u64("btree_preparation_nanos_total", delta.btree_preparation_nanos);
++    json.u64("publication_nanos_total", delta.publication_nanos);
++    json.u64("wal_bytes_delta", delta.wal_bytes);
++    json.u64("wal_syncs_delta", delta.wal_syncs);
++    json.u64("wal_committed_batches_delta", delta.wal_committed_batches);
++    json.u64("page_images_delta", delta.page_images);
++    json.u64("wal_append_nanos_total", delta.wal_append_nanos);
++    json.u64("wal_sync_nanos_total", delta.wal_sync_nanos);
++    json.f64("transactions_per_sync", delta.transactions_per_sync());
++    json.string(
++        "component_timing_scope",
++        "existing cumulative coordinator/storage/WAL metrics; per-request component percentiles unavailable without production hot-path instrumentation",
++    );
++    json.finish()
++}
++
++fn current_git_commit() -> String {
++    command_output("git", &["rev-parse", "HEAD"])
++}
++
++fn print_run_summary(
++    scenario: &Scenario,
++    repetition: usize,
++    measured: &WorkerStats,
++    wall: Duration,
++    delta: &MetricDelta,
++) {
++    let seconds = wall.as_secs_f64().max(f64::EPSILON);
++    println!(
++        "{:<58} rep={} tx/s={:>9.0} mut/s={:>9.0} read/s={:>9.0} agg/s={:>9.0} p50={:>8.1}us p95={:>8.1}us p99={:>8.1}us groups={:>5} avg_group={:>5.2}",
++        scenario.name(),
++        repetition,
++        measured.successful_transactions as f64 / seconds,
++        measured.mutation_ops as f64 / seconds,
++        measured.successful_reads() as f64 / seconds,
++        measured.successful_operations() as f64 / seconds,
++        measured.e2e_latency.percentile_us(0.50),
++        measured.e2e_latency.percentile_us(0.95),
++        measured.e2e_latency.percentile_us(0.99),
++        delta.groups,
++        delta.avg_group_requests(),
++    );
++}
++
++async fn run_repetition(
++    args: &Args,
++    scenario: &Scenario,
++    machine: &MachineInfo,
++    repetition: usize,
++    seed: u64,
++    output: &mut std::fs::File,
++) -> Result<()> {
++    let (adapter, data_path, seeded_rows) = open_adapter(args, scenario, repetition, seed).await?;
++    let warmup_stats = run_interval(
++        Arc::clone(&adapter),
++        args,
++        scenario,
++        seed ^ 0xaaaa_0000,
++        args.warmup,
++        true,
++    )
++    .await;
++    let _ = warmup_stats;
++    let before = adapter.snapshot();
++    let cpu_start = ProcessCpuSample::capture();
++    let started = Instant::now();
++    let measured = run_interval(
++        Arc::clone(&adapter),
++        args,
++        scenario,
++        seed ^ 0xbbbb_0000,
++        args.duration,
++        false,
++    )
++    .await;
++    let wall = started.elapsed();
++    let cpu_end = ProcessCpuSample::capture();
++    let after = adapter.snapshot();
++    let delta = MetricDelta::from(&before, &after);
++    print_run_summary(scenario, repetition, &measured, wall, &delta);
++    let line = build_record(
++        machine,
++        args,
++        scenario,
++        repetition,
++        seed,
++        seeded_rows,
++        &measured,
++        &delta,
++        wall,
++        &cpu_start,
++        &cpu_end,
++    );
++    use std::io::Write;
++    writeln!(output, "{line}")?;
++    output.flush()?;
++    adapter.shutdown().await?;
++    remove_database_files(&data_path);
++    Ok(())
++}
++
++fn open_output(path: &Path) -> std::fs::File {
++    if let Some(parent) = path.parent() {
++        std::fs::create_dir_all(parent).expect("benchmark output directory should be creatable");
++    }
++    std::fs::OpenOptions::new()
++        .create(true)
++        .truncate(true)
++        .write(true)
++        .open(path)
++        .unwrap_or_else(|error| panic!("benchmark output should open: {error}"))
++}
++
++fn run(args: Args) -> Result<()> {
++    let machine = MachineInfo::collect();
++    println!(
++        "phase0-bench engine={} build={} cpu={:?} logical_cpus={} tokio_workers={} duration={:?} warmup={:?} repetitions={}",
++        args.engine.as_str(),
++        if cfg!(debug_assertions) {
++            "debug"
++        } else {
++            "release"
++        },
++        machine.cpu_model,
++        machine.logical_cpus,
++        args.tokio_workers,
++        args.duration,
++        args.warmup,
++        args.repetitions,
++    );
++    println!("raw output: {}", args.output.display());
++    println!(
++        "scenario                                                       repetition throughput summary"
++    );
++    let mut output = open_output(&args.output);
++    let scenarios = scenarios(&args);
++    let runtime = tokio::runtime::Builder::new_multi_thread()
++        .worker_threads(args.tokio_workers)
++        .enable_all()
++        .build()
++        .map_err(|error| Error::invariant(format!("benchmark runtime should build: {error}")))?;
++    runtime.block_on(async {
++        for (scenario_index, scenario) in scenarios.iter().enumerate() {
++            for repetition in 0..args.repetitions {
++                let seed = args
++                    .seed
++                    .wrapping_add((scenario_index as u64).wrapping_mul(0x9e37_79b9))
++                    .wrapping_add(repetition as u64);
++                run_repetition(&args, scenario, &machine, repetition, seed, &mut output).await?;
++            }
++        }
++        Ok::<(), Error>(())
++    })?;
++    println!(
++        "completed {} scenarios x {} repetitions",
++        scenarios.len(),
++        args.repetitions
++    );
++    Ok(())
++}
++
++fn main() {
++    if let Err(error) = run(Args::parse()) {
++        eprintln!("phase0-bench failed: {error}");
++        std::process::exit(1);
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn workload(distribution: Distribution, width: usize) -> WorkloadConfig {
++        WorkloadConfig {
++            distribution,
++            working_set: 256,
++            key_size: 16,
++            value_size: 64,
++            width,
++            transaction_mode: TransactionMode::Unconditional,
++            read_limit: 16,
++        }
++    }
++
++    #[test]
++    #[test]
++    fn same_seed_produces_same_transaction_sequence() {
++        let mut left = WorkloadGenerator::new(workload(Distribution::Uniform, 4), 42, 3);
++        let mut right = WorkloadGenerator::new(workload(Distribution::Uniform, 4), 42, 3);
++        for _ in 0..32 {
++            assert_eq!(left.next_transaction(), right.next_transaction());
++        }
++    }
++
++    #[test]
++    fn transaction_width_and_key_uniqueness_are_preserved() {
++        for distribution in [
++            Distribution::Uniform,
++            Distribution::Sequential,
++            Distribution::Hotspot,
++            Distribution::SameLeafHeavy,
++            Distribution::DifferentLeafHeavy,
++        ] {
++            let mut generator = WorkloadGenerator::new(workload(distribution, 25), 7, 1);
++            for _ in 0..64 {
++                let request = generator.next_transaction();
++                assert_eq!(request.mutations.len(), 25);
++                let keys = request
++                    .mutations
++                    .iter()
++                    .map(TransactionMutation::key)
++                    .collect::<HashSet<_>>();
++                assert_eq!(keys.len(), 25);
++            }
++        }
++    }
++
++    #[test]
++    fn locality_generators_have_distinct_pk_shapes() {
++        let same = WorkloadGenerator::new(workload(Distribution::SameLeafHeavy, 4), 1, 0);
++        let different = WorkloadGenerator::new(workload(Distribution::DifferentLeafHeavy, 4), 1, 0);
++        let same_keys = same.seed_keys().take(32).collect::<Vec<_>>();
++        let different_keys = different.seed_keys().take(32).collect::<Vec<_>>();
++        assert!(same_keys.windows(2).all(|pair| pair[0].pk == pair[1].pk));
++        assert!(
++            different_keys
++                .windows(2)
++                .any(|pair| pair[0].pk != pair[1].pk)
++        );
++    }
++
++    #[test]
++    fn duration_parser_supports_required_units() {
++        assert_eq!(parse_duration("0"), Duration::ZERO);
++        assert_eq!(parse_duration("50us"), Duration::from_micros(50));
++        assert_eq!(parse_duration("1ms"), Duration::from_millis(1));
++        assert_eq!(parse_duration("2s"), Duration::from_secs(2));
++    }
++
++    #[test]
++    fn disabled_sync_mode_aliases_parse_and_report_canonical_name() {
++        assert_eq!(SyncMode::parse("disabled"), SyncMode::Disabled);
++        assert_eq!(SyncMode::parse("none"), SyncMode::Disabled);
++        assert_eq!(SyncMode::parse("no-sync"), SyncMode::Disabled);
++        assert_eq!(SyncMode::Disabled.as_str(), "disabled");
++    }
++
++    #[test]
++    fn real_benchmark_sync_calls_real_sync_once() {
++        let mut closure_calls = 0;
++        let result = perform_benchmark_sync(SyncMode::Real, Duration::ZERO, || {
++            closure_calls += 1;
++            Ok(())
++        });
++        assert!(result.is_ok());
++        assert_eq!(closure_calls, 1);
++    }
++
++    #[test]
++    fn injected_benchmark_sync_calls_real_sync_once() {
++        let mut closure_calls = 0;
++        let result = perform_benchmark_sync(SyncMode::Injected, Duration::ZERO, || {
++            closure_calls += 1;
++            Ok(())
++        });
++        assert!(result.is_ok());
++        assert_eq!(closure_calls, 1);
++    }
++
++    #[test]
++    fn disabled_benchmark_sync_does_not_call_real_sync() {
++        let mut closure_calls = 0;
++        let result = perform_benchmark_sync(SyncMode::Disabled, Duration::ZERO, || {
++            closure_calls += 1;
++            Ok(())
++        });
++        assert!(result.is_ok());
++        assert_eq!(closure_calls, 0);
++    }
++
++    #[test]
++    fn json_string_escapes_control_characters() {
++        assert_eq!(json_string("a\"b\\c\n"), "\"a\\\"b\\\\c\\n\"");
++    }
++}

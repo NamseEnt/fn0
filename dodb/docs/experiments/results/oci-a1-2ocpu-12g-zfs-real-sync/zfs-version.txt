@@ -1,0 +1,358 @@
+zfs-2.2.11-1
+zfs-kmod-2.2.11-1
+filename:       /lib/modules/6.12.0-206.104.4.4.el9uek.aarch64/extra/zfs.ko
+version:        2.2.11-1
+license:        CDDL
+license:        Dual BSD/GPL
+license:        Dual MIT/GPL
+author:         OpenZFS
+description:    ZFS
+alias:          zzstd
+alias:          zcommon
+alias:          zunicode
+alias:          znvpair
+alias:          zlua
+alias:          icp
+alias:          zavl
+alias:          devname:zfs
+alias:          char-major-10-249
+srcversion:     0E86A937ADF8AC94E0C7F33
+depends:        spl
+name:           zfs
+vermagic:       6.12.0-206.104.4.4.el9uek.aarch64 SMP mod_unload modversions aarch64
+parm:           zvol_inhibit_dev:Do not create zvol device nodes (uint)
+parm:           zvol_major:Major number for zvol device (uint)
+parm:           zvol_threads:Number of threads to handle I/O requests. Setto 0 to use all active CPUs (uint)
+parm:           zvol_request_sync:Synchronously handle bio requests (uint)
+parm:           zvol_max_discard_blocks:Max number of blocks to discard (ulong)
+parm:           zvol_num_taskqs:Number of zvol taskqs (uint)
+parm:           zvol_prefetch_bytes:Prefetch N bytes at zvol start+end (uint)
+parm:           zvol_volmode:Default volmode property value (uint)
+parm:           zvol_blk_mq_queue_depth:Default blk-mq queue depth (uint)
+parm:           zvol_use_blk_mq:Use the blk-mq API for zvols (uint)
+parm:           zvol_blk_mq_blocks_per_thread:Process volblocksize blocks per thread (uint)
+parm:           zvol_open_timeout_ms:Timeout for ZVOL open retries (uint)
+parm:           zfs_xattr_compat:Use legacy ZFS xattr naming for writing new user namespace xattrs
+parm:           zfs_fallocate_reserve_percent:Percentage of length to use for the available capacity check (uint)
+parm:           zfs_key_max_salt_uses:Max number of times a salt value can be used for generating encryption keys before it is rotated (ulong)
+parm:           zfs_object_mutex_size:Size of znode hold array (uint)
+parm:           zfs_unlink_suspend_progress:Set to prevent async unlinks (debug - leaks space into the unlinked set) (int)
+parm:           zfs_delete_blocks:Delete files larger than N blocks async (ulong)
+parm:           zfs_dbgmsg_enable:Enable ZFS debug message log (int)
+parm:           zfs_dbgmsg_maxsize:Maximum ZFS debug log size (uint)
+parm:           zfs_admin_snapshot:Enable mkdir/rmdir/mv in .zfs/snapshot (int)
+parm:           zfs_expire_snapshot:Seconds to expire .zfs/snapshot (int)
+parm:           vdev_file_logical_ashift:Logical ashift for file-based devices
+parm:           vdev_file_physical_ashift:Physical ashift for file-based devices
+parm:           zfs_vdev_scheduler:I/O scheduler
+parm:           zfs_vdev_open_timeout_ms:Timeout before determining that a device is missing
+parm:           zfs_vdev_failfast_mask:Defines failfast mask: 1 - device, 2 - transport, 4 - driver
+parm:           zfs_vdev_disk_max_segs:Maximum number of data segments to add to an IO request (min 4)
+parm:           zfs_vdev_disk_classic:Use classic BIO submission method
+parm:           zfs_arc_shrinker_limit:Limit on number of pages that ARC shrinker can reclaim at once
+parm:           zfs_arc_shrinker_seeks:Relative cost of ARC eviction vs other kernel subsystems
+parm:           zfs_abd_scatter_enabled:Toggle whether ABD allocations must be linear. (int)
+parm:           zfs_abd_scatter_min_size:Minimum size of scatter allocations. (int)
+parm:           zfs_abd_scatter_max_order:Maximum order allocation used for a scatter ABD. (uint)
+parm:           zio_slow_io_ms:Max I/O completion time (milliseconds) before marking it as slow
+parm:           zio_requeue_io_start_cut_in_line:Prioritize requeued I/O
+parm:           zfs_sync_pass_deferred_free:Defer frees starting in this pass
+parm:           zfs_sync_pass_dont_compress:Don't compress starting in this pass
+parm:           zfs_sync_pass_rewrite:Rewrite new bps starting in this pass
+parm:           zio_dva_throttle_enabled:Throttle block allocations in the ZIO pipeline
+parm:           zio_deadman_log_all:Log all slow ZIOs, not just those with vdevs
+parm:           zfs_commit_timeout_pct:ZIL block open timeout percentage
+parm:           zil_replay_disable:Disable intent logging replay
+parm:           zil_nocacheflush:Disable ZIL cache flushes
+parm:           zil_slog_bulk:Limit in bytes slog sync writes per commit
+parm:           zil_maxblocksize:Limit in bytes of ZIL log block size
+parm:           zil_maxcopied:Limit in bytes WR_COPIED size
+parm:           zfs_vnops_read_chunk_size:Bytes to read per chunk
+parm:           zfs_bclone_enabled:Enable block cloning
+parm:           zfs_bclone_wait_dirty:Wait for dirty blocks when cloning
+parm:           zfs_zil_saxattr:Disable xattr=sa extended attribute logging in ZIL by settng 0.
+parm:           zfs_immediate_write_sz:Largest data block to write to zil
+parm:           zfs_max_nvlist_src_size:Maximum size in bytes allowed for src nvlist passed with ZFS ioctls
+parm:           zfs_history_output_max:Maximum size in bytes of ZFS ioctl output that will be logged
+parm:           zfs_zevent_retain_max:Maximum recent zevents records to retain for duplicate checking
+parm:           zfs_zevent_retain_expire_secs:Expiration time for recent zevents records
+parm:           zfs_lua_max_instrlimit:Max instruction limit that can be specified for a channel program
+parm:           zfs_lua_max_memlimit:Max memory limit that can be specified for a channel program
+parm:           zap_micro_max_size:Maximum micro ZAP size, before converting to a fat ZAP, in bytes
+parm:           zap_iterate_prefetch:When iterating ZAP object, prefetch it
+parm:           zfs_trim_extent_bytes_max:Max size of TRIM commands, larger will be split
+parm:           zfs_trim_extent_bytes_min:Min size of TRIM commands, smaller will be skipped
+parm:           zfs_trim_metaslab_skip:Skip metaslabs which have never been initialized
+parm:           zfs_trim_txg_batch:Min number of txgs to aggregate frees before issuing TRIM
+parm:           zfs_trim_queue_limit:Max queued TRIMs outstanding per leaf vdev
+parm:           zfs_removal_ignore_errors:Ignore hard IO errors when removing device
+parm:           zfs_remove_max_segment:Largest contiguous segment to allocate when removing device
+parm:           vdev_removal_max_span:Largest span of free chunks a remap segment can span
+parm:           zfs_removal_suspend_progress:Pause device removal after this many bytes are copied (debug use only - causes removal to hang)
+parm:           zfs_rebuild_max_segment:Max segment size in bytes of rebuild reads
+parm:           zfs_rebuild_vdev_limit:Max bytes in flight per leaf vdev for sequential resilvers
+parm:           zfs_rebuild_scrub_enabled:Automatically scrub after sequential resilver completes
+parm:           zfs_vdev_raidz_impl:Select raidz implementation.
+parm:           zfs_vdev_aggregation_limit:Max vdev I/O aggregation size
+parm:           zfs_vdev_aggregation_limit_non_rotating:Max vdev I/O aggregation size for non-rotating media
+parm:           zfs_vdev_read_gap_limit:Aggregate read I/O over gap
+parm:           zfs_vdev_write_gap_limit:Aggregate write I/O over gap
+parm:           zfs_vdev_max_active:Maximum number of active I/Os per vdev
+parm:           zfs_vdev_async_write_active_max_dirty_percent:Async write concurrency max threshold
+parm:           zfs_vdev_async_write_active_min_dirty_percent:Async write concurrency min threshold
+parm:           zfs_vdev_async_read_max_active:Max active async read I/Os per vdev
+parm:           zfs_vdev_async_read_min_active:Min active async read I/Os per vdev
+parm:           zfs_vdev_async_write_max_active:Max active async write I/Os per vdev
+parm:           zfs_vdev_async_write_min_active:Min active async write I/Os per vdev
+parm:           zfs_vdev_initializing_max_active:Max active initializing I/Os per vdev
+parm:           zfs_vdev_initializing_min_active:Min active initializing I/Os per vdev
+parm:           zfs_vdev_removal_max_active:Max active removal I/Os per vdev
+parm:           zfs_vdev_removal_min_active:Min active removal I/Os per vdev
+parm:           zfs_vdev_scrub_max_active:Max active scrub I/Os per vdev
+parm:           zfs_vdev_scrub_min_active:Min active scrub I/Os per vdev
+parm:           zfs_vdev_sync_read_max_active:Max active sync read I/Os per vdev
+parm:           zfs_vdev_sync_read_min_active:Min active sync read I/Os per vdev
+parm:           zfs_vdev_sync_write_max_active:Max active sync write I/Os per vdev
+parm:           zfs_vdev_sync_write_min_active:Min active sync write I/Os per vdev
+parm:           zfs_vdev_trim_max_active:Max active trim/discard I/Os per vdev
+parm:           zfs_vdev_trim_min_active:Min active trim/discard I/Os per vdev
+parm:           zfs_vdev_rebuild_max_active:Max active rebuild I/Os per vdev
+parm:           zfs_vdev_rebuild_min_active:Min active rebuild I/Os per vdev
+parm:           zfs_vdev_nia_credit:Number of non-interactive I/Os to allow in sequence
+parm:           zfs_vdev_nia_delay:Number of non-interactive I/Os before _max_active
+parm:           zfs_vdev_queue_depth_pct:Queue depth percentage for each top-level vdev
+parm:           zfs_vdev_def_queue_depth:Default queue depth for each allocator
+parm:           zfs_vdev_mirror_rotating_inc:Rotating media load increment for non-seeking I/Os
+parm:           zfs_vdev_mirror_rotating_seek_inc:Rotating media load increment for seeking I/Os
+parm:           zfs_vdev_mirror_rotating_seek_offset:Offset in bytes from the last I/O which triggers a reduced rotating media seek increment
+parm:           zfs_vdev_mirror_non_rotating_inc:Non-rotating media load increment for non-seeking I/Os
+parm:           zfs_vdev_mirror_non_rotating_seek_inc:Non-rotating media load increment for seeking I/Os
+parm:           zfs_initialize_value:Value written during zpool initialize
+parm:           zfs_initialize_chunk_size:Size in bytes of writes by zpool initialize
+parm:           zfs_condense_indirect_vdevs_enable:Whether to attempt condensing indirect vdev mappings
+parm:           zfs_condense_indirect_obsolete_pct:Minimum obsolete percent of bytes in the mapping to attempt condensing
+parm:           zfs_condense_min_mapping_bytes:Don't bother condensing if the mapping uses less than this amount of memory
+parm:           zfs_condense_max_obsolete_bytes:Minimum size obsolete spacemap to attempt condensing
+parm:           zfs_condense_indirect_commit_entry_delay_ms:Used by tests to ensure certain actions happen in the middle of a condense. A maximum value of 1 should be sufficient.
+parm:           zfs_reconstruct_indirect_combinations_max:Maximum number of combinations when reconstructing split segments
+parm:           zfs_vdev_default_ms_count:Target number of metaslabs per top-level vdev
+parm:           zfs_vdev_default_ms_shift:Default lower limit for metaslab size
+parm:           zfs_vdev_max_ms_shift:Default upper limit for metaslab size
+parm:           zfs_vdev_min_ms_count:Minimum number of metaslabs per top-level vdev
+parm:           zfs_vdev_ms_count_limit:Practical upper limit of total metaslabs per top-level vdev
+parm:           zfs_slow_io_events_per_second:Rate limit slow IO (delay) events to this many per second
+parm:           zfs_deadman_events_per_second:Rate limit hung IO (deadman) events to this many per second
+parm:           zfs_checksum_events_per_second:Rate limit checksum events to this many checksum errors per second (do not set below ZED threshold).
+parm:           zfs_scan_ignore_errors:Ignore errors during resilver/scrub
+parm:           vdev_validate_skip:Bypass vdev_validate()
+parm:           zfs_nocacheflush:Disable cache flushes
+parm:           zfs_embedded_slog_min_ms:Minimum number of metaslabs required to dedicate one for log blocks
+parm:           zfs_vdev_min_auto_ashift:Minimum ashift used when creating new top-level vdevs
+parm:           zfs_vdev_max_auto_ashift:Maximum ashift used when optimizing for logical -> physical sector size on new top-level vdevs
+parm:           zfs_txg_timeout:Max seconds worth of delta per txg
+parm:           zfs_read_history:Historical statistics for the last N reads
+parm:           zfs_read_history_hits:Include cache hits in read history
+parm:           zfs_txg_history:Historical statistics for the last N txgs
+parm:           zfs_multihost_history:Historical statistics for last N multihost writes
+parm:           zfs_flags:Set additional debugging flags
+parm:           zfs_recover:Set to attempt to recover from fatal errors
+parm:           zfs_free_leak_on_eio:Set to ignore IO errors during free and permanently leak the space
+parm:           zfs_deadman_checktime_ms:Dead I/O check interval in milliseconds
+parm:           zfs_deadman_enabled:Enable deadman timer
+parm:           spa_asize_inflation:SPA size estimate multiplication factor
+parm:           zfs_ddt_data_is_special:Place DDT data into the special class
+parm:           zfs_user_indirect_is_special:Place user data indirect blocks into the special class
+parm:           zfs_deadman_failmode:Failmode for deadman timer
+parm:           zfs_deadman_synctime_ms:Pool sync expiration time in milliseconds
+parm:           zfs_deadman_ziotime_ms:IO expiration time in milliseconds
+parm:           zfs_special_class_metadata_reserve_pct:Small file blocks in special vdevs depends on this much free space available
+parm:           spa_slop_shift:Reserved free space in pool
+parm:           zfs_unflushed_max_mem_amt:Specific hard-limit in memory that ZFS allows to be used for unflushed changes
+parm:           zfs_unflushed_max_mem_ppm:Percentage of the overall system memory that ZFS allows to be used for unflushed changes (value is calculated over 1000000 for finer granularity)
+parm:           zfs_unflushed_log_block_max:Hard limit (upper-bound) in the size of the space map log in terms of blocks.
+parm:           zfs_unflushed_log_block_min:Lower-bound limit for the maximum amount of blocks allowed in log spacemap (see zfs_unflushed_log_block_max)
+parm:           zfs_unflushed_log_txg_max:Hard limit (upper-bound) in the size of the space map log in terms of dirty TXGs.
+parm:           zfs_unflushed_log_block_pct:Tunable used to determine the number of blocks that can be used for the spacemap log, expressed as a percentage of the total number of metaslabs in the pool (e.g. 400 means the number of log blocks is capped at 4 times the number of metaslabs)
+parm:           zfs_max_log_walking:The number of past TXGs that the flushing algorithm of the log spacemap feature uses to estimate incoming log blocks
+parm:           zfs_keep_log_spacemaps_at_export:Prevent the log spacemaps from being flushed and destroyed during pool export/destroy
+parm:           zfs_max_logsm_summary_length:Maximum number of rows allowed in the summary of the spacemap log
+parm:           zfs_min_metaslabs_to_flush:Minimum number of metaslabs to flush per dirty TXG
+parm:           spa_upgrade_errlog_limit:Limit the number of errors which will be upgraded to the new on-disk error log when enabling head_errlog
+parm:           spa_config_path:SPA config file (/etc/zfs/zpool.cache)
+parm:           zfs_autoimport_disable:Disable pool import at module load
+parm:           zfs_spa_discard_memory_limit:Limit for memory used in prefetching the checkpoint space map done on each vdev while discarding the checkpoint
+parm:           metaslab_preload_pct:Percentage of CPUs to run a metaslab preload taskq
+parm:           spa_load_verify_shift:log2 fraction of arc that can be used by inflight I/Os when verifying pool during import
+parm:           spa_load_verify_metadata:Set to traverse metadata on pool import
+parm:           spa_load_verify_data:Set to traverse data on pool import
+parm:           spa_load_print_vdev_tree:Print vdev tree to zfs_dbgmsg during pool import
+parm:           zio_taskq_batch_pct:Percentage of CPUs to run an IO worker thread
+parm:           zio_taskq_batch_tpq:Number of threads per IO worker taskqueue
+parm:           zfs_max_missing_tvds:Allow importing pool with up to this number of missing top-level vdevs (in read-only mode)
+parm:           zfs_livelist_condense_zthr_pause:Set the livelist condense zthr to pause
+parm:           zfs_livelist_condense_sync_pause:Set the livelist condense synctask to pause
+parm:           zfs_livelist_condense_sync_cancel:Whether livelist condensing was canceled in the synctask
+parm:           zfs_livelist_condense_zthr_cancel:Whether livelist condensing was canceled in the zthr function
+parm:           zfs_livelist_condense_new_alloc:Whether extra ALLOC blkptrs were added to a livelist entry while it was being condensed
+parm:           zio_taskq_read:Configure IO queues for read IO
+parm:           zio_taskq_write:Configure IO queues for write IO
+parm:           zfs_multilist_num_sublists:Number of sublists used in each multilist
+parm:           zfs_multihost_interval:Milliseconds between mmp writes to each leaf
+parm:           zfs_multihost_fail_intervals:Max allowed period without a successful mmp write
+parm:           zfs_multihost_import_intervals:Number of zfs_multihost_interval periods to wait for activity
+parm:           metaslab_aliquot:Allocation granularity (a.k.a. stripe size)
+parm:           metaslab_debug_load:Load all metaslabs when pool is first opened
+parm:           metaslab_debug_unload:Prevent metaslabs from being unloaded
+parm:           metaslab_preload_enabled:Preload potential metaslabs during reassessment
+parm:           metaslab_preload_limit:Max number of metaslabs per group to preload
+parm:           metaslab_unload_delay:Delay in txgs after metaslab was last used before unloading
+parm:           metaslab_unload_delay_ms:Delay in milliseconds after metaslab was last used before unloading
+parm:           zfs_mg_noalloc_threshold:Percentage of metaslab group size that should be free to make it eligible for allocation
+parm:           zfs_mg_fragmentation_threshold:Percentage of metaslab group size that should be considered eligible for allocations unless all metaslab groups within the metaslab class have also crossed this threshold
+parm:           metaslab_fragmentation_factor_enabled:Use the fragmentation metric to prefer less fragmented metaslabs
+parm:           zfs_metaslab_fragmentation_threshold:Fragmentation for metaslab to allow allocation
+parm:           metaslab_lba_weighting_enabled:Prefer metaslabs with lower LBAs
+parm:           metaslab_bias_enabled:Enable metaslab group biasing
+parm:           zfs_metaslab_segment_weight_enabled:Enable segment-based metaslab selection
+parm:           zfs_metaslab_switch_threshold:Segment-based metaslab selection maximum buckets before switching
+parm:           metaslab_force_ganging:Blocks larger than this size are sometimes forced to be gang blocks
+parm:           metaslab_force_ganging_pct:Percentage of large blocks that will be forced to be gang blocks
+parm:           metaslab_df_max_search:Max distance (bytes) to search forward before using size tree
+parm:           metaslab_df_use_largest_segment:When looking in size tree, use largest segment instead of exact fit
+parm:           zfs_metaslab_max_size_cache_sec:How long to trust the cached max chunk size of a metaslab
+parm:           zfs_metaslab_mem_limit:Percentage of memory that can be used to store metaslab range trees
+parm:           zfs_metaslab_try_hard_before_gang:Try hard to allocate before ganging
+parm:           zfs_metaslab_find_max_tries:Normally only consider this many of the best metaslabs in each vdev
+parm:           zfs_zevent_len_max:Max event queue length
+parm:           zfs_scan_vdev_limit:Max bytes in flight per leaf vdev for scrubs and resilvers
+parm:           zfs_scrub_min_time_ms:Min millisecs to scrub per txg
+parm:           zfs_obsolete_min_time_ms:Min millisecs to obsolete per txg
+parm:           zfs_free_min_time_ms:Min millisecs to free per txg
+parm:           zfs_resilver_min_time_ms:Min millisecs to resilver per txg
+parm:           zfs_scan_suspend_progress:Set to prevent scans from progressing
+parm:           zfs_no_scrub_io:Set to disable scrub I/O
+parm:           zfs_no_scrub_prefetch:Set to disable scrub prefetching
+parm:           zfs_async_block_max_blocks:Max number of blocks freed in one txg
+parm:           zfs_max_async_dedup_frees:Max number of dedup blocks freed in one txg
+parm:           zfs_free_bpobj_enabled:Enable processing of the free_bpobj
+parm:           zfs_scan_blkstats:Enable block statistics calculation during scrub
+parm:           zfs_scan_mem_lim_fact:Fraction of RAM for scan hard limit
+parm:           zfs_scan_issue_strategy:IO issuing strategy during scrubbing. 0 = default, 1 = LBA, 2 = size
+parm:           zfs_scan_legacy:Scrub using legacy non-sequential method
+parm:           zfs_scan_checkpoint_intval:Scan progress on-disk checkpointing interval
+parm:           zfs_scan_max_ext_gap:Max gap in bytes between sequential scrub / resilver I/Os
+parm:           zfs_scan_mem_lim_soft_fact:Fraction of hard limit used as soft limit
+parm:           zfs_scan_strict_mem_lim:Tunable to attempt to reduce lock contention
+parm:           zfs_scan_fill_weight:Tunable to adjust bias towards more filled segments during scans
+parm:           zfs_scan_report_txgs:Tunable to report resilver performance over the last N txgs
+parm:           zfs_resilver_disable_defer:Process all resilvers immediately
+parm:           zfs_scrub_error_blocks_per_txg:Error blocks to be scrubbed in one txg
+parm:           zfs_dirty_data_max_percent:Max percent of RAM allowed to be dirty
+parm:           zfs_dirty_data_max_max_percent:zfs_dirty_data_max upper bound as % of RAM
+parm:           zfs_delay_min_dirty_percent:Transaction delay threshold
+parm:           zfs_dirty_data_max:Determines the dirty space limit
+parm:           zfs_wrlog_data_max:The size limit of write-transaction zil log data
+parm:           zfs_dirty_data_max_max:zfs_dirty_data_max upper bound in bytes
+parm:           zfs_dirty_data_sync_percent:Dirty data txg sync threshold as a percentage of zfs_dirty_data_max
+parm:           zfs_delay_scale:How quickly delay approaches infinity
+parm:           zfs_sync_taskq_batch_pct:Max percent of CPUs that are used to sync dirty data
+parm:           zfs_zil_clean_taskq_nthr_pct:Max percent of CPUs that are used per dp_sync_taskq
+parm:           zfs_zil_clean_taskq_minalloc:Number of taskq entries that are pre-populated
+parm:           zfs_zil_clean_taskq_maxalloc:Max number of taskq entries that are cached
+parm:           zvol_enforce_quotas:Enable strict ZVOL quota enforcment
+parm:           zfs_livelist_max_entries:Size to start the next sub-livelist in a livelist
+parm:           zfs_livelist_min_percent_shared:Threshold at which livelist is disabled
+parm:           zfs_max_recordsize:Max allowed record size
+parm:           zfs_allow_redacted_dataset_mount:Allow mounting of redacted datasets
+parm:           zfs_snapshot_history_enabled:Include snapshot events in pool history/events
+parm:           zfs_disable_ivset_guid_check:Set to allow raw receives without IVset guids
+parm:           zfs_default_bs:Default dnode block shift
+parm:           zfs_default_ibs:Default dnode indirect block shift
+parm:           zfs_prefetch_disable:Disable all ZFS prefetching
+parm:           zfetch_max_streams:Max number of streams per zfetch
+parm:           zfetch_min_sec_reap:Min time before stream reclaim
+parm:           zfetch_max_sec_reap:Max time before stream delete
+parm:           zfetch_min_distance:Min bytes to prefetch per stream
+parm:           zfetch_max_distance:Max bytes to prefetch per stream
+parm:           zfetch_max_idistance:Max bytes to prefetch indirects for per stream
+parm:           zfetch_max_reorder:Max request reorder distance within a stream
+parm:           zfetch_hole_shift:Max log2 fraction of holes in a stream
+parm:           zfs_pd_bytes_max:Max number of bytes to prefetch
+parm:           zfs_traverse_indirect_prefetch_limit:Traverse prefetch number of blocks pointed by indirect block
+parm:           ignore_hole_birth:Alias for send_holes_without_birth_time (int)
+parm:           send_holes_without_birth_time:Ignore hole_birth txg for zfs send
+parm:           zfs_send_corrupt_data:Allow sending corrupt data
+parm:           zfs_send_queue_length:Maximum send queue length
+parm:           zfs_send_unmodified_spill_blocks:Send unmodified spill blocks
+parm:           zfs_send_no_prefetch_queue_length:Maximum send queue length for non-prefetch queues
+parm:           zfs_send_queue_ff:Send queue fill fraction
+parm:           zfs_send_no_prefetch_queue_ff:Send queue fill fraction for non-prefetch queues
+parm:           zfs_override_estimate_recordsize:Override block size estimate with fixed size
+parm:           zfs_recv_queue_length:Maximum receive queue length
+parm:           zfs_recv_queue_ff:Receive queue fill fraction
+parm:           zfs_recv_write_batch_size:Maximum amount of writes to batch into one transaction
+parm:           zfs_recv_best_effort_corrective:Ignore errors during corrective receive
+parm:           dmu_object_alloc_chunk_shift:CPU-specific allocator grabs 2^N objects at once
+parm:           zfs_nopwrite_enabled:Enable NOP writes
+parm:           zfs_per_txg_dirty_frees_percent:Percentage of dirtied blocks from frees in one TXG
+parm:           zfs_dmu_offset_next_sync:Enable forcing txg sync to find holes
+parm:           dmu_prefetch_max:Limit one prefetch call to this size
+parm:           ddt_zap_default_bs:DDT ZAP leaf blockshift
+parm:           ddt_zap_default_ibs:DDT ZAP indirect blockshift
+parm:           zfs_dedup_prefetch:Enable prefetching dedup-ed blks
+parm:           zfs_dbuf_state_index:Calculate arc header index
+parm:           dbuf_cache_max_bytes:Maximum size in bytes of the dbuf cache.
+parm:           dbuf_cache_hiwater_pct:Percentage over dbuf_cache_max_bytes for direct dbuf eviction.
+parm:           dbuf_cache_lowater_pct:Percentage below dbuf_cache_max_bytes when dbuf eviction stops.
+parm:           dbuf_metadata_cache_max_bytes:Maximum size in bytes of dbuf metadata cache.
+parm:           dbuf_cache_shift:Set size of dbuf cache to log2 fraction of arc size.
+parm:           dbuf_metadata_cache_shift:Set size of dbuf metadata cache to log2 fraction of arc size.
+parm:           dbuf_mutex_cache_shift:Set size of dbuf cache mutex array as log2 shift.
+parm:           zfs_btree_verify_intensity:Enable btree verification. Levels above 4 require ZFS be built with debugging
+parm:           brt_zap_prefetch:Enable prefetching of BRT ZAP entries
+parm:           brt_zap_default_bs:BRT ZAP leaf blockshift
+parm:           brt_zap_default_ibs:BRT ZAP indirect blockshift
+parm:           zfs_arc_min:Minimum ARC size in bytes
+parm:           zfs_arc_max:Maximum ARC size in bytes
+parm:           zfs_arc_meta_balance:Balance between metadata and data on ghost hits.
+parm:           zfs_arc_grow_retry:Seconds before growing ARC size
+parm:           zfs_arc_shrink_shift:log2(fraction of ARC to reclaim)
+parm:           zfs_arc_pc_percent:Percent of pagecache to reclaim ARC to
+parm:           zfs_arc_average_blocksize:Target average block size
+parm:           zfs_compressed_arc_enabled:Disable compressed ARC buffers
+parm:           zfs_arc_min_prefetch_ms:Min life of prefetch block in ms
+parm:           zfs_arc_min_prescient_prefetch_ms:Min life of prescient prefetched block in ms
+parm:           l2arc_write_max:Max write bytes per interval
+parm:           l2arc_write_boost:Extra write bytes during device warmup
+parm:           l2arc_headroom:Number of max device writes to precache
+parm:           l2arc_headroom_boost:Compressed l2arc_headroom multiplier
+parm:           l2arc_trim_ahead:TRIM ahead L2ARC write size multiplier
+parm:           l2arc_feed_secs:Seconds between L2ARC writing
+parm:           l2arc_feed_min_ms:Min feed interval in milliseconds
+parm:           l2arc_noprefetch:Skip caching prefetched buffers
+parm:           l2arc_feed_again:Turbo L2ARC warmup
+parm:           l2arc_norw:No reads during writes
+parm:           l2arc_meta_percent:Percent of ARC size allowed for L2ARC-only headers
+parm:           l2arc_rebuild_enabled:Rebuild the L2ARC when importing a pool
+parm:           l2arc_rebuild_blocks_min_l2size:Min size in bytes to write rebuild log blocks in L2ARC
+parm:           l2arc_mfuonly:Cache only MFU data from ARC into L2ARC
+parm:           l2arc_exclude_special:Exclude dbufs on special vdevs from being cached to L2ARC if set.
+parm:           zfs_arc_lotsfree_percent:System free memory I/O throttle in bytes
+parm:           zfs_arc_sys_free:System free memory target size in bytes
+parm:           zfs_arc_dnode_limit:Minimum bytes of dnodes in ARC
+parm:           zfs_arc_dnode_limit_percent:Percent of ARC meta buffers for dnodes
+parm:           zfs_arc_dnode_reduce_percent:Percentage of excess dnodes to try to unpin
+parm:           zfs_arc_eviction_pct:When full, ARC allocation waits for eviction of this % of alloc size
+parm:           zfs_arc_evict_batch_limit:The number of headers to evict per sublist before moving to the next
+parm:           zfs_arc_prune_task_threads:Number of arc_prune threads
+parm:           zstd_earlyabort_pass:Enable early abort attempts when using zstd
+parm:           zstd_abort_size:Minimal size of block to attempt early abort
+parm:           zfs_max_dataset_nesting:Limit to the amount of nesting a path can have. Defaults to 50.
+parm:           zfs_fletcher_4_impl:Select fletcher 4 implementation.
+parm:           zfs_sha512_impl:Select SHA512 implementation.
+parm:           zfs_sha256_impl:Select SHA256 implementation.
+parm:           icp_gcm_impl:Select gcm implementation.
+parm:           zfs_blake3_impl:Select BLAKE3 implementation.
+parm:           icp_aes_impl:Select aes implementation.
+zfs                  5890048  2
+spl                   184320  1 zfs

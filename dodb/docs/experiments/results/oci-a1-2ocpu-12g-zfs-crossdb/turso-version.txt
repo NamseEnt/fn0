@@ -1,0 +1,67 @@
+Turso benchmark source
+checked at: 2026-09-25 (benchmark start ~12:10 UTC)
+latest stable release on GitHub: v0.7.2 (2026-07-30) - core/pragma.rs has no mvcc_group_commit pragma at that tag, so it cannot run the required MVCC group-commit comparator
+latest pre-release on GitHub: v0.8.0-pre.13 (2026-09-25T08:17:58Z) - selected and pinned
+tag: v0.8.0-pre.13
+tag object: 900afeaae972952aaa8c21c72aeb4e5466a43727
+commit: 64b8ef5742fc18937f9c89806c81e3f6475dc7a3
+describe: v0.8.0-pre.13
+working tree status (empty = clean):
+workspace version: version = "0.8.0-pre.13"
+upstream rust-toolchain.toml: [toolchain] channel = "1.88" components = ["clippy", "rustfmt", "rust-analyzer"] 
+toolchain used (same as the dodb builds): rustc 1.98.1 (48a229cea 2026-09-01) / cargo 1.98.1 (797e8a9bc 2026-08-05)
+
+MVCC maturity statements in docs/manual.md at this tag:
+112:MVCC is a supported journal mode. It has the following limitations:
+590:| `mvcc` | Multi-Version Concurrency Control mode. Enables concurrent transactions with snapshot isolation. **Note:** the feature is not production ready so do not use it for critical data right now. |
+
+mvcc_group_commit documentation (docs/sql-reference/pragmas.mdx):
+### mvcc_group_commit
+
+Lets concurrent MVCC commits batch their logical-log writes so one of them appends
+every waiting transaction's record and the whole batch shares a single fsync.
+Off by default.
+Exclusive transactions started with `BEGIN IMMEDIATE` or `BEGIN EXCLUSIVE` commit
+on the solo path and do not join the queue. The setting applies to every
+connection on the store.
+
+```sql
+PRAGMA mvcc_group_commit = on;
+```
+
+## Change Data Capture
+
+synchronous documentation:
+### synchronous
+
+Controls the fsync behavior for durability guarantees.
+
+```sql
+PRAGMA synchronous;
+PRAGMA synchronous = OFF;    -- no fsync (fastest, risk of corruption on crash)
+PRAGMA synchronous = FULL;   -- fsync after every transaction (safest)
+```
+
+Only `OFF` and `FULL` are supported in Turso.
+
+### temp_store
+Linux sync implementation (core/io/unix.rs): FileSyncType is ignored off Apple platforms and libc::fsync is called
+    #[instrument(err, skip_all, level = Level::TRACE)]
+    fn sync(&self, c: Completion, sync_type: FileSyncType) -> Result<Completion> {
+        let result = unsafe {
+            #[cfg(target_vendor = "apple")]
+            {
+                match sync_type {
+                    FileSyncType::Fsync => libc::fsync(self.file.as_raw_fd()),
+                    FileSyncType::FullFsync => {
+                        libc::fcntl(self.file.as_raw_fd(), libc::F_FULLFSYNC)
+                    }
+                }
+            }
+            #[cfg(not(target_vendor = "apple"))]
+            {
+                // FullFsync has no effect on non-Apple platforms
+                let _ = sync_type;
+                libc::fsync(self.file.as_raw_fd())
+            }
+        };

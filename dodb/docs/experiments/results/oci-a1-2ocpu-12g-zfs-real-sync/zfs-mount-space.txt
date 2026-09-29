@@ -1,0 +1,9 @@
+TARGET     SOURCE    FSTYPE OPTIONS
+/bench/zfs dodbbench zfs    rw,noatime,seclabel,xattr,noacl,casesensitive
+TARGET        SOURCE       FSTYPE OPTIONS
+/bench/zfs/db dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive
+Filesystem      Size  Used Avail Use% Mounted on
+dodbbench/db    149G  120K  149G   1% /bench/zfs/db
+NAME        SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
+dodbbench   153G  1.91M   153G        -         -     0%     0%  1.00x    ONLINE  -
+  sda4      153G  1.91M   153G        -         -     0%  0.00%      -    ONLINE

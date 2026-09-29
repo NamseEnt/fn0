@@ -1,0 +1,23 @@
+Earlier final-candidate build command selected the candidate worktree with git -C but did not change the shell working directory before cargo build.
+The shell remained in /home/opc/dodb at HEAD b309b0fa9f187f7b8f14b1640bb55b9b892926d9, whose parent is 9e82d9da4db9c1818ce725addf112281020dc6a7.
+That checkout had no .cargo/config.toml, so the build did not use the repository +crc rustflags.
+The binary consumed by the old run was /home/opc/dodb-target-admitted-key-reuse-final/release/phase0-bench, SHA256 3899baaff31950565f21eed0d832b29fe2f1df268299ac7a740aba57619aa53f.
+Its saved Cargo bin fingerprint records rustflags: []. The older current-crc-reattribution document records the exact same SHA as the generic/default build of source 9e82d9d.
+The previous verbose build log was not retained, but cwd, old checkout lineage/config absence, old target fingerprint, and binary SHA identify the wrong-worktree/generic-build provenance error.
+OLD_BINARY_AND_FINGERPRINT
+/home/opc/dodb-forensic-binaries/preexisting-suspect-candidate-phase0-bench size=2428920 mtime=2026-09-25 06:09:59.147552179 +0000 mode=555
+3899baaff31950565f21eed0d832b29fe2f1df268299ac7a740aba57619aa53f  /home/opc/dodb-forensic-binaries/preexisting-suspect-candidate-phase0-bench
+55cb3878f06ab1795c9980734cd55a20e8d54fb91bdbd55725c386935e7175b5  /home/opc/dodb-oci-artifacts-admitted-key-reuse-forensic-1eaabbc/preexisting-suspect-fingerprint.json
+NEW_INTERLEAVED_ORDER
+base width=1 repetition=0 seed=973348902 binary=/home/opc/dodb-forensic-binaries/base-phase0-bench
+candidate width=1 repetition=0 seed=973348902 binary=/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench
+base width=16 repetition=0 seed=973283366 binary=/home/opc/dodb-forensic-binaries/base-phase0-bench
+candidate width=16 repetition=0 seed=973283366 binary=/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench
+candidate width=1 repetition=1 seed=973348903 binary=/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench
+base width=1 repetition=1 seed=973348903 binary=/home/opc/dodb-forensic-binaries/base-phase0-bench
+candidate width=16 repetition=1 seed=973283367 binary=/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench
+base width=16 repetition=1 seed=973283367 binary=/home/opc/dodb-forensic-binaries/base-phase0-bench
+base width=1 repetition=2 seed=973348904 binary=/home/opc/dodb-forensic-binaries/base-phase0-bench
+candidate width=1 repetition=2 seed=973348904 binary=/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench
+base width=16 repetition=2 seed=973283368 binary=/home/opc/dodb-forensic-binaries/base-phase0-bench
+candidate width=16 repetition=2 seed=973283368 binary=/home/opc/dodb-forensic-binaries/candidate-a-phase0-bench

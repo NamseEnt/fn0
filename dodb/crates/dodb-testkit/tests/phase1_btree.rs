@@ -1,12 +1,20 @@
 use dodb_core::{
-    DocumentKey, PrimaryKey, Revision, RevisionState, SortKey, TransactionCondition,
+    DocumentKey, PrimaryKey, Result, Revision, RevisionState, SortKey, TransactionCondition,
     TransactionMutation, TransactionRequest,
 };
-use dodb_storage::{BTreeStore, DatabaseConfig, DurableFile};
+use dodb_storage::{BTreeStore, DatabaseConfig, DurableFile, FaultInjector};
 
 use dodb_testkit::{
     CrashInjector, CrashableFile, FaultAction, FaultPlan, FileOperation, ReferenceDb,
 };
+
+struct NoopWalFaultInjector;
+
+impl FaultInjector for NoopWalFaultInjector {
+    fn hit(&mut self, _point: &str) -> Result<()> {
+        Ok(())
+    }
+}
 
 fn key_from_rng(mut value: u64) -> DocumentKey {
     let pk_len = (value as usize) % 9;
@@ -574,6 +582,7 @@ fn wal_commit_without_a_commit_record_is_ignored_after_crash() {
         DatabaseConfig::default().with_cache_capacity(0),
     )
     .unwrap();
+    store.set_fault_injector(NoopWalFaultInjector);
     let key = DocumentKey::new(vec![5], vec![5]);
     assert!(store.put(key.clone(), b"not committed".to_vec()).is_err());
     let (mut data, mut wal) = store.into_files().unwrap();
@@ -606,6 +615,7 @@ fn wal_write_and_sync_fault_matrix_never_exposes_a_partial_commit() {
         store =
             BTreeStore::open_with_wal(data, wal, DatabaseConfig::default().with_cache_capacity(0))
                 .unwrap();
+        store.set_fault_injector(NoopWalFaultInjector);
         let key = DocumentKey::new(vec![6], vec![write_number as u8]);
         assert!(store.put(key.clone(), b"matrix".to_vec()).is_err());
         let (mut data, mut wal) = store.into_files().unwrap();

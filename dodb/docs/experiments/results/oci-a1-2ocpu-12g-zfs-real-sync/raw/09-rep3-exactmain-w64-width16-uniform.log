@@ -1,0 +1,5 @@
+phase0-bench engine=main-btree build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /tmp/dodb-zfs-run-results/raw/09-rep3-exactmain-w64-width16-uniform.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-uniform                          rep=0 tx/s=      547 mut/s=     8745 read/s=        0 agg/s=      547 p50=111494.9us p95=153283.3us p99=235120.0us groups=   45 avg_group=61.02
+completed 1 scenarios x 1 repetitions

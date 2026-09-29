@@ -1,0 +1,1 @@
+raw records=186 writer_streams=13008 generated_transactions=13170086 failures=0

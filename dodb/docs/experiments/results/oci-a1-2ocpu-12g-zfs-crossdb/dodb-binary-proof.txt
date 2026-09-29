@@ -1,0 +1,12 @@
+dodb binaries
+core matrix: reused raw results of the ZFS real-sync run; Planned binary unchanged:
+79122436e330be122059f8a4bf5908406e55b74596bfab2ee3cf745dd17fb6cb  /tmp/dodb-zfs-exp-target/release/phase0-bench
+sustained run: 0d310da32af5dfaa9df6469788998dacccebb841 + dodb-sustained-window.patch (benchmark binary phase0-bench.rs only; storage library untouched)
+fba986d4dea7d306b4fb814e4cd82c468f427572362e95a9c1e06e5525304999  /tmp/dodb-crossdb-window-target/release/phase0-bench
+0d310da32af5dfaa9df6469788998dacccebb841
+ crates/dodb-storage/src/bin/phase0-bench.rs | 52 ++++++++++++++++++++++++++++-
+ 1 file changed, 51 insertions(+), 1 deletion(-)
+18da0c96b84f9592aa7d71b1663350cf3da0d3d79bc96708d8f51c6fc7097d7b  dodb-sustained-window.patch
+production source files differ between window copy and Planned source? (expect only phase0-bench.rs)
+Files /tmp/dodb-zfs-experiment/crates/dodb-storage/src/bin/phase0-bench.rs and /tmp/dodb-crossdb-window/crates/dodb-storage/src/bin/phase0-bench.rs differ
+Only in /tmp/dodb-zfs-experiment/crates/dodb-storage/src/bin: zfs-reopen-check.rs

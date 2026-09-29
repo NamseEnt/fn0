@@ -1,0 +1,15 @@
+main harness shared-section equivalence
+experiment source: current experiment phase0-bench.rs
+main harness: temporary copy on detached ac45cf519d6cd008dfbc5362f72561f9092a7b11
+
+WorkloadGenerator: identical=true sha256=e616b4b911ff9ec0f75bd7c08143874b897c55f891fc5f8c416600d2d6ac888a bytes=6015
+writer_loop: identical=true sha256=5f334166c9811c6d34d9f07273cf28a1ee313ff9cd8d742d0109c405cf3382f3 bytes=1328
+BenchFile_and_sync_disabled: identical=true sha256=257395bec74363033584e435948ec657b92fbf01fa163b3ce9f347b04bd5c3c4 bytes=1560
+scenario_generation: identical=true sha256=54157fc466aad82407ae436e2bdc46e77560cbddda9f11128da60986ec195a2b bytes=5300
+seed_generation: identical=true sha256=3f611fee60da7dbc34da24b742b053aa4673ba28525e01b1c0278d8412faab89 bytes=2378
+benchmark_config_and_sync: identical=true sha256=7214cf4dd8fbb0f5294b30f0d285155796893afa87fb18faf250aa909e4b529b bytes=759
+warmup_and_measured_control: identical=true sha256=a18c04773dfce67f1b0c1b395a62d56d870a6fa7767227d6f15c5bdb9bf24e3b bytes=1413
+
+Seed derivation snippet was extracted to seed-derivation.txt; experiment and main bytes identical, SHA256=474dad855762cbdaa607f671bad383d4ecf659fd9d2c1ffbb8bba4a5719becd9.
+API adapter difference: baseline adapter asserts successful main transaction results carry Some(commit_lsn). Blink-only imports, adapter, metrics, and engine selections were removed.
+Benchmark-only temporary harness and .cargo/config.toml are outside committed main source; no production paths were edited.

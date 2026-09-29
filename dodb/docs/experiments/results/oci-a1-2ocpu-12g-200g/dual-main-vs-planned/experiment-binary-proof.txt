@@ -1,0 +1,19 @@
+Build command: env -u RUSTFLAGS CARGO_TARGET_DIR=/tmp/dodb-dual-rebaseline-exp-target cargo build --locked --release -p dodb-storage --bin phase0-bench -vv
+
+Immediately before build:
+pwd: /home/opc/dodb-dual-rebaseline-exp
+HEAD: 93b1e7546710ef4863398c36464595c912f85dc4
+status: binary: /tmp/dodb-dual-rebaseline-exp-target/release/phase0-bench
+sha256: not-built
+rustc: rustc 1.98.1 (48a229cea 2026-09-01) binary: rustc commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985 commit-date: 2026-09-01 host: aarch64-unknown-linux-gnu release: 1.98.1 LLVM version: 22.1.8 
+cargo: cargo 1.98.1 (797e8a9bc 2026-08-05)
+machine: Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+filesystem: /dev/mapper/ocivolume-root xfs    29.4G 17.2G
+
+Immediately after build:
+pwd: /home/opc/dodb-dual-rebaseline-exp
+HEAD: 93b1e7546710ef4863398c36464595c912f85dc4
+status: binary: /tmp/dodb-dual-rebaseline-exp-target/release/phase0-bench
+sha256: 79122436e330be122059f8a4bf5908406e55b74596bfab2ee3cf745dd17fb6cb  /tmp/dodb-dual-rebaseline-exp-target/release/phase0-bench
+rustc: rustc 1.98.1 (48a229cea 2026-09-01) binary: rustc commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985 commit-date: 2026-09-01 host: aarch64-unknown-linux-gnu release: 1.98.1 LLVM version: 22.1.8 
+cargo: cargo 1.98.1 (797e8a9bc 2026-08-05)

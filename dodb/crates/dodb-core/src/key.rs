@@ -78,6 +78,15 @@ impl DocumentKey {
         }
         Ok(Self::from_parts(PrimaryKey::new(pk), SortKey::new(sk)))
     }
+
+    pub fn validate_encoded(encoded: &[u8]) -> Result<(), KeyCodecError> {
+        let next = skip_component(encoded, 0)?;
+        let end = skip_component(encoded, next)?;
+        if end != encoded.len() {
+            return Err(KeyCodecError::TrailingBytes { offset: end });
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Debug for PrimaryKey {
@@ -176,6 +185,37 @@ fn decode_component(encoded: &[u8], start: usize) -> Result<(Vec<u8>, usize), Ke
     Err(KeyCodecError::TruncatedEscape { offset })
 }
 
+fn skip_component(encoded: &[u8], start: usize) -> Result<usize, KeyCodecError> {
+    if start >= encoded.len() {
+        return Err(KeyCodecError::MissingComponent { offset: start });
+    }
+
+    let mut offset = start;
+    while offset < encoded.len() {
+        let byte = encoded[offset];
+        if byte != 0 {
+            offset += 1;
+            continue;
+        }
+
+        let Some(&escape) = encoded.get(offset + 1) else {
+            return Err(KeyCodecError::TruncatedEscape { offset });
+        };
+        match escape {
+            0 => return Ok(offset + 2),
+            0xff => offset += 2,
+            other => {
+                return Err(KeyCodecError::InvalidEscape {
+                    offset,
+                    byte: other,
+                });
+            }
+        }
+    }
+
+    Err(KeyCodecError::TruncatedEscape { offset })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,6 +227,12 @@ mod tests {
             let key = DocumentKey::new(pk, sk);
             let encoded = key.encode();
             prop_assert_eq!(DocumentKey::decode(&encoded), Ok(key));
+            prop_assert_eq!(DocumentKey::validate_encoded(&encoded), Ok(()));
+        }
+
+        #[test]
+        fn validator_matches_decode_for_arbitrary_bytes(encoded in proptest::collection::vec(any::<u8>(), 0..160)) {
+            prop_assert_eq!(DocumentKey::validate_encoded(&encoded), DocumentKey::decode(&encoded).map(|_| ()));
         }
 
         #[test]
@@ -215,6 +261,39 @@ mod tests {
             assert!(DocumentKey::decode(&input).is_err(), "accepted {input:?}");
         }
         assert!(DocumentKey::decode(&[0, 0, 0, 0]).is_ok());
+    }
+
+    #[test]
+    fn validator_matches_decode_for_malformed_and_boundary_encodings() {
+        let first_component = [1, 0, 0];
+        let second_component = [2, 0, 0];
+        let valid_pair = [1, 0, 0, 2, 0, 0];
+        let cases: &[&[u8]] = &[
+            &[],
+            &[0],
+            &[0, 1],
+            &[0, 0],
+            &[0, 0, 0],
+            &[1, 0, 0, 0, 0, 9],
+            &[0, 0xff],
+            &[0, 0xff, 0],
+            &[0, 0xff, 0, 0],
+            &first_component,
+            &[1, 0, 0, 2],
+            &valid_pair,
+            &[1, 0, 0, 2, 0, 0, 3],
+            &[1, 0, 0, 0, 2],
+            &[1, 0, 0, 2, 0, 3],
+            &second_component,
+        ];
+
+        for encoded in cases {
+            assert_eq!(
+                DocumentKey::validate_encoded(encoded),
+                DocumentKey::decode(encoded).map(|_| ()),
+                "differing result for {encoded:?}"
+            );
+        }
     }
 
     #[test]

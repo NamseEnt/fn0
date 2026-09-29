@@ -1,0 +1,74 @@
+359521 12:53:48.174879 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.193055 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/rocksdb/LOG", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.199195 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/rocksdb/CURRENT", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.199593 fdatasync(6</bench/zfs/db/probe-rocksdb/rocksdb/000000.dbtmp>) = 0
+359521 12:53:48.200773 fsync(6</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.201601 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/rocksdb/MANIFEST-000001", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.201914 fdatasync(6</bench/zfs/db/probe-rocksdb/rocksdb/MANIFEST-000001>) = 0
+359521 12:53:48.202948 fdatasync(6</bench/zfs/db/probe-rocksdb/rocksdb/000001.dbtmp>) = 0
+359521 12:53:48.203800 fsync(4</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359524 12:53:48.207560 +++ exited with 0 +++
+359525 12:53:48.207626 +++ exited with 0 +++
+359526 12:53:48.207760 +++ exited with 0 +++
+359527 12:53:48.207920 +++ exited with 0 +++
+359528 12:53:48.207997 +++ exited with 0 +++
+359529 12:53:48.208158 +++ exited with 0 +++
+359530 12:53:48.208229 +++ exited with 0 +++
+359531 12:53:48.208383 +++ exited with 0 +++
+359532 12:53:48.208464 +++ exited with 0 +++
+359533 12:53:48.208622 +++ exited with 0 +++
+359534 12:53:48.208677 +++ exited with 0 +++
+359535 12:53:48.208835 +++ exited with 0 +++
+359536 12:53:48.208896 +++ exited with 0 +++
+359537 12:53:48.209039 +++ exited with 0 +++
+359538 12:53:48.209174 +++ exited with 0 +++
+359521 12:53:48.210302 fdatasync(8</bench/zfs/db/probe-rocksdb/rocksdb/MANIFEST-000005>) = 0
+359521 12:53:48.211802 fdatasync(9</bench/zfs/db/probe-rocksdb/rocksdb/000005.dbtmp>) = 0
+359521 12:53:48.212730 fsync(4</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.214266 fsync(9</bench/zfs/db/probe-rocksdb/rocksdb/OPTIONS-000006.dbtmp>) = 0
+359521 12:53:48.216746 fsync(9</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.218796 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-begin-0", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.219089 fdatasync(7</bench/zfs/db/probe-rocksdb/rocksdb/000004.log>) = 0
+359521 12:53:48.220250 fsync(4</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.220365 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-returned-0", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.220431 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-begin-1", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.220509 fdatasync(7</bench/zfs/db/probe-rocksdb/rocksdb/000004.log>) = 0
+359521 12:53:48.221617 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-returned-1", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.221705 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-begin-2", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.221777 fdatasync(7</bench/zfs/db/probe-rocksdb/rocksdb/000004.log>) = 0
+359521 12:53:48.222713 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-returned-2", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.222788 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-begin-3", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.222868 fdatasync(7</bench/zfs/db/probe-rocksdb/rocksdb/000004.log>) = 0
+359521 12:53:48.223755 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-commit-returned-3", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.223823 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-close-begin", F_OK) = -1 ENOENT (No such file or directory)
+359540 12:53:48.224033 +++ exited with 0 +++
+359521 12:53:48.224824 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/.strace-marker-reopen-begin", F_OK) = -1 ENOENT (No such file or directory)
+359521 12:53:48.225053 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/rocksdb/LOG", F_OK) = 0
+359521 12:53:48.229188 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/rocksdb/CURRENT", F_OK) = 0
+359541 12:53:48.231558 +++ exited with 0 +++
+359542 12:53:48.231666 +++ exited with 0 +++
+359543 12:53:48.231728 +++ exited with 0 +++
+359544 12:53:48.231812 +++ exited with 0 +++
+359545 12:53:48.231972 +++ exited with 0 +++
+359546 12:53:48.232036 +++ exited with 0 +++
+359547 12:53:48.232212 +++ exited with 0 +++
+359548 12:53:48.232287 +++ exited with 0 +++
+359549 12:53:48.232472 +++ exited with 0 +++
+359550 12:53:48.232502 +++ exited with 0 +++
+359551 12:53:48.232639 +++ exited with 0 +++
+359552 12:53:48.232754 +++ exited with 0 +++
+359553 12:53:48.232908 +++ exited with 0 +++
+359554 12:53:48.233013 +++ exited with 0 +++
+359555 12:53:48.233131 +++ exited with 0 +++
+359521 12:53:48.233484 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-rocksdb/rocksdb/IDENTITY", F_OK) = 0
+359521 12:53:48.234876 fdatasync(7</bench/zfs/db/probe-rocksdb/rocksdb/000008.sst>) = 0
+359521 12:53:48.236830 fsync(6</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.237828 fdatasync(9</bench/zfs/db/probe-rocksdb/rocksdb/MANIFEST-000010>) = 0
+359521 12:53:48.238896 fdatasync(10</bench/zfs/db/probe-rocksdb/rocksdb/000010.dbtmp>) = 0
+359521 12:53:48.239900 fsync(4</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359521 12:53:48.241250 fsync(10</bench/zfs/db/probe-rocksdb/rocksdb/OPTIONS-000011.dbtmp>) = 0
+359521 12:53:48.243160 fsync(10</bench/zfs/db/probe-rocksdb/rocksdb>) = 0
+359556 12:53:48.245050 +++ exited with 0 +++
+359522 12:53:48.247664 +++ exited with 0 +++
+359523 12:53:48.247835 +++ exited with 0 +++
+359521 12:53:48.248692 +++ exited with 0 +++

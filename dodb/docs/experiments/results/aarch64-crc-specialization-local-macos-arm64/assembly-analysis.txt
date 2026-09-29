@@ -1,0 +1,10 @@
+Target: aarch64-apple-darwin, rustc 1.97.1, LLVM 22.1.6
+Disassembler: LLVM objdump 22.1.6
+Generic build: RUSTFLAGS=-C target-feature=-crc
+Global control: RUSTFLAGS=-C target-feature=+crc
+
+Generic measure_default and measure_specialized both retain the inlined public crc32c_append runtime dispatch. The specialized caller still tests cached feature state, branches to crc32c::hw_aarch64::crc32c or crc32c::sw::crc32c, and contains the slow-path call to std_detect::detect::cache::detect_and_initialize. Its target_feature attribute does not propagate compile-time CRC knowledge into the dependency crate.
+
+Global +crc measure_default has no feature-detection branch and calls crc32c::hw_aarch64::crc32c directly. The generic backend retains calls across the target-feature helper boundary. In the global backend more CRC instructions are present in the backend body and fewer helper calls remain, consistent with helper inlining after the whole dependency is compiled with +crc.
+
+The same 4,104-byte benchmark payload checksums matched in all variants. Full disassembly was generated from both release binaries with llvm-objdump --demangle --disassemble; temporary full listings are /tmp/dodb-crc-generic.dis and /tmp/dodb-crc-global.dis.

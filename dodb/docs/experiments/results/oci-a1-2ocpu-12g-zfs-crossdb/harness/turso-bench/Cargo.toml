@@ -1,0 +1,20 @@
+[package]
+name = "turso-bench"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+turso = { path = "/tmp/turso-crossdb/bindings/rust" }
+tokio = { version = "1", features = ["rt", "time"] }
+serde_json = "1"
+libc = "0.2"
+
+[profile.release]
+opt-level = 3
+debug = "line-tables-only"
+codegen-units = 4
+panic = "abort"
+lto = "thin"

@@ -1,0 +1,24 @@
+Build command: env -u RUSTFLAGS CARGO_TARGET_DIR=/tmp/dodb-dual-rebaseline-main-target cargo build --locked --release -p dodb-storage --bin phase0-bench -vv
+
+Immediately before successful final build:
+pwd: /home/opc/dodb-dual-rebaseline-main
+HEAD: ac45cf519d6cd008dfbc5362f72561f9092a7b11
+status: ?? .cargo/
+?? crates/dodb-storage/src/bin/phase0-bench.rs
+binary: /tmp/dodb-dual-rebaseline-main-target/release/phase0-bench
+sha256: not-built
+config: [target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "target-feature=+crc"]
+
+Immediately after successful final build:
+pwd: /home/opc/dodb-dual-rebaseline-main
+HEAD: ac45cf519d6cd008dfbc5362f72561f9092a7b11
+status: ?? .cargo/
+?? crates/dodb-storage/src/bin/phase0-bench.rs
+binary: /tmp/dodb-dual-rebaseline-main-target/release/phase0-bench
+sha256: d32ced9744fd16f7949bca0d263ce8f6de3d0d9b38ac3ed655da81bd63e77417  /tmp/dodb-dual-rebaseline-main-target/release/phase0-bench
+rustc: rustc 1.98.1 (48a229cea 2026-09-01) binary: rustc commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985 commit-date: 2026-09-01 host: aarch64-unknown-linux-gnu release: 1.98.1 LLVM version: 22.1.8 
+cargo: cargo 1.98.1 (797e8a9bc 2026-08-05)
+
+Temporary harness source SHA256: 2f198ed066e0407b567d1e712ae0ce721321de453a22aa19887d020789825daf
+Temporary build config SHA256: d7f22f835a631b08459a9662e207df20f4abfbf8110e198cbac04582f5c42c9f

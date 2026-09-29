@@ -1,0 +1,38 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+Oracle Linux 9 CodeReady Builder (aarch64) - (U  70 MB/s |  17 MB     00:00    
+Last metadata expiration check: 0:00:04 ago on Fri 25 Sep 2026 10:31:23 AM GMT.
+Dependencies resolved.
+================================================================================
+ Package            Arch        Version         Repository                 Size
+================================================================================
+Installing:
+ libtirpc-devel     aarch64     1.3.3-9.el9     ol9_codeready_builder     187 k
+
+Transaction Summary
+================================================================================
+Install  1 Package
+
+Total download size: 187 k
+Installed size: 252 k
+Downloading Packages:
+libtirpc-devel-1.3.3-9.el9.aarch64.rpm          6.7 MB/s | 187 kB     00:00    
+--------------------------------------------------------------------------------
+Total                                           6.1 MB/s | 187 kB     00:00     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : libtirpc-devel-1.3.3-9.el9.aarch64                     1/1 
+  Running scriptlet: libtirpc-devel-1.3.3-9.el9.aarch64                     1/1 
+  Verifying        : libtirpc-devel-1.3.3-9.el9.aarch64                     1/1 
+
+Installed:
+  libtirpc-devel-1.3.3-9.el9.aarch64                                            
+
+Complete!
+libtirpc-devel-1.3.3-9.el9.aarch64
+libtirpc-devel-1.3.3-9.el9.aarch64

@@ -1,0 +1,4 @@
+                let seed = args
+                    .seed
+                    .wrapping_add((scenario_index as u64).wrapping_mul(0x9e37_79b9))
+                    .wrapping_add(repetition as u64);

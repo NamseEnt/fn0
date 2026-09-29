@@ -1,0 +1,20 @@
+353048 12:35:09.811668 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+353048 12:35:09.814035 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/sys/devices/system/node/node1", R_OK) = -1 ENOENT (No such file or directory)
+353048 12:35:09.815887 fsync(3</bench/zfs/db/probe-turso-wal/kv.db>) = 0
+353048 12:35:09.817796 fsync(4</bench/zfs/db/probe-turso-wal/kv.db-wal>) = 0
+353048 12:35:09.818667 fsync(4</bench/zfs/db/probe-turso-wal/kv.db-wal>) = 0
+353048 12:35:09.820131 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-wal/.strace-marker-commit-begin-0", F_OK) = -1 ENOENT (No such file or directory)
+353048 12:35:09.820373 fsync(4</bench/zfs/db/probe-turso-wal/kv.db-wal>) = 0
+353048 12:35:09.821319 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-wal/.strace-marker-commit-returned-0", F_OK) = -1 ENOENT (No such file or directory)
+353048 12:35:09.821390 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-wal/.strace-marker-commit-begin-1", F_OK) = -1 ENOENT (No such file or directory)
+353048 12:35:09.821590 fsync(4</bench/zfs/db/probe-turso-wal/kv.db-wal>) = 0
+353048 12:35:09.822499 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-wal/.strace-marker-commit-returned-1", F_OK) = -1 ENOENT (No such file or directory)
+353048 12:35:09.822575 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-wal/.strace-marker-commit-begin-2", F_OK) = -1 ENOENT (No such file or directory)
+353048 12:35:09.822713 fsync(4</bench/zfs/db/probe-turso-wal/kv.db-wal>) = 0
+353048 12:35:09.823589 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-wal/.strace-marker-commit-returned-2", F_OK) = -1 ENOENT (No such file or directory)
+353048 12:35:09.823663 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-wal/.strace-marker-commit-begin-3", F_OK) = -1 ENOENT (No such file or directory)
+353048 12:35:09.823910 fsync(4</bench/zfs/db/probe-turso-wal/kv.db-wal>) = 0
+353048 12:35:09.824763 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-wal/.strace-marker-commit-returned-3", F_OK) = -1 ENOENT (No such file or directory)
+353048 12:35:09.824890 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-wal/.strace-marker-close-begin", F_OK) = -1 ENOENT (No such file or directory)
+353048 12:35:09.825364 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-wal/.strace-marker-reopen-begin", F_OK) = -1 ENOENT (No such file or directory)
+353048 12:35:09.829172 +++ exited with 0 +++

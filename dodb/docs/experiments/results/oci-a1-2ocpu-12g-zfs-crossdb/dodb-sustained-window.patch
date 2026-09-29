@@ -1,0 +1,112 @@
+diff --git a/crates/dodb-storage/src/bin/phase0-bench.rs b/crates/dodb-storage/src/bin/phase0-bench.rs
+index e6813df..8e3b3f7 100644
+--- a/crates/dodb-storage/src/bin/phase0-bench.rs
++++ b/crates/dodb-storage/src/bin/phase0-bench.rs
+@@ -1326,6 +1326,7 @@ struct WorkerStats {
+     e2e_latency: LatencySamples,
+     write_latency: LatencySamples,
+     read_latency: LatencySamples,
++    window_timeline: Vec<(u64, u64)>,
+ }
+ 
+ impl WorkerStats {
+@@ -1347,6 +1348,7 @@ impl WorkerStats {
+             e2e_latency: LatencySamples::with_seed(seed),
+             write_latency: LatencySamples::with_seed(seed ^ 0x1111),
+             read_latency: LatencySamples::with_seed(seed ^ 0x2222),
++            window_timeline: Vec::new(),
+         }
+     }
+ 
+@@ -1373,6 +1375,7 @@ impl WorkerStats {
+         for value in other.read_latency.values {
+             self.read_latency.push(value);
+         }
++        self.window_timeline.extend(other.window_timeline);
+     }
+ 
+     fn attempted_operations(&self) -> u64 {
+@@ -2168,6 +2171,7 @@ async fn writer_loop(
+     deadline: Instant,
+     quota: Option<MixQuota>,
+     warmup: bool,
++    interval_start: Instant,
+ ) -> WorkerStats {
+     let mut generator = WorkloadGenerator::new(workload, seed, worker_id);
+     let mut stats = WorkerStats::new(seed ^ worker_id as u64);
+@@ -2190,6 +2194,10 @@ async fn writer_loop(
+                 Ok(_) => {
+                     stats.successful_transactions += 1;
+                     stats.mutation_ops += width;
++                    stats.window_timeline.push((
++                        (started + elapsed - interval_start).as_nanos() as u64,
++                        elapsed.as_nanos() as u64,
++                    ));
+                 }
+                 Err(Error::Conflict(_)) => stats.conflicts += 1,
+                 Err(Error::Overloaded(_)) => stats.overloads += 1,
+@@ -2258,7 +2266,8 @@ async fn run_interval(
+     duration: Duration,
+     warmup: bool,
+ ) -> WorkerStats {
+-    let deadline = Instant::now() + duration;
++    let interval_start = Instant::now();
++    let deadline = interval_start + duration;
+     let workload = WorkloadConfig {
+         distribution: scenario.distribution,
+         working_set: args.working_set,
+@@ -2279,6 +2288,7 @@ async fn run_interval(
+             deadline,
+             quota.clone(),
+             warmup,
++            interval_start,
+         )));
+     }
+     for worker_id in 0..scenario.readers {
+@@ -2977,6 +2987,46 @@ fn build_record(
+         "component_timing_scope",
+         "existing cumulative coordinator/storage/WAL metrics; per-request component percentiles unavailable without production hot-path instrumentation",
+     );
++    if wall >= Duration::from_secs(20) {
++        let mut timeline = measured.window_timeline.clone();
++        timeline.sort_unstable();
++        let window_nanos = 10_000_000_000u64;
++        let wall_nanos = wall.as_nanos() as u64;
++        let window_count = wall_nanos.div_ceil(window_nanos);
++        json.u64("window_seconds", 10);
++        json.u64("window_count", window_count);
++        for window_index in 0..window_count {
++            let start = window_index * window_nanos;
++            let end = start + window_nanos;
++            let mut latencies: Vec<u64> = timeline
++                .iter()
++                .filter(|(finish, _)| *finish >= start && *finish < end)
++                .map(|(_, latency)| *latency)
++                .collect();
++            latencies.sort_unstable();
++            let span = (end.min(wall_nanos) - start) as f64 / 1e9;
++            let percentile = |fraction: f64| {
++                if latencies.is_empty() {
++                    0.0
++                } else {
++                    latencies[((latencies.len() - 1) as f64 * fraction).round() as usize] as f64
++                        / 1_000.0
++                }
++            };
++            json.u64(
++                &format!("window_{window_index:02}_successful_transactions"),
++                latencies.len() as u64,
++            );
++            json.f64(&format!("window_{window_index:02}_span_seconds"), span);
++            json.f64(
++                &format!("window_{window_index:02}_logical_tx_per_second"),
++                latencies.len() as f64 / span,
++            );
++            json.f64(&format!("window_{window_index:02}_p50_us"), percentile(0.50));
++            json.f64(&format!("window_{window_index:02}_p95_us"), percentile(0.95));
++            json.f64(&format!("window_{window_index:02}_p99_us"), percentile(0.99));
++        }
++    }
+     json.finish()
+ }
+ 

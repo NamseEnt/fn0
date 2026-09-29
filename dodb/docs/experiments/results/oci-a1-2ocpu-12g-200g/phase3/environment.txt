@@ -1,0 +1,12 @@
+Branch: experiment/b-link-batched-engine
+Commit: aa00444348d074e081e0dbe5d0979032271bf014
+Shape: OCI A1, 2 OCPU; target 12 GiB RAM; guest free reported approximately 10 GiB
+Architecture: aarch64 / ARM64, Ampere; 2 logical CPUs, Neoverse-N1
+OS: Oracle Linux Server 9.8
+Kernel: Linux 6.12.0-206.104.4.4.el9uek.aarch64
+Rust: rustc 1.98.1 (48a229cea 2026-09-01)
+Cargo: 1.98.1
+Storage: /dev/sda reported as 200 GB; /dev/sda3 approximately 44.5 GB; no separate 200 GB mounted filesystem
+Benchmark filesystem: XFS root filesystem on the root LVM logical volume, rw,relatime
+Benchmark path: /home/opc/dodb/target/oci-a1-2ocpu-12g-200g/phase3-tmp
+CPU affinity/governor tuning: none

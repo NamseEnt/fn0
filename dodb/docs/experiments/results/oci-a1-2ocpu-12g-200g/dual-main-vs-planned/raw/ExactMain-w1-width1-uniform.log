@@ -1,0 +1,7 @@
+phase0-bench engine=main-btree build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=2s warmup=1s repetitions=3
+raw output: /home/opc/dodb-oci-artifacts-dual-main-vs-planned-93b1e75/raw/ExactMain-w1-width1-uniform.jsonl
+scenario                                                       repetition throughput summary
+100%-write-1w-0r-width1-uniform                            rep=0 tx/s=     7562 mut/s=     7562 read/s=        0 agg/s=     7562 p50=   109.4us p95=   187.7us p99=   205.5us groups=15146 avg_group= 1.00
+100%-write-1w-0r-width1-uniform                            rep=1 tx/s=     7929 mut/s=     7929 read/s=        0 agg/s=     7929 p50=   102.7us p95=   182.3us p99=   198.4us groups=15863 avg_group= 1.00
+100%-write-1w-0r-width1-uniform                            rep=2 tx/s=     7511 mut/s=     7511 read/s=        0 agg/s=     7511 p50=   109.5us p95=   187.7us p99=   204.7us groups=15041 avg_group= 1.00
+completed 1 scenarios x 3 repetitions

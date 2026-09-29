@@ -1,0 +1,13 @@
+[package]
+name = "workload-equivalence"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+dodb-core = { path = "/tmp/dodb-zfs-experiment/crates/dodb-core" }
+dodb-storage = { path = "/tmp/dodb-zfs-experiment/crates/dodb-storage" }
+serde_json = "1"
+libc = "0.2"

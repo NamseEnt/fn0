@@ -1,0 +1,66 @@
+Disk /dev/sda: 419430400 sectors, 200.0 GiB
+Model: BlockVolume     
+Sector size (logical/physical): 512/4096 bytes
+Disk identifier (GUID): DA43F94F-6C02-4ECE-B6E2-9B7D31FB591A
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 97727250
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 2801 sectors (1.4 MiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1            2048          206847   100.0 MiB   EF00  EFI System Partition
+   2          206848         4401151   2.0 GiB     8300  
+   3         4401152        97726463   44.5 GiB    8E00  
+
+Problem: The secondary header's self-pointer indicates that it doesn't reside
+at the end of the disk. If you've added a disk to a RAID array, use the 'e'
+option on the experts' menu to adjust the secondary header's and partition
+table's locations.
+
+Identified 1 problems!
+Model: ORACLE BlockVolume (scsi)
+Disk /dev/sda: 419430400s
+Sector size (logical/physical): 512B/4096B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start      End         Size        File system  Name                  Flags
+        34s        2047s       2014s       Free Space
+ 1      2048s      206847s     204800s     fat16        EFI System Partition  boot, esp
+ 2      206848s    4401151s    4194304s    xfs
+ 3      4401152s   97726463s   93325312s                                      lvm
+        97726464s  419430366s  321703903s  Free Space
+
+NAME               PATH                               SIZE TYPE FSTYPE      MOUNTPOINTS
+sda                /dev/sda                   214748364800 disk             
+├─sda1             /dev/sda1                     104857600 part vfat        /boot/efi
+├─sda2             /dev/sda2                    2147483648 part xfs         /boot
+└─sda3             /dev/sda3                   47782559744 part LVM2_member 
+  ├─ocivolume-root /dev/mapper/ocivolume-root  31675383808 lvm  xfs         /
+  └─ocivolume-oled /dev/mapper/ocivolume-oled  16106127360 lvm  xfs         /var/oled
+Disk /dev/sda: 200 GiB, 214748364800 bytes, 419430400 sectors
+Disk model: BlockVolume     
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
+Disklabel type: gpt
+Disk identifier: DA43F94F-6C02-4ECE-B6E2-9B7D31FB591A
+
+Device       Start      End  Sectors  Size Type
+/dev/sda1     2048   206847   204800  100M EFI System
+/dev/sda2   206848  4401151  4194304    2G Linux filesystem
+/dev/sda3  4401152 97726463 93325312 44.5G Linux LVM
+512
+214748364800
+419430400
+TARGET SOURCE                     FSTYPE OPTIONS
+/      /dev/mapper/ocivolume-root xfs    rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota
+TARGET SOURCE    FSTYPE OPTIONS
+/boot  /dev/sda2 xfs    rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota
+TARGET    SOURCE    FSTYPE OPTIONS
+/boot/efi /dev/sda1 vfat   rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=winnt,errors=remount-ro
+TARGET    SOURCE                     FSTYPE OPTIONS
+/var/oled /dev/mapper/ocivolume-oled xfs    rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota
+  PV         PSize        PFree VG       
+  /dev/sda3  47781511168B    0B ocivolume

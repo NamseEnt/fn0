@@ -1,0 +1,170 @@
+WORKTREE /home/opc/dodb-forensic-base
+/home/opc/dodb-forensic-base
+ac181f5900ed46a83e616f3d28bcb85bac88ca48
+ac181f5 docs: record planner key copy experiment
+WORKTREE /home/opc/dodb-forensic-candidate
+/home/opc/dodb-forensic-candidate
+1eaabbce8ec29948fe886008dd3e4548d1a8d748
+1eaabbc storage: keep serial Blink validation allocation stable
+CANDIDATE SOURCE EXCERPTS
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "target-feature=+crc"]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RouteHint {
+    pub leaf_id: PageId,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PlannedMutation {
+    pub mutation: TransactionMutation,
+    pub encoded_key: Vec<u8>,
+    pub route_hint: RouteHint,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PhysicalTransactionPlan {
+    pub fifo_position: usize,
+    pub provisional_revision: ProvisionalRevisionToken,
+    pub mutations: Vec<PlannedMutation>,
+    pub mutated_key_set: BTreeSet<Vec<u8>>,
+    pub dependency_metadata: DependencyMetadata,
+}
+
+}
+
+struct AdmittedTransaction<'a> {
+    fifo_position: usize,
+    request: &'a TransactionRequest,
+    encoded_mutation_keys: Vec<Vec<u8>>,
+    provisional_revision: ProvisionalRevisionToken,
+}
+
+struct CachedLeaf {
+    leaf_id: PageId,
+                return Err(error);
+            }
+            let encoded_mutation_keys =
+                match validate_and_encode_mutation_keys(request, &self.config.limits) {
+                    Ok(encoded_mutation_keys) => encoded_mutation_keys,
+                    Err(error) => {
+                        self.batch_metrics.rejected_transactions =
+                            self.batch_metrics.rejected_transactions.saturating_add(1);
+                        results.push(Err(error));
+                        continue;
+                    }
+                };
+            if let Err(error) = overlay.validate_conditions(&request.conditions) {
+                if matches!(error, Error::Conflict(_)) {
+                    self.batch_metrics.conflicted_transactions =
+                        self.batch_metrics.conflicted_transactions.saturating_add(1);
+                    results.push(Err(error));
+                    continue;
+                }
+                return Err(error);
+            }
+            let ordinal = provisional_start
+                .checked_add(accepted_count)
+                .ok_or_else(|| Error::invariant("experimental revision exhausted"))?;
+            let provisional_revision = ProvisionalRevisionToken {
+                transaction_position: fifo_position,
+                ordinal,
+            };
+            overlay.accept_preencoded(request, &encoded_mutation_keys, provisional_revision)?;
+            admitted.push(AdmittedTransaction {
+                fifo_position,
+                request,
+                encoded_mutation_keys,
+                provisional_revision,
+            });
+            accepted_count = accepted_count.saturating_add(1);
+            results.push(Ok(TransactionResult {
+                commit_lsn: Lsn::ZERO,
+            }));
+            self.batch_metrics.admitted_transactions =
+                self.batch_metrics.admitted_transactions.saturating_add(1);
+fn encode_leaf_body_into(
+    body: &mut [u8],
+    high_key: Option<&[u8]>,
+    right_sibling: Option<PageId>,
+    entries: &[LeafEntry],
+) -> Result<()> {
+    debug_assert_eq!(body.len(), BODY_SIZE);
+    let layout = leaf_body_layout(entries, high_key)?;
+    body[0..4].copy_from_slice(&LEAF_MAGIC);
+    body[4..6].copy_from_slice(&BODY_VERSION.to_le_bytes());
+    body[8..10].copy_from_slice(&(entries.len() as u16).to_le_bytes());
+    body[10..12].copy_from_slice(&(layout.slot_end as u16).to_le_bytes());
+    body[12..14].copy_from_slice(&(layout.records_start as u16).to_le_bytes());
+    let high_offset = if high_key.is_some() {
+        layout.slot_end
+    } else {
+        0
+    };
+    body[14..16].copy_from_slice(&(high_offset as u16).to_le_bytes());
+    body[16..18].copy_from_slice(&(high_key.map_or(0, <[u8]>::len) as u16).to_le_bytes());
+    body[20..28].copy_from_slice(&encode_page_id(right_sibling).to_le_bytes());
+    if let Some(high_key) = high_key {
+        body[layout.slot_end..layout.records_start].copy_from_slice(high_key);
+    }
+
+    let mut record_offset = BODY_SIZE;
+    for entry_index in (0..entries.len()).rev() {
+        let entry = &entries[entry_index];
+        let record_length = leaf_record_encoded_len(entry)?;
+        record_offset = record_offset
+            .checked_sub(record_length)
+            .ok_or_else(|| Error::invalid_input("Blink leaf records exceed page"))?;
+        if record_offset < layout.records_start {
+            return Err(Error::invalid_input("Blink leaf records exceed page"));
+        }
+        encode_leaf_record_into_validated(
+            &mut body[record_offset..record_offset + record_length],
+            entry,
+        )?;
+        let slot = LEAF_HEADER_SIZE + entry_index * SLOT_SIZE;
+        body[slot..slot + 2].copy_from_slice(&(record_offset as u16).to_le_bytes());
+        body[slot + 2..slot + 4].copy_from_slice(&(record_length as u16).to_le_bytes());
+        body[slot + 4..slot + 6].copy_from_slice(&(entry.key.len() as u16).to_le_bytes());
+    }
+    body[18..20].copy_from_slice(&(layout.records_end as u16).to_le_bytes());
+    Ok(())
+}
+
+fn encode_leaf_record_into_validated(target: &mut [u8], entry: &LeafEntry) -> Result<()> {
+    let (flags, value_length, aux, inline) = match &entry.value {
+        None => (0u8, 0u64, NULL_PAGE_ID, &[][..]),
+        Some(BlinkValueRef::Inline(value)) => (1u8, value.len() as u64, 0, value.as_ref()),
+        Some(BlinkValueRef::Overflow { head, length }) => (2u8, *length, head.get(), &[][..]),
+    };
+    let record_length = leaf_record_encoded_len(entry)?;
+    if target.len() != record_length {
+        return Err(Error::invalid_input(
+            "Blink leaf record target has invalid size",
+        ));
+    }
+    target[0..8].copy_from_slice(&entry.revision.get().to_le_bytes());
+    target[8..16].copy_from_slice(&value_length.to_le_bytes());
+    target[16..24].copy_from_slice(&aux.to_le_bytes());
+    target[24] = flags;
+    target[26..28].copy_from_slice(&(entry.key.len() as u16).to_le_bytes());
+    target[LEAF_RECORD_HEADER_SIZE..LEAF_RECORD_HEADER_SIZE + entry.key.len()]
+        .copy_from_slice(&entry.key);
+    target[LEAF_RECORD_HEADER_SIZE + entry.key.len()..].copy_from_slice(inline);
+    Ok(())
+MATCHING SOURCE SYMBOLS
+HEAD:crates/dodb-storage/src/blink/mod.rs:103:pub struct RouteHint {
+HEAD:crates/dodb-storage/src/blink/mod.rs:115:pub struct PhysicalTransactionPlan {
+HEAD:crates/dodb-storage/src/blink/mod.rs:592:struct AdmittedTransaction<'a> {
+HEAD:crates/dodb-storage/src/blink/mod.rs:595:    encoded_mutation_keys: Vec<Vec<u8>>,
+HEAD:crates/dodb-storage/src/blink/mod.rs:1840:            let encoded_mutation_keys =
+HEAD:crates/dodb-storage/src/blink/mod.rs:1842:                    Ok(encoded_mutation_keys) => encoded_mutation_keys,
+HEAD:crates/dodb-storage/src/blink/mod.rs:1866:            overlay.accept_preencoded(request, &encoded_mutation_keys, provisional_revision)?;
+HEAD:crates/dodb-storage/src/blink/mod.rs:1870:                encoded_mutation_keys,
+HEAD:crates/dodb-storage/src/blink/mod.rs:2336:        encoded_mutation_keys: &[Vec<u8>],
+HEAD:crates/dodb-storage/src/blink/mod.rs:2339:        if request.mutations.len() != encoded_mutation_keys.len() {
+HEAD:crates/dodb-storage/src/blink/mod.rs:2344:        for (mutation, encoded_key) in request.mutations.iter().zip(encoded_mutation_keys) {
+HEAD:crates/dodb-storage/src/blink/mod.rs:2415:        if transaction.request.mutations.len() != transaction.encoded_mutation_keys.len() {
+HEAD:crates/dodb-storage/src/blink/mod.rs:2424:            .zip(&transaction.encoded_mutation_keys)
+HEAD:crates/dodb-storage/src/blink/mod.rs:4548:        encode_leaf_record_into_validated(
+HEAD:crates/dodb-storage/src/blink/mod.rs:4561:fn encode_leaf_record_into_validated(target: &mut [u8], entry: &LeafEntry) -> Result<()> {
+HEAD:crates/dodb-storage/src/blink/mod.rs:8110:                encoded_mutation_keys: request

@@ -67,12 +67,7 @@ pub struct DecodedPage {
 /// The checksum covers all 4096 bytes. The checksum field at bytes 28..32 is
 /// zeroed while calculating CRC32C, then filled with the result.
 pub fn encode_page(header: PageHeader, body: &[u8]) -> Result<[u8; PAGE_SIZE]> {
-    if header.format_version != PAGE_FORMAT_VERSION {
-        return Err(Error::unsupported_format(format!(
-            "cannot encode page version {}",
-            header.format_version
-        )));
-    }
+    validate_encoded_page_header(header)?;
     if body.len() > PAGE_SIZE - PAGE_HEADER_SIZE {
         return Err(Error::invalid_input(format!(
             "page body is {} bytes, maximum is {}",
@@ -82,17 +77,34 @@ pub fn encode_page(header: PageHeader, body: &[u8]) -> Result<[u8; PAGE_SIZE]> {
     }
 
     let mut page = [0u8; PAGE_SIZE];
+    page[PAGE_HEADER_SIZE..PAGE_HEADER_SIZE + body.len()].copy_from_slice(body);
+    finalize_encoded_page(header, &mut page)?;
+    Ok(page)
+}
+
+pub(crate) fn finalize_encoded_page(header: PageHeader, page: &mut [u8; PAGE_SIZE]) -> Result<()> {
+    validate_encoded_page_header(header)?;
     page[0..4].copy_from_slice(&PAGE_MAGIC);
     page[4..6].copy_from_slice(&header.format_version.to_le_bytes());
     page[6] = header.page_type as u8;
+    page[7] = 0;
     page[8..16].copy_from_slice(&header.page_id.get().to_le_bytes());
     page[16..24].copy_from_slice(&header.page_lsn.get().to_le_bytes());
     page[24..28].copy_from_slice(&header.flags.to_le_bytes());
-    page[PAGE_HEADER_SIZE..PAGE_HEADER_SIZE + body.len()].copy_from_slice(body);
-
-    let checksum = page_checksum(&page);
+    page[CHECKSUM_OFFSET..CHECKSUM_OFFSET + 4].fill(0);
+    let checksum = crc32c::crc32c(page);
     page[CHECKSUM_OFFSET..CHECKSUM_OFFSET + 4].copy_from_slice(&checksum.to_le_bytes());
-    Ok(page)
+    Ok(())
+}
+
+fn validate_encoded_page_header(header: PageHeader) -> Result<()> {
+    if header.format_version != PAGE_FORMAT_VERSION {
+        return Err(Error::unsupported_format(format!(
+            "cannot encode page version {}",
+            header.format_version
+        )));
+    }
+    Ok(())
 }
 
 pub fn decode_page(bytes: &[u8]) -> Result<DecodedPage> {
@@ -178,6 +190,52 @@ mod tests {
             b"body",
         )
         .unwrap()
+    }
+
+    fn legacy_encode_page(header: PageHeader, body: &[u8]) -> [u8; PAGE_SIZE] {
+        let mut page = [0u8; PAGE_SIZE];
+        page[0..4].copy_from_slice(&PAGE_MAGIC);
+        page[4..6].copy_from_slice(&header.format_version.to_le_bytes());
+        page[6] = header.page_type as u8;
+        page[8..16].copy_from_slice(&header.page_id.get().to_le_bytes());
+        page[16..24].copy_from_slice(&header.page_lsn.get().to_le_bytes());
+        page[24..28].copy_from_slice(&header.flags.to_le_bytes());
+        page[PAGE_HEADER_SIZE..PAGE_HEADER_SIZE + body.len()].copy_from_slice(body);
+        let mut checksum_input = page;
+        checksum_input[CHECKSUM_OFFSET..CHECKSUM_OFFSET + 4].fill(0);
+        let checksum = crc32c::crc32c(&checksum_input);
+        page[CHECKSUM_OFFSET..CHECKSUM_OFFSET + 4].copy_from_slice(&checksum.to_le_bytes());
+        page
+    }
+
+    #[test]
+    fn generic_encode_page_matches_legacy_bytes() {
+        let header = PageHeader {
+            format_version: PAGE_FORMAT_VERSION,
+            page_type: PageType::Internal,
+            page_id: PageId::new(19),
+            page_lsn: Lsn::new(0x1020_3040_5060_7080),
+            flags: 0x1234_5678,
+            checksum: 0xfeed_beef,
+        };
+        let body = (0..257)
+            .map(|offset| (offset * 37) as u8)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            encode_page(header, &body).unwrap(),
+            legacy_encode_page(header, &body)
+        );
+    }
+
+    #[test]
+    fn generic_encode_page_preserves_header_validation_order() {
+        let mut header = PageHeader::new(PageType::Leaf, PageId::new(7), Lsn::new(42));
+        header.format_version = PAGE_FORMAT_VERSION + 1;
+        let oversized_body = vec![0; PAGE_SIZE];
+        assert!(matches!(
+            encode_page(header, &oversized_body),
+            Err(Error::UnsupportedFormat(_))
+        ));
     }
 
     #[test]

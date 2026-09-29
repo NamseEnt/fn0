@@ -1,0 +1,1 @@
+engine=ExactMain logical_transaction_width=16 clean_close_reopen=PASS recovered_values=16/16 path=/bench/zfs/db/reopen-exact-main.db

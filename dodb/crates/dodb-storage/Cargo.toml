@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 crc32c.workspace = true
 dodb-core.workspace = true
+libc.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "process", "rt", "rt-multi-thread", "sync", "time"] }
 
 [dev-dependencies]

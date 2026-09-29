@@ -1,0 +1,31 @@
+# Commit-to-sync ratio under strace (observation only; strace slows every syscall, so these throughputs are not benchmark results)
+# 16 writers, width 1, uniform, working set 100000, warmup 1 s, measured 3 s, seed 979000000
+## turso-mvcc-gc
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.043507         135       321           fsync
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.043507         135       321           total
+engine turso-mvcc-gc committed_including_warmup_and_100_seed_commits 1040 measured_tx_per_s_under_strace 216.2
+## turso-mvcc-nogc
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.059754         133       446           fsync
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.059754         133       446           total
+engine turso-mvcc-nogc committed_including_warmup_and_100_seed_commits 388 measured_tx_per_s_under_strace 66.3
+## turso-wal
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.369245          94      3913           fsync
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.369245          94      3913           total
+engine turso-wal committed_including_warmup_and_100_seed_commits 3842 measured_tx_per_s_under_strace 916.1
+## rocksdb
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+ 99.97    0.439700         137      3189           fdatasync
+  0.03    0.000133          13        10           fsync
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.439833         137      3199           total
+engine rocksdb committed_including_warmup_and_100_seed_commits 24778 measured_tx_per_s_under_strace 6145.1

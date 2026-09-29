@@ -1,0 +1,7 @@
+phase0-bench engine=planned-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=2s warmup=1s repetitions=3
+raw output: /home/opc/dodb-oci-artifacts-dual-main-vs-planned-93b1e75/raw/Planned-w16-width1-different-leaf-heavy.jsonl
+scenario                                                       repetition throughput summary
+100%-write-16w-0r-width1-different-leaf-heavy              rep=0 tx/s=    47007 mut/s=    47007 read/s=        0 agg/s=    47007 p50=   317.4us p95=   595.5us p99=   634.7us groups= 6538 avg_group=14.39
+100%-write-16w-0r-width1-different-leaf-heavy              rep=1 tx/s=    47685 mut/s=    47685 read/s=        0 agg/s=    47685 p50=   315.2us p95=   556.2us p99=   647.8us groups= 6769 avg_group=14.11
+100%-write-16w-0r-width1-different-leaf-heavy              rep=2 tx/s=    47413 mut/s=    47413 read/s=        0 agg/s=    47413 p50=   318.2us p95=   564.8us p99=   654.1us groups= 6847 avg_group=13.87
+completed 1 scenarios x 3 repetitions

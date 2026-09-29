@@ -1,0 +1,45 @@
+# turso-mvcc durability syscall probe
+verdict: VERIFIED
+successful commits with a successful fsync/fdatasync on a database file under /bench/zfs/db/probe-turso-mvcc, between the commit-begin marker and the commit-returned marker: 4/4
+close/reopen value verification passed: True (verified 19 of 19, rows 19)
+
+## Per-transaction result
+{"committed": true, "markers_found": true, "successful_sync_calls_on_database_files": 1, "sync_call_kinds": ["fsync"], "sync_calls_between_begin_and_return": 3, "sync_paths": ["/bench/zfs/db/probe-turso-mvcc/kv.db-log"], "transaction": 0, "verified": true, "width": 1}
+{"committed": true, "markers_found": true, "successful_sync_calls_on_database_files": 1, "sync_call_kinds": ["fsync"], "sync_calls_between_begin_and_return": 1, "sync_paths": ["/bench/zfs/db/probe-turso-mvcc/kv.db-log"], "transaction": 1, "verified": true, "width": 1}
+{"committed": true, "markers_found": true, "successful_sync_calls_on_database_files": 1, "sync_call_kinds": ["fsync"], "sync_calls_between_begin_and_return": 1, "sync_paths": ["/bench/zfs/db/probe-turso-mvcc/kv.db-log"], "transaction": 2, "verified": true, "width": 1}
+{"committed": true, "markers_found": true, "successful_sync_calls_on_database_files": 1, "sync_call_kinds": ["fsync"], "sync_calls_between_begin_and_return": 1, "sync_paths": ["/bench/zfs/db/probe-turso-mvcc/kv.db-log"], "transaction": 3, "verified": true, "width": 16}
+
+## Effective settings reported by the probe
+{"begin_statement": "BEGIN CONCURRENT", "busy_timeout": 0, "cache_size": -32768, "io_backend": "default (PlatformIO, syscall on Linux)", "journal_mode": "mvcc", "mvcc_checkpoint_threshold": 4120000, "mvcc_group_commit": 1, "page_size": 4096, "per_connection_checks": "synchronous=2, journal_mode, mvcc_group_commit asserted on every writer connection", "synchronous": 2, "wal_autocheckpoint": null}
+
+## Marker and sync events in order
+353057 12:35:09.861096 fsync(3</bench/zfs/db/probe-turso-mvcc/kv.db>) = 0
+353057 12:35:09.862220 fsync(4</bench/zfs/db/probe-turso-mvcc/kv.db-wal>) = 0
+353057 12:35:09.863597 fsync(4</bench/zfs/db/probe-turso-mvcc/kv.db-wal>) = 0
+353057 12:35:09.864978 fsync(5</bench/zfs/db/probe-turso-mvcc/kv.db-log>) = 0
+353057 12:35:09.866108 fsync(3</bench/zfs/db/probe-turso-mvcc/kv.db>) = 0
+353057 12:35:09.867285 fsync(4</bench/zfs/db/probe-turso-mvcc/kv.db-wal>) = 0
+353057 12:35:09.868294 fsync(4</bench/zfs/db/probe-turso-mvcc/kv.db-wal>) = 0
+353057 12:35:09.869289 fsync(4</bench/zfs/db/probe-turso-mvcc/kv.db-wal>) = 0
+353057 12:35:09.870228 fsync(4</bench/zfs/db/probe-turso-mvcc/kv.db-wal>) = 0
+353057 12:35:09.870338 fsync(3</bench/zfs/db/probe-turso-mvcc/kv.db>) = 0
+353057 12:35:09.871151 fsync(5</bench/zfs/db/probe-turso-mvcc/kv.db-log>) = 0
+353057 12:35:09.871961 fsync(4</bench/zfs/db/probe-turso-mvcc/kv.db-wal>) = 0
+353057 12:35:09.873210 fsync(5</bench/zfs/db/probe-turso-mvcc/kv.db-log>) = 0
+353057 12:35:09.874456 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-mvcc/.strace-marker-commit-begin-0", F_OK) = -1 ENOENT (No such file or directory)
+353057 12:35:09.875497 fsync(6</tmp/.tmpPdw1JU/tursodb-temp.db>) = 0
+353057 12:35:09.877810 fsync(5</bench/zfs/db/probe-turso-mvcc/kv.db-log>) = 0
+353057 12:35:09.878695 fsync(7</tmp/.tmpPdw1JU/tursodb-temp.db-wal>) = 0
+353057 12:35:09.880192 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-mvcc/.strace-marker-commit-returned-0", F_OK) = -1 ENOENT (No such file or directory)
+353057 12:35:09.880283 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-mvcc/.strace-marker-commit-begin-1", F_OK) = -1 ENOENT (No such file or directory)
+353057 12:35:09.880443 fsync(5</bench/zfs/db/probe-turso-mvcc/kv.db-log>) = 0
+353057 12:35:09.881209 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-mvcc/.strace-marker-commit-returned-1", F_OK) = -1 ENOENT (No such file or directory)
+353057 12:35:09.881284 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-mvcc/.strace-marker-commit-begin-2", F_OK) = -1 ENOENT (No such file or directory)
+353057 12:35:09.881407 fsync(5</bench/zfs/db/probe-turso-mvcc/kv.db-log>) = 0
+353057 12:35:09.882231 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-mvcc/.strace-marker-commit-returned-2", F_OK) = -1 ENOENT (No such file or directory)
+353057 12:35:09.882309 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-mvcc/.strace-marker-commit-begin-3", F_OK) = -1 ENOENT (No such file or directory)
+353057 12:35:09.882566 fsync(5</bench/zfs/db/probe-turso-mvcc/kv.db-log>) = 0
+353057 12:35:09.883325 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-mvcc/.strace-marker-commit-returned-3", F_OK) = -1 ENOENT (No such file or directory)
+353057 12:35:09.884136 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-mvcc/.strace-marker-close-begin", F_OK) = -1 ENOENT (No such file or directory)
+353057 12:35:09.884663 faccessat(AT_FDCWD</tmp/crossdb-artifacts>, "/bench/zfs/db/probe-turso-mvcc/.strace-marker-reopen-begin", F_OK) = -1 ENOENT (No such file or directory)
+353057 12:35:09.885666 fsync(4</bench/zfs/db/probe-turso-mvcc/kv.db-wal>) = 0

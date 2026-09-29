@@ -1,0 +1,22 @@
+librocksdb.a
+b0d15c3de73506ee286e667a2356ddedf72b974a3a7bec71d9ad568dec624ece  /tmp/rocksdb-crossdb/librocksdb.a
+-rw-r--r--. 1 opc opc 1201025220 Sep 25 12:52 /tmp/rocksdb-crossdb/librocksdb.a
+build: make clean; make -j2 static_lib DEBUG_LEVEL=0 PORTABLE=0 DISABLE_WARNING_AS_ERROR=1 V=1
+flag counts over all compile lines in rocksdb-build.log:
+    617 -DNDEBUG
+    617 -fno-rtti
+    617 -march=armv8-a+crc+crypto
+    617 -O2
+    254 -Werror
+rocksdb-bench binary
+78f222f2214701a42b9f255b3b5044936e0dfb9be63bec1f0f01997e8ee9195a  /tmp/crossdb-rocksdb-target/release/rocksdb-bench
+/tmp/crossdb-rocksdb-target/release/rocksdb-bench: ELF 64-bit LSB executable, ARM aarch64, version 1 (GNU/Linux), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=1beb699493fbb3b66ff9b8e189023e1004697c10, for GNU/Linux 3.7.0, with debug_info, not stripped
+harness build: RUSTFLAGS="-C target-cpu=native -C relocation-model=static" (non-PIE link because librocksdb.a is not PIC); shim compiled with -std=c++20 -O2 -fno-rtti -march=armv8-a+crc+crypto -DNDEBUG
+dfa45f5a4ee41d6588948187f1cda65f3ac6a1a0db37360d450e3595805d6823  common/driver.rs
+8321d6e72d1eb9c9c26ddf0ccb64355c61064a9de38f9aed9ba80217bfabca7f  common/mod.rs
+38d3b047d0029f3e3d13a7bff5a411fd785e63b5b3c8191b21a8d6216be8f82f  common/workload.rs
+0b2ddbf2ec6d9eaf34c5b3b643c1b23a6b6c8895b9ef42504b118bf4207b1f2c  rocksdb-bench/src/main.rs
+ec132c59cde06615ebfd15e7e008c4cf000d3194e5159dca4214d1aa1925f3bf  rocksdb-bench/shim/rocksdb_shim.cc
+3fca17d5ac5d7b6cf0d1c7b72677a1c59ec7d3e4dfa22539d594fb651a7933d0  rocksdb-bench/build.rs
+844a5edc18db015cd38c8a4ffc391ab9ddd0052f4b0130670e145336e8f76a7a  rocksdb-bench/Cargo.toml
+9f38cd60946e076db5b8b773ccf02cb1f53494fe3a6370bd5b8964426f478a14  rocksdb-bench/Cargo.lock
