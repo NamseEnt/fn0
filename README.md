@@ -8,7 +8,7 @@ It provides serverless compute using **Wasmtime and V8**, together with platform
 
 Applications can run directly on fn0, or use **Forte**, the full-stack Rust + React framework built on top of it.
 
-This repository is the main monorepo for the fn0 platform. In addition to fn0 itself, it contains **Forte** and **dodb**, a transactional document/KV database developed for fn0.
+This repository is the main monorepo for the fn0 platform. In addition to fn0 itself, it contains **Forte**, **dodb**, a transactional document/KV database developed for fn0, and **obsy**, the observability stack.
 
 **fn0** is pronounced `f-n-zero`.
 
@@ -49,6 +49,29 @@ Its logical key space is based on `(tenant, pk, sk)` with opaque byte values. It
 fn0 exposes a backend-neutral document database API to applications; dodb is the database backend used by the fn0 platform without exposing dodb-specific storage details to application code.
 
 [dodb Architecture Overview](dodb/docs/architecture/00-overview.md)
+
+### obsy
+
+**obsy** is the observability stack for fn0. It contains **Signy**, the telemetry storage and query engine, and **collecty**, the durable OTLP collector.
+
+Both are standalone Rust projects under `obsy/`; they are intentionally excluded from the root Cargo workspace and keep their own lockfiles, pinned toolchains, and Docker build structures.
+
+[obsy Overview](obsy/README.md)
+
+## Repository Structure
+
+```text
+fn0/
+├── fn0/                fn0 runtime and platform
+├── forte/              Forte framework and tooling
+├── dodb/               document database
+├── obsy/               observability stack: Signy and collecty
+├── doc-db/             document database API
+├── object-storage/     S3-compatible object storage API
+├── infra/              deployment infrastructure
+├── scripts/            development and operations scripts
+└── docs/               project documentation
+```
 
 ## Platform Capabilities
 

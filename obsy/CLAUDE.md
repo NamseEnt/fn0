@@ -2,16 +2,16 @@
 
 ## Repository layout
 
-This repository is obsy, which is the product name. Each component lives in a
-directory under it.
+This directory contains obsy, which is the product name. Each component lives
+in a directory under it. Repository work also follows the root `CLAUDE.md`.
 
 - `signy/` — the storage and query engine. The crate root is here, so build and
-  test with `cd signy && cargo test`
+  test from the monorepo root with `cd obsy/signy && cargo test`
 - `collecty/` — the collector. Takes OTLP/HTTP, compresses with zstd into an
   append-only disk queue, and forwards batches to signy. Build and test with
-  `cd collecty && cargo test`
+  `cd obsy/collecty && cargo test`
 
-There is no Cargo workspace at the root. Each component carries its own
+There is no Cargo workspace under `obsy/`. Each component carries its own
 `Cargo.lock` and `rust-toolchain.toml` and builds separately. obsy is a name
 that never appears at build or run time: binaries, crates, env prefixes, metric
 families and image names all use the component's name.

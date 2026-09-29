@@ -9,7 +9,7 @@ previous candidate cannot make the next candidate pass or fail.
 The default experiment uses the old comparison budget and searches from 10,000
 to 2,000,000 requested burst series with a 10,000-series final uncertainty:
 
-    cd signy
+    cd obsy/signy
     COMPARE_MEMORY=2g compare/run_metric_capacity.sh
 
 This is intentionally a long experiment. A short smoke run that validates the

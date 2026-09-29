@@ -418,7 +418,7 @@ that never contend with writes. Optimizing against those numbers reproduces them
 - [x] **Fix `scripts/run_load_local.sh`** — the repository root is derived from the script's own location, the
       addresses and the result path are defaults rather than assignments, and the harness's non-zero verdict
       exit no longer truncates the server log
-- [x] **CI.** [`../.github/workflows/signy.yml`](../.github/workflows/signy.yml), on every push and every pull request:
+- [x] **CI.** [`../../.github/workflows/signy.yml`](../../.github/workflows/signy.yml), for Signy changes on `main` and every pull request:
       `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` (the tree is at zero warnings and that is
       a maintained property), `cargo test`, `cargo bench --no-run` so `benches/` — a separate crate nothing else
       compiles — cannot rot, a criterion `--test` pass that executes every bench body once, and a twenty-second

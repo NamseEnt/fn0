@@ -4,12 +4,15 @@ name: signy
 # has nothing to prove here. collecty gets its own workflow beside this one.
 on:
   push:
+    branches: [main]
     paths:
-      - 'signy/**'
+      - 'obsy/signy/**'
+      - 'obsy/CLAUDE.md'
       - '.github/workflows/signy.yml'
   pull_request:
     paths:
-      - 'signy/**'
+      - 'obsy/signy/**'
+      - 'obsy/CLAUDE.md'
       - '.github/workflows/signy.yml'
 
 # The answer to a commit that has already been superseded is not worth a runner.
@@ -30,7 +33,7 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: signy
+        working-directory: obsy/signy
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +53,7 @@ jobs:
       # run spends most of its time compiling code that did not change.
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: signy
+          workspaces: obsy/signy
 
       - name: cargo fmt
         run: cargo fmt --check
@@ -74,7 +77,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-output-${{ github.run_id }}-${{ github.run_attempt }}
-          path: signy/target/test-output.log
+          path: obsy/signy/target/test-output.log
           if-no-files-found: ignore
 
   # Separate job: the benches build under the `bench` profile, so they share no
@@ -85,7 +88,7 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: signy
+        working-directory: obsy/signy
     steps:
       - uses: actions/checkout@v4
 
@@ -98,7 +101,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: signy
+          workspaces: obsy/signy
 
       - name: cargo bench --no-run
         # `benches/` is a separate crate against the `[lib]` target, so nothing
@@ -115,37 +118,15 @@ jobs:
         run: cargo bench --locked --benches -- --test
 
   signy-image:
-    # Only after the tests pass, and only for what is actually deployed. A pull
-    # request does not need a published image.
     needs: signy-check
-    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    env:
-      IMAGE: ghcr.io/namse/signy
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to the registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      # The revision is baked in rather than inferred at runtime: `build_info`
-      # on /metrics is how a scraped series is attributed to code, which is the
-      # first question asked when two deployments behave differently.
-      - name: Build
+      - name: Validate Docker image build
         run: |
           docker build \
             --build-arg SIGNY_BUILD_REVISION="${GITHUB_SHA}" \
             --build-arg SIGNY_BUILD_BRANCH="${GITHUB_REF_NAME}" \
-            --tag "${IMAGE}:${GITHUB_SHA}" \
-            --tag "${IMAGE}:latest" \
-            signy
-
-      # Both tags, because the immutable one is what a deployment should pin to
-      # and the moving one is what a person types.
-      - name: Push
-        run: |
-          docker push "${IMAGE}:${GITHUB_SHA}"
-          docker push "${IMAGE}:latest"
+            --tag signy:ci \
+            obsy/signy

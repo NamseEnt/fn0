@@ -66,7 +66,7 @@ rule:
 ```
 SIGNY_R2_TEST_URL=s3://your-bucket/signy-r2-smoke \
 SIGNY_OBJECT_STORE_CATALOG_LOCKED=true \
-cargo test --manifest-path signy/Cargo.toml --lib r2_catalog_backend_smoke -- --ignored
+cargo test --manifest-path obsy/signy/Cargo.toml --lib r2_catalog_backend_smoke -- --ignored
 ```
 
 ## 2. The disk

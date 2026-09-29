@@ -44,6 +44,18 @@ fn0/
 └── vendor/            deno_core            Vendored and patched for deterministic module map serialization
 ```
 
+## Standalone Rust projects
+
+### obsy/signy
+
+The Signy telemetry storage and query engine. Build and test it from `obsy/signy` with its own pinned toolchain and lockfile.
+
+### obsy/collecty
+
+The collecty OTLP collector and durable queue. Build and test it from `obsy/collecty` with its own pinned toolchain and lockfile.
+
+Signy and collecty live in this Git monorepo but are intentionally excluded from the root Cargo workspace. Each component retains its own `Cargo.lock`, `rust-toolchain.toml`, dependencies, and Docker build structure.
+
 ## forte-sdk
 
 **Crate:** `forte-sdk` · **Target:** `wasm32-wasip2`

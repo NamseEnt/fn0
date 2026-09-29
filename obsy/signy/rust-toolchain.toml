@@ -4,7 +4,7 @@
 # symptom of the drift is a clippy failure nobody can reproduce.
 #
 # Edition 2024 needs >= 1.85; this is the version the tree is developed against
-# and the one every check in `../.github/workflows/signy.yml` was verified under.
+# and the one every check in `../../.github/workflows/signy.yml` was verified under.
 [toolchain]
 channel = "1.92.0"
 components = ["rustfmt", "clippy"]

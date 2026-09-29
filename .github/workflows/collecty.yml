@@ -2,12 +2,15 @@ name: collecty
 
 on:
   push:
+    branches: [main]
     paths:
-      - 'collecty/**'
+      - 'obsy/collecty/**'
+      - 'obsy/CLAUDE.md'
       - '.github/workflows/collecty.yml'
   pull_request:
     paths:
-      - 'collecty/**'
+      - 'obsy/collecty/**'
+      - 'obsy/CLAUDE.md'
       - '.github/workflows/collecty.yml'
 
 concurrency:
@@ -24,7 +27,7 @@ jobs:
     timeout-minutes: 20
     defaults:
       run:
-        working-directory: collecty
+        working-directory: obsy/collecty
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +40,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: collecty
+          workspaces: obsy/collecty
 
       - name: cargo fmt
         run: cargo fmt --check
@@ -55,7 +58,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-output-${{ github.run_id }}-${{ github.run_attempt }}
-          path: collecty/target/test-output.log
+          path: obsy/collecty/target/test-output.log
           if-no-files-found: ignore
 
   collecty-bench:
@@ -63,7 +66,7 @@ jobs:
     timeout-minutes: 20
     defaults:
       run:
-        working-directory: collecty
+        working-directory: obsy/collecty
     steps:
       - uses: actions/checkout@v4
 
@@ -75,7 +78,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: collecty
+          workspaces: obsy/collecty
 
       - name: cargo bench --no-run
         run: cargo bench --locked --no-run
@@ -85,27 +88,10 @@ jobs:
 
   collecty-image:
     needs: collecty-check
-    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    env:
-      IMAGE: ghcr.io/namse/collecty
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to the registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Build
+      - name: Validate Docker image build
         run: |
-          docker build \
-            --tag "${IMAGE}:${GITHUB_SHA}" \
-            --tag "${IMAGE}:latest" \
-            collecty
-
-      - name: Push
-        run: |
-          docker push "${IMAGE}:${GITHUB_SHA}"
-          docker push "${IMAGE}:latest"
+          docker build --tag collecty:ci obsy/collecty
