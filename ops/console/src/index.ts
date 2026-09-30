@@ -1,11 +1,14 @@
 import { verifyAccessRequest } from "./access.ts";
 import { type Env, MissingBindingError, readConfig } from "./config.ts";
 import { recentErrors } from "./errors.ts";
+import { dodbSeries } from "./dodb-series.ts";
 import { live } from "./live.ts";
 import { overview } from "./overview.ts";
 import { r2Analytics } from "./r2.ts";
 import { DEFAULT_DEADLINES, type Dependencies } from "./runtime.ts";
 import { series } from "./series.ts";
+import { telemetrySeries } from "./telemetry-series.ts";
+import { workerSeries } from "./worker-series.ts";
 import { APP_HTML, APP_SCRIPT } from "./ui.ts";
 import { type TimeWindow, WINDOW_NAMES, parseWindow } from "./windows.ts";
 
@@ -45,6 +48,9 @@ const ROUTES: Record<string, Route> = {
   "/api/r2": { windowed: false, handle: r2Analytics },
   "/api/overview": { windowed: true, handle: overview },
   "/api/series": { windowed: true, handle: series },
+  "/api/dodb-series": { windowed: true, handle: dodbSeries },
+  "/api/worker-series": { windowed: true, handle: workerSeries },
+  "/api/telemetry-series": { windowed: true, handle: telemetrySeries },
   "/api/errors": { windowed: true, handle: recentErrors },
 };
 

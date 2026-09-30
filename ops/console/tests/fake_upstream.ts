@@ -117,6 +117,7 @@ export class FakeUpstream {
   workerTelemetryAgeSeconds = 30;
   instant: Record<string, string[]> = {};
   range: Record<string, string[]> = {};
+  rangeFailures: Record<string, Answer> = {};
   logs: string[] = [];
   signingKeysAnswer: Answer | null = null;
   graphqlAnswer: Answer = {
@@ -188,6 +189,8 @@ export class FakeUpstream {
       return { status: 200, body: (this.instant[metric] ?? this.defaultInstant(metric)).join("\n") };
     }
     if (url.pathname === "/signy/api/v1/metrics/query") {
+      const failure = this.rangeFailures[metric];
+      if (failure !== undefined) return failure;
       return { status: 200, body: (this.range[metric] ?? []).join("\n") };
     }
     if (url.pathname === "/signy/api/v1/logs") {

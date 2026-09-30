@@ -47,6 +47,9 @@ test("an invalid, repeated or extra parameter is a 400", async () => {
     "/api/errors?window=1h&attr=severity_text%3DINFO",
     "/api/live?window=1h",
     "/api/series?tenant=5t1hmzd4",
+    "/api/dodb-series?window=1h&metric=dodb.server.requests",
+    "/api/worker-series?query=anything",
+    "/api/telemetry-series?window=15s",
   ]) {
     const response = await get(upstream, path);
     assert.equal(response.status, 400, path);
@@ -106,10 +109,32 @@ test("the authenticated worker serves the console document and browser bundle", 
   assert.equal(script.response.status, 200);
   assert.match(script.text, /\/api\/live/);
   assert.match(script.text, /visibilitychange/);
+  assert.match(script.text, /dodb-operations-chart/);
+  assert.match(script.text, /host-cpu-chart/);
+  assert.match(script.text, /worker-history-chart/);
+  assert.match(script.text, /telemetry-queue-chart/);
+  assert.match(script.text, /Promise\.allSettled/);
+  assert.match(script.text, /axisValue\(value, format\)/);
   assert.doesNotThrow(() => new Function(script.text));
   assert.match(script.response.headers.get("content-type") ?? "", /javascript/);
   assert.equal(script.response.headers.get("cache-control"), "no-store");
   assert.match(script.response.headers.get("content-security-policy") ?? "", /script-src 'self'/);
+});
+
+test("fixed history routes share bounded window grids and keep Signy selectors server-defined", async () => {
+  for (const route of ["dodb-series", "worker-series", "telemetry-series"]) {
+    const upstream = new FakeUpstream();
+    const response = await get(upstream, `/api/${route}?window=6h`);
+    assert.equal(response.status, 200);
+    const body = response.body as { window: string; step_seconds: number; generated_at: string; timestamps_ms: number[] };
+    assert.equal(body.window, "6h");
+    assert.equal(body.step_seconds, 300);
+    assert.equal(body.timestamps_ms.length, 72);
+    assert.ok(Number.isFinite(Date.parse(body.generated_at)));
+    const queries = upstream.requests.filter((request) => request.url.pathname.endsWith("/metrics/query"));
+    assert.ok(queries.length > 0);
+    assert.ok(queries.every((request) => request.url.searchParams.get("step") === "300s"));
+  }
 });
 
 test("a valid window answers a bounded, aligned series", async () => {

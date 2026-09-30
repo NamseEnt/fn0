@@ -172,6 +172,36 @@ export interface SeriesResponse {
   latency_seconds: Record<keyof LatencySeconds, (number | null)[]>;
 }
 
+export interface HistorySeriesBase {
+  window: WindowName;
+  step_seconds: number;
+  generated_at: string;
+  timestamps_ms: number[];
+}
+
+export interface DodbHistoryResponse extends HistorySeriesBase {
+  operations: { telemetry: TelemetryQueryStatus; per_minute: Record<DodbOperation, (number | null)[]> };
+  latency: { telemetry: TelemetryQueryStatus; seconds: Record<keyof LatencySeconds, (number | null)[]> };
+  storage: { telemetry: TelemetryQueryStatus; database_file_bytes: (number | null)[]; wal_file_bytes: (number | null)[] };
+  host: {
+    cpu: { telemetry: TelemetryQueryStatus; busy_percent: (number | null)[] };
+    memory: { telemetry: TelemetryQueryStatus; used_bytes: (number | null)[]; available_bytes: (number | null)[] };
+    disk: { telemetry: TelemetryQueryStatus; read_bytes_per_minute: (number | null)[]; write_bytes_per_minute: (number | null)[] };
+    network: { telemetry: TelemetryQueryStatus; received_bytes_per_minute: (number | null)[]; sent_bytes_per_minute: (number | null)[] };
+  };
+}
+
+export interface WorkerHistoryResponse extends HistorySeriesBase {
+  telemetry: TelemetryQueryStatus;
+  in_flight_requests: (number | null)[];
+  websocket_connections: (number | null)[];
+}
+
+export interface TelemetryHistoryResponse extends HistorySeriesBase {
+  queue: { telemetry: TelemetryQueryStatus; bytes: (number | null)[] };
+  segments: { telemetry: TelemetryQueryStatus; dropped: (number | null)[]; refused: (number | null)[] };
+}
+
 export interface PlatformError {
   timestamp: string;
   service: string | null;
