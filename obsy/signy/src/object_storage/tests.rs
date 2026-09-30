@@ -1711,6 +1711,169 @@
         assert!(!root.join("quarantine").exists());
     }
 
+    #[tokio::test]
+    async fn metric_reconciliation_quarantines_an_evicted_retired_cache_shell() {
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("metric-retired-cache-shell");
+        let metrics_root = root.join("metrics");
+        let parts = metric_parts_for(&metrics_root, 1_700_000_000_000_000_000);
+        let manifest = storage.publish_metric_parts(&parts, &[]).await.unwrap();
+        storage
+            .evict_metric_cache(&metrics_root, 0, std::slice::from_ref(&parts[0].dir))
+            .unwrap();
+        storage.remove_metric_parts(&manifest.parts).await.unwrap();
+        storage.delete_metric_part_objects(&manifest.parts).await.unwrap();
+
+        let reconciled = storage
+            .reconcile_metric_local_cache(&metrics_root)
+            .await
+            .unwrap();
+        let quarantine = root
+            .join("quarantine")
+            .join(chrono::Utc::now().format("%Y%m%d").to_string())
+            .join("metrics")
+            .join(&parts[0].meta.partition)
+            .join(&parts[0].meta.id);
+
+        assert!(reconciled.parts.is_empty());
+        assert!(!parts[0].dir.exists());
+        assert!(quarantine
+            .join(crate::series_part::SERIES_META_FILE)
+            .is_file());
+        assert!(quarantine
+            .join(crate::series_part::SERIES_INDEX_FILE)
+            .is_file());
+        assert!(!quarantine
+            .join(crate::series_part::SERIES_DATA_FILE)
+            .exists());
+        assert!(storage.load_metric_manifest().await.unwrap().parts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn metric_reconciliation_preserves_retired_cache_when_complete_remote_objects_remain() {
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("metric-retired-cache-complete-objects");
+        let metrics_root = root.join("metrics");
+        let parts = metric_parts_for(&metrics_root, 1_700_000_000_000_000_000);
+        let manifest = storage.publish_metric_parts(&parts, &[]).await.unwrap();
+        let descriptor = manifest.parts[0].clone();
+        let files = METRIC_PART_FILES
+            .iter()
+            .map(|file| (*file, std::fs::read(parts[0].dir.join(file)).unwrap()))
+            .collect::<Vec<_>>();
+        storage
+            .evict_metric_cache(&metrics_root, 0, std::slice::from_ref(&parts[0].dir))
+            .unwrap();
+        storage.remove_metric_parts(&manifest.parts).await.unwrap();
+        storage.delete_metric_part_objects(&manifest.parts).await.unwrap();
+        for (file, bytes) in &files {
+            storage
+                .store
+                .put_opts(
+                    &storage.metric_part_path(&descriptor, file),
+                    bytes.clone().into(),
+                    PutOptions {
+                        mode: PutMode::Create,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+        }
+
+        let reconciled = storage
+            .reconcile_metric_local_cache(&metrics_root)
+            .await
+            .unwrap();
+
+        assert!(reconciled.parts.is_empty());
+        assert!(parts[0]
+            .dir
+            .join(crate::series_part::SERIES_META_FILE)
+            .is_file());
+        assert!(!parts[0].data_path().exists());
+        assert!(!root.join("quarantine").exists());
+        for file in METRIC_PART_FILES {
+            assert!(storage
+                .store
+                .head(&storage.metric_part_path(&descriptor, file))
+                .await
+                .is_ok());
+        }
+    }
+
+    #[tokio::test]
+    async fn metric_reconciliation_fails_closed_for_retired_cache_with_remote_objects() {
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("metric-retired-cache-partial-objects");
+        let metrics_root = root.join("metrics");
+        let parts = metric_parts_for(&metrics_root, 1_700_000_000_000_000_000);
+        let manifest = storage.publish_metric_parts(&parts, &[]).await.unwrap();
+        let descriptor = manifest.parts[0].clone();
+        storage
+            .evict_metric_cache(&metrics_root, 0, std::slice::from_ref(&parts[0].dir))
+            .unwrap();
+        storage.remove_metric_parts(&manifest.parts).await.unwrap();
+        storage.delete_metric_part_objects(&manifest.parts).await.unwrap();
+        let file = METRIC_PART_FILES[1];
+        let bytes = std::fs::read(parts[0].dir.join(file)).unwrap();
+        storage
+            .store
+            .put_opts(
+                &storage.metric_part_path(&descriptor, file),
+                bytes.into(),
+                PutOptions {
+                    mode: PutMode::Create,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        let error = storage
+            .reconcile_metric_local_cache(&metrics_root)
+            .await
+            .unwrap_err();
+
+        assert!(error.contains("remote metric objects remain"));
+        assert!(parts[0].dir.exists());
+        assert!(!root.join("quarantine").exists());
+    }
+
+    #[tokio::test]
+    async fn metric_reconciliation_fails_closed_for_pending_flush_reference() {
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("metric-retired-cache-pending-flush");
+        let metrics_root = root.join("metrics");
+        let parts = metric_parts_for(&metrics_root, 1_700_000_000_000_000_000);
+        let manifest = storage.publish_metric_parts(&parts, &[]).await.unwrap();
+        storage
+            .evict_metric_cache(&metrics_root, 0, std::slice::from_ref(&parts[0].dir))
+            .unwrap();
+        storage.remove_metric_parts(&manifest.parts).await.unwrap();
+        storage.delete_metric_part_objects(&manifest.parts).await.unwrap();
+        write_flush_transaction(
+            &root,
+            &FlushTransaction {
+                offset: 8,
+                log_parts: Vec::new(),
+                trace_parts: Vec::new(),
+                metric_parts: manifest.parts.clone(),
+            },
+        )
+        .unwrap();
+
+        let error = storage
+            .reconcile_metric_local_cache(&metrics_root)
+            .await
+            .unwrap_err();
+
+        assert!(error.contains("pending flush transaction"));
+        assert!(parts[0].dir.exists());
+        assert!(root.join(FLUSH_TRANSACTION_FILE).is_file());
+        assert!(!root.join("quarantine").exists());
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn trace_cache_rejects_symlinked_immutable_files() {
