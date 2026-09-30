@@ -5,6 +5,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 pulumi_dir="${repo_root}/infra/cloud"
 stack="prod"
+echo "LEGACY: standalone Signy node setup; production deployment targets the DODB OCI VM" >&2
 ssh_target=""
 while [[ $# -gt 0 ]]; do
   case "$1" in

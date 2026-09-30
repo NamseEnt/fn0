@@ -117,7 +117,8 @@ When a deploy step requires a dependency crate to be published (e.g., `deploy-fn
 
 ## Telemetry
 
-The platform's telemetry stack is self-hosted on `192.168.0.10`. Each worker sends
+The platform telemetry stack's production host target is the existing DODB OCI
+VM. Each worker sends
 metrics, logs, and traces over OTLP/HTTP protobuf straight to the worker-local
 collecty durable queue. Each project is its own Signy tenant: the worker decodes
 every guest export and sets `tenant.id` on each resource to the calling
@@ -137,9 +138,11 @@ node loopback interface. The R2 token is bucket-scoped, catalog writes use
 conditional ETags, and the catalog prefix has a seven-day Bucket Lock rule.
 
 The production image references are immutable OCIR digests in Pulumi config.
-The worker image metadata pins collecty to the same digest on every host, and
-the Signy node setup pins the Signy digest. Update both deliberately and run
-the verification procedure before changing either reference.
+The worker image metadata pins collecty to the same digest on every host. The
+Signy target is the existing DODB OCI VM, reached through OCI Bastion; deploy it
+with `scripts/deploy-signy-on-dodb.sh`. The current Signy digest is an x86_64
+image and cannot be deployed to that ARM64 VM until a same-source ARM64 digest
+is published and pinned. The standalone setup scripts are legacy utilities.
 
 Cost safety is part of the deployment: collecty uses warning-level JSON logs,
 does not enable journald collection, samples host metrics once per minute, and
@@ -151,12 +154,12 @@ flushes at most once a minute,
 compacts every signal's parts by size tier, collects orphaned objects hourly in
 bounded resumable passes, and prunes catalog history older than eight days on
 its own schedule.
-Docker log rotation is capped at five 100 MiB files on the Signy node.
+The DODB Signy unit will cap each container log at 100 MiB.
 
-Provision the permanent node from the Pulumi stack with
-`scripts/setup-signy-node-remote.sh --ssh namse@192.168.0.10`. The setup writes
-only root-readable secret files, replaces obsolete metrics tunnel units, and
-verifies Signy readiness and R2 health before returning.
+The DODB-hosted Signy deployment writes root-readable secret files and verifies
+Signy readiness, R2 health, the existing Tunnel, and external Access. Its
+installation remains gated on publishing the ARM64 image built from the pinned
+production source revision.
 
 The [Signy production record](signy-production.md) covers telemetry recovery.
 The [operations dashboard guide](operations-dashboard.md) covers its

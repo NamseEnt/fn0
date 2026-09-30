@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+echo "LEGACY: standalone Signy node setup; production deployment targets the DODB OCI VM" >&2
+
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "run as root" >&2
   exit 1

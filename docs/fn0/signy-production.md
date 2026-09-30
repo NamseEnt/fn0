@@ -2,14 +2,32 @@
 
 The fn0 production telemetry path is:
 
-`fn0 workload -> worker OTLP -> collecty durable queue -> Signy -> Cloudflare R2`
+`fn0 workload -> worker OTLP -> collecty durable queue -> Signy on the DODB OCI VM -> Cloudflare R2`
 
 The active worker pool has one worker. Collecty listens on `127.0.0.1:4318`,
 and the worker exports its own telemetry and every forwarded guest export
-there. Signy listens
-on `127.0.0.1:3100` on `192.168.0.10`. External access is
-`https://signy.fn0.dev`, protected by a Cloudflare Access service token and
-served through the Signy Tunnel.
+there. The production Signy host target is the existing DODB OCI VM, managed
+through OCI Bastion port forwarding. Signy will listen on `127.0.0.1:3100`.
+The external endpoint remains `https://signy.fn0.dev`, protected by the
+existing Cloudflare Access service tokens and served through the existing
+Signy Tunnel; that path is currently unavailable pending the migration.
+
+## Migration status
+
+The former standalone Signy node is inaccessible and its Tunnel is down. The
+DODB-hosted Signy services have not yet been installed. The current pinned
+production image is x86_64 and cannot run on the ARM64 DODB VM. The documented
+production source revision `4da304fb9c1ada8d8871076fae92bae402f39317` is not
+available in this checkout or the configured source repository, so the
+required same-revision ARM64 image has not been built. The DODB deploy script
+checks the pulled image architecture before installing service files and will
+refuse the current image.
+
+After the matching ARM64 image is available, use
+`scripts/deploy-signy-on-dodb.sh`. Do not operate the old standalone node as a
+production writer. The old node and its storage have not been deleted. Data
+acknowledged by the old process but not flushed to R2 may remain only in its
+unavailable local WAL.
 
 ## Pinned production resources
 
@@ -27,33 +45,39 @@ served through the Signy Tunnel.
 - Tunnel id: `cfdc38c0-48b9-43db-848a-a5f442a695ec`
 
 The image references and the telemetry configuration version are stored in
-`infra/cloud/Pulumi.prod.yaml`. Worker cloud-init and the node setup script
+`infra/cloud/Pulumi.prod.yaml`. Worker cloud-init and the DODB deploy script
 consume those values, so a redeploy cannot silently select a mutable tag.
 
-The node is running the pinned Signy image above. It was built on the x86_64
-Signy node from the source revision listed above.
+The pinned Signy image above is the former standalone-node image. It was built
+on the x86_64 Signy node from the source revision listed above and is not
+compatible with the ARM64 DODB VM.
 
 ## Deployment
 
-Apply the Pulumi stack before configuring the node:
+The existing Pulumi stack already owns the Signy R2 bucket, Tunnel, hostname,
+Access application, and service tokens. Do not recreate or rotate them. A
+Pulumi apply is not required for the DODB-hosted service deployment unless a
+future preview identifies a necessary output-only wiring change.
 
 ```sh
 cd infra/cloud
 npm run build
 npx tsc --noEmit
-pulumi up
 ```
 
-Configure or refresh the permanent Signy node with:
+Deploy through the existing OCI Bastion and the DODB service path with:
 
 ```sh
-scripts/setup-signy-node-remote.sh --ssh namse@192.168.0.10
+scripts/deploy-signy-on-dodb.sh
 ```
 
-The script writes root-only secret files, starts the digest-pinned Signy
-container, configures the Tunnel, removes obsolete metrics tunnel and backup
-units, and verifies R2 health. It does not create a platform tenant policy;
-control owns explicit project policies.
+The deploy script refuses to install the services unless the configured image
+is digest-pinned and the pulled image is ARM64. It writes root-only secret
+files, starts `fn0-signy.service` and `fn0-signy-tunnel.service`, verifies R2
+health and manifest restoration, checks platform tenant queries, and verifies
+the existing Tunnel and external Access path. It does not create a platform
+tenant policy; control owns explicit project policies. Until the ARM64 image
+gate passes, production Signy remains unavailable.
 
 ## Cost and retention controls
 
@@ -87,13 +111,14 @@ On the worker, 1% of requests are traced and background loops are never traced.
 Server errors, requests that ran out of time and failed static page
 generations are logged; a slow request that succeeded is not.
 Request metrics carry the project, the route template, and a bounded outcome;
-raw paths and raw error messages go to logs only. Signy container logs rotate at five
-100 MiB files. At the verification time the R2 bucket contained 1,281 objects
-using about 2.1 MiB; this includes only the current rollout and verification
-data. VictoriaMetrics
+raw paths and raw error messages go to logs only. The former Docker setup
+rotated Signy container logs at five 100 MiB files. The DODB Podman unit will
+cap each container log at 100 MiB. At the historical verification time the R2
+bucket contained 1,281 objects using about 2.1 MiB; this includes only the
+current rollout and verification data. VictoriaMetrics
 and its old backup/tunnel units are no longer part of the deployment.
 
-## Verification record
+## Historical verification record
 
 The production checks completed on 2026-09-14:
 
@@ -112,10 +137,8 @@ The production checks completed on 2026-09-14:
    `signy_remote_healthy 1`, `signy_ingest_errors_total 0`, and successful
    flushes. A subsequent `fn0.dev` request was visible in Signy's query path.
 
-If an outage test is repeated, stop only the `signy` container on
-`192.168.0.10`, issue a small number of normal `fn0.dev` requests, observe
-`/var/lib/collecty` growth and collecty's retry logs, start Signy, then wait
-for the queue to drain before declaring recovery.
+This verification record describes the former standalone deployment as of
+2026-09-14. Do not use its retired node address for production operations.
 
 The operator console's telemetry health signals and production checks are
 documented in [operations-dashboard.md](operations-dashboard.md).
