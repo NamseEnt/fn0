@@ -1162,7 +1162,12 @@ These are attribution controls, not separate products. If a control is too
 expensive to implement, record why and do not claim isolated causality for the
 missing feature.
 
-## 17. Benchmark workloads
+## 17. Architecture and stress benchmark workloads
+
+The product workload suite and adoption policy are defined by
+[`fn0-product-workload.md`](fn0-product-workload.md). The synthetic matrix in
+this section remains useful for architecture/stress diagnosis, but does not
+alone determine product adoption.
 
 The minimum matrix is the Cartesian product of the following dimensions where
 the run budget permits; otherwise use the staged core/focused matrix described
@@ -1314,11 +1319,16 @@ Metrics must be reported for both successful and failed/conflicting requests
 where meaningful. A throughput increase caused by silently dropping or
 overloading requests is not a win.
 
-## 19. Adoption criteria
+## 19. Architecture hypothesis criteria
 
-These criteria should be recorded before the final result is inspected. The
-thresholds below are the proposed decision rule; if the project changes them,
-the change must be documented before rerunning the final matrix.
+Product adoption is governed by
+[`fn0-product-workload.md`](fn0-product-workload.md#8-product-adoption-policy).
+The thresholds in this section are secondary architecture-hypothesis tests;
+they must not be used as the sole product decision rule.
+
+Record these criteria before inspecting the final architecture-stress result.
+They preserve the B-link research hypothesis and do not replace the product
+workload regression budget or Pareto assessment in the policy document.
 
 ### 19.1 Hard gates
 
