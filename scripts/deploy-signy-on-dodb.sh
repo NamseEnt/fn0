@@ -112,7 +112,7 @@ ssh_options=(
   -o StrictHostKeyChecking=accept-new
 )
 scp_options=(
-  -i "${target_ssh_key_file}" -P "${BASTION_LOCAL_PORT}" -o IdentitiesOnly=yes
+  -i "${target_ssh_key_file}" -P "${BASTION_LOCAL_PORT}" -p -o IdentitiesOnly=yes
   -o BatchMode=yes -o ConnectTimeout=10
   -o "UserKnownHostsFile=${BASTION_TEMP_DIR}/known_hosts"
   -o StrictHostKeyChecking=accept-new
@@ -123,6 +123,8 @@ scp "${scp_options[@]}" "${signy_env_file}" "${tunnel_env_file}" \
 
 ssh "${ssh_options[@]}" opc@127.0.0.1 bash -s -- "${signy_image_ref}" <<'REMOTE_INSTALL'
 set -euo pipefail
+chmod 600 /tmp/signy.env /tmp/signy-tunnel.env
+trap 'rm -f /tmp/signy.env /tmp/signy-tunnel.env' EXIT
 
 signy_image_ref="$1"
 tunnel_image="docker.io/cloudflare/cloudflared:latest"
