@@ -2,6 +2,29 @@ import type { RangeRow } from "./signy.ts";
 
 export type HistoryColumn = (number | null)[];
 
+export async function mapLimit<T, R>(
+  values: readonly T[],
+  maximumConcurrency: number,
+  mapper: (value: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (!Number.isInteger(maximumConcurrency) || maximumConcurrency < 1) {
+    throw new RangeError("maximumConcurrency must be a positive integer");
+  }
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+  const runWorker = async (): Promise<void> => {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= values.length) return;
+      results[currentIndex] = await mapper(values[currentIndex]!, currentIndex);
+    }
+  };
+  const workerCount = Math.min(maximumConcurrency, values.length);
+  await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+  return results;
+}
+
 export function alignedRange(
   timestampsSeconds: readonly number[],
   rows: readonly RangeRow[],

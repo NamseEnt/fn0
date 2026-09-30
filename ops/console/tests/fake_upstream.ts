@@ -92,6 +92,15 @@ export interface RecordedRequest {
   body: string | null;
 }
 
+interface RangeRequestGate {
+  threshold: number;
+  arrivals: number;
+  entered: Promise<void>;
+  resolveEntered: () => void;
+  released: Promise<void>;
+  release: () => void;
+}
+
 const nanoseconds = (ms: number) => `${BigInt(ms) * 1_000_000n}`;
 
 export function gauge(value: number, ageSeconds: number, labels: Record<string, string> = {}) {
@@ -118,6 +127,9 @@ export class FakeUpstream {
   instant: Record<string, string[]> = {};
   range: Record<string, string[]> = {};
   rangeFailures: Record<string, Answer> = {};
+  activeRangeRequests = 0;
+  maximumConcurrentRangeRequests = 0;
+  private rangeRequestGate: RangeRequestGate | null = null;
   logs: string[] = [];
   signingKeysAnswer: Answer | null = null;
   graphqlAnswer: Answer = {
@@ -135,26 +147,51 @@ export class FakeUpstream {
     };
   }
 
+  holdRangeRequestsUntilReleased(threshold: number): { entered: Promise<void>; release: () => void } {
+    let resolveEntered = () => {};
+    let release = () => {};
+    const entered = new Promise<void>((resolve) => { resolveEntered = resolve; });
+    const released = new Promise<void>((resolve) => { release = resolve; });
+    this.rangeRequestGate = { threshold, arrivals: 0, entered, resolveEntered, released, release };
+    return { entered, release };
+  }
+
   private async fetch(input: string, init?: RequestInit): Promise<Response> {
     const url = new URL(input);
     const headers = Object.fromEntries(new Headers(init?.headers).entries());
     this.requests.push({ url, headers, body: typeof init?.body === "string" ? init.body : null });
-    const answer = this.answerFor(url);
-    if (answer === "timeout") {
-      // Node does not keep the process alive for AbortSignal.timeout, so a
-      // request that only waits on it would end the test run early.
-      return new Promise((_, reject) => {
-        const keepAlive = setInterval(() => {}, 1_000);
-        init?.signal?.addEventListener("abort", () => {
-          clearInterval(keepAlive);
-          reject(init.signal?.reason);
+    const isRangeQuery = url.pathname === "/signy/api/v1/metrics/query";
+    if (isRangeQuery) {
+      this.activeRangeRequests += 1;
+      this.maximumConcurrentRangeRequests = Math.max(
+        this.maximumConcurrentRangeRequests,
+        this.activeRangeRequests,
+      );
+    }
+    try {
+      if (isRangeQuery && this.rangeRequestGate !== null) {
+        const gate = this.rangeRequestGate;
+        gate.arrivals += 1;
+        if (gate.arrivals >= gate.threshold) gate.resolveEntered();
+        await gate.released;
+      }
+      const answer = this.answerFor(url);
+      if (answer === "timeout") {
+        return await new Promise((_, reject) => {
+          const keepAlive = setInterval(() => {}, 1_000);
+          init?.signal?.addEventListener("abort", () => {
+            clearInterval(keepAlive);
+            reject(init.signal?.reason);
+          });
         });
-      });
+      }
+      if (answer === "unreachable") {
+        throw new TypeError("fetch failed");
+      }
+      return new Response(answer.body, { status: answer.status });
+    } finally {
+      if (isRangeQuery) this.activeRangeRequests -= 1;
     }
-    if (answer === "unreachable") {
-      throw new TypeError("fetch failed");
-    }
-    return new Response(answer.body, { status: answer.status });
   }
 
   private answerFor(url: URL): Answer {

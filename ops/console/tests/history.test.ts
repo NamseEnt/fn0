@@ -98,6 +98,23 @@ test("DODB host query failure stays local to that host graph", async () => {
   assert.ok(result.host.cpu.busy_percent.every((value) => value === null));
 });
 
+test("DODB history runs at most two Signy range queries at once", async () => {
+  const upstream = new FakeUpstream();
+  const gate = upstream.holdRangeRequestsUntilReleased(2);
+  const pending = dodbSeries(upstream.dependencies(), parseWindow("1h")!);
+  await gate.entered;
+  const maximumWhileHeld = upstream.maximumConcurrentRangeRequests;
+  gate.release();
+  const result = await pending;
+  assert.equal(maximumWhileHeld, 2);
+  assert.equal(upstream.maximumConcurrentRangeRequests, 2);
+  assert.equal(upstream.activeRangeRequests, 0);
+  assert.equal(upstream.requests.filter((entry) => entry.url.pathname.endsWith("/metrics/query")).length, 8);
+  assert.equal(result.operations.telemetry, "ok");
+  assert.equal(result.storage.telemetry, "ok");
+  assert.equal(result.host.cpu.telemetry, "ok");
+});
+
 test("worker history sums blue-green instances while preserving gauge gaps", async () => {
   const upstream = new FakeUpstream();
   upstream.range["fn0.worker.requests.in_flight"] = [

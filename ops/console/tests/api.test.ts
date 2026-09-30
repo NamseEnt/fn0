@@ -113,7 +113,7 @@ test("the authenticated worker serves the console document and browser bundle", 
   assert.match(script.text, /host-cpu-chart/);
   assert.match(script.text, /worker-history-chart/);
   assert.match(script.text, /telemetry-queue-chart/);
-  assert.match(script.text, /Promise\.allSettled/);
+  assert.match(script.text, /requestHistorySequence/);
   assert.match(script.text, /axisValue\(value, format\)/);
   assert.doesNotThrow(() => new Function(script.text));
   assert.match(script.response.headers.get("content-type") ?? "", /javascript/);

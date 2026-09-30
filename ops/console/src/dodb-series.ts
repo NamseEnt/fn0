@@ -1,5 +1,5 @@
 import { bucketsFromLabels, latencyFromBuckets } from "./accounting.ts";
-import { alignGaugeRows, alignedRange, emptyColumn, perMinute } from "./history.ts";
+import { alignGaugeRows, alignedRange, emptyColumn, mapLimit, perMinute } from "./history.ts";
 import type { DodbHistoryResponse, DodbOperation } from "./schema.ts";
 import type { Dependencies } from "./runtime.ts";
 import { SignyClient } from "./signy.ts";
@@ -8,6 +8,17 @@ import { type TimeWindow, stepGrid } from "./windows.ts";
 const OPERATIONS: readonly DodbOperation[] = ["get", "put", "delete", "query", "scan", "transact"];
 const SERVICE_INSTANCE_ID = "fn0-dodb";
 const HOST_NAME = "fn0-dodb";
+type DodbRangeResult = Awaited<ReturnType<SignyClient["range"]>>;
+type DodbRangeResults = [
+  operations: DodbRangeResult,
+  buckets: DodbRangeResult,
+  database: DodbRangeResult,
+  wal: DodbRangeResult,
+  cpu: DodbRangeResult,
+  memory: DodbRangeResult,
+  disk: DodbRangeResult,
+  network: DodbRangeResult,
+];
 
 function emptyOperations(length: number): Record<DodbOperation, (number | null)[]> {
   return Object.fromEntries(OPERATIONS.map((operation) => [operation, emptyColumn(length)])) as Record<DodbOperation, (number | null)[]>;
@@ -22,16 +33,22 @@ export async function dodbSeries(dependencies: Dependencies, window: TimeWindow)
     stepSeconds: window.stepSeconds,
   };
   const range = `${window.stepSeconds}s`;
-  const [operations, buckets, database, wal, cpu, memory, disk, network] = await Promise.all([
-    signy.range({ metric: "dodb.server.requests", func: "increase", range, agg: "sum", by: ["operation", "service_instance_id"] }, gridRange),
-    signy.range({ metric: "dodb.server.request.duration_bucket", func: "increase", range, agg: "sum", by: ["le", "service_instance_id"] }, gridRange),
-    signy.range({ metric: "dodb.storage.database.file.bytes", agg: "sum", by: ["service_instance_id"] }, gridRange),
-    signy.range({ metric: "dodb.storage.wal.file.bytes", agg: "sum", by: ["service_instance_id"] }, gridRange),
-    signy.range({ metric: "system.cpu.time", func: "increase", range, agg: "sum", by: ["host_name", "cpu_mode"] }, gridRange),
-    signy.range({ metric: "system.memory.usage", agg: "sum", by: ["host_name", "state"] }, gridRange),
-    signy.range({ metric: "system.disk.io", func: "increase", range, agg: "sum", by: ["host_name", "direction"] }, gridRange),
-    signy.range({ metric: "system.network.io", func: "increase", range, agg: "sum", by: ["host_name", "direction"] }, gridRange),
-  ]);
+  const queryTasks = [
+    () => signy.range({ metric: "dodb.server.requests", func: "increase", range, agg: "sum", by: ["operation", "service_instance_id"] }, gridRange),
+    () => signy.range({ metric: "dodb.server.request.duration_bucket", func: "increase", range, agg: "sum", by: ["le", "service_instance_id"] }, gridRange),
+    () => signy.range({ metric: "dodb.storage.database.file.bytes", agg: "sum", by: ["service_instance_id"] }, gridRange),
+    () => signy.range({ metric: "dodb.storage.wal.file.bytes", agg: "sum", by: ["service_instance_id"] }, gridRange),
+    () => signy.range({ metric: "system.cpu.time", func: "increase", range, agg: "sum", by: ["host_name", "cpu_mode"] }, gridRange),
+    () => signy.range({ metric: "system.memory.usage", agg: "sum", by: ["host_name", "state"] }, gridRange),
+    () => signy.range({ metric: "system.disk.io", func: "increase", range, agg: "sum", by: ["host_name", "direction"] }, gridRange),
+    () => signy.range({ metric: "system.network.io", func: "increase", range, agg: "sum", by: ["host_name", "direction"] }, gridRange),
+  ];
+  const queryResults = await mapLimit(
+    queryTasks,
+    2,
+    (query) => query(),
+  );
+  const [operations, buckets, database, wal, cpu, memory, disk, network] = queryResults as DodbRangeResults;
   const count = grid.length;
   const empty = () => emptyColumn(count);
   const operationsPerMinute = emptyOperations(count);

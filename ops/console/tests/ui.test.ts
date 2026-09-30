@@ -80,6 +80,10 @@ test("history chart containers preserve the current graphs and adapt to mobile w
   assert.match(APP_HTML, /name="viewport"/);
   assert.match(APP_HTML, /\.chart\{width:100%;height:150px/);
   assert.match(APP_SCRIPT, /setAttribute\("viewBox"/);
+  assert.match(APP_SCRIPT, /historyDue = Date\.now\(\) \+ 60_000/);
+  assert.match(APP_SCRIPT, /setInterval\(\(\) => void updateLive\(\), 12_000\)/);
+  assert.match(APP_SCRIPT, /setInterval\(\(\) => void updateHistory\(\), 2_000\)/);
+  assert.match(APP_SCRIPT, /windowSelect\.addEventListener\("change", \(\) => \{ historyDue = 0; void updateHistory\(true\); \}\)/);
 });
 
 test("chart axis supports number, bytes, percent and duration formatters", () => {
@@ -105,4 +109,58 @@ test("chart rendering splits null gaps and renders multiple series legends", () 
   assert.equal(svg.children.filter((child) => child.tagName === "path").length, 3);
   assert.equal(target.children[1]!.className, "chart-legend");
   assert.equal(target.children[1]!.children.length, 2);
+});
+
+test("browser history loads DODB, Worker, then Telemetry and continues after endpoint failure", async () => {
+  const start = APP_SCRIPT.indexOf("async function historyEndpoint(");
+  const end = APP_SCRIPT.indexOf("\nasync function updateHistory", start);
+  assert.ok(start >= 0 && end > start);
+  const sequenceSource = APP_SCRIPT.slice(start, end);
+  const calls: string[] = [];
+  let activeNewHistoryRequests = 0;
+  let maximumNewHistoryConcurrency = 0;
+  const getJson = async (path: string) => {
+    calls.push(path);
+    const isNewHistoryEndpoint = ["/api/dodb-series", "/api/worker-series", "/api/telemetry-series"]
+      .some((endpoint) => path.startsWith(endpoint));
+    if (isNewHistoryEndpoint) {
+      activeNewHistoryRequests += 1;
+      maximumNewHistoryConcurrency = Math.max(maximumNewHistoryConcurrency, activeNewHistoryRequests);
+    }
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (path.startsWith("/api/dodb-series")) throw new Error("DODB history unavailable");
+      return path;
+    } finally {
+      if (isNewHistoryEndpoint) activeNewHistoryRequests -= 1;
+    }
+  };
+  const requestHistorySequence = new Function(
+    "getJson",
+    `${sequenceSource}; return requestHistorySequence;`,
+  )(getJson) as (
+    query: string,
+    onStage: (stage: string, result: Record<string, unknown>) => boolean,
+  ) => Promise<void>;
+  const stages: string[] = [];
+  const results: Record<string, unknown>[] = [];
+  await requestHistorySequence("?window=1h", (stage, result) => {
+    stages.push(stage);
+    results.push(result);
+    return true;
+  });
+
+  assert.deepEqual(calls, [
+    "/api/overview?window=1h",
+    "/api/series?window=1h",
+    "/api/errors?window=1h",
+    "/api/dodb-series?window=1h",
+    "/api/worker-series?window=1h",
+    "/api/telemetry-series?window=1h",
+  ]);
+  assert.deepEqual(stages, ["base", "dodb", "worker", "telemetry"]);
+  assert.equal((results[1] as { status: string }).status, "rejected");
+  assert.equal((results[2] as { status: string }).status, "fulfilled");
+  assert.equal((results[3] as { status: string }).status, "fulfilled");
+  assert.equal(maximumNewHistoryConcurrency, 1);
 });
