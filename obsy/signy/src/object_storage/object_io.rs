@@ -233,6 +233,65 @@ impl ObjectStorage {
     }
 }
 
+fn quarantine_trace_cache_shell(
+    traces_root: &Path,
+    part: &TracePart,
+) -> Result<PathBuf, String> {
+    let data_dir = traces_root
+        .parent()
+        .ok_or_else(|| format!("trace cache root has no parent: {}", traces_root.display()))?;
+    let quarantine_root = data_dir.join("quarantine");
+    let date = chrono::Utc::now().format("%Y%m%d").to_string();
+    let destination_parent = quarantine_root
+        .join(date)
+        .join("traces")
+        .join(&part.meta.partition);
+    let mut directory = data_dir.to_path_buf();
+    for component in destination_parent.strip_prefix(data_dir).map_err(|error| error.to_string())?.components() {
+        directory.push(component);
+        match std::fs::create_dir(&directory) {
+            Ok(()) => {
+                #[cfg(unix)]
+                std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700))
+                    .map_err(|error| error.to_string())?;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(error.to_string()),
+        }
+        let metadata = std::fs::symlink_metadata(&directory).map_err(|error| error.to_string())?;
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            return Err(format!(
+                "refusing unsafe trace quarantine directory {}",
+                directory.display()
+            ));
+        }
+    }
+    let destination = destination_parent.join(&part.meta.id);
+    match std::fs::symlink_metadata(&destination) {
+        Ok(_) => {
+            return Err(format!(
+                "trace quarantine destination already exists: {}",
+                destination.display()
+            ));
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.to_string()),
+    }
+    std::fs::rename(&part.dir, &destination).map_err(|error| {
+        format!(
+            "failed to atomically quarantine trace part {}: {error}",
+            part.meta.id
+        )
+    })?;
+    crate::part::fsync_dir(part.dir.parent().unwrap_or(traces_root))
+        .map_err(|error| error.to_string())?;
+    crate::part::fsync_dir(&destination_parent).map_err(|error| error.to_string())?;
+    Ok(destination)
+}
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 impl ObjectStorage {
     async fn upload_metric_part(&self, part: &SeriesPart) -> Result<(), String> {
         let descriptor = MetricManifestPart::from(part);
@@ -574,6 +633,66 @@ impl ObjectStorage {
                 }
                 continue;
             }
+            let data_path = part.data_path();
+            let data_missing = match std::fs::symlink_metadata(&data_path) {
+                Ok(metadata) if metadata.is_file() => false,
+                Ok(_) => {
+                    return Err(format!(
+                        "trace parquet path is not a regular file for part {} in partition {}",
+                        descriptor.id, descriptor.partition
+                    ));
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+                Err(error) => {
+                    return Err(format!(
+                        "failed to inspect trace parquet for part {} in partition {}: {error}",
+                        descriptor.id, descriptor.partition
+                    ));
+                }
+            };
+            if data_missing {
+                if self.flush_transaction_references_trace(traces_root, &descriptor)? {
+                    return Err(format!(
+                        "incomplete local trace part {} in partition {} is referenced by a pending flush transaction",
+                        descriptor.id, descriptor.partition
+                    ));
+                }
+                if self.trace_compaction_references(traces_root, &descriptor)? {
+                    return Err(format!(
+                        "incomplete local trace part {} in partition {} is referenced by a pending compaction",
+                        descriptor.id, descriptor.partition
+                    ));
+                }
+                match self.remote_trace_part_object_count(&descriptor).await? {
+                    0 => {
+                        let quarantine = quarantine_trace_cache_shell(traces_root, &part)?;
+                        tracing::warn!(
+                            part_id = %descriptor.id,
+                            partition = %descriptor.partition,
+                            reason = "absent from manifest, no remote objects, no pending transaction or compaction, and local parquet body is absent",
+                            quarantine = %quarantine.display(),
+                            "quarantined a retired incomplete local trace cache shell"
+                        );
+                        continue;
+                    }
+                    count if count == TRACE_PART_FILES.len() => {
+                        tracing::warn!(
+                            part_id = %descriptor.id,
+                            partition = %descriptor.partition,
+                            remote_objects = count,
+                            reason = "absent from manifest but complete immutable remote object set remains",
+                            "preserving a retired trace generation during cache reconciliation"
+                        );
+                        continue;
+                    }
+                    count => {
+                        return Err(format!(
+                            "incomplete local trace part {} in partition {} is absent from the manifest but {count} remote trace objects remain; preserving local and remote state",
+                            descriptor.id, descriptor.partition
+                        ));
+                    }
+                }
+            }
             TracePartReader::open(part.clone()).map_err(|error| {
                 format!(
                     "local trace part {} is not fully cached and is absent from the remote manifest: {error}",
@@ -586,6 +705,75 @@ impl ObjectStorage {
             self.publish_trace_parts(&unpublished).await?;
         }
         self.restore_trace_catalog(traces_root).await
+    }
+
+    async fn remote_trace_part_object_count(
+        &self,
+        descriptor: &TraceManifestPart,
+    ) -> Result<usize, String> {
+        let mut count = 0;
+        for file in TRACE_PART_FILES {
+            match self
+                .store
+                .head(&self.trace_part_path(descriptor, file))
+                .await
+            {
+                Ok(_) => count += 1,
+                Err(object_store::Error::NotFound { .. }) => {}
+                Err(error) => {
+                    return Err(format!(
+                        "failed to inspect remote trace part {} in partition {}: {error}",
+                        descriptor.id, descriptor.partition
+                    ));
+                }
+            }
+        }
+        Ok(count)
+    }
+
+    fn flush_transaction_references_trace(
+        &self,
+        traces_root: &Path,
+        descriptor: &TraceManifestPart,
+    ) -> Result<bool, String> {
+        let data_dir = traces_root
+            .parent()
+            .ok_or_else(|| format!("trace cache root has no parent: {}", traces_root.display()))?;
+        let path = data_dir.join(FLUSH_TRANSACTION_FILE);
+        let metadata = match std::fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error.to_string()),
+        };
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(format!(
+                "refusing non-regular flush transaction {}",
+                path.display()
+            ));
+        }
+        let bytes = std::fs::read(&path).map_err(|error| error.to_string())?;
+        let transaction: FlushTransaction = serde_json::from_slice(&bytes)
+            .map_err(|error| format!("invalid flush transaction: {error}"))?;
+        Ok(transaction.trace_parts.iter().any(|part| part == descriptor))
+    }
+
+    fn trace_compaction_references(
+        &self,
+        traces_root: &Path,
+        descriptor: &TraceManifestPart,
+    ) -> Result<bool, String> {
+        for (_, record) in crate::trace_merge::read_records(traces_root)? {
+            let expected = format!("{}/{}", descriptor.partition, descriptor.id);
+            if record
+                .new
+                .iter()
+                .chain(&record.inputs)
+                .any(|relative| relative == &expected)
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// Finishes every trace compaction a crash interrupted, the way the pass

@@ -1477,6 +1477,240 @@
         assert_eq!(storage.load_trace_manifest().await.unwrap().parts.len(), 1);
     }
 
+    #[tokio::test]
+    async fn trace_reconciliation_quarantines_an_evicted_retired_cache_shell() {
+        use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
+
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("trace-retired-cache-shell");
+        let traces_root = root.join("traces");
+        let request = crate::trace::ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: None,
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![Span {
+                        trace_id: vec![7; 16],
+                        span_id: vec![8; 8],
+                        start_time_unix_nano: 1_700_000_000_000_000_000,
+                        end_time_unix_nano: 1_700_000_000_000_000_100,
+                        ..Default::default()
+                    }],
+                    schema_url: String::new(),
+                }],
+                schema_url: String::new(),
+            }],
+        };
+        let spans = crate::trace::normalize_request(&test_tenant(), request).unwrap();
+        let parts = crate::trace_part::flush_trace_spans(&spans, &traces_root, 100).unwrap();
+        let manifest = storage.publish_trace_parts(&parts).await.unwrap();
+        storage
+            .evict_trace_cache(&traces_root, 0, std::slice::from_ref(&parts[0].dir))
+            .unwrap();
+        storage.remove_trace_parts(&manifest.parts).await.unwrap();
+        storage.delete_trace_part_objects(&manifest.parts).await.unwrap();
+
+        let reconciled = storage
+            .reconcile_trace_local_cache(&traces_root)
+            .await
+            .unwrap();
+        let quarantine = root
+            .join("quarantine")
+            .join(chrono::Utc::now().format("%Y%m%d").to_string())
+            .join("traces")
+            .join(&parts[0].meta.partition)
+            .join(&parts[0].meta.id);
+
+        assert!(reconciled.parts.is_empty());
+        assert!(!parts[0].dir.exists());
+        assert!(quarantine.join(crate::trace_part::TRACE_META_FILE).is_file());
+        assert!(quarantine.join(crate::trace_part::TRACE_BLOOM_FILE).is_file());
+        assert!(!quarantine.join(crate::trace_part::TRACE_DATA_FILE).exists());
+        assert!(storage.load_trace_manifest().await.unwrap().parts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn trace_reconciliation_fails_closed_for_retired_cache_with_remote_objects() {
+        use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
+
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("trace-retired-cache-partial-objects");
+        let traces_root = root.join("traces");
+        let request = crate::trace::ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: None,
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![Span {
+                        trace_id: vec![9; 16],
+                        span_id: vec![1; 8],
+                        start_time_unix_nano: 1_700_000_000_000_000_000,
+                        end_time_unix_nano: 1_700_000_000_000_000_100,
+                        ..Default::default()
+                    }],
+                    schema_url: String::new(),
+                }],
+                schema_url: String::new(),
+            }],
+        };
+        let spans = crate::trace::normalize_request(&test_tenant(), request).unwrap();
+        let parts = crate::trace_part::flush_trace_spans(&spans, &traces_root, 100).unwrap();
+        let manifest = storage.publish_trace_parts(&parts).await.unwrap();
+        storage
+            .evict_trace_cache(&traces_root, 0, std::slice::from_ref(&parts[0].dir))
+            .unwrap();
+        storage.remove_trace_parts(&manifest.parts).await.unwrap();
+        storage.delete_trace_part_objects(&manifest.parts).await.unwrap();
+        let descriptor = &manifest.parts[0];
+        let bloom = tokio::fs::read(parts[0].dir.join(crate::trace_part::TRACE_BLOOM_FILE))
+            .await
+            .unwrap();
+        storage
+            .store
+            .put_opts(
+                &storage.trace_part_path(descriptor, crate::trace_part::TRACE_BLOOM_FILE),
+                bloom.into(),
+                PutOptions {
+                    mode: PutMode::Create,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        let error = storage
+            .reconcile_trace_local_cache(&traces_root)
+            .await
+            .unwrap_err();
+
+        assert!(error.contains("remote trace objects remain"));
+        assert!(parts[0].dir.exists());
+        assert!(!root.join("quarantine").exists());
+    }
+
+    #[tokio::test]
+    async fn trace_reconciliation_preserves_retired_cache_when_complete_remote_objects_remain() {
+        use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
+
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("trace-retired-cache-complete-objects");
+        let traces_root = root.join("traces");
+        let request = crate::trace::ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: None,
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![Span {
+                        trace_id: vec![4; 16],
+                        span_id: vec![3; 8],
+                        start_time_unix_nano: 1_700_000_000_000_000_000,
+                        end_time_unix_nano: 1_700_000_000_000_000_100,
+                        ..Default::default()
+                    }],
+                    schema_url: String::new(),
+                }],
+                schema_url: String::new(),
+            }],
+        };
+        let spans = crate::trace::normalize_request(&test_tenant(), request).unwrap();
+        let parts = crate::trace_part::flush_trace_spans(&spans, &traces_root, 100).unwrap();
+        let manifest = storage.publish_trace_parts(&parts).await.unwrap();
+        let descriptor = manifest.parts[0].clone();
+        let files = TRACE_PART_FILES
+            .iter()
+            .map(|file| (*file, std::fs::read(parts[0].dir.join(file)).unwrap()))
+            .collect::<Vec<_>>();
+        storage
+            .evict_trace_cache(&traces_root, 0, std::slice::from_ref(&parts[0].dir))
+            .unwrap();
+        storage.remove_trace_parts(&manifest.parts).await.unwrap();
+        storage.delete_trace_part_objects(&manifest.parts).await.unwrap();
+        for (file, bytes) in &files {
+            storage
+                .store
+                .put_opts(
+                    &storage.trace_part_path(&descriptor, file),
+                    bytes.clone().into(),
+                    PutOptions {
+                        mode: PutMode::Create,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+        }
+
+        let reconciled = storage
+            .reconcile_trace_local_cache(&traces_root)
+            .await
+            .unwrap();
+
+        assert!(reconciled.parts.is_empty());
+        assert!(parts[0].dir.join(crate::trace_part::TRACE_META_FILE).is_file());
+        assert!(!parts[0].dir.join(crate::trace_part::TRACE_DATA_FILE).exists());
+        assert!(!root.join("quarantine").exists());
+        for file in TRACE_PART_FILES {
+            assert!(storage
+                .store
+                .head(&storage.trace_part_path(&descriptor, file))
+                .await
+                .is_ok());
+        }
+    }
+
+    #[tokio::test]
+    async fn trace_reconciliation_fails_closed_for_pending_flush_reference() {
+        use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
+
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("trace-retired-cache-pending-flush");
+        let traces_root = root.join("traces");
+        let request = crate::trace::ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: None,
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![Span {
+                        trace_id: vec![5; 16],
+                        span_id: vec![6; 8],
+                        start_time_unix_nano: 1_700_000_000_000_000_000,
+                        end_time_unix_nano: 1_700_000_000_000_000_100,
+                        ..Default::default()
+                    }],
+                    schema_url: String::new(),
+                }],
+                schema_url: String::new(),
+            }],
+        };
+        let spans = crate::trace::normalize_request(&test_tenant(), request).unwrap();
+        let parts = crate::trace_part::flush_trace_spans(&spans, &traces_root, 100).unwrap();
+        let manifest = storage.publish_trace_parts(&parts).await.unwrap();
+        storage
+            .evict_trace_cache(&traces_root, 0, std::slice::from_ref(&parts[0].dir))
+            .unwrap();
+        storage.remove_trace_parts(&manifest.parts).await.unwrap();
+        write_flush_transaction(
+            &root,
+            &FlushTransaction {
+                offset: 8,
+                log_parts: Vec::new(),
+                trace_parts: manifest.parts.clone(),
+                metric_parts: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        let error = storage
+            .reconcile_trace_local_cache(&traces_root)
+            .await
+            .unwrap_err();
+
+        assert!(error.contains("pending flush transaction"));
+        assert!(parts[0].dir.exists());
+        assert!(root.join(FLUSH_TRANSACTION_FILE).is_file());
+        assert!(!root.join("quarantine").exists());
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn trace_cache_rejects_symlinked_immutable_files() {
