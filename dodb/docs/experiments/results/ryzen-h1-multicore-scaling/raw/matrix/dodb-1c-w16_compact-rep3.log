@@ -1,0 +1,5 @@
+phase0-bench engine=parallel-blink build=release cpu="AMD Ryzen 5 5600 6-Core Processor" logical_cpus=1 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /home/namse/dodb-scaling-artifacts/restart-20260930-01/raw/matrix/dodb-1c-w16_compact-rep3.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-same-leaf-heavy                  rep=0 tx/s=     6855 mut/s=   109678 read/s=        0 agg/s=     6855 p50=  7963.3us p95= 14050.3us p99= 16391.8us groups=  666 avg_group=51.54
+completed 1 scenarios x 1 repetitions
