@@ -73,3 +73,5 @@ The 2-post check was lower than the original 2-OCPU baseline: dodb width-16 unif
 This is **B**: H1's leaf-parallel physical work converts into a meaningful first scaling step, and it improves relative to RocksDB, but the uniform workload remains materially slower and throughput saturates at 4 OCPUs. Keep the H1 read path and locality advantage. The next focused measurement should isolate width-16 uniform's planning/coordinator and durable-group admission path, since 4→6 adds worker parallelism without additional transactions per second. Do not infer that a new storage architecture is required from this result alone.
 
 The final OCI API query after the post-check confirmed the same instance `RUNNING` as `VM.Standard.A1.Flex / 2 OCPU / 12 GB`. The final query result is also recorded in `oci-timeline.jsonl`.
+
+VM.Standard.A1.Flex / 2 OCPU
