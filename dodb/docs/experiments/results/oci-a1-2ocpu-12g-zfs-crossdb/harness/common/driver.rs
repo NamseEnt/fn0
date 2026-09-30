@@ -832,11 +832,15 @@ fn verify<E: Engine>(engine: &E, args: &Args, reports: &[WriterReport]) -> Value
         .filter(|key| key_index(key) >= working_set && !candidates.contains_key(*key))
         .count() as u64;
     let query_seed_rows = if matches!(args.operation.as_str(), "query" | "mixed") {
-        args.working_set.min(256) as u64
+        args.working_set.min(256)
     } else {
-        0
+        0usize
     };
-    let expected_rows_min = working_set + query_seed_rows + committed_new_keys;
+    let query_seed_overlaps = (0..query_seed_rows.min(args.working_set))
+        .step_by(128)
+        .count() as u64;
+    let expected_rows_min =
+        working_set + query_seed_rows as u64 - query_seed_overlaps + committed_new_keys;
     let expected_rows_max = expected_rows_min + ambiguous_new_keys;
 
     let mut sampled: Vec<Vec<u8>> = sampled_working_set_indices(args)
@@ -1030,7 +1034,8 @@ fn run_bench<F: EngineFactory>(args: &Args) {
         }
         if matches!(args.operation.as_str(), "query" | "mixed") {
             let rows = query_rows(args.value_size, args.working_set);
-            seeded_rows += rows.len();
+            let overlaps = (0..rows.len().min(args.working_set)).step_by(128).count();
+            seeded_rows += rows.len() - overlaps;
             for chunk in rows.chunks(SEED_CHUNK_ROWS) {
                 engine.seed(&mut seeder, chunk);
             }
