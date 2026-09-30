@@ -140,9 +140,11 @@ conditional ETags, and the catalog prefix has a seven-day Bucket Lock rule.
 The production image references are immutable OCIR digests in Pulumi config.
 The worker image metadata pins collecty to the same digest on every host. The
 Signy target is the existing DODB OCI VM, reached through OCI Bastion; deploy it
-with `scripts/deploy-signy-on-dodb.sh`. The current Signy digest is an x86_64
-image and cannot be deployed to that ARM64 VM until a same-source ARM64 digest
-is published and pinned. The standalone setup scripts are legacy utilities.
+with `scripts/deploy-signy-on-dodb.sh`. Production Signy uses
+`namse/obsy@4da304fb9c1ada8d8871076fae92bae402f39317`, built for `linux/arm64`
+and pinned to
+`ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:a7ac0dc5f1e67f9521e9d7b7554d9d2944ae86b3e037219fa508c727e8d310b5`.
+The standalone setup scripts are legacy utilities.
 
 Cost safety is part of the deployment: collecty uses warning-level JSON logs,
 does not enable journald collection, samples host metrics once per minute, and
@@ -154,12 +156,16 @@ flushes at most once a minute,
 compacts every signal's parts by size tier, collects orphaned objects hourly in
 bounded resumable passes, and prunes catalog history older than eight days on
 its own schedule.
-The DODB Signy unit will cap each container log at 100 MiB.
+The DODB Signy unit caps each container log at 100 MiB.
 
 The DODB-hosted Signy deployment writes root-readable secret files and verifies
-Signy readiness, R2 health, the existing Tunnel, and external Access. Its
-installation remains gated on publishing the ARM64 image built from the pinned
-production source revision.
+Signy readiness, R2 health, the existing Tunnel, and external Access. It uses
+the existing DODB node, R2 prefix, Tunnel, hostname, and Access service tokens.
+Ops Console history panels for DODB and host metrics, worker state, and Collecty
+queue/segments were verified across all five supported windows on 2026-09-30.
+The dashboard's top-level worker health currently disagrees with direct Signy
+worker gauges and the worker's local readiness endpoint; see the [Signy
+production record](signy-production.md).
 
 The [Signy production record](signy-production.md) covers telemetry recovery.
 The [operations dashboard guide](operations-dashboard.md) covers its

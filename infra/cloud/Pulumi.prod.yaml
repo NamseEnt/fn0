@@ -40,7 +40,7 @@ config:
   fn0Cloud:ociVaultRegion: ap-osaka-1
   fn0Cloud:signyHostname: signy.fn0.dev
   fn0Cloud:collectyImageRef: ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:10e14acafb8d7a367b0d0b3bf9269fa925ff788e23dbeb76326725f2854e6620
-  fn0Cloud:signyImageRef: ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:8212e26d9e46e5d52ff9ee8c498673959347f5cb0a705a7057f0a3b78eed357d
+  fn0Cloud:signyImageRef: ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:a7ac0dc5f1e67f9521e9d7b7554d9d2944ae86b3e037219fa508c727e8d310b5
   fn0Cloud:telemetryConfigVersion: signy-20260920-v1
   fn0Cloud:dodbRuntimeAddr: 10.0.2.142:18445
   fn0Cloud:dodbRuntimeServerName: dodb.internal

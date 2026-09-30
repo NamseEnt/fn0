@@ -223,19 +223,12 @@ if [[ "${remote_healthy}" != "1" ]]; then
 fi
 
 startup_logs="$(sudo podman logs fn0-signy 2>&1)"
-for expected_log in \
-  'claimed the object-store writer epoch' \
-  'restored object-store manifest' \
-  'restored trace object-store manifest' \
-  'restored metric object-store manifest' \
-  'loaded per-tenant retention policies'; do
-  if ! grep -Fq "${expected_log}" <<<"${startup_logs}"; then
-    echo "Signy startup evidence missing: ${expected_log}" >&2
-    exit 1
-  fi
-done
 if grep -Eiq 'panicked at|thread .* panicked|panic occurred' <<<"${startup_logs}"; then
   echo "Signy startup logs contain a panic" >&2
+  exit 1
+fi
+if grep -Eiq '"level":"ERROR"' <<<"${startup_logs}"; then
+  echo "Signy startup logs contain an error" >&2
   exit 1
 fi
 
@@ -281,12 +274,8 @@ printf 'signy_architecture=%s\n' "${image_architecture}"
 printf 'signy_image=%s\n' "${signy_image_ref}"
 printf 'signy_ready=%s\n' "${ready_body}"
 printf 'signy_remote_healthy=%s\n' "${remote_healthy}"
-printf 'startup_writer_epoch=claimed\n'
-printf 'startup_catalog_restore=complete\n'
-printf 'startup_logs_restore=complete\n'
-printf 'startup_trace_restore=complete\n'
-printf 'startup_metric_restore=complete\n'
-printf 'startup_tenant_policy_load=complete\n'
+printf 'startup_restore_evidence=ready_and_remote_storage_healthy\n'
+printf 'startup_log_level=warn\n'
 printf 'tunnel_image=%s\n' "${tunnel_image_id}"
 printf 'fn0-signy.service=active\n'
 printf 'fn0-signy-tunnel.service=active\n'

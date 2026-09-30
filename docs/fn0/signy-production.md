@@ -6,38 +6,31 @@ The fn0 production telemetry path is:
 
 The active worker pool has one worker. Collecty listens on `127.0.0.1:4318`,
 and the worker exports its own telemetry and every forwarded guest export
-there. The production Signy host target is the existing DODB OCI VM, managed
-through OCI Bastion port forwarding. Signy will listen on `127.0.0.1:3100`.
-The external endpoint remains `https://signy.fn0.dev`, protected by the
-existing Cloudflare Access service tokens and served through the existing
-Signy Tunnel; that path is currently unavailable pending the migration.
+there. Production Signy runs on the existing DODB OCI VM, reached by operators
+through OCI Bastion port forwarding. Its host port is published only on
+`127.0.0.1:3100`. The external endpoint remains `https://signy.fn0.dev`,
+protected by the existing Cloudflare Access service tokens and served through
+the existing Signy Tunnel.
 
 ## Migration status
 
-The former standalone Signy node is inaccessible and its Tunnel is down. The
-DODB-hosted Signy services have not yet been installed. The current pinned
-production image is x86_64 and cannot run on the ARM64 DODB VM. The documented
-production source revision `4da304fb9c1ada8d8871076fae92bae402f39317` is not
-available in this checkout or the configured source repository, so the
-required same-revision ARM64 image has not been built. The DODB deploy script
-checks the pulled image architecture before installing service files and will
-refuse the current image.
-
-After the matching ARM64 image is available, use
-`scripts/deploy-signy-on-dodb.sh`. Do not operate the old standalone node as a
-production writer. The old node and its storage have not been deleted. Data
-acknowledged by the old process but not flushed to R2 may remain only in its
-unavailable local WAL.
+The migration completed on 2026-09-30. The same-revision ARM64 image from
+`namse/obsy` is running on DODB. The existing Tunnel is healthy and connected;
+external readiness and tenant queries succeed. The former standalone node and
+its storage have not been deleted. Data acknowledged by the old process but
+not flushed to R2 may remain only in its inaccessible local WAL.
 
 ## Pinned production resources
 
 - collecty image:
   `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:10e14acafb8d7a367b0d0b3bf9269fa925ff788e23dbeb76326725f2854e6620`
 - Signy image:
-  `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:8212e26d9e46e5d52ff9ee8c498673959347f5cb0a705a7057f0a3b78eed357d`
+  `ocir.ap-osaka-1.oci.oraclecloud.com/axhyjd4qpgot/fn0-worker-rx1ebeyn@sha256:a7ac0dc5f1e67f9521e9d7b7554d9d2944ae86b3e037219fa508c727e8d310b5`
 - Obsy source revision for the collecty image: `c6c7d5c8fada9f05be31c418a5e673fbe25476a9`
-- Obsy source revision for the Signy image: `4da304fb9c1ada8d8871076fae92bae402f39317`
-  (built on the x86_64 Signy node from `obsy/signy/Dockerfile`)
+- Signy source repository: `namse/obsy`
+- Signy source revision: `4da304fb9c1ada8d8871076fae92bae402f39317`
+- Signy image platform: `linux/arm64`
+- Signy build branch metadata: `production-arm64-migration`
 - R2 bucket: `fn0-signy-u35twkcf`
 - R2 prefix: `fn0/signy`
 - R2 catalog lock: seven days
@@ -48,16 +41,17 @@ The image references and the telemetry configuration version are stored in
 `infra/cloud/Pulumi.prod.yaml`. Worker cloud-init and the DODB deploy script
 consume those values, so a redeploy cannot silently select a mutable tag.
 
-The pinned Signy image above is the former standalone-node image. It was built
-on the x86_64 Signy node from the source revision listed above and is not
-compatible with the ARM64 DODB VM.
+The Signy image was built from the exact production source revision in the old
+`namse/obsy` repository using `signy/Dockerfile`. Its immutable child manifest
+digest is pinned in Pulumi config; no mutable tag is used for the service.
 
 ## Deployment
 
-The existing Pulumi stack already owns the Signy R2 bucket, Tunnel, hostname,
-Access application, and service tokens. Do not recreate or rotate them. A
-Pulumi apply is not required for the DODB-hosted service deployment unless a
-future preview identifies a necessary output-only wiring change.
+The existing Pulumi stack owns the Signy R2 bucket, Tunnel, hostname, Access
+application, and service tokens. They were reused without recreation or
+rotation. Pulumi config pins the Signy image digest. The image-ref output was
+targeted separately; the Signy Tunnel, R2 resources, DODB instance, and worker
+image were not changed.
 
 ```sh
 cd infra/cloud
@@ -74,10 +68,44 @@ scripts/deploy-signy-on-dodb.sh
 The deploy script refuses to install the services unless the configured image
 is digest-pinned and the pulled image is ARM64. It writes root-only secret
 files, starts `fn0-signy.service` and `fn0-signy-tunnel.service`, verifies R2
-health and manifest restoration, checks platform tenant queries, and verifies
-the existing Tunnel and external Access path. It does not create a platform
-tenant policy; control owns explicit project policies. Until the ARM64 image
-gate passes, production Signy remains unavailable.
+health, platform tenant metric and log queries, the existing Tunnel, and the
+external Access path. Startup uses the required `RUST_LOG=signy=warn`, so
+info-level restore messages are suppressed; readiness, remote R2 health, and
+queries against restored history verify successful startup. The installer does
+not create a platform tenant policy; control owns explicit project policies.
+
+The standalone setup scripts are legacy utilities. Current DODB operations use
+`scripts/deploy-signy-on-dodb.sh` through OCI Bastion.
+
+## Migration verification
+
+On 2026-09-30, the DODB VM reported `dodb.service`, `fn0-collecty.service`,
+`fn0-signy.service`, and `fn0-signy-tunnel.service` active. Signy `/ready`
+returned HTTP 200 locally and externally; `signy_remote_healthy` was `1`.
+The existing Tunnel reported healthy with eight connections. Platform tenant
+instant and range metric queries returned data, and an eight-day logs query
+returned ten rows. `signy_query_quota_rejected_total` and
+`signy_query_errors_total` were both zero.
+
+The worker and DODB Collecty durable queues returned to their 20-byte identity
+baseline. No queue file was cleared or reset. Ops Console DODB and host history,
+worker history, and Collecty queue/segment history all loaded for 15 minutes,
+one hour, six hours, 24 hours, and seven days. At the final check, its top-level
+Worker health still reported “no reporting worker instance has its manifest
+loaded”, while a direct Signy instant query returned the latest worker gauge as
+`manifest_loaded=1`, `draining=0`, and the worker's local `/ready` endpoint
+returned HTTP 200. This dashboard-health discrepancy remains under
+investigation; the history panels and telemetry pipeline were available.
+
+The targeted Pulumi preview for the Ops Console history update contained one
+`WorkersScript` update and 147 unchanged resources. The broad preview also
+reported the accepted R2 event-notification `missing ID` drift; that resource
+was not targeted or applied.
+
+The required warning-level Signy log setting suppresses info-level messages
+that would separately name writer-epoch claim and each catalog or manifest
+restore. Startup completed readiness, remote-storage, and restored-data query
+checks without a panic or error log.
 
 ## Cost and retention controls
 
