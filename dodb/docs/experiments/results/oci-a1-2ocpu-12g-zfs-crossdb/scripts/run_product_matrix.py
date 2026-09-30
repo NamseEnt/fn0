@@ -128,7 +128,7 @@ def engine_command(engine, case, seed, scenario_index, repetition):
                 writers, readers = 1, clients - 1
             command += ["--suite", "mixed", "--readers", str(readers), "--writers", str(writers), "--mixes", f"{read_percent}/{100 - read_percent}"]
         command += ["--distributions", distribution, "--duration", f"{arguments.duration_ms}ms",
-                    "--warmup", f"{arguments.warmup_ms}ms", "--repetitions", str(arguments.repetitions),
+                    "--warmup", f"{arguments.warmup_ms}ms", "--repetitions", "1",
                     "--cache-capacity", str(cache_pages), "--working-set", str(working_set),
                     "--key-size", "16", "--value-size", str(value_size), "--read-limit", "16",
                     "--sync-mode", "real", "--transaction-mode", "unconditional", "--seed", str(seed),
