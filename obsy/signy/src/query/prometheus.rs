@@ -364,6 +364,7 @@ signy_build_info{{version=\"{}\",revision=\"{}\"}} 1\n\
     );
     body.push_str(&object_store_operation_metrics(&state));
     body.push_str(&object_store_gc_metrics(&state));
+    body.push_str(&cache_quarantine_metrics(&state));
     body.push_str(&restore_economics_metrics());
     body.push_str(&delete_request_metrics(&state));
     body.push_str(&journal_writer_metrics(&state));
@@ -371,6 +372,22 @@ signy_build_info{{version=\"{}\",revision=\"{}\"}} 1\n\
     body.push_str(&crate::memprof::render());
     body.push_str(&crate::allocator_stats::render());
     body
+}
+
+fn cache_quarantine_metrics(state: &AppState) -> String {
+    let counts = state
+        .remote_cache
+        .as_ref()
+        .map(|cache| cache.storage.cache_quarantined_parts())
+        .unwrap_or([0; 3]);
+    format!(
+        "# HELP signy_cache_quarantined_parts_total Retired incomplete local cache shells moved to quarantine during this process.\n\
+# TYPE signy_cache_quarantined_parts_total counter\n\
+signy_cache_quarantined_parts_total{{signal=\"logs\",reason=\"retired_incomplete_shell\"}} {}\n\
+signy_cache_quarantined_parts_total{{signal=\"traces\",reason=\"retired_incomplete_shell\"}} {}\n\
+signy_cache_quarantined_parts_total{{signal=\"metrics\",reason=\"retired_incomplete_shell\"}} {}\n",
+        counts[0], counts[1], counts[2]
+    )
 }
 
 /// Where an accepted push's server-side time went.

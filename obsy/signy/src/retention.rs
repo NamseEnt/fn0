@@ -143,33 +143,8 @@ async fn retention_once(
     .await
 }
 
-#[allow(clippy::too_many_arguments)]
-/// Retire expired log parts: first from the registry readers plan against,
-/// then from the manifest a restore validates against.
-///
-/// The order is the contract. A reader plans under the lifecycle read guard
-/// and restores under it again, so the registry is the side that is serialised
-/// against it -- the write guard cannot be taken while a reader holds the read
-/// guard, and a reader that re-plans afterwards no longer asks for the part.
-/// Writing the manifest first left a window where a reader still planning from
-/// the registry asked the restore for a part the manifest had already dropped,
-/// and that fails the whole query rather than returning less.
-///
-/// Failing on the manifest write now leaves the part retired locally and still
-/// in the manifest -- retention lagging rather than data vanishing under a
-/// reader -- and a restart rebuilds the registry from the manifest, so the
-/// part returns and the next tick retires it again.
-async fn retire_log_parts(
-    registry: &PartRegistry,
-    cache: &RemoteCache,
-    config: &Config,
-    ids: &[String],
-) -> Result<(), String> {
-    unregister_log_parts(registry, ids).await;
-    drop_log_parts_from_manifest(cache, config, ids).await
-}
-
 /// Stop planning reads against these parts, under the lifecycle write guard.
+#[cfg(test)]
 async fn unregister_log_parts(registry: &PartRegistry, ids: &[String]) {
     let _guard =
         crate::part_registry::PartRegistry::write_without_convoy(registry.operation_lock()).await;
@@ -357,16 +332,14 @@ async fn retention_once_at(
                 removed += 1;
             }
         }
-        if remote_cache.is_none() {
-            registry.unregister(&removed_log_ids);
-            trace_registry.unregister(&removed_trace_ids);
-            series_registry.unregister(&removed_metric_ids);
-        }
+        registry.unregister(&removed_log_ids);
+        trace_registry.unregister(&removed_trace_ids);
+        series_registry.unregister(&removed_metric_ids);
     }
 
     if let Some(cache) = remote_cache {
         if !removed_log_ids.is_empty() {
-            retire_log_parts(registry, cache, config, &removed_log_ids).await?;
+            drop_log_parts_from_manifest(cache, config, &removed_log_ids).await?;
         }
         if !removed_trace_ids.is_empty() {
             let descriptors: Vec<_> = trace_parts
@@ -374,14 +347,6 @@ async fn retention_once_at(
                 .filter(|(part, _)| removed_trace_ids.iter().any(|id| id == &part.id))
                 .map(|(part, _)| part.clone())
                 .collect();
-            // Registry first, then the manifest -- see `retire_log_parts`.
-            {
-                let _guard = crate::part_registry::PartRegistry::write_without_convoy(
-                    registry.operation_lock(),
-                )
-                .await;
-                trace_registry.unregister(&removed_trace_ids);
-            }
             match tokio::time::timeout(
                 config.max_retention_runtime,
                 cache.storage.remove_trace_parts(&descriptors),
@@ -409,14 +374,6 @@ async fn retention_once_at(
                 .filter(|(part, _)| removed_metric_ids.iter().any(|id| id == &part.id))
                 .map(|(part, _)| part.clone())
                 .collect();
-            // Registry first, then the manifest -- see `retire_log_parts`.
-            {
-                let _guard = crate::part_registry::PartRegistry::write_without_convoy(
-                    registry.operation_lock(),
-                )
-                .await;
-                series_registry.unregister(&removed_metric_ids);
-            }
             match tokio::time::timeout(
                 config.max_retention_runtime,
                 cache.storage.remove_metric_parts(&descriptors),
@@ -831,6 +788,47 @@ mod tests {
         assert!(!parts[0].dir.exists());
     }
 
+    #[tokio::test]
+    async fn retention_retires_an_evicted_trace_shell_from_local_and_remote_state() {
+        let root = temp_root("retention-evicted-trace");
+        let traces_root = root.join("traces");
+        let spans = vec![span_for("alpha", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 1_000)];
+        let parts = crate::trace_part::flush_trace_spans(&spans, &traces_root, 100).unwrap();
+        let storage = Arc::new(crate::object_storage::ObjectStorage::in_memory());
+        storage.publish_trace_parts(&parts).await.unwrap();
+        let registry = Arc::new(PartRegistry::new());
+        let trace_registry = Arc::new(TraceRegistry::standalone());
+        trace_registry.register(parts.clone()).unwrap();
+        storage
+            .evict_trace_cache(&traces_root, 0, std::slice::from_ref(&parts[0].dir))
+            .unwrap();
+        assert!(!parts[0].data_path().exists());
+        let remote = RemoteCache::new(storage.clone(), root.join("parts"));
+
+        retention_once_at(
+            &registry,
+            &trace_registry,
+            &SeriesRegistry::standalone(),
+            Some(&remote),
+            &per_tenant_config(root),
+            &policy_with(&[("alpha", TenantRetention::Finite(Duration::from_nanos(1)))]),
+            1_000_000,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(trace_registry.part_count(), 0);
+        assert!(!parts[0].dir.exists());
+        assert!(
+            storage
+                .load_trace_manifest()
+                .await
+                .unwrap()
+                .parts
+                .is_empty()
+        );
+    }
+
     fn metric_part_for(
         root: &std::path::Path,
         owner: &str,
@@ -889,6 +887,11 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(series_registry.part_count(), 1);
+
+        storage
+            .evict_metric_cache(&metrics_root, 0, std::slice::from_ref(&part.dir))
+            .unwrap();
+        assert!(!part.data_path().exists());
 
         retention_once_at(
             &registry,
@@ -1122,6 +1125,9 @@ mod tests {
         storage.publish(&parts, &[]).await.unwrap();
         let registry = Arc::new(PartRegistry::new());
         registry.register(parts.clone()).unwrap();
+        storage
+            .evict_cache(&parts_root, 0, std::slice::from_ref(&parts[0].dir))
+            .unwrap();
         let trace_registry = Arc::new(TraceRegistry::standalone());
         let remote = RemoteCache::new(storage.clone(), parts_root.clone());
         let config = Config {

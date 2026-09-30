@@ -30,6 +30,7 @@ pub struct ObjectStorage {
     /// generation create stops a lost update but not two divergent local WALs, and not one
     /// instance's retention expiring a part the other has just registered.
     writer_epoch: AtomicU64,
+    cache_quarantined_parts: [AtomicU64; 3],
     /// Catalog files checksummed while restoring. The expensive part of a
     /// startup at scale is this, not the store round trips: every part's bloom,
     /// stream index and metadata are read and verified from local disk. Counted
@@ -210,6 +211,7 @@ impl ObjectStorage {
             local_manifest_overwrite,
             fence_sink: std::sync::OnceLock::new(),
             writer_epoch: AtomicU64::new(0),
+            cache_quarantined_parts: std::array::from_fn(|_| AtomicU64::new(0)),
             #[cfg(test)]
             catalog_validations: AtomicU64::new(0),
         }
@@ -218,6 +220,22 @@ impl ObjectStorage {
     /// Object-store requests this process has issued, by kind.
     pub fn operation_counts(&self) -> ObjectStoreOpCounts {
         self.ops.snapshot()
+    }
+
+    pub(crate) fn record_cache_quarantine(&self, signal: &str) {
+        let counter_index = match signal {
+            "logs" => 0,
+            "traces" => 1,
+            "metrics" => 2,
+            _ => return,
+        };
+        self.cache_quarantined_parts[counter_index].fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(crate) fn cache_quarantined_parts(&self) -> [u64; 3] {
+        std::array::from_fn(|counter_index| {
+            self.cache_quarantined_parts[counter_index].load(Ordering::Relaxed)
+        })
     }
 
     #[cfg(test)]

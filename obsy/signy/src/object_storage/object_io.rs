@@ -424,7 +424,9 @@ impl ObjectStorage {
                             &descriptor.id,
                             &part.dir,
                         )?;
+                        self.record_cache_quarantine("metrics");
                         tracing::warn!(
+                            signal = "metrics",
                             part_id = %descriptor.id,
                             partition = %descriptor.partition,
                             reason = "absent from manifest, no remote objects, no pending transaction or compaction, and local metric data body is absent",
@@ -435,6 +437,7 @@ impl ObjectStorage {
                     }
                     count if count == METRIC_PART_FILES.len() => {
                         tracing::warn!(
+                            signal = "traces",
                             part_id = %descriptor.id,
                             partition = %descriptor.partition,
                             remote_objects = count,
@@ -757,7 +760,9 @@ impl ObjectStorage {
                             &descriptor.id,
                             &part.dir,
                         )?;
+                        self.record_cache_quarantine("traces");
                         tracing::warn!(
+                            signal = "logs",
                             part_id = %descriptor.id,
                             partition = %descriptor.partition,
                             reason = "absent from manifest, no remote objects, no pending transaction or compaction, and local parquet body is absent",
@@ -1205,6 +1210,7 @@ impl ObjectStorage {
                             &descriptor.id,
                             &part.dir,
                         )?;
+                        self.record_cache_quarantine("logs");
                         tracing::warn!(
                             part_id = %descriptor.id,
                             partition = %descriptor.partition,

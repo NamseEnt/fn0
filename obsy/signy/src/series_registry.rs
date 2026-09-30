@@ -18,6 +18,7 @@ pub struct SeriesRegistry {
     inner: RwLock<HashMap<String, Arc<SeriesPartReader>>>,
     stored_bytes: RwLock<HashMap<TenantId, u64>>,
     operation_lock: Arc<tokio::sync::RwLock<()>>,
+    deletion_lock: Arc<tokio::sync::RwLock<()>>,
 }
 
 fn reader_tenant_bytes(reader: &SeriesPartReader) -> Vec<(TenantId, u64)> {
@@ -46,15 +47,27 @@ impl SeriesRegistry {
     }
 
     pub fn new(operation_lock: Arc<tokio::sync::RwLock<()>>) -> Self {
+        Self::with_locks(operation_lock, Arc::new(tokio::sync::RwLock::new(())))
+    }
+
+    pub fn with_locks(
+        operation_lock: Arc<tokio::sync::RwLock<()>>,
+        deletion_lock: Arc<tokio::sync::RwLock<()>>,
+    ) -> Self {
         Self {
             inner: RwLock::new(HashMap::new()),
             stored_bytes: RwLock::new(HashMap::new()),
             operation_lock,
+            deletion_lock,
         }
     }
 
     pub fn operation_lock(&self) -> Arc<tokio::sync::RwLock<()>> {
         self.operation_lock.clone()
+    }
+
+    pub fn deletion_lock(&self) -> Arc<tokio::sync::RwLock<()>> {
+        self.deletion_lock.clone()
     }
 
     pub fn visit_tenants(&self, mut visit: impl FnMut(&TenantId)) {
@@ -69,7 +82,19 @@ impl SeriesRegistry {
         metrics_root: &Path,
         operation_lock: Arc<tokio::sync::RwLock<()>>,
     ) -> Result<Self, String> {
-        let registry = Self::new(operation_lock);
+        Self::load_from_disk_with_locks(
+            metrics_root,
+            operation_lock,
+            Arc::new(tokio::sync::RwLock::new(())),
+        )
+    }
+
+    pub fn load_from_disk_with_locks(
+        metrics_root: &Path,
+        operation_lock: Arc<tokio::sync::RwLock<()>>,
+        deletion_lock: Arc<tokio::sync::RwLock<()>>,
+    ) -> Result<Self, String> {
+        let registry = Self::with_locks(operation_lock, deletion_lock);
         registry.reload_from_disk(metrics_root)?;
         Ok(registry)
     }
@@ -95,7 +120,21 @@ impl SeriesRegistry {
         manifest: &MetricManifest,
         operation_lock: Arc<tokio::sync::RwLock<()>>,
     ) -> Result<Self, String> {
-        let registry = Self::new(operation_lock);
+        Self::load_from_manifest_with_locks(
+            metrics_root,
+            manifest,
+            operation_lock,
+            Arc::new(tokio::sync::RwLock::new(())),
+        )
+    }
+
+    pub fn load_from_manifest_with_locks(
+        metrics_root: &Path,
+        manifest: &MetricManifest,
+        operation_lock: Arc<tokio::sync::RwLock<()>>,
+        deletion_lock: Arc<tokio::sync::RwLock<()>>,
+    ) -> Result<Self, String> {
+        let registry = Self::with_locks(operation_lock, deletion_lock);
         let mut readers = HashMap::new();
         for descriptor in &manifest.parts {
             let dir = metrics_root

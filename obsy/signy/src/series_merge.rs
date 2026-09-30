@@ -254,10 +254,26 @@ pub async fn compact_once(
     metrics_root: &Path,
     remote: Option<&RemoteCache>,
 ) -> Result<bool, String> {
+    let deletion_guard = registry.deletion_lock().read_owned().await;
     let Some(inputs) = select_inputs(&registry.snapshot(), crate::clock::Clock::system().now_ns())
     else {
         return Ok(false);
     };
+
+    if let Some(remote) = remote {
+        let input_ids: std::collections::HashSet<String> = inputs
+            .iter()
+            .map(|reader| reader.part().meta.id.clone())
+            .collect();
+        let missing = registry.missing_data_ids(&input_ids);
+        if !missing.is_empty() {
+            remote
+                .storage
+                .restore_metric_parts(&remote.metric_parts_root(), &missing)
+                .await?;
+            remote.record_remote_success();
+        }
+    }
 
     // Everything from here to the record write is synchronous, so the arena
     // guard is safe to hold across it and is dropped before the first await.
@@ -312,6 +328,7 @@ pub async fn compact_once(
         return Err("metric compaction wrote an unexpected replacement id".to_string());
     }
     drop(arena);
+    drop(deletion_guard);
 
     if let Some(cache) = remote {
         // One CAS replaces the inputs with the output; a conflict means
@@ -558,6 +575,68 @@ mod tests {
         assert!(read_records(&root).unwrap().is_empty());
         let discovered = series_part::discover_series_parts(&root).unwrap();
         assert_eq!(discovered.len(), registry.part_count());
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[tokio::test]
+    async fn compaction_restores_evicted_inputs_and_holds_the_deletion_lifecycle_lock() {
+        let root = temp_root("evicted-inputs");
+        let metrics_root = root.join("metrics");
+        let series = labels("queue_depth", "a");
+        for index in 0..COMPACT_MIN_PARTS {
+            let base = 1_772_000_000_000_000_000 + index as i64 * 60_000_000_000;
+            flush_one_part(&metrics_root, &series, base, 5);
+        }
+        let parts = crate::series_part::discover_series_parts(&metrics_root).unwrap();
+        let storage = Arc::new(crate::object_storage::ObjectStorage::in_memory());
+        let manifest = storage.publish_metric_parts(&parts, &[]).await.unwrap();
+        let operation_lock = Arc::new(tokio::sync::RwLock::new(()));
+        let deletion_lock = Arc::new(tokio::sync::RwLock::new(()));
+        let registry = SeriesRegistry::load_from_manifest_with_locks(
+            &metrics_root,
+            &manifest,
+            operation_lock,
+            deletion_lock.clone(),
+        )
+        .unwrap();
+        let before = all_samples(&registry);
+        storage
+            .evict_metric_cache(&metrics_root, 0, &registry.part_dirs())
+            .unwrap();
+        assert!(
+            registry
+                .snapshot()
+                .iter()
+                .all(|reader| !reader.part().data_path().exists())
+        );
+
+        let remote = crate::object_storage::RemoteCache::new(storage, root.join("parts"));
+        let lifecycle_writer = deletion_lock.write_owned().await;
+        let compacting_registry = Arc::new(registry);
+        let task_registry = compacting_registry.clone();
+        let compacting_root = metrics_root.clone();
+        let compacting_remote = Arc::new(remote);
+        let task_started = Arc::new(tokio::sync::Notify::new());
+        let task_started_signal = task_started.clone();
+        let mut compacting = tokio::spawn(async move {
+            task_started_signal.notify_one();
+            compact_once(&task_registry, &compacting_root, Some(&compacting_remote)).await
+        });
+        task_started.notified().await;
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(20), &mut compacting)
+                .await
+                .is_err()
+        );
+        drop(lifecycle_writer);
+        assert!(compacting.await.unwrap().unwrap());
+        assert_eq!(all_samples(&compacting_registry), before);
+        assert!(
+            compacting_registry
+                .snapshot()
+                .iter()
+                .all(|reader| reader.part().data_path().exists())
+        );
         std::fs::remove_dir_all(&root).ok();
     }
 

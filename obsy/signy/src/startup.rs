@@ -328,14 +328,18 @@ pub async fn run(config: Arc<Config>) {
     );
     let series_registry = Arc::new(
         match &remote_metric_manifest {
-            Some(manifest) => crate::series_registry::SeriesRegistry::load_from_manifest(
+            Some(manifest) => {
+                crate::series_registry::SeriesRegistry::load_from_manifest_with_locks(
+                    &config.data_dir.join("metrics"),
+                    manifest,
+                    parts.operation_lock(),
+                    parts.deletion_lock(),
+                )
+            }
+            None => crate::series_registry::SeriesRegistry::load_from_disk_with_locks(
                 &config.data_dir.join("metrics"),
-                manifest,
                 parts.operation_lock(),
-            ),
-            None => crate::series_registry::SeriesRegistry::load_from_disk(
-                &config.data_dir.join("metrics"),
-                parts.operation_lock(),
+                parts.deletion_lock(),
             ),
         }
         .unwrap_or_else(|e| panic!("failed to load metric parts: {e}")),

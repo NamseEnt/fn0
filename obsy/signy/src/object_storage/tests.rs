@@ -61,6 +61,7 @@
         assert!(quarantine.join(UPLOAD_MARKER_FILE).is_file());
         assert!(!quarantine.join(part::DATA_FILE).exists());
         assert!(storage.load_manifest().await.unwrap().parts.is_empty());
+        assert_eq!(storage.cache_quarantined_parts(), [1, 0, 0]);
     }
 
     #[tokio::test]
@@ -1727,6 +1728,7 @@
         assert!(quarantine.join(crate::trace_part::TRACE_BLOOM_FILE).is_file());
         assert!(!quarantine.join(crate::trace_part::TRACE_DATA_FILE).exists());
         assert!(storage.load_trace_manifest().await.unwrap().parts.is_empty());
+        assert_eq!(storage.cache_quarantined_parts(), [0, 1, 0]);
     }
 
     #[tokio::test]
@@ -1986,6 +1988,7 @@
             .join(crate::series_part::SERIES_DATA_FILE)
             .exists());
         assert!(storage.load_metric_manifest().await.unwrap().parts.is_empty());
+        assert_eq!(storage.cache_quarantined_parts(), [0, 0, 1]);
     }
 
     #[tokio::test]
