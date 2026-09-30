@@ -1,0 +1,5 @@
+phase0-bench engine=parallel-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /bench/btrfs/db/oci-a1-scaling-20260930/raw/2-dodb-width16-compact-rep1.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-same-leaf-heavy                  rep=0 tx/s=     9366 mut/s=   149850 read/s=        0 agg/s=     9366 p50=  7887.9us p95=  8775.0us p99=  9410.3us groups= 1214 avg_group=38.61
+completed 1 scenarios x 1 repetitions

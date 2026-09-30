@@ -1,0 +1,978 @@
+{
+  "fio": {
+    "2": {
+      "iops": 394.10706,
+      "mb_s": 1.614262,
+      "sync_count": 5912,
+      "sync_mean_ms": 2.5132935167459998,
+      "sync_p50_ms": 2.53952,
+      "sync_p95_ms": 2.965504,
+      "sync_p99_ms": 3.129344
+    },
+    "2-post": {
+      "iops": 367.575495,
+      "mb_s": 1.505589,
+      "sync_count": 5514,
+      "sync_mean_ms": 2.694757300689,
+      "sync_p50_ms": 2.637824,
+      "sync_p95_ms": 3.227648,
+      "sync_p99_ms": 3.6864
+    },
+    "4": {
+      "iops": 433.10446,
+      "mb_s": 1.773995,
+      "sync_count": 6497,
+      "sync_mean_ms": 2.2802659776820002,
+      "sync_p50_ms": 2.244608,
+      "sync_p95_ms": 2.670592,
+      "sync_p99_ms": 3.227648
+    },
+    "6": {
+      "iops": 430.913817,
+      "mb_s": 1.765022,
+      "sync_count": 6465,
+      "sync_mean_ms": 2.296013501933,
+      "sync_p50_ms": 2.244608,
+      "sync_p95_ms": 2.768896,
+      "sync_p99_ms": 3.096576
+    }
+  },
+  "io": {
+    "2-dodb-width1-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 7512,
+      "disk_bytes_written": 815443968
+    },
+    "2-dodb-width1-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 7484,
+      "disk_bytes_written": 796397568
+    },
+    "2-dodb-width1-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 7472,
+      "disk_bytes_written": 818163712
+    },
+    "2-dodb-width16-compact-rep1.jsonl": {
+      "block_device_busy_ms": 4900,
+      "disk_bytes_written": 434073600
+    },
+    "2-dodb-width16-compact-rep2.jsonl": {
+      "block_device_busy_ms": 4584,
+      "disk_bytes_written": 433258496
+    },
+    "2-dodb-width16-compact-rep3.jsonl": {
+      "block_device_busy_ms": 4460,
+      "disk_bytes_written": 409042944
+    },
+    "2-dodb-width16-spread-rep1.jsonl": {
+      "block_device_busy_ms": 4052,
+      "disk_bytes_written": 446746624
+    },
+    "2-dodb-width16-spread-rep2.jsonl": {
+      "block_device_busy_ms": 4228,
+      "disk_bytes_written": 444866560
+    },
+    "2-dodb-width16-spread-rep3.jsonl": {
+      "block_device_busy_ms": 4092,
+      "disk_bytes_written": 448581632
+    },
+    "2-dodb-width16-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 4140,
+      "disk_bytes_written": 628445184
+    },
+    "2-dodb-width16-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 4356,
+      "disk_bytes_written": 643260416
+    },
+    "2-dodb-width16-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 4216,
+      "disk_bytes_written": 634494976
+    },
+    "2-post-dodb-width1-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 7560,
+      "disk_bytes_written": 796299264
+    },
+    "2-post-dodb-width1-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 7548,
+      "disk_bytes_written": 795471872
+    },
+    "2-post-dodb-width1-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 7360,
+      "disk_bytes_written": 770121728
+    },
+    "2-post-dodb-width16-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 4400,
+      "disk_bytes_written": 615395328
+    },
+    "2-post-dodb-width16-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 4552,
+      "disk_bytes_written": 621309952
+    },
+    "2-post-dodb-width16-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 4292,
+      "disk_bytes_written": 611422208
+    },
+    "2-post-rocksdb-width1-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 6132,
+      "disk_bytes_written": 363409408
+    },
+    "2-post-rocksdb-width1-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 6308,
+      "disk_bytes_written": 401678336
+    },
+    "2-post-rocksdb-width1-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 6300,
+      "disk_bytes_written": 406822912
+    },
+    "2-post-rocksdb-width16-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 4964,
+      "disk_bytes_written": 406044672
+    },
+    "2-post-rocksdb-width16-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 5212,
+      "disk_bytes_written": 411533312
+    },
+    "2-post-rocksdb-width16-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 5084,
+      "disk_bytes_written": 414138368
+    },
+    "2-rocksdb-width1-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 6092,
+      "disk_bytes_written": 443891712
+    },
+    "2-rocksdb-width1-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 6148,
+      "disk_bytes_written": 448241664
+    },
+    "2-rocksdb-width1-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 6124,
+      "disk_bytes_written": 434868224
+    },
+    "2-rocksdb-width16-compact-rep1.jsonl": {
+      "block_device_busy_ms": 5528,
+      "disk_bytes_written": 450838528
+    },
+    "2-rocksdb-width16-compact-rep2.jsonl": {
+      "block_device_busy_ms": 5600,
+      "disk_bytes_written": 459788288
+    },
+    "2-rocksdb-width16-compact-rep3.jsonl": {
+      "block_device_busy_ms": 5596,
+      "disk_bytes_written": 454643712
+    },
+    "2-rocksdb-width16-spread-rep1.jsonl": {
+      "block_device_busy_ms": 5484,
+      "disk_bytes_written": 464728064
+    },
+    "2-rocksdb-width16-spread-rep2.jsonl": {
+      "block_device_busy_ms": 5656,
+      "disk_bytes_written": 461926400
+    },
+    "2-rocksdb-width16-spread-rep3.jsonl": {
+      "block_device_busy_ms": 5540,
+      "disk_bytes_written": 465637376
+    },
+    "2-rocksdb-width16-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 5184,
+      "disk_bytes_written": 434216960
+    },
+    "2-rocksdb-width16-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 5188,
+      "disk_bytes_written": 428843008
+    },
+    "2-rocksdb-width16-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 5124,
+      "disk_bytes_written": 431968256
+    },
+    "4-dodb-width1-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 7428,
+      "disk_bytes_written": 874688512
+    },
+    "4-dodb-width1-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 7044,
+      "disk_bytes_written": 878342144
+    },
+    "4-dodb-width1-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 6868,
+      "disk_bytes_written": 831606784
+    },
+    "4-dodb-width16-compact-rep1.jsonl": {
+      "block_device_busy_ms": 3672,
+      "disk_bytes_written": 392024064
+    },
+    "4-dodb-width16-compact-rep2.jsonl": {
+      "block_device_busy_ms": 3556,
+      "disk_bytes_written": 391958528
+    },
+    "4-dodb-width16-compact-rep3.jsonl": {
+      "block_device_busy_ms": 3712,
+      "disk_bytes_written": 402956288
+    },
+    "4-dodb-width16-spread-rep1.jsonl": {
+      "block_device_busy_ms": 3724,
+      "disk_bytes_written": 433889280
+    },
+    "4-dodb-width16-spread-rep2.jsonl": {
+      "block_device_busy_ms": 3640,
+      "disk_bytes_written": 431853568
+    },
+    "4-dodb-width16-spread-rep3.jsonl": {
+      "block_device_busy_ms": 3664,
+      "disk_bytes_written": 436731904
+    },
+    "4-dodb-width16-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 3412,
+      "disk_bytes_written": 639922176
+    },
+    "4-dodb-width16-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 3508,
+      "disk_bytes_written": 641159168
+    },
+    "4-dodb-width16-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 3416,
+      "disk_bytes_written": 632901632
+    },
+    "4-rocksdb-width1-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 6268,
+      "disk_bytes_written": 498851840
+    },
+    "4-rocksdb-width1-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 6292,
+      "disk_bytes_written": 535359488
+    },
+    "4-rocksdb-width1-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 6320,
+      "disk_bytes_written": 518479872
+    },
+    "4-rocksdb-width16-compact-rep1.jsonl": {
+      "block_device_busy_ms": 5788,
+      "disk_bytes_written": 554532864
+    },
+    "4-rocksdb-width16-compact-rep2.jsonl": {
+      "block_device_busy_ms": 5892,
+      "disk_bytes_written": 558415872
+    },
+    "4-rocksdb-width16-compact-rep3.jsonl": {
+      "block_device_busy_ms": 5804,
+      "disk_bytes_written": 549392384
+    },
+    "4-rocksdb-width16-spread-rep1.jsonl": {
+      "block_device_busy_ms": 6000,
+      "disk_bytes_written": 552398848
+    },
+    "4-rocksdb-width16-spread-rep2.jsonl": {
+      "block_device_busy_ms": 5916,
+      "disk_bytes_written": 582008832
+    },
+    "4-rocksdb-width16-spread-rep3.jsonl": {
+      "block_device_busy_ms": 5832,
+      "disk_bytes_written": 567017472
+    },
+    "4-rocksdb-width16-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 5700,
+      "disk_bytes_written": 538771456
+    },
+    "4-rocksdb-width16-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 5652,
+      "disk_bytes_written": 525606912
+    },
+    "4-rocksdb-width16-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 5520,
+      "disk_bytes_written": 529170432
+    },
+    "6-dodb-width1-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 7364,
+      "disk_bytes_written": 824303616
+    },
+    "6-dodb-width1-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 6720,
+      "disk_bytes_written": 830865408
+    },
+    "6-dodb-width1-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 6680,
+      "disk_bytes_written": 829186048
+    },
+    "6-dodb-width16-compact-rep1.jsonl": {
+      "block_device_busy_ms": 3560,
+      "disk_bytes_written": 365518848
+    },
+    "6-dodb-width16-compact-rep2.jsonl": {
+      "block_device_busy_ms": 3764,
+      "disk_bytes_written": 362942464
+    },
+    "6-dodb-width16-compact-rep3.jsonl": {
+      "block_device_busy_ms": 3916,
+      "disk_bytes_written": 382976000
+    },
+    "6-dodb-width16-spread-rep1.jsonl": {
+      "block_device_busy_ms": 3828,
+      "disk_bytes_written": 422305792
+    },
+    "6-dodb-width16-spread-rep2.jsonl": {
+      "block_device_busy_ms": 3960,
+      "disk_bytes_written": 431083520
+    },
+    "6-dodb-width16-spread-rep3.jsonl": {
+      "block_device_busy_ms": 3832,
+      "disk_bytes_written": 424820736
+    },
+    "6-dodb-width16-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 3364,
+      "disk_bytes_written": 643588096
+    },
+    "6-dodb-width16-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 3284,
+      "disk_bytes_written": 631943168
+    },
+    "6-dodb-width16-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 3272,
+      "disk_bytes_written": 640368640
+    },
+    "6-rocksdb-width1-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 6312,
+      "disk_bytes_written": 452534272
+    },
+    "6-rocksdb-width1-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 6352,
+      "disk_bytes_written": 494047232
+    },
+    "6-rocksdb-width1-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 6308,
+      "disk_bytes_written": 438124544
+    },
+    "6-rocksdb-width16-compact-rep1.jsonl": {
+      "block_device_busy_ms": 6120,
+      "disk_bytes_written": 531042304
+    },
+    "6-rocksdb-width16-compact-rep2.jsonl": {
+      "block_device_busy_ms": 6068,
+      "disk_bytes_written": 531001344
+    },
+    "6-rocksdb-width16-compact-rep3.jsonl": {
+      "block_device_busy_ms": 6016,
+      "disk_bytes_written": 527589376
+    },
+    "6-rocksdb-width16-spread-rep1.jsonl": {
+      "block_device_busy_ms": 6072,
+      "disk_bytes_written": 543662080
+    },
+    "6-rocksdb-width16-spread-rep2.jsonl": {
+      "block_device_busy_ms": 6028,
+      "disk_bytes_written": 546287616
+    },
+    "6-rocksdb-width16-spread-rep3.jsonl": {
+      "block_device_busy_ms": 6076,
+      "disk_bytes_written": 544993280
+    },
+    "6-rocksdb-width16-uniform-rep1.jsonl": {
+      "block_device_busy_ms": 5744,
+      "disk_bytes_written": 516886528
+    },
+    "6-rocksdb-width16-uniform-rep2.jsonl": {
+      "block_device_busy_ms": 5840,
+      "disk_bytes_written": 505769984
+    },
+    "6-rocksdb-width16-uniform-rep3.jsonl": {
+      "block_device_busy_ms": 5836,
+      "disk_bytes_written": 526696448
+    }
+  },
+  "stages": {
+    "2": {
+      "width1-uniform": {
+        "dodb": {
+          "cpu_machine_percent": 14.182373,
+          "cpu_seconds": 1.4197867183500001,
+          "generation_publication_ms": 0.84348,
+          "group_size": 32.132226,
+          "groups_per_second": 325.6092688773472,
+          "p50_us": 5972.087,
+          "p95_us": 7031.688,
+          "p99_us": 9101.811,
+          "physical_ms": 272.427653,
+          "planning_ms": 127.339867,
+          "publication_swap_ms": 0.0512,
+          "publication_total_ms": 4698.793801,
+          "state_install_ms": 14.450258,
+          "syncs_per_second": 325.6092688773472,
+          "tx_s": 10675.731317,
+          "validation_ms": 30.246713,
+          "wal_assembly_ms": 6.326849,
+          "wal_sync_count": 1630.0,
+          "wal_sync_mean_us": 2549.162890184049,
+          "wal_sync_total_ms": 4164.816767,
+          "worker_parallelism": 1.615239
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 33.7000668002672,
+          "cpu_machine_percent": 17.485159432464346,
+          "cpu_seconds": 1.75,
+          "p50_us": 6569.447,
+          "p95_us": 7405.329000000001,
+          "p99_us": 7907.329,
+          "syncs_per_second": 299.0327128312389,
+          "tx_s": 10102.670175946476,
+          "wal_sync_mean_us": 2975.086,
+          "wal_sync_p50_us": 3117.853,
+          "wal_sync_p95_us": 4277.985,
+          "wal_sync_p99_us": 4381.108,
+          "worker_parallelism": 0.3497031886492869
+        }
+      },
+      "width16-compact": {
+        "dodb": {
+          "cpu_machine_percent": 27.769571,
+          "cpu_seconds": 2.7797340570999998,
+          "generation_publication_ms": 0.660481,
+          "group_size": 39.569682,
+          "groups_per_second": 242.6059152677858,
+          "p50_us": 7876.93,
+          "p95_us": 8659.13,
+          "p99_us": 9180.451,
+          "physical_ms": 545.81057,
+          "planning_ms": 650.113198,
+          "publication_swap_ms": 0.03788,
+          "publication_total_ms": 3749.538912,
+          "state_install_ms": 1.43188,
+          "syncs_per_second": 242.6059152677858,
+          "tx_s": 9607.272654,
+          "validation_ms": 255.412628,
+          "wal_assembly_ms": 4.77945,
+          "wal_sync_count": 1214.0,
+          "wal_sync_mean_us": 2515.1209084158413,
+          "wal_sync_total_ms": 3048.326541,
+          "worker_parallelism": 1.65928
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 35.06605351170568,
+          "cpu_machine_percent": 28.860347706225625,
+          "cpu_seconds": 2.89,
+          "p50_us": 7887.249000000001,
+          "p95_us": 9232.171,
+          "p99_us": 11061.653,
+          "syncs_per_second": 239.98971520378734,
+          "tx_s": 8376.291504853954,
+          "wal_sync_mean_us": 3403.077,
+          "wal_sync_p50_us": 3615.633,
+          "wal_sync_p95_us": 4335.63,
+          "wal_sync_p99_us": 4398.675,
+          "worker_parallelism": 0.5772069541245125
+        }
+      },
+      "width16-spread": {
+        "dodb": {
+          "cpu_machine_percent": 29.863492,
+          "cpu_seconds": 2.9899328691000004,
+          "generation_publication_ms": 0.5706,
+          "group_size": 39.451521,
+          "groups_per_second": 210.34758290051937,
+          "p50_us": 9032.371,
+          "p95_us": 10007.492,
+          "p99_us": 10611.732,
+          "physical_ms": 584.855226,
+          "planning_ms": 621.698499,
+          "publication_swap_ms": 0.03328,
+          "publication_total_ms": 3772.001865,
+          "state_install_ms": 14.272785,
+          "syncs_per_second": 210.34758290051937,
+          "tx_s": 8290.465067,
+          "validation_ms": 245.282091,
+          "wal_assembly_ms": 5.724085,
+          "wal_sync_count": 1053.0,
+          "wal_sync_mean_us": 2760.5630199619773,
+          "wal_sync_total_ms": 2904.112297,
+          "worker_parallelism": 1.826428
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 35.8042194092827,
+          "cpu_machine_percent": 29.452405589971935,
+          "cpu_seconds": 2.95,
+          "p50_us": 7895.6900000000005,
+          "p95_us": 9432.611,
+          "p99_us": 11438.253,
+          "syncs_per_second": 236.61763134994402,
+          "tx_s": 8471.909588958164,
+          "wal_sync_mean_us": 3377.73,
+          "wal_sync_p50_us": 3621.048,
+          "wal_sync_p95_us": 4344.257,
+          "wal_sync_p99_us": 5366.429,
+          "worker_parallelism": 0.5890481117994387
+        }
+      },
+      "width16-uniform": {
+        "dodb": {
+          "cpu_machine_percent": 44.868463,
+          "cpu_seconds": 4.49940946964,
+          "generation_publication_ms": 0.36568,
+          "group_size": 41.316901,
+          "groups_per_second": 113.2828081372158,
+          "p50_us": 16402.66,
+          "p95_us": 18710.981,
+          "p99_us": 21693.066,
+          "physical_ms": 1358.708393,
+          "planning_ms": 612.895218,
+          "publication_swap_ms": 0.01728,
+          "publication_total_ms": 3898.273374,
+          "state_install_ms": 53.4151,
+          "syncs_per_second": 113.2828081372158,
+          "tx_s": 4641.682639,
+          "validation_ms": 160.624359,
+          "wal_assembly_ms": 11.125887,
+          "wal_sync_count": 568.0,
+          "wal_sync_mean_us": 3188.244857394366,
+          "wal_sync_total_ms": 1801.379843,
+          "worker_parallelism": 1.915681
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 35.324276950043824,
+          "cpu_machine_percent": 37.13116975012588,
+          "cpu_seconds": 3.72,
+          "p50_us": 8153.8099999999995,
+          "p95_us": 10135.372,
+          "p99_us": 12511.334,
+          "syncs_per_second": 227.777767123084,
+          "tx_s": 8046.084928918406,
+          "wal_sync_mean_us": 3228.051,
+          "wal_sync_p50_us": 3511.081,
+          "wal_sync_p95_us": 4335.68,
+          "wal_sync_p99_us": 5072.833,
+          "worker_parallelism": 0.7426233950025176
+        }
+      }
+    },
+    "2-post": {
+      "width1-uniform": {
+        "dodb": {
+          "cpu_machine_percent": 13.289315,
+          "cpu_seconds": 1.3299946452,
+          "dodb_rocks_ratio": 1.0438082384831262,
+          "generation_publication_ms": 0.786612,
+          "group_size": 31.791035,
+          "groups_per_second": 303.0969030969031,
+          "p50_us": 6519.724,
+          "p95_us": 7671.336,
+          "p99_us": 9995.268,
+          "physical_ms": 264.390618,
+          "planning_ms": 117.314794,
+          "publication_swap_ms": 0.046721,
+          "publication_total_ms": 4727.181389,
+          "speedup_vs_2": 0.9025446215245921,
+          "state_install_ms": 13.601408,
+          "syncs_per_second": 303.0969030969031,
+          "tx_s": 9635.323881,
+          "validation_ms": 26.945327,
+          "wal_assembly_ms": 6.182817,
+          "wal_sync_count": 1517.0,
+          "wal_sync_mean_us": 2787.441593935399,
+          "wal_sync_total_ms": 4228.548898,
+          "worker_parallelism": 1.5637
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 33.70475514549326,
+          "cpu_machine_percent": 16.98405347178351,
+          "cpu_seconds": 1.7,
+          "p50_us": 7158.929,
+          "p95_us": 8077.380999999999,
+          "p99_us": 8732.79,
+          "speedup_vs_2": 0.9137121976019004,
+          "syncs_per_second": 274.0862626096719,
+          "tx_s": 9230.932968111232,
+          "wal_sync_mean_us": 3268.85,
+          "wal_sync_p50_us": 3537.564,
+          "wal_sync_p95_us": 4318.61,
+          "wal_sync_p99_us": 4390.305,
+          "worker_parallelism": 0.3396810694356702
+        }
+      },
+      "width16-uniform": {
+        "dodb": {
+          "cpu_machine_percent": 43.51732,
+          "cpu_seconds": 4.35956516769,
+          "dodb_rocks_ratio": 0.58801260560805,
+          "generation_publication_ms": 0.350122,
+          "group_size": 39.171846,
+          "groups_per_second": 107.20702735076861,
+          "p50_us": 17365.203,
+          "p95_us": 19949.998,
+          "p99_us": 22080.588,
+          "physical_ms": 1313.055544,
+          "planning_ms": 578.439086,
+          "publication_swap_ms": 0.01632,
+          "publication_total_ms": 3920.006369,
+          "speedup_vs_2": 0.9206973324916279,
+          "state_install_ms": 54.270467,
+          "syncs_per_second": 107.20702735076861,
+          "tx_s": 4273.584824,
+          "validation_ms": 151.350404,
+          "wal_assembly_ms": 10.578708,
+          "wal_sync_count": 537.0,
+          "wal_sync_mean_us": 3512.6265977653634,
+          "wal_sync_total_ms": 1886.280483,
+          "worker_parallelism": 1.893628
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 35.30673076923077,
+          "cpu_machine_percent": 36.161417676661856,
+          "cpu_seconds": 3.62,
+          "p50_us": 8994.276,
+          "p95_us": 11076.955,
+          "p99_us": 13223.824999999999,
+          "speedup_vs_2": 0.9032772654901661,
+          "syncs_per_second": 207.73252683906944,
+          "tx_s": 7267.845592495055,
+          "wal_sync_mean_us": 3611.593,
+          "wal_sync_p50_us": 3666.879,
+          "wal_sync_p95_us": 4359.711,
+          "wal_sync_p99_us": 5901.176,
+          "worker_parallelism": 0.7232283535332371
+        }
+      }
+    },
+    "4": {
+      "width1-uniform": {
+        "dodb": {
+          "cpu_machine_percent": 8.844064,
+          "cpu_seconds": 1.7698741377100002,
+          "dodb_rocks_ratio": 0.9862006033073242,
+          "generation_publication_ms": 0.816762,
+          "group_size": 32.293508,
+          "groups_per_second": 366.3801718968619,
+          "p50_us": 5360.206,
+          "p95_us": 6223.847,
+          "p99_us": 8076.488,
+          "physical_ms": 236.007989,
+          "planning_ms": 132.204989,
+          "publication_swap_ms": 0.057,
+          "publication_total_ms": 4668.853433,
+          "speedup_vs_2": 1.108201332039949,
+          "state_install_ms": 15.568136,
+          "syncs_per_second": 366.3801718968619,
+          "tx_s": 11830.859666,
+          "validation_ms": 31.32828,
+          "wal_assembly_ms": 8.055729,
+          "wal_sync_count": 1833.0,
+          "wal_sync_mean_us": 2273.998456628478,
+          "wal_sync_total_ms": 4148.880478,
+          "worker_parallelism": 2.618743
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 32.52709100473435,
+          "cpu_machine_percent": 11.440865427700505,
+          "cpu_seconds": 2.29,
+          "p50_us": 5342.823,
+          "p95_us": 6042.831999999999,
+          "p99_us": 6410.1669999999995,
+          "speedup_vs_2": 1.1874487217750078,
+          "syncs_per_second": 367.80763965560527,
+          "tx_s": 11996.402786942137,
+          "wal_sync_mean_us": 2473.902,
+          "wal_sync_p50_us": 2419.002,
+          "wal_sync_p95_us": 2886.103,
+          "wal_sync_p99_us": 4078.226,
+          "worker_parallelism": 0.45763461710802017
+        }
+      },
+      "width16-compact": {
+        "dodb": {
+          "cpu_machine_percent": 20.387068,
+          "cpu_seconds": 4.07985999813,
+          "dodb_rocks_ratio": 1.3211963296494524,
+          "generation_publication_ms": 0.467441,
+          "group_size": 62.905222,
+          "groups_per_second": 205.87647411553067,
+          "p50_us": 4830.335,
+          "p95_us": 5257.656,
+          "p99_us": 9372.188,
+          "physical_ms": 542.368556,
+          "planning_ms": 876.737133,
+          "publication_swap_ms": 0.03176,
+          "publication_total_ms": 3189.158424,
+          "speedup_vs_2": 1.3456162449618347,
+          "state_install_ms": 1.281404,
+          "syncs_per_second": 205.87647411553067,
+          "tx_s": 12927.702153,
+          "validation_ms": 329.353065,
+          "wal_assembly_ms": 5.940097,
+          "wal_sync_count": 1030.0,
+          "wal_sync_mean_us": 2398.6857678916826,
+          "wal_sync_total_ms": 2467.995884,
+          "worker_parallelism": 2.363812
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 33.03524533517623,
+          "cpu_machine_percent": 18.925331201715057,
+          "cpu_seconds": 3.79,
+          "p50_us": 6567.3,
+          "p95_us": 7351.581999999999,
+          "p99_us": 7926.384,
+          "speedup_vs_2": 1.1681596372110368,
+          "syncs_per_second": 296.21389099887523,
+          "tx_s": 9784.845645484085,
+          "wal_sync_mean_us": 2886.281,
+          "wal_sync_p50_us": 2683.857,
+          "wal_sync_p95_us": 4202.837,
+          "wal_sync_p99_us": 4369.798,
+          "worker_parallelism": 0.7570132480686023
+        }
+      },
+      "width16-spread": {
+        "dodb": {
+          "cpu_machine_percent": 20.982417,
+          "cpu_seconds": 4.19984063676,
+          "dodb_rocks_ratio": 1.0881535271188876,
+          "generation_publication_ms": 0.414402,
+          "group_size": 62.84109,
+          "groups_per_second": 176.05915267785772,
+          "p50_us": 5679.127,
+          "p95_us": 6176.837,
+          "p99_us": 11103.057,
+          "physical_ms": 456.492239,
+          "planning_ms": 820.469758,
+          "publication_swap_ms": 0.0276,
+          "publication_total_ms": 3279.567504,
+          "speedup_vs_2": 1.3161070669523154,
+          "state_install_ms": 18.432828,
+          "syncs_per_second": 176.05915267785772,
+          "tx_s": 10911.139663,
+          "validation_ms": 330.407315,
+          "wal_assembly_ms": 8.204569,
+          "wal_sync_count": 881.0,
+          "wal_sync_mean_us": 2813.110145289444,
+          "wal_sync_total_ms": 2478.350038,
+          "worker_parallelism": 3.522463
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 32.790333115610714,
+          "cpu_machine_percent": 18.32588657486897,
+          "cpu_seconds": 3.67,
+          "p50_us": 6401.849,
+          "p95_us": 7191.77,
+          "p99_us": 7870.5779999999995,
+          "speedup_vs_2": 1.183582753642351,
+          "syncs_per_second": 305.7976277506746,
+          "tx_s": 10027.206079908143,
+          "wal_sync_mean_us": 2842.289,
+          "wal_sync_p50_us": 2614.753,
+          "wal_sync_p95_us": 4166.905,
+          "wal_sync_p99_us": 4369.24,
+          "worker_parallelism": 0.7330354629947589
+        }
+      },
+      "width16-uniform": {
+        "dodb": {
+          "cpu_machine_percent": 29.91526,
+          "cpu_seconds": 5.989035102049999,
+          "dodb_rocks_ratio": 0.650901488107508,
+          "generation_publication_ms": 0.293,
+          "group_size": 62.698545,
+          "groups_per_second": 95.90409590409591,
+          "p50_us": 10293.492,
+          "p95_us": 11205.293,
+          "p99_us": 20529.344,
+          "physical_ms": 1094.508209,
+          "planning_ms": 765.583061,
+          "publication_swap_ms": 0.01484,
+          "publication_total_ms": 3551.630439,
+          "speedup_vs_2": 1.2940188651704159,
+          "state_install_ms": 63.667163,
+          "syncs_per_second": 95.90409590409591,
+          "tx_s": 6006.424901,
+          "validation_ms": 205.103633,
+          "wal_assembly_ms": 15.111947,
+          "wal_sync_count": 480.0,
+          "wal_sync_mean_us": 3183.222879237288,
+          "wal_sync_total_ms": 1526.94961,
+          "worker_parallelism": 3.774264
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 33.3013698630137,
+          "cpu_machine_percent": 22.514132415947476,
+          "cpu_seconds": 4.51,
+          "p50_us": 7013.888,
+          "p95_us": 7946.009,
+          "p99_us": 10899.85,
+          "speedup_vs_2": 1.1468752341551705,
+          "syncs_per_second": 277.1013797583937,
+          "tx_s": 9227.855536885685,
+          "wal_sync_mean_us": 2971.085,
+          "wal_sync_p50_us": 2966.084,
+          "wal_sync_p95_us": 4275.49,
+          "wal_sync_p99_us": 5325.833,
+          "worker_parallelism": 0.900565296637899
+        }
+      }
+    },
+    "6": {
+      "width1-uniform": {
+        "dodb": {
+          "cpu_machine_percent": 5.86049,
+          "cpu_seconds": 1.75999536308,
+          "dodb_rocks_ratio": 0.933055372612133,
+          "generation_publication_ms": 0.720642,
+          "group_size": 32.246324,
+          "groups_per_second": 326.1390887290168,
+          "p50_us": 5961.649,
+          "p95_us": 7188.531,
+          "p99_us": 9278.694,
+          "physical_ms": 209.187757,
+          "planning_ms": 120.179377,
+          "publication_swap_ms": 0.05116,
+          "publication_total_ms": 4695.33619,
+          "speedup_vs_2": 0.9859503824565952,
+          "state_install_ms": 14.830856,
+          "syncs_per_second": 326.1390887290168,
+          "tx_s": 10525.741375,
+          "validation_ms": 27.753404,
+          "wal_assembly_ms": 7.058649,
+          "wal_sync_count": 1632.0,
+          "wal_sync_mean_us": 2578.900162507608,
+          "wal_sync_total_ms": 4237.132967,
+          "worker_parallelism": 2.857212
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 32.21320093457944,
+          "cpu_machine_percent": 8.124279873071755,
+          "cpu_seconds": 2.44,
+          "p50_us": 5604.968,
+          "p95_us": 6536.89,
+          "p99_us": 7029.210999999999,
+          "speedup_vs_2": 1.116629512978774,
+          "syncs_per_second": 350.74938675716686,
+          "tx_s": 11280.939678352299,
+          "wal_sync_mean_us": 2620.442,
+          "wal_sync_p50_us": 2478.826,
+          "wal_sync_p95_us": 3869.551,
+          "wal_sync_p99_us": 4319.551,
+          "worker_parallelism": 0.4874567923843052
+        }
+      },
+      "width16-compact": {
+        "dodb": {
+          "cpu_machine_percent": 13.05975,
+          "cpu_seconds": 3.9194922700399997,
+          "dodb_rocks_ratio": 1.328921689536181,
+          "generation_publication_ms": 0.426164,
+          "group_size": 62.920537,
+          "groups_per_second": 194.922031187525,
+          "p50_us": 5109.874,
+          "p95_us": 5626.997,
+          "p99_us": 9864.373,
+          "physical_ms": 505.746955,
+          "planning_ms": 849.196878,
+          "publication_swap_ms": 0.03048,
+          "publication_total_ms": 3264.312481,
+          "speedup_vs_2": 1.2764398372616437,
+          "state_install_ms": 1.207135,
+          "syncs_per_second": 194.922031187525,
+          "tx_s": 12263.105543,
+          "validation_ms": 319.612403,
+          "wal_assembly_ms": 5.677388,
+          "wal_sync_count": 975.0,
+          "wal_sync_mean_us": 2662.869931888545,
+          "wal_sync_total_ms": 2592.57938,
+          "worker_parallelism": 2.424285
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 32.66807610993658,
+          "cpu_machine_percent": 12.957766404529687,
+          "cpu_seconds": 3.89,
+          "p50_us": 6939.766,
+          "p95_us": 7871.273999999999,
+          "p99_us": 8551.924,
+          "speedup_vs_2": 1.1016643440572322,
+          "syncs_per_second": 282.0062991793016,
+          "tx_s": 9227.861686327098,
+          "wal_sync_mean_us": 3115.875,
+          "wal_sync_p50_us": 3371.117,
+          "wal_sync_p95_us": 4308.499,
+          "wal_sync_p99_us": 4392.403,
+          "worker_parallelism": 0.7774659842717813
+        }
+      },
+      "width16-spread": {
+        "dodb": {
+          "cpu_machine_percent": 13.886358,
+          "cpu_seconds": 4.16924002584,
+          "dodb_rocks_ratio": 1.1563134132427186,
+          "generation_publication_ms": 0.379282,
+          "group_size": 62.847222,
+          "groups_per_second": 172.22777222777222,
+          "p50_us": 5793.475,
+          "p95_us": 6482.24,
+          "p99_us": 11303.914,
+          "physical_ms": 362.270011,
+          "planning_ms": 804.963929,
+          "publication_swap_ms": 0.02708,
+          "publication_total_ms": 3318.734669,
+          "speedup_vs_2": 1.3006978712114752,
+          "state_install_ms": 18.699922,
+          "syncs_per_second": 172.22777222777222,
+          "tx_s": 10783.390264,
+          "validation_ms": 323.707204,
+          "wal_assembly_ms": 7.968333,
+          "wal_sync_count": 862.0,
+          "wal_sync_mean_us": 3063.920750293083,
+          "wal_sync_total_ms": 2613.5244,
+          "worker_parallelism": 4.845346
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 32.32756232686981,
+          "cpu_machine_percent": 12.65237207489736,
+          "cpu_seconds": 3.8,
+          "p50_us": 6765.682000000001,
+          "p95_us": 7686.927,
+          "p99_us": 8693.253,
+          "speedup_vs_2": 1.1007747202554639,
+          "syncs_per_second": 288.4740833076598,
+          "tx_s": 9325.663907815006,
+          "wal_sync_mean_us": 3081.081,
+          "wal_sync_p50_us": 3298.871,
+          "wal_sync_p95_us": 4299.589,
+          "wal_sync_p99_us": 4388.542,
+          "worker_parallelism": 0.7591423244938416
+        }
+      },
+      "width16-uniform": {
+        "dodb": {
+          "cpu_machine_percent": 20.680835,
+          "cpu_seconds": 6.229067552199999,
+          "dodb_rocks_ratio": 0.6648165750031699,
+          "generation_publication_ms": 0.30248,
+          "group_size": 62.7125,
+          "groups_per_second": 95.96161535385846,
+          "p50_us": 10243.135,
+          "p95_us": 11527.622,
+          "p99_us": 20507.83,
+          "physical_ms": 899.953429,
+          "planning_ms": 794.552541,
+          "publication_swap_ms": 0.01484,
+          "publication_total_ms": 3524.46808,
+          "speedup_vs_2": 1.2963487842624994,
+          "state_install_ms": 67.929249,
+          "syncs_per_second": 95.96161535385846,
+          "tx_s": 6017.239646,
+          "validation_ms": 210.218616,
+          "wal_assembly_ms": 15.119999,
+          "wal_sync_count": 480.0,
+          "wal_sync_mean_us": 3433.9841774530273,
+          "wal_sync_total_ms": 1644.878421,
+          "worker_parallelism": 5.471932
+        },
+        "rocksdb": {
+          "avg_tx_per_sync": 32.714801444043324,
+          "cpu_machine_percent": 15.78078121463379,
+          "cpu_seconds": 4.74,
+          "p50_us": 7065.198,
+          "p95_us": 8088.804,
+          "p99_us": 8876.968,
+          "speedup_vs_2": 1.1248920754735285,
+          "syncs_per_second": 276.663063066681,
+          "tx_s": 9050.977175127304,
+          "wal_sync_mean_us": 3084.813,
+          "wal_sync_p50_us": 3332.902,
+          "wal_sync_p95_us": 4301.684,
+          "wal_sync_p99_us": 4387.019,
+          "worker_parallelism": 0.9468468728780274
+        }
+      }
+    }
+  }
+}

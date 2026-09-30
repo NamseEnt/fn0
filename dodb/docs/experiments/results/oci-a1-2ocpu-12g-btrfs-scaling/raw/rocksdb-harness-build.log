@@ -1,0 +1,66 @@
+ Downloading crates ...
+  Downloaded itoa v1.0.18
+  Downloaded zmij v1.0.23
+  Downloaded shlex v2.0.1
+  Downloaded find-msvc-tools v0.1.14
+  Downloaded serde_core v1.0.229
+  Downloaded memchr v2.8.3
+  Downloaded serde_json v1.0.151
+  Downloaded libc v0.2.189
+  Downloaded cc v1.5.0
+   Compiling serde_core v1.0.229
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.14
+   Compiling zmij v1.0.23
+   Compiling cc v1.5.0
+   Compiling libc v0.2.189
+   Compiling serde_json v1.0.151
+   Compiling rocksdb-bench v0.1.0 (/bench/btrfs/db/oci-a1-scaling-20260930/harness/rocksdb-bench)
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+warning: variants `Busy`, `BusySnapshot`, and `Conflict` are never constructed
+   --> src/../../common/driver.rs:147:5
+    |
+146 | pub enum RetryKind {
+    |          --------- variants in this enum
+147 |     Busy,
+    |     ^^^^
+148 |     BusySnapshot,
+    |     ^^^^^^^^^^^^
+149 |     Conflict,
+    |     ^^^^^^^^
+    |
+    = note: `RetryKind` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: variant `Retryable` is never constructed
+   --> src/../../common/driver.rs:155:5
+    |
+153 | pub enum Attempt {
+    |          ------- variant in this enum
+154 |     Committed,
+155 |     Retryable(RetryKind, String),
+    |     ^^^^^^^^^
+    |
+    = note: `Attempt` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: constant `BASE_SEED` is never used
+ --> src/../../common/workload.rs:4:11
+  |
+4 | pub const BASE_SEED: u64 = 979_000_000;
+  |           ^^^^^^^^^
+
+warning: constant `SEED_STRIDE` is never used
+ --> src/../../common/workload.rs:5:11
+  |
+5 | pub const SEED_STRIDE: u64 = 1_009;
+  |           ^^^^^^^^^^^
+
+warning: function `invocation_seed` is never used
+   --> src/../../common/workload.rs:163:8
+    |
+163 | pub fn invocation_seed(scenario_index: u64, repetition_index: u64) -> u64 {
+    |        ^^^^^^^^^^^^^^^
+
+warning: `rocksdb-bench` (bin "rocksdb-bench") generated 5 warnings
+    Finished `release` profile [optimized + debuginfo] target(s) in 18.32s
