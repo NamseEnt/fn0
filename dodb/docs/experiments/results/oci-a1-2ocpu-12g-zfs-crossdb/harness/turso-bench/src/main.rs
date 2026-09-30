@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use common::driver::{self, Args, Attempt, Engine, EngineFactory, RetryKind};
 use common::workload::Mutation;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use turso::params::Params;
 use turso::{Builder, Connection, Database, Statement};
 
@@ -233,14 +233,20 @@ impl Engine for TursoEngine {
             ..
         } = writer;
         runtime.block_on(async {
-            let mut rows = connection
+            let mut rows = match connection
                 .query(
                     "SELECT v FROM kv WHERE k = ?1",
                     Params::Positional(vec![turso::Value::Blob(key.to_vec())]),
                 )
                 .await
-                .expect("select should run");
-            let row = rows.next().await.expect("select should step")?;
+            {
+                Ok(rows) => rows,
+                Err(_) => return None,
+            };
+            let row = match rows.next().await {
+                Ok(row) => row?,
+                Err(_) => return None,
+            };
             match row.get_value(0).expect("value column") {
                 turso::Value::Blob(bytes) => Some(bytes),
                 other => panic!("unexpected value type {other:?}"),
@@ -259,7 +265,7 @@ impl Engine for TursoEngine {
         let mut upper = primary_key.to_vec();
         upper.extend_from_slice(&[u8::MAX; 8]);
         runtime.block_on(async {
-            let mut rows = connection
+            let mut rows = match connection
                 .query(
                     "SELECT k, v FROM kv WHERE k >= ?1 AND k <= ?2 ORDER BY k LIMIT ?3",
                     Params::Positional(vec![
@@ -269,9 +275,17 @@ impl Engine for TursoEngine {
                     ]),
                 )
                 .await
-                .expect("range query should run");
+            {
+                Ok(rows) => rows,
+                Err(_) => return Vec::new(),
+            };
             let mut result = Vec::new();
-            while let Some(row) = rows.next().await.expect("range query should step") {
+            loop {
+                let row = match rows.next().await {
+                    Ok(Some(row)) => row,
+                    Ok(None) => break,
+                    Err(_) => return Vec::new(),
+                };
                 let key = match row.get_value(0).expect("key column") {
                     turso::Value::Blob(bytes) => bytes,
                     other => panic!("unexpected key type {other:?}"),
