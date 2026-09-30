@@ -16,6 +16,7 @@ parser.add_argument("--duration-ms", type=int, default=5_000)
 parser.add_argument("--warmup-ms", type=int, default=2_000)
 parser.add_argument("--repetitions", type=int, default=3)
 parser.add_argument("--engine-filter", default="all")
+parser.add_argument("--case-filter", default="all")
 arguments = parser.parse_args()
 
 results = arguments.results
@@ -188,6 +189,12 @@ if arguments.phase in ("smoke", "core", "all"):
     selected_cases.extend(core_cases[:1] if arguments.phase == "smoke" else core_cases)
 if arguments.phase in ("cache-pressure", "all"):
     selected_cases.extend(pressure_cases)
+if arguments.case_filter != "all":
+    allowed_cases = set(arguments.case_filter.split(","))
+    selected_cases = [case for case in selected_cases if case[0] in allowed_cases]
+    missing_cases = allowed_cases - {case[0] for case in selected_cases}
+    if missing_cases:
+        raise SystemExit(f"unknown or phase-excluded cases: {sorted(missing_cases)}")
 selected_engines = engine_names if arguments.engine_filter == "all" else arguments.engine_filter.split(",")
 results.mkdir(parents=True, exist_ok=True)
 (results / "environment.json").write_text(json.dumps(environment_record(), indent=2) + "\n", encoding="utf-8")
