@@ -1,0 +1,53 @@
+{
+  "binary_sha256": "3756eac0557bbe0d87ba3b2ea46ed088df46aa7e8d79fae56f570d8eb52469b6",
+  "block_device": "sda",
+  "block_stats_after": {
+    "io_busy_ms": 1393224,
+    "read_sectors": 7865901,
+    "written_sectors": 147735480
+  },
+  "block_stats_before": {
+    "io_busy_ms": 1374436,
+    "read_sectors": 7865901,
+    "written_sectors": 147481928
+  },
+  "block_stats_delta": {
+    "io_busy_ms": 18788,
+    "read_sectors": 0,
+    "written_sectors": 253552
+  },
+  "command": [
+    "fio",
+    "--name=wal-payload-fdatasync",
+    "--filename=/bench/btrfs/db/xfs-zfs-crossover-working/fio-payload-4096.dat",
+    "--rw=write",
+    "--bs=4096",
+    "--ioengine=psync",
+    "--iodepth=1",
+    "--direct=0",
+    "--size=268435456",
+    "--time_based=1",
+    "--runtime=20",
+    "--fdatasync=1",
+    "--group_reporting=1",
+    "--allow_file_create=0",
+    "--output-format=json",
+    "--output=/dev/shm/xfs-zfs-crossover/raw/XFS-pre/fio/xfs-pre-payload4096-rep2.json"
+  ],
+  "device_busy_ms": 18788,
+  "elapsed_ms": 20259.913769,
+  "ended_at": "2026-09-30T06:36:02.146543+00:00",
+  "exit_code": 0,
+  "filesystem": "XFS",
+  "kind": "fio",
+  "log_path": "/dev/shm/xfs-zfs-crossover/raw/XFS-pre/fio/xfs-pre-payload4096-rep2.log",
+  "output_path": "/dev/shm/xfs-zfs-crossover/raw/XFS-pre/fio/xfs-pre-payload4096-rep2.json",
+  "payload_size_bytes": 4096,
+  "repetition": 2,
+  "seed": null,
+  "source_commit": "08e82ec484bd62aeb659471a39f317b86cfb488f",
+  "stage": "XFS-pre",
+  "started_at": "2026-09-30T06:35:41.886592+00:00",
+  "transaction_width": null,
+  "written_bytes": 129818624
+}

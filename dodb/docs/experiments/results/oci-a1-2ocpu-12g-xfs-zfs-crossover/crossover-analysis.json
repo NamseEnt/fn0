@@ -1,0 +1,112 @@
+{
+  "fio_operations_per_second": {
+    "XFS-pre": {
+      "payload_bytes": [
+        4096,
+        16384,
+        65536,
+        262144,
+        1048576
+      ],
+      "xfs_operations_per_second": [
+        1372.412759,
+        1398.830058,
+        1062.39688,
+        394.330283,
+        100.684897
+      ],
+      "zfs_operations_per_second": [
+        1270.386481,
+        1079.39603,
+        429.628519,
+        249.95001,
+        91.722483
+      ],
+      "crossing_intervals": []
+    },
+    "XFS-post": {
+      "payload_bytes": [
+        4096,
+        16384,
+        65536,
+        262144,
+        1048576
+      ],
+      "xfs_operations_per_second": [
+        1399.480026,
+        1384.230788,
+        1051.79741,
+        395.210479,
+        98.475381
+      ],
+      "zfs_operations_per_second": [
+        1270.386481,
+        1079.39603,
+        429.628519,
+        249.95001,
+        91.722483
+      ],
+      "crossing_intervals": []
+    }
+  },
+  "dodb_tx_per_second": {
+    "XFS-pre": {
+      "transaction_widths": [
+        1,
+        2,
+        4,
+        8,
+        16
+      ],
+      "xfs_tx_per_second": [
+        16568.677337,
+        13928.253916,
+        11204.976465,
+        8046.911445,
+        5012.837734
+      ],
+      "zfs_tx_per_second": [
+        22986.5377,
+        18427.088714,
+        13347.444914,
+        7085.605415,
+        4513.241768
+      ],
+      "crossing_intervals": [
+        {
+          "lower_point": 4,
+          "upper_point": 8
+        }
+      ]
+    },
+    "XFS-post": {
+      "transaction_widths": [
+        1,
+        2,
+        4,
+        8,
+        16
+      ],
+      "xfs_tx_per_second": [
+        16458.270038,
+        14072.278332,
+        11287.363415,
+        8284.415644,
+        5013.820363
+      ],
+      "zfs_tx_per_second": [
+        22986.5377,
+        18427.088714,
+        13347.444914,
+        7085.605415,
+        4513.241768
+      ],
+      "crossing_intervals": [
+        {
+          "lower_point": 4,
+          "upper_point": 8
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,2 @@
+OCI compute volume-attachment list query used the configured OSAKA-VM profile, availability domain IsRG:AP-OSAKA-1-AD-1, and the instance OCID shown in oci-instance.json.
+Exit status: 0. Standard output: empty. The guest device inventory is in environment-initial.txt.

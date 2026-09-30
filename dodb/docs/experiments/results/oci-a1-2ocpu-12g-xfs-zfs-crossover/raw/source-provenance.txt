@@ -1,0 +1,15 @@
+Source checkout
+  repository: https://github.com/NamseEnt/fn0.git
+  checkout: detached
+  source commit: 08e82ec484bd62aeb659471a39f317b86cfb488f
+  status at build: clean
+
+Release build
+  command: CARGO_TARGET_DIR=/var/oled/xfs-zfs-crossover/target cargo build --release --locked --package dodb-storage --bin phase0-bench
+  rustc: 1.98.1 (48a229cea 2026-09-01)
+  cargo: 1.98.1 (797e8a9bc 2026-08-05)
+  host: aarch64
+  binary: /var/oled/xfs-zfs-crossover/target/release/phase0-bench
+  sha256: 3756eac0557bbe0d87ba3b2ea46ed088df46aa7e8d79fae56f570d8eb52469b6
+
+The requested previous binary SHA256 was not found among the checked existing benchmark binary candidates. This release binary was built once from the pinned Git checkout and is reused for all three stages. No filesystem-specific rebuild was performed.

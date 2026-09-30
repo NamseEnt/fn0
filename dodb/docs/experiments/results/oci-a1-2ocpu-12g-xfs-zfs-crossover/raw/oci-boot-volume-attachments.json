@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "availability-domain": "IsRG:AP-OSAKA-1-AD-1",
+      "boot-volume-id": "ocid1.bootvolume.oc1.ap-osaka-1.abvwsljrxzh3px7kxsz7w4jzqiqaytbke42huk7rvadeu6y3r4mynxlr3aiq",
+      "compartment-id": "ocid1.tenancy.oc1..aaaaaaaa7p7f5frocdgdqcctydyrrqv3kvr3jxmq6sxcr62fa5mcrqvtcy5a",
+      "display-name": "Remote boot attachment for instance",
+      "encryption-in-transit-type": "NONE",
+      "id": "ocid1.instance.oc1.ap-osaka-1.anvwsljrrfkd6xqcuiozrid2bkb7uh6ba3p7zkwkip6kcagbwgd5cp7os2jq",
+      "instance-id": "ocid1.instance.oc1.ap-osaka-1.anvwsljrrfkd6xqcuiozrid2bkb7uh6ba3p7zkwkip6kcagbwgd5cp7os2jq",
+      "is-pv-encryption-in-transit-enabled": true,
+      "lifecycle-state": "ATTACHED",
+      "time-created": "2026-09-23T01:46:31.867000+00:00",
+      "time-updated": "2026-09-30T03:18:39.258000+00:00"
+    }
+  ]
+}

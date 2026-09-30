@@ -1,0 +1,53 @@
+{
+  "binary_sha256": "3756eac0557bbe0d87ba3b2ea46ed088df46aa7e8d79fae56f570d8eb52469b6",
+  "block_device": "sda",
+  "block_stats_after": {
+    "io_busy_ms": 2077336,
+    "read_sectors": 7876746,
+    "written_sectors": 236084607
+  },
+  "block_stats_before": {
+    "io_busy_ms": 2060572,
+    "read_sectors": 7876746,
+    "written_sectors": 234597218
+  },
+  "block_stats_delta": {
+    "io_busy_ms": 16764,
+    "read_sectors": 0,
+    "written_sectors": 1487389
+  },
+  "command": [
+    "fio",
+    "--name=wal-payload-fdatasync",
+    "--filename=/bench/btrfs/db/xfs-zfs-crossover-working/fio-payload-16384.dat",
+    "--rw=write",
+    "--bs=16384",
+    "--ioengine=psync",
+    "--iodepth=1",
+    "--direct=0",
+    "--size=268435456",
+    "--time_based=1",
+    "--runtime=20",
+    "--fdatasync=1",
+    "--group_reporting=1",
+    "--allow_file_create=0",
+    "--output-format=json",
+    "--output=/dev/shm/xfs-zfs-crossover/raw/ZFS/fio/zfs-payload16384-rep2.json"
+  ],
+  "device_busy_ms": 16764,
+  "elapsed_ms": 20252.860358,
+  "ended_at": "2026-09-30T06:53:09.983800+00:00",
+  "exit_code": 0,
+  "filesystem": "ZFS",
+  "kind": "fio",
+  "log_path": "/dev/shm/xfs-zfs-crossover/raw/ZFS/fio/zfs-payload16384-rep2.log",
+  "output_path": "/dev/shm/xfs-zfs-crossover/raw/ZFS/fio/zfs-payload16384-rep2.json",
+  "payload_size_bytes": 16384,
+  "repetition": 2,
+  "seed": null,
+  "source_commit": "08e82ec484bd62aeb659471a39f317b86cfb488f",
+  "stage": "ZFS",
+  "started_at": "2026-09-30T06:52:49.730895+00:00",
+  "transaction_width": null,
+  "written_bytes": 761543168
+}

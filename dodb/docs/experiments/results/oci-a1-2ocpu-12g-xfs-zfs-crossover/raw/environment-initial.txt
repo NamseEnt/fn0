@@ -1,0 +1,144 @@
+Wed Sep 30 06:04:15 AM UTC 2026
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+Architecture:                            aarch64
+CPU op-mode(s):                          32-bit, 64-bit
+Byte Order:                              Little Endian
+CPU(s):                                  2
+On-line CPU(s) list:                     0,1
+Vendor ID:                               ARM
+Model name:                              Neoverse-N1
+Model:                                   1
+Thread(s) per core:                      1
+Core(s) per socket:                      2
+Socket(s):                               1
+Stepping:                                r3p1
+BogoMIPS:                                50.00
+Flags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0,1
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; CSV2, BHB
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+2
+               total        used        free      shared  buff/cache   available
+Mem:            10Gi       827Mi       7.3Gi        13Mi       2.8Gi       9.8Gi
+Swap:          4.0Gi          0B       4.0Gi
+NAME                 SIZE TYPE FSTYPE      MOUNTPOINTS     UUID                                   PARTUUID
+sda                  200G disk                                                                    
+├─sda1               100M part vfat        /boot/efi       7049-BB0F                              12f9b35f-a9d4-4e97-8b1d-e34d65ef3a10
+├─sda2                 2G part xfs         /boot           88d3ee9a-b987-45cc-a3ce-75aebba9bccd   b2e7eccf-eabb-4934-a8dd-f7279f5ff6c6
+├─sda3              44.5G part LVM2_member                 rY0mAV-gwvu-O1b3-CPU8-24It-03qY-hM3O1m 3d4b764e-19c5-4e3d-999a-1782b23f522a
+│ ├─ocivolume-root  29.5G lvm  xfs         /               e88e4336-832e-412f-a155-50bf9bd7451b   
+│ └─ocivolume-oled    15G lvm  xfs         /var/oled       2ca3994a-8c94-41cb-9f1c-16a43132bfde   
+└─sda4             153.4G part btrfs       /bench/btrfs/db 0db0f499-b1eb-4572-aece-fbb019f8b7d6   83f10ca6-016c-4894-85a0-0b67fadf20aa
+TARGET                                                  SOURCE                     FSTYPE     OPTIONS
+/                                                       /dev/mapper/ocivolume-root xfs        rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota
+├─/proc                                                 proc                       proc       rw,nosuid,nodev,noexec,relatime
+│ └─/proc/sys/fs/binfmt_misc                            systemd-1                  autofs     rw,relatime,fd=30,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=7000
+├─/sys                                                  sysfs                      sysfs      rw,nosuid,nodev,noexec,relatime,seclabel
+│ ├─/sys/kernel/security                                securityfs                 securityfs rw,nosuid,nodev,noexec,relatime
+│ ├─/sys/fs/cgroup                                      cgroup2                    cgroup2    rw,nosuid,nodev,noexec,relatime,seclabel,nsdelegate,memory_recursiveprot
+│ ├─/sys/fs/pstore                                      pstore                     pstore     rw,nosuid,nodev,noexec,relatime,seclabel
+│ ├─/sys/firmware/efi/efivars                           efivarfs                   efivarfs   rw,nosuid,nodev,noexec,relatime
+│ ├─/sys/fs/bpf                                         bpf                        bpf        rw,nosuid,nodev,noexec,relatime,mode=700
+│ ├─/sys/fs/selinux                                     selinuxfs                  selinuxfs  rw,nosuid,noexec,relatime
+│ ├─/sys/kernel/debug                                   debugfs                    debugfs    rw,nosuid,nodev,noexec,relatime,seclabel
+│ ├─/sys/kernel/tracing                                 tracefs                    tracefs    rw,nosuid,nodev,noexec,relatime,seclabel
+│ ├─/sys/fs/fuse/connections                            fusectl                    fusectl    rw,nosuid,nodev,noexec,relatime
+│ └─/sys/kernel/config                                  configfs                   configfs   rw,nosuid,nodev,noexec,relatime
+├─/dev                                                  devtmpfs                   devtmpfs   rw,nosuid,seclabel,size=4096k,nr_inodes=1383360,mode=755,inode64
+│ ├─/dev/shm                                            tmpfs                      tmpfs      rw,nosuid,nodev,noexec,seclabel,inode64
+│ ├─/dev/pts                                            devpts                     devpts     rw,nosuid,noexec,relatime,seclabel,gid=5,mode=620,ptmxmode=000
+│ ├─/dev/mqueue                                         mqueue                     mqueue     rw,nosuid,nodev,noexec,relatime,seclabel
+│ └─/dev/hugepages                                      hugetlbfs                  hugetlbfs  rw,relatime,seclabel,pagesize=2M
+├─/run                                                  tmpfs                      tmpfs      rw,nosuid,nodev,seclabel,size=2231952k,nr_inodes=819200,mode=755,inode64
+│ ├─/run/credentials/systemd-sysctl.service             ramfs                      ramfs      ro,nosuid,nodev,noexec,relatime,seclabel,mode=700
+│ ├─/run/credentials/systemd-tmpfiles-setup-dev.service ramfs                      ramfs      ro,nosuid,nodev,noexec,relatime,seclabel,mode=700
+│ ├─/run/user/1000                                      tmpfs                      tmpfs      rw,nosuid,nodev,relatime,seclabel,size=1115972k,nr_inodes=278993,mode=700,uid=1000,gid=1000,inode64
+│ ├─/run/credentials/systemd-tmpfiles-setup.service     ramfs                      ramfs      ro,nosuid,nodev,noexec,relatime,seclabel,mode=700
+│ └─/run/user/988                                       tmpfs                      tmpfs      rw,nosuid,nodev,relatime,seclabel,size=1115972k,nr_inodes=278993,mode=700,uid=988,gid=990,inode64
+├─/boot                                                 /dev/sda2                  xfs        rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota
+│ └─/boot/efi                                           /dev/sda1                  vfat       rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=winnt,errors=remount-ro
+├─/bench/btrfs/db                                       /dev/sda4                  btrfs      rw,noatime,seclabel,discard=async,space_cache=v2,subvolid=5,subvol=/
+├─/var/oled                                             /dev/mapper/ocivolume-oled xfs        rw,relatime,seclabel,attr2,inode64,logbufs=8,logbsize=32k,noquota
+└─/var/lib/nfs/rpc_pipefs                               rpc_pipefs                 rpc_pipefs rw,relatime
+/dev/sda4: LABEL="dodbbench" UUID="0db0f499-b1eb-4572-aece-fbb019f8b7d6" UUID_SUB="beab8953-32c7-43d5-b55b-87f4317b3952" TYPE="btrfs" PARTLABEL="dodb-zfs" PARTUUID="83f10ca6-016c-4894-85a0-0b67fadf20aa"
+/dev/mapper/ocivolume-oled: UUID="2ca3994a-8c94-41cb-9f1c-16a43132bfde" TYPE="xfs"
+/dev/mapper/ocivolume-root: UUID="e88e4336-832e-412f-a155-50bf9bd7451b" TYPE="xfs"
+/dev/sda2: UUID="88d3ee9a-b987-45cc-a3ce-75aebba9bccd" TYPE="xfs" PARTUUID="b2e7eccf-eabb-4934-a8dd-f7279f5ff6c6"
+/dev/sda3: UUID="rY0mAV-gwvu-O1b3-CPU8-24It-03qY-hM3O1m" TYPE="LVM2_member" PARTUUID="3d4b764e-19c5-4e3d-999a-1782b23f522a"
+/dev/sda1: SEC_TYPE="msdos" UUID="7049-BB0F" TYPE="vfat" PARTLABEL="EFI System Partition" PARTUUID="12f9b35f-a9d4-4e97-8b1d-e34d65ef3a10"
+#
+# /etc/fstab
+# Created by anaconda on Thu Jul  9 07:00:28 2026
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk/'.
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info.
+#
+# After editing this file, run 'systemctl daemon-reload' to update systemd
+# units generated from this file.
+#
+/dev/mapper/ocivolume-root /                       xfs     defaults        0 0
+UUID=88d3ee9a-b987-45cc-a3ce-75aebba9bccd /boot                   xfs     defaults        0 0
+UUID=7049-BB0F          /boot/efi               vfat    defaults,uid=0,gid=0,umask=077,shortname=winnt 0 2
+/dev/mapper/ocivolume-oled /var/oled               xfs     defaults        0 0
+tmpfs                   /dev/shm                tmpfs   defaults,nodev,nosuid,noexec      0 0
+######################################
+## ORACLE CLOUD INFRASTRUCTURE CUSTOMERS
+##
+## If you are adding an iSCSI remote block volume to this file you MUST
+## include the '_netdev' mount option or your instance will become
+## unavailable after the next reboot.
+## SCSI device names are not stable across reboots; please use the device UUID instead of /dev path.
+##
+## Example:
+## UUID="94c5aade-8bb1-4d55-ad0c-388bb8aa716a"   /data1    xfs       defaults,noatime,_netdev      0      2
+##
+## More information:
+## https://docs.us-phoenix-1.oraclecloud.com/Content/Block/Tasks/connectingtoavolume.htm
+/.swapfile	none	swap	sw	0	0
+UUID=0db0f499-b1eb-4572-aece-fbb019f8b7d6 /bench/btrfs/db btrfs defaults,noatime 0 0
+label: gpt
+label-id: DA43F94F-6C02-4ECE-B6E2-9B7D31FB591A
+device: /dev/sda
+unit: sectors
+first-lba: 34
+last-lba: 419430366
+sector-size: 512
+
+/dev/sda1 : start=        2048, size=      204800, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, uuid=12F9B35F-A9D4-4E97-8B1D-E34D65EF3A10, name="EFI System Partition"
+/dev/sda2 : start=      206848, size=     4194304, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, uuid=B2E7ECCF-EABB-4934-A8DD-F7279F5FF6C6
+/dev/sda3 : start=     4401152, size=    93325312, type=E6D6D379-F507-44C2-A23C-238F2A3DF928, uuid=3D4B764E-19C5-4E3D-999A-1782B23F522A
+/dev/sda4 : start=    97726464, size=   321703903, type=6A898CC3-1DD2-11B2-99A6-080020736631, uuid=83F10CA6-016C-4894-85A0-0B67FADF20AA, name="dodb-zfs"
+759b5fa624c6eec18cf1797afaca6890428dc25c137f89d778a35c5ba5ed1026  /home/opc/dodb/target/release/phase0-bench
+3899baaff31950565f21eed0d832b29fe2f1df268299ac7a740aba57619aa53f  /home/opc/dodb/target/oci-current-default/release/phase0-bench
+f1d8252ab249d94171412a3e989d5306ca541d05fac75a4ae783d01c58355e42  /home/opc/dodb/target/oci-current-plus-crc/release/phase0-bench
+f1d8252ab249d94171412a3e989d5306ca541d05fac75a4ae783d01c58355e42  /home/opc/dodb/target/crc-policy-host-probe/release/phase0-bench
+f1d8252ab249d94171412a3e989d5306ca541d05fac75a4ae783d01c58355e42  /home/opc/dodb/target/oci-aarch64-crc-baseline/repo-default/release/phase0-bench
+f1d8252ab249d94171412a3e989d5306ca541d05fac75a4ae783d01c58355e42  /home/opc/dodb/target/oci-aarch64-crc-baseline/explicit-crc/release/phase0-bench
+8f402d6b3660e8b16d8899b49830bc4b6bb93d70398aa66e56cdc3e7fff0baa3  /home/opc/dodb-target-admitted-key-reuse-base/release/phase0-bench
+1b7d2dda3801840ef9f49a4c0b05032846df3a4165987059d05175e8a2764056  /home/opc/dodb-target-admitted-key-reuse-candidate/release/phase0-bench
+3899baaff31950565f21eed0d832b29fe2f1df268299ac7a740aba57619aa53f  /home/opc/dodb-target-admitted-key-reuse-final/release/phase0-bench
+3ad35073561a6edc20cd44bc19f4d2b6e213c1bf025245efdde05da9121df30d  /home/opc/dodb-wal-v3/target/release/phase0-bench
+78d2f788b64b4e097b677228c9e07582ebe78eb359069b5f69a730b8bdf9aaba  /home/opc/phase-i-build/instrumented/release/phase0-bench
+6a1a9e3911e8623e27e52a686024ebd766e63a9f697b709a50c30fe698bd5d09  /home/opc/phase-i-build/h1/release/phase0-bench
+16cd84dfbae7af416a5bfcc6fff07862bb89fdd99ff3a1a1145b615873e418ab  /home/opc/phase-j-build/src/target/release/phase0-bench
+d6b698953decbf84052c6c95604cda0d75c83b8dc7b8dc33a32c03f5900aecce  /home/opc/phase-j-build/src-j2-control/target/release/phase0-bench
+422a4635d67bd08fb0dcfc2839727838fe539cd28b5518fc8684b19e411f8b76  /home/opc/phase-j-build/j4-h1/target/release/phase0-bench
+027b20b809ee9c7c91d962aa6777c2e3b44b4023f6fe1e8df4af09ef9b48925f  /home/opc/phase-j-build/j4-phase/target/release/phase0-bench
+1d139ec0edf7ac083f5d327d73b66a0fa9689c50eabb69c7febc0902ac70fb63  /home/opc/phase-j-build/j4-final/target/release/phase0-bench
+bcbf337ce4713b7294fac1d494f2ba853c132bdb6ee59f8fd588a60a62d2cd16  /home/opc/phase-j-build/j4-final-script/target/release/phase0-bench

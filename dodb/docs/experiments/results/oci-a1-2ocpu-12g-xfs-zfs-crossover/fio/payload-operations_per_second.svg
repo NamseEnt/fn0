@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="540" viewBox="0 0 920 540">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="460.0" y="34" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="600">Operations per second</text>
+<line x1="92" y1="442.00" x2="690" y2="442.00" stroke="#e5e7eb"/>
+<text x="80" y="447.00" text-anchor="end" font-family="sans-serif" font-size="12" fill="#4b5563">0.00</text>
+<line x1="92" y1="368.40" x2="690" y2="368.40" stroke="#e5e7eb"/>
+<text x="80" y="373.40" text-anchor="end" font-family="sans-serif" font-size="12" fill="#4b5563">379.36</text>
+<line x1="92" y1="294.80" x2="690" y2="294.80" stroke="#e5e7eb"/>
+<text x="80" y="299.80" text-anchor="end" font-family="sans-serif" font-size="12" fill="#4b5563">758.73</text>
+<line x1="92" y1="221.20" x2="690" y2="221.20" stroke="#e5e7eb"/>
+<text x="80" y="226.20" text-anchor="end" font-family="sans-serif" font-size="12" fill="#4b5563">1,138.09</text>
+<line x1="92" y1="147.60" x2="690" y2="147.60" stroke="#e5e7eb"/>
+<text x="80" y="152.60" text-anchor="end" font-family="sans-serif" font-size="12" fill="#4b5563">1,517.46</text>
+<line x1="92" y1="74.00" x2="690" y2="74.00" stroke="#e5e7eb"/>
+<text x="80" y="79.00" text-anchor="end" font-family="sans-serif" font-size="12" fill="#4b5563">1,896.82</text>
+<line x1="92" y1="74" x2="92" y2="442" stroke="#374151"/>
+<line x1="92" y1="442" x2="690" y2="442" stroke="#374151"/>
+<line x1="92.00" y1="442" x2="92.00" y2="448" stroke="#374151"/>
+<text x="92.00" y="466" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#4b5563">4096</text>
+<line x1="241.50" y1="442" x2="241.50" y2="448" stroke="#374151"/>
+<text x="241.50" y="466" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#4b5563">16384</text>
+<line x1="391.00" y1="442" x2="391.00" y2="448" stroke="#374151"/>
+<text x="391.00" y="466" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#4b5563">65536</text>
+<line x1="540.50" y1="442" x2="540.50" y2="448" stroke="#374151"/>
+<text x="540.50" y="466" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#4b5563">262144</text>
+<line x1="690.00" y1="442" x2="690.00" y2="448" stroke="#374151"/>
+<text x="690.00" y="466" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#4b5563">1048576</text>
+<text x="391.0" y="506" text-anchor="middle" font-family="sans-serif" font-size="14">sync payload size (bytes, log2 scale)</text>
+<text x="24" y="258.0" text-anchor="middle" transform="rotate(-90 24 258.0)" font-family="sans-serif" font-size="14">fio operations per second</text>
+<path d="M 92.00 175.74 L 241.50 170.61 L 391.00 235.89 L 540.50 365.50 L 690.00 422.47" fill="none" stroke="#2563eb" stroke-width="2.5"/>
+<line x1="92.00" y1="233.68" x2="92.00" y2="117.80" stroke="#2563eb" stroke-width="1.2"/>
+<line x1="88.00" y1="233.68" x2="96.00" y2="233.68" stroke="#2563eb"/>
+<line x1="88.00" y1="117.80" x2="96.00" y2="117.80" stroke="#2563eb"/>
+<circle cx="92.00" cy="175.74" r="4" fill="#2563eb"/>
+<line x1="241.50" y1="226.80" x2="241.50" y2="114.43" stroke="#2563eb" stroke-width="1.2"/>
+<line x1="237.50" y1="226.80" x2="245.50" y2="226.80" stroke="#2563eb"/>
+<line x1="237.50" y1="114.43" x2="245.50" y2="114.43" stroke="#2563eb"/>
+<circle cx="241.50" cy="170.61" r="4" fill="#2563eb"/>
+<line x1="391.00" y1="247.40" x2="391.00" y2="224.37" stroke="#2563eb" stroke-width="1.2"/>
+<line x1="387.00" y1="247.40" x2="395.00" y2="247.40" stroke="#2563eb"/>
+<line x1="387.00" y1="224.37" x2="395.00" y2="224.37" stroke="#2563eb"/>
+<circle cx="391.00" cy="235.89" r="4" fill="#2563eb"/>
+<line x1="540.50" y1="366.20" x2="540.50" y2="364.80" stroke="#2563eb" stroke-width="1.2"/>
+<line x1="536.50" y1="366.20" x2="544.50" y2="366.20" stroke="#2563eb"/>
+<line x1="536.50" y1="364.80" x2="544.50" y2="364.80" stroke="#2563eb"/>
+<circle cx="540.50" cy="365.50" r="4" fill="#2563eb"/>
+<line x1="690.00" y1="422.66" x2="690.00" y2="422.28" stroke="#2563eb" stroke-width="1.2"/>
+<line x1="686.00" y1="422.66" x2="694.00" y2="422.66" stroke="#2563eb"/>
+<line x1="686.00" y1="422.28" x2="694.00" y2="422.28" stroke="#2563eb"/>
+<circle cx="690.00" cy="422.47" r="4" fill="#2563eb"/>
+<line x1="710" y1="102" x2="734" y2="102" stroke="#2563eb" stroke-width="2.5"/>
+<text x="742" y="107" font-family="sans-serif" font-size="12" fill="#374151">XFS-pre median ± SD</text>
+<path d="M 92.00 195.53 L 241.50 232.59 L 391.00 358.65 L 540.50 393.51 L 690.00 424.21" fill="none" stroke="#d97706" stroke-width="2.5"/>
+<line x1="92.00" y1="197.37" x2="92.00" y2="193.70" stroke="#d97706" stroke-width="1.2"/>
+<line x1="88.00" y1="197.37" x2="96.00" y2="197.37" stroke="#d97706"/>
+<line x1="88.00" y1="193.70" x2="96.00" y2="193.70" stroke="#d97706"/>
+<circle cx="92.00" cy="195.53" r="4" fill="#d97706"/>
+<line x1="241.50" y1="235.31" x2="241.50" y2="229.87" stroke="#d97706" stroke-width="1.2"/>
+<line x1="237.50" y1="235.31" x2="245.50" y2="235.31" stroke="#d97706"/>
+<line x1="237.50" y1="229.87" x2="245.50" y2="229.87" stroke="#d97706"/>
+<circle cx="241.50" cy="232.59" r="4" fill="#d97706"/>
+<line x1="391.00" y1="359.18" x2="391.00" y2="358.12" stroke="#d97706" stroke-width="1.2"/>
+<line x1="387.00" y1="359.18" x2="395.00" y2="359.18" stroke="#d97706"/>
+<line x1="387.00" y1="358.12" x2="395.00" y2="358.12" stroke="#d97706"/>
+<circle cx="391.00" cy="358.65" r="4" fill="#d97706"/>
+<line x1="540.50" y1="393.89" x2="540.50" y2="393.13" stroke="#d97706" stroke-width="1.2"/>
+<line x1="536.50" y1="393.89" x2="544.50" y2="393.89" stroke="#d97706"/>
+<line x1="536.50" y1="393.13" x2="544.50" y2="393.13" stroke="#d97706"/>
+<circle cx="540.50" cy="393.51" r="4" fill="#d97706"/>
+<line x1="690.00" y1="424.40" x2="690.00" y2="424.01" stroke="#d97706" stroke-width="1.2"/>
+<line x1="686.00" y1="424.40" x2="694.00" y2="424.40" stroke="#d97706"/>
+<line x1="686.00" y1="424.01" x2="694.00" y2="424.01" stroke="#d97706"/>
+<circle cx="690.00" cy="424.21" r="4" fill="#d97706"/>
+<line x1="710" y1="126" x2="734" y2="126" stroke="#d97706" stroke-width="2.5"/>
+<text x="742" y="131" font-family="sans-serif" font-size="12" fill="#374151">ZFS median ± SD</text>
+<path d="M 92.00 170.49 L 241.50 173.45 L 391.00 237.94 L 540.50 365.33 L 690.00 422.89" fill="none" stroke="#059669" stroke-width="2.5"/>
+<line x1="92.00" y1="229.43" x2="92.00" y2="111.54" stroke="#059669" stroke-width="1.2"/>
+<line x1="88.00" y1="229.43" x2="96.00" y2="229.43" stroke="#059669"/>
+<line x1="88.00" y1="111.54" x2="96.00" y2="111.54" stroke="#059669"/>
+<circle cx="92.00" cy="170.49" r="4" fill="#059669"/>
+<line x1="241.50" y1="230.17" x2="241.50" y2="116.73" stroke="#059669" stroke-width="1.2"/>
+<line x1="237.50" y1="230.17" x2="245.50" y2="230.17" stroke="#059669"/>
+<line x1="237.50" y1="116.73" x2="245.50" y2="116.73" stroke="#059669"/>
+<circle cx="241.50" cy="173.45" r="4" fill="#059669"/>
+<line x1="391.00" y1="249.30" x2="391.00" y2="226.58" stroke="#059669" stroke-width="1.2"/>
+<line x1="387.00" y1="249.30" x2="395.00" y2="249.30" stroke="#059669"/>
+<line x1="387.00" y1="226.58" x2="395.00" y2="226.58" stroke="#059669"/>
+<circle cx="391.00" cy="237.94" r="4" fill="#059669"/>
+<line x1="540.50" y1="365.97" x2="540.50" y2="364.68" stroke="#059669" stroke-width="1.2"/>
+<line x1="536.50" y1="365.97" x2="544.50" y2="365.97" stroke="#059669"/>
+<line x1="536.50" y1="364.68" x2="544.50" y2="364.68" stroke="#059669"/>
+<circle cx="540.50" cy="365.33" r="4" fill="#059669"/>
+<line x1="690.00" y1="422.92" x2="690.00" y2="422.87" stroke="#059669" stroke-width="1.2"/>
+<line x1="686.00" y1="422.92" x2="694.00" y2="422.92" stroke="#059669"/>
+<line x1="686.00" y1="422.87" x2="694.00" y2="422.87" stroke="#059669"/>
+<circle cx="690.00" cy="422.89" r="4" fill="#059669"/>
+<line x1="710" y1="150" x2="734" y2="150" stroke="#059669" stroke-width="2.5"/>
+<text x="742" y="155" font-family="sans-serif" font-size="12" fill="#374151">XFS-post median ± SD</text>
+</svg>

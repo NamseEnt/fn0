@@ -1,0 +1,1 @@
+The original ZFS 4 KiB fio repetition 4 is excluded because a read-only host-state probe overlapped its 20-second run. It was replaced by an isolated repetition 4 rerun with the same binary, command arguments, stage, payload size, and file size. The replacement is stored in fio/zfs-payload4096-rep4.*.

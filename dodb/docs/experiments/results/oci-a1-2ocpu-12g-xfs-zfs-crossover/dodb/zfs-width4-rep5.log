@@ -1,0 +1,5 @@
+phase0-bench engine=parallel-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /dev/shm/xfs-zfs-crossover/raw/ZFS/dodb/zfs-width4-rep5.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width4-uniform                           rep=0 tx/s=    13418 mut/s=    53672 read/s=        0 agg/s=    13418 p50=  5158.9us p95=  6575.0us p99=  8598.6us groups= 1809 avg_group=37.12
+completed 1 scenarios x 1 repetitions

@@ -1,0 +1,14 @@
+{
+  "data": {
+    "id": "ocid1.instance.oc1.ap-osaka-1.anvwsljrrfkd6xqcuiozrid2bkb7uh6ba3p7zkwkip6kcagbwgd5cp7os2jq",
+    "display-name": "instance-20260923-1013",
+    "lifecycle-state": "RUNNING",
+    "shape": "VM.Standard.A1.Flex",
+    "availability-domain": "IsRG:AP-OSAKA-1-AD-1",
+    "region": "ap-osaka-1",
+    "shape-config": {
+      "ocpus": 2.0,
+      "memory-in-gbs": 12.0
+    }
+  }
+}
