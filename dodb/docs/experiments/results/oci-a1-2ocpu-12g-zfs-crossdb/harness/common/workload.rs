@@ -13,6 +13,7 @@ pub enum Distribution {
     Uniform,
     SameLeafHeavy,
     DifferentLeafHeavy,
+    Hotspot,
 }
 
 impl Distribution {
@@ -21,6 +22,7 @@ impl Distribution {
             "uniform" => Self::Uniform,
             "same-leaf-heavy" | "compact-locality" => Self::SameLeafHeavy,
             "different-leaf-heavy" | "spread-locality" => Self::DifferentLeafHeavy,
+            "hotspot" => Self::Hotspot,
             other => panic!("unknown key distribution {other:?}"),
         }
     }
@@ -30,6 +32,7 @@ impl Distribution {
             Self::Uniform => "uniform",
             Self::SameLeafHeavy => "same-leaf-heavy",
             Self::DifferentLeafHeavy => "different-leaf-heavy",
+            Self::Hotspot => "hotspot",
         }
     }
 
@@ -38,6 +41,7 @@ impl Distribution {
             Self::Uniform => "uniform",
             Self::SameLeafHeavy => "compact-locality",
             Self::DifferentLeafHeavy => "spread-locality",
+            Self::Hotspot => "hotspot",
         }
     }
 }
@@ -127,6 +131,14 @@ impl WorkloadGenerator {
                     .saturating_add(offset))
                     % working_set
             }
+            Distribution::Hotspot => {
+                let hot_set = (working_set / 100).max(1);
+                if self.random_bounded(100) < 80 {
+                    self.random_bounded(hot_set)
+                } else {
+                    self.random_bounded(working_set)
+                }
+            }
         }
     }
 
@@ -147,6 +159,7 @@ pub fn key_for_index(distribution: Distribution, key_size: usize, index: usize) 
         Distribution::SameLeafHeavy => (0x11, 0, 0x21),
         Distribution::DifferentLeafHeavy => (0x31, index as u64, 0x41),
         Distribution::Uniform => (0x51, (index % 128) as u64, 0x61),
+        Distribution::Hotspot => (0x51, (index % 128) as u64, 0x61),
     };
     let mut key = component_bytes(pk_tag, pk_value, pk_len);
     key.extend_from_slice(&component_bytes(sk_tag, index as u64, sk_len));
@@ -221,7 +234,10 @@ impl TraceHash {
         }
     }
 
-    pub fn push_transaction<'a>(&mut self, mutations: impl IntoIterator<Item = (&'a [u8], &'a [u8])>) {
+    pub fn push_transaction<'a>(
+        &mut self,
+        mutations: impl IntoIterator<Item = (&'a [u8], &'a [u8])>,
+    ) {
         self.transactions += 1;
         let mut width = 0u32;
         for (key, value) in mutations {

@@ -246,6 +246,32 @@ int crossdb_rocksdb_get(void* raw_handle, const uint8_t* key, size_t key_length,
   return 0;
 }
 
+int crossdb_rocksdb_query(void* raw_handle, const uint8_t* lower,
+                          const uint8_t* upper, size_t key_length,
+                          size_t value_length, size_t limit, uint8_t* keys_out,
+                          uint8_t* values_out) {
+  auto* handle = static_cast<Handle*>(raw_handle);
+  std::unique_ptr<rocksdb::Iterator> iterator(
+      handle->db->NewIterator(rocksdb::ReadOptions()));
+  const rocksdb::Slice lower_slice(reinterpret_cast<const char*>(lower), key_length);
+  const rocksdb::Slice upper_slice(reinterpret_cast<const char*>(upper), key_length);
+  size_t count = 0;
+  for (iterator->Seek(lower_slice); iterator->Valid() && count < limit;
+       iterator->Next()) {
+    if (iterator->key().compare(upper_slice) > 0) {
+      break;
+    }
+    if (iterator->key().size() != key_length ||
+        iterator->value().size() != value_length) {
+      return -1;
+    }
+    std::memcpy(keys_out + count * key_length, iterator->key().data(), key_length);
+    std::memcpy(values_out + count * value_length, iterator->value().data(), value_length);
+    ++count;
+  }
+  return iterator->status().ok() ? static_cast<int>(count) : -1;
+}
+
 uint64_t crossdb_rocksdb_count(void* raw_handle) {
   auto* handle = static_cast<Handle*>(raw_handle);
   std::unique_ptr<rocksdb::Iterator> iterator(

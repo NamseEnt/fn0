@@ -1,12 +1,12 @@
 #[path = "../../common/mod.rs"]
 mod common;
 
-use std::ffi::{c_char, c_void, CStr, CString};
+use std::ffi::{CStr, CString, c_char, c_void};
 use std::path::PathBuf;
 
 use common::driver::{self, Args, Attempt, Engine, EngineFactory};
 use common::workload::Mutation;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const BLOCK_CACHE_BYTES: u64 = 64 * 1024 * 1024;
 const ROCKSDB_TAG: &str = env!("CROSSDB_ROCKSDB_TAG");
@@ -35,12 +35,19 @@ unsafe extern "C" {
         value: *mut *mut c_char,
         value_length: *mut usize,
     ) -> i32;
+    fn crossdb_rocksdb_query(
+        handle: *mut c_void,
+        lower: *const u8,
+        upper: *const u8,
+        key_length: usize,
+        value_length: usize,
+        limit: usize,
+        keys_out: *mut u8,
+        values_out: *mut u8,
+    ) -> i32;
     fn crossdb_rocksdb_count(handle: *mut c_void) -> u64;
     fn crossdb_rocksdb_property(handle: *mut c_void, name: *const c_char) -> *mut c_char;
-    fn crossdb_rocksdb_map_property_json(
-        handle: *mut c_void,
-        name: *const c_char,
-    ) -> *mut c_char;
+    fn crossdb_rocksdb_map_property_json(handle: *mut c_void, name: *const c_char) -> *mut c_char;
     fn crossdb_rocksdb_events(handle: *mut c_void) -> *mut c_char;
     fn crossdb_rocksdb_options(handle: *mut c_void) -> *mut c_char;
     fn crossdb_monotonic_seconds() -> f64;
@@ -122,7 +129,10 @@ impl Engine for RocksEngine {
     type Writer = (Vec<u8>, Vec<u8>);
 
     fn open_writer(&self, _writer_id: usize) -> Self::Writer {
-        (Vec::with_capacity(16 * 16), Vec::with_capacity(16 * self.value_size))
+        (
+            Vec::with_capacity(16 * 16),
+            Vec::with_capacity(16 * self.value_size),
+        )
     }
 
     fn attempt(&self, writer: &mut Self::Writer, mutations: &[Mutation]) -> Attempt {
@@ -177,14 +187,43 @@ impl Engine for RocksEngine {
         };
         match status {
             0 => {
-                let bytes =
-                    unsafe { std::slice::from_raw_parts(value as *const u8, value_length) }.to_vec();
+                let bytes = unsafe { std::slice::from_raw_parts(value as *const u8, value_length) }
+                    .to_vec();
                 unsafe { crossdb_free(value) };
                 Some(bytes)
             }
             1 => None,
             _ => panic!("rocksdb get failed"),
         }
+    }
+
+    fn query(&self, _writer: &mut Self::Writer, primary_key: &[u8], limit: usize) -> Vec<Mutation> {
+        let mut lower = primary_key.to_vec();
+        lower.extend_from_slice(&[0; 8]);
+        let mut upper = primary_key.to_vec();
+        upper.extend_from_slice(&[u8::MAX; 8]);
+        let mut keys = vec![0; limit * 16];
+        let mut values = vec![0; limit * self.value_size];
+        let count = unsafe {
+            crossdb_rocksdb_query(
+                self.handle,
+                lower.as_ptr(),
+                upper.as_ptr(),
+                16,
+                self.value_size,
+                limit,
+                keys.as_mut_ptr(),
+                values.as_mut_ptr(),
+            )
+        };
+        assert!(count >= 0, "rocksdb range query failed");
+        (0..count as usize)
+            .map(|row_index| Mutation {
+                key: keys[row_index * 16..(row_index + 1) * 16].to_vec(),
+                value: values[row_index * self.value_size..(row_index + 1) * self.value_size]
+                    .to_vec(),
+            })
+            .collect()
     }
 
     fn count_rows(&self, _writer: &mut Self::Writer) -> u64 {

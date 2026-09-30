@@ -6,11 +6,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Barrier, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 use super::workload::{
-    key_for_index, seed_rows, splitmix64, writer_phase_seed, Distribution, LatencySamples,
-    Mutation, TraceHash, WorkloadConfig, WorkloadGenerator,
+    Distribution, LatencySamples, Mutation, TraceHash, WorkloadConfig, WorkloadGenerator,
+    component_bytes, key_for_index, seed_rows, splitmix64, writer_phase_seed,
 };
 
 pub const MAX_ATTEMPTS: u32 = 16;
@@ -18,6 +18,23 @@ pub const BACKOFF_BASE_MICROS: u64 = 100;
 pub const BACKOFF_CAP_MICROS: u64 = 10_000;
 pub const SEED_CHUNK_ROWS: usize = 1_000;
 pub const SEEDER_WRITER_ID: usize = usize::MAX;
+
+fn query_primary_key() -> Vec<u8> {
+    component_bytes(0x33, 0, 8)
+}
+
+fn query_rows(value_size: usize, limit: usize) -> Vec<Mutation> {
+    (0..limit.min(256))
+        .map(|index| {
+            let mut key = query_primary_key();
+            key.extend_from_slice(&component_bytes(0x43, index as u64, 8));
+            Mutation {
+                key,
+                value: vec![(index & 0xff) as u8; value_size],
+            }
+        })
+        .collect()
+}
 
 pub fn backoff_after(failed_attempts: u32) -> Duration {
     let shift = failed_attempts.saturating_sub(1).min(16);
@@ -34,6 +51,9 @@ pub enum Mode {
 #[derive(Clone, Debug)]
 pub struct Args {
     pub mode: Mode,
+    pub operation: String,
+    pub read_percent: u8,
+    pub read_limit: usize,
     pub writers: usize,
     pub width: usize,
     pub distribution: Distribution,
@@ -57,6 +77,9 @@ impl Args {
     pub fn parse() -> Self {
         let mut args = Self {
             mode: Mode::Bench,
+            operation: "write".to_owned(),
+            read_percent: 0,
+            read_limit: 16,
             writers: 16,
             width: 1,
             distribution: Distribution::Uniform,
@@ -89,6 +112,9 @@ impl Args {
                         other => panic!("unknown mode {other}"),
                     }
                 }
+                "--operation" => args.operation = value,
+                "--read-percent" => args.read_percent = value.parse().expect("read percent"),
+                "--read-limit" => args.read_limit = value.parse().expect("read limit"),
                 "--writers" => args.writers = value.parse().expect("writers"),
                 "--width" => args.width = value.parse().expect("width"),
                 "--distribution" => args.distribution = Distribution::parse(&value),
@@ -124,6 +150,12 @@ impl Args {
             }
         }
         assert_eq!(args.key_size, 16, "the shared workload uses 16-byte keys");
+        assert!(matches!(
+            args.operation.as_str(),
+            "write" | "get" | "query" | "mixed"
+        ));
+        assert!(args.read_percent <= 100);
+        assert!(args.read_limit > 0);
         args
     }
 
@@ -162,6 +194,7 @@ pub trait Engine: Sync {
     fn attempt(&self, writer: &mut Self::Writer, mutations: &[Mutation]) -> Attempt;
     fn seed(&self, writer: &mut Self::Writer, rows: &[Mutation]);
     fn read(&self, writer: &mut Self::Writer, key: &[u8]) -> Option<Vec<u8>>;
+    fn query(&self, writer: &mut Self::Writer, primary_key: &[u8], limit: usize) -> Vec<Mutation>;
     fn count_rows(&self, writer: &mut Self::Writer) -> u64;
     fn settings(&self, writer: &mut Self::Writer) -> Value;
     fn metrics(&self) -> Value;
@@ -197,9 +230,13 @@ struct PhaseStats {
     conflicts: u64,
     errors: u64,
     mutation_ops: u64,
+    read_operations: u64,
+    query_rows: u64,
     max_attempts_used: u32,
     committed_latency: LatencySamples,
     all_latency: LatencySamples,
+    read_latency: LatencySamples,
+    write_latency: LatencySamples,
     messages: BTreeMap<String, u64>,
     timeline: Vec<(u64, u64, bool)>,
 }
@@ -218,9 +255,13 @@ impl PhaseStats {
             conflicts: 0,
             errors: 0,
             mutation_ops: 0,
+            read_operations: 0,
+            query_rows: 0,
             max_attempts_used: 0,
             committed_latency: LatencySamples::with_seed(seed),
             all_latency: LatencySamples::with_seed(seed ^ 0x1111),
+            read_latency: LatencySamples::with_seed(seed ^ 0x2222),
+            write_latency: LatencySamples::with_seed(seed ^ 0x3333),
             messages: BTreeMap::new(),
             timeline: Vec::new(),
         }
@@ -238,9 +279,13 @@ impl PhaseStats {
         self.conflicts += other.conflicts;
         self.errors += other.errors;
         self.mutation_ops += other.mutation_ops;
+        self.read_operations += other.read_operations;
+        self.query_rows += other.query_rows;
         self.max_attempts_used = self.max_attempts_used.max(other.max_attempts_used);
         self.committed_latency.merge(other.committed_latency);
         self.all_latency.merge(other.all_latency);
+        self.read_latency.merge(other.read_latency);
+        self.write_latency.merge(other.write_latency);
         for (message, count) in other.messages {
             *self.messages.entry(message).or_default() += count;
         }
@@ -260,6 +305,8 @@ impl PhaseStats {
             "conflicts": self.conflicts,
             "errors": self.errors,
             "mutation_ops": self.mutation_ops,
+            "read_operations": self.read_operations,
+            "query_rows": self.query_rows,
             "max_attempts_used": self.max_attempts_used,
             "messages": self.messages,
         })
@@ -348,14 +395,73 @@ fn writer_thread<E: Engine>(
         let mut generator = WorkloadGenerator::new(args.workload(), phase_seed, writer_id);
         let mut stats = PhaseStats::new(phase_seed ^ writer_id as u64);
         let mut trace = TraceHash::new();
+        let mut operation_index = 0u64;
         while Instant::now() < deadline {
+            let started = Instant::now();
+            let choose_read = match args.operation.as_str() {
+                "get" | "query" => true,
+                "mixed" => {
+                    splitmix64(phase_seed ^ (writer_id as u64).rotate_left(17) ^ operation_index)
+                        % 100
+                        < u64::from(args.read_percent)
+                }
+                _ => false,
+            };
+            if choose_read {
+                let generated = generator.next_transaction();
+                let rows = if args.operation == "query" {
+                    Some(engine.query(&mut writer, &query_primary_key(), args.read_limit))
+                } else {
+                    engine.read(&mut writer, &generated[0].key).map(|value| {
+                        vec![Mutation {
+                            key: generated[0].key.clone(),
+                            value,
+                        }]
+                    })
+                };
+                let finished = Instant::now();
+                let elapsed = finished - started;
+                stats.attempted_transactions += 1;
+                stats.read_operations += 1;
+                let succeeded = rows.as_ref().is_some_and(|result| {
+                    if args.operation == "query" {
+                        !result.is_empty()
+                    } else {
+                        result
+                            .first()
+                            .is_some_and(|row| row.value.len() == args.value_size)
+                    }
+                });
+                if succeeded {
+                    stats.successful_transactions += 1;
+                    stats.query_rows += if args.operation == "query" {
+                        rows.as_ref().map_or(0, |result| result.len() as u64)
+                    } else {
+                        0
+                    };
+                    stats.committed_latency.push(elapsed);
+                } else {
+                    stats.failed_transactions += 1;
+                    stats.errors += 1;
+                }
+                stats.all_latency.push(elapsed);
+                stats.read_latency.push(elapsed);
+                if record_timeline && !warmup {
+                    stats.timeline.push((
+                        (finished - phase_start).as_nanos() as u64,
+                        elapsed.as_nanos() as u64,
+                        succeeded,
+                    ));
+                }
+                operation_index = operation_index.wrapping_add(1);
+                continue;
+            }
             let mutations = generator.next_transaction();
             trace.push_transaction(
                 mutations
                     .iter()
                     .map(|mutation| (mutation.key.as_slice(), mutation.value.as_slice())),
             );
-            let started = Instant::now();
             let outcome = execute_with_retry(engine, &mut writer, &mutations, &mut stats);
             let finished = Instant::now();
             let elapsed = finished - started;
@@ -366,14 +472,17 @@ fn writer_thread<E: Engine>(
                     stats.successful_transactions += 1;
                     stats.mutation_ops += mutations.len() as u64;
                     stats.committed_latency.push(elapsed);
+                    stats.write_latency.push(elapsed);
                     for mutation in &mutations {
                         report
                             .last_writes
                             .insert(mutation.key.clone(), mutation.value[0]);
                     }
                     if !warmup {
-                        report.last_committed =
-                            mutations.iter().map(|mutation| mutation.key.clone()).collect();
+                        report.last_committed = mutations
+                            .iter()
+                            .map(|mutation| mutation.key.clone())
+                            .collect();
                     }
                 }
                 Outcome::Abandoned => stats.abandoned_transactions += 1,
@@ -395,6 +504,7 @@ fn writer_thread<E: Engine>(
                     outcome == Outcome::Committed,
                 ));
             }
+            operation_index = operation_index.wrapping_add(1);
         }
         report.phases.push(PhaseReport {
             warmup,
@@ -418,11 +528,7 @@ pub fn process_cpu_ticks() -> Option<u64> {
 
 pub fn clock_ticks_per_second() -> u64 {
     let ticks = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
-    if ticks > 0 {
-        ticks as u64
-    } else {
-        100
-    }
+    if ticks > 0 { ticks as u64 } else { 100 }
 }
 
 pub fn status_kib(field: &str) -> Option<u64> {
@@ -534,8 +640,7 @@ fn window_summary(timeline: &mut [(u64, u64, bool)], window: Duration, wall: Dur
             if committed_latencies.is_empty() {
                 return 0.0;
             }
-            let index =
-                ((committed_latencies.len() - 1) as f64 * fraction).round() as usize;
+            let index = ((committed_latencies.len() - 1) as f64 * fraction).round() as usize;
             committed_latencies[index] as f64 / 1_000.0
         };
         let span_seconds = (end.min(wall.as_nanos() as u64).saturating_sub(start)) as f64 / 1e9;
@@ -659,7 +764,12 @@ fn run_phases<E: Engine>(engine: &E, args: &Args) -> RunOutcome {
             }
             _ => None,
         };
-        (reports, wall.max(wall_from_writers), cpu_seconds, metrics_before)
+        (
+            reports,
+            wall.max(wall_from_writers),
+            cpu_seconds,
+            metrics_before,
+        )
     });
     let mut measured = PhaseStats::new(args.seed ^ 0xabcd);
     let mut warmup = PhaseStats::new(args.seed ^ 0xabce);
@@ -721,7 +831,12 @@ fn verify<E: Engine>(engine: &E, args: &Args, reports: &[WriterReport]) -> Value
         .keys()
         .filter(|key| key_index(key) >= working_set && !candidates.contains_key(*key))
         .count() as u64;
-    let expected_rows_min = working_set + committed_new_keys;
+    let query_seed_rows = if matches!(args.operation.as_str(), "query" | "mixed") {
+        args.working_set.min(256) as u64
+    } else {
+        0
+    };
+    let expected_rows_min = working_set + query_seed_rows + committed_new_keys;
     let expected_rows_max = expected_rows_min + ambiguous_new_keys;
 
     let mut sampled: Vec<Vec<u8>> = sampled_working_set_indices(args)
@@ -835,9 +950,42 @@ fn stats_record(stats: &PhaseStats, wall: Duration) -> Value {
         "mutation_ops_per_second".into(),
         json!(stats.mutation_ops as f64 / seconds),
     );
-    object.insert("p50_us".into(), json!(stats.committed_latency.percentile_us(0.50)));
-    object.insert("p95_us".into(), json!(stats.committed_latency.percentile_us(0.95)));
-    object.insert("p99_us".into(), json!(stats.committed_latency.percentile_us(0.99)));
+    object.insert(
+        "read_operations_per_second".into(),
+        json!(stats.read_operations as f64 / seconds),
+    );
+    object.insert(
+        "query_rows_per_second".into(),
+        json!(stats.query_rows as f64 / seconds),
+    );
+    for (name, samples) in [
+        ("read", &stats.read_latency),
+        ("write", &stats.write_latency),
+    ] {
+        object.insert(format!("{name}_p50_us"), json!(samples.percentile_us(0.50)));
+        object.insert(format!("{name}_p95_us"), json!(samples.percentile_us(0.95)));
+        object.insert(format!("{name}_p99_us"), json!(samples.percentile_us(0.99)));
+    }
+    object.insert(
+        "read_operations_per_second".into(),
+        json!(stats.read_operations as f64 / seconds),
+    );
+    object.insert(
+        "query_rows_per_second".into(),
+        json!(stats.query_rows as f64 / seconds),
+    );
+    object.insert(
+        "p50_us".into(),
+        json!(stats.committed_latency.percentile_us(0.50)),
+    );
+    object.insert(
+        "p95_us".into(),
+        json!(stats.committed_latency.percentile_us(0.95)),
+    );
+    object.insert(
+        "p99_us".into(),
+        json!(stats.committed_latency.percentile_us(0.99)),
+    );
     object.insert(
         "all_outcomes_p50_us".into(),
         json!(stats.all_latency.percentile_us(0.50)),
@@ -875,12 +1023,20 @@ fn run_bench<F: EngineFactory>(args: &Args) {
         let settings = engine.settings(&mut seeder);
         let workload = args.workload();
         let rows: Vec<Mutation> = seed_rows(&workload).collect();
+        let mut seeded_rows = rows.len();
         let seed_started = Instant::now();
         for chunk in rows.chunks(SEED_CHUNK_ROWS) {
             engine.seed(&mut seeder, chunk);
         }
+        if matches!(args.operation.as_str(), "query" | "mixed") {
+            let rows = query_rows(args.value_size, args.working_set);
+            seeded_rows += rows.len();
+            for chunk in rows.chunks(SEED_CHUNK_ROWS) {
+                engine.seed(&mut seeder, chunk);
+            }
+        }
         let seed_elapsed = seed_started.elapsed();
-        json!({"effective": settings, "seed_rows": rows.len(), "seed_elapsed_s": seed_elapsed.as_secs_f64()})
+        json!({"effective": settings, "seed_rows": seeded_rows, "seed_elapsed_s": seed_elapsed.as_secs_f64()})
     };
     let rss_after_seed = status_kib("VmRSS:");
     let metrics_after_seed = engine.metrics();
@@ -904,6 +1060,9 @@ fn run_bench<F: EngineFactory>(args: &Args) {
         "sync_contract": "durable-return",
         "writers": args.writers,
         "transaction_width": args.width,
+        "operation": args.operation,
+        "read_percent": args.read_percent,
+        "read_limit": args.read_limit,
         "distribution": args.distribution.as_str(),
         "report_distribution": args.distribution.report_name(),
         "working_set": args.working_set,

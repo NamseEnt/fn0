@@ -6,11 +6,11 @@ use std::sync::Mutex;
 
 use common::driver::{self, Args, Attempt, Engine, EngineFactory, RetryKind};
 use common::workload::Mutation;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use turso::params::Params;
 use turso::{Builder, Connection, Database, Statement};
 
-const CACHE_SIZE_KIB: i64 = 32_768;
+const CACHE_SIZE_KIB: i64 = 65_536;
 const TURSO_TAG: &str = env!("CROSSDB_TURSO_TAG");
 const TURSO_COMMIT: &str = env!("CROSSDB_TURSO_COMMIT");
 
@@ -84,9 +84,7 @@ async fn execute_pragma(connection: &Connection, statement: &str) {
 fn classify(error: turso::Error) -> Attempt {
     match error {
         turso::Error::Busy(message) => Attempt::Retryable(RetryKind::Busy, message),
-        turso::Error::BusySnapshot(message) => {
-            Attempt::Retryable(RetryKind::BusySnapshot, message)
-        }
+        turso::Error::BusySnapshot(message) => Attempt::Retryable(RetryKind::BusySnapshot, message),
         turso::Error::Error(message) if message.to_ascii_lowercase().contains("conflict") => {
             Attempt::Retryable(RetryKind::Conflict, message)
         }
@@ -250,6 +248,44 @@ impl Engine for TursoEngine {
         })
     }
 
+    fn query(&self, writer: &mut TursoWriter, primary_key: &[u8], limit: usize) -> Vec<Mutation> {
+        let TursoWriter {
+            runtime,
+            connection,
+            ..
+        } = writer;
+        let mut lower = primary_key.to_vec();
+        lower.extend_from_slice(&[0; 8]);
+        let mut upper = primary_key.to_vec();
+        upper.extend_from_slice(&[u8::MAX; 8]);
+        runtime.block_on(async {
+            let mut rows = connection
+                .query(
+                    "SELECT k, v FROM kv WHERE k >= ?1 AND k <= ?2 ORDER BY k LIMIT ?3",
+                    Params::Positional(vec![
+                        turso::Value::Blob(lower),
+                        turso::Value::Blob(upper),
+                        turso::Value::Integer(limit as i64),
+                    ]),
+                )
+                .await
+                .expect("range query should run");
+            let mut result = Vec::new();
+            while let Some(row) = rows.next().await.expect("range query should step") {
+                let key = match row.get_value(0).expect("key column") {
+                    turso::Value::Blob(bytes) => bytes,
+                    other => panic!("unexpected key type {other:?}"),
+                };
+                let value = match row.get_value(1).expect("value column") {
+                    turso::Value::Blob(bytes) => bytes,
+                    other => panic!("unexpected value type {other:?}"),
+                };
+                result.push(Mutation { key, value });
+            }
+            result
+        })
+    }
+
     fn count_rows(&self, writer: &mut TursoWriter) -> u64 {
         let TursoWriter {
             runtime,
@@ -322,8 +358,11 @@ impl TursoFactory {
                 .expect("turso database should open");
             let connection = database.connect().expect("setup connection");
             if fresh {
-                execute_pragma(&connection, &format!("PRAGMA journal_mode = {}", journal.as_str()))
-                    .await;
+                execute_pragma(
+                    &connection,
+                    &format!("PRAGMA journal_mode = {}", journal.as_str()),
+                )
+                .await;
                 execute_pragma(&connection, "PRAGMA synchronous = FULL").await;
                 if journal == Journal::Mvcc {
                     let value = if group_commit { "on" } else { "off" };

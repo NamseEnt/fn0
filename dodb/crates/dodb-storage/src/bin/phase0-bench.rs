@@ -787,21 +787,27 @@ fn scenarios(args: &Args) -> Vec<Scenario> {
     if include(Suite::Mixed, Suite::Mixed) {
         let mixed_readers = args.readers.clone().unwrap_or_else(|| vec![16, 64]);
         let mixed_writers = args.writers.clone().unwrap_or_else(|| vec![16, 64]);
+        let mixed_distributions = args
+            .distributions
+            .clone()
+            .unwrap_or_else(|| vec![Distribution::Uniform]);
         for readers in &mixed_readers {
             for writers in &mixed_writers {
-                for mix in &mixes {
-                    output.push(Scenario {
-                        suite: Suite::Mixed,
-                        workload: "mixed",
-                        writers: *writers,
-                        readers: *readers,
-                        width: 1,
-                        distribution: Distribution::Uniform,
-                        read_kind: Some(ReadKind::Get),
-                        mix: Some(*mix),
-                        collection_delay: selected_delay,
-                        sync_delay: args.sync_delay,
-                    });
+                for distribution in &mixed_distributions {
+                    for mix in &mixes {
+                        output.push(Scenario {
+                            suite: Suite::Mixed,
+                            workload: "mixed",
+                            writers: *writers,
+                            readers: *readers,
+                            width: 1,
+                            distribution: *distribution,
+                            read_kind: Some(ReadKind::Get),
+                            mix: Some(*mix),
+                            collection_delay: selected_delay,
+                            sync_delay: args.sync_delay,
+                        });
+                    }
                 }
             }
         }
