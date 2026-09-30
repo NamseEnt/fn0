@@ -1,0 +1,51 @@
+{
+  "block_device": "sda",
+  "block_stats_after": {
+    "io_busy_ms": 786456,
+    "read_sectors": 5466412,
+    "written_sectors": 81824504
+  },
+  "block_stats_before": {
+    "io_busy_ms": 767632,
+    "read_sectors": 5466412,
+    "written_sectors": 81587359
+  },
+  "block_stats_delta": {
+    "io_busy_ms": 18824,
+    "read_sectors": 0,
+    "written_sectors": 237145
+  },
+  "command": [
+    "fio",
+    "--name=wal-like-fdatasync",
+    "--filename=/bench/btrfs/db/fsperf-working/fio.dat",
+    "--rw=randwrite",
+    "--bs=4k",
+    "--ioengine=psync",
+    "--iodepth=1",
+    "--direct=0",
+    "--size=268435456",
+    "--time_based=1",
+    "--runtime=20",
+    "--fdatasync=1",
+    "--group_reporting=1",
+    "--allow_file_create=0",
+    "--randrepeat=1",
+    "--randseed=20260930",
+    "--norandommap=1",
+    "--output-format=json",
+    "--output=/dev/shm/dodb-filesystem-performance/raw/xfs-fio-rand-rep3.json"
+  ],
+  "elapsed_ms": 20250.133676,
+  "ended_at": "2026-09-30T05:20:18.844745+00:00",
+  "exit_code": 0,
+  "filesystem": "xfs",
+  "kind": "fio-rand",
+  "log_path": "/dev/shm/dodb-filesystem-performance/raw/xfs-fio-rand-rep3.log",
+  "output_path": "/dev/shm/dodb-filesystem-performance/raw/xfs-fio-rand-rep3.json",
+  "repetition": 3,
+  "seed": null,
+  "started_at": "2026-09-30T05:19:58.594574+00:00",
+  "width": null,
+  "written_bytes": 121418240
+}

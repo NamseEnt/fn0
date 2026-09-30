@@ -1,0 +1,48 @@
+{
+  "block_device": "sda",
+  "block_stats_after": {
+    "io_busy_ms": 730124,
+    "read_sectors": 5466412,
+    "written_sectors": 80995773
+  },
+  "block_stats_before": {
+    "io_busy_ms": 711252,
+    "read_sectors": 5466412,
+    "written_sectors": 80748214
+  },
+  "block_stats_delta": {
+    "io_busy_ms": 18872,
+    "read_sectors": 0,
+    "written_sectors": 247559
+  },
+  "command": [
+    "fio",
+    "--name=wal-like-fdatasync",
+    "--filename=/bench/btrfs/db/fsperf-working/fio.dat",
+    "--rw=write",
+    "--bs=4k",
+    "--ioengine=psync",
+    "--iodepth=1",
+    "--direct=0",
+    "--size=268435456",
+    "--time_based=1",
+    "--runtime=20",
+    "--fdatasync=1",
+    "--group_reporting=1",
+    "--allow_file_create=0",
+    "--output-format=json",
+    "--output=/dev/shm/dodb-filesystem-performance/raw/xfs-fio-seq-rep5.json"
+  ],
+  "elapsed_ms": 20254.846836,
+  "ended_at": "2026-09-30T05:19:17.949579+00:00",
+  "exit_code": 0,
+  "filesystem": "xfs",
+  "kind": "fio-seq",
+  "log_path": "/dev/shm/dodb-filesystem-performance/raw/xfs-fio-seq-rep5.log",
+  "output_path": "/dev/shm/dodb-filesystem-performance/raw/xfs-fio-seq-rep5.json",
+  "repetition": 5,
+  "seed": null,
+  "started_at": "2026-09-30T05:18:57.694697+00:00",
+  "width": null,
+  "written_bytes": 126750208
+}

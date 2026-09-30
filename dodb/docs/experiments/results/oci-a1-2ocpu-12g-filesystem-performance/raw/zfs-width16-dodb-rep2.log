@@ -1,0 +1,5 @@
+phase0-bench engine=parallel-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /dev/shm/dodb-filesystem-performance/raw/zfs-width16-dodb-rep2.jsonl
+scenario                                                       repetition throughput summary
+100%-write-64w-0r-width16-uniform                          rep=0 tx/s=     4282 mut/s=    68506 read/s=        0 agg/s=     4282 p50= 16261.6us p95= 21870.9us p99= 27671.4us groups=  535 avg_group=40.12
+completed 1 scenarios x 1 repetitions

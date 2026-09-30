@@ -1,0 +1,23 @@
+{
+  "availability_domain": "IsRG:AP-OSAKA-1-AD-1",
+  "compartment_id": "ocid1.tenancy.oc1..aaaaaaaa7p7f5frocdgdqcctydyrrqv3kvr3jxmq6sxcr62fa5mcrqvtcy5a",
+  "display_name": "instance-20260923-1013",
+  "instance_id": "ocid1.instance.oc1.ap-osaka-1.anvwsljrrfkd6xqcuiozrid2bkb7uh6ba3p7zkwkip6kcagbwgd5cp7os2jq",
+  "lifecycle_state": "RUNNING",
+  "shape": "VM.Standard.A1.Flex",
+  "shape_config": {
+    "baseline-ocpu-utilization": null,
+    "gpu-description": null,
+    "gpus": 0,
+    "local-disk-description": null,
+    "local-disks": 0,
+    "local-disks-total-size-in-gbs": null,
+    "max-vnic-attachments": 2,
+    "memory-in-gbs": 12.0,
+    "networking-bandwidth-in-gbps": 2.0,
+    "ocpus": 2.0,
+    "processor-description": "3.0 GHz Ampere® Altra™",
+    "resource-management": null,
+    "vcpus": 2
+  }
+}

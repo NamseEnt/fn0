@@ -1,0 +1,48 @@
+{
+  "block_device": "sda",
+  "block_stats_after": {
+    "io_busy_ms": 182316,
+    "read_sectors": 4853483,
+    "written_sectors": 25661915
+  },
+  "block_stats_before": {
+    "io_busy_ms": 164272,
+    "read_sectors": 4853483,
+    "written_sectors": 23250001
+  },
+  "block_stats_delta": {
+    "io_busy_ms": 18044,
+    "read_sectors": 0,
+    "written_sectors": 2411914
+  },
+  "command": [
+    "fio",
+    "--name=wal-like-fdatasync",
+    "--filename=/bench/btrfs/db/fsperf-working/fio.dat",
+    "--rw=write",
+    "--bs=4k",
+    "--ioengine=psync",
+    "--iodepth=1",
+    "--direct=0",
+    "--size=268435456",
+    "--time_based=1",
+    "--runtime=20",
+    "--fdatasync=1",
+    "--group_reporting=1",
+    "--allow_file_create=0",
+    "--output-format=json",
+    "--output=/dev/shm/dodb-filesystem-performance/raw/btrfs-pre-fio-seq-rep3.json"
+  ],
+  "elapsed_ms": 20256.420744,
+  "ended_at": "2026-09-30T04:59:08.236421+00:00",
+  "exit_code": 0,
+  "filesystem": "btrfs-pre",
+  "kind": "fio-seq",
+  "log_path": "/dev/shm/dodb-filesystem-performance/raw/btrfs-pre-fio-seq-rep3.log",
+  "output_path": "/dev/shm/dodb-filesystem-performance/raw/btrfs-pre-fio-seq-rep3.json",
+  "repetition": 3,
+  "seed": null,
+  "started_at": "2026-09-30T04:58:47.979970+00:00",
+  "width": null,
+  "written_bytes": 1234899968
+}

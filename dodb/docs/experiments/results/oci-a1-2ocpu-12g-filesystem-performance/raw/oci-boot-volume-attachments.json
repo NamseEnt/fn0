@@ -1,0 +1,7 @@
+[
+  {
+    "boot_volume_id": "ocid1.bootvolume.oc1.ap-osaka-1.abvwsljrxzh3px7kxsz7w4jzqiqaytbke42huk7rvadeu6y3r4mynxlr3aiq",
+    "lifecycle_state": "ATTACHED",
+    "time_created": "2026-09-23T01:46:31.867000+00:00"
+  }
+]

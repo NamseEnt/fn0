@@ -1,0 +1,282 @@
+{
+  "fastest_by_metric": [
+    {
+      "metric": "fio fdatasync IOPS",
+      "fastest_filesystem": "XFS",
+      "fastest_median": 1345.182741,
+      "runner_up_filesystem": "ZFS",
+      "runner_up_median": 1275.636218,
+      "median_gap": 69.54652299999998,
+      "combined_within_filesystem_sd": 213.0888058586592,
+      "gap_exceeds_sd": false,
+      "unit": "IOPS"
+    },
+    {
+      "metric": "fio fdatasync throughput",
+      "fastest_filesystem": "XFS",
+      "fastest_median": 5.509868,
+      "runner_up_filesystem": "ZFS",
+      "runner_up_median": 5.225005,
+      "median_gap": 0.28486299999999964,
+      "combined_within_filesystem_sd": 0.8728116545982302,
+      "gap_exceeds_sd": false,
+      "unit": "MB/s"
+    },
+    {
+      "metric": "fio fdatasync mean",
+      "fastest_filesystem": "XFS",
+      "fastest_median": 0.731726581936,
+      "runner_up_filesystem": "ZFS",
+      "runner_up_median": 0.76482439496,
+      "median_gap": 0.033097813023999945,
+      "combined_within_filesystem_sd": 0.18882289893617454,
+      "gap_exceeds_sd": false,
+      "unit": "ms"
+    },
+    {
+      "metric": "fio fdatasync p50",
+      "fastest_filesystem": "XFS",
+      "fastest_median": 0.651264,
+      "runner_up_filesystem": "ext4",
+      "runner_up_median": 0.67584,
+      "median_gap": 0.024576000000000042,
+      "combined_within_filesystem_sd": 0.4589348207142273,
+      "gap_exceeds_sd": false,
+      "unit": "ms"
+    },
+    {
+      "metric": "fio fdatasync p95",
+      "fastest_filesystem": "ZFS",
+      "fastest_median": 1.04448,
+      "runner_up_filesystem": "XFS",
+      "runner_up_median": 1.335296,
+      "median_gap": 0.29081599999999996,
+      "combined_within_filesystem_sd": 0.19438746033630872,
+      "gap_exceeds_sd": true,
+      "unit": "ms"
+    },
+    {
+      "metric": "fio fdatasync p99",
+      "fastest_filesystem": "ZFS",
+      "fastest_median": 1.400832,
+      "runner_up_filesystem": "XFS",
+      "runner_up_median": 1.564672,
+      "median_gap": 0.16383999999999999,
+      "combined_within_filesystem_sd": 0.13878128104323004,
+      "gap_exceeds_sd": true,
+      "unit": "ms"
+    },
+    {
+      "metric": "4 KiB overwrite IOPS",
+      "fastest_filesystem": "XFS",
+      "fastest_median": 1438.178091,
+      "runner_up_filesystem": "ext4",
+      "runner_up_median": 1344.882756,
+      "median_gap": 93.29533500000002,
+      "combined_within_filesystem_sd": 270.5545050946722,
+      "gap_exceeds_sd": false,
+      "unit": "IOPS"
+    },
+    {
+      "metric": "4 KiB overwrite write p50",
+      "fastest_filesystem": "XFS",
+      "fastest_median": 0.00864,
+      "runner_up_filesystem": "ext4",
+      "runner_up_median": 0.008896,
+      "median_gap": 0.0002559999999999993,
+      "combined_within_filesystem_sd": 0.0007016688677716862,
+      "gap_exceeds_sd": false,
+      "unit": "ms"
+    },
+    {
+      "metric": "4 KiB overwrite write p95",
+      "fastest_filesystem": "ext4",
+      "fastest_median": 0.014528,
+      "runner_up_filesystem": "XFS",
+      "runner_up_median": 0.015168,
+      "median_gap": 0.0006399999999999999,
+      "combined_within_filesystem_sd": 0.002551385505955539,
+      "gap_exceeds_sd": false,
+      "unit": "ms"
+    },
+    {
+      "metric": "4 KiB overwrite write p99",
+      "fastest_filesystem": "XFS",
+      "fastest_median": 0.018816,
+      "runner_up_filesystem": "ext4",
+      "runner_up_median": 0.0224,
+      "median_gap": 0.0035840000000000004,
+      "combined_within_filesystem_sd": 0.0020311305226400392,
+      "gap_exceeds_sd": true,
+      "unit": "ms"
+    },
+    {
+      "metric": "dodb width1 throughput",
+      "fastest_filesystem": "ZFS",
+      "fastest_median": 23344.143226,
+      "runner_up_filesystem": "XFS",
+      "runner_up_median": 16481.526448,
+      "median_gap": 6862.616778,
+      "combined_within_filesystem_sd": 285.4445299796702,
+      "gap_exceeds_sd": true,
+      "unit": "tx/s"
+    },
+    {
+      "metric": "dodb width1 p50",
+      "fastest_filesystem": "ZFS",
+      "fastest_median": 2819.904,
+      "runner_up_filesystem": "XFS",
+      "runner_up_median": 3819.553,
+      "median_gap": 999.6489999999999,
+      "combined_within_filesystem_sd": 52.30114607013883,
+      "gap_exceeds_sd": true,
+      "unit": "us"
+    },
+    {
+      "metric": "dodb width1 p95",
+      "fastest_filesystem": "ZFS",
+      "fastest_median": 3375.668,
+      "runner_up_filesystem": "XFS",
+      "runner_up_median": 4731.481,
+      "median_gap": 1355.8129999999996,
+      "combined_within_filesystem_sd": 60.17213126065921,
+      "gap_exceeds_sd": true,
+      "unit": "us"
+    },
+    {
+      "metric": "dodb width1 p99",
+      "fastest_filesystem": "ZFS",
+      "fastest_median": 4915.122,
+      "runner_up_filesystem": "XFS",
+      "runner_up_median": 5770.529,
+      "median_gap": 855.4070000000002,
+      "combined_within_filesystem_sd": 199.71465075589725,
+      "gap_exceeds_sd": true,
+      "unit": "us"
+    },
+    {
+      "metric": "dodb width16 throughput",
+      "fastest_filesystem": "XFS",
+      "fastest_median": 4949.427088,
+      "runner_up_filesystem": "ZFS",
+      "runner_up_median": 4517.32421,
+      "median_gap": 432.1028780000006,
+      "combined_within_filesystem_sd": 125.69385128959226,
+      "gap_exceeds_sd": true,
+      "unit": "tx/s"
+    },
+    {
+      "metric": "dodb width16 p50",
+      "fastest_filesystem": "XFS",
+      "fastest_median": 14938.488,
+      "runner_up_filesystem": "ZFS",
+      "runner_up_median": 15547.053,
+      "median_gap": 608.5650000000005,
+      "combined_within_filesystem_sd": 332.553875576575,
+      "gap_exceeds_sd": true,
+      "unit": "us"
+    },
+    {
+      "metric": "dodb width16 p95",
+      "fastest_filesystem": "XFS",
+      "fastest_median": 17573.79,
+      "runner_up_filesystem": "ext4",
+      "runner_up_median": 18716.76,
+      "median_gap": 1142.9699999999975,
+      "combined_within_filesystem_sd": 754.3371932314485,
+      "gap_exceeds_sd": true,
+      "unit": "us"
+    },
+    {
+      "metric": "dodb width16 p99",
+      "fastest_filesystem": "XFS",
+      "fastest_median": 20046.092,
+      "runner_up_filesystem": "ext4",
+      "runner_up_median": 22387.912,
+      "median_gap": 2341.8199999999997,
+      "combined_within_filesystem_sd": 1499.9904292227836,
+      "gap_exceeds_sd": true,
+      "unit": "us"
+    }
+  ],
+  "slowest_metric_counts": {
+    "ext4": 0,
+    "XFS": 0,
+    "Btrfs": 16,
+    "ZFS": 2
+  },
+  "slowest_by_metric": [
+    {
+      "metric": "fio fdatasync IOPS",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "fio fdatasync throughput",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "fio fdatasync mean",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "fio fdatasync p50",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "fio fdatasync p95",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "fio fdatasync p99",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "4 KiB overwrite IOPS",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "4 KiB overwrite write p50",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "4 KiB overwrite write p95",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "4 KiB overwrite write p99",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "dodb width1 throughput",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "dodb width1 p50",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "dodb width1 p95",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "dodb width1 p99",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "dodb width16 throughput",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "dodb width16 p50",
+      "slowest_filesystem": "Btrfs"
+    },
+    {
+      "metric": "dodb width16 p95",
+      "slowest_filesystem": "ZFS"
+    },
+    {
+      "metric": "dodb width16 p99",
+      "slowest_filesystem": "ZFS"
+    }
+  ]
+}

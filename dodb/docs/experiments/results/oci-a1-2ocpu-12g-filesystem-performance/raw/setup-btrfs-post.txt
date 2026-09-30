@@ -1,0 +1,104 @@
+btrfs-progs v6.12 
+See https://btrfs.readthedocs.io for more information.
+
+Performing full device TRIM /dev/sda4 (153.40GiB) ...
+NOTE: several default settings have changed in version 5.15, please make sure
+      this does not affect your deployments:
+      - DUP for metadata (-m dup)
+      - enabled no-holes (-O no-holes)
+      - enabled free-space-tree (-R free-space-tree)
+
+Label:              dodbbench
+UUID:               0db0f499-b1eb-4572-aece-fbb019f8b7d6
+Node size:          16384
+Sector size:        4096	(CPU page size: 4096)
+Filesystem size:    153.40GiB
+Block group profiles:
+  Data:             single            8.00MiB
+  Metadata:         DUP               1.00GiB
+  System:           DUP               8.00MiB
+SSD detected:       no
+Zoned device:       no
+Features:           extref, skinny-metadata, no-holes, free-space-tree
+Checksum:           crc32c
+Number of devices:  1
+Devices:
+   ID        SIZE  PATH     
+    1   153.40GiB  /dev/sda4
+
+UUID=0db0f499-b1eb-4572-aece-fbb019f8b7d6 /bench/btrfs/db btrfs defaults,noatime 0 0
+TARGET          SOURCE    FSTYPE OPTIONS
+/bench/btrfs/db /dev/sda4 btrfs  rw,noatime,seclabel,discard=async,space_cache=v2,subvolid=5,subvol=/
+NAME               FSTYPE      FSVER    LABEL     UUID                                   FSAVAIL FSUSE% MOUNTPOINTS
+sda                                                                                                     
+├─sda1             vfat        FAT16              7049-BB0F                                91.9M     8% /boot/efi
+├─sda2             xfs                            88d3ee9a-b987-45cc-a3ce-75aebba9bccd      1.5G    20% /boot
+├─sda3             LVM2_member LVM2 001           rY0mAV-gwvu-O1b3-CPU8-24It-03qY-hM3O1m                
+│ ├─ocivolume-root xfs                            e88e4336-832e-412f-a155-50bf9bd7451b    653.6M    98% /
+│ └─ocivolume-oled xfs                            2ca3994a-8c94-41cb-9f1c-16a43132bfde     14.7G     2% /var/oled
+└─sda4             btrfs                dodbbench 0db0f499-b1eb-4572-aece-fbb019f8b7d6    151.1G     0% /bench/btrfs/db
+/dev/sda4: LABEL="dodbbench" UUID="0db0f499-b1eb-4572-aece-fbb019f8b7d6" UUID_SUB="beab8953-32c7-43d5-b55b-87f4317b3952" TYPE="btrfs" PARTLABEL="dodb-zfs" PARTUUID="83f10ca6-016c-4894-85a0-0b67fadf20aa"
+Overall:
+    Device size:		 153.40GiB
+    Device allocated:		   3.02GiB
+    Device unallocated:		 150.38GiB
+    Device missing:		     0.00B
+    Device slack:		  16.00EiB
+    Used:			 256.28MiB
+    Free (estimated):		 151.13GiB	(min: 75.95GiB)
+    Free (statfs, df):		 151.13GiB
+    Data ratio:			      1.00
+    Metadata ratio:		      2.00
+    Global reserve:		   5.50MiB	(used: 0.00B)
+    Multiple profiles:		        no
+
+Data,single: Size:1.01GiB, Used:256.00MiB (24.81%)
+
+Metadata,DUP: Size:1.00GiB, Used:128.00KiB (0.01%)
+
+System,DUP: Size:8.00MiB, Used:16.00KiB (0.20%)
+
+---------------------- /bench/btrfs/db/fsperf-working
+---------------------- /bench/btrfs/db/fsperf-working/fio.dat
+#
+# /etc/fstab
+# Created by anaconda on Thu Jul  9 07:00:28 2026
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk/'.
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info.
+#
+# After editing this file, run 'systemctl daemon-reload' to update systemd
+# units generated from this file.
+#
+/dev/mapper/ocivolume-root /                       xfs     defaults        0 0
+UUID=88d3ee9a-b987-45cc-a3ce-75aebba9bccd /boot                   xfs     defaults        0 0
+UUID=7049-BB0F          /boot/efi               vfat    defaults,uid=0,gid=0,umask=077,shortname=winnt 0 2
+/dev/mapper/ocivolume-oled /var/oled               xfs     defaults        0 0
+tmpfs                   /dev/shm                tmpfs   defaults,nodev,nosuid,noexec      0 0
+######################################
+## ORACLE CLOUD INFRASTRUCTURE CUSTOMERS
+##
+## If you are adding an iSCSI remote block volume to this file you MUST
+## include the '_netdev' mount option or your instance will become
+## unavailable after the next reboot.
+## SCSI device names are not stable across reboots; please use the device UUID instead of /dev path.
+##
+## Example:
+## UUID="94c5aade-8bb1-4d55-ad0c-388bb8aa716a"   /data1    xfs       defaults,noatime,_netdev      0      2
+##
+## More information:
+## https://docs.us-phoenix-1.oraclecloud.com/Content/Block/Tasks/connectingtoavolume.htm
+/.swapfile	none	swap	sw	0	0
+UUID=0db0f499-b1eb-4572-aece-fbb019f8b7d6 /bench/btrfs/db btrfs defaults,noatime 0 0
+label: gpt
+label-id: DA43F94F-6C02-4ECE-B6E2-9B7D31FB591A
+device: /dev/sda
+unit: sectors
+first-lba: 34
+last-lba: 419430366
+sector-size: 512
+
+/dev/sda1 : start=        2048, size=      204800, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, uuid=12F9B35F-A9D4-4E97-8B1D-E34D65EF3A10, name="EFI System Partition"
+/dev/sda2 : start=      206848, size=     4194304, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, uuid=B2E7ECCF-EABB-4934-A8DD-F7279F5FF6C6
+/dev/sda3 : start=     4401152, size=    93325312, type=E6D6D379-F507-44C2-A23C-238F2A3DF928, uuid=3D4B764E-19C5-4E3D-999A-1782B23F522A
+/dev/sda4 : start=    97726464, size=   321703903, type=6A898CC3-1DD2-11B2-99A6-080020736631, uuid=83F10CA6-016C-4894-85A0-0B67FADF20AA, name="dodb-zfs"

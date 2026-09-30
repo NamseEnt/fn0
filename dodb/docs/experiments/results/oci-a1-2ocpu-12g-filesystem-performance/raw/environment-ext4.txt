@@ -1,0 +1,147 @@
+2026-09-30T05:16:32,752811976+00:00
+instance-20260923-1013
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+Architecture:                            aarch64
+CPU op-mode(s):                          32-bit, 64-bit
+Byte Order:                              Little Endian
+CPU(s):                                  2
+On-line CPU(s) list:                     0,1
+Vendor ID:                               ARM
+Model name:                              Neoverse-N1
+Model:                                   1
+Thread(s) per core:                      1
+Core(s) per socket:                      2
+Socket(s):                               1
+Stepping:                                r3p1
+BogoMIPS:                                50.00
+Flags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0,1
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; CSV2, BHB
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+               total        used        free      shared  buff/cache   available
+Mem:     11427577856   850984960  8788484096    60010496  2079051776 10576592896
+Swap:     4294963200           0  4294963200
+NAME               FSTYPE      FSVER    LABEL     UUID                                   FSAVAIL FSUSE% MOUNTPOINTS
+sda                                                                                                     
+├─sda1             vfat        FAT16              7049-BB0F                                91.9M     8% /boot/efi
+├─sda2             xfs                            88d3ee9a-b987-45cc-a3ce-75aebba9bccd      1.5G    20% /boot
+├─sda3             LVM2_member LVM2 001           rY0mAV-gwvu-O1b3-CPU8-24It-03qY-hM3O1m                
+│ ├─ocivolume-root xfs                            e88e4336-832e-412f-a155-50bf9bd7451b    654.4M    98% /
+│ └─ocivolume-oled xfs                            2ca3994a-8c94-41cb-9f1c-16a43132bfde     14.7G     2% /var/oled
+└─sda4             ext4        1.0      dodbbench f68009c0-2d4a-4144-98df-3b27f9066595      142G     0% /bench/btrfs/db
+TARGET          SOURCE    FSTYPE OPTIONS
+/bench/btrfs/db /dev/sda4 ext4   rw,noatime,seclabel,stripe=256
+/dev/sda4: LABEL="dodbbench" UUID="f68009c0-2d4a-4144-98df-3b27f9066595" TYPE="ext4" PARTLABEL="dodb-zfs" PARTUUID="83f10ca6-016c-4894-85a0-0b67fadf20aa"
+/dev/mapper/ocivolume-oled: UUID="2ca3994a-8c94-41cb-9f1c-16a43132bfde" TYPE="xfs"
+/dev/mapper/ocivolume-root: UUID="e88e4336-832e-412f-a155-50bf9bd7451b" TYPE="xfs"
+/dev/sda2: UUID="88d3ee9a-b987-45cc-a3ce-75aebba9bccd" TYPE="xfs" PARTUUID="b2e7eccf-eabb-4934-a8dd-f7279f5ff6c6"
+/dev/sda3: UUID="rY0mAV-gwvu-O1b3-CPU8-24It-03qY-hM3O1m" TYPE="LVM2_member" PARTUUID="3d4b764e-19c5-4e3d-999a-1782b23f522a"
+/dev/sda1: SEC_TYPE="msdos" UUID="7049-BB0F" TYPE="vfat" PARTLABEL="EFI System Partition" PARTUUID="12f9b35f-a9d4-4e97-8b1d-e34d65ef3a10"
+#
+# /etc/fstab
+# Created by anaconda on Thu Jul  9 07:00:28 2026
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk/'.
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info.
+#
+# After editing this file, run 'systemctl daemon-reload' to update systemd
+# units generated from this file.
+#
+/dev/mapper/ocivolume-root /                       xfs     defaults        0 0
+UUID=88d3ee9a-b987-45cc-a3ce-75aebba9bccd /boot                   xfs     defaults        0 0
+UUID=7049-BB0F          /boot/efi               vfat    defaults,uid=0,gid=0,umask=077,shortname=winnt 0 2
+/dev/mapper/ocivolume-oled /var/oled               xfs     defaults        0 0
+tmpfs                   /dev/shm                tmpfs   defaults,nodev,nosuid,noexec      0 0
+######################################
+## ORACLE CLOUD INFRASTRUCTURE CUSTOMERS
+##
+## If you are adding an iSCSI remote block volume to this file you MUST
+## include the '_netdev' mount option or your instance will become
+## unavailable after the next reboot.
+## SCSI device names are not stable across reboots; please use the device UUID instead of /dev path.
+##
+## Example:
+## UUID="94c5aade-8bb1-4d55-ad0c-388bb8aa716a"   /data1    xfs       defaults,noatime,_netdev      0      2
+##
+## More information:
+## https://docs.us-phoenix-1.oraclecloud.com/Content/Block/Tasks/connectingtoavolume.htm
+/.swapfile	none	swap	sw	0	0
+label: gpt
+label-id: DA43F94F-6C02-4ECE-B6E2-9B7D31FB591A
+device: /dev/sda
+unit: sectors
+first-lba: 34
+last-lba: 419430366
+sector-size: 512
+
+/dev/sda1 : start=        2048, size=      204800, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, uuid=12F9B35F-A9D4-4E97-8B1D-E34D65EF3A10, name="EFI System Partition"
+/dev/sda2 : start=      206848, size=     4194304, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, uuid=B2E7ECCF-EABB-4934-A8DD-F7279F5FF6C6
+/dev/sda3 : start=     4401152, size=    93325312, type=E6D6D379-F507-44C2-A23C-238F2A3DF928, uuid=3D4B764E-19C5-4E3D-999A-1782B23F522A
+/dev/sda4 : start=    97726464, size=   321703903, type=6A898CC3-1DD2-11B2-99A6-080020736631, uuid=83F10CA6-016C-4894-85A0-0B67FADF20AA, name="dodb-zfs"
+tune2fs 1.47.1 (20-May-2024)
+Filesystem volume name:   dodbbench
+Last mounted on:          /bench/btrfs/db
+Filesystem UUID:          f68009c0-2d4a-4144-98df-3b27f9066595
+Filesystem magic number:  0xEF53
+Filesystem revision #:    1 (dynamic)
+Filesystem features:      has_journal ext_attr resize_inode dir_index filetype needs_recovery extent 64bit flex_bg sparse_super large_file huge_file dir_nlink extra_isize metadata_csum
+Filesystem flags:         unsigned_directory_hash 
+Default mount options:    user_xattr acl
+Filesystem state:         clean
+Errors behavior:          Continue
+Filesystem OS type:       Linux
+Inode count:              10059776
+Block count:              40212987
+Reserved block count:     2010649
+Overhead clusters:        909011
+Free blocks:              39303969
+Free inodes:              10059765
+First block:              0
+Block size:               4096
+Fragment size:            4096
+Group descriptor size:    64
+Reserved GDT blocks:      1024
+Blocks per group:         32768
+Fragments per group:      32768
+Inodes per group:         8192
+Inode blocks per group:   512
+RAID stripe width:        256
+Flex block group size:    16
+Filesystem created:       Wed Sep 30 05:10:31 2026
+Last mount time:          Wed Sep 30 05:10:40 2026
+Last write time:          Wed Sep 30 05:10:40 2026
+Mount count:              1
+Maximum mount count:      -1
+Last checked:             Wed Sep 30 05:10:31 2026
+Check interval:           0 (<none>)
+Lifetime writes:          4518 kB
+Reserved blocks uid:      0 (user root)
+Reserved blocks gid:      0 (group root)
+First inode:              11
+Inode size:               256
+Required extra isize:     32
+Desired extra isize:      32
+Journal inode:            8
+Default directory hash:   half_md4
+Directory Hash Seed:      e4f080d3-2d32-4923-ae40-fe5e09ef230f
+Journal backup:           inode blocks
+Checksum type:            crc32c
+Checksum:                 0xe8662cd6
+fio-3.35
+765f6b3b33f7a85dfaebdeb5582eb10c64ad6a3222cf354146fc8fc13fe08a4e  /home/opc/phase0-bench-filesystem-matrix
