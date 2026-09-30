@@ -23,7 +23,7 @@ results = arguments.results
 raw = results / "raw"
 raw.mkdir(parents=True, exist_ok=True)
 order_path = results / "run-order.jsonl"
-data_root = pathlib.Path("/bench/zfs/db")
+data_root = pathlib.Path(os.environ.get("BENCH_DATA_ROOT", "/bench/zfs/db"))
 phase0_binary = pathlib.Path(os.environ.get("PHASE0_BINARY", "/tmp/dodb-product-target/release/phase0-bench"))
 sqlite_binary = pathlib.Path(os.environ.get("SQLITE_BINARY", "/tmp/sqlite-product-target/release/sqlite-bench"))
 turso_binary = pathlib.Path(os.environ.get("TURSO_BINARY", "/tmp/turso-product-target/release/turso-bench"))
