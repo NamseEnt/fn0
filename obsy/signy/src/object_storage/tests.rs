@@ -20,6 +20,206 @@
         }
     }
 
+    async fn retire_incomplete_log_part(
+        storage: &ObjectStorage,
+        parts_root: &Path,
+        line: &str,
+    ) -> Vec<Part> {
+        let parts = part::flush_rows(vec![row(line)], parts_root, 100).unwrap();
+        let manifest = storage.publish(&parts, &[]).await.unwrap();
+        storage
+            .evict_cache(parts_root, 0, std::slice::from_ref(&parts[0].dir))
+            .unwrap();
+        storage
+            .publish(&[], &[manifest.parts[0].id.clone()])
+            .await
+            .unwrap();
+        storage.delete_part_objects(&manifest.parts).await.unwrap();
+        parts
+    }
+
+    #[tokio::test]
+    async fn log_reconciliation_quarantines_a_retired_incomplete_cache_shell() {
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("log-retired-cache-shell");
+        let parts_root = root.join("parts");
+        let parts = retire_incomplete_log_part(&storage, &parts_root, "retired log").await;
+        write_upload_marker(&parts[0]).unwrap();
+
+        let reconciled = storage.reconcile_local_cache(&parts_root).await.unwrap();
+        let quarantine = root
+            .join("quarantine")
+            .join(chrono::Utc::now().format("%Y%m%d").to_string())
+            .join("parts")
+            .join(&parts[0].meta.partition)
+            .join(&parts[0].meta.id);
+
+        assert!(reconciled.parts.is_empty());
+        assert!(!parts[0].dir.exists());
+        assert!(quarantine.join(part::META_FILE).is_file());
+        assert!(quarantine.join(part::INDEX_FILE).is_file());
+        assert!(quarantine.join(UPLOAD_MARKER_FILE).is_file());
+        assert!(!quarantine.join(part::DATA_FILE).exists());
+        assert!(storage.load_manifest().await.unwrap().parts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn log_reconciliation_preserves_incomplete_local_only_data_before_manifest_exists() {
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("log-local-only-incomplete");
+        let parts_root = root.join("parts");
+        let parts = part::flush_rows(vec![row("local-only log")], &parts_root, 100).unwrap();
+        std::fs::remove_file(parts[0].data_path()).unwrap();
+
+        let error = storage.reconcile_local_cache(&parts_root).await.unwrap_err();
+
+        assert!(error.contains("cannot be proven retired"));
+        assert!(parts[0].dir.exists());
+        assert!(!root.join("quarantine").exists());
+        assert!(storage.load_manifest().await.unwrap().parts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn log_reconciliation_preserves_a_retired_cache_with_complete_remote_objects() {
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("log-retired-cache-complete-objects");
+        let parts_root = root.join("parts");
+        let parts = part::flush_rows(vec![row("retired log")], &parts_root, 100).unwrap();
+        let manifest = storage.publish(&parts, &[]).await.unwrap();
+        let descriptor = manifest.parts[0].clone();
+        let files = PART_FILES
+            .iter()
+            .map(|file| (*file, std::fs::read(parts[0].dir.join(file)).unwrap()))
+            .collect::<Vec<_>>();
+        storage
+            .evict_cache(&parts_root, 0, std::slice::from_ref(&parts[0].dir))
+            .unwrap();
+        storage
+            .publish(&[], &[manifest.parts[0].id.clone()])
+            .await
+            .unwrap();
+        storage.delete_part_objects(&manifest.parts).await.unwrap();
+        for (file, bytes) in &files {
+            storage
+                .store
+                .put_opts(
+                    &storage.part_path(&descriptor, file),
+                    bytes.clone().into(),
+                    PutOptions {
+                        mode: PutMode::Create,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+        }
+
+        let reconciled = storage.reconcile_local_cache(&parts_root).await.unwrap();
+
+        assert!(reconciled.parts.is_empty());
+        assert!(parts[0].dir.join(part::META_FILE).is_file());
+        assert!(!parts[0].data_path().exists());
+        assert!(!root.join("quarantine").exists());
+        for file in PART_FILES {
+            assert!(storage
+                .store
+                .head(&storage.part_path(&descriptor, file))
+                .await
+                .is_ok());
+        }
+    }
+
+    #[tokio::test]
+    async fn log_reconciliation_fails_closed_for_partial_remote_objects() {
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("log-retired-cache-partial-objects");
+        let parts_root = root.join("parts");
+        let parts = retire_incomplete_log_part(&storage, &parts_root, "retired log").await;
+        let index = std::fs::read(parts[0].index_path()).unwrap();
+        let descriptor = ManifestPart::from(&parts[0]);
+        storage
+            .store
+            .put_opts(
+                &storage.part_path(&descriptor, INDEX_FILE),
+                index.into(),
+                PutOptions {
+                    mode: PutMode::Create,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        let error = storage.reconcile_local_cache(&parts_root).await.unwrap_err();
+
+        assert!(error.contains("remote log objects remain"));
+        assert!(parts[0].dir.exists());
+        assert!(!root.join("quarantine").exists());
+        assert!(storage.load_manifest().await.unwrap().parts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn log_reconciliation_fails_closed_for_a_pending_flush_reference() {
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("log-retired-cache-pending-flush");
+        let parts_root = root.join("parts");
+        let parts = retire_incomplete_log_part(&storage, &parts_root, "retired log").await;
+        write_flush_transaction(
+            &root,
+            &FlushTransaction {
+                offset: 8,
+                log_parts: vec![ManifestPart::from(&parts[0])],
+                trace_parts: Vec::new(),
+                metric_parts: Vec::new(),
+            },
+        )
+        .unwrap();
+
+        let error = storage.reconcile_local_cache(&parts_root).await.unwrap_err();
+
+        assert!(error.contains("pending flush transaction"));
+        assert!(parts[0].dir.exists());
+        assert!(root.join(FLUSH_TRANSACTION_FILE).is_file());
+        assert!(!root.join("quarantine").exists());
+    }
+
+    #[tokio::test]
+    async fn log_reconciliation_fails_closed_for_a_pending_compaction_reference() {
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("log-retired-cache-pending-compaction");
+        let parts_root = root.join("parts");
+        let old = part::flush_rows(vec![row("old log")], &parts_root, 100).unwrap();
+        let manifest = storage.publish(&old, &[]).await.unwrap();
+        storage
+            .evict_cache(&parts_root, 0, std::slice::from_ref(&old[0].dir))
+            .unwrap();
+        storage
+            .publish(&[], &[manifest.parts[0].id.clone()])
+            .await
+            .unwrap();
+        storage.delete_part_objects(&manifest.parts).await.unwrap();
+        part::flush_rows_with_merge_tombstone(
+            vec![row("replacement log")],
+            &parts_root,
+            100,
+            std::slice::from_ref(&old[0].dir),
+        )
+        .unwrap();
+
+        let error = storage
+            .publish_local_only_parts(
+                &old,
+                &storage.load_manifest().await.unwrap(),
+                &parts_root,
+            )
+            .await
+            .unwrap_err();
+
+        assert!(error.contains("pending compaction"));
+        assert!(old[0].dir.exists());
+        assert!(!root.join("quarantine").exists());
+    }
+
     #[tokio::test]
     async fn flush_transaction_rolls_back_partial_cross_domain_publication() {
         let root = temp_dir("flush-transaction");
@@ -1530,6 +1730,45 @@
     }
 
     #[tokio::test]
+    async fn trace_reconciliation_preserves_incomplete_local_only_data_before_manifest_exists() {
+        use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
+
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("trace-local-only-incomplete");
+        let traces_root = root.join("traces");
+        let request = crate::trace::ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: None,
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![Span {
+                        trace_id: vec![7; 16],
+                        span_id: vec![8; 8],
+                        start_time_unix_nano: 1_700_000_000_000_000_000,
+                        end_time_unix_nano: 1_700_000_000_000_000_100,
+                        ..Default::default()
+                    }],
+                    schema_url: String::new(),
+                }],
+                schema_url: String::new(),
+            }],
+        };
+        let spans = crate::trace::normalize_request(&test_tenant(), request).unwrap();
+        let parts = crate::trace_part::flush_trace_spans(&spans, &traces_root, 100).unwrap();
+        std::fs::remove_file(parts[0].data_path()).unwrap();
+
+        let error = storage
+            .reconcile_trace_local_cache(&traces_root)
+            .await
+            .unwrap_err();
+
+        assert!(error.contains("cannot be proven retired"));
+        assert!(parts[0].dir.exists());
+        assert!(!root.join("quarantine").exists());
+        assert!(storage.load_trace_manifest().await.unwrap().parts.is_empty());
+    }
+
+    #[tokio::test]
     async fn trace_reconciliation_fails_closed_for_retired_cache_with_remote_objects() {
         use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
 
@@ -1746,6 +1985,25 @@
         assert!(!quarantine
             .join(crate::series_part::SERIES_DATA_FILE)
             .exists());
+        assert!(storage.load_metric_manifest().await.unwrap().parts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn metric_reconciliation_preserves_incomplete_local_only_data_before_manifest_exists() {
+        let storage = ObjectStorage::in_memory();
+        let root = temp_dir("metric-local-only-incomplete");
+        let metrics_root = root.join("metrics");
+        let parts = metric_parts_for(&metrics_root, 1_700_000_000_000_000_000);
+        std::fs::remove_file(parts[0].data_path()).unwrap();
+
+        let error = storage
+            .reconcile_metric_local_cache(&metrics_root)
+            .await
+            .unwrap_err();
+
+        assert!(error.contains("cannot be proven retired"));
+        assert!(parts[0].dir.exists());
+        assert!(!root.join("quarantine").exists());
         assert!(storage.load_metric_manifest().await.unwrap().parts.is_empty());
     }
 

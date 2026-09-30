@@ -100,7 +100,7 @@ impl ObjectStorage {
             // durable local outputs to retry; a crash after it leaves the
             // whole active generation visible.
             let local_parts = part::discover_parts(parts_root)?;
-            self.publish_local_only_parts(&local_parts, &initial)
+            self.publish_local_only_parts(&local_parts, &initial, parts_root)
                 .await?;
             return self.restore_catalog(parts_root).await;
         }
@@ -157,7 +157,7 @@ impl ObjectStorage {
         let local_parts = part::discover_parts(parts_root)?;
         let manifest = self.load_manifest().await?;
         let published = self
-            .publish_local_only_parts(&local_parts, &manifest)
+            .publish_local_only_parts(&local_parts, &manifest, parts_root)
             .await?;
         // Only restore again if the manifest changed. The second pass exists to
         // fetch catalog files for parts this reconcile just published, and on a

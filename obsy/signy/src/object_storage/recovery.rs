@@ -315,6 +315,48 @@ fn collect_local_merge_groups(parts_root: &Path) -> Result<Vec<LocalMergeGroup>,
     Ok(groups)
 }
 
+fn log_compaction_references(
+    parts_root: &Path,
+    descriptor: &ManifestPart,
+) -> Result<bool, String> {
+    let expected = Path::new(&descriptor.partition).join(&descriptor.id);
+    let partitions = match std::fs::read_dir(parts_root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.to_string()),
+    };
+    for partition in partitions {
+        let partition = partition.map_err(|error| error.to_string())?;
+        if !partition.path().is_dir() {
+            continue;
+        }
+        for entry in std::fs::read_dir(partition.path()).map_err(|error| error.to_string())? {
+            let entry = entry.map_err(|error| error.to_string())?;
+            let replacement = entry.path();
+            if !replacement.is_dir() {
+                continue;
+            }
+            if replacement.file_name().and_then(|name| name.to_str())
+                == Some(descriptor.id.as_str())
+                && replacement
+                    .join(part::MERGE_TOMBSTONE_FILE)
+                    .exists()
+            {
+                return Ok(true);
+            }
+            if !replacement.join(part::MERGE_TOMBSTONE_FILE).exists() {
+                continue;
+            }
+            for old_dir in part::read_merge_tombstone_dirs(&replacement, parts_root)? {
+                if old_dir.strip_prefix(parts_root).ok() == Some(expected.as_path()) {
+                    return Ok(true);
+                }
+            }
+        }
+    }
+    Ok(false)
+}
+
 fn topological_merge_order(groups: &[LocalMergeGroup]) -> Result<Vec<usize>, String> {
     let mut producer = HashMap::new();
     for (index, group) in groups.iter().enumerate() {

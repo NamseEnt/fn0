@@ -409,6 +409,12 @@ impl ObjectStorage {
                         descriptor.id, descriptor.partition
                     ));
                 }
+                if manifest.generation == 0 && manifest.parts.is_empty() {
+                    return Err(format!(
+                        "incomplete local metric part {} in partition {} cannot be proven retired before an object-store manifest exists",
+                        descriptor.id, descriptor.partition
+                    ));
+                }
                 match self.remote_metric_part_object_count(&descriptor).await? {
                     0 => {
                         let quarantine = quarantine_cache_shell(
@@ -736,6 +742,12 @@ impl ObjectStorage {
                         descriptor.id, descriptor.partition
                     ));
                 }
+                if manifest.generation == 0 && manifest.parts.is_empty() {
+                    return Err(format!(
+                        "incomplete local trace part {} in partition {} cannot be proven retired before an object-store manifest exists",
+                        descriptor.id, descriptor.partition
+                    ));
+                }
                 match self.remote_trace_part_object_count(&descriptor).await? {
                     0 => {
                         let quarantine = quarantine_cache_shell(
@@ -832,6 +844,32 @@ impl ObjectStorage {
             }
         }
         Ok(count)
+    }
+
+    fn flush_transaction_references_log(
+        &self,
+        parts_root: &Path,
+        descriptor: &ManifestPart,
+    ) -> Result<bool, String> {
+        let data_dir = parts_root
+            .parent()
+            .ok_or_else(|| format!("log cache root has no parent: {}", parts_root.display()))?;
+        let path = data_dir.join(FLUSH_TRANSACTION_FILE);
+        let metadata = match std::fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error.to_string()),
+        };
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(format!(
+                "refusing non-regular flush transaction {}",
+                path.display()
+            ));
+        }
+        let bytes = std::fs::read(&path).map_err(|error| error.to_string())?;
+        let transaction: FlushTransaction = serde_json::from_slice(&bytes)
+            .map_err(|error| format!("invalid flush transaction: {error}"))?;
+        Ok(transaction.log_parts.iter().any(|part| part == descriptor))
     }
 
     fn flush_transaction_references_trace(
@@ -1086,6 +1124,7 @@ impl ObjectStorage {
         &self,
         local_parts: &[Part],
         manifest: &Manifest,
+        parts_root: &Path,
     ) -> Result<Manifest, String> {
         let active_ids: HashSet<&str> =
             manifest.parts.iter().map(|part| part.id.as_str()).collect();
@@ -1096,6 +1135,103 @@ impl ObjectStorage {
                 continue;
             }
             let marker = part.dir.join(UPLOAD_MARKER_FILE);
+            match std::fs::symlink_metadata(&marker) {
+                Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+                    return Err(format!(
+                        "refusing unsafe upload marker for local part {} in partition {}",
+                        part.meta.id, part.meta.partition
+                    ));
+                }
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.to_string()),
+            }
+            let data_path = part.data_path();
+            let data_missing = match std::fs::symlink_metadata(&data_path) {
+                Ok(metadata) if metadata.is_file() => false,
+                Ok(_) => {
+                    return Err(format!(
+                        "log data path is not a regular file for part {} in partition {}",
+                        part.meta.id, part.meta.partition
+                    ));
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+                Err(error) => {
+                    return Err(format!(
+                        "failed to inspect log data for part {} in partition {}: {error}",
+                        part.meta.id, part.meta.partition
+                    ));
+                }
+            };
+            if data_missing {
+                let descriptor = ManifestPart::from(part);
+                if self.flush_transaction_references_log(parts_root, &descriptor)? {
+                    return Err(format!(
+                        "incomplete local log part {} in partition {} is referenced by a pending flush transaction",
+                        descriptor.id, descriptor.partition
+                    ));
+                }
+                if log_compaction_references(parts_root, &descriptor)? {
+                    return Err(format!(
+                        "incomplete local log part {} in partition {} is referenced by a pending compaction",
+                        descriptor.id, descriptor.partition
+                    ));
+                }
+                if manifest.generation == 0 && manifest.parts.is_empty() {
+                    return Err(format!(
+                        "incomplete local log part {} in partition {} cannot be proven retired before an object-store manifest exists",
+                        descriptor.id, descriptor.partition
+                    ));
+                }
+                let mut remote_files = 0usize;
+                for file in PART_FILES {
+                    match self.store.head(&self.part_path(&descriptor, file)).await {
+                        Ok(_) => remote_files += 1,
+                        Err(object_store::Error::NotFound { .. }) => {}
+                        Err(error) => {
+                            return Err(format!(
+                                "failed to inspect remote log part {} file {file}: {error}",
+                                descriptor.id
+                            ));
+                        }
+                    }
+                }
+                match remote_files {
+                    0 => {
+                        let quarantine = quarantine_cache_shell(
+                            parts_root,
+                            "parts",
+                            &descriptor.partition,
+                            &descriptor.id,
+                            &part.dir,
+                        )?;
+                        tracing::warn!(
+                            part_id = %descriptor.id,
+                            partition = %descriptor.partition,
+                            reason = "absent from manifest, no remote objects, no pending transaction or compaction, and local log data body is absent",
+                            quarantine = %quarantine.display(),
+                            "quarantined a retired incomplete local log cache shell"
+                        );
+                        continue;
+                    }
+                    count if count == PART_FILES.len() => {
+                        tracing::warn!(
+                            part_id = %descriptor.id,
+                            partition = %descriptor.partition,
+                            remote_objects = count,
+                            reason = "absent from manifest but complete immutable remote object set remains",
+                            "preserving a retired log generation during cache reconciliation"
+                        );
+                        continue;
+                    }
+                    count => {
+                        return Err(format!(
+                            "incomplete local log part {} in partition {} is absent from the manifest but {count} remote log objects remain; preserving local and remote state",
+                            descriptor.id, descriptor.partition
+                        ));
+                    }
+                }
+            }
             if marker.exists() {
                 unpublished.push(part.clone());
                 continue;
