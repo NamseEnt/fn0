@@ -460,6 +460,7 @@ struct Args {
     blink_workers: usize,
     parallel_workers: usize,
     parallel_min_mutations: usize,
+    parallel_background_min_operations: usize,
     seed: u64,
     output: PathBuf,
     window_seconds: Option<u64>,
@@ -499,6 +500,7 @@ impl Default for Args {
             blink_workers: 2,
             parallel_workers: 0,
             parallel_min_mutations: 0,
+            parallel_background_min_operations: 0,
             seed: 0xd0db_2026_0000_0001,
             output: PathBuf::from(DEFAULT_OUTPUT),
             window_seconds: None,
@@ -508,8 +510,12 @@ impl Default for Args {
 
 impl Args {
     fn parse() -> Self {
+        Self::parse_from(env::args().skip(1))
+    }
+
+    fn parse_from(arguments: impl IntoIterator<Item = String>) -> Self {
         let mut args = Self::default();
-        let mut values = env::args().skip(1);
+        let mut values = arguments.into_iter();
         while let Some(flag) = values.next() {
             match flag.as_str() {
                 "--help" | "-h" => {
@@ -608,6 +614,10 @@ impl Args {
                     args.parallel_min_mutations =
                         parse_usize(&take_value(&mut values, &flag), &flag)
                 }
+                "--parallel-background-min-operations" => {
+                    args.parallel_background_min_operations =
+                        parse_usize(&take_value(&mut values, &flag), &flag)
+                }
                 "--blink-workers" => {
                     args.blink_workers = parse_usize(&take_value(&mut values, &flag), &flag)
                 }
@@ -693,7 +703,9 @@ fn print_help() {
          --blink-collection-policy current|main-parity --mixed-value-mode constant|changing\n\
          --collection-delay 500us --sync-mode real|injected|disabled --sync-delay 1ms\n\
          --transaction-mode unconditional|insert-if-absent\n\
-         --tokio-workers 12 --blink-workers 2 --parallel-workers 0|1|2 (planned-blink leaf workers, 0 = serial) --seed 0xd0db2026 --output target/phase0/results.jsonl\n\
+         --tokio-workers 12 --blink-workers 2 --parallel-workers 0|1|2 (planned-blink leaf workers, 0 = serial)\n\
+         --parallel-background-min-operations 0 (minimum planned operations before background worker dispatch)\n\
+         --seed 0xd0db2026 --output target/phase0/results.jsonl\n\
          --window-seconds 10 (per-window tx/s and latency, periodic WAL/RSS/dirty-page samples)"
     );
 }
@@ -2066,6 +2078,7 @@ struct MetricDelta {
     parallel_transactions: u64,
     parallel_mutations: u64,
     parallel_worker_dispatches: u64,
+    parallel_background_worker_dispatches: u64,
     parallel_worker_nanos: u64,
     parallel_join_nanos: u64,
     parallel_fallback_groups: u64,
@@ -2579,6 +2592,10 @@ impl MetricDelta {
             parallel_worker_dispatches: subtraction(
                 batch_after.parallel_worker_dispatches,
                 batch_before.parallel_worker_dispatches,
+            ),
+            parallel_background_worker_dispatches: subtraction(
+                batch_after.parallel_background_worker_dispatches,
+                batch_before.parallel_background_worker_dispatches,
             ),
             parallel_worker_nanos: subtraction(
                 batch_after.parallel_worker_nanos,
@@ -3334,8 +3351,10 @@ fn write_phase_i_locality_samples(args: &Args, scenario: &Scenario, repetition: 
     {
         writeln!(
             output,
-            "{{\"record_type\":\"group_locality\",\"git_commit\":{},\"sync_mode\":{},\"writers\":{},\"width\":{},\"distribution\":{},\"repetition\":{},\"seed\":{},\"group_index\":{},\"requested_transactions\":{},\"successful_transactions\":{},\"failed_transactions\":{},\"logical_mutations\":{},\"unique_keys\":{},\"boundary_materializations\":{},\"page_encodes\":{},\"page_delta_records\":{},\"distinct_touched_leaves\":{},\"mutations_per_leaf\":[{}],\"transactions_per_leaf\":[{}],\"leaves_by_transaction_touch_count\":[{},{},{}]}}",
+            "{{\"record_type\":\"group_locality\",\"git_commit\":{},\"parallel_background_min_operations\":{},\"blink_read_observational_metrics_enabled\":{},\"sync_mode\":{},\"writers\":{},\"width\":{},\"distribution\":{},\"repetition\":{},\"seed\":{},\"group_index\":{},\"requested_transactions\":{},\"successful_transactions\":{},\"failed_transactions\":{},\"logical_mutations\":{},\"unique_keys\":{},\"boundary_materializations\":{},\"page_encodes\":{},\"page_delta_records\":{},\"distinct_touched_leaves\":{},\"mutations_per_leaf\":[{}],\"transactions_per_leaf\":[{}],\"leaves_by_transaction_touch_count\":[{},{},{}]}}",
             json_string(&git_commit),
+            args.parallel_background_min_operations,
+            !cfg!(feature = "blink-read-metrics-disabled"),
             json_string(effective_sync(args, scenario).0.as_str()),
             scenario.writers,
             scenario.width,
@@ -3524,6 +3543,9 @@ async fn open_adapter(
             if args.parallel_workers > 0 {
                 store.enable_parallel_execution(args.parallel_workers)?;
                 store.set_parallel_min_group_mutations(args.parallel_min_mutations);
+                store.set_parallel_min_background_worker_operations(
+                    args.parallel_background_min_operations,
+                );
             }
             if CHECKPOINT_WAL_BYTES.load(Ordering::Relaxed) > 0 {
                 checkpoint_blink_store(&mut store)?;
@@ -3548,6 +3570,9 @@ async fn open_adapter(
                 store.apply_transaction_group(chunk)?;
             }
             store.enable_parallel_execution(args.blink_workers)?;
+            store.set_parallel_min_background_worker_operations(
+                args.parallel_background_min_operations,
+            );
             let adapter = BlinkAdapter::start_versioned(
                 store,
                 benchmark_config(args, scenario),
@@ -3611,6 +3636,10 @@ impl JsonObject {
         self.fields.push((key.to_owned(), value.to_string()));
     }
 
+    fn boolean(&mut self, key: &str, value: bool) {
+        self.fields.push((key.to_owned(), value.to_string()));
+    }
+
     fn f64(&mut self, key: &str, value: f64) {
         self.fields.push((
             key.to_owned(),
@@ -3637,6 +3666,17 @@ impl JsonObject {
             .collect::<Vec<_>>();
         format!("{{{}}}", fields.join(","))
     }
+}
+
+fn add_parallel_metadata(json: &mut JsonObject, args: &Args) {
+    json.usize(
+        "parallel_background_min_operations",
+        args.parallel_background_min_operations,
+    );
+    json.boolean(
+        "blink_read_observational_metrics_enabled",
+        !cfg!(feature = "blink-read-metrics-disabled"),
+    );
 }
 
 fn json_string(value: &str) -> String {
@@ -3755,6 +3795,7 @@ fn build_record(
     json.usize("blink_workers", args.blink_workers);
     json.usize("parallel_workers", args.parallel_workers);
     json.usize("parallel_min_mutations", args.parallel_min_mutations);
+    add_parallel_metadata(&mut json, args);
     json.string("suite", scenario.suite.as_str());
     json.string("workload", scenario.workload);
     json.usize("writers", scenario.writers);
@@ -4245,6 +4286,10 @@ fn build_record(
         "parallel_worker_dispatches_delta",
         delta.parallel_worker_dispatches,
     );
+    json.u64(
+        "parallel_background_worker_dispatches_delta",
+        delta.parallel_background_worker_dispatches,
+    );
     json.u64("parallel_worker_nanos_total", delta.parallel_worker_nanos);
     json.u64("parallel_join_nanos_total", delta.parallel_join_nanos);
     if delta.parallel_join_nanos > 0 {
@@ -4709,6 +4754,28 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parallel_background_threshold_defaults_to_zero() {
+        let args = Args::parse_from(Vec::<String>::new());
+        assert_eq!(args.parallel_background_min_operations, 0);
+    }
+
+    #[test]
+    fn parallel_background_threshold_cli_value_is_reported_in_json() {
+        let args =
+            Args::parse_from(["--parallel-background-min-operations", "17"].map(str::to_owned));
+        assert_eq!(args.parallel_background_min_operations, 17);
+        let mut json = JsonObject::new();
+        add_parallel_metadata(&mut json, &args);
+        let record = json.finish();
+        assert!(record.contains("\"parallel_background_min_operations\":17"));
+        let expected_read_metric_flag = format!(
+            "\"blink_read_observational_metrics_enabled\":{}",
+            !cfg!(feature = "blink-read-metrics-disabled")
+        );
+        assert!(record.contains(&expected_read_metric_flag));
+    }
 
     #[test]
     fn mixed_schedule_preserves_exact_requested_ratio() {

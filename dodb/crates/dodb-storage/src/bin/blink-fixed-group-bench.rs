@@ -84,6 +84,7 @@ struct Args {
     group_size: usize,
     sync_mode: SyncMode,
     value_mode: MixedValueMode,
+    parallel_background_min_operations: usize,
     working_set: usize,
     value_size: usize,
     warmup: Duration,
@@ -101,6 +102,7 @@ impl Args {
         let mut group_size = None;
         let mut sync_mode = None;
         let mut value_mode = None;
+        let mut parallel_background_min_operations = 0;
         let mut working_set = DEFAULT_WORKING_SET;
         let mut value_size = DEFAULT_VALUE_SIZE;
         let mut warmup_ms = DEFAULT_WARMUP_MS;
@@ -130,6 +132,9 @@ impl Args {
                 }
                 "--sync-mode" => sync_mode = Some(SyncMode::parse(&value)?),
                 "--value-mode" => value_mode = Some(MixedValueMode::parse(&value)),
+                "--parallel-background-min-operations" => {
+                    parallel_background_min_operations = parse_number(&argument, &value)?
+                }
                 "--working-set" => working_set = parse_number(&argument, &value)?,
                 "--value-size" => value_size = parse_number(&argument, &value)?,
                 "--warmup-ms" => warmup_ms = parse_number(&argument, &value)?,
@@ -160,6 +165,7 @@ impl Args {
             group_size: group_size.ok_or_else(|| "--group-size is required".to_owned())?,
             sync_mode: sync_mode.ok_or_else(|| "--sync-mode is required".to_owned())?,
             value_mode: value_mode.ok_or_else(|| "--value-mode is required".to_owned())?,
+            parallel_background_min_operations,
             working_set,
             value_size,
             warmup: Duration::from_millis(warmup_ms),
@@ -174,6 +180,9 @@ impl Args {
         }
         if args.value_size == 0 {
             return Err("value size must be positive".into());
+        }
+        if args.engine == Engine::Planned && args.parallel_background_min_operations > 0 {
+            return Err("parallel background operation threshold requires parallel-blink".into());
         }
         if args.duration.is_zero() {
             return Err("duration must be positive".into());
@@ -280,7 +289,12 @@ fn run() -> BenchResult<()> {
     let seeded_keys = seed_existing(&mut store, &workload_config, args.group_size)?;
     match args.engine {
         Engine::Planned => store.enable_planned_execution(),
-        Engine::Parallel => store.enable_parallel_execution(args.workers)?,
+        Engine::Parallel => {
+            store.enable_parallel_execution(args.workers)?;
+            store.set_parallel_min_background_worker_operations(
+                args.parallel_background_min_operations,
+            );
+        }
     }
     let mut expected_samples = initial_sample_values(&workload_config);
     let invocation_seed = args.seed.wrapping_add(args.repetition);
@@ -437,6 +451,9 @@ fn run() -> BenchResult<()> {
         ("process_vm_hwm_kib", option_json(vm_hwm_kib)),
         ("data_dir", json_string(&data_dir.display().to_string())),
     ];
+    fields.extend(parallel_metadata_fields(
+        args.parallel_background_min_operations,
+    ));
     fields.extend(wal_metric_fields(&wal_before, &wal_after));
     fields.extend(blink_metric_fields(&blink_before, &blink_after));
     fields.extend(storage_metric_fields(&storage_before, &storage_after));
@@ -891,6 +908,14 @@ fn blink_metric_fields(
             .to_string(),
         ),
         (
+            "blink_parallel_background_worker_dispatches",
+            delta(
+                before.parallel_background_worker_dispatches,
+                after.parallel_background_worker_dispatches,
+            )
+            .to_string(),
+        ),
+        (
             "blink_parallel_worker_nanos",
             delta(before.parallel_worker_nanos, after.parallel_worker_nanos).to_string(),
         ),
@@ -1184,6 +1209,76 @@ fn json_object(fields: Vec<(&str, String)>) -> String {
     record
 }
 
+fn parallel_metadata_fields(
+    parallel_background_min_operations: usize,
+) -> [(&'static str, String); 2] {
+    [
+        (
+            "parallel_background_min_operations",
+            parallel_background_min_operations.to_string(),
+        ),
+        (
+            "blink_read_observational_metrics_enabled",
+            (!cfg!(feature = "blink-read-metrics-disabled")).to_string(),
+        ),
+    ]
+}
+
 fn usage() -> &'static str {
-    "Usage: blink-fixed-group-bench --engine planned-blink|parallel-blink --group-size 4|16|64 --sync-mode real|disabled --value-mode changing|constant --data-dir PATH --output PATH [--workers 1|2] [--working-set 10000] [--value-size 512] [--warmup-ms 2000] [--duration-ms 5000] [--seed N] [--repetition N]"
+    "Usage: blink-fixed-group-bench --engine planned-blink|parallel-blink --group-size 4|16|64 --sync-mode real|disabled --value-mode changing|constant --data-dir PATH --output PATH [--workers 1|2] [--parallel-background-min-operations N] [--working-set 10000] [--value-size 512] [--warmup-ms 2000] [--duration-ms 5000] [--seed N] [--repetition N]"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cli_args(threshold: usize) -> Vec<String> {
+        let threshold_value = threshold.to_string();
+        [
+            "--engine",
+            "parallel-blink",
+            "--workers",
+            "2",
+            "--group-size",
+            "16",
+            "--sync-mode",
+            "disabled",
+            "--value-mode",
+            "changing",
+            "--parallel-background-min-operations",
+            threshold_value.as_str(),
+            "--data-dir",
+            "target/fixed-group-test-data",
+            "--output",
+            "target/fixed-group-test.jsonl",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect()
+    }
+
+    #[test]
+    fn parallel_background_threshold_cli_value_is_reported() {
+        let args = Args::parse(cli_args(23)).unwrap();
+        assert_eq!(args.parallel_background_min_operations, 23);
+        let record = json_object(
+            parallel_metadata_fields(args.parallel_background_min_operations)
+                .into_iter()
+                .collect(),
+        );
+        assert!(record.contains("\"parallel_background_min_operations\":23"));
+        assert!(record.contains("\"blink_read_observational_metrics_enabled\":"));
+    }
+
+    #[test]
+    fn parallel_background_threshold_defaults_to_zero() {
+        let mut arguments = cli_args(0);
+        let flag_position = arguments
+            .iter()
+            .position(|argument| argument == "--parallel-background-min-operations")
+            .unwrap();
+        arguments.drain(flag_position..=flag_position + 1);
+        let args = Args::parse(arguments).unwrap();
+        assert_eq!(args.parallel_background_min_operations, 0);
+    }
 }

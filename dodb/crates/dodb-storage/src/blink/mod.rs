@@ -218,6 +218,7 @@ pub struct BlinkBatchMetrics {
     pub parallel_transactions: u64,
     pub parallel_mutations: u64,
     pub parallel_worker_dispatches: u64,
+    pub parallel_background_worker_dispatches: u64,
     pub parallel_worker_nanos: u64,
     pub parallel_join_nanos: u64,
     pub parallel_job_operations: u64,
@@ -1179,22 +1180,25 @@ impl GenerationPublisher {
 
     fn pin(&self) -> GenerationPin {
         let generation = Arc::clone(&self.current.read().expect("generation lock poisoned"));
-        let active = self
+        let _active_before = self
             .metrics
             .active_generation_pins
-            .fetch_add(1, Ordering::Relaxed)
-            + 1;
-        self.metrics.generation_pins.fetch_add(1, Ordering::Relaxed);
-        let mut observed = self.metrics.max_concurrent_pins.load(Ordering::Relaxed);
-        while active > observed {
-            match self.metrics.max_concurrent_pins.compare_exchange_weak(
-                observed,
-                active,
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => break,
-                Err(next) => observed = next,
+            .fetch_add(1, Ordering::Relaxed);
+        #[cfg(not(feature = "blink-read-metrics-disabled"))]
+        {
+            let active = _active_before + 1;
+            self.metrics.generation_pins.fetch_add(1, Ordering::Relaxed);
+            let mut observed = self.metrics.max_concurrent_pins.load(Ordering::Relaxed);
+            while active > observed {
+                match self.metrics.max_concurrent_pins.compare_exchange_weak(
+                    observed,
+                    active,
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => break,
+                    Err(next) => observed = next,
+                }
             }
         }
         GenerationPin {
@@ -1528,12 +1532,14 @@ pub struct BlinkReadHandle {
 impl BlinkReadHandle {
     pub fn get(&self, key: &DocumentKey) -> Result<RevisionState> {
         let pin = self.publisher.pin();
+        #[cfg(not(feature = "blink-read-metrics-disabled"))]
         self.publisher
             .metrics
             .read_operations
             .fetch_add(1, Ordering::Relaxed);
         let mut corrections = 0;
         let result = read_published_state(&pin, key, &mut corrections);
+        #[cfg(not(feature = "blink-read-metrics-disabled"))]
         self.publisher
             .metrics
             .right_link_corrections
@@ -1548,6 +1554,7 @@ impl BlinkReadHandle {
         limit: usize,
     ) -> Result<Vec<Document>> {
         let pin = self.publisher.pin();
+        #[cfg(not(feature = "blink-read-metrics-disabled"))]
         self.publisher
             .metrics
             .read_operations
@@ -1562,6 +1569,7 @@ impl BlinkReadHandle {
             limit,
             &mut corrections,
         );
+        #[cfg(not(feature = "blink-read-metrics-disabled"))]
         self.publisher
             .metrics
             .right_link_corrections
@@ -1571,12 +1579,14 @@ impl BlinkReadHandle {
 
     pub fn scan(&self, cursor: Option<&DocumentKey>, limit: usize) -> Result<Vec<Document>> {
         let pin = self.publisher.pin();
+        #[cfg(not(feature = "blink-read-metrics-disabled"))]
         self.publisher
             .metrics
             .read_operations
             .fetch_add(1, Ordering::Relaxed);
         let mut corrections = 0;
         let result = published_range_state(&pin, None, cursor.cloned(), limit, &mut corrections);
+        #[cfg(not(feature = "blink-read-metrics-disabled"))]
         self.publisher
             .metrics
             .right_link_corrections
@@ -1736,6 +1746,7 @@ pub struct BlinkStore<F: DurableFile, W: DurableFile = crate::btree::NoWal> {
     planned_execution: bool,
     parallel_workers: usize,
     parallel_min_group_mutations: usize,
+    parallel_min_background_worker_operations: usize,
     parallel_worker_pool: Option<ParallelWorkerPool>,
     #[cfg(test)]
     parallel_worker_fault: Option<ParallelWorkerFault>,
@@ -1925,6 +1936,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             planned_execution: false,
             parallel_workers: 1,
             parallel_min_group_mutations: 0,
+            parallel_min_background_worker_operations: 0,
             parallel_worker_pool: None,
             #[cfg(test)]
             parallel_worker_fault: None,
@@ -2009,6 +2021,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             planned_execution: false,
             parallel_workers: 1,
             parallel_min_group_mutations: 0,
+            parallel_min_background_worker_operations: 0,
             parallel_worker_pool: None,
             #[cfg(test)]
             parallel_worker_fault: None,
@@ -2076,6 +2089,10 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
     /// multi-leaf group eligible.
     pub fn set_parallel_min_group_mutations(&mut self, mutations: usize) {
         self.parallel_min_group_mutations = mutations;
+    }
+
+    pub fn set_parallel_min_background_worker_operations(&mut self, operations: usize) {
+        self.parallel_min_background_worker_operations = operations;
     }
 
     pub fn enable_parallel_execution(&mut self, workers: usize) -> Result<()> {
@@ -2917,24 +2934,32 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             .map_or(self.next_batch_id, WalLog::next_batch_id);
         let physical_started = Instant::now();
         let parallel_preparation = match self.parallel_worker_pool.as_ref() {
-            Some(worker_pool) => prepare_leaf_parallel_execution(
-                self.parallel_min_group_mutations,
-                &self.state,
-                &self.publisher.pin(),
-                &plan,
-                worker_pool,
-                self.wal.as_ref(),
-                &self.dirty_pages,
-                &self.current_superblock,
-                self.active_slot,
-                current_next_lsn,
-                current_next_batch_id,
-                self.publisher.can_reuse_pages(),
-                &mut self.batch_metrics,
-                &mut self.fault_injector,
-                #[cfg(test)]
-                self.parallel_worker_fault,
-            )?,
+            Some(worker_pool) => {
+                let dispatch_background_workers = self.parallel_min_background_worker_operations
+                    == 0
+                    || plan.transactions.iter().fold(0usize, |total, transaction| {
+                        total.saturating_add(transaction.mutations.len())
+                    }) >= self.parallel_min_background_worker_operations;
+                prepare_leaf_parallel_execution(
+                    self.parallel_min_group_mutations,
+                    dispatch_background_workers,
+                    &self.state,
+                    &self.publisher.pin(),
+                    &plan,
+                    worker_pool,
+                    self.wal.as_ref(),
+                    &self.dirty_pages,
+                    &self.current_superblock,
+                    self.active_slot,
+                    current_next_lsn,
+                    current_next_batch_id,
+                    self.publisher.can_reuse_pages(),
+                    &mut self.batch_metrics,
+                    &mut self.fault_injector,
+                    #[cfg(test)]
+                    self.parallel_worker_fault,
+                )?
+            }
             None => None,
         };
         let serial_site = churn::enter(ChurnSite::PackedLeafMutationCow);
@@ -4596,6 +4621,7 @@ struct ParallelWorkerRun {
     coordinator_lane_nanos: u64,
     join_nanos: u64,
     lanes: u64,
+    background_dispatches: u64,
     worker_threads: Vec<(usize, ThreadId)>,
 }
 
@@ -4641,10 +4667,22 @@ impl ParallelWorkerPool {
         Ok(Self { workers })
     }
 
-    fn execute(&self, jobs: Vec<LeafChainJob>) -> Result<ParallelWorkerRun> {
-        let lanes = self.workers.len() + 1;
-        let chunk = (jobs.len() / (lanes * 8)).max(1);
-        let threads_used = self.workers.len().min(jobs.len().saturating_sub(1));
+    fn execute(
+        &self,
+        jobs: Vec<LeafChainJob>,
+        dispatch_background_workers: bool,
+    ) -> Result<ParallelWorkerRun> {
+        let threads_used = if dispatch_background_workers {
+            self.workers.len().min(jobs.len().saturating_sub(1))
+        } else {
+            0
+        };
+        let lanes_for_chunk = if dispatch_background_workers {
+            self.workers.len() + 1
+        } else {
+            1
+        };
+        let chunk = (jobs.len() / (lanes_for_chunk * 8)).max(1);
         let queue = Arc::new(LeafChainQueue {
             jobs: Mutex::new(jobs),
             chunk,
@@ -4738,6 +4776,7 @@ impl ParallelWorkerPool {
             coordinator_lane_nanos,
             join_nanos,
             lanes: dispatched as u64 + 1,
+            background_dispatches: dispatched as u64,
             worker_threads,
         })
     }
@@ -4787,6 +4826,7 @@ fn parallel_worker_loop(worker_index: usize, receiver: Receiver<ParallelWorkerCo
 #[allow(clippy::too_many_arguments)]
 fn prepare_leaf_parallel_execution<'a, W: DurableFile>(
     min_group_mutations: usize,
+    dispatch_background_workers: bool,
     state: &'a BlinkState,
     published: &GenerationPin,
     plan: &Arc<BatchPlan>,
@@ -4947,7 +4987,7 @@ fn prepare_leaf_parallel_execution<'a, W: DurableFile>(
         injector.hit("before_parallel_leaf_dispatch")?;
     }
 
-    let worker_run = worker_pool.execute(jobs)?;
+    let worker_run = worker_pool.execute(jobs, dispatch_background_workers)?;
     drop(dispatch_site);
     let _collect_site = churn::enter(ChurnSite::JobResultCollection);
     if worker_run.worker_threads.len() as u64 + 1 != worker_run.lanes {
@@ -4964,6 +5004,9 @@ fn prepare_leaf_parallel_execution<'a, W: DurableFile>(
     metrics.parallel_worker_dispatches = metrics
         .parallel_worker_dispatches
         .saturating_add(worker_run.lanes);
+    metrics.parallel_background_worker_dispatches = metrics
+        .parallel_background_worker_dispatches
+        .saturating_add(worker_run.background_dispatches);
     metrics.parallel_worker_nanos = metrics
         .parallel_worker_nanos
         .saturating_add(worker_run.worker_nanos);
@@ -10127,6 +10170,66 @@ mod tests {
     }
 
     #[test]
+    fn parallel_min_background_worker_operations_preserves_pipeline_and_wal() {
+        let (mut baseline, _) = phase_d_store(2, 800);
+        let (mut adaptive, _) = phase_d_store(2, 800);
+        adaptive.set_parallel_min_background_worker_operations(32);
+        let distinct = keys_on_distinct_leaves(&baseline, 800, 32);
+        for operation_count in [31usize, 32] {
+            let baseline_metrics_before = baseline.batch_metrics();
+            let adaptive_metrics_before = adaptive.batch_metrics();
+            let requests = distinct
+                .iter()
+                .take(operation_count)
+                .map(|(index, _)| put_request(&[(*index, b0_value(*index, 2))]))
+                .collect::<Vec<_>>();
+
+            let baseline_results = baseline.apply_transaction_group(&requests).unwrap();
+            let adaptive_results = adaptive.apply_transaction_group(&requests).unwrap();
+            assert_eq!(
+                successful_commit_lsns(&adaptive_results),
+                successful_commit_lsns(&baseline_results)
+            );
+            assert_eq!(baseline.state.pages, adaptive.state.pages);
+            assert_eq!(baseline.current_superblock, adaptive.current_superblock);
+
+            let baseline_metrics = baseline.batch_metrics();
+            let adaptive_metrics = adaptive.batch_metrics();
+            assert_eq!(
+                baseline_metrics.parallel_groups - baseline_metrics_before.parallel_groups,
+                1
+            );
+            assert_eq!(
+                adaptive_metrics.parallel_groups - adaptive_metrics_before.parallel_groups,
+                1
+            );
+            assert_eq!(
+                baseline_metrics.parallel_worker_dispatches
+                    - baseline_metrics_before.parallel_worker_dispatches,
+                2
+            );
+            assert_eq!(
+                adaptive_metrics.parallel_worker_dispatches
+                    - adaptive_metrics_before.parallel_worker_dispatches,
+                if operation_count < 32 { 1 } else { 2 }
+            );
+            assert_eq!(
+                baseline_metrics.parallel_background_worker_dispatches
+                    - baseline_metrics_before.parallel_background_worker_dispatches,
+                1
+            );
+            assert_eq!(
+                adaptive_metrics.parallel_background_worker_dispatches
+                    - adaptive_metrics_before.parallel_background_worker_dispatches,
+                if operation_count >= 32 { 1 } else { 0 }
+            );
+        }
+        let baseline_wal = baseline.into_files().1.unwrap().0;
+        let adaptive_wal = adaptive.into_files().1.unwrap().0;
+        assert_eq!(adaptive_wal, baseline_wal);
+    }
+
+    #[test]
     fn packed_leaf_matches_reference_model_randomized() {
         let mut compactions_seen = false;
         for seed in 0..400u64 {
@@ -11145,8 +11248,8 @@ mod tests {
                 })
                 .collect::<Vec<_>>()
         };
-        let first_run = pool.execute(make_jobs()).unwrap();
-        let second_run = pool.execute(make_jobs()).unwrap();
+        let first_run = pool.execute(make_jobs(), true).unwrap();
+        let second_run = pool.execute(make_jobs(), true).unwrap();
         let mut first_workers = first_run.worker_threads;
         let mut second_workers = second_run.worker_threads;
         first_workers.sort_by_key(|(worker_index, _)| *worker_index);
@@ -13875,6 +13978,75 @@ mod tests {
             query
         );
         reopened.check_invariants().unwrap();
+    }
+
+    #[cfg(not(feature = "blink-read-metrics-disabled"))]
+    #[test]
+    fn versioned_read_metrics_remain_enabled_by_default() {
+        let mut store = planned_store();
+        let first_key = DocumentKey::new(b"read-metrics".to_vec(), b"first".to_vec());
+        let second_key = DocumentKey::new(b"read-metrics".to_vec(), b"second".to_vec());
+        store
+            .put(first_key.clone(), b"first-value".to_vec())
+            .unwrap();
+        store.put(second_key, b"second-value".to_vec()).unwrap();
+        let before = store.versioned_read_metrics();
+        let handle = store.versioned_read_handle();
+
+        assert_eq!(
+            handle.get(&first_key).unwrap().value(),
+            Some(&b"first-value"[..])
+        );
+        let queried = handle
+            .query(&PrimaryKey::new(b"read-metrics".to_vec()), None, 10)
+            .unwrap();
+        assert_eq!(queried.len(), 2);
+        assert_eq!(handle.scan(None, 10).unwrap(), queried);
+
+        let after = store.versioned_read_metrics();
+        assert_eq!(after.read_operations - before.read_operations, 3);
+        assert_eq!(after.generation_pins - before.generation_pins, 3);
+        assert!(after.max_concurrent_pins >= 1);
+        assert_eq!(after.active_generation_pins, 0);
+    }
+
+    #[cfg(feature = "blink-read-metrics-disabled")]
+    #[test]
+    fn disabled_versioned_read_metrics_preserve_values_and_active_pin_accounting() {
+        let mut store = planned_store();
+        let first_key = DocumentKey::new(b"read-metrics".to_vec(), b"first".to_vec());
+        let second_key = DocumentKey::new(b"read-metrics".to_vec(), b"second".to_vec());
+        store
+            .put(first_key.clone(), b"first-value".to_vec())
+            .unwrap();
+        store.put(second_key, b"second-value".to_vec()).unwrap();
+
+        let generation_pin = store.publisher.pin();
+        assert_eq!(store.versioned_read_metrics().active_generation_pins, 1);
+        assert!(!store.publisher.can_reuse_pages());
+        drop(generation_pin);
+        assert_eq!(store.versioned_read_metrics().active_generation_pins, 0);
+        assert!(store.publisher.can_reuse_pages());
+
+        let handle = store.versioned_read_handle();
+        assert_eq!(
+            handle.get(&first_key).unwrap().value(),
+            Some(&b"first-value"[..])
+        );
+        let queried = handle
+            .query(&PrimaryKey::new(b"read-metrics".to_vec()), None, 10)
+            .unwrap();
+        assert_eq!(queried.len(), 2);
+        assert_eq!(handle.scan(None, 10).unwrap(), queried);
+
+        let metrics = store.versioned_read_metrics();
+        assert_eq!(metrics.active_generation_pins, 0);
+        assert_eq!(metrics.generation_pins, 0);
+        assert_eq!(metrics.max_concurrent_pins, 0);
+        assert_eq!(metrics.read_operations, 0);
+        assert_eq!(metrics.right_link_corrections, 0);
+        assert!(store.publisher.can_reuse_pages());
+        store.check_invariants().unwrap();
     }
 
     #[test]
