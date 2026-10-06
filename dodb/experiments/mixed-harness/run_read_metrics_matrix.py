@@ -463,7 +463,12 @@ def validate_raw_record(record, cell, checkout_sha):
     assert_equal(record, "requested_duration_ms", cell["duration_ms"])
     assert_equal(record, "repetition", cell["expected_raw_repetition"])
     if cell["binary_kind"] == "phase0":
-        assert_equal(record, "suite", "read")
+        assert_equal(record, "suite", "read-scaling")
+        expected_workload = {
+            "get": "100%-read-get",
+            "query": "100%-read-query",
+        }[cell["read_kind"]]
+        assert_equal(record, "workload", expected_workload)
         assert_equal(record, "readers", cell["readers"])
         assert_equal(record, "writers", 0)
         assert_equal(record, "tokio_workers", PHASE0_TOKIO_WORKERS)
@@ -507,6 +512,13 @@ def validate_raw_record(record, cell, checkout_sha):
     )
     if successful_read_percent != 100.0 or successful_write_count != 0:
         raise ValidationError(f"raw record contains non-read operations for {cell['cell_id']}")
+    if cell["binary_kind"] == "phase0":
+        attempted_read_percent = numeric_value(record, ("attempted_read_percent",))
+        attempted_write_count = numeric_value(record, ("attempted_write_transactions",))
+        if attempted_read_percent != 100.0 or attempted_write_count != 0:
+            raise ValidationError(
+                f"raw record contains attempted writes for {cell['cell_id']}"
+            )
     if cell["variant"] in ("blink-metrics-on", "blink-metrics-off"):
         read_operation_metric = numeric_value(record, ("read_operations_metric",))
         if read_operation_metric is None:

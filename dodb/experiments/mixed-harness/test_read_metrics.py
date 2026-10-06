@@ -31,7 +31,11 @@ def make_raw_record(cell, checkout_sha=SOURCE_COMMIT, repetition=None):
         "engine": cell["expected_engine"],
         "git_commit": checkout_sha,
         "seed": cell["seed"],
-        "suite": "read",
+        "suite": "read-scaling",
+        "workload": {
+            "get": "100%-read-get",
+            "query": "100%-read-query",
+        }[cell["read_kind"]],
         "readers": cell["readers"],
         "writers": 0,
         "tokio_workers": 2,
@@ -57,6 +61,8 @@ def make_raw_record(cell, checkout_sha=SOURCE_COMMIT, repetition=None):
         "overloads": 0,
         "successful_reads": 100,
         "successful_read_percent": 100.0,
+        "attempted_read_percent": 100.0,
+        "attempted_write_transactions": 0,
         "successful_write_transactions": 0,
         "read_operations_metric": 100
         if cell["expected_read_metrics_enabled"]
@@ -269,6 +275,39 @@ class ReadMetricsMatrixTests(unittest.TestCase):
         self.assertEqual(command[command.index("--suite") + 1], "read")
         self.assertEqual(command[command.index("--readers") + 1], "16")
         self.assertEqual(environment["DODB_BENCH_DIR"], "/tmp/read-metrics-data")
+
+    def test_phase0_read_contract_rejects_invalid_suite_and_workload(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            arguments = make_arguments(
+                pathlib.Path(temporary_directory) / "results",
+                "--readers",
+                "2",
+                "--read-kinds",
+                "query",
+                "--variants",
+                "blink-metrics-on",
+                "--repetitions",
+                "1",
+            )
+            cell = read_metrics_runner.build_expected_cells(arguments, SOURCE_COMMIT)[0]
+
+        record = make_raw_record(cell)
+        self.assertIs(
+            read_metrics_runner.validate_raw_record(record, cell, SOURCE_COMMIT), record
+        )
+        for field_name, bad_value in (
+            ("suite", "read"),
+            ("workload", "100%-read-get"),
+            ("attempted_read_percent", 99.0),
+            ("attempted_write_transactions", 1),
+        ):
+            mismatched_record = dict(record)
+            mismatched_record[field_name] = bad_value
+            with self.subTest(field=field_name):
+                with self.assertRaises(ValidationError):
+                    read_metrics_runner.validate_raw_record(
+                        mismatched_record, cell, SOURCE_COMMIT
+                    )
 
     def test_raw_metric_modes_accept_matching_records_and_reject_mismatch(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
