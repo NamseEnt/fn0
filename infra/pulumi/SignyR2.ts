@@ -35,22 +35,27 @@ export class SignyR2 extends pulumi.ComponentResource {
       { parent: this },
     );
 
+    const catalogPrefixes = [
+      { id: "signy-catalog-seven-days", prefix: "fn0/signy" },
+      {
+        id: "signy-catalog-current-seven-days",
+        prefix: args.storagePrefix,
+      },
+    ];
     const lock = new cloudflare.R2BucketLock(
       "catalog-lock",
       {
         accountId: args.accountId,
         bucketName: bucket.name,
-        rules: [
-          {
-            id: "signy-catalog-seven-days",
-            enabled: true,
-            prefix: pulumi.interpolate`${args.storagePrefix}/catalog/`,
-            condition: {
-              type: "Age",
-              maxAgeSeconds: 604800,
-            },
+        rules: catalogPrefixes.map(({ id, prefix }) => ({
+          id,
+          enabled: true,
+          prefix: pulumi.interpolate`${prefix}/catalog/`,
+          condition: {
+            type: "Age",
+            maxAgeSeconds: 604800,
           },
-        ],
+        })),
       },
       { parent: this, dependsOn: [bucket] },
     );
