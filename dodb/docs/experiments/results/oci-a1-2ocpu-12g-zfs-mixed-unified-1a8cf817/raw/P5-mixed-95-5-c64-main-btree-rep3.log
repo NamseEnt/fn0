@@ -1,0 +1,5 @@
+phase0-bench engine=main-btree build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /bench/zfs/db/mixed-unified-aae183ee/results/raw/P5-mixed-95-5-c64-main-btree-rep3.jsonl
+scenario                                                       repetition throughput summary
+mixed-64w-0r-get-95/5-width1-uniform                       rep=0 tx/s=     6542 mut/s=     6542 read/s=   124314 agg/s=   130856 p50=     0.0us p95=     0.0us p99=     0.0us groups=  590 avg_group=55.61
+completed 1 scenarios x 1 repetitions

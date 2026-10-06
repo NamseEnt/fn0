@@ -1,0 +1,5 @@
+phase0-bench engine=parallel-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /bench/zfs/db/mixed-unified-aae183ee/results/raw/P5-mixed-95-5-c64-parallel-blink-rep1.jsonl
+scenario                                                       repetition throughput summary
+mixed-64w-0r-get-95/5-width1-uniform                       rep=0 tx/s=    20057 mut/s=    20057 read/s=   381103 agg/s=   401160 p50=     0.0us p95=     0.0us p99=     0.0us groups= 3107 avg_group=32.40
+completed 1 scenarios x 1 repetitions

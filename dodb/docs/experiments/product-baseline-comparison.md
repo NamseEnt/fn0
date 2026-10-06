@@ -8,7 +8,55 @@ The old dodb execution model used dedicated reader and writer tasks. For example
 
 The corrected harness starts exactly N mixed client workers for every engine at cN. Each worker may issue either operation. A shared atomic fetch-add assigns each offered operation a global index; `index % 100 < read_percent` selects a read, and a request seed derived from the same invocation seed and index generates its key/value trace. Index allocation does not hold a lock across database calls, so requests can be concurrently in flight. The harness records requested and observed attempted/successful ratios, separate read/write latency percentiles, and a deterministic 1,000-operation logical trace hash. The summarizer rejects a run set when engine seeds, scenario parameters, or logical trace hashes differ.
 
-The corrected product matrix is P5 95/5, P6 50/50, and P7 20/80 at c4/c16/c64, plus 95/5 with width-4 and width-8 writes at c16. All use uniform distribution, 512 B values, a 10,000-row resident working set, 2 s warmup, 5 s measurement, three repetitions, and the existing durable-return contracts. Raw files and the run manifest are in `results/oci-a1-2ocpu-12g-zfs-mixed-unified-<source-sha8>/`.
+The corrected product matrix is P5 95/5, P6 50/50, and P7 20/80 at c4/c16/c64, plus 95/5 with width-4 and width-8 writes at c16. All use uniform distribution, 512 B values, a 10,000-row resident working set, 2 s warmup, 5 s measurement, three repetitions, and the existing durable-return contracts. Raw files and the run manifest are in [`oci-a1-2ocpu-12g-zfs-mixed-unified-1a8cf817`](results/oci-a1-2ocpu-12g-zfs-mixed-unified-1a8cf817/).
+
+The final source SHA is `1a8cf817f0c725e928817e5e45cb046164f05325`. The run used OCI host `instance-20260923-1013`, AArch64 Neoverse-N1, 2 OCPU, 12 GiB RAM, on ZFS dataset `dodbbench/db` with `sync=standard`, `recordsize=4K`, compression off, and atime off. Before the final run, a six-engine smoke run exposed a missing writer seed mask in dodb request generation. The seed was aligned, tested, pushed, fetched on OCI, and the smoke run then produced the same trace hash on all engines. The final 198 executions all exited successfully. Across all 33 case/repetition groups, all six engines matched on worker count, seed, trace hash, transaction width, requested ratio, distribution, working set, key/value sizes, warmup, measurement duration, and durable-return contract. The 1,000-operation trace hash covers each operation kind and the generated read key or write keys and values. The local summary contains 66 median rows and rejects mismatches.
+
+### Corrected c16 results
+
+Each rate is the median of three repetitions. Throughput columns are total logical operations/s, successful read operations/s, and successful write transactions/s. Read latencies are p50/p95/p99 in microseconds; write latencies are p50/p95/p99 in milliseconds. Ratios show attempted R/W followed by successful R/W. Counter order is errors/conflicts/retries/Busy/overloads; `—` means the adapter does not expose that counter.
+
+| Workload | Engine | Total/read/write ops/s | Read p50/p95/p99 (us) | Write p50/p95/p99 (ms) | Attempted -> successful R/W (%) | Errors/conflicts/retries/Busy/overloads |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 95/5 c16 | main-btree | 82,719/78,584/4,135 | 1.72/2.52/3.36 | 3.66/5.53/7.01 | 95.00/5.00 -> 95.00/5.00 | 0/0/—/—/0 |
+| 95/5 c16 | parallel-blink | 129,740/123,253/6,487 | 1.36/2.00/2.92 | 2.36/3.40/3.91 | 95.00/5.00 -> 95.00/5.00 | 0/0/—/—/0 |
+| 95/5 c16 | RocksDB | 148,890/141,446/7,444 | 2.20/3.84/6.48 | 2.06/3.09/4.00 | 95.00/5.00 -> 95.00/5.00 | 0/0/0/0/— |
+| 95/5 c16 | SQLite WAL | 21,874/20,780/1,094 | 15.40/33.76/62.16 | 0.90/34.96/330.55 | 95.00/5.00 -> 95.00/5.00 | 0/0/0/0/— |
+| 95/5 c16 | Turso WAL | 13,110/12,507/602 | 71.24/361.72/1,952.50 | 3.17/72.50/98.93 | 95.00/5.00 -> 95.40/4.60 | 0/0/16,082/16,363/— |
+| 95/5 c16 | Turso MVCC | 25,420/24,150/1,271 | 45.36/100.00/2,117.22 | 8.82/20.95/32.46 | 95.00/5.00 -> 95.00/5.00 | 0/16/16/0/— |
+| 50/50 c16 | main-btree | 8,348/4,178/4,170 | 2.56/3.92/7.36 | 3.68/5.18/7.08 | 50.05/49.95 -> 50.05/49.95 | 0/0/—/—/0 |
+| 50/50 c16 | parallel-blink | 14,468/7,236/7,233 | 2.00/2.96/5.96 | 2.09/3.16/3.56 | 50.02/49.98 -> 50.02/49.98 | 0/0/—/—/0 |
+| 50/50 c16 | RocksDB | 16,134/8,067/8,067 | 2.96/5.64/11.52 | 2.02/2.52/3.29 | 50.01/49.99 -> 50.01/49.99 | 0/0/0/0/— |
+| 50/50 c16 | SQLite WAL | 3,886/1,947/1,939 | 11.92/27.36/51.24 | 0.08/1.06/1.49 | 50.06/49.94 -> 50.06/49.94 | 0/0/0/0/— |
+| 50/50 c16 | Turso WAL | 3,106/1,617/1,489 | 65.16/144.80/476.36 | 0.89/7.08/76.80 | 50.10/49.90 -> 51.98/48.02 | 0/0/13,216/13,830/— |
+| 50/50 c16 | Turso MVCC | 1,431/719/712 | 73.76/136.40/3,106.55 | 18.98/52.03/83.88 | 50.10/49.90 -> 50.10/49.90 | 0/11/11/0/— |
+| 20/80 c16 | main-btree | 5,092/1,020/4,072 | 2.96/6.80/8.16 | 3.75/5.29/7.15 | 20.02/79.98 -> 20.02/79.98 | 0/0/—/—/0 |
+| 20/80 c16 | parallel-blink | 9,222/1,847/7,374 | 2.36/4.92/7.04 | 2.05/3.13/3.64 | 20.01/79.99 -> 20.01/79.99 | 0/0/—/—/0 |
+| 20/80 c16 | RocksDB | 10,189/2,040/8,149 | 3.32/9.48/14.60 | 2.02/2.45/3.13 | 20.03/79.97 -> 20.03/79.97 | 0/0/0/0/— |
+| 20/80 c16 | SQLite WAL | 2,493/500/1,992 | 12.84/36.00/63.52 | 0.07/1.05/1.38 | 20.10/79.90 -> 20.10/79.90 | 0/0/0/0/— |
+| 20/80 c16 | Turso WAL | 2,091/445/1,646 | 66.44/152.84/294.96 | 0.84/1.61/64.97 | 20.06/79.94 -> 21.32/78.68 | 0/0/13,023/13,691/— |
+| 20/80 c16 | Turso MVCC | 869/176/693 | 82.12/215.20/648.45 | 19.98/52.02/78.91 | 20.23/79.77 -> 20.23/79.77 | 0/8/8/0/— |
+
+At c16, B-link completed 1.57x, 1.73x, and 1.81x main-btree throughput for 95/5, 50/50, and 20/80. Its 95/5 read and write p99 were both lower than main-btree. RocksDB remained 1.15x, 1.12x, and 1.10x ahead of B-link on total throughput for those ratios. Turso WAL retained its Busy retry cost in the counters and write tails; Turso MVCC retained conflicts/retries as failed attempts. These are results from the unified matrix only. The full c4/c16/c64 and focused-case metrics, including p50/p95/p99 and attempted/successful ratios, are in [`mixed-summary.csv`](results/oci-a1-2ocpu-12g-zfs-mixed-unified-1a8cf817/mixed-summary.csv).
+
+### Focused transaction-heavy mixes
+
+The width-4 and width-8 cases use the same 95/5 request schedule at c16. Rates are total/read/write ops/s; actual R/W is the successful ratio. Their complete latency and retry metrics are in the summary CSV.
+
+| Workload | Engine | Total/read/write ops/s | Successful R/W (%) | Conflicts/retries |
+| --- | --- | ---: | ---: | ---: |
+| 95/5 width-4 c16 | main-btree | 48,984/46,536/2,448 | 95.00/5.00 | 0/— |
+| 95/5 width-4 c16 | parallel-blink | 92,640/88,009/4,632 | 95.00/5.00 | 0/— |
+| 95/5 width-4 c16 | RocksDB | 109,088/103,633/5,454 | 95.00/5.00 | 0/0 |
+| 95/5 width-4 c16 | SQLite WAL | 13,147/12,490/657 | 95.00/5.00 | 0/0 |
+| 95/5 width-4 c16 | Turso WAL | 10,305/9,855/448 | 95.67/4.33 | 0/14,689 |
+| 95/5 width-4 c16 | Turso MVCC | 11,892/11,298/594 | 95.01/4.99 | 152/152 |
+| 95/5 width-8 c16 | main-btree | 33,107/31,452/1,655 | 95.00/5.00 | 0/— |
+| 95/5 width-8 c16 | parallel-blink | 60,815/57,775/3,040 | 95.00/5.00 | 0/— |
+| 95/5 width-8 c16 | RocksDB | 71,661/68,078/3,583 | 95.00/5.00 | 0/0 |
+| 95/5 width-8 c16 | SQLite WAL | 10,226/9,716/511 | 95.00/5.00 | 0/0 |
+| 95/5 width-8 c16 | Turso WAL | 8,750/8,388/362 | 95.93/4.07 | 0/13,796 |
+| 95/5 width-8 c16 | Turso MVCC | 7,250/6,888/362 | 95.01/4.99 | 238/239 |
 
 ## Historical result context
 
@@ -23,7 +71,7 @@ Get falls 19.6% at 4 clients and 22.5% at 16; Query limit 16 falls 24.7% and
 regression above 10% in those paths as an adoption blocker. Write gains do not
 cancel those regressions.
 
-## Headline throughput
+## Historical headline throughput (legacy mixed cross-engine rows invalidated)
 
 Values are median throughput across three runs. Get is operations/s, Query is
 queries/s, durable writes and multi-key transactions are transactions/s, and
@@ -131,11 +179,10 @@ isolation.
 
 Turso MVCC is an approximate concurrent-transaction reference. At c16 it
 records 697 tx/s for w1, 486 tx/s for w4, and 465 tx/s for w8, compared with
-B-link's 7,181, 4,833, and 3,142 tx/s. It records 24,958 aggregate ops/s for
-95/5 with 29 conflicts/retries, 1,522 ops/s for 50/50, and 917 ops/s for
-20/80. The headline rates, conflicts, retries, and errors use v0.8.2-pre.2.
-Its MVCC snapshot and conflict behavior, group commit, and retry behavior
-differ from dodb's transaction contract.
+B-link's 7,181, 4,833, and 3,142 tx/s. The former mixed cross-engine Turso
+MVCC rates are invalidated and replaced by the unified results above. Its MVCC
+snapshot and conflict behavior, group commit, and retry behavior differ from
+dodb's transaction contract.
 
 In the seed-matched v0.8.2-pre.2 P5 95/5 c4 case, MVCC produced 118
 `database is locked` errors over three repetitions. The pinned adapter retries typed Busy and

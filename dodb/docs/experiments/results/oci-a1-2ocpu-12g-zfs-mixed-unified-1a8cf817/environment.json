@@ -1,0 +1,20 @@
+{
+  "timestamp_utc": "2026-10-06T06:53:47.355775+00:00",
+  "hostname": "instance-20260923-1013",
+  "architecture": "aarch64",
+  "kernel": "6.12.0-206.104.4.4.el9uek.aarch64",
+  "cpu_model": "Neoverse-N1",
+  "logical_cpus": 2,
+  "memory_total_kib": 11159744,
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "git_commit": "1a8cf817f0c725e928817e5e45cb046164f05325",
+  "git_branch": "",
+  "main_sha": "d5e41bb823b55d68bad6ab5ba73b0b5113223d8b",
+  "filesystem": "dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive",
+  "pool_status": "pool: dodbbench\n state: ONLINE\nconfig:\n\n\tNAME        STATE     READ WRITE CKSUM\n\tdodbbench   ONLINE       0     0     0\n\t  sda4      ONLINE       0     0     0\n\nerrors: No known data errors",
+  "zfs_properties": "NAME          PROPERTY     VALUE           SOURCE\ndodbbench/db  sync         standard        local\ndodbbench/db  recordsize   4K              local\ndodbbench/db  compression  off             inherited from dodbbench\ndodbbench/db  atime        off             inherited from dodbbench",
+  "durability": "durable-return; real sync for dodb, WAL FULL for SQLite and Turso, synced RocksDB WriteBatch",
+  "primary_working_set_rows": 10000,
+  "cache_pressure_working_set_rows": 250000,
+  "dodb_cache_pages": 16384
+}

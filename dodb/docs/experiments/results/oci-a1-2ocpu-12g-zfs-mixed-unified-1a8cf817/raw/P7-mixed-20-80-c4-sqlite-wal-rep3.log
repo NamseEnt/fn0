@@ -1,0 +1,1 @@
+sqlite-wal w4 width1 uniform rep3: 2493.5 tx/s committed, 2493.5 attempted/s, busy=0 conflicts=0 abandoned=0 errors=0 p99=1314us verify=true
