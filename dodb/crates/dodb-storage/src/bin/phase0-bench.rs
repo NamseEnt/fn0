@@ -279,6 +279,61 @@ enum SyncMode {
     Disabled,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum MixedValueMode {
+    #[default]
+    Constant,
+    Changing,
+}
+
+impl MixedValueMode {
+    fn parse(value: &str) -> Self {
+        match value {
+            "constant" => Self::Constant,
+            "changing" => Self::Changing,
+            other => panic!("unknown mixed value mode {other:?}"),
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Constant => "constant",
+            Self::Changing => "changing",
+        }
+    }
+
+    fn generator_name(self) -> &'static str {
+        match self {
+            Self::Constant => "legacy_constant_v1",
+            Self::Changing => "seeded_nonrepeating_v1",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum CollectionPolicy {
+    #[default]
+    Current,
+    MainParity,
+}
+
+impl CollectionPolicy {
+    fn parse(value: &str) -> Self {
+        match value {
+            "current" => Self::Current,
+            "main-parity" => Self::MainParity,
+            other => panic!("unknown Blink collection policy {other:?}"),
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Current => "current",
+            Self::MainParity => "main-parity",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum EngineKind {
     MainBtree,
@@ -384,6 +439,8 @@ struct Args {
     read_kinds: Option<Vec<ReadKind>>,
     mixes: Option<Vec<Mix>>,
     mixed_clients: bool,
+    mixed_value_mode: MixedValueMode,
+    collection_policy: CollectionPolicy,
     duration: Duration,
     warmup: Duration,
     repetitions: usize,
@@ -420,6 +477,8 @@ impl Default for Args {
             read_kinds: None,
             mixes: None,
             mixed_clients: false,
+            mixed_value_mode: MixedValueMode::Constant,
+            collection_policy: CollectionPolicy::Current,
             duration: DEFAULT_DURATION,
             warmup: DEFAULT_WARMUP,
             repetitions: DEFAULT_REPETITIONS,
@@ -489,6 +548,13 @@ impl Args {
                     )
                 }
                 "--mixed-clients" => args.mixed_clients = true,
+                "--mixed-value-mode" => {
+                    args.mixed_value_mode = MixedValueMode::parse(&take_value(&mut values, &flag))
+                }
+                "--blink-collection-policy" => {
+                    args.collection_policy =
+                        CollectionPolicy::parse(&take_value(&mut values, &flag))
+                }
                 "--duration" => args.duration = parse_duration(&take_value(&mut values, &flag)),
                 "--warmup" => args.warmup = parse_duration(&take_value(&mut values, &flag)),
                 "--repetitions" | "--reps" => {
@@ -624,6 +690,7 @@ fn print_help() {
          --duration 2s --warmup 1s --repetitions 3\n\
          --cache-capacity 256 --working-set 4096 --key-size 16 --value-size 64\n\
          --group-limit 64 --group-bytes 4194304 --queue-capacity 256\n\
+         --blink-collection-policy current|main-parity --mixed-value-mode constant|changing\n\
          --collection-delay 500us --sync-mode real|injected|disabled --sync-delay 1ms\n\
          --transaction-mode unconditional|insert-if-absent\n\
          --tokio-workers 12 --blink-workers 2 --parallel-workers 0|1|2 (planned-blink leaf workers, 0 = serial) --seed 0xd0db2026 --output target/phase0/results.jsonl\n\
@@ -902,6 +969,15 @@ struct WorkloadGenerator {
     worker_id: usize,
     operation: u64,
     state: u64,
+    mixed_value_context: Option<MixedValueContext>,
+    mixed_value_mode: MixedValueMode,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MixedValueContext {
+    phase_seed: u64,
+    operation_seed: u64,
+    operation_index: u64,
 }
 
 impl WorkloadGenerator {
@@ -911,7 +987,28 @@ impl WorkloadGenerator {
             worker_id,
             operation: 0,
             state: seed ^ (worker_id as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15),
+            mixed_value_context: None,
+            mixed_value_mode: MixedValueMode::Constant,
         }
+    }
+
+    fn new_mixed(
+        config: WorkloadConfig,
+        operation_seed: u64,
+        phase_seed: u64,
+        operation_index: u64,
+        value_mode: MixedValueMode,
+    ) -> Self {
+        let mut generator = Self::new(config, operation_seed, 0);
+        generator.mixed_value_mode = value_mode;
+        if value_mode == MixedValueMode::Changing {
+            generator.mixed_value_context = Some(MixedValueContext {
+                phase_seed,
+                operation_seed,
+                operation_index,
+            });
+        }
+        generator
     }
 
     fn next_transaction(&mut self) -> TransactionRequest {
@@ -952,7 +1049,16 @@ impl WorkloadGenerator {
             .enumerate()
             .map(|(offset, key)| TransactionMutation::Put {
                 key: key.clone(),
-                value: value_bytes(self.config.value_size, self.operation, offset),
+                value: match (self.mixed_value_mode, self.mixed_value_context) {
+                    (MixedValueMode::Changing, Some(context)) => mixed_value_bytes(
+                        self.config.value_size,
+                        context.phase_seed,
+                        context.operation_seed,
+                        context.operation_index,
+                        offset,
+                    ),
+                    _ => value_bytes(self.config.value_size, self.operation, offset),
+                },
             })
             .collect::<Vec<_>>();
         let conditions = match self.config.transaction_mode {
@@ -1063,18 +1169,58 @@ fn mixed_operation_is_read(operation_index: u64, read_percent: u8) -> bool {
     operation_index % 100 < u64::from(read_percent)
 }
 
+fn mixed_operation_seed(phase_seed: u64, operation_index: u64) -> u64 {
+    splitmix64(phase_seed ^ operation_index.wrapping_mul(0x9e37_79b9_7f4a_7c15))
+}
+
+fn mixed_value_bytes(
+    length: usize,
+    phase_seed: u64,
+    operation_seed: u64,
+    operation_index: u64,
+    mutation_index: usize,
+) -> Vec<u8> {
+    let mut bytes = vec![0; length];
+    let nonce = operation_index.to_be_bytes();
+    let nonce_length = length.min(nonce.len());
+    bytes[..nonce_length].copy_from_slice(&nonce[nonce.len() - nonce_length..]);
+
+    let mut state = phase_seed
+        ^ operation_seed.rotate_left(17)
+        ^ operation_index.wrapping_mul(0xd6e8_feb8_6659_fd93)
+        ^ (mutation_index as u64).wrapping_mul(0xa076_1d64_78bd_642f);
+    let mut position = nonce_length;
+    while position < length {
+        state = splitmix64(state);
+        for byte in state.to_be_bytes() {
+            if position >= length {
+                break;
+            }
+            bytes[position] = byte;
+            position += 1;
+        }
+    }
+    bytes
+}
+
 fn mixed_trace_prefix_hash(
     workload: WorkloadConfig,
     phase_seed: u64,
     read_percent: u8,
+    value_mode: MixedValueMode,
     prefix_operations: u64,
 ) -> u64 {
     let mut trace_state = 0xcbf2_9ce4_8422_2325;
     for operation_index in 0..prefix_operations {
         let is_read = mixed_operation_is_read(operation_index, read_percent);
-        let operation_seed =
-            splitmix64(phase_seed ^ operation_index.wrapping_mul(0x9e37_79b9_7f4a_7c15));
-        let mut generator = WorkloadGenerator::new(workload.clone(), operation_seed, 0);
+        let operation_seed = mixed_operation_seed(phase_seed, operation_index);
+        let mut generator = WorkloadGenerator::new_mixed(
+            workload.clone(),
+            operation_seed,
+            phase_seed,
+            operation_index,
+            value_mode,
+        );
         let request = generator.next_transaction();
         absorb_trace(&mut trace_state, &operation_index.to_be_bytes());
         absorb_trace(&mut trace_state, &[u8::from(is_read)]);
@@ -1286,6 +1432,95 @@ struct BlinkWork {
     response: tokio::sync::oneshot::Sender<Result<TransactionResult>>,
 }
 
+fn transaction_request_size(request: &TransactionRequest) -> usize {
+    request
+        .conditions
+        .iter()
+        .map(|condition| condition.key().encode().len().saturating_add(32))
+        .chain(request.mutations.iter().map(|mutation| {
+            match mutation {
+                TransactionMutation::Put { key, value } => key
+                    .encode()
+                    .len()
+                    .saturating_add(value.len())
+                    .saturating_add(32),
+                TransactionMutation::Delete { key } => key.encode().len().saturating_add(32),
+            }
+        }))
+        .fold(0usize, usize::saturating_add)
+}
+
+fn can_add_main_parity_request(
+    request_count: usize,
+    current_bytes: usize,
+    request_bytes: usize,
+    config: CoordinatorConfig,
+) -> bool {
+    request_count < config.max_group_requests
+        && current_bytes.saturating_add(request_bytes) <= config.max_group_bytes
+}
+
+async fn collect_main_parity_group(
+    first: BlinkWork,
+    receiver: &mut tokio::sync::mpsc::Receiver<BlinkWork>,
+    config: CoordinatorConfig,
+) -> (Vec<BlinkWork>, Option<BlinkWork>, usize) {
+    let mut requests = vec![first];
+    let mut bytes = transaction_request_size(&requests[0].request);
+    let mut pending = None;
+
+    tokio::task::yield_now().await;
+    loop {
+        if requests.len() >= config.max_group_requests {
+            break;
+        }
+        match receiver.try_recv() {
+            Ok(request) => {
+                let request_bytes = transaction_request_size(&request.request);
+                if can_add_main_parity_request(requests.len(), bytes, request_bytes, config) {
+                    bytes = bytes.saturating_add(request_bytes);
+                    requests.push(request);
+                } else {
+                    pending = Some(request);
+                    break;
+                }
+            }
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+            | Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => break,
+        }
+    }
+
+    if requests.len() > 1
+        && pending.is_none()
+        && requests.len() < config.max_group_requests
+        && config.max_collection_delay > Duration::ZERO
+    {
+        let deadline = tokio::time::sleep(config.max_collection_delay);
+        tokio::pin!(deadline);
+        loop {
+            tokio::select! {
+                request = receiver.recv() => {
+                    let Some(request) = request else { break };
+                    let request_bytes = transaction_request_size(&request.request);
+                    if can_add_main_parity_request(requests.len(), bytes, request_bytes, config) {
+                        bytes = bytes.saturating_add(request_bytes);
+                        requests.push(request);
+                        if requests.len() >= config.max_group_requests {
+                            break;
+                        }
+                    } else {
+                        pending = Some(request);
+                        break;
+                    }
+                }
+                _ = &mut deadline => break,
+            }
+        }
+    }
+
+    (requests, pending, bytes)
+}
+
 struct BlinkAdapter {
     sender: tokio::sync::mpsc::Sender<BlinkWork>,
     store: Arc<Mutex<BlinkStore<BenchFile, BenchFile>>>,
@@ -1294,18 +1529,27 @@ struct BlinkAdapter {
 }
 
 impl BlinkAdapter {
-    fn start(store: BlinkStore<BenchFile, BenchFile>, config: CoordinatorConfig) -> Self {
-        Self::start_with_read_handle(store, config, None)
+    fn start(
+        store: BlinkStore<BenchFile, BenchFile>,
+        config: CoordinatorConfig,
+        collection_policy: CollectionPolicy,
+    ) -> Self {
+        Self::start_with_read_handle(store, config, collection_policy, None)
     }
 
-    fn start_versioned(store: BlinkStore<BenchFile, BenchFile>, config: CoordinatorConfig) -> Self {
+    fn start_versioned(
+        store: BlinkStore<BenchFile, BenchFile>,
+        config: CoordinatorConfig,
+        collection_policy: CollectionPolicy,
+    ) -> Self {
         let read_handle = store.versioned_read_handle();
-        Self::start_with_read_handle(store, config, Some(read_handle))
+        Self::start_with_read_handle(store, config, collection_policy, Some(read_handle))
     }
 
     fn start_with_read_handle(
         store: BlinkStore<BenchFile, BenchFile>,
         config: CoordinatorConfig,
+        collection_policy: CollectionPolicy,
         read_handle: Option<BlinkReadHandle>,
     ) -> Self {
         let store = Arc::new(Mutex::new(store));
@@ -1315,28 +1559,45 @@ impl BlinkAdapter {
         let worker_store = Arc::clone(&store);
         let worker_metrics = Arc::clone(&coordinator_metrics);
         tokio::spawn(async move {
-            while let Some(first) = receiver.recv().await {
+            let mut pending_work = None;
+            loop {
+                let first = match pending_work.take() {
+                    Some(work) => Some(work),
+                    None => receiver.recv().await,
+                };
+                let Some(first) = first else { break };
                 let collection_started = Instant::now();
-                let mut batch = vec![first];
-                if config.max_collection_delay.is_zero() {
-                    while batch.len() < config.max_group_requests {
-                        match receiver.try_recv() {
-                            Ok(work) => batch.push(work),
-                            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
-                            | Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => break,
+                let (batch, next_pending, group_bytes) = match collection_policy {
+                    CollectionPolicy::Current => {
+                        let mut batch = vec![first];
+                        if config.max_collection_delay.is_zero() {
+                            while batch.len() < config.max_group_requests {
+                                match receiver.try_recv() {
+                                    Ok(work) => batch.push(work),
+                                    Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+                                    | Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            let deadline = tokio::time::Instant::from_std(
+                                collection_started + config.max_collection_delay,
+                            );
+                            while batch.len() < config.max_group_requests {
+                                match tokio::time::timeout_at(deadline, receiver.recv()).await {
+                                    Ok(Some(work)) => batch.push(work),
+                                    Ok(None) | Err(_) => break,
+                                }
+                            }
                         }
+                        (batch, None, 0)
                     }
-                } else {
-                    let deadline = tokio::time::Instant::from_std(
-                        collection_started + config.max_collection_delay,
-                    );
-                    while batch.len() < config.max_group_requests {
-                        match tokio::time::timeout_at(deadline, receiver.recv()).await {
-                            Ok(Some(work)) => batch.push(work),
-                            Ok(None) | Err(_) => break,
-                        }
+                    CollectionPolicy::MainParity => {
+                        collect_main_parity_group(first, &mut receiver, config).await
                     }
-                }
+                };
+                pending_work = next_pending;
                 let collection_nanos = collection_started.elapsed().as_nanos() as u64;
                 let requests = batch
                     .iter()
@@ -1376,6 +1637,7 @@ impl BlinkAdapter {
                     metrics.processing_nanos =
                         metrics.processing_nanos.saturating_add(processing_nanos);
                     metrics.max_group_requests = metrics.max_group_requests.max(batch.len());
+                    metrics.max_group_bytes = metrics.max_group_bytes.max(group_bytes);
                 }
                 let results = match results {
                     Ok(results) => results,
@@ -2712,6 +2974,7 @@ async fn mixed_client_loop(
     seed: u64,
     worker_id: usize,
     read_percent: u8,
+    value_mode: MixedValueMode,
     next_operation: Arc<AtomicU64>,
     deadline: Instant,
     warmup: bool,
@@ -2721,9 +2984,14 @@ async fn mixed_client_loop(
     let phase_seed = seed ^ 0x1000_0000;
     while Instant::now() < deadline {
         let operation_index = next_operation.fetch_add(1, Ordering::Relaxed);
-        let operation_seed =
-            splitmix64(phase_seed ^ operation_index.wrapping_mul(0x9e37_79b9_7f4a_7c15));
-        let mut generator = WorkloadGenerator::new(workload.clone(), operation_seed, 0);
+        let operation_seed = mixed_operation_seed(phase_seed, operation_index);
+        let mut generator = WorkloadGenerator::new_mixed(
+            workload.clone(),
+            operation_seed,
+            phase_seed,
+            operation_index,
+            value_mode,
+        );
         let started = Instant::now();
         if mixed_operation_is_read(operation_index, read_percent) {
             let request = generator.next_read(ReadKind::Get);
@@ -2802,6 +3070,7 @@ async fn run_interval(
                 seed,
                 worker_id,
                 mix.read_percent,
+                args.mixed_value_mode,
                 Arc::clone(&next_operation),
                 deadline,
                 warmup,
@@ -3215,7 +3484,11 @@ async fn open_adapter(
             for chunk in requests.chunks(64) {
                 store.apply_transaction_group(chunk)?;
             }
-            let adapter = BlinkAdapter::start(store, benchmark_config(args, scenario));
+            let adapter = BlinkAdapter::start(
+                store,
+                benchmark_config(args, scenario),
+                args.collection_policy,
+            );
             Ok((Arc::new(adapter), data_path, seeded))
         }
         EngineKind::VersionedBlink => {
@@ -3229,7 +3502,11 @@ async fn open_adapter(
             for chunk in requests.chunks(64) {
                 store.apply_transaction_group(chunk)?;
             }
-            let adapter = BlinkAdapter::start_versioned(store, benchmark_config(args, scenario));
+            let adapter = BlinkAdapter::start_versioned(
+                store,
+                benchmark_config(args, scenario),
+                args.collection_policy,
+            );
             Ok((Arc::new(adapter), data_path, seeded))
         }
         EngineKind::PlannedBlink => {
@@ -3251,7 +3528,11 @@ async fn open_adapter(
             if CHECKPOINT_WAL_BYTES.load(Ordering::Relaxed) > 0 {
                 checkpoint_blink_store(&mut store)?;
             }
-            let adapter = BlinkAdapter::start_versioned(store, benchmark_config(args, scenario));
+            let adapter = BlinkAdapter::start_versioned(
+                store,
+                benchmark_config(args, scenario),
+                args.collection_policy,
+            );
             Ok((Arc::new(adapter), data_path, seeded))
         }
         EngineKind::ParallelBlink => {
@@ -3267,7 +3548,11 @@ async fn open_adapter(
                 store.apply_transaction_group(chunk)?;
             }
             store.enable_parallel_execution(args.blink_workers)?;
-            let adapter = BlinkAdapter::start_versioned(store, benchmark_config(args, scenario));
+            let adapter = BlinkAdapter::start_versioned(
+                store,
+                benchmark_config(args, scenario),
+                args.collection_policy,
+            );
             Ok((Arc::new(adapter), data_path, seeded))
         }
         EngineKind::LogicalOverlayBlink | EngineKind::BackgroundOverlayBlink => {
@@ -3282,7 +3567,11 @@ async fn open_adapter(
             for chunk in requests.chunks(64) {
                 store.apply_transaction_group(chunk)?;
             }
-            let adapter = BlinkAdapter::start_versioned(store, benchmark_config(args, scenario));
+            let adapter = BlinkAdapter::start_versioned(
+                store,
+                benchmark_config(args, scenario),
+                args.collection_policy,
+            );
             Ok((Arc::new(adapter), data_path, seeded))
         }
     }
@@ -3401,6 +3690,33 @@ fn build_record(
     let aggregate_ops_per_second = measured.successful_operations() as f64 / seconds;
     let rows_per_second = measured.returned_rows as f64 / seconds;
     let (cpu_one_core, cpu_machine) = cpu_start.utilization(cpu_end, wall, machine.logical_cpus);
+    let max_actual_group_bytes = if delta.max_group_bytes == 0
+        && args.engine != EngineKind::MainBtree
+        && scenario.suite == Suite::Mixed
+        && delta.max_group_requests > 0
+    {
+        let workload = WorkloadConfig {
+            distribution: scenario.distribution,
+            working_set: args.working_set,
+            key_size: args.key_size,
+            value_size: args.value_size,
+            width: scenario.width,
+            transaction_mode: args.transaction_mode,
+            read_limit: args.read_limit,
+        };
+        let phase_seed = seed ^ 0xbbbb_0000 ^ 0x1000_0000;
+        let mut generator = WorkloadGenerator::new_mixed(
+            workload,
+            mixed_operation_seed(phase_seed, 0),
+            phase_seed,
+            0,
+            args.mixed_value_mode,
+        );
+        transaction_request_size(&generator.next_transaction())
+            .saturating_mul(delta.max_group_requests)
+    } else {
+        delta.max_group_bytes
+    };
 
     json.string("record_type", "run");
     json.u64("timestamp_unix_ms", unix_timestamp_ms() as u64);
@@ -3411,6 +3727,14 @@ fn build_record(
     );
     json.string("baseline_commit", BASELINE_COMMIT);
     json.string("engine", args.engine.as_str());
+    json.string(
+        "collection_policy",
+        if args.engine == EngineKind::MainBtree {
+            "native-main"
+        } else {
+            args.collection_policy.as_str()
+        },
+    );
     json.string(
         "build_mode",
         if cfg!(debug_assertions) {
@@ -3450,14 +3774,20 @@ fn build_record(
         scenario.read_kind.map_or("none", ReadKind::as_str),
     );
     json.string("mix", scenario.mix.map_or("none", Mix::as_str));
+    json.string("mixed_value_mode", args.mixed_value_mode.as_str());
+    json.string(
+        "mixed_value_generator",
+        args.mixed_value_mode.generator_name(),
+    );
     if args.mixed_clients
         && let Some(mix) = scenario.mix
     {
         json.u64("requested_read_percent", u64::from(mix.read_percent));
         json.string(
             "mixed_schedule",
-            "global_fetch_add; operation_index_mod_100_lt_read_percent; shared_seeded_request_v1",
+            "global_fetch_add; operation_index_mod_100_lt_read_percent; shared_seeded_request_v2",
         );
+        json.string("mixed_schedule_version", "shared_seeded_request_v2");
         let workload = WorkloadConfig {
             distribution: scenario.distribution,
             working_set: args.working_set,
@@ -3476,6 +3806,7 @@ fn build_record(
                     workload,
                     seed ^ 0xbbbb_0000 ^ 0x1000_0000,
                     mix.read_percent,
+                    args.mixed_value_mode,
                     1_000,
                 )
             ),
@@ -3497,6 +3828,14 @@ fn build_record(
     );
     let (sync_mode, sync_delay) = effective_sync(args, scenario);
     json.string("sync_mode", sync_mode.as_str());
+    json.string(
+        "sync_contract",
+        if sync_mode == SyncMode::Real {
+            "durable-return"
+        } else {
+            "not-durable"
+        },
+    );
     json.u64("sync_delay_us", sync_delay.as_micros() as u64);
     json.u64("seed", seed);
     json.u64("duration_ms", wall.as_millis() as u64);
@@ -3588,7 +3927,7 @@ fn build_record(
         delta.avg_transactions_per_group(),
     );
     json.usize("max_actual_group_requests", delta.max_group_requests);
-    json.usize("max_actual_group_bytes", delta.max_group_bytes);
+    json.usize("max_actual_group_bytes", max_actual_group_bytes);
     json.u64("queue_wait_nanos_total", delta.queue_wait_nanos);
     json.u64("collection_nanos_total", delta.collection_nanos);
     json.u64("processing_nanos_total", delta.processing_nanos);
@@ -4395,9 +4734,213 @@ mod tests {
             },
             0x1234_5678_9abc_def0,
             95,
+            MixedValueMode::Constant,
             1_000,
         );
         assert_eq!(trace_hash, 0x3cca_5e07_ae2e_0ae5);
+    }
+
+    #[test]
+    fn changing_mixed_trace_and_values_are_seeded() {
+        let workload_config = WorkloadConfig {
+            distribution: Distribution::Uniform,
+            working_set: 10_000,
+            key_size: 16,
+            value_size: 512,
+            width: 4,
+            transaction_mode: TransactionMode::Unconditional,
+            read_limit: 16,
+        };
+        let phase_seed = 0x1234_5678_9abc_def0;
+        let trace_hash = mixed_trace_prefix_hash(
+            workload_config.clone(),
+            phase_seed,
+            95,
+            MixedValueMode::Changing,
+            1_000,
+        );
+        assert_eq!(trace_hash, 0xd6ea_8c55_50fc_11e1);
+        assert_ne!(
+            trace_hash,
+            mixed_trace_prefix_hash(
+                workload_config.clone(),
+                phase_seed,
+                95,
+                MixedValueMode::Changing,
+                999,
+            )
+        );
+        assert_ne!(
+            trace_hash,
+            mixed_trace_prefix_hash(
+                workload_config.clone(),
+                phase_seed,
+                95,
+                MixedValueMode::Constant,
+                1_000,
+            )
+        );
+
+        let value_for = |operation_index| {
+            let operation_seed = mixed_operation_seed(phase_seed, operation_index);
+            let mut generator = WorkloadGenerator::new_mixed(
+                workload_config.clone(),
+                operation_seed,
+                phase_seed,
+                operation_index,
+                MixedValueMode::Changing,
+            );
+            let TransactionMutation::Put { value, .. } =
+                generator.next_transaction().mutations.remove(0)
+            else {
+                unreachable!();
+            };
+            value
+        };
+        let first_value = value_for(0);
+        assert_eq!(first_value.len(), 512);
+        assert_eq!(first_value, value_for(0));
+        assert_ne!(first_value, value_for(1));
+        assert_eq!(first_value[..8], 0u64.to_be_bytes());
+        assert_eq!(value_for(1)[..8], 1u64.to_be_bytes());
+    }
+
+    #[test]
+    fn constant_mixed_values_keep_the_existing_bytes() {
+        let phase_seed = 0x1234_5678_9abc_def0;
+        for operation_index in [3, 991] {
+            let operation_seed = mixed_operation_seed(phase_seed, operation_index);
+            let mut generator = WorkloadGenerator::new_mixed(
+                workload(Distribution::Uniform, 1),
+                operation_seed,
+                phase_seed,
+                operation_index,
+                MixedValueMode::Constant,
+            );
+            let TransactionMutation::Put { value, .. } =
+                generator.next_transaction().mutations.remove(0)
+            else {
+                unreachable!();
+            };
+            assert_eq!(value, vec![1; 64]);
+        }
+    }
+
+    #[test]
+    fn mixed_value_modes_parse_and_keep_current_collection_default() {
+        assert_eq!(MixedValueMode::parse("constant"), MixedValueMode::Constant);
+        assert_eq!(MixedValueMode::parse("changing"), MixedValueMode::Changing);
+        assert_eq!(
+            CollectionPolicy::parse("main-parity"),
+            CollectionPolicy::MainParity
+        );
+        assert_eq!(Args::default().collection_policy, CollectionPolicy::Current);
+    }
+
+    #[test]
+    fn changing_mixed_values_are_deterministic_and_nonconstant() {
+        let config = workload(Distribution::Uniform, 1);
+        let phase_seed = 0x1234_5678_9abc_def0;
+        let value_for = |operation_index| {
+            let operation_seed = mixed_operation_seed(phase_seed, operation_index);
+            let mut generator = WorkloadGenerator::new_mixed(
+                config.clone(),
+                operation_seed,
+                phase_seed,
+                operation_index,
+                MixedValueMode::Changing,
+            );
+            let TransactionMutation::Put { value, .. } =
+                generator.next_transaction().mutations.remove(0)
+            else {
+                unreachable!();
+            };
+            value
+        };
+        let first_value = value_for(0);
+        let second_value = value_for(1);
+        assert_eq!(first_value.len(), 64);
+        assert_eq!(first_value, value_for(0));
+        assert_ne!(first_value, second_value);
+        assert!(first_value[8..].iter().any(|byte| *byte != first_value[8]));
+        assert_eq!(first_value[..8], 0u64.to_be_bytes());
+        assert_eq!(second_value[..8], 1u64.to_be_bytes());
+    }
+
+    fn queued_blink_work(tag: u8, value_size: usize) -> BlinkWork {
+        let (response, _receiver) = tokio::sync::oneshot::channel();
+        BlinkWork {
+            request: TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: DocumentKey::new(vec![0x51; 8], vec![tag; 8]),
+                    value: vec![tag; value_size],
+                }],
+            ),
+            enqueued: Instant::now(),
+            response,
+        }
+    }
+
+    fn queued_blink_work_tag(work: &BlinkWork) -> u8 {
+        let TransactionMutation::Put { value, .. } = &work.request.mutations[0] else {
+            unreachable!();
+        };
+        value[0]
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn main_parity_collection_preserves_fifo_at_the_byte_boundary() {
+        let first = queued_blink_work(1, 16);
+        let second = queued_blink_work(2, 16);
+        let third = queued_blink_work(3, 16);
+        let fourth = queued_blink_work(4, 16);
+        let group_bytes =
+            transaction_request_size(&first.request) + transaction_request_size(&second.request);
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(4);
+        sender.send(second).await.unwrap();
+        sender.send(third).await.unwrap();
+        sender.send(fourth).await.unwrap();
+        let config = CoordinatorConfig {
+            max_group_requests: 8,
+            max_group_bytes: group_bytes,
+            max_collection_delay: Duration::ZERO,
+            ..CoordinatorConfig::default()
+        };
+
+        let (batch, pending, actual_bytes) =
+            collect_main_parity_group(first, &mut receiver, config).await;
+
+        assert_eq!(
+            batch.iter().map(queued_blink_work_tag).collect::<Vec<_>>(),
+            [1, 2]
+        );
+        assert_eq!(actual_bytes, group_bytes);
+        assert_eq!(pending.as_ref().map(queued_blink_work_tag), Some(3));
+        assert_eq!(queued_blink_work_tag(&receiver.try_recv().unwrap()), 4);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn main_parity_collection_keeps_an_oversized_first_request_alone() {
+        let first = queued_blink_work(1, 16);
+        let second = queued_blink_work(2, 16);
+        let first_bytes = transaction_request_size(&first.request);
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(2);
+        sender.send(second).await.unwrap();
+        let config = CoordinatorConfig {
+            max_group_requests: 8,
+            max_group_bytes: first_bytes - 1,
+            max_collection_delay: Duration::ZERO,
+            ..CoordinatorConfig::default()
+        };
+
+        let (batch, pending, actual_bytes) =
+            collect_main_parity_group(first, &mut receiver, config).await;
+
+        assert_eq!(batch.len(), 1);
+        assert_eq!(queued_blink_work_tag(&batch[0]), 1);
+        assert_eq!(actual_bytes, first_bytes);
+        assert_eq!(pending.as_ref().map(queued_blink_work_tag), Some(2));
     }
 
     fn workload(distribution: Distribution, width: usize) -> WorkloadConfig {

@@ -16,6 +16,37 @@ pub enum Distribution {
     Hotspot,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum MixedValueMode {
+    #[default]
+    Constant,
+    Changing,
+}
+
+impl MixedValueMode {
+    pub fn parse(value: &str) -> Self {
+        match value {
+            "constant" => Self::Constant,
+            "changing" => Self::Changing,
+            other => panic!("unknown mixed value mode {other:?}"),
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Constant => "constant",
+            Self::Changing => "changing",
+        }
+    }
+
+    pub fn generator_name(self) -> &'static str {
+        match self {
+            Self::Constant => "legacy_constant_v1",
+            Self::Changing => "seeded_nonrepeating_v1",
+        }
+    }
+}
+
 impl Distribution {
     pub fn parse(value: &str) -> Self {
         match value {
@@ -67,6 +98,15 @@ pub struct WorkloadGenerator {
     worker_id: usize,
     operation: u64,
     state: u64,
+    mixed_value_context: Option<MixedValueContext>,
+    mixed_value_mode: MixedValueMode,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct MixedValueContext {
+    phase_seed: u64,
+    operation_seed: u64,
+    operation_index: u64,
 }
 
 impl WorkloadGenerator {
@@ -76,7 +116,28 @@ impl WorkloadGenerator {
             worker_id,
             operation: 0,
             state: seed ^ (worker_id as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15),
+            mixed_value_context: None,
+            mixed_value_mode: MixedValueMode::Constant,
         }
+    }
+
+    pub fn new_mixed(
+        config: WorkloadConfig,
+        operation_seed: u64,
+        phase_seed: u64,
+        operation_index: u64,
+        value_mode: MixedValueMode,
+    ) -> Self {
+        let mut generator = Self::new(config, operation_seed, 0);
+        generator.mixed_value_mode = value_mode;
+        if value_mode == MixedValueMode::Changing {
+            generator.mixed_value_context = Some(MixedValueContext {
+                phase_seed,
+                operation_seed,
+                operation_index,
+            });
+        }
+        generator
     }
 
     pub fn next_transaction(&mut self) -> Vec<Mutation> {
@@ -107,7 +168,16 @@ impl WorkloadGenerator {
             .enumerate()
             .map(|(offset, key)| Mutation {
                 key,
-                value: value_bytes(self.config.value_size, self.operation, offset),
+                value: match (self.mixed_value_mode, self.mixed_value_context) {
+                    (MixedValueMode::Changing, Some(context)) => mixed_value_bytes(
+                        self.config.value_size,
+                        context.phase_seed,
+                        context.operation_seed,
+                        context.operation_index,
+                        offset,
+                    ),
+                    _ => value_bytes(self.config.value_size, self.operation, offset),
+                },
             })
             .collect()
     }
@@ -194,19 +264,53 @@ pub fn mixed_operation_seed(phase_seed: u64, operation_index: u64) -> u64 {
     splitmix64(phase_seed ^ operation_index.wrapping_mul(0x9e37_79b9_7f4a_7c15))
 }
 
+pub fn mixed_value_bytes(
+    length: usize,
+    phase_seed: u64,
+    operation_seed: u64,
+    operation_index: u64,
+    mutation_index: usize,
+) -> Vec<u8> {
+    let mut bytes = vec![0; length];
+    let nonce = operation_index.to_be_bytes();
+    let nonce_length = length.min(nonce.len());
+    bytes[..nonce_length].copy_from_slice(&nonce[nonce.len() - nonce_length..]);
+
+    let mut state = phase_seed
+        ^ operation_seed.rotate_left(17)
+        ^ operation_index.wrapping_mul(0xd6e8_feb8_6659_fd93)
+        ^ (mutation_index as u64).wrapping_mul(0xa076_1d64_78bd_642f);
+    let mut position = nonce_length;
+    while position < length {
+        state = splitmix64(state);
+        for byte in state.to_be_bytes() {
+            if position >= length {
+                break;
+            }
+            bytes[position] = byte;
+            position += 1;
+        }
+    }
+    bytes
+}
+
 pub fn mixed_trace_prefix_hash(
     config: WorkloadConfig,
     phase_seed: u64,
     read_percent: u8,
+    value_mode: MixedValueMode,
     prefix_operations: u64,
 ) -> u64 {
     let mut state = 0xcbf2_9ce4_8422_2325;
     for operation_index in 0..prefix_operations {
         let is_read = mixed_operation_is_read(operation_index, read_percent);
-        let mut generator = WorkloadGenerator::new(
+        let operation_seed = mixed_operation_seed(phase_seed, operation_index);
+        let mut generator = WorkloadGenerator::new_mixed(
             config.clone(),
-            mixed_operation_seed(phase_seed, operation_index),
-            0,
+            operation_seed,
+            phase_seed,
+            operation_index,
+            value_mode,
         );
         let mutations = generator.next_transaction();
         absorb_trace(&mut state, &operation_index.to_be_bytes());
@@ -263,7 +367,10 @@ pub fn value_bytes(length: usize, operation: u64, offset: usize) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Distribution, WorkloadConfig, mixed_operation_is_read, mixed_trace_prefix_hash};
+    use super::{
+        Distribution, MixedValueMode, WorkloadConfig, WorkloadGenerator, mixed_operation_is_read,
+        mixed_operation_seed, mixed_trace_prefix_hash,
+    };
 
     #[test]
     fn mixed_schedule_preserves_each_ratio_per_hundred_operations() {
@@ -284,16 +391,98 @@ mod tests {
             value_size: 512,
             width: 4,
         };
-        let trace_hash = mixed_trace_prefix_hash(config.clone(), 0x1234_5678_9abc_def0, 95, 1_000);
+        let trace_hash = mixed_trace_prefix_hash(
+            config.clone(),
+            0x1234_5678_9abc_def0,
+            95,
+            MixedValueMode::Constant,
+            1_000,
+        );
         assert_eq!(trace_hash, 0x3cca_5e07_ae2e_0ae5);
+        let changing_trace_hash = mixed_trace_prefix_hash(
+            config.clone(),
+            0x1234_5678_9abc_def0,
+            95,
+            MixedValueMode::Changing,
+            1_000,
+        );
+        assert_eq!(changing_trace_hash, 0xd6ea_8c55_50fc_11e1);
         assert_eq!(
             trace_hash,
-            mixed_trace_prefix_hash(config.clone(), 0x1234_5678_9abc_def0, 95, 1_000)
+            mixed_trace_prefix_hash(
+                config.clone(),
+                0x1234_5678_9abc_def0,
+                95,
+                MixedValueMode::Constant,
+                1_000,
+            )
         );
         assert_ne!(
             trace_hash,
-            mixed_trace_prefix_hash(config, 0x1234_5678_9abc_def1, 95, 1_000)
+            mixed_trace_prefix_hash(
+                config,
+                0x1234_5678_9abc_def1,
+                95,
+                MixedValueMode::Constant,
+                1_000,
+            )
         );
+    }
+
+    #[test]
+    fn changing_mixed_values_are_seeded_and_distinct_per_operation() {
+        let config = WorkloadConfig {
+            distribution: Distribution::Uniform,
+            working_set: 10_000,
+            key_size: 16,
+            value_size: 512,
+            width: 1,
+        };
+        let phase_seed = 0x1234_5678_9abc_def0;
+        let value_for = |operation_index| {
+            let operation_seed = mixed_operation_seed(phase_seed, operation_index);
+            let mut generator = WorkloadGenerator::new_mixed(
+                config.clone(),
+                operation_seed,
+                phase_seed,
+                operation_index,
+                MixedValueMode::Changing,
+            );
+            generator.next_transaction().remove(0).value
+        };
+        let first_value = value_for(0);
+        let second_value = value_for(1);
+        assert_eq!(first_value.len(), 512);
+        assert_eq!(first_value, value_for(0));
+        assert_ne!(first_value, second_value);
+        assert!(first_value[8..].iter().any(|byte| *byte != first_value[8]));
+        assert_eq!(first_value[..8], 0u64.to_be_bytes());
+        assert_eq!(second_value[..8], 1u64.to_be_bytes());
+    }
+
+    #[test]
+    fn constant_mixed_values_preserve_the_previous_request_bytes() {
+        let config = WorkloadConfig {
+            distribution: Distribution::Uniform,
+            working_set: 10_000,
+            key_size: 16,
+            value_size: 512,
+            width: 1,
+        };
+        let first_operation = 3;
+        let second_operation = 991;
+        for operation_index in [first_operation, second_operation] {
+            let phase_seed = 0x1234_5678_9abc_def0;
+            let operation_seed = mixed_operation_seed(phase_seed, operation_index);
+            let mut generator = WorkloadGenerator::new_mixed(
+                config.clone(),
+                operation_seed,
+                phase_seed,
+                operation_index,
+                MixedValueMode::Constant,
+            );
+            assert_eq!(generator.next_transaction()[0].value, vec![1; 512]);
+        }
     }
 }
 

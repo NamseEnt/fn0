@@ -9,9 +9,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde_json::{Map, Value, json};
 
 use super::workload::{
-    Distribution, LatencySamples, Mutation, TraceHash, WorkloadConfig, WorkloadGenerator,
-    component_bytes, key_for_index, mixed_operation_is_read, mixed_operation_seed,
-    mixed_trace_prefix_hash, seed_rows, splitmix64, writer_phase_seed,
+    Distribution, LatencySamples, MixedValueMode, Mutation, TraceHash, WorkloadConfig,
+    WorkloadGenerator, component_bytes, key_for_index, mixed_operation_is_read,
+    mixed_operation_seed, mixed_trace_prefix_hash, mixed_value_bytes, seed_rows, splitmix64,
+    value_bytes, writer_phase_seed,
 };
 
 pub const MAX_ATTEMPTS: u32 = 16;
@@ -58,6 +59,7 @@ pub struct Args {
     pub writers: usize,
     pub width: usize,
     pub distribution: Distribution,
+    pub mixed_value_mode: MixedValueMode,
     pub working_set: usize,
     pub key_size: usize,
     pub value_size: usize,
@@ -84,6 +86,7 @@ impl Args {
             writers: 16,
             width: 1,
             distribution: Distribution::Uniform,
+            mixed_value_mode: MixedValueMode::Constant,
             working_set: 100_000,
             key_size: 16,
             value_size: 64,
@@ -119,6 +122,7 @@ impl Args {
                 "--writers" => args.writers = value.parse().expect("writers"),
                 "--width" => args.width = value.parse().expect("width"),
                 "--distribution" => args.distribution = Distribution::parse(&value),
+                "--mixed-value-mode" => args.mixed_value_mode = MixedValueMode::parse(&value),
                 "--working-set" => args.working_set = value.parse().expect("working set"),
                 "--key-size" => args.key_size = value.parse().expect("key size"),
                 "--value-size" => args.value_size = value.parse().expect("value size"),
@@ -363,9 +367,60 @@ struct PhaseReport {
 struct WriterReport {
     writer_id: usize,
     phases: Vec<PhaseReport>,
-    last_writes: HashMap<Vec<u8>, u8>,
-    ambiguous_writes: HashMap<Vec<u8>, Vec<u8>>,
+    last_writes: HashMap<Vec<u8>, ValueExpectation>,
+    ambiguous_writes: HashMap<Vec<u8>, Vec<ValueExpectation>>,
     last_committed: Vec<Vec<u8>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ValueExpectation {
+    ConstantByte(u8),
+    MixedChanging {
+        phase_seed: u64,
+        operation_seed: u64,
+        operation_index: u64,
+        mutation_index: usize,
+    },
+}
+
+impl ValueExpectation {
+    fn from_mutation(
+        args: &Args,
+        phase_seed: u64,
+        mixed_index: Option<u64>,
+        mutation_index: usize,
+        value: &[u8],
+    ) -> Self {
+        if args.operation == "mixed" && args.mixed_value_mode == MixedValueMode::Changing {
+            if let Some(operation_index) = mixed_index {
+                return Self::MixedChanging {
+                    phase_seed,
+                    operation_seed: mixed_operation_seed(phase_seed, operation_index),
+                    operation_index,
+                    mutation_index,
+                };
+            }
+        }
+        Self::ConstantByte(value.first().copied().unwrap_or_default())
+    }
+
+    fn expected_bytes(self, value_size: usize) -> Vec<u8> {
+        match self {
+            Self::ConstantByte(byte) => vec![byte; value_size],
+            Self::MixedChanging {
+                phase_seed,
+                operation_seed,
+                operation_index,
+                mutation_index,
+            } => mixed_value_bytes(
+                value_size,
+                phase_seed,
+                operation_seed,
+                operation_index,
+                mutation_index,
+            ),
+        }
+    }
 }
 
 struct Schedule {
@@ -414,11 +469,13 @@ fn writer_thread<E: Engine>(
                 ),
                 _ => false,
             };
-            let mut mixed_generator = mixed_index.map(|mixed_index| {
-                WorkloadGenerator::new(
+            let mut mixed_generator = mixed_index.map(|operation_index| {
+                WorkloadGenerator::new_mixed(
                     args.workload(),
-                    mixed_operation_seed(phase_seed, mixed_index),
-                    0,
+                    mixed_operation_seed(phase_seed, operation_index),
+                    phase_seed,
+                    operation_index,
+                    args.mixed_value_mode,
                 )
             });
             if choose_read {
@@ -494,10 +551,17 @@ fn writer_thread<E: Engine>(
                     stats.mutation_ops += mutations.len() as u64;
                     stats.committed_latency.push(elapsed);
                     stats.write_latency.push(elapsed);
-                    for mutation in &mutations {
-                        report
-                            .last_writes
-                            .insert(mutation.key.clone(), mutation.value[0]);
+                    for (mutation_index, mutation) in mutations.iter().enumerate() {
+                        report.last_writes.insert(
+                            mutation.key.clone(),
+                            ValueExpectation::from_mutation(
+                                args,
+                                phase_seed,
+                                mixed_index,
+                                mutation_index,
+                                &mutation.value,
+                            ),
+                        );
                     }
                     if !warmup {
                         report.last_committed = mutations
@@ -509,12 +573,18 @@ fn writer_thread<E: Engine>(
                 Outcome::Abandoned => stats.abandoned_transactions += 1,
                 Outcome::Failed => {
                     stats.failed_transactions += 1;
-                    for mutation in &mutations {
+                    for (mutation_index, mutation) in mutations.iter().enumerate() {
                         report
                             .ambiguous_writes
                             .entry(mutation.key.clone())
                             .or_default()
-                            .push(mutation.value[0]);
+                            .push(ValueExpectation::from_mutation(
+                                args,
+                                phase_seed,
+                                mixed_index,
+                                mutation_index,
+                                &mutation.value,
+                            ));
                     }
                 }
             }
@@ -851,17 +921,20 @@ fn sampled_working_set_indices(args: &Args) -> Vec<usize> {
 }
 
 fn verify<E: Engine>(engine: &E, args: &Args, reports: &[WriterReport]) -> Value {
-    let mut candidates: HashMap<&[u8], HashSet<u8>> = HashMap::new();
-    let mut ambiguous: HashMap<&[u8], HashSet<u8>> = HashMap::new();
+    let mut candidates: HashMap<&[u8], Vec<ValueExpectation>> = HashMap::new();
+    let mut ambiguous: HashMap<&[u8], Vec<ValueExpectation>> = HashMap::new();
     for report in reports {
-        for (key, byte) in &report.last_writes {
-            candidates.entry(key.as_slice()).or_default().insert(*byte);
+        for (key, expectation) in &report.last_writes {
+            candidates
+                .entry(key.as_slice())
+                .or_default()
+                .push(*expectation);
         }
-        for (key, bytes) in &report.ambiguous_writes {
+        for (key, expectations) in &report.ambiguous_writes {
             ambiguous
                 .entry(key.as_slice())
                 .or_default()
-                .extend(bytes.iter().copied());
+                .extend(expectations.iter().copied());
         }
     }
     let working_set = args.working_set as u64;
@@ -903,31 +976,41 @@ fn verify<E: Engine>(engine: &E, args: &Args, reports: &[WriterReport]) -> Value
     let mut keys_with_committed_writes = 0u64;
     for key in &sampled {
         let actual = engine.read(&mut reader, key);
-        let mut allowed: HashSet<u8> = HashSet::new();
+        let mut allowed_value_hashes: HashSet<u64> = HashSet::new();
         let committed = candidates.get(key.as_slice());
-        if let Some(bytes) = committed {
+        if let Some(expectations) = committed {
             keys_with_committed_writes += 1;
-            allowed.extend(bytes.iter().copied());
+            allowed_value_hashes.extend(
+                expectations
+                    .iter()
+                    .map(|expectation| value_hash(&expectation.expected_bytes(args.value_size))),
+            );
         } else if key_index(key) < working_set {
-            allowed.insert((key_index(key) & 0xff) as u8);
+            allowed_value_hashes.insert(value_hash(&value_bytes(
+                args.value_size,
+                key_index(key),
+                0,
+            )));
         }
         let may_be_absent = committed.is_none() && key_index(key) >= working_set;
-        if let Some(bytes) = ambiguous.get(key.as_slice()) {
-            allowed.extend(bytes.iter().copied());
+        if let Some(expectations) = ambiguous.get(key.as_slice()) {
+            allowed_value_hashes.extend(
+                expectations
+                    .iter()
+                    .map(|expectation| value_hash(&expectation.expected_bytes(args.value_size))),
+            );
         }
         let valid = match &actual {
             None => may_be_absent,
             Some(value) => {
-                value.len() == args.value_size
-                    && value.iter().all(|byte| *byte == value[0])
-                    && allowed.contains(&value[0])
+                value.len() == args.value_size && allowed_value_hashes.contains(&value_hash(value))
             }
         };
         if !valid && mismatches.len() < 20 {
             mismatches.push(json!({
                 "key": hex(key),
-                "actual": actual.as_ref().map(|value| hex(value)),
-                "allowed": allowed.iter().copied().collect::<Vec<u8>>(),
+                "actual_value_hash": actual.as_ref().map(|value| format!("{:016x}", value_hash(value))),
+                "allowed_value_hashes": allowed_value_hashes.iter().map(|value| format!("{value:016x}")).collect::<Vec<_>>(),
             }));
         }
         if !valid && mismatches.len() >= 20 {
@@ -942,6 +1025,8 @@ fn verify<E: Engine>(engine: &E, args: &Args, reports: &[WriterReport]) -> Value
     json!({
         "sampled_keys": sampled.len(),
         "sampled_keys_with_committed_writes": keys_with_committed_writes,
+        "value_hash_algorithm": "fnv1a64_v1",
+        "comparison": "full_value_hash_and_length",
         "mismatches": mismatches,
         "row_count": row_count,
         "expected_rows_min": expected_rows_min,
@@ -949,6 +1034,45 @@ fn verify<E: Engine>(engine: &E, args: &Args, reports: &[WriterReport]) -> Value
         "committed_keys_outside_working_set": committed_new_keys,
         "passed": passed,
     })
+}
+
+fn value_hash(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |state, byte| {
+        (state ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
+}
+
+#[cfg(test)]
+mod value_verification_tests {
+    use super::{ValueExpectation, value_hash};
+
+    #[test]
+    fn full_value_hash_detects_changes_after_the_first_byte() {
+        let mut expected = vec![0x31; 512];
+        let mut changed = expected.clone();
+        changed[511] ^= 1;
+        assert_eq!(expected[0], changed[0]);
+        assert_ne!(value_hash(&expected), value_hash(&changed));
+
+        expected[0] ^= 1;
+        let first_operation = ValueExpectation::MixedChanging {
+            phase_seed: 0x1234_5678_9abc_def0,
+            operation_seed: 0x1020_3040_5060_7080,
+            operation_index: 7,
+            mutation_index: 0,
+        }
+        .expected_bytes(512);
+        let next_operation = ValueExpectation::MixedChanging {
+            phase_seed: 0x1234_5678_9abc_def0,
+            operation_seed: 0x1020_3040_5060_7080,
+            operation_index: 8,
+            mutation_index: 0,
+        }
+        .expected_bytes(512);
+        assert_eq!(first_operation[..8], 7u64.to_be_bytes());
+        assert_eq!(next_operation[..8], 8u64.to_be_bytes());
+        assert_ne!(value_hash(&first_operation), value_hash(&next_operation));
+    }
 }
 
 pub fn hex(bytes: &[u8]) -> String {
@@ -1155,12 +1279,16 @@ fn run_bench<F: EngineFactory>(args: &Args) {
         "build": F::build_info(),
         "machine": machine_info(),
         "sync_contract": "durable-return",
+        "collection_policy": "not-applicable",
         "writers": args.writers,
         "client_workers": args.writers,
         "transaction_width": args.width,
         "operation": args.operation,
         "read_percent": args.read_percent,
-        "mixed_schedule": "global_fetch_add; operation_index_mod_100_lt_read_percent; shared_seeded_request_v1",
+        "mixed_value_mode": args.mixed_value_mode.as_str(),
+        "mixed_value_generator": args.mixed_value_mode.generator_name(),
+        "mixed_schedule": "global_fetch_add; operation_index_mod_100_lt_read_percent; shared_seeded_request_v2",
+        "mixed_schedule_version": "shared_seeded_request_v2",
         "logical_trace_prefix_operations": 1000,
         "logical_trace_prefix_hash": format!(
             "{:016x}",
@@ -1168,6 +1296,7 @@ fn run_bench<F: EngineFactory>(args: &Args) {
                 args.workload(),
                 writer_phase_seed(args.seed, false),
                 args.read_percent,
+                args.mixed_value_mode,
                 1000,
             )
         ),
@@ -1192,6 +1321,8 @@ fn run_bench<F: EngineFactory>(args: &Args) {
             "backoff": "min(base << (failed_attempt - 1), cap)",
         },
         "measured": stats_record(&outcome.measured, outcome.wall),
+        "errors": outcome.measured.errors,
+        "conflicts": outcome.measured.conflicts,
         "warmup": outcome.warmup.counters(),
         "cpu_seconds": outcome.cpu_seconds,
         "cpu_utilization_percent_one_core": outcome.cpu_seconds.map(|seconds| seconds / wall_seconds * 100.0),
