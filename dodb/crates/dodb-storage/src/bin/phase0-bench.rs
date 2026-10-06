@@ -383,6 +383,7 @@ struct Args {
     distributions: Option<Vec<Distribution>>,
     read_kinds: Option<Vec<ReadKind>>,
     mixes: Option<Vec<Mix>>,
+    mixed_clients: bool,
     duration: Duration,
     warmup: Duration,
     repetitions: usize,
@@ -418,6 +419,7 @@ impl Default for Args {
             distributions: None,
             read_kinds: None,
             mixes: None,
+            mixed_clients: false,
             duration: DEFAULT_DURATION,
             warmup: DEFAULT_WARMUP,
             repetitions: DEFAULT_REPETITIONS,
@@ -486,6 +488,7 @@ impl Args {
                             .collect(),
                     )
                 }
+                "--mixed-clients" => args.mixed_clients = true,
                 "--duration" => args.duration = parse_duration(&take_value(&mut values, &flag)),
                 "--warmup" => args.warmup = parse_duration(&take_value(&mut values, &flag)),
                 "--repetitions" | "--reps" => {
@@ -795,18 +798,25 @@ fn scenarios(args: &Args) -> Vec<Scenario> {
             for writers in &mixed_writers {
                 for distribution in &mixed_distributions {
                     for mix in &mixes {
-                        output.push(Scenario {
-                            suite: Suite::Mixed,
-                            workload: "mixed",
-                            writers: *writers,
-                            readers: *readers,
-                            width: 1,
-                            distribution: *distribution,
-                            read_kind: Some(ReadKind::Get),
-                            mix: Some(*mix),
-                            collection_delay: selected_delay,
-                            sync_delay: args.sync_delay,
-                        });
+                        let selected_widths = if args.mixed_clients {
+                            widths.as_slice()
+                        } else {
+                            &[1]
+                        };
+                        for width in selected_widths {
+                            output.push(Scenario {
+                                suite: Suite::Mixed,
+                                workload: "mixed",
+                                writers: *writers,
+                                readers: *readers,
+                                width: *width,
+                                distribution: *distribution,
+                                read_kind: Some(ReadKind::Get),
+                                mix: Some(*mix),
+                                collection_delay: selected_delay,
+                                sync_delay: args.sync_delay,
+                            });
+                        }
                     }
                 }
             }
@@ -1047,6 +1057,65 @@ fn splitmix64(mut state: u64) -> u64 {
     value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
     value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
     value ^ (value >> 31)
+}
+
+fn mixed_operation_is_read(operation_index: u64, read_percent: u8) -> bool {
+    operation_index % 100 < u64::from(read_percent)
+}
+
+fn mixed_trace_prefix_hash(
+    workload: WorkloadConfig,
+    phase_seed: u64,
+    read_percent: u8,
+    prefix_operations: u64,
+) -> u64 {
+    let mut trace_state = 0xcbf2_9ce4_8422_2325;
+    for operation_index in 0..prefix_operations {
+        let is_read = mixed_operation_is_read(operation_index, read_percent);
+        let operation_seed =
+            splitmix64(phase_seed ^ operation_index.wrapping_mul(0x9e37_79b9_7f4a_7c15));
+        let mut generator = WorkloadGenerator::new(workload.clone(), operation_seed, 0);
+        let request = generator.next_transaction();
+        absorb_trace(&mut trace_state, &operation_index.to_be_bytes());
+        absorb_trace(&mut trace_state, &[u8::from(is_read)]);
+        if is_read {
+            let Some(TransactionMutation::Put { key, .. }) = request.mutations.first() else {
+                unreachable!();
+            };
+            let key = document_key_bytes(key);
+            absorb_trace(&mut trace_state, &(key.len() as u32).to_be_bytes());
+            absorb_trace(&mut trace_state, &key);
+        } else {
+            absorb_trace(
+                &mut trace_state,
+                &(request.mutations.len() as u32).to_be_bytes(),
+            );
+            for mutation in request.mutations {
+                let TransactionMutation::Put { key, value } = mutation else {
+                    unreachable!();
+                };
+                let key = document_key_bytes(&key);
+                absorb_trace(&mut trace_state, &(key.len() as u32).to_be_bytes());
+                absorb_trace(&mut trace_state, &key);
+                absorb_trace(&mut trace_state, &(value.len() as u32).to_be_bytes());
+                absorb_trace(&mut trace_state, &value);
+            }
+        }
+    }
+    trace_state
+}
+
+fn document_key_bytes(key: &DocumentKey) -> Vec<u8> {
+    let mut bytes = key.pk.as_bytes().to_vec();
+    bytes.extend_from_slice(key.sk.as_bytes());
+    bytes
+}
+
+fn absorb_trace(trace_state: &mut u64, bytes: &[u8]) {
+    for byte in bytes {
+        *trace_state ^= u64::from(*byte);
+        *trace_state = trace_state.wrapping_mul(0x0000_0100_0000_01b3);
+    }
 }
 
 fn key_component_lengths(key_size: usize) -> (usize, usize) {
@@ -2637,6 +2706,68 @@ async fn reader_loop(
     stats
 }
 
+async fn mixed_client_loop(
+    adapter: Arc<dyn EngineAdapter>,
+    workload: WorkloadConfig,
+    seed: u64,
+    worker_id: usize,
+    read_percent: u8,
+    next_operation: Arc<AtomicU64>,
+    deadline: Instant,
+    warmup: bool,
+    timeline_start: Option<Instant>,
+) -> WorkerStats {
+    let mut stats = WorkerStats::new(seed ^ worker_id as u64 ^ 0xfeed);
+    while Instant::now() < deadline {
+        let operation_index = next_operation.fetch_add(1, Ordering::Relaxed);
+        let operation_seed = splitmix64(seed ^ operation_index.wrapping_mul(0x9e37_79b9_7f4a_7c15));
+        let mut generator = WorkloadGenerator::new(workload.clone(), operation_seed, 0);
+        let started = Instant::now();
+        if mixed_operation_is_read(operation_index, read_percent) {
+            let request = generator.next_read(ReadKind::Get);
+            let result = adapter.execute(request).await;
+            let elapsed = started.elapsed();
+            if warmup {
+                continue;
+            }
+            stats.attempted_gets += 1;
+            stats.read_latency.push(elapsed);
+            match result {
+                Ok(BatchResponse::Get(_)) => stats.successful_gets += 1,
+                Ok(_) => stats.errors += 1,
+                Err(Error::Overloaded(_)) => stats.overloads += 1,
+                Err(_) => stats.errors += 1,
+            }
+            if let Some(timeline_start) = timeline_start {
+                stats.window_timeline.push((
+                    (started + elapsed - timeline_start).as_nanos() as u64,
+                    elapsed.as_nanos() as u64,
+                ));
+            }
+        } else {
+            let request = generator.next_transaction();
+            let width = request.mutations.len() as u64;
+            let result = adapter.execute_transaction(request).await;
+            let elapsed = started.elapsed();
+            if warmup {
+                continue;
+            }
+            stats.attempted_transactions += 1;
+            stats.write_latency.push(elapsed);
+            match result {
+                Ok(_) => {
+                    stats.successful_transactions += 1;
+                    stats.mutation_ops += width;
+                }
+                Err(Error::Conflict(_)) => stats.conflicts += 1,
+                Err(Error::Overloaded(_)) => stats.overloads += 1,
+                Err(_) => stats.errors += 1,
+            }
+        }
+    }
+    stats
+}
+
 async fn run_interval(
     adapter: Arc<dyn EngineAdapter>,
     args: &Args,
@@ -2657,31 +2788,50 @@ async fn run_interval(
         transaction_mode: args.transaction_mode,
         read_limit: args.read_limit,
     };
-    let quota = scenario.mix.map(|mix| MixQuota::new(mix.read_percent));
     let mut tasks = Vec::with_capacity(scenario.writers + scenario.readers);
-    for worker_id in 0..scenario.writers {
-        tasks.push(tokio::spawn(writer_loop(
-            Arc::clone(&adapter),
-            workload.clone(),
-            seed ^ 0x1000_0000,
-            worker_id,
-            deadline,
-            quota.clone(),
-            warmup,
-            timeline_start,
-        )));
-    }
-    for worker_id in 0..scenario.readers {
-        tasks.push(tokio::spawn(reader_loop(
-            Arc::clone(&adapter),
-            workload.clone(),
-            scenario.read_kind.unwrap_or(ReadKind::Get),
-            seed ^ 0x2000_0000,
-            worker_id,
-            deadline,
-            quota.clone(),
-            warmup,
-        )));
+    if args.mixed_clients
+        && let Some(mix) = scenario.mix
+    {
+        let next_operation = Arc::new(AtomicU64::new(0));
+        for worker_id in 0..scenario.writers {
+            tasks.push(tokio::spawn(mixed_client_loop(
+                Arc::clone(&adapter),
+                workload.clone(),
+                seed,
+                worker_id,
+                mix.read_percent,
+                Arc::clone(&next_operation),
+                deadline,
+                warmup,
+                timeline_start,
+            )));
+        }
+    } else {
+        let quota = scenario.mix.map(|mix| MixQuota::new(mix.read_percent));
+        for worker_id in 0..scenario.writers {
+            tasks.push(tokio::spawn(writer_loop(
+                Arc::clone(&adapter),
+                workload.clone(),
+                seed ^ 0x1000_0000,
+                worker_id,
+                deadline,
+                quota.clone(),
+                warmup,
+                timeline_start,
+            )));
+        }
+        for worker_id in 0..scenario.readers {
+            tasks.push(tokio::spawn(reader_loop(
+                Arc::clone(&adapter),
+                workload.clone(),
+                scenario.read_kind.unwrap_or(ReadKind::Get),
+                seed ^ 0x2000_0000,
+                worker_id,
+                deadline,
+                quota.clone(),
+                warmup,
+            )));
+        }
     }
     let mut stats = WorkerStats::new(seed ^ 0xabcd);
     for task in tasks {
@@ -3283,6 +3433,14 @@ fn build_record(
     json.string("workload", scenario.workload);
     json.usize("writers", scenario.writers);
     json.usize("readers", scenario.readers);
+    json.usize(
+        "client_workers",
+        if args.mixed_clients && scenario.mix.is_some() {
+            scenario.writers
+        } else {
+            scenario.writers + scenario.readers
+        },
+    );
     json.usize("transaction_width", scenario.width);
     json.string("distribution", scenario.distribution.as_str());
     json.string(
@@ -3290,6 +3448,32 @@ fn build_record(
         scenario.read_kind.map_or("none", ReadKind::as_str),
     );
     json.string("mix", scenario.mix.map_or("none", Mix::as_str));
+    if args.mixed_clients
+        && let Some(mix) = scenario.mix
+    {
+        json.u64("requested_read_percent", u64::from(mix.read_percent));
+        json.string(
+            "mixed_schedule",
+            "global_fetch_add; operation_index_mod_100_lt_read_percent; shared_seeded_request_v1",
+        );
+        let workload = WorkloadConfig {
+            distribution: scenario.distribution,
+            working_set: args.working_set,
+            key_size: args.key_size,
+            value_size: args.value_size,
+            width: scenario.width,
+            transaction_mode: args.transaction_mode,
+            read_limit: args.read_limit,
+        };
+        json.u64("logical_trace_prefix_operations", 1_000);
+        json.string(
+            "logical_trace_prefix_hash",
+            &format!(
+                "{:016x}",
+                mixed_trace_prefix_hash(workload, seed ^ 0xbbbb_0000, mix.read_percent, 1_000)
+            ),
+        );
+    }
     json.string("transaction_mode", args.transaction_mode.as_str());
     json.usize("cache_capacity", args.cache_capacity);
     json.usize("working_set", args.working_set);
@@ -3309,6 +3493,7 @@ fn build_record(
     json.u64("sync_delay_us", sync_delay.as_micros() as u64);
     json.u64("seed", seed);
     json.u64("duration_ms", wall.as_millis() as u64);
+    json.u64("requested_duration_ms", args.duration.as_millis() as u64);
     json.u64("warmup_ms", args.warmup.as_millis() as u64);
     json.usize("repetition", repetition);
     json.u64("attempted_operations", measured.attempted_operations());
@@ -3325,6 +3510,37 @@ fn build_record(
     json.u64("overloads", measured.overloads);
     json.u64("errors", measured.errors);
     json.u64("mutation_ops", measured.mutation_ops);
+    json.u64(
+        "attempted_reads",
+        measured.attempted_gets + measured.attempted_queries + measured.attempted_scans,
+    );
+    json.u64(
+        "successful_reads",
+        measured.successful_gets + measured.successful_queries + measured.successful_scans,
+    );
+    json.u64(
+        "attempted_write_transactions",
+        measured.attempted_transactions,
+    );
+    json.u64(
+        "successful_write_transactions",
+        measured.successful_transactions,
+    );
+    json.f64(
+        "successful_read_percent",
+        measured.successful_reads() as f64 * 100.0 / measured.successful_operations().max(1) as f64,
+    );
+    json.f64(
+        "successful_write_percent",
+        measured.successful_transactions as f64 * 100.0
+            / measured.successful_operations().max(1) as f64,
+    );
+    json.f64(
+        "attempted_read_percent",
+        (measured.attempted_gets + measured.attempted_queries + measured.attempted_scans) as f64
+            * 100.0
+            / measured.attempted_operations().max(1) as f64,
+    );
     json.u64("returned_rows", measured.returned_rows);
     json.f64("logical_tx_per_second", logical_tx_per_second);
     json.f64("mutation_ops_per_second", mutation_ops_per_second);
@@ -4147,6 +4363,35 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mixed_schedule_preserves_exact_requested_ratio() {
+        for read_percent in [95, 50, 20] {
+            let successful_read_slots = (0..10_000)
+                .filter(|operation_index| mixed_operation_is_read(*operation_index, read_percent))
+                .count();
+            assert_eq!(successful_read_slots, 100 * usize::from(read_percent));
+        }
+    }
+
+    #[test]
+    fn mixed_trace_prefix_matches_external_adapter_vector() {
+        let trace_hash = mixed_trace_prefix_hash(
+            WorkloadConfig {
+                distribution: Distribution::Uniform,
+                working_set: 10_000,
+                key_size: 16,
+                value_size: 512,
+                width: 4,
+                transaction_mode: TransactionMode::Unconditional,
+                read_limit: 16,
+            },
+            0x1234_5678_9abc_def0,
+            95,
+            1_000,
+        );
+        assert_eq!(trace_hash, 0x3cca_5e07_ae2e_0ae5);
+    }
 
     fn workload(distribution: Distribution, width: usize) -> WorkloadConfig {
         WorkloadConfig {

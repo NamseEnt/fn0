@@ -1,6 +1,18 @@
 # dodb Product Workload External Baseline Benchmark
 
-## Result
+## Mixed workload cross-engine correction
+
+The former 95/5, 50/50, and 20/80 mixed cross-engine results are invalid for external comparison. They are retained in the historical tables and raw artifacts for provenance only; do not use them for product or Pareto conclusions. The internal `main-btree` versus `parallel-blink` rows used the same dodb runner and remain historical relative evidence, but they do not replace the corrected matrix below.
+
+The old dodb execution model used dedicated reader and writer tasks. For example, c16 at 95/5 ran 15 reader tasks and one writer task. Each task waited for its role's global mix slot, yielding while the next slot belonged to the other role. External comparators instead ran 16 workers, and each worker chose read or write independently on each operation. This gave external engines concurrent write supply that dodb did not have.
+
+The corrected harness starts exactly N mixed client workers for every engine at cN. Each worker may issue either operation. A shared atomic fetch-add assigns each offered operation a global index; `index % 100 < read_percent` selects a read, and a request seed derived from the same invocation seed and index generates its key/value trace. Index allocation does not hold a lock across database calls, so requests can be concurrently in flight. The harness records requested and observed attempted/successful ratios, separate read/write latency percentiles, and a deterministic 1,000-operation logical trace hash. The summarizer rejects a run set when engine seeds, scenario parameters, or logical trace hashes differ.
+
+The corrected product matrix is P5 95/5, P6 50/50, and P7 20/80 at c4/c16/c64, plus 95/5 with width-4 and width-8 writes at c16. All use uniform distribution, 512 B values, a 10,000-row resident working set, 2 s warmup, 5 s measurement, three repetitions, and the existing durable-return contracts. Raw files and the run manifest are in `results/oci-a1-2ocpu-12g-zfs-mixed-unified-<source-sha8>/`.
+
+## Historical result context
+
+The following legacy baseline is retained as provenance. Its mixed cross-engine figures are invalidated by the correction above.
 
 The current `parallel-blink` candidate has clear durable-write gains over
 `main-btree`, including width 1 at 16 clients and widths 4/8 across the tested
@@ -99,9 +111,7 @@ Query16 (1.71x). RocksDB is a write-optimized LSM reference, not a required
 product winner. Its atomic WriteBatch does not implement dodb conditional or
 revision-based transaction semantics.
 
-For mixed c16, RocksDB reports 7.85x B-link throughput at 95/5, 2.12x at
-50/50, and 1.27x at 20/80. Those are aggregate logical operation rates under
-the same client mix; read/write tails and operation cost differ by adapter.
+The former mixed c16 RocksDB comparisons are invalidated. Their dodb and external client execution models differed as described above; the corrected comparison is reported in the unified matrix below.
 
 ### SQLite and Turso WAL
 
