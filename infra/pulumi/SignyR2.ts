@@ -42,7 +42,7 @@ export class SignyR2 extends pulumi.ComponentResource {
         bucketName: bucket.name,
         rules: [
           {
-            id: "signy-catalog-seven-days",
+            id: "signy-catalog-current-seven-days",
             enabled: true,
             prefix: pulumi.interpolate`${args.storagePrefix}/catalog/`,
             condition: {

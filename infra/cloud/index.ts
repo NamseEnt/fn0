@@ -398,7 +398,7 @@ const bundleStoreR2 = new fn0.BundleStoreR2(
   cloudflareOperatedComponent,
 );
 
-const signyStoragePrefix = "fn0/signy";
+const signyStoragePrefix = "fn0/signy-v2";
 const signyR2 = new fn0.SignyR2(
   "signy-r2",
   {
