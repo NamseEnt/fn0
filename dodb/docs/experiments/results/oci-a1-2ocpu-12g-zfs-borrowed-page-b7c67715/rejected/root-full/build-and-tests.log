@@ -1,0 +1,16 @@
++ rustup run 1.97.1 cargo build -p dodb-storage --release --locked -j2 --bin phase0-bench
+   Compiling dodb-core v0.1.0 (/home/opc/fn0-read-borrowed-b7c67715/dodb/crates/dodb-core)
+   Compiling dodb-storage v0.1.0 (/home/opc/fn0-read-borrowed-b7c67715/dodb/crates/dodb-storage)
+    Finished `release` profile [optimized + debuginfo] target(s) in 33.53s
++ cp /tmp/dodb-mixed-target-04f05824/release/phase0-bench /bench/zfs/db/experiment-results/borrowed-page-b7c67715/bin/phase0-default
++ rustup run 1.97.1 cargo build -p dodb-storage --release --locked -j2 --bin phase0-bench --features blink-borrowed-page-views
+   Compiling dodb-storage v0.1.0 (/home/opc/fn0-read-borrowed-b7c67715/dodb/crates/dodb-storage)
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "/tmp/dodb-mixed-target-04f05824/release/deps/rustcMXkvIC/symbols.o" "<17 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "/tmp/dodb-mixed-target-04f05824/release/deps/{libmimalloc-73c7c7c62d96289b,liblibmimalloc_sys-2412402b13e23b91,libdodb_storage-cf11011466c05a0a,libcrc32c-d7d753fc2d3f4bb3,libtokio-908d8c76ac755eec,libsignal_hook_registry-44d07bfddb2b4cc6,liberrno-66b4f2fb13acfdd7,libsocket2-d117fb7c3ed925bd,libbytes-742b4c891e19a418,libmio-d698bea670457feb,liblibc-fd583a6d27251736,libpin_project_lite-4eac5d88d19ad3de,libdodb_core-06aee4ed185914ac}.rlib" "<sysroot>/lib/rustlib/aarch64-unknown-linux-gnu/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "/tmp/dodb-mixed-target-04f05824/release/deps/rustcMXkvIC/raw-dylibs" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "/tmp/dodb-mixed-target-04f05824/release/build/libmimalloc-sys-5100db6b157d1c2f/out" "-L" "<sysroot>/lib/rustlib/aarch64-unknown-linux-gnu/lib" "-o" "/tmp/dodb-mixed-target-04f05824/release/deps/phase0_bench-a17531fd7470f038" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-Wl,-O1" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: /usr/bin/ld: final link failed: No space left on device
+          collect2: error: ld returned 1 exit status
+          
+
+error: could not compile `dodb-storage` (bin "phase0-bench") due to 1 previous error

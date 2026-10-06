@@ -1,0 +1,106 @@
+{
+  "accepted": true,
+  "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+  "case_counts": {
+    "smoke": 6,
+    "read-c16": 18
+  },
+  "profile_count": 4,
+  "binary_hashes": {
+    "phase0-default": "fa98d52a7df8433b6f5df671f5ea22390a066e62d7acacd2fd7dee84d58a2809",
+    "phase0-borrowed": "3ba65fd42f642e50e5f32f8cdadfac6b0c002bbb663754ccbe9067141f80c265"
+  },
+  "paired_ratios": {
+    "get": {
+      "candidate_over_control": {
+        "ratios": [
+          1.0619543003726237,
+          1.1561308165310722,
+          1.1045082869701044
+        ],
+        "median": 1.1045082869701044,
+        "min": 1.0619543003726237,
+        "max": 1.1561308165310722
+      },
+      "candidate_over_main": {
+        "ratios": [
+          0.8769264153488667,
+          0.9030672742797997,
+          0.8995773929158287
+        ],
+        "median": 0.8995773929158287,
+        "min": 0.8769264153488667,
+        "max": 0.9030672742797997
+      },
+      "control_over_main": {
+        "ratios": [
+          0.825766622011104,
+          0.7811116712461829,
+          0.8144596138645156
+        ],
+        "median": 0.8144596138645156,
+        "min": 0.7811116712461829,
+        "max": 0.825766622011104
+      }
+    },
+    "query": {
+      "candidate_over_control": {
+        "ratios": [
+          1.3388023562527938,
+          1.3031572198641375,
+          1.305054077951339
+        ],
+        "median": 1.305054077951339,
+        "min": 1.3031572198641375,
+        "max": 1.3388023562527938
+      },
+      "candidate_over_main": {
+        "ratios": [
+          1.0027149411584562,
+          0.9783443447190537,
+          0.975561926294383
+        ],
+        "median": 0.9783443447190537,
+        "min": 0.975561926294383,
+        "max": 1.0027149411584562
+      },
+      "control_over_main": {
+        "ratios": [
+          0.7489641293767805,
+          0.7507492801375512,
+          0.7475260548787452
+        ],
+        "median": 0.7489641293767805,
+        "min": 0.7475260548787452,
+        "max": 0.7507492801375512
+      }
+    }
+  },
+  "read_product_gate_passed": false,
+  "raw_sha256": {
+    "smoke/raw/readers-16-get-blink-metrics-on-rep1.jsonl": "a7b8a0f56f4496c878b43dd14ee1b9bbfb3b08a36b0ecc6f0d2ef871490abdb1",
+    "smoke/raw/readers-16-get-blink-borrowed-pages-rep1.jsonl": "e2b1d5827e6b7b4de4de7ab7bf641a79d8d951b6a71a67805d1ed6952749e4cf",
+    "smoke/raw/readers-16-get-main-btree-rep1.jsonl": "e62e831e720300d9937a0705ef8f8c8eb5ff77c7d90b5f31661dc3501f9e7163",
+    "smoke/raw/readers-16-query-blink-metrics-on-rep1.jsonl": "cf1db43ca9b6848ea35f5fc3524bf4d3d18ee7a9d1b3d880c7b87997c824217e",
+    "smoke/raw/readers-16-query-blink-borrowed-pages-rep1.jsonl": "734a94dee943303db068681ec0cfb97e1200fb9eb1a1e7571b2f97c7b204e3e3",
+    "smoke/raw/readers-16-query-main-btree-rep1.jsonl": "0d5b30433687b6499e8224eb9360ef65bd8f73a591aeb323e4dc296d23c49617",
+    "read-c16/raw/readers-16-get-blink-metrics-on-rep1.jsonl": "b4a8bff86657264797c37d7be6d6ce895024edafdd91cea5bc86b704cecd8ae5",
+    "read-c16/raw/readers-16-get-blink-borrowed-pages-rep1.jsonl": "328adbeed9bd89c81bae687056832220b67c2546c28126535a467547231ba352",
+    "read-c16/raw/readers-16-get-main-btree-rep1.jsonl": "3d9877d50da7818446f430b3e5d3e509504dfac0b5d8edf11fd65362c122d349",
+    "read-c16/raw/readers-16-get-blink-metrics-on-rep2.jsonl": "80973ac866e96b51463ee95b75de07b3739e9626f78c24b12e4d95e48fcde5e9",
+    "read-c16/raw/readers-16-get-blink-borrowed-pages-rep2.jsonl": "6b1c09e0c07d0721e34af9352a861d3768250f80e9336c693c742ddb0182e849",
+    "read-c16/raw/readers-16-get-main-btree-rep2.jsonl": "64805e05e96ef625b986c24265031dbec3845a40e93ae2651ed6b66a6c0f3d37",
+    "read-c16/raw/readers-16-get-blink-metrics-on-rep3.jsonl": "cf57fc12ead5a69f6ab31108e61c45e85a3df6d932a11243f5cc9fc67b8c3def",
+    "read-c16/raw/readers-16-get-blink-borrowed-pages-rep3.jsonl": "9cb7d7fbebde693c1584531cf394d4cfc2f5dd242a7b7fb381a77106ab059aa8",
+    "read-c16/raw/readers-16-get-main-btree-rep3.jsonl": "6da4e10314ec0b83272a211647f061f0c201454623b3dba6ba47a734e6ece46a",
+    "read-c16/raw/readers-16-query-blink-metrics-on-rep1.jsonl": "dbd298878db53924b82fe9541b823074ef1ff12f83939655eeae97adac8cd952",
+    "read-c16/raw/readers-16-query-blink-borrowed-pages-rep1.jsonl": "7915d10d2e7066e72263f8a4acb27052fc0c173abfa0f80494ab77d0dc42eee5",
+    "read-c16/raw/readers-16-query-main-btree-rep1.jsonl": "a6de2d10f3b98492d97a42fc84f31b09aeac0c6a45620c3ec0b0f9b6209e7140",
+    "read-c16/raw/readers-16-query-blink-metrics-on-rep2.jsonl": "bc0c1ba2c34bb7532395c7a9123d762da048e8c0a288655bb20465c168553c0a",
+    "read-c16/raw/readers-16-query-blink-borrowed-pages-rep2.jsonl": "80bc4359b599c3650cdf9cd1f45e5ccf9b46154486c6abec4ed167004e94abdc",
+    "read-c16/raw/readers-16-query-main-btree-rep2.jsonl": "9aea9bebff0734dbfe3e42598b4daeb4a06bd9fcb99865f5f9d4b752fca9bc69",
+    "read-c16/raw/readers-16-query-blink-metrics-on-rep3.jsonl": "61283751b2a19d680f5f68740c9e15240444043263d463de24cd5fc9b2788fc2",
+    "read-c16/raw/readers-16-query-blink-borrowed-pages-rep3.jsonl": "fc29fb7f13138e40f17d549bac4004f5fae5845d17e82696fdb6827e94024f4a",
+    "read-c16/raw/readers-16-query-main-btree-rep3.jsonl": "04e9be084e6db1a93fb76b27d6ac06b2dee29180a052ffba6f4ccebb6a285d16"
+  }
+}

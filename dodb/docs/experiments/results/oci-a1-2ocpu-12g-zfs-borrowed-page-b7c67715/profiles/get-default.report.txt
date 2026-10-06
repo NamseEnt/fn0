@@ -1,0 +1,540 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 12K of event 'cycles:u'
+# Event count (approx.): 68930210605
+#
+# Overhead  Command          Shared Object          Symbol                                                                                                                                                                                                                                                                                                                                                 IPC   [IPC Coverage]
+# ........  ...............  .....................  .....................................................................................................................................................................................................................................................................................................................................................  ....................
+#
+    19.51%  tokio-rt-worker  phase0-default         [.] _RNvMse_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_13GenerationPin10owned_page                                                                                                                                                                                                                                                                       -      -            
+            |
+            ---_RNvMse_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_13GenerationPin10owned_page
+               |          
+               |--18.75%--_RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink22find_leaf_with_metricsNtB2_13GenerationPinEB4_
+               |          _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink23find_entry_with_metricsNtB2_13GenerationPinEB4_
+               |          _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink18read_state_encodedNtB2_13GenerationPinEB4_
+               |          _RNvNtCs1Qj6LM5v7bK_12dodb_storage5blink20read_published_state
+               |          _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+               |          _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+               |          _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               |          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               |          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               |          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               |          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               |          _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               |          _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               |          _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               |          _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               |          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               |          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               |          _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               |          _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               |          _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               |          _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               |          start_thread
+               |          thread_start
+               |          
+                --0.76%--_RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink23find_entry_with_metricsNtB2_13GenerationPinEB4_
+                          _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink18read_state_encodedNtB2_13GenerationPinEB4_
+                          _RNvNtCs1Qj6LM5v7bK_12dodb_storage5blink20read_published_state
+                          _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+                          _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+                          _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+                          _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+                          _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+                          _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+                          _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+                          _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+                          _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+                          _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+                          start_thread
+                          thread_start
+
+    12.13%  tokio-rt-worker  libc.so.6              [.] memcmp                                                                                                                                                                                                                                                                                                                                             -      -            
+            |
+            ---memcmp
+               |          
+               |--7.78%--_RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink22find_leaf_with_metricsNtB2_13GenerationPinEB4_
+               |          _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink23find_entry_with_metricsNtB2_13GenerationPinEB4_
+               |          _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink18read_state_encodedNtB2_13GenerationPinEB4_
+               |          _RNvNtCs1Qj6LM5v7bK_12dodb_storage5blink20read_published_state
+               |          _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+               |          _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+               |          _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               |          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               |          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               |          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               |          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               |          _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               |          _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               |          _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               |          _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               |          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               |          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               |          _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               |          _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               |          _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               |          _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               |          start_thread
+               |          thread_start
+               |          
+                --4.36%--_RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink23find_entry_with_metricsNtB2_13GenerationPinEB4_
+                          _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink18read_state_encodedNtB2_13GenerationPinEB4_
+                          _RNvNtCs1Qj6LM5v7bK_12dodb_storage5blink20read_published_state
+                          _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+                          _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+                          _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+                          _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+                          _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+                          _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+                          _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+                          _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+                          _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+                          _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+                          start_thread
+                          thread_start
+
+    10.52%  tokio-rt-worker  phase0-default         [.] _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink22find_leaf_with_metricsNtB2_13GenerationPinEB4_                                                                                                                                                                                                                                                          -      -            
+            |
+            ---_RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink22find_leaf_with_metricsNtB2_13GenerationPinEB4_
+               _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink23find_entry_with_metricsNtB2_13GenerationPinEB4_
+               _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink18read_state_encodedNtB2_13GenerationPinEB4_
+               _RNvNtCs1Qj6LM5v7bK_12dodb_storage5blink20read_published_state
+               _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+               _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+               _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     9.86%  tokio-rt-worker  phase0-default         [.] _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get                                                                                                                                                                                                                                                                             -      -            
+            |
+            ---_RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+               _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+               _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     8.90%  tokio-rt-worker  phase0-default         [.] _RNvMsd_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_19GenerationPublisher3pin                                                                                                                                                                                                                                                                         -      -            
+            |
+            ---_RNvMsd_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_19GenerationPublisher3pin
+               _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+               _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+               _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     4.57%  tokio-rt-worker  libc.so.6              [.] __GI___memcpy_simd                                                                                                                                                                                                                                                                                                                                 -      -            
+            |
+            ---__GI___memcpy_simd
+               |          
+                --4.38%--_RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink17materialize_valueNtB2_13GenerationPinEB4_
+                          _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink18read_state_encodedNtB2_13GenerationPinEB4_
+                          _RNvNtCs1Qj6LM5v7bK_12dodb_storage5blink20read_published_state
+                          _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+                          _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+                          _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+                          _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+                          _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+                          _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+                          _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+                          _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+                          _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+                          _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+                          start_thread
+                          thread_start
+
+     3.86%  tokio-rt-worker  phase0-default         [.] _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_                                                                                                                                                                                                                                                          -      -            
+            |
+            ---_RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+               _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     2.90%  tokio-rt-worker  phase0-default         [.] _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink23find_entry_with_metricsNtB2_13GenerationPinEB4_                                                                                                                                                                                                                                                         -      -            
+            |
+            ---_RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink23find_entry_with_metricsNtB2_13GenerationPinEB4_
+               |          
+                --2.89%--_RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink18read_state_encodedNtB2_13GenerationPinEB4_
+                          _RNvNtCs1Qj6LM5v7bK_12dodb_storage5blink20read_published_state
+                          _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+                          _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+                          _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+                          _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+                          _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+                          _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+                          _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+                          _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+                          _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+                          _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+                          start_thread
+                          thread_start
+
+     2.65%  tokio-rt-worker  phase0-default         [.] _RNvXsf_CsdLVziX1JX3X_12phase0_benchNtB5_12BlinkAdapterNtB5_13EngineAdapter7execute                                                                                                                                                                                                                                                                -      -            
+            |
+            ---_RNvXsf_CsdLVziX1JX3X_12phase0_benchNtB5_12BlinkAdapterNtB5_13EngineAdapter7execute
+               _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     2.57%  tokio-rt-worker  phase0-default         [.] _RNvNtCs3CyqJHX7tdf_9dodb_core3key16encode_component                                                                                                                                                                                                                                                                                               -      -            
+            |
+            ---_RNvNtCs3CyqJHX7tdf_9dodb_core3key16encode_component
+               _RNvMs0_NtCs3CyqJHX7tdf_9dodb_core3keyNtB5_11DocumentKey6encode
+               _RNvNtCs1Qj6LM5v7bK_12dodb_storage5blink20read_published_state
+               _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+               _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+               _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     2.16%  tokio-rt-worker  [vdso]                 [.] 0x00000000000005cc                                                                                                                                                                                                                                                                                                                                 -      -            
+            |
+            ---0xffffbbdaf5cc
+               __kernel_clock_gettime
+               clock_gettime@@GLIBC_2.17
+               _RNvMNtNtNtNtCsjfZfl7cBLOC_3std3sys3pal4unix4timeNtB2_8Timespec3now
+               |          
+               |--1.47%--_RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               |          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               |          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               |          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               |          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               |          _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               |          _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               |          _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               |          _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               |          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               |          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               |          _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               |          _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               |          _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               |          _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               |          start_thread
+               |          thread_start
+               |          
+                --0.69%--_RNvMNtCsjfZfl7cBLOC_3std4timeNtB2_7Instant7elapsed
+                          _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+                          _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+                          _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+                          _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+                          _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+                          _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+                          _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+                          _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+                          start_thread
+                          thread_start
+
+     2.00%  tokio-rt-worker  phase0-default         [.] _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353                                                                                                                                                                                                                                                                       -      -            
+            |
+            ---_RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     1.91%  tokio-rt-worker  phase0-default         [.] _RNvMs1_NtCs4Z9VWoF3XCk_9hashbrown3mapINtB5_7HashMapNtNtCs3CyqJHX7tdf_9dodb_core11identifiers6PageIduNtNtNtCsjfZfl7cBLOC_3std4hash6random11RandomStateE6insertCs1Qj6LM5v7bK_12dodb_storage                                                                                                                                                         -      -            
+            |
+            ---_RNvMs1_NtCs4Z9VWoF3XCk_9hashbrown3mapINtB5_7HashMapNtNtCs3CyqJHX7tdf_9dodb_core11identifiers6PageIduNtNtNtCsjfZfl7cBLOC_3std4hash6random11RandomStateE6insertCs1Qj6LM5v7bK_12dodb_storage
+               _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink22find_leaf_with_metricsNtB2_13GenerationPinEB4_
+               _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink23find_entry_with_metricsNtB2_13GenerationPinEB4_
+               _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink18read_state_encodedNtB2_13GenerationPinEB4_
+               _RNvNtCs1Qj6LM5v7bK_12dodb_storage5blink20read_published_state
+               _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+               _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+               _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     1.50%  tokio-rt-worker  [vdso]                 [.] 0x00000000000005bc                                                                                                                                                                                                                                                                                                                                 -      -            
+            |
+            ---0xffffbbdaf5bc
+               __kernel_clock_gettime
+               clock_gettime@@GLIBC_2.17
+               _RNvMNtNtNtNtCsjfZfl7cBLOC_3std3sys3pal4unix4timeNtB2_8Timespec3now
+               |          
+                --1.10%--_RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+                          _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+                          _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+                          _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+                          _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+                          _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+                          _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+                          _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+                          start_thread
+                          thread_start
+
+     1.44%  tokio-rt-worker  phase0-default         [.] _RNvMs0_NtCs3CyqJHX7tdf_9dodb_core3keyNtB5_11DocumentKey16validate_encoded                                                                                                                                                                                                                                                                         -      -            
+            |
+            ---_RNvMs0_NtCs3CyqJHX7tdf_9dodb_core3keyNtB5_11DocumentKey16validate_encoded
+               _RNvNtCs1Qj6LM5v7bK_12dodb_storage5blink20read_published_state
+               _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+               _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+               _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     1.09%  tokio-rt-worker  phase0-default         [.] mi_theap_malloc_aligned                                                                                                                                                                                                                                                                                                                            -      -            
+            |
+            ---mi_theap_malloc_aligned
+               |          
+                --0.57%--_RNvMsa_CsdLVziX1JX3X_12phase0_benchNtB5_17WorkloadGenerator13key_for_index.llvm.3539117898397689132
+                          _RNvMsa_CsdLVziX1JX3X_12phase0_benchNtB5_17WorkloadGenerator9next_read
+                          _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+                          _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+                          _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+                          _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+                          _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+                          _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+                          _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+                          _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+                          _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+                          _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+                          _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+                          start_thread
+                          thread_start
+
+     1.01%  tokio-rt-worker  phase0-default         [.] _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink18read_state_encodedNtB2_13GenerationPinEB4_                                                                                                                                                                                                                                                              -      -            
+            |
+            ---_RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink18read_state_encodedNtB2_13GenerationPinEB4_
+               _RNvNtCs1Qj6LM5v7bK_12dodb_storage5blink20read_published_state
+               _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+               _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+               _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     0.96%  tokio-rt-worker  phase0-default         [.] mi_free                                                                                                                                                                                                                                                                                                                                            -      -            
+            |
+            ---mi_free
+
+     0.80%  tokio-rt-worker  phase0-default         [.] _mi_page_malloc_zero                                                                                                                                                                                                                                                                                                                               -      -            
+            |
+            ---_mi_page_malloc_zero
+
+     0.78%  tokio-rt-worker  phase0-default         [.] _RINvYNtNtNtCsjfZfl7cBLOC_3std4hash6random11RandomStateNtNtCsfo0Ls1ZyrQZ_4core4hash11BuildHasher8hash_oneRNtNtCs3CyqJHX7tdf_9dodb_core11identifiers6PageIdECs1Qj6LM5v7bK_12dodb_storage                                                                                                                                                            -      -            
+            |
+            ---_RINvYNtNtNtCsjfZfl7cBLOC_3std4hash6random11RandomStateNtNtCsfo0Ls1ZyrQZ_4core4hash11BuildHasher8hash_oneRNtNtCs3CyqJHX7tdf_9dodb_core11identifiers6PageIdECs1Qj6LM5v7bK_12dodb_storage
+               _RNvMs1_NtCs4Z9VWoF3XCk_9hashbrown3mapINtB5_7HashMapNtNtCs3CyqJHX7tdf_9dodb_core11identifiers6PageIduNtNtNtCsjfZfl7cBLOC_3std4hash6random11RandomStateE6insertCs1Qj6LM5v7bK_12dodb_storage
+               _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink22find_leaf_with_metricsNtB2_13GenerationPinEB4_
+               _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink23find_entry_with_metricsNtB2_13GenerationPinEB4_
+               _RINvNtCs1Qj6LM5v7bK_12dodb_storage5blink18read_state_encodedNtB2_13GenerationPinEB4_
+               _RNvNtCs1Qj6LM5v7bK_12dodb_storage5blink20read_published_state
+               _RNvMsg_NtCs1Qj6LM5v7bK_12dodb_storage5blinkNtB5_15BlinkReadHandle3get
+               _RNCNvXsf_CsdLVziX1JX3X_12phase0_benchNtB7_12BlinkAdapterNtB7_13EngineAdapter7execute0B7_
+               _RNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0B3_.llvm.4732110771566488353
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB11_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessNCNvCsdLVziX1JX3X_12phase0_bench11reader_loop0INtNtCsi2GJixwxVUa_5alloc4sync3ArcNtNtNtNtB9_9scheduler12multi_thread6handle6HandleEE4pollB17_
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context8run_task
+               _RNvMs_NtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6workerNtB4_7Context3run
+               _RINvMNtNtNtCspirw3WJvZh_5tokio7runtime7context6scopedINtB3_6ScopedNtNtB7_9scheduler7ContextE3setNCNCNvNtNtB14_12multi_thread6worker3run00uEB9_
+               _RINvNtNtNtCspirw3WJvZh_5tokio7runtime7context7runtime13enter_runtimeNCNvNtNtNtB6_9scheduler12multi_thread6worker3run0uEB8_
+               _RNvNtNtNtNtCspirw3WJvZh_5tokio7runtime9scheduler12multi_thread6worker3run
+               _RNvXs0_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4taskINtB5_12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1f_6Launch6launch0ENtNtNtCsfo0Ls1ZyrQZ_4core6future6future6Future4pollBb_
+               _RNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime4task4coreINtB5_4CoreINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1E_6Launch6launch0ENtNtB12_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs0_NtNtNtCspirw3WJvZh_5tokio7runtime4task7harnessINtB5_7HarnessINtNtNtB9_8blocking4task12BlockingTaskNCNvMNtNtNtB9_9scheduler12multi_thread6workerNtB1K_6Launch6launch0ENtNtB18_8schedule16BlockingScheduleE4pollBb_
+               _RNvMs5_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB5_5Inner3run
+               _RINvNtNtCsjfZfl7cBLOC_3std3sys9backtrace28___rust_begin_short_backtraceNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1f_7Spawner12spawn_thread0uEB1l_
+               _RNSNvYNCINvNtNtCsjfZfl7cBLOC_3std6thread9lifecycle15spawn_uncheckedNCNvMs4_NtNtNtCspirw3WJvZh_5tokio7runtime8blocking4poolNtB1b_7Spawner12spawn_thread0uEs_0INtNtNtCsfo0Ls1ZyrQZ_4core3ops8function6FnOnceuE9call_once6vtableB1h_
+               _RNvNvMs0_NtNtNtCsjfZfl7cBLOC_3std3sys6thread4unixNtB7_6Thread3new12thread_start
+               start_thread
+               thread_start
+
+     0.53%  tokio-rt-worker  [vdso]                 [.] 0x00000000000005b0                                                                                                                                                                                                                                                                                                                                 -      -            
+            |
+            ---0xffffbbdaf5b0
+               __kernel_clock_gettime
+               clock_gettime@@GLIBC_2.17
+               _RNvMNtNtNtNtCsjfZfl7cBLOC_3std3sys3pal4unix4timeNtB2_8Timespec3now
+
+
+
+#
+# (Tip: To see callchains in a more compact form: perf report -g folded)
+#

@@ -1,0 +1,629 @@
+{
+  "accepted": true,
+  "analysis_scope": "Descriptive pure-read measurements. B-link metrics-on and metrics-off share the phase0 workload seed; phase0 uses reader tasks on two Tokio workers while RocksDB uses one OS thread per reader. The RocksDB driver uses an independent key stream, so cross-engine key-trace equality is not claimed.",
+  "completed_count": 6,
+  "environment": {
+    "architecture": "aarch64",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "cpu_model": "Neoverse-N1",
+    "data_root": "/bench/zfs/db",
+    "filesystem": "dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive",
+    "git_branch": "",
+    "git_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+    "hostname": "instance-20260923-1013",
+    "kernel": "6.12.0-206.104.4.4.el9uek.aarch64",
+    "logical_cpus": 2,
+    "memory_total_kib": 11159744,
+    "os_release": "NAME=\"Oracle Linux Server\"\nVERSION=\"9.8\"\nID=\"ol\"\nID_LIKE=\"fedora\"\nVARIANT=\"Server\"\nVARIANT_ID=\"server\"\nVERSION_ID=\"9.8\"\nPLATFORM_ID=\"platform:el9\"\nPRETTY_NAME=\"Oracle Linux Server 9.8\"\nANSI_COLOR=\"0;31\"\nCPE_NAME=\"cpe:/o:oracle:linux:9:8:server\"\nHOME_URL=\"https://linux.oracle.com/\"\nBUG_REPORT_URL=\"https://github.com/oracle/oracle-linux\"\n\nORACLE_BUGZILLA_PRODUCT=\"Oracle Linux 9\"\nORACLE_BUGZILLA_PRODUCT_VERSION=9.8\nORACLE_SUPPORT_PRODUCT=\"Oracle Linux\"\nORACLE_SUPPORT_PRODUCT_VERSION=9.8\n",
+    "python": "Python 3.9.25",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "timestamp_utc": "2026-10-06T14:14:05.880830+00:00",
+    "zfs_dataset": "dodbbench/db",
+    "zfs_properties": "NAME          PROPERTY     VALUE           SOURCE\ndodbbench/db  sync         standard        local\ndodbbench/db  recordsize   4K              local\ndodbbench/db  compression  off             inherited from dodbbench\ndodbbench/db  atime        off             inherited from dodbbench",
+    "zpool_status": "pool: dodbbench\n state: ONLINE\nconfig:\n\n\tNAME        STATE     READ WRITE CKSUM\n\tdodbbench   ONLINE       0     0     0\n\t  sda4      ONLINE       0     0     0\n\nerrors: No known data errors"
+  },
+  "generated_at_utc": "2026-10-06T14:14:14.848120+00:00",
+  "matrix_config": {
+    "config": {
+      "base_seed": 979000000,
+      "cache_capacity": 16384,
+      "data_namespace": "/bench/zfs/db/smoke",
+      "data_root": "/bench/zfs/db",
+      "distribution": "uniform",
+      "duration_ms": 300,
+      "key_size": 16,
+      "read_kinds": [
+        "get",
+        "query"
+      ],
+      "read_limit": 16,
+      "reader_execution_models": {
+        "phase0": "one async reader task per reader on two Tokio workers",
+        "rocksdb": "one OS thread per reader"
+      },
+      "readers": 16,
+      "repetitions": 1,
+      "seed_stride": 1009,
+      "sync_contract": "durable-return",
+      "sync_mode": "real",
+      "tokio_workers": 2,
+      "transaction_width": 1,
+      "value_size": 512,
+      "variants": [
+        {
+          "binary_env": "PHASE0_BINARY",
+          "binary_key": "phase0-bench",
+          "binary_kind": "phase0",
+          "blink_read_observational_metrics_enabled": true,
+          "blink_workers": 2,
+          "collection_policy": "current",
+          "engine": "parallel-blink",
+          "engine_options": [
+            "--blink-collection-policy",
+            "current",
+            "--blink-workers",
+            "2"
+          ],
+          "name": "blink-metrics-on",
+          "read_metrics_mode": "on",
+          "tokio_workers": 2
+        },
+        {
+          "binary_env": "PHASE0_BORROWED_PAGES_BINARY",
+          "binary_key": "phase0-borrowed-pages",
+          "binary_kind": "phase0",
+          "blink_read_observational_metrics_enabled": true,
+          "blink_workers": 2,
+          "collection_policy": "current",
+          "engine": "parallel-blink",
+          "engine_options": [
+            "--blink-collection-policy",
+            "current",
+            "--blink-workers",
+            "2"
+          ],
+          "name": "blink-borrowed-pages",
+          "read_metrics_mode": "on",
+          "tokio_workers": 2
+        },
+        {
+          "binary_env": "PHASE0_BINARY",
+          "binary_key": "phase0-bench",
+          "binary_kind": "phase0",
+          "blink_read_observational_metrics_enabled": true,
+          "blink_workers": null,
+          "collection_policy": "native-main",
+          "engine": "main-btree",
+          "engine_options": [],
+          "name": "main-btree",
+          "read_metrics_mode": "on",
+          "tokio_workers": 2
+        }
+      ],
+      "warmup_ms": 200,
+      "working_set": 10000
+    },
+    "created_at_utc": "2026-10-06T14:14:05.840046+00:00",
+    "expected_cells": [
+      {
+        "binary_env": "PHASE0_BINARY",
+        "binary_key": "phase0-bench",
+        "binary_kind": "phase0",
+        "cache_capacity": 16384,
+        "cell_id": "readers-16-get-blink-metrics-on-rep1",
+        "distribution": "uniform",
+        "duration_ms": 300,
+        "expected_blink_workers": 2,
+        "expected_collection_policy": "current",
+        "expected_engine": "parallel-blink",
+        "expected_raw_repetition": 0,
+        "expected_read_metrics_enabled": true,
+        "expected_tokio_workers": 2,
+        "key_size": 16,
+        "read_kind": "get",
+        "read_limit": 16,
+        "read_metrics_mode": "on",
+        "readers": 16,
+        "repetition": 1,
+        "scenario_index": 16100,
+        "seed": 995244900,
+        "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+        "transaction_width": 1,
+        "value_size": 512,
+        "variant": "blink-metrics-on",
+        "warmup_ms": 200,
+        "working_set": 10000
+      },
+      {
+        "binary_env": "PHASE0_BORROWED_PAGES_BINARY",
+        "binary_key": "phase0-borrowed-pages",
+        "binary_kind": "phase0",
+        "cache_capacity": 16384,
+        "cell_id": "readers-16-get-blink-borrowed-pages-rep1",
+        "distribution": "uniform",
+        "duration_ms": 300,
+        "expected_blink_workers": 2,
+        "expected_collection_policy": "current",
+        "expected_engine": "parallel-blink",
+        "expected_raw_repetition": 0,
+        "expected_read_metrics_enabled": true,
+        "expected_tokio_workers": 2,
+        "key_size": 16,
+        "read_kind": "get",
+        "read_limit": 16,
+        "read_metrics_mode": "on",
+        "readers": 16,
+        "repetition": 1,
+        "scenario_index": 16100,
+        "seed": 995244900,
+        "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+        "transaction_width": 1,
+        "value_size": 512,
+        "variant": "blink-borrowed-pages",
+        "warmup_ms": 200,
+        "working_set": 10000
+      },
+      {
+        "binary_env": "PHASE0_BINARY",
+        "binary_key": "phase0-bench",
+        "binary_kind": "phase0",
+        "cache_capacity": 16384,
+        "cell_id": "readers-16-get-main-btree-rep1",
+        "distribution": "uniform",
+        "duration_ms": 300,
+        "expected_blink_workers": null,
+        "expected_collection_policy": "native-main",
+        "expected_engine": "main-btree",
+        "expected_raw_repetition": 0,
+        "expected_read_metrics_enabled": true,
+        "expected_tokio_workers": 2,
+        "key_size": 16,
+        "read_kind": "get",
+        "read_limit": 16,
+        "read_metrics_mode": "on",
+        "readers": 16,
+        "repetition": 1,
+        "scenario_index": 16100,
+        "seed": 995244900,
+        "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+        "transaction_width": 1,
+        "value_size": 512,
+        "variant": "main-btree",
+        "warmup_ms": 200,
+        "working_set": 10000
+      },
+      {
+        "binary_env": "PHASE0_BINARY",
+        "binary_key": "phase0-bench",
+        "binary_kind": "phase0",
+        "cache_capacity": 16384,
+        "cell_id": "readers-16-query-blink-metrics-on-rep1",
+        "distribution": "uniform",
+        "duration_ms": 300,
+        "expected_blink_workers": 2,
+        "expected_collection_policy": "current",
+        "expected_engine": "parallel-blink",
+        "expected_raw_repetition": 0,
+        "expected_read_metrics_enabled": true,
+        "expected_tokio_workers": 2,
+        "key_size": 16,
+        "read_kind": "query",
+        "read_limit": 16,
+        "read_metrics_mode": "on",
+        "readers": 16,
+        "repetition": 1,
+        "scenario_index": 16200,
+        "seed": 995345800,
+        "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+        "transaction_width": 1,
+        "value_size": 512,
+        "variant": "blink-metrics-on",
+        "warmup_ms": 200,
+        "working_set": 10000
+      },
+      {
+        "binary_env": "PHASE0_BORROWED_PAGES_BINARY",
+        "binary_key": "phase0-borrowed-pages",
+        "binary_kind": "phase0",
+        "cache_capacity": 16384,
+        "cell_id": "readers-16-query-blink-borrowed-pages-rep1",
+        "distribution": "uniform",
+        "duration_ms": 300,
+        "expected_blink_workers": 2,
+        "expected_collection_policy": "current",
+        "expected_engine": "parallel-blink",
+        "expected_raw_repetition": 0,
+        "expected_read_metrics_enabled": true,
+        "expected_tokio_workers": 2,
+        "key_size": 16,
+        "read_kind": "query",
+        "read_limit": 16,
+        "read_metrics_mode": "on",
+        "readers": 16,
+        "repetition": 1,
+        "scenario_index": 16200,
+        "seed": 995345800,
+        "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+        "transaction_width": 1,
+        "value_size": 512,
+        "variant": "blink-borrowed-pages",
+        "warmup_ms": 200,
+        "working_set": 10000
+      },
+      {
+        "binary_env": "PHASE0_BINARY",
+        "binary_key": "phase0-bench",
+        "binary_kind": "phase0",
+        "cache_capacity": 16384,
+        "cell_id": "readers-16-query-main-btree-rep1",
+        "distribution": "uniform",
+        "duration_ms": 300,
+        "expected_blink_workers": null,
+        "expected_collection_policy": "native-main",
+        "expected_engine": "main-btree",
+        "expected_raw_repetition": 0,
+        "expected_read_metrics_enabled": true,
+        "expected_tokio_workers": 2,
+        "key_size": 16,
+        "read_kind": "query",
+        "read_limit": 16,
+        "read_metrics_mode": "on",
+        "readers": 16,
+        "repetition": 1,
+        "scenario_index": 16200,
+        "seed": 995345800,
+        "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+        "transaction_width": 1,
+        "value_size": 512,
+        "variant": "main-btree",
+        "warmup_ms": 200,
+        "working_set": 10000
+      }
+    ],
+    "planned_count": 6,
+    "schema_version": 1,
+    "source_branch": "",
+    "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547"
+  },
+  "planned_count": 6,
+  "rows": [
+    {
+      "blink_read_observational_metrics_enabled": true,
+      "collection_policy": "current",
+      "distribution": "uniform",
+      "duration_ms": 300,
+      "engine": "parallel-blink",
+      "key_size": 16,
+      "metrics": {
+        "cpu_utilization_percent_one_core": {
+          "max": 188.742756,
+          "median": 188.742756,
+          "min": 188.742756
+        },
+        "read_operations_metric": {
+          "max": 392203.0,
+          "median": 392203.0,
+          "min": 392203.0
+        },
+        "read_p99_us": {
+          "max": 2.0,
+          "median": 2.0,
+          "min": 2.0
+        },
+        "rss_end_kib": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "rss_hwm_kib": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "throughput_ops_per_second": {
+          "max": 1138853.463487,
+          "median": 1138853.463487,
+          "min": 1138853.463487
+        }
+      },
+      "read_kind": "get",
+      "read_limit": 16,
+      "read_metrics_mode": "on",
+      "reader_execution_model": "16 reader tasks on 2 Tokio workers",
+      "readers": 16,
+      "repetitions": 1,
+      "seeds": [
+        995244900
+      ],
+      "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+      "sync_contract": "durable-return",
+      "transaction_width": 1,
+      "value_size": 512,
+      "variant": "blink-borrowed-pages",
+      "warmup_ms": 200,
+      "working_set": 10000
+    },
+    {
+      "blink_read_observational_metrics_enabled": true,
+      "collection_policy": "current",
+      "distribution": "uniform",
+      "duration_ms": 300,
+      "engine": "parallel-blink",
+      "key_size": 16,
+      "metrics": {
+        "cpu_utilization_percent_one_core": {
+          "max": 190.747334,
+          "median": 190.747334,
+          "min": 190.747334
+        },
+        "read_operations_metric": {
+          "max": 326503.0,
+          "median": 326503.0,
+          "min": 326503.0
+        },
+        "read_p99_us": {
+          "max": 2.36,
+          "median": 2.36,
+          "min": 2.36
+        },
+        "rss_end_kib": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "rss_hwm_kib": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "throughput_ops_per_second": {
+          "max": 1055586.049265,
+          "median": 1055586.049265,
+          "min": 1055586.049265
+        }
+      },
+      "read_kind": "get",
+      "read_limit": 16,
+      "read_metrics_mode": "on",
+      "reader_execution_model": "16 reader tasks on 2 Tokio workers",
+      "readers": 16,
+      "repetitions": 1,
+      "seeds": [
+        995244900
+      ],
+      "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+      "sync_contract": "durable-return",
+      "transaction_width": 1,
+      "value_size": 512,
+      "variant": "blink-metrics-on",
+      "warmup_ms": 200,
+      "working_set": 10000
+    },
+    {
+      "blink_read_observational_metrics_enabled": true,
+      "collection_policy": "native-main",
+      "distribution": "uniform",
+      "duration_ms": 300,
+      "engine": "main-btree",
+      "key_size": 16,
+      "metrics": {
+        "cpu_utilization_percent_one_core": {
+          "max": 188.722107,
+          "median": 188.722107,
+          "min": 188.722107
+        },
+        "read_operations_metric": {
+          "max": 0.0,
+          "median": 0.0,
+          "min": 0.0
+        },
+        "read_p99_us": {
+          "max": 1.8,
+          "median": 1.8,
+          "min": 1.8
+        },
+        "rss_end_kib": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "rss_hwm_kib": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "throughput_ops_per_second": {
+          "max": 1223015.068636,
+          "median": 1223015.068636,
+          "min": 1223015.068636
+        }
+      },
+      "read_kind": "get",
+      "read_limit": 16,
+      "read_metrics_mode": "on",
+      "reader_execution_model": "16 reader tasks on 2 Tokio workers",
+      "readers": 16,
+      "repetitions": 1,
+      "seeds": [
+        995244900
+      ],
+      "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+      "sync_contract": "durable-return",
+      "transaction_width": 1,
+      "value_size": 512,
+      "variant": "main-btree",
+      "warmup_ms": 200,
+      "working_set": 10000
+    },
+    {
+      "blink_read_observational_metrics_enabled": true,
+      "collection_policy": "current",
+      "distribution": "uniform",
+      "duration_ms": 300,
+      "engine": "parallel-blink",
+      "key_size": 16,
+      "metrics": {
+        "cpu_utilization_percent_one_core": {
+          "max": 198.571612,
+          "median": 198.571612,
+          "min": 198.571612
+        },
+        "read_operations_metric": {
+          "max": 162985.0,
+          "median": 162985.0,
+          "min": 162985.0
+        },
+        "read_p99_us": {
+          "max": 3.48,
+          "median": 3.48,
+          "min": 3.48
+        },
+        "rss_end_kib": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "rss_hwm_kib": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "throughput_ops_per_second": {
+          "max": 539403.235053,
+          "median": 539403.235053,
+          "min": 539403.235053
+        }
+      },
+      "read_kind": "query",
+      "read_limit": 16,
+      "read_metrics_mode": "on",
+      "reader_execution_model": "16 reader tasks on 2 Tokio workers",
+      "readers": 16,
+      "repetitions": 1,
+      "seeds": [
+        995345800
+      ],
+      "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+      "sync_contract": "durable-return",
+      "transaction_width": 1,
+      "value_size": 512,
+      "variant": "blink-borrowed-pages",
+      "warmup_ms": 200,
+      "working_set": 10000
+    },
+    {
+      "blink_read_observational_metrics_enabled": true,
+      "collection_policy": "current",
+      "distribution": "uniform",
+      "duration_ms": 300,
+      "engine": "parallel-blink",
+      "key_size": 16,
+      "metrics": {
+        "cpu_utilization_percent_one_core": {
+          "max": 198.553474,
+          "median": 198.553474,
+          "min": 198.553474
+        },
+        "read_operations_metric": {
+          "max": 134014.0,
+          "median": 134014.0,
+          "min": 134014.0
+        },
+        "read_p99_us": {
+          "max": 4.88,
+          "median": 4.88,
+          "min": 4.88
+        },
+        "rss_end_kib": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "rss_hwm_kib": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "throughput_ops_per_second": {
+          "max": 443482.421975,
+          "median": 443482.421975,
+          "min": 443482.421975
+        }
+      },
+      "read_kind": "query",
+      "read_limit": 16,
+      "read_metrics_mode": "on",
+      "reader_execution_model": "16 reader tasks on 2 Tokio workers",
+      "readers": 16,
+      "repetitions": 1,
+      "seeds": [
+        995345800
+      ],
+      "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+      "sync_contract": "durable-return",
+      "transaction_width": 1,
+      "value_size": 512,
+      "variant": "blink-metrics-on",
+      "warmup_ms": 200,
+      "working_set": 10000
+    },
+    {
+      "blink_read_observational_metrics_enabled": true,
+      "collection_policy": "native-main",
+      "distribution": "uniform",
+      "duration_ms": 300,
+      "engine": "main-btree",
+      "key_size": 16,
+      "metrics": {
+        "cpu_utilization_percent_one_core": {
+          "max": 187.672569,
+          "median": 187.672569,
+          "min": 187.672569
+        },
+        "read_operations_metric": {
+          "max": 0.0,
+          "median": 0.0,
+          "min": 0.0
+        },
+        "read_p99_us": {
+          "max": 3.12,
+          "median": 3.12,
+          "min": 3.12
+        },
+        "rss_end_kib": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "rss_hwm_kib": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "throughput_ops_per_second": {
+          "max": 558704.474768,
+          "median": 558704.474768,
+          "min": 558704.474768
+        }
+      },
+      "read_kind": "query",
+      "read_limit": 16,
+      "read_metrics_mode": "on",
+      "reader_execution_model": "16 reader tasks on 2 Tokio workers",
+      "readers": 16,
+      "repetitions": 1,
+      "seeds": [
+        995345800
+      ],
+      "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547",
+      "sync_contract": "durable-return",
+      "transaction_width": 1,
+      "value_size": 512,
+      "variant": "main-btree",
+      "warmup_ms": 200,
+      "working_set": 10000
+    }
+  ],
+  "schema_version": 1,
+  "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547"
+}

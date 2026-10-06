@@ -32,6 +32,7 @@ export CARGO_TARGET_DIR="$study_cache"
 export RUSTFLAGS='-C target-cpu=native'
 export RUSTUP_TOOLCHAIN=1.97.1
 export RUSTC="$study_rustc"
+export PYTHONDONTWRITEBYTECODE=1
 
 (
     set -x

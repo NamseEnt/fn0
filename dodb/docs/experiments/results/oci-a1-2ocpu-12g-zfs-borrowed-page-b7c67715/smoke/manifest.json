@@ -1,0 +1,19 @@
+{
+  "accepted": true,
+  "binary_sha256": {
+    "phase0-bench": {
+      "environment_variable": "PHASE0_BINARY",
+      "path": "/bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/bin/phase0-default",
+      "sha256": "fa98d52a7df8433b6f5df671f5ea22390a066e62d7acacd2fd7dee84d58a2809"
+    },
+    "phase0-borrowed-pages": {
+      "environment_variable": "PHASE0_BORROWED_PAGES_BINARY",
+      "path": "/bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/bin/phase0-borrowed",
+      "sha256": "3ba65fd42f642e50e5f32f8cdadfac6b0c002bbb663754ccbe9067141f80c265"
+    }
+  },
+  "completed_count": 6,
+  "planned_count": 6,
+  "results": "/bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/smoke",
+  "source_commit": "b7c67715c2dc52d30fce43fcb5d885fedd070547"
+}

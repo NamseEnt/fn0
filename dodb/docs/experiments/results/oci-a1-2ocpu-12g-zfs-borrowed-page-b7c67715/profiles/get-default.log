@@ -1,0 +1,13 @@
++ sudo -n env TMPDIR=/bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/profiles/tmp perf record -e cycles:u -F 499 --call-graph fp -o /bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/profiles/get-default.perf.data -- /bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/bin/phase0-default --engine parallel-blink --suite read --readers 16 --widths 1 --distributions uniform --read-kinds get --duration 10s --warmup 2s --repetitions 1 --tokio-workers 2 --cache-capacity 16384 --working-set 10000 --key-size 16 --value-size 512 --read-limit 16 --sync-mode real --blink-collection-policy current --blink-workers 2 --seed 3504029734 --output /bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/profiles/get-default.jsonl
+phase0-bench engine=parallel-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=10s warmup=2s repetitions=1
+raw output: /bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/profiles/get-default.jsonl
+scenario                                                       repetition throughput summary
+100%-read-get-0w-16r-get-width1-uniform                    rep=0 tx/s=        0 mut/s=        0 read/s=  1123897 agg/s=  1123897 p50=     1.5us p95=     1.9us p99=     2.2us groups=    0 avg_group= 0.00
+completed 1 scenarios x 1 repetitions
+[ perf record: Woken up 11 times to write data ]
+[ perf record: Captured and wrote 2.810 MB /bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/profiles/get-default.perf.data (12071 samples) ]
+++ id -u
+++ id -g
++ sudo -n chown 1000:1000 /bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/profiles/get-default.perf.data /bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/profiles/get-default.jsonl
++ perf report --stdio --no-children --percent-limit 0.5 -s comm,dso,symbol -i /bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/profiles/get-default.perf.data
++ gzip /bench/zfs/db/experiment-results/borrowed-page-b7c67715-accepted/profiles/get-default.perf.data

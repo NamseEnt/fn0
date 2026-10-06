@@ -1,0 +1,57 @@
+source_sha_before=b7c67715c2dc52d30fce43fcb5d885fedd070547
+source_status_before=clean
+source_directory=/home/opc/fn0-read-borrowed-b7c67715
+instance-20260923-1013
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+Architecture:                            aarch64
+CPU op-mode(s):                          32-bit, 64-bit
+Byte Order:                              Little Endian
+CPU(s):                                  2
+On-line CPU(s) list:                     0,1
+Vendor ID:                               ARM
+Model name:                              Neoverse-N1
+Model:                                   1
+Thread(s) per core:                      1
+Core(s) per socket:                      2
+Socket(s):                               1
+Stepping:                                r3p1
+BogoMIPS:                                50.00
+Flags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0,1
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; CSV2, BHB
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+TARGET        SOURCE       FSTYPE OPTIONS
+/bench/zfs/db dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive
+NAME          PROPERTY     VALUE           SOURCE
+dodbbench/db  sync         standard        local
+dodbbench/db  recordsize   4K              local
+dodbbench/db  compression  off             inherited from dodbbench
+dodbbench/db  atime        off             inherited from dodbbench
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+binary: rustc
+commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452
+commit-date: 2026-07-14
+host: aarch64-unknown-linux-gnu
+release: 1.97.1
+LLVM version: 22.1.6
+cargo 1.97.1 (c980f4866 2026-06-30)
+target_directory=/bench/zfs/db/experiment-build/borrowed-page-b7c67715-target
+rustflags=-C target-cpu=native
+source_sha_after=b7c67715c2dc52d30fce43fcb5d885fedd070547
+source_status_after=clean
