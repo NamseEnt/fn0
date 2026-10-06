@@ -7,7 +7,7 @@ publish = false
 [workspace]
 
 [dependencies]
-turso = { path = "/tmp/turso-crossdb/bindings/rust" }
+turso = { git = "https://github.com/tursodatabase/turso", rev = "418ef1c3e8e4975597be5882ebcf1d03c3ce83aa" }
 tokio = { version = "1", features = ["rt", "time"] }
 serde_json = "1"
 libc = "0.2"
