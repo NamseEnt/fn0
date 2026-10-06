@@ -1,0 +1,742 @@
+{
+  "accepted": true,
+  "source_commit": "99924ae7040065f75066da0b033ac4a81149b1f1",
+  "case_counts": {
+    "read-smoke": 6,
+    "mixed-smoke": 8,
+    "read-c16": 18,
+    "mixed-c4-c64": 24
+  },
+  "binary_hashes": {
+    "phase0-default": "3743a43c694019788bacb4024957778e28b1f8c8b07bb79cef0c4ecccf3945b4",
+    "phase0-borrowed": "f7d229026f014ffda7e7b7cc4acb245bd2ca2e07d8bf5bc59c1e780051ea2850"
+  },
+  "read_paired_ratios": {
+    "get": {
+      "compact_main_over_main": {
+        "ratios": [
+          0.9793278100675115,
+          1.0201850196631663,
+          1.033857545564867
+        ],
+        "median": 1.0201850196631663,
+        "min": 0.9793278100675115,
+        "max": 1.033857545564867
+      },
+      "borrowed_blink_over_main": {
+        "ratios": [
+          0.9258491246953601,
+          0.9051117318702483,
+          0.9466292562022385
+        ],
+        "median": 0.9258491246953601,
+        "min": 0.9051117318702483,
+        "max": 0.9466292562022385
+      },
+      "borrowed_blink_over_compact_main": {
+        "ratios": [
+          0.9453924571298912,
+          0.8872035115444926,
+          0.9156283283544931
+        ],
+        "median": 0.9156283283544931,
+        "min": 0.8872035115444926,
+        "max": 0.9453924571298912
+      }
+    },
+    "query": {
+      "compact_main_over_main": {
+        "ratios": [
+          0.9796833060680802,
+          0.9913315393385733,
+          1.004566145394879
+        ],
+        "median": 0.9913315393385733,
+        "min": 0.9796833060680802,
+        "max": 1.004566145394879
+      },
+      "borrowed_blink_over_main": {
+        "ratios": [
+          0.9420371610780995,
+          0.9718106918959851,
+          0.9600504629399491
+        ],
+        "median": 0.9600504629399491,
+        "min": 0.9420371610780995,
+        "max": 0.9718106918959851
+      },
+      "borrowed_blink_over_compact_main": {
+        "ratios": [
+          0.9615731484278609,
+          0.9803084571932285,
+          0.9556866587043589
+        ],
+        "median": 0.9615731484278609,
+        "min": 0.9556866587043589,
+        "max": 0.9803084571932285
+      }
+    }
+  },
+  "mixed_paired_ratios": {
+    "4": {
+      "compact_main_over_main": {
+        "ratios": [
+          1.825580764062688,
+          1.6691442879065685,
+          1.6066145200121
+        ],
+        "median": 1.6691442879065685,
+        "min": 1.6066145200121,
+        "max": 1.825580764062688
+      },
+      "blink_over_compact_main": {
+        "ratios": [
+          0.9684563754264638,
+          1.1215120321098304,
+          1.1541956005243212
+        ],
+        "median": 1.1215120321098304,
+        "min": 0.9684563754264638,
+        "max": 1.1541956005243212
+      },
+      "borrowed_blink_over_compact_main": {
+        "ratios": [
+          1.01330527479002,
+          1.0485604329073326,
+          1.1223419878015772
+        ],
+        "median": 1.0485604329073326,
+        "min": 1.01330527479002,
+        "max": 1.1223419878015772
+      },
+      "borrowed_blink_over_blink": {
+        "ratios": [
+          1.0463096743452247,
+          0.9349524596135999,
+          0.9724018938312765
+        ],
+        "median": 0.9724018938312765,
+        "min": 0.9349524596135999,
+        "max": 1.0463096743452247
+      }
+    },
+    "64": {
+      "compact_main_over_main": {
+        "ratios": [
+          2.0611848204617687,
+          2.003129004467587,
+          1.9529952294135453
+        ],
+        "median": 2.003129004467587,
+        "min": 1.9529952294135453,
+        "max": 2.0611848204617687
+      },
+      "blink_over_compact_main": {
+        "ratios": [
+          1.304873256353408,
+          1.333778726815603,
+          1.348955989937672
+        ],
+        "median": 1.333778726815603,
+        "min": 1.304873256353408,
+        "max": 1.348955989937672
+      },
+      "borrowed_blink_over_compact_main": {
+        "ratios": [
+          1.2887956183456872,
+          1.3340763023505744,
+          1.3718903781425675
+        ],
+        "median": 1.3340763023505744,
+        "min": 1.2887956183456872,
+        "max": 1.3718903781425675
+      },
+      "borrowed_blink_over_blink": {
+        "ratios": [
+          0.9876787742185388,
+          1.0002231071233845,
+          1.0170015837254671
+        ],
+        "median": 1.0002231071233845,
+        "min": 0.9876787742185388,
+        "max": 1.0170015837254671
+      }
+    }
+  },
+  "read_metrics": {
+    "get-main-btree": {
+      "read_p99_us": {
+        "values": [
+          1.72,
+          1.8,
+          1.8
+        ],
+        "median": 1.8
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          197.124424,
+          196.955271,
+          189.570669
+        ],
+        "median": 196.955271
+      }
+    },
+    "get-main-btree-compact-wal": {
+      "read_p99_us": {
+        "values": [
+          1.76,
+          1.72,
+          1.76
+        ],
+        "median": 1.76
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          197.810951,
+          197.307623,
+          194.93962
+        ],
+        "median": 197.307623
+      }
+    },
+    "get-blink-borrowed-pages": {
+      "read_p99_us": {
+        "values": [
+          1.88,
+          2.0,
+          1.92
+        ],
+        "median": 1.92
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          197.43631,
+          197.230529,
+          197.843467
+        ],
+        "median": 197.43631
+      }
+    },
+    "query-main-btree": {
+      "read_p99_us": {
+        "values": [
+          3.08,
+          3.16,
+          3.12
+        ],
+        "median": 3.12
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          197.563827,
+          198.111979,
+          197.988293
+        ],
+        "median": 197.988293
+      }
+    },
+    "query-main-btree-compact-wal": {
+      "read_p99_us": {
+        "values": [
+          3.16,
+          3.16,
+          3.08
+        ],
+        "median": 3.16
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          197.148056,
+          196.280528,
+          198.020655
+        ],
+        "median": 197.148056
+      }
+    },
+    "query-blink-borrowed-pages": {
+      "read_p99_us": {
+        "values": [
+          3.36,
+          3.28,
+          3.32
+        ],
+        "median": 3.32
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          198.05071,
+          197.209312,
+          197.540497
+        ],
+        "median": 197.540497
+      }
+    }
+  },
+  "mixed_metrics": {
+    "c4-main-btree": {
+      "aggregate_ops_per_second": {
+        "values": [
+          4190.043266,
+          4335.681672,
+          4355.383905
+        ],
+        "median": 4335.681672
+      },
+      "avg_transactions_per_group": {
+        "values": [
+          3.834617,
+          3.787413,
+          3.782216
+        ],
+        "median": 3.787413
+      },
+      "write_p99_us": {
+        "values": [
+          3978.034,
+          3597.031,
+          3434.47
+        ],
+        "median": 3597.031
+      },
+      "read_p99_us": {
+        "values": [
+          8.44,
+          9.16,
+          8.801
+        ],
+        "median": 8.801
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          19.193785,
+          20.796554,
+          20.588579
+        ],
+        "median": 20.588579
+      },
+      "wal_bytes_per_successful_write": {
+        "values": [
+          8380.0,
+          8380.0,
+          8380.0
+        ],
+        "median": 8380.0
+      }
+    },
+    "c4-main-btree-compact-wal": {
+      "aggregate_ops_per_second": {
+        "values": [
+          7649.262387,
+          7236.878297,
+          6997.423022
+        ],
+        "median": 7236.878297
+      },
+      "avg_transactions_per_group": {
+        "values": [
+          3.792734,
+          3.781818,
+          3.857584
+        ],
+        "median": 3.792734
+      },
+      "write_p99_us": {
+        "values": [
+          2068.978,
+          2228.219,
+          2157.819
+        ],
+        "median": 2157.819
+      },
+      "read_p99_us": {
+        "values": [
+          8.64,
+          8.96,
+          8.4
+        ],
+        "median": 8.64
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          23.995177,
+          23.792367,
+          23.792598
+        ],
+        "median": 23.792598
+      },
+      "wal_bytes_per_successful_write": {
+        "values": [
+          669.3899183417085,
+          669.3501326259947,
+          669.3448394102184
+        ],
+        "median": 669.3501326259947
+      }
+    },
+    "c4-parallel-blink-main-parity": {
+      "aggregate_ops_per_second": {
+        "values": [
+          7407.976926,
+          8116.246085,
+          8076.394867
+        ],
+        "median": 8076.394867
+      },
+      "avg_transactions_per_group": {
+        "values": [
+          3.911839,
+          3.894818,
+          3.892809
+        ],
+        "median": 3.894818
+      },
+      "write_p99_us": {
+        "values": [
+          2093.898,
+          1941.817,
+          1943.177
+        ],
+        "median": 1943.177
+      },
+      "read_p99_us": {
+        "values": [
+          7.92,
+          8.96,
+          8.401
+        ],
+        "median": 8.401
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          22.592,
+          22.394057,
+          21.594639
+        ],
+        "median": 22.394057
+      },
+      "wal_bytes_per_successful_write": {
+        "values": [
+          669.3519429281738,
+          669.363000197122,
+          669.3788133914421
+        ],
+        "median": 669.363000197122
+      }
+    },
+    "c4-parallel-blink-main-parity-borrowed": {
+      "aggregate_ops_per_second": {
+        "values": [
+          7751.037925,
+          7588.30424,
+          7853.501664
+        ],
+        "median": 7751.037925
+      },
+      "avg_transactions_per_group": {
+        "values": [
+          3.913922,
+          3.889596,
+          3.910558
+        ],
+        "median": 3.910558
+      },
+      "write_p99_us": {
+        "values": [
+          1957.097,
+          2130.058,
+          1995.777
+        ],
+        "median": 1995.777
+      },
+      "read_p99_us": {
+        "values": [
+          7.88,
+          7.48,
+          7.68
+        ],
+        "median": 7.68
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          22.591367,
+          21.992767,
+          21.992444
+        ],
+        "median": 21.992767
+      },
+      "wal_bytes_per_successful_write": {
+        "values": [
+          669.3866804336603,
+          669.3355492244381,
+          669.3189852783862
+        ],
+        "median": 669.3355492244381
+      }
+    },
+    "c64-main-btree": {
+      "aggregate_ops_per_second": {
+        "values": [
+          14592.505057,
+          14923.151911,
+          14960.39128
+        ],
+        "median": 14923.151911
+      },
+      "avg_transactions_per_group": {
+        "values": [
+          56.617054,
+          55.907186,
+          58.023256
+        ],
+        "median": 56.617054
+      },
+      "write_p99_us": {
+        "values": [
+          18965.683,
+          21030.821,
+          19703.369
+        ],
+        "median": 19703.369
+      },
+      "read_p99_us": {
+        "values": [
+          8.04,
+          7.52,
+          7.561
+        ],
+        "median": 7.561
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          42.139084,
+          40.156816,
+          40.760198
+        ],
+        "median": 40.760198
+      },
+      "wal_bytes_per_successful_write": {
+        "values": [
+          8380.0,
+          8380.0,
+          8380.0
+        ],
+        "median": 8380.0
+      }
+    },
+    "c64-main-btree-compact-wal": {
+      "aggregate_ops_per_second": {
+        "values": [
+          30077.849916,
+          29892.998431,
+          29217.5728
+        ],
+        "median": 29892.998431
+      },
+      "avg_transactions_per_group": {
+        "values": [
+          57.698084,
+          56.767071,
+          56.75854
+        ],
+        "median": 56.767071
+      },
+      "write_p99_us": {
+        "values": [
+          7766.307,
+          8004.948,
+          8035.989
+        ],
+        "median": 8004.948
+      },
+      "read_p99_us": {
+        "values": [
+          6.72,
+          6.76,
+          7.04
+        ],
+        "median": 6.76
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          55.723393,
+          55.124759,
+          55.936005
+        ],
+        "median": 55.723393
+      },
+      "wal_bytes_per_successful_write": {
+        "values": [
+          668.608252762431,
+          668.5888343869873,
+          668.5819301005403
+        ],
+        "median": 668.5888343869873
+      }
+    },
+    "c64-parallel-blink-main-parity": {
+      "aggregate_ops_per_second": {
+        "values": [
+          39247.781964,
+          39870.645388,
+          39413.21984
+        ],
+        "median": 39413.21984
+      },
+      "avg_transactions_per_group": {
+        "values": [
+          56.213349,
+          56.624291,
+          56.736479
+        ],
+        "median": 56.624291
+      },
+      "write_p99_us": {
+        "values": [
+          6011.891,
+          5701.609,
+          5857.531
+        ],
+        "median": 5857.531
+      },
+      "read_p99_us": {
+        "values": [
+          7.24,
+          7.36,
+          7.32
+        ],
+        "median": 7.32
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          48.588775,
+          49.745409,
+          48.952331
+        ],
+        "median": 48.952331
+      },
+      "wal_bytes_per_successful_write": {
+        "values": [
+          668.5854863915894,
+          668.5953373692017,
+          668.5881977121531
+        ],
+        "median": 668.5881977121531
+      }
+    },
+    "c64-parallel-blink-main-parity-borrowed": {
+      "aggregate_ops_per_second": {
+        "values": [
+          38764.201181,
+          39879.540813,
+          40083.306997
+        ],
+        "median": 39879.540813
+      },
+      "avg_transactions_per_group": {
+        "values": [
+          56.045061,
+          56.604084,
+          55.924192
+        ],
+        "median": 56.045061
+      },
+      "write_p99_us": {
+        "values": [
+          5971.852,
+          5931.051,
+          5714.809
+        ],
+        "median": 5931.051
+      },
+      "read_p99_us": {
+        "values": [
+          7.36,
+          6.56,
+          6.721
+        ],
+        "median": 6.721
+      },
+      "cpu_utilization_percent_one_core": {
+        "values": [
+          49.138395,
+          47.753229,
+          48.536679
+        ],
+        "median": 48.536679
+      },
+      "wal_bytes_per_successful_write": {
+        "values": [
+          668.5937905869256,
+          668.5985489964226,
+          668.5993341838769
+        ],
+        "median": 668.5985489964226
+      }
+    }
+  },
+  "resource_fields_present_in_all_cases": {
+    "cpu_utilization_percent_one_core": true,
+    "rss_end_kib": false,
+    "rss_hwm_kib": false
+  },
+  "borrowed_blink_read_gate_passed": true,
+  "raw_sha256": {
+    "read-smoke/raw/readers-16-get-main-btree-rep1.jsonl": "25b8045c573f13f060adad2c745b9a6289233ffe213216d81092fb25e1e5d130",
+    "read-smoke/raw/readers-16-get-main-btree-compact-wal-rep1.jsonl": "a650bfd600e6eb94fc871c46d383aa934220ad4d17586a121011c13ec7bb1d77",
+    "read-smoke/raw/readers-16-get-blink-borrowed-pages-rep1.jsonl": "a9b70ea6ed29ab6354a06e9ee640027c61a8a933b69777e5f456c6949ca5f2b3",
+    "read-smoke/raw/readers-16-query-main-btree-rep1.jsonl": "61785a84a60d7b868ee9f3692489b401ee525df6e86a5a38c9a1c9af3811004b",
+    "read-smoke/raw/readers-16-query-main-btree-compact-wal-rep1.jsonl": "0ee8a7db47dcfafccdedf2de6dc7ca7dfbe86905c5df98217e5af853c60357de",
+    "read-smoke/raw/readers-16-query-blink-borrowed-pages-rep1.jsonl": "842293313ff7567d2031b0a3d5e26b7d31b7b8be6687912357aaaa3a47b10974",
+    "mixed-smoke/raw/clients-4-mix-50-50-changing-main-btree-rep1.jsonl": "449c9e73e26c00237ba271d118e2d266c73f7f3519a06933bc361f590115a39c",
+    "mixed-smoke/raw/clients-4-mix-50-50-changing-main-btree-compact-wal-rep1.jsonl": "6247d9bae841e91ba117a170acb6ac86ee602576a597f72e001b6834ea03cc5e",
+    "mixed-smoke/raw/clients-4-mix-50-50-changing-parallel-blink-main-parity-rep1.jsonl": "fecee37859da8c8217425083a663432553ecdc67e533270c06016256ba2c4cc1",
+    "mixed-smoke/raw/clients-4-mix-50-50-changing-parallel-blink-main-parity-borrowed-rep1.jsonl": "992301ba1fa1b2107e23c35ef295a053fd0ca1f8c6ef6ef5ffbfe1d2476d4a9e",
+    "mixed-smoke/raw/clients-64-mix-50-50-changing-main-btree-rep1.jsonl": "6cf1cd2f28750095f140cf815237179b972198398aa57cc6ec2bd502385a8637",
+    "mixed-smoke/raw/clients-64-mix-50-50-changing-main-btree-compact-wal-rep1.jsonl": "5adb6beebb4854ebfffeb7114fc4f75d9b755c3e70bf26227e2e28c05cf39e16",
+    "mixed-smoke/raw/clients-64-mix-50-50-changing-parallel-blink-main-parity-rep1.jsonl": "e48981b83181fc2818aee221e637cf863a14316aad15ae15f8f977753da03409",
+    "mixed-smoke/raw/clients-64-mix-50-50-changing-parallel-blink-main-parity-borrowed-rep1.jsonl": "92569fb803254e96260bf0418c0015705ae6e676c13c468ff367d37d739b7c14",
+    "read-c16/raw/readers-16-get-main-btree-rep1.jsonl": "0d28d7ec019b2b2089b7a168d16ca0d5f08dd198b5e1a821556f4abbc4ac2493",
+    "read-c16/raw/readers-16-get-main-btree-compact-wal-rep1.jsonl": "373a458924b21ea0c3fade378789728364cc2d6191a3995876c9c9f82990dce6",
+    "read-c16/raw/readers-16-get-blink-borrowed-pages-rep1.jsonl": "f5cdfe7c4787512e2cb8aaa98658d0aed91eac32ba3aa9793b5fb32ea038b0c9",
+    "read-c16/raw/readers-16-get-main-btree-rep2.jsonl": "a5c16b9a8018bab27973cbeaf685ac4113bb2bb2e3a6c8e81356f02708ee9137",
+    "read-c16/raw/readers-16-get-main-btree-compact-wal-rep2.jsonl": "f72a769a2cce44822753d2b422509fcea85e4761eeda8b4d77d542cd40573877",
+    "read-c16/raw/readers-16-get-blink-borrowed-pages-rep2.jsonl": "a9285e260bae8f5c80908751fd5b1e83c8cb90ba525681e78ae398d1159e2d72",
+    "read-c16/raw/readers-16-get-main-btree-rep3.jsonl": "5dbadc2fd83b3623749978619570f102e5995550213697d156e73de19c61b386",
+    "read-c16/raw/readers-16-get-main-btree-compact-wal-rep3.jsonl": "d0b5437109f08d37ea3214e49ea7ddfbd821b80bddbd41d20873523149f8c1de",
+    "read-c16/raw/readers-16-get-blink-borrowed-pages-rep3.jsonl": "01096ee4bdd61d46949547349bce46ac40b7a24df1f79cd660db9b2412397823",
+    "read-c16/raw/readers-16-query-main-btree-rep1.jsonl": "f9876ca662a5cba416de3cfed18c35c27612c78949d7eca75dc5a59ee06cc374",
+    "read-c16/raw/readers-16-query-main-btree-compact-wal-rep1.jsonl": "93c76f0a8d3a2ea83a3b68855e8d85b358b83edc9ef8d5adb6ccf2e7fcd1be88",
+    "read-c16/raw/readers-16-query-blink-borrowed-pages-rep1.jsonl": "f3474f686ee9dab99b103e2c1ac434ec93ce8572e1b22de8f13b9fba24d4f909",
+    "read-c16/raw/readers-16-query-main-btree-rep2.jsonl": "79d86afe1e1ec8aa25015abfd0ecb686bbe8f97247bac3673151e72233dbb4f7",
+    "read-c16/raw/readers-16-query-main-btree-compact-wal-rep2.jsonl": "0917d2c5de6575320367a3fda6e3aecb98b586929d95de9e28b333ea16863d4d",
+    "read-c16/raw/readers-16-query-blink-borrowed-pages-rep2.jsonl": "10cdcc6e721cc183ee046c24bc56b649210a3637c73a41c2f86d518ce57e78fa",
+    "read-c16/raw/readers-16-query-main-btree-rep3.jsonl": "2fb6bb6c93feee27492cf9b0d11cd8e9b010c762a736eba5ef3875104b135c8d",
+    "read-c16/raw/readers-16-query-main-btree-compact-wal-rep3.jsonl": "7946f23ae0cf1641ec1b5c9ee1d19d3f084baebf86134cb74b158e99edacc181",
+    "read-c16/raw/readers-16-query-blink-borrowed-pages-rep3.jsonl": "ae8900e6b27a1f8aebdff0e8c992890b8a1b5a3a618c92ec382b9b2e2d802103",
+    "mixed-c4-c64/raw/clients-4-mix-50-50-changing-main-btree-rep1.jsonl": "def7ef05eee3076ea43ff713b1e5aa6bd410ced2ab610065997f7b0531907fd8",
+    "mixed-c4-c64/raw/clients-4-mix-50-50-changing-main-btree-compact-wal-rep1.jsonl": "cda7fba325b85382f21cd7574d203aacbf36a3218e778ad7e3a82e16d25a0689",
+    "mixed-c4-c64/raw/clients-4-mix-50-50-changing-parallel-blink-main-parity-rep1.jsonl": "b95d8cabe828e2eae14d8f364fad4b03865c56eeff807cfdc936007599da8041",
+    "mixed-c4-c64/raw/clients-4-mix-50-50-changing-parallel-blink-main-parity-borrowed-rep1.jsonl": "cff4e7868239b04e1a384de08df0d494c68279bb53b3a04530c39d9b399c4a25",
+    "mixed-c4-c64/raw/clients-4-mix-50-50-changing-main-btree-rep2.jsonl": "a4501fe4501e176c97152cb87a095aaf13a3aed5a225fd9168e59dcd7663096f",
+    "mixed-c4-c64/raw/clients-4-mix-50-50-changing-main-btree-compact-wal-rep2.jsonl": "56f1ecacf156b66babb8e23eef78b8bea643c8389d2663786122ce11652e1528",
+    "mixed-c4-c64/raw/clients-4-mix-50-50-changing-parallel-blink-main-parity-rep2.jsonl": "6bf6c94146aa05907d846c2d1abbdeb0c9f171cd8c63bd49e3d58b7223656a68",
+    "mixed-c4-c64/raw/clients-4-mix-50-50-changing-parallel-blink-main-parity-borrowed-rep2.jsonl": "27363e14d64c5f7b3b7c80cd8208eec1b68dbb734a323c5ab776e425ad41b79d",
+    "mixed-c4-c64/raw/clients-4-mix-50-50-changing-main-btree-rep3.jsonl": "792c6355ff206399fe9990fe5de07e9dc5ab21a4287e90d56ab8c55c403022f9",
+    "mixed-c4-c64/raw/clients-4-mix-50-50-changing-main-btree-compact-wal-rep3.jsonl": "bf2060d04188e3a1d63440ff2e44af0cc7ff3475ac133ff536c2d6965588596a",
+    "mixed-c4-c64/raw/clients-4-mix-50-50-changing-parallel-blink-main-parity-rep3.jsonl": "e2f47a98cef7d576e24c4bca25e95f91c9d2b868ce7e521b2bcca7cc3c4cafb6",
+    "mixed-c4-c64/raw/clients-4-mix-50-50-changing-parallel-blink-main-parity-borrowed-rep3.jsonl": "c0ea16121427a8d9dba663706f60426e74c46cf1a5f4bd0a28c2b4fadc2dac14",
+    "mixed-c4-c64/raw/clients-64-mix-50-50-changing-main-btree-rep1.jsonl": "ac58365b8ddbe9e6ad963aa9e1b8af9215a366c6fee5d7ad94197eff60e9d974",
+    "mixed-c4-c64/raw/clients-64-mix-50-50-changing-main-btree-compact-wal-rep1.jsonl": "44fd64b783ad6e97cac7f2bf7d7e025b58f3f8886bce74b6f714654cde82a161",
+    "mixed-c4-c64/raw/clients-64-mix-50-50-changing-parallel-blink-main-parity-rep1.jsonl": "f0f40c8af079eee8cd4e6e823bd98955d30886847ee825c54297cef7fd54efeb",
+    "mixed-c4-c64/raw/clients-64-mix-50-50-changing-parallel-blink-main-parity-borrowed-rep1.jsonl": "ec45c0554a9613f06c64113a4ec177d27a40aefa9a36018462232ff854ec9908",
+    "mixed-c4-c64/raw/clients-64-mix-50-50-changing-main-btree-rep2.jsonl": "544387972357e52e68c2d76ef3094aa81a3be3fe21b0f74fe161f01457fa3751",
+    "mixed-c4-c64/raw/clients-64-mix-50-50-changing-main-btree-compact-wal-rep2.jsonl": "16118d2f48c66ffbb093b59dff526bd74b72008b2617cc204f0c244a89cb614e",
+    "mixed-c4-c64/raw/clients-64-mix-50-50-changing-parallel-blink-main-parity-rep2.jsonl": "8dad5b56ae205739f9308598dc52ba5a57b0456a01d220b0bc4d02968d2c95e4",
+    "mixed-c4-c64/raw/clients-64-mix-50-50-changing-parallel-blink-main-parity-borrowed-rep2.jsonl": "d190a50f015449366093b8991845dbd543e32fde3614e06a83251b1090bdcf62",
+    "mixed-c4-c64/raw/clients-64-mix-50-50-changing-main-btree-rep3.jsonl": "da978425d55058ef6818ef2c091dca1aabe6c24795e7c68e88706108c54953ec",
+    "mixed-c4-c64/raw/clients-64-mix-50-50-changing-main-btree-compact-wal-rep3.jsonl": "cceb760883ee5f02890c2fe3cbd978517854884fc29588a3b4cb19d2401b1ef9",
+    "mixed-c4-c64/raw/clients-64-mix-50-50-changing-parallel-blink-main-parity-rep3.jsonl": "e7861a1f79b72f17af3d2d65c52f168f26a1b440afcec5197732d05ec958b787",
+    "mixed-c4-c64/raw/clients-64-mix-50-50-changing-parallel-blink-main-parity-borrowed-rep3.jsonl": "1e5634c4573030ac1e6abe6abefd191f00166a94695a7a5af35124cdbca5708c"
+  }
+}

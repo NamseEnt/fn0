@@ -14103,7 +14103,7 @@ mod tests {
         assert_eq!(store.versioned_read_metrics().active_generation_pins, 0);
         assert!(store.publisher.can_reuse_pages());
         let (data, wal) = store.into_files();
-        let mut reopened = reopen_memory_store(data, wal.unwrap());
+        let reopened = reopen_memory_store(data, wal.unwrap());
         assert_eq!(
             reopened.versioned_read_handle().get(&key).unwrap().value(),
             Some(vec![0x85; INLINE_VALUE_LIMIT].as_slice())

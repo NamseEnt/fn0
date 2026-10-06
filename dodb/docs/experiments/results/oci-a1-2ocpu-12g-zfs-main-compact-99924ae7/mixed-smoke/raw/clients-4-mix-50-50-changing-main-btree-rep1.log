@@ -1,0 +1,5 @@
+phase0-bench engine=main-btree build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=300ms warmup=200ms repetitions=1
+raw output: /bench/zfs/db/experiment-results/main-compact-99924ae7/mixed-smoke/raw/clients-4-mix-50-50-changing-main-btree-rep1.jsonl
+scenario                                                       repetition throughput summary
+mixed-4w-0r-get-50/50-width1-uniform                       rep=0 tx/s=     2219 mut/s=     2219 read/s=     2322 agg/s=     4541 p50=     0.0us p95=     0.0us p99=     0.0us groups=  174 avg_group= 3.84
+completed 1 scenarios x 1 repetitions

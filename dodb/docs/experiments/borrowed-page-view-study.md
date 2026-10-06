@@ -96,3 +96,15 @@ build cache and temporary directory onto ZFS and disabled Python bytecode
 generation. Task-related storage build caches were removed from the root disk;
 older benchmark result artifacts were preserved. The retry completed with a
 clean checkout before and after the study.
+
+## Longer read follow-up
+
+The [main compact-WAL study](main-compact-wal-study.md) repeats c16 reads
+with ten-second windows and three paired seeds at source
+`99924ae7040065f75066da0b033ac4a81149b1f1`. Borrowed-page B-link reaches
+0.925849 of full-image main for Get and 0.960050 for Query(16), with all
+three pairs above 0.90. Against compact main the paired medians are
+0.915628 and 0.961573; one Get pair is 0.887204. Thus the follow-up passes
+the median read gate, while the initial short-window result and the compact
+main variation show that Get has limited margin. Keep the feature opt-in.
+The original five-second measurements above remain unchanged.

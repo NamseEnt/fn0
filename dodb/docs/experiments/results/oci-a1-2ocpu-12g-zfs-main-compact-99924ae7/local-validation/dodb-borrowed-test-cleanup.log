@@ -1,0 +1,9 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0-dodb-blink-experiment/dodb/crates/dodb-storage)
+    Finished `release` profile [optimized + debuginfo] target(s) in 20.36s
+     Running unittests src/lib.rs (target/release/deps/dodb_storage-12776e5b15792bde)
+
+running 1 test
+test blink::tests::borrowed_pages_retain_old_values_without_page_arc_clones ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 184 filtered out; finished in 0.00s
+
