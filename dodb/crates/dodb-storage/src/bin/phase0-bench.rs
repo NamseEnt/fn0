@@ -2718,9 +2718,11 @@ async fn mixed_client_loop(
     timeline_start: Option<Instant>,
 ) -> WorkerStats {
     let mut stats = WorkerStats::new(seed ^ worker_id as u64 ^ 0xfeed);
+    let phase_seed = seed ^ 0x1000_0000;
     while Instant::now() < deadline {
         let operation_index = next_operation.fetch_add(1, Ordering::Relaxed);
-        let operation_seed = splitmix64(seed ^ operation_index.wrapping_mul(0x9e37_79b9_7f4a_7c15));
+        let operation_seed =
+            splitmix64(phase_seed ^ operation_index.wrapping_mul(0x9e37_79b9_7f4a_7c15));
         let mut generator = WorkloadGenerator::new(workload.clone(), operation_seed, 0);
         let started = Instant::now();
         if mixed_operation_is_read(operation_index, read_percent) {
@@ -3470,7 +3472,12 @@ fn build_record(
             "logical_trace_prefix_hash",
             &format!(
                 "{:016x}",
-                mixed_trace_prefix_hash(workload, seed ^ 0xbbbb_0000, mix.read_percent, 1_000)
+                mixed_trace_prefix_hash(
+                    workload,
+                    seed ^ 0xbbbb_0000 ^ 0x1000_0000,
+                    mix.read_percent,
+                    1_000,
+                )
             ),
         );
     }
