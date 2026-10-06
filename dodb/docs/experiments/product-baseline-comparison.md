@@ -37,7 +37,7 @@ Each rate is the median of three repetitions. Throughput columns are total logic
 | 20/80 c16 | Turso WAL | 2,091/445/1,646 | 66.44/152.84/294.96 | 0.84/1.61/64.97 | 20.06/79.94 -> 21.32/78.68 | 0/0/13,023/13,691/— |
 | 20/80 c16 | Turso MVCC | 869/176/693 | 82.12/215.20/648.45 | 19.98/52.02/78.91 | 20.23/79.77 -> 20.23/79.77 | 0/8/8/0/— |
 
-At c16, B-link completed 1.57x, 1.73x, and 1.81x main-btree throughput for 95/5, 50/50, and 20/80. Its 95/5 read and write p99 were both lower than main-btree. RocksDB remained 1.15x, 1.12x, and 1.10x ahead of B-link on total throughput for those ratios. Turso WAL retained its Busy retry cost in the counters and write tails; Turso MVCC retained conflicts/retries as failed attempts. These are results from the unified matrix only. The full c4/c16/c64 and focused-case metrics, including p50/p95/p99 and attempted/successful ratios, are in [`mixed-summary.csv`](results/oci-a1-2ocpu-12g-zfs-mixed-unified-1a8cf817/mixed-summary.csv).
+At c16, B-link completed 1.57x, 1.73x, and 1.81x main-btree throughput for 95/5, 50/50, and 20/80. Its 95/5 read and write p99 were both lower than main-btree. This gain depends on concurrency: B-link/main was 0.78–0.81x at c4 and 3.04–3.16x at c64 across these ratios. RocksDB remained 1.15x, 1.12x, and 1.10x ahead of B-link on c16 total throughput for those ratios. Turso WAL retained its Busy retry cost in the counters and write tails; Turso MVCC retained conflicts/retries as failed attempts. These are results from the unified matrix only. The full c4/c16/c64 and focused-case metrics, including p50/p95/p99 and attempted/successful ratios, are in [`mixed-summary.csv`](results/oci-a1-2ocpu-12g-zfs-mixed-unified-1a8cf817/mixed-summary.csv).
 
 ### Focused transaction-heavy mixes
 
