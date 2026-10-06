@@ -355,7 +355,7 @@ def build_expected_cells(arguments, source_commit):
                             "write_percent": write_percent,
                             "value_mode": value_mode,
                             "repetition": repetition,
-                            "expected_raw_repetition": repetition - 1 if variant_spec["binary_kind"] == "phase0" else repetition,
+                            "expected_raw_repetition": 0 if variant_spec["binary_kind"] == "phase0" else repetition,
                             "seed": seed,
                             "transaction_width": arguments.transaction_width,
                             "distribution": arguments.distribution,

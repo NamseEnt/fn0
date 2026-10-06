@@ -282,6 +282,9 @@ class PayloadBatchingSummaryTests(unittest.TestCase):
         self.assertEqual(len(default_cells), 48)
         self.assertEqual(default_arguments.value_modes, ["constant", "changing"])
         self.assertEqual(default_arguments.clients, [4, 64])
+        for cell in default_cells:
+            expected_repetition = cell["repetition"] if cell["binary_kind"] == "rocksdb" else 0
+            self.assertEqual(cell["expected_raw_repetition"], expected_repetition)
 
         smoke_arguments = parse_arguments(
             (
