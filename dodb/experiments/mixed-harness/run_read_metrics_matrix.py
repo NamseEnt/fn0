@@ -46,6 +46,17 @@ VARIANT_SPECS = {
         "tokio_workers": PHASE0_TOKIO_WORKERS,
         "engine_options": (),
     },
+    "main-btree-compact-wal": {
+        "binary_key": "phase0-bench",
+        "binary_env": "PHASE0_BINARY",
+        "binary_kind": "phase0",
+        "engine": "main-btree",
+        "collection_policy": "native-main",
+        "read_metrics_mode": "on",
+        "blink_read_observational_metrics_enabled": True,
+        "tokio_workers": PHASE0_TOKIO_WORKERS,
+        "engine_options": ("--main-compact-wal",),
+    },
     "blink-metrics-on": {
         "binary_key": "phase0-bench",
         "binary_env": "PHASE0_BINARY",
@@ -487,6 +498,9 @@ def validate_raw_record(record, cell, checkout_sha):
         assert_equal(record, "tokio_workers", PHASE0_TOKIO_WORKERS)
         assert_equal(record, "read_kind", cell["read_kind"])
         assert_equal(record, "collection_policy", cell["expected_collection_policy"])
+        expected_compact_wal = cell["variant"] == "main-btree-compact-wal"
+        if expected_compact_wal or "main_compact_wal_enabled" in record:
+            assert_equal(record, "main_compact_wal_enabled", expected_compact_wal)
         assert_equal(
             record,
             "blink_read_observational_metrics_enabled",

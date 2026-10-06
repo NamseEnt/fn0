@@ -31,6 +31,13 @@ VARIANT_SPECS = {
         "collection_policy": "native-main",
         "engine_options": (),
     },
+    "main-btree-compact-wal": {
+        "binary_key": "phase0-bench",
+        "binary_kind": "phase0",
+        "engine": "main-btree",
+        "collection_policy": "native-main",
+        "engine_options": ("--main-compact-wal",),
+    },
     "parallel-blink-current": {
         "binary_key": "phase0-bench",
         "binary_kind": "phase0",
@@ -44,6 +51,15 @@ VARIANT_SPECS = {
         "engine": "parallel-blink",
         "collection_policy": "main-parity",
         "engine_options": ("--blink-collection-policy", "main-parity"),
+    },
+    "parallel-blink-main-parity-borrowed": {
+        "binary_key": "phase0-borrowed-pages",
+        "binary_env": "PHASE0_BORROWED_PAGES_BINARY",
+        "binary_kind": "phase0",
+        "engine": "parallel-blink",
+        "collection_policy": "main-parity",
+        "blink_workers": 2,
+        "engine_options": ("--blink-collection-policy", "main-parity", "--blink-workers", "2"),
     },
     "parallel-blink-main-parity-workers1": {
         "binary_key": "phase0-bench",
@@ -410,7 +426,12 @@ def record_event(results, event):
         os.fsync(output_file.fileno())
 
 
-def binary_path_for(arguments, binary_kind):
+def binary_path_for(arguments, binary_kind, binary_env=None):
+    if binary_env:
+        binary_path = os.environ.get(binary_env)
+        if not binary_path:
+            raise RunnerError(f"required binary environment variable is missing: {binary_env}")
+        return pathlib.Path(binary_path).expanduser().resolve()
     if binary_kind == "phase0":
         return pathlib.Path(
             os.environ.get("PHASE0_BINARY", "/tmp/dodb-product-target/release/phase0-bench")
@@ -535,7 +556,7 @@ def event_identity(cell, source_commit, source_branch):
 
 
 def execute_cell(arguments, results, repository, cell, binary_registry, source_state_before):
-    binary = binary_path_for(arguments, cell["binary_kind"])
+    binary = binary_path_for(arguments, cell["binary_kind"], VARIANT_SPECS[cell["variant"]].get("binary_env"))
     if not binary.is_file() or not os.access(binary, os.X_OK):
         raise RunnerError(f"benchmark executable is missing or not executable: {binary}")
     binary_hash = sha256_file(binary)

@@ -439,6 +439,7 @@ struct Args {
     read_kinds: Option<Vec<ReadKind>>,
     mixes: Option<Vec<Mix>>,
     mixed_clients: bool,
+    main_compact_wal: bool,
     mixed_value_mode: MixedValueMode,
     collection_policy: CollectionPolicy,
     duration: Duration,
@@ -478,6 +479,7 @@ impl Default for Args {
             read_kinds: None,
             mixes: None,
             mixed_clients: false,
+            main_compact_wal: false,
             mixed_value_mode: MixedValueMode::Constant,
             collection_policy: CollectionPolicy::Current,
             duration: DEFAULT_DURATION,
@@ -554,6 +556,7 @@ impl Args {
                     )
                 }
                 "--mixed-clients" => args.mixed_clients = true,
+                "--main-compact-wal" => args.main_compact_wal = true,
                 "--mixed-value-mode" => {
                     args.mixed_value_mode = MixedValueMode::parse(&take_value(&mut values, &flag))
                 }
@@ -631,6 +634,10 @@ impl Args {
     }
 
     fn validate(&self) {
+        assert!(
+            !self.main_compact_wal || self.engine == EngineKind::MainBtree,
+            "main-compact-wal requires main-btree"
+        );
         assert!(self.repetitions > 0, "repetitions must be positive");
         assert!(self.tokio_workers > 0, "tokio-workers must be positive");
         assert!(self.blink_workers > 0, "blink-workers must be positive");
@@ -701,6 +708,7 @@ fn print_help() {
          --cache-capacity 256 --working-set 4096 --key-size 16 --value-size 64\n\
          --group-limit 64 --group-bytes 4194304 --queue-capacity 256\n\
          --blink-collection-policy current|main-parity --mixed-value-mode constant|changing\n\
+         --main-compact-wal (experimental main B-tree compact redo)\n\
          --collection-delay 500us --sync-mode real|injected|disabled --sync-delay 1ms\n\
          --transaction-mode unconditional|insert-if-absent\n\
          --tokio-workers 12 --blink-workers 2 --parallel-workers 0|1|2 (planned-blink leaf workers, 0 = serial)\n\
@@ -3480,11 +3488,13 @@ async fn open_adapter(
     let config = DatabaseConfig::default().with_cache_capacity(args.cache_capacity);
     match args.engine {
         EngineKind::MainBtree => {
-            let mut store = BTreeStore::open_with_wal(
-                BenchFile::open(&data_path, sync_mode, sync_delay)?,
-                BenchFile::open(&wal_path, sync_mode, sync_delay)?,
-                config,
-            )?;
+            let data_file = BenchFile::open(&data_path, sync_mode, sync_delay)?;
+            let wal_file = BenchFile::open(&wal_path, sync_mode, sync_delay)?;
+            let mut store = if args.main_compact_wal {
+                BTreeStore::open_with_compact_wal(data_file, wal_file, config)?
+            } else {
+                BTreeStore::open_with_wal(data_file, wal_file, config)?
+            };
             let seeded = seed_store(&mut store, args, scenario)?;
             let shard = Arc::new(AsyncShard::start_with_config(
                 store,
@@ -3681,6 +3691,7 @@ fn add_parallel_metadata(json: &mut JsonObject, args: &Args) {
         "blink_borrowed_page_views_enabled",
         cfg!(feature = "blink-borrowed-page-views"),
     );
+    json.boolean("main_compact_wal_enabled", args.main_compact_wal);
 }
 
 fn json_string(value: &str) -> String {

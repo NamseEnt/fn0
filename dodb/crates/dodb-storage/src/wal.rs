@@ -58,6 +58,7 @@ const SUPERBLOCK_B_PAGE: PageId = PageId::new(1);
 pub enum WalPageImageFormat {
     Baseline,
     ExperimentalBlink,
+    ExperimentalBtree,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -634,7 +635,7 @@ impl<F: DurableFile> WalLog<F> {
 
     pub fn page_delta_enabled(&self) -> bool {
         self.format_version >= WAL_FORMAT_VERSION
-            && self.page_image_format == WalPageImageFormat::ExperimentalBlink
+            && self.page_image_format != WalPageImageFormat::Baseline
     }
 
     pub fn last_commit_lsn(&self) -> Option<Lsn> {
@@ -1516,7 +1517,7 @@ impl<F: DurableFile> WalLog<F> {
                 "WAL page-delta eligibility must name every commit",
             ));
         }
-        let track_chain = self.page_image_format == WalPageImageFormat::ExperimentalBlink;
+        let track_chain = self.page_image_format != WalPageImageFormat::Baseline;
         let delta_format = self.page_delta_enabled();
         let mut group_chain: HashMap<PageId, (PageChainEntry, &[u8; PAGE_SIZE])> = HashMap::new();
         let mut records = Vec::with_capacity(commits.len());
@@ -3043,6 +3044,7 @@ fn scan_wal<F: DurableFile>(
     let mut max_batch_id = 0u64;
     let mut last_commit_lsn = None;
     let blink = page_image_format == WalPageImageFormat::ExperimentalBlink;
+    let compact = page_image_format != WalPageImageFormat::Baseline;
     let keep_batches = !blink || materialization == ScanMaterialization::Batches;
     while offset < length {
         let remaining = length - offset;
@@ -3142,7 +3144,7 @@ fn scan_wal<F: DurableFile>(
                     validate_page_image(&page, page_image_format)?;
                     Some(page)
                 } else {
-                    if format_version < WAL_FORMAT_VERSION || !blink {
+                    if format_version < WAL_FORMAT_VERSION || !compact {
                         return Err(Error::corruption(
                             "WAL page-delta record in a page-image-only WAL",
                         ));
@@ -3236,7 +3238,7 @@ fn scan_wal<F: DurableFile>(
                         }
                     };
                     report.replayable_pages += 1;
-                    if blink {
+                    if compact {
                         match pages.get_mut(&page.page_id) {
                             Some(recovered) => {
                                 recovered.commit_lsn = record_lsn;
@@ -3377,7 +3379,7 @@ fn decode_page_image(payload: &[u8]) -> Result<WalPageImage> {
 fn validate_page_image(page: &WalPageImage, page_image_format: WalPageImageFormat) -> Result<()> {
     if page.page_id == SUPERBLOCK_A_PAGE || page.page_id == SUPERBLOCK_B_PAGE {
         match page_image_format {
-            WalPageImageFormat::Baseline => {
+            WalPageImageFormat::Baseline | WalPageImageFormat::ExperimentalBtree => {
                 decode_superblock(&page.image)?;
             }
             WalPageImageFormat::ExperimentalBlink => {
@@ -3390,7 +3392,7 @@ fn validate_page_image(page: &WalPageImage, page_image_format: WalPageImageForma
         }
     } else {
         match page_image_format {
-            WalPageImageFormat::Baseline => {
+            WalPageImageFormat::Baseline | WalPageImageFormat::ExperimentalBtree => {
                 decode_page_at(&page.image, Some(page.page_id))?;
             }
             WalPageImageFormat::ExperimentalBlink => {
@@ -3428,7 +3430,9 @@ fn page_lsn_of(image: &[u8; PAGE_SIZE]) -> Lsn {
 fn write_format_version(page_image_format: WalPageImageFormat) -> u16 {
     match page_image_format {
         WalPageImageFormat::Baseline => WAL_PAGE_IMAGE_FORMAT_VERSION,
-        WalPageImageFormat::ExperimentalBlink => WAL_FORMAT_VERSION,
+        WalPageImageFormat::ExperimentalBlink | WalPageImageFormat::ExperimentalBtree => {
+            WAL_FORMAT_VERSION
+        }
     }
 }
 

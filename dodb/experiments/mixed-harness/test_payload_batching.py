@@ -237,6 +237,23 @@ def write_synthetic_matrix(results, mutation=None, drop_last_complete=False):
 
 
 class PayloadBatchingSummaryTests(unittest.TestCase):
+    def test_compact_main_wal_variant_requires_its_runtime_flag(self):
+        arguments = parse_arguments(("--results", "/tmp/compact-main-test", "--clients", "4", "--variants", "main-btree-compact-wal", "--value-modes", "changing", "--repetitions", "1"))
+        cell = build_expected_cells(arguments, SOURCE_COMMIT)[0]
+        self.assertEqual(VARIANT_SPECS[cell["variant"]]["engine_options"], ("--main-compact-wal",))
+        record = sample_raw_record(cell)
+        record["parallel_background_min_operations"] = 0
+        record["parallel_background_worker_dispatches_delta"] = 0
+        record["blink_read_observational_metrics_enabled"] = True
+        record["main_compact_wal_enabled"] = True
+        validate_raw_record(record, cell, SOURCE_COMMIT)
+        record["main_compact_wal_enabled"] = False
+        with self.assertRaises(ValidationError):
+            validate_raw_record(record, cell, SOURCE_COMMIT)
+        record.pop("main_compact_wal_enabled")
+        with self.assertRaises(ValidationError):
+            validate_raw_record(record, cell, SOURCE_COMMIT)
+
     def test_parallel_workers_one_variant_maps_engine_policy_and_raw_setting(self):
         variant_name = "parallel-blink-main-parity-workers1"
         arguments = parse_arguments(

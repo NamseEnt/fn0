@@ -16,8 +16,10 @@ SUMMARY_JSON_NAME = "payload-batching-summary.json"
 MANIFEST_NAME = "artifact-sha256.txt"
 SUPPORTED_VARIANTS = {
     "main-btree": ("main-btree", "native-main", None),
+    "main-btree-compact-wal": ("main-btree", "native-main", None),
     "parallel-blink-current": ("parallel-blink", "current", None),
     "parallel-blink-main-parity": ("parallel-blink", "main-parity", None),
+    "parallel-blink-main-parity-borrowed": ("parallel-blink", "main-parity", 2),
     "parallel-blink-main-parity-workers1": ("parallel-blink", "main-parity", 1),
     "parallel-blink-main-parity-adaptive32": ("parallel-blink", "main-parity", 2),
     "planned-blink-main-parity": ("planned-blink", "main-parity", None),
@@ -26,8 +28,10 @@ SUPPORTED_VARIANTS = {
 }
 SUPPORTED_VARIANT_RUNTIME = {
     "main-btree": (0, True),
+    "main-btree-compact-wal": (0, True),
     "parallel-blink-current": (0, True),
     "parallel-blink-main-parity": (0, True),
+    "parallel-blink-main-parity-borrowed": (0, True),
     "parallel-blink-main-parity-workers1": (0, True),
     "parallel-blink-main-parity-adaptive32": (32, True),
     "planned-blink-main-parity": (0, True),
@@ -189,6 +193,12 @@ def validate_raw_record(record, cell, checkout_sha):
         raise ValidationError(f"invalid logical_trace_prefix_hash for {cell['cell_id']}")
     assert_equal(record, "sync_contract", "durable-return")
     assert_equal(record, "collection_policy", cell["expected_collection_policy"])
+    expected_compact_wal = cell["variant"] == "main-btree-compact-wal"
+    if expected_compact_wal or "main_compact_wal_enabled" in record:
+        assert_equal(record, "main_compact_wal_enabled", expected_compact_wal)
+    expected_borrowed_pages = cell["variant"] == "parallel-blink-main-parity-borrowed"
+    if expected_borrowed_pages or "blink_borrowed_page_views_enabled" in record:
+        assert_equal(record, "blink_borrowed_page_views_enabled", expected_borrowed_pages)
     if cell.get("expected_blink_workers") is not None:
         assert_equal(record, "blink_workers", cell["expected_blink_workers"])
     expected_background_min_operations = cell.get(

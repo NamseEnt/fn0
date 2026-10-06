@@ -11,6 +11,7 @@ mod format;
 
 pub use coordinator::{AsyncShard, CoordinatorConfig, CoordinatorMetrics};
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 use std::time::Instant;
@@ -28,7 +29,10 @@ use self::format::{
 };
 use crate::PAGE_SIZE;
 use crate::fault::FaultInjector;
-use crate::wal::{CommittedWalBatch, WalCommit, WalIdentity, WalLog, WalMetrics, WalPageImage};
+use crate::wal::{
+    CommittedWalBatch, WalCommit, WalDeltaRequest, WalIdentity, WalLog, WalMetrics, WalPageImage,
+    WalPageImageFormat,
+};
 use crate::{
     DurableFile, ProductionFile, Superblock, SuperblockSlot, choose_superblock, decode_page_at,
     decode_superblock, encode_superblock,
@@ -187,6 +191,7 @@ pub struct PreparedBatch {
     high_water_page_id: PageId,
     commit_lsn: Option<Lsn>,
     batch_id: u64,
+    superblock_image_emitted: bool,
 }
 
 impl PreparedBatch {
@@ -410,7 +415,39 @@ impl<F: DurableFile, W: DurableFile> BTreeStore<F, W> {
     }
 
     pub fn open_with_wal(file: F, wal_file: W, config: DatabaseConfig) -> Result<BTreeStore<F, W>> {
-        Self::open_with_wal_internal(file, wal_file, config, None)
+        Self::open_with_wal_internal(file, wal_file, config, None, WalPageImageFormat::Baseline)
+    }
+
+    pub fn open_with_compact_wal(
+        file: F,
+        wal_file: W,
+        config: DatabaseConfig,
+    ) -> Result<BTreeStore<F, W>> {
+        Self::open_with_wal_internal(
+            file,
+            wal_file,
+            config,
+            None,
+            WalPageImageFormat::ExperimentalBtree,
+        )
+    }
+
+    pub fn open_with_compact_wal_and_fault_injector<I>(
+        file: F,
+        wal_file: W,
+        config: DatabaseConfig,
+        injector: I,
+    ) -> Result<BTreeStore<F, W>>
+    where
+        I: FaultInjector + Send + 'static,
+    {
+        Self::open_with_wal_internal(
+            file,
+            wal_file,
+            config,
+            Some(Box::new(injector)),
+            WalPageImageFormat::ExperimentalBtree,
+        )
     }
 
     pub fn open_with_wal_and_fault_injector<I>(
@@ -422,7 +459,13 @@ impl<F: DurableFile, W: DurableFile> BTreeStore<F, W> {
     where
         I: FaultInjector + Send + 'static,
     {
-        Self::open_with_wal_internal(file, wal_file, config, Some(Box::new(injector)))
+        Self::open_with_wal_internal(
+            file,
+            wal_file,
+            config,
+            Some(Box::new(injector)),
+            WalPageImageFormat::Baseline,
+        )
     }
 
     fn open_with_wal_internal(
@@ -430,6 +473,7 @@ impl<F: DurableFile, W: DurableFile> BTreeStore<F, W> {
         wal_file: W,
         config: DatabaseConfig,
         mut fault_injector: Option<Box<dyn FaultInjector + Send>>,
+        page_image_format: WalPageImageFormat,
     ) -> Result<BTreeStore<F, W>> {
         let identity = WalIdentity::new(
             config.database_uuid,
@@ -441,12 +485,14 @@ impl<F: DurableFile, W: DurableFile> BTreeStore<F, W> {
         let checkpoint_hint =
             validate_existing_identity_before_wal(&mut file, &identity, wal_length)?
                 .unwrap_or(Lsn::ZERO);
-        let mut wal = WalLog::open_with_fault_injector_and_start_lsn(
+        let mut wal = WalLog::open_with_page_image_format_and_fault_injector_and_start_lsn(
             wal_file,
             identity.clone(),
+            page_image_format,
             checkpoint_hint,
             fault_injector.as_deref_mut(),
         )?;
+        wal.take_recovery_pages();
         let recovery_batches = wal.take_recovery_batches();
         if file.is_empty()? && recovery_batches.is_empty() {
             let mut store = BTreeStore::<F, W>::initialize(file, config)?;
@@ -462,6 +508,7 @@ impl<F: DurableFile, W: DurableFile> BTreeStore<F, W> {
             &recovery_batches,
             checkpoint_hint,
             fault_injector.as_deref_mut(),
+            page_image_format == WalPageImageFormat::ExperimentalBtree,
         )?;
         let length = file.len()?;
         if length < (FIRST_DATA_PAGE * PAGE_SIZE as u64) || !length.is_multiple_of(PAGE_SIZE as u64)
@@ -809,13 +856,15 @@ impl<F: DurableFile, W: DurableFile> BTreeStore<F, W> {
                         image: *image,
                     })
                     .collect::<Vec<_>>();
-                images.push(WalPageImage {
-                    page_id: match candidate.new_slot {
-                        SuperblockSlot::A => PageId::ZERO,
-                        SuperblockSlot::B => PageId::new(1),
-                    },
-                    image: superblock_bytes,
-                });
+                if candidate.superblock_image_emitted {
+                    images.push(WalPageImage {
+                        page_id: match candidate.new_slot {
+                            SuperblockSlot::A => PageId::ZERO,
+                            SuperblockSlot::B => PageId::new(1),
+                        },
+                        image: superblock_bytes,
+                    });
+                }
                 wal_commits.push(WalCommit {
                     batch_id: candidate.batch_id,
                     commit_lsn,
@@ -826,7 +875,40 @@ impl<F: DurableFile, W: DurableFile> BTreeStore<F, W> {
         }
 
         if let Some(wal) = self.wal.as_mut() {
-            if let Err(error) = wal.append_group(&wal_commits, self.fault_injector.as_deref_mut()) {
+            let appended = if wal.page_delta_enabled() {
+                let eligible_commits = prepared
+                    .iter()
+                    .map(|candidate| !candidate.superblock_image_emitted)
+                    .collect::<Vec<_>>();
+                let dirty_pages = &self.dirty_pages;
+                let file = &mut self.file;
+                let mut base_source = |page_id: PageId| -> Option<Cow<'_, [u8; PAGE_SIZE]>> {
+                    if let Some(image) = dirty_pages.get(&page_id) {
+                        return Some(Cow::Borrowed(image));
+                    }
+                    read_exact_at(
+                        file,
+                        page_id.get().checked_mul(PAGE_SIZE as u64)?,
+                        PAGE_SIZE,
+                    )
+                    .ok()?
+                    .try_into()
+                    .ok()
+                    .map(Cow::Owned)
+                };
+                let mut delta = WalDeltaRequest {
+                    eligible_commits: &eligible_commits,
+                    base_source: &mut base_source,
+                };
+                wal.append_group_trusted_internal_with_page_deltas(
+                    &wal_commits,
+                    &mut delta,
+                    self.fault_injector.as_deref_mut(),
+                )
+            } else {
+                wal.append_group(&wal_commits, self.fault_injector.as_deref_mut())
+            };
+            if let Err(error) = appended {
                 self.broken = Some(error.to_string());
                 return Err(error);
             }
@@ -902,6 +984,30 @@ impl<F: DurableFile, W: DurableFile> BTreeStore<F, W> {
             injector.hit("after_publish")?;
         }
         Ok(())
+    }
+
+    pub fn compact_wal_enabled(&self) -> bool {
+        self.wal.as_ref().is_some_and(WalLog::page_delta_enabled)
+    }
+
+    fn superblock_image_required(
+        &self,
+        previous: &Superblock,
+        root_page_id: PageId,
+        free_list_head: Option<PageId>,
+        high_water_page_id: PageId,
+        batch_id: u64,
+    ) -> bool {
+        !self.compact_wal_enabled()
+            || previous.root_page_id != Some(root_page_id)
+            || previous.free_list_head != free_list_head
+            || previous.high_water_page_id != Some(high_water_page_id)
+            || (batch_id == self.next_batch_id
+                && self
+                    .wal
+                    .as_ref()
+                    .and_then(WalLog::last_commit_lsn)
+                    .is_none_or(|commit_lsn| commit_lsn <= previous.checkpoint_lsn))
     }
 
     pub fn flush(&mut self) -> Result<()> {
@@ -1393,11 +1499,18 @@ impl<'a, F: DurableFile, W: DurableFile> Overlay<'a, F, W> {
             .last_lsn
             .ok_or_else(|| Error::invariant("transaction has no provisional revision"))?;
         let base_generation = self.current_superblock.generation;
+        let superblock_image_emitted = self.store.superblock_image_required(
+            &self.current_superblock,
+            self.root_page_id,
+            self.free_list_head,
+            self.high_water_page_id,
+            self.next_batch_id,
+        );
         let commit_lsn = if self.store.wal.is_some() {
             let image_count = self
                 .dirty
                 .len()
-                .checked_add(1)
+                .checked_add(usize::from(superblock_image_emitted))
                 .ok_or_else(|| Error::invariant("WAL image count overflow"))?;
             Lsn::new(
                 self.next_lsn
@@ -1464,6 +1577,7 @@ impl<'a, F: DurableFile, W: DurableFile> Overlay<'a, F, W> {
             high_water_page_id: self.high_water_page_id,
             commit_lsn: Some(commit_lsn),
             batch_id: self.next_batch_id,
+            superblock_image_emitted,
         };
 
         self.current_superblock = new_superblock;
@@ -1498,10 +1612,17 @@ impl<'a, F: DurableFile, W: DurableFile> Overlay<'a, F, W> {
             ..
         } = self;
         let provisional_lsn = last_lsn;
+        let superblock_image_emitted = store.superblock_image_required(
+            &store.current_superblock,
+            root_page_id,
+            free_list_head,
+            high_water_page_id,
+            store.next_batch_id,
+        );
         let commit_lsn = if provisional_lsn.is_some() {
             let image_count = dirty
                 .len()
-                .checked_add(1)
+                .checked_add(usize::from(superblock_image_emitted))
                 .ok_or_else(|| Error::invariant("WAL image count overflow"))?;
             if store.wal.is_some() {
                 Some(Lsn::new(
@@ -1587,6 +1708,7 @@ impl<'a, F: DurableFile, W: DurableFile> Overlay<'a, F, W> {
             high_water_page_id,
             commit_lsn,
             batch_id: store.next_batch_id,
+            superblock_image_emitted,
         })
     }
 
@@ -2301,6 +2423,7 @@ fn recover_data_file<F: DurableFile>(
     committed_batches: &[CommittedWalBatch],
     checkpoint_lsn: Lsn,
     mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+    compact_wal: bool,
 ) -> Result<()> {
     let committed_batches = committed_batches
         .iter()
@@ -2362,6 +2485,43 @@ fn recover_data_file<F: DurableFile>(
                 write_all_at(file, offset, &page.image)?;
                 changed = true;
             }
+        }
+    }
+    if compact_wal {
+        let (metadata_position, metadata_page) = committed_batches
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(batch_position, batch)| {
+                batch
+                    .pages
+                    .iter()
+                    .find(|page| page.page_id.get() < FIRST_DATA_PAGE)
+                    .map(|page| (batch_position, page))
+            })
+            .ok_or_else(|| Error::corruption("compact B-tree WAL has no metadata anchor"))?;
+        let trailing_commits = committed_batches.len() - metadata_position - 1;
+        if trailing_commits > 0 {
+            let mut superblock = decode_superblock(&metadata_page.image)?;
+            superblock.generation = superblock
+                .generation
+                .checked_add(
+                    u64::try_from(trailing_commits)
+                        .map_err(|_| Error::recovery("compact recovery generation overflows"))?,
+                )
+                .ok_or_else(|| Error::recovery("compact recovery generation overflows"))?;
+            let metadata_page_id = if trailing_commits.is_multiple_of(2) {
+                metadata_page.page_id
+            } else {
+                PageId::new(1 - metadata_page.page_id.get())
+            };
+            hit_fault(&mut injector, "during_recovery_page_write")?;
+            write_all_at(
+                file,
+                metadata_page_id.get() * PAGE_SIZE as u64,
+                &encode_superblock(&superblock)?,
+            )?;
+            changed = true;
         }
     }
     if changed {

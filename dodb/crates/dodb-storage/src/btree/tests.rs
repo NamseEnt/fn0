@@ -63,6 +63,187 @@ fn config(cache_capacity: usize) -> DatabaseConfig {
 }
 
 #[test]
+fn compact_wal_elides_metadata_and_recovers_stable_groups() {
+    let mut store =
+        BTreeStore::open_with_compact_wal(MemoryFile::default(), MemoryFile::default(), config(16))
+            .unwrap();
+    let document_key = key(b"compact".to_vec(), b"first".to_vec());
+    store.put(document_key.clone(), vec![0x11; 512]).unwrap();
+    let before = store.wal_metrics().unwrap().unwrap().redo;
+    let requests = (0..4u8)
+        .map(|value_byte| {
+            TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: document_key.clone(),
+                    value: vec![value_byte; 512],
+                }],
+            )
+        })
+        .collect::<Vec<_>>();
+    let results = store.apply_transaction_group(&requests).unwrap();
+    assert!(results.iter().all(Result::is_ok));
+    let after = store.wal_metrics().unwrap().unwrap().redo;
+    assert_eq!(after.image_superblock, before.image_superblock);
+    assert_eq!(after.page_delta_records - before.page_delta_records, 4);
+    let expected = store.get(&document_key).unwrap();
+    let expected_superblock = store.current_superblock.clone();
+    let expected_next_lsn = store.next_lsn;
+    let (data, wal) = store.into_files().unwrap();
+    let mut reopened = BTreeStore::open_with_compact_wal(data, wal, config(16)).unwrap();
+    assert_eq!(reopened.get(&document_key).unwrap(), expected);
+    assert_eq!(reopened.current_superblock, expected_superblock);
+    assert_eq!(reopened.next_lsn, expected_next_lsn);
+    reopened.put(document_key.clone(), vec![0x55; 512]).unwrap();
+    let expected = reopened.get(&document_key).unwrap();
+    reopened.flush().unwrap();
+    let generation = reopened.current_superblock.generation;
+    let (data, wal) = reopened.into_files().unwrap();
+    let mut reopened = BTreeStore::open_with_compact_wal(data, wal, config(16)).unwrap();
+    assert_eq!(reopened.current_superblock.generation, generation);
+    assert_eq!(reopened.get(&document_key).unwrap(), expected);
+    reopened.check_invariants().unwrap();
+}
+
+#[test]
+fn compact_wal_checkpoint_restarts_with_full_images_and_metadata_anchor() {
+    let mut store =
+        BTreeStore::open_with_compact_wal(MemoryFile::default(), MemoryFile::default(), config(16))
+            .unwrap();
+    let document_key = key(b"compact".to_vec(), b"first".to_vec());
+    store.put(document_key.clone(), vec![0x11; 512]).unwrap();
+    store.put(document_key.clone(), vec![0x22; 512]).unwrap();
+    let checkpoint = store.checkpoint().unwrap();
+    let before = store.wal_metrics().unwrap().unwrap().redo;
+    store
+        .apply_transaction_group(&[
+            TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: document_key.clone(),
+                    value: vec![0x33; 512],
+                }],
+            ),
+            TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: document_key.clone(),
+                    value: vec![0x44; 512],
+                }],
+            ),
+        ])
+        .unwrap()
+        .into_iter()
+        .collect::<Result<Vec<_>>>()
+        .unwrap();
+    let after = store.wal_metrics().unwrap().unwrap().redo;
+    assert_eq!(after.image_superblock - before.image_superblock, 1);
+    assert_eq!(after.page_image_records - before.page_image_records, 2);
+    assert_eq!(after.page_delta_records - before.page_delta_records, 1);
+    let expected = store.get(&document_key).unwrap();
+    let generation = store.current_superblock.generation;
+    let (data, wal) = store.into_files().unwrap();
+    let mut reopened = BTreeStore::open_with_compact_wal(data, wal, config(16)).unwrap();
+    assert_eq!(reopened.current_superblock.generation, generation);
+    assert_eq!(
+        reopened.current_superblock.checkpoint_lsn,
+        checkpoint.checkpoint_lsn
+    );
+    assert_eq!(reopened.get(&document_key).unwrap(), expected);
+    reopened.checkpoint().unwrap();
+    let (data, wal) = reopened.into_files().unwrap();
+    let mut reopened = BTreeStore::open_with_compact_wal(data, wal, config(16)).unwrap();
+    assert_eq!(reopened.get(&document_key).unwrap(), expected);
+}
+
+#[test]
+fn compact_wal_splits_overflow_tombstones_conditions_and_ranges_survive_reopen() {
+    let mut store =
+        BTreeStore::open_with_compact_wal(MemoryFile::default(), MemoryFile::default(), config(8))
+            .unwrap();
+    let primary_key = b"compact".to_vec();
+    for key_index in 0..160u64 {
+        let document_key = key(primary_key.clone(), key_index.to_be_bytes().to_vec());
+        store.put(document_key, vec![key_index as u8; 512]).unwrap();
+    }
+    let first = key(primary_key.clone(), 0u64.to_be_bytes().to_vec());
+    let second = key(primary_key.clone(), 1u64.to_be_bytes().to_vec());
+    store.put(first.clone(), vec![0xa5; 8192]).unwrap();
+    store.delete(second.clone()).unwrap();
+    let results = store
+        .apply_transaction_group(&[
+            TransactionRequest::new(
+                vec![TransactionCondition::Exists {
+                    key: second.clone(),
+                }],
+                vec![TransactionMutation::Put {
+                    key: first.clone(),
+                    value: b"rejected".to_vec(),
+                }],
+            ),
+            TransactionRequest::new(
+                vec![TransactionCondition::Exists { key: first.clone() }],
+                Vec::new(),
+            ),
+            TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: first.clone(),
+                    value: vec![0x78; 8192],
+                }],
+            ),
+        ])
+        .unwrap();
+    assert!(matches!(&results[0], Err(Error::Conflict(_))));
+    assert_eq!(results[1].as_ref().unwrap().commit_lsn, None);
+    assert!(results[2].is_ok());
+    let expected = store.scan(None, usize::MAX).unwrap();
+    assert_eq!(expected.len(), 159);
+    let tombstone = store.get(&second).unwrap();
+    let (data, wal) = store.into_files().unwrap();
+    let mut reopened = BTreeStore::open_with_compact_wal(data, wal, config(8)).unwrap();
+    assert_eq!(reopened.scan(None, usize::MAX).unwrap(), expected);
+    assert_eq!(
+        reopened
+            .query(&PrimaryKey::new(primary_key), None, usize::MAX)
+            .unwrap(),
+        expected
+    );
+    assert_eq!(reopened.get(&second).unwrap(), tombstone);
+    reopened.check_invariants().unwrap();
+}
+
+#[test]
+fn compact_wal_torn_tail_never_publishes_a_partial_transaction() {
+    let mut store =
+        BTreeStore::open_with_compact_wal(MemoryFile::default(), MemoryFile::default(), config(16))
+            .unwrap();
+    let document_key = key(b"compact".to_vec(), b"first".to_vec());
+    store.put(document_key.clone(), vec![0x11; 512]).unwrap();
+    let before = store.get(&document_key).unwrap();
+    let initial_length = store.wal_metrics().unwrap().unwrap().wal_bytes as usize;
+    store.put(document_key.clone(), vec![0x22; 512]).unwrap();
+    let after = store.get(&document_key).unwrap();
+    let (data, wal) = store.into_files().unwrap();
+    for tail_length in initial_length..=wal.bytes.len() {
+        let truncated = MemoryFile {
+            bytes: wal.bytes[..tail_length].to_vec(),
+        };
+        let mut reopened =
+            BTreeStore::open_with_compact_wal(data.clone(), truncated, config(16)).unwrap();
+        assert_eq!(
+            reopened.get(&document_key).unwrap(),
+            if tail_length == wal.bytes.len() {
+                after.clone()
+            } else {
+                before.clone()
+            }
+        );
+        reopened.check_invariants().unwrap();
+    }
+}
+
+#[test]
 fn basic_operations_preserve_missing_revisions_and_order() {
     let mut store = BTreeStore::open(MemoryFile::default(), config(16)).unwrap();
     let first = key(vec![0, 1], vec![0]);
