@@ -15,6 +15,7 @@ from summarize_payload_batching import (
     validate_expected_matrix,
     validate_matrix,
     validate_raw_record,
+    metric_value,
     write_summary,
 )
 from run_payload_batching_matrix import VARIANT_SPECS, build_expected_cells, parse_arguments
@@ -113,6 +114,19 @@ def sample_raw_record(cell, trace_hash=None, policy=None):
     if cell["expected_engine"] != "rocksdb":
         record["overloads"] = 0
         record["sync_mode"] = "real"
+        if cell.get("expected_blink_workers") is not None:
+            record["blink_workers"] = cell["expected_blink_workers"]
+        if cell.get("expected_parallel_background_min_operations") is not None:
+            record["parallel_background_min_operations"] = cell[
+                "expected_parallel_background_min_operations"
+            ]
+        if cell.get("expected_blink_read_observational_metrics_enabled") is not None:
+            record["blink_read_observational_metrics_enabled"] = cell[
+                "expected_blink_read_observational_metrics_enabled"
+            ]
+        if cell.get("expected_parallel_background_worker_dispatches_metric") is True:
+            record["parallel_background_worker_dispatches_delta"] = 6
+            record["parallel_groups_delta"] = 12
     else:
         record["verification"] = {"passed": True}
         record["settings"] = {
@@ -277,6 +291,99 @@ class PayloadBatchingSummaryTests(unittest.TestCase):
         self.assertEqual(validated["raw_record"]["engine"], "parallel-blink")
         self.assertEqual(validated["raw_record"]["collection_policy"], "main-parity")
 
+    def test_adaptive_background_variant_requires_runtime_threshold_and_metrics_mode(self):
+        variant_name = "parallel-blink-main-parity-adaptive32"
+        arguments = parse_arguments(
+            (
+                "--results",
+                "/tmp/payload-batching-adaptive32",
+                "--clients",
+                "4",
+                "--variants",
+                variant_name,
+                "--value-modes",
+                "changing",
+                "--repetitions",
+                "1",
+            )
+        )
+        cell = build_expected_cells(arguments, SOURCE_COMMIT)[0]
+        variant_spec = VARIANT_SPECS[variant_name]
+        self.assertEqual(
+            variant_spec["engine_options"],
+            (
+                "--blink-collection-policy",
+                "main-parity",
+                "--blink-workers",
+                "2",
+                "--parallel-background-min-operations",
+                "32",
+            ),
+        )
+        self.assertEqual(cell["expected_parallel_background_min_operations"], 32)
+        self.assertIs(cell["expected_blink_read_observational_metrics_enabled"], True)
+        matrix_config = {
+            "schema_version": 2,
+            "config": {
+                "clients": [4],
+                "variants": [
+                    {
+                        "name": variant_name,
+                        "engine": variant_spec["engine"],
+                        "collection_policy": variant_spec["collection_policy"],
+                        "binary_key": variant_spec["binary_key"],
+                        "blink_workers": 2,
+                        "parallel_background_min_operations": 32,
+                        "blink_read_observational_metrics_enabled": True,
+                    }
+                ],
+                "value_modes": ["changing"],
+                "mixes": ["50/50"],
+                "repetitions": 1,
+                "transaction_width": 1,
+                "distribution": "uniform",
+                "working_set": 10_000,
+                "key_size": 16,
+                "value_size": 512,
+                "warmup_ms": 2_000,
+                "duration_ms": 5_000,
+                "cache_capacity": 16_384,
+                "read_limit": 16,
+                "base_seed": 979_000_000,
+                "seed_stride": 1_009,
+                "sync_mode": "real",
+                "sync_contract": "durable-return",
+            },
+        }
+        validate_expected_matrix(matrix_config, [cell])
+        raw_record = sample_raw_record(cell)
+        raw_record.update(
+            {
+                "blink_workers": 2,
+                "parallel_background_min_operations": 32,
+                "blink_read_observational_metrics_enabled": True,
+            }
+        )
+        validate_raw_record(raw_record, cell, SOURCE_COMMIT)
+        self.assertEqual(
+            metric_value(raw_record, "parallel_background_dispatches_per_parallel_group"),
+            0.5,
+        )
+        raw_record.pop("parallel_background_worker_dispatches_delta")
+        with self.assertRaisesRegex(
+            ValidationError,
+            "parallel_background_worker_dispatches_delta",
+        ):
+            validate_raw_record(raw_record, cell, SOURCE_COMMIT)
+        raw_record["parallel_background_worker_dispatches_delta"] = 6
+        raw_record.pop("parallel_background_min_operations")
+        with self.assertRaisesRegex(ValidationError, "parallel_background_min_operations"):
+            validate_raw_record(raw_record, cell, SOURCE_COMMIT)
+        raw_record["parallel_background_min_operations"] = 32
+        raw_record["blink_read_observational_metrics_enabled"] = False
+        with self.assertRaisesRegex(ValidationError, "blink_read_observational_metrics_enabled"):
+            validate_raw_record(raw_record, cell, SOURCE_COMMIT)
+
     def test_default_matrix_plans_48_runs_and_smoke_plans_eight_with_paired_seeds(self):
         default_arguments = parse_arguments(("--results", "/tmp/payload-batching-default"))
         default_cells = build_expected_cells(default_arguments, SOURCE_COMMIT)
@@ -323,6 +430,16 @@ class PayloadBatchingSummaryTests(unittest.TestCase):
             self.assertEqual(
                 summary["rows"][0]["metrics"]["wal_bytes_per_sync"]["median"],
                 102.4,
+            )
+            self.assertIsNone(
+                summary["rows"][0]["metrics"]["parallel_background_worker_dispatches_delta"][
+                    "median"
+                ]
+            )
+            self.assertIsNone(
+                summary["rows"][0]["metrics"]["parallel_background_dispatches_per_parallel_group"][
+                    "median"
+                ]
             )
 
     def test_validates_relocated_results_without_rewriting_recorded_paths(self):

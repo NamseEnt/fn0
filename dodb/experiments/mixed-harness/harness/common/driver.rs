@@ -479,16 +479,16 @@ fn writer_thread<E: Engine>(
                 )
             });
             if choose_read {
-                let generated = mixed_generator.as_mut().map_or_else(
-                    || generator.next_transaction(),
-                    WorkloadGenerator::next_transaction,
+                let read_key = mixed_generator.as_mut().map_or_else(
+                    || generator.next_read_key(),
+                    WorkloadGenerator::next_read_key,
                 );
                 let rows = if args.operation == "query" {
                     Some(engine.query(&mut writer, &query_primary_key(), args.read_limit))
                 } else {
-                    engine.read(&mut writer, &generated[0].key).map(|value| {
+                    engine.read(&mut writer, &read_key).map(|value| {
                         vec![Mutation {
-                            key: generated[0].key.clone(),
+                            key: read_key,
                             value,
                         }]
                     })
@@ -1284,6 +1284,8 @@ fn run_bench<F: EngineFactory>(args: &Args) {
         "client_workers": args.writers,
         "transaction_width": args.width,
         "operation": args.operation,
+        "read_key_generator_version": matches!(args.operation.as_str(), "get" | "query" | "mixed")
+            .then_some("key_only_preserving_schedule_v1"),
         "read_percent": args.read_percent,
         "mixed_value_mode": args.mixed_value_mode.as_str(),
         "mixed_value_generator": args.mixed_value_mode.generator_name(),

@@ -19,9 +19,20 @@ SUPPORTED_VARIANTS = {
     "parallel-blink-current": ("parallel-blink", "current", None),
     "parallel-blink-main-parity": ("parallel-blink", "main-parity", None),
     "parallel-blink-main-parity-workers1": ("parallel-blink", "main-parity", 1),
+    "parallel-blink-main-parity-adaptive32": ("parallel-blink", "main-parity", 2),
     "planned-blink-main-parity": ("planned-blink", "main-parity", None),
     "planned-blink-main-parity-workers0": ("planned-blink", "main-parity", None),
     "rocksdb": ("rocksdb", "not-applicable", None),
+}
+SUPPORTED_VARIANT_RUNTIME = {
+    "main-btree": (0, True),
+    "parallel-blink-current": (0, True),
+    "parallel-blink-main-parity": (0, True),
+    "parallel-blink-main-parity-workers1": (0, True),
+    "parallel-blink-main-parity-adaptive32": (32, True),
+    "planned-blink-main-parity": (0, True),
+    "planned-blink-main-parity-workers0": (0, True),
+    "rocksdb": (None, None),
 }
 METRIC_NAMES = (
     "aggregate_ops_per_second",
@@ -43,6 +54,7 @@ METRIC_NAMES = (
     "rss_end_kib",
     "rss_hwm_kib",
     "avg_transactions_per_group",
+    "parallel_groups_delta",
     "avg_transactions_per_wal_sync",
     "wal_syncs_delta",
     "wal_bytes_delta",
@@ -62,6 +74,8 @@ METRIC_NAMES = (
     "parallel_workers",
     "blink_workers",
     "parallel_worker_dispatches_delta",
+    "parallel_background_worker_dispatches_delta",
+    "parallel_background_dispatches_per_parallel_group",
     "parallel_worker_nanos_total",
 )
 RATIO_METRICS = (
@@ -177,6 +191,32 @@ def validate_raw_record(record, cell, checkout_sha):
     assert_equal(record, "collection_policy", cell["expected_collection_policy"])
     if cell.get("expected_blink_workers") is not None:
         assert_equal(record, "blink_workers", cell["expected_blink_workers"])
+    expected_background_min_operations = cell.get(
+        "expected_parallel_background_min_operations"
+    )
+    if expected_background_min_operations is not None:
+        assert_equal(
+            record,
+            "parallel_background_min_operations",
+            expected_background_min_operations,
+        )
+    expected_read_metrics_enabled = cell.get(
+        "expected_blink_read_observational_metrics_enabled"
+    )
+    if expected_read_metrics_enabled is not None:
+        assert_equal(
+            record,
+            "blink_read_observational_metrics_enabled",
+            expected_read_metrics_enabled,
+        )
+    if cell.get("expected_parallel_background_worker_dispatches_metric") is True:
+        dispatch_count = numeric_value(
+            record, ("parallel_background_worker_dispatches_delta",)
+        )
+        if dispatch_count is None:
+            raise ValidationError(
+                "raw record is missing numeric gate field parallel_background_worker_dispatches_delta"
+            )
     assert_equal(record, "git_commit", checkout_sha)
     assert_equal(record, "warmup_ms", cell["warmup_ms"])
     assert_equal(
@@ -401,6 +441,36 @@ def validate_expected_matrix(config, expected_cells):
                     raise ValidationError(
                         f"expected cell {cell['cell_id']} {cell_field} does not match variant configuration"
                     )
+    if config.get("schema_version") == 2:
+        for variant_name, variant_spec in variant_specs.items():
+            expected_background_min_operations, expected_read_metrics_enabled = (
+                SUPPORTED_VARIANT_RUNTIME[variant_name]
+            )
+            if variant_spec is not None:
+                if variant_spec.get("parallel_background_min_operations") != expected_background_min_operations:
+                    raise ValidationError(
+                        f"matrix variant {variant_name} has an invalid parallel background threshold"
+                    )
+                if variant_spec.get("blink_read_observational_metrics_enabled") != expected_read_metrics_enabled:
+                    raise ValidationError(
+                        f"matrix variant {variant_name} has an invalid Blink read metrics mode"
+                    )
+            for cell in expected_cells:
+                if cell["variant"] != variant_name:
+                    continue
+                if cell.get("expected_parallel_background_min_operations") != expected_background_min_operations:
+                    raise ValidationError(
+                        f"expected cell {cell['cell_id']} has an invalid parallel background threshold"
+                    )
+                if cell.get("expected_blink_read_observational_metrics_enabled") != expected_read_metrics_enabled:
+                    raise ValidationError(
+                        f"expected cell {cell['cell_id']} has an invalid Blink read metrics mode"
+                    )
+                expected_background_metric = expected_background_min_operations is not None
+                if cell.get("expected_parallel_background_worker_dispatches_metric") is not expected_background_metric:
+                    raise ValidationError(
+                        f"expected cell {cell['cell_id']} has an invalid background dispatch metric requirement"
+                    )
     for scenario_key, scenario_seeds in seed_by_scenario.items():
         if len(scenario_seeds) != 1:
             raise ValidationError(f"paired variants and value modes do not share a seed for {scenario_key}")
@@ -439,7 +509,7 @@ def validate_matrix(results, recorded_results_root=None):
     results = pathlib.Path(results).resolve()
     verify_existing_manifest(results)
     config = read_json(results / "matrix-config.json")
-    if config.get("schema_version") != 1:
+    if config.get("schema_version") not in (1, 2):
         raise ValidationError("unsupported matrix config schema_version")
     expected_cells = config.get("expected_cells")
     if not isinstance(expected_cells, list) or not expected_cells:
@@ -634,6 +704,7 @@ def metric_value(record, metric_name):
         "cpu_utilization_percent_one_core": ("cpu_utilization_percent_one_core",),
         "cpu_seconds": ("cpu_seconds",),
         "avg_transactions_per_group": ("avg_transactions_per_group",),
+        "parallel_groups_delta": ("parallel_groups_delta",),
         "wal_syncs_delta": ("wal_syncs_delta", "syncs_delta"),
         "wal_bytes_delta": ("wal_bytes_delta",),
         "wal_sync_nanos_total": ("wal_sync_nanos_total",),
@@ -650,6 +721,9 @@ def metric_value(record, metric_name):
         "parallel_workers": ("parallel_workers",),
         "blink_workers": ("blink_workers",),
         "parallel_worker_dispatches_delta": ("parallel_worker_dispatches_delta", "parallel_worker_dispatches"),
+        "parallel_background_worker_dispatches_delta": (
+            "parallel_background_worker_dispatches_delta",
+        ),
         "parallel_worker_nanos_total": ("parallel_worker_nanos_total", "parallel_worker_nanos"),
     }
     if metric_name == "successful_read_percent":
@@ -694,6 +768,12 @@ def metric_value(record, metric_name):
         syncs = metric_value(record, "wal_syncs_delta")
         if sync_nanos is not None and syncs not in (None, 0):
             return sync_nanos / syncs / 1000.0
+        return None
+    if metric_name == "parallel_background_dispatches_per_parallel_group":
+        dispatches = metric_value(record, "parallel_background_worker_dispatches_delta")
+        groups = numeric_value(record, ("parallel_groups_delta",))
+        if dispatches is not None and groups not in (None, 0):
+            return dispatches / groups
         return None
     return numeric_value(record, aliases.get(metric_name, (metric_name,)))
 
@@ -777,6 +857,13 @@ def build_summary(validated):
                 "variant": variant,
                 "engine": first_cell["expected_engine"],
                 "collection_policy": first_cell["expected_collection_policy"],
+                "blink_workers": first_cell.get("expected_blink_workers"),
+                "parallel_background_min_operations": first_cell.get(
+                    "expected_parallel_background_min_operations"
+                ),
+                "blink_read_observational_metrics_enabled": first_cell.get(
+                    "expected_blink_read_observational_metrics_enabled"
+                ),
                 "clients": clients,
                 "read_percent": read_percent,
                 "write_percent": write_percent,
@@ -830,6 +917,9 @@ def flatten_csv_rows(summary):
                 "variant",
                 "engine",
                 "collection_policy",
+                "blink_workers",
+                "parallel_background_min_operations",
+                "blink_read_observational_metrics_enabled",
                 "clients",
                 "read_percent",
                 "write_percent",

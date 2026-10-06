@@ -58,6 +58,22 @@ VARIANT_SPECS = {
         ),
         "blink_workers": 1,
     },
+    "parallel-blink-main-parity-adaptive32": {
+        "binary_key": "phase0-bench",
+        "binary_kind": "phase0",
+        "engine": "parallel-blink",
+        "collection_policy": "main-parity",
+        "engine_options": (
+            "--blink-collection-policy",
+            "main-parity",
+            "--blink-workers",
+            "2",
+            "--parallel-background-min-operations",
+            "32",
+        ),
+        "blink_workers": 2,
+        "parallel_background_min_operations": 32,
+    },
     "planned-blink-main-parity": {
         "binary_key": "phase0-bench",
         "binary_kind": "phase0",
@@ -348,6 +364,17 @@ def build_expected_cells(arguments, source_commit):
                             "expected_engine": variant_spec["engine"],
                             "expected_collection_policy": variant_spec["collection_policy"],
                             "expected_blink_workers": variant_spec.get("blink_workers"),
+                            "expected_parallel_background_min_operations": (
+                                variant_spec.get("parallel_background_min_operations", 0)
+                                if variant_spec["binary_kind"] == "phase0"
+                                else None
+                            ),
+                            "expected_blink_read_observational_metrics_enabled": (
+                                True if variant_spec["binary_kind"] == "phase0" else None
+                            ),
+                            "expected_parallel_background_worker_dispatches_metric": (
+                                True if variant_spec["binary_kind"] == "phase0" else None
+                            ),
                             "binary_key": variant_spec["binary_key"],
                             "binary_kind": variant_spec["binary_kind"],
                             "clients": clients,
@@ -645,7 +672,7 @@ def run_matrix(arguments):
     data_root = pathlib.Path(os.environ.get("BENCH_DATA_ROOT", "/bench/zfs/db")).expanduser().resolve()
     expected_cells = build_expected_cells(arguments, source_state_before["commit"])
     config = {
-        "schema_version": 1,
+        "schema_version": 2,
         "created_at_utc": timestamp_utc(),
         "source_commit": source_state_before["commit"],
         "source_branch": source_state_before["branch"],
@@ -659,6 +686,14 @@ def run_matrix(arguments):
                     "collection_policy": VARIANT_SPECS[variant]["collection_policy"],
                     "binary_key": VARIANT_SPECS[variant]["binary_key"],
                     "blink_workers": VARIANT_SPECS[variant].get("blink_workers"),
+                    "parallel_background_min_operations": (
+                        VARIANT_SPECS[variant].get("parallel_background_min_operations", 0)
+                        if VARIANT_SPECS[variant]["binary_kind"] == "phase0"
+                        else None
+                    ),
+                    "blink_read_observational_metrics_enabled": (
+                        True if VARIANT_SPECS[variant]["binary_kind"] == "phase0" else None
+                    ),
                 }
                 for variant in arguments.variants
             ],

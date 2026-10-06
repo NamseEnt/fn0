@@ -141,6 +141,33 @@ impl WorkloadGenerator {
     }
 
     pub fn next_transaction(&mut self) -> Vec<Mutation> {
+        self.next_keys()
+            .into_iter()
+            .enumerate()
+            .map(|(offset, key)| Mutation {
+                key,
+                value: match (self.mixed_value_mode, self.mixed_value_context) {
+                    (MixedValueMode::Changing, Some(context)) => mixed_value_bytes(
+                        self.config.value_size,
+                        context.phase_seed,
+                        context.operation_seed,
+                        context.operation_index,
+                        offset,
+                    ),
+                    _ => value_bytes(self.config.value_size, self.operation, offset),
+                },
+            })
+            .collect()
+    }
+
+    pub fn next_read_key(&mut self) -> Vec<u8> {
+        self.next_keys()
+            .into_iter()
+            .next()
+            .expect("transaction width must be positive")
+    }
+
+    fn next_keys(&mut self) -> Vec<Vec<u8>> {
         let mut keys = Vec::with_capacity(self.config.width);
         let mut seen = HashSet::with_capacity(self.config.width);
         for offset in 0..self.config.width {
@@ -164,22 +191,7 @@ impl WorkloadGenerator {
             }
         }
         self.operation = self.operation.wrapping_add(1);
-        keys.into_iter()
-            .enumerate()
-            .map(|(offset, key)| Mutation {
-                key,
-                value: match (self.mixed_value_mode, self.mixed_value_context) {
-                    (MixedValueMode::Changing, Some(context)) => mixed_value_bytes(
-                        self.config.value_size,
-                        context.phase_seed,
-                        context.operation_seed,
-                        context.operation_index,
-                        offset,
-                    ),
-                    _ => value_bytes(self.config.value_size, self.operation, offset),
-                },
-            })
-            .collect()
+        keys
     }
 
     fn next_index(&mut self, offset: usize) -> usize {
@@ -482,6 +494,57 @@ mod tests {
                 MixedValueMode::Constant,
             );
             assert_eq!(generator.next_transaction()[0].value, vec![1; 512]);
+        }
+    }
+
+    #[test]
+    fn read_key_generation_preserves_keys_state_and_following_write_values() {
+        for distribution in [
+            Distribution::Uniform,
+            Distribution::SameLeafHeavy,
+            Distribution::DifferentLeafHeavy,
+            Distribution::Hotspot,
+        ] {
+            for width in [1, 4] {
+                for value_mode in [MixedValueMode::Constant, MixedValueMode::Changing] {
+                    let config = WorkloadConfig {
+                        distribution,
+                        working_set: 1_024,
+                        key_size: 16,
+                        value_size: 512,
+                        width,
+                    };
+                    let phase_seed = 0x1234_5678_9abc_def0;
+                    let operation_seed = mixed_operation_seed(phase_seed, 17);
+                    let mut reference_generator = WorkloadGenerator::new_mixed(
+                        config.clone(),
+                        operation_seed,
+                        phase_seed,
+                        17,
+                        value_mode,
+                    );
+                    let mut read_key_generator = WorkloadGenerator::new_mixed(
+                        config,
+                        operation_seed,
+                        phase_seed,
+                        17,
+                        value_mode,
+                    );
+                    for operation_index in 0..8 {
+                        let reference_read = reference_generator.next_transaction();
+                        let read_key = read_key_generator.next_read_key();
+                        assert_eq!(
+                            read_key, reference_read[0].key,
+                            "read key differed for {distribution:?}, width {width}, mode {value_mode:?}, operation {operation_index}"
+                        );
+                        assert_eq!(
+                            reference_generator.next_transaction(),
+                            read_key_generator.next_transaction(),
+                            "following write differed for {distribution:?}, width {width}, mode {value_mode:?}, operation {operation_index}"
+                        );
+                    }
+                }
+            }
         }
     }
 }
