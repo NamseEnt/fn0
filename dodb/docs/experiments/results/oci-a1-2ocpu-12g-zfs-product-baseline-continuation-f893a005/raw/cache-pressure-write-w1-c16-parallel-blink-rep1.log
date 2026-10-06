@@ -1,0 +1,5 @@
+phase0-bench engine=parallel-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: dodb/docs/experiments/results/oci-a1-2ocpu-12g-zfs-product-baseline-continuation-f893a005/raw/cache-pressure-write-w1-c16-parallel-blink-rep1.jsonl
+scenario                                                       repetition throughput summary
+100%-write-16w-0r-width1-uniform                           rep=0 tx/s=     6662 mut/s=     6662 read/s=        0 agg/s=     6662 p50=  2254.5us p95=  3465.5us p99=  4050.3us groups= 4370 avg_group= 7.63
+completed 1 scenarios x 1 repetitions

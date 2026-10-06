@@ -1,0 +1,1 @@
+turso-mvcc-gc w16 width1 hotspot rep2: 573.5 tx/s committed, 575.1 attempted/s, busy=0 conflicts=1045 abandoned=8 errors=0 p99=196771us verify=true

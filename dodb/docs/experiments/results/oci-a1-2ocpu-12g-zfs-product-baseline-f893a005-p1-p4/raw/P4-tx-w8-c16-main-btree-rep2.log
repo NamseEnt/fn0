@@ -1,0 +1,5 @@
+phase0-bench engine=main-btree build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /bench/zfs/db/product-results-exact-f893a005-p1-p4/raw/P4-tx-w8-c16-main-btree-rep2.jsonl
+scenario                                                       repetition throughput summary
+100%-write-16w-0r-width8-uniform                           rep=0 tx/s=     1777 mut/s=    14220 read/s=        0 agg/s=     1777 p50=  8242.0us p95= 14450.8us p99= 19544.6us groups=  570 avg_group=15.63
+completed 1 scenarios x 1 repetitions

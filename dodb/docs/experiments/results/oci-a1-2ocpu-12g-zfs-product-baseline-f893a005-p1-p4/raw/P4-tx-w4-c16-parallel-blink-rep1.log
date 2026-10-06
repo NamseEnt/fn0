@@ -1,0 +1,5 @@
+phase0-bench engine=parallel-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /bench/zfs/db/product-results-exact-f893a005-p1-p4/raw/P4-tx-w4-c16-parallel-blink-rep1.jsonl
+scenario                                                       repetition throughput summary
+100%-write-16w-0r-width4-uniform                           rep=0 tx/s=     5024 mut/s=    20095 read/s=        0 agg/s=     5024 p50=  2887.8us p95=  4436.6us p99=  5677.9us groups= 3281 avg_group= 7.66
+completed 1 scenarios x 1 repetitions

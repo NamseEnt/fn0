@@ -1,0 +1,5 @@
+phase0-bench engine=main-btree build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: dodb/docs/experiments/results/oci-a1-2ocpu-12g-zfs-product-baseline-continuation-f893a005/raw/P6-mixed-50-50-c64-main-btree-rep3.jsonl
+scenario                                                       repetition throughput summary
+mixed-32w-32r-get-50/50-width1-uniform                     rep=0 tx/s=     4804 mut/s=     4804 read/s=     4813 agg/s=     9617 p50=    11.6us p95=  8794.8us p99= 15941.1us groups=  794 avg_group=30.29
+completed 1 scenarios x 1 repetitions

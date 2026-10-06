@@ -1,0 +1,1 @@
+turso-wal w4 width4 uniform rep3: 760.0 tx/s committed, 786.7 attempted/s, busy=2671 conflicts=0 abandoned=134 errors=0 p99=22574us verify=true

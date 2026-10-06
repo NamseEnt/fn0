@@ -1,0 +1,1 @@
+turso-mvcc-gc w4 width4 uniform rep2: 1139.0 tx/s committed, 1139.0 attempted/s, busy=0 conflicts=55 abandoned=0 errors=0 p99=13307us verify=true

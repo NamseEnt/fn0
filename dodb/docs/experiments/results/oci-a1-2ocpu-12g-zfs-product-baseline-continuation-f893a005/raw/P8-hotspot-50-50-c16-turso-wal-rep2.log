@@ -1,0 +1,1 @@
+turso-wal w16 width1 hotspot rep2: 1803.5 tx/s committed, 1900.4 attempted/s, busy=15724 conflicts=0 abandoned=488 errors=0 p99=76845us verify=true
