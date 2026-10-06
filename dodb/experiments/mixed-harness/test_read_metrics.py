@@ -225,6 +225,39 @@ def write_matrix_fixture(results_path, recorded_root):
 
 
 class ReadMetricsMatrixTests(unittest.TestCase):
+    def test_borrowed_page_variant_rejects_wrong_build_and_disabled_metrics(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            arguments = make_arguments(
+                pathlib.Path(temporary_directory) / "results",
+                "--variants", "blink-borrowed-pages,blink-metrics-on",
+                "--read-kinds", "get",
+                "--repetitions", "1",
+            )
+            cells = read_metrics_runner.build_expected_cells(arguments, SOURCE_COMMIT)
+        candidate, baseline = cells
+        record = make_raw_record(candidate)
+        record["blink_borrowed_page_views_enabled"] = True
+        read_metrics_runner.validate_raw_record(record, candidate, SOURCE_COMMIT)
+        for field_name, value in (
+            ("blink_borrowed_page_views_enabled", False),
+            ("blink_read_observational_metrics_enabled", False),
+            ("read_operations_metric", 0),
+        ):
+            mismatched_record = dict(record)
+            mismatched_record[field_name] = value
+            with self.subTest(field=field_name):
+                with self.assertRaises(ValidationError):
+                    read_metrics_runner.validate_raw_record(
+                        mismatched_record, candidate, SOURCE_COMMIT
+                    )
+        record.pop("blink_borrowed_page_views_enabled")
+        with self.assertRaises(ValidationError):
+            read_metrics_runner.validate_raw_record(record, candidate, SOURCE_COMMIT)
+        baseline_record = make_raw_record(baseline)
+        baseline_record["blink_borrowed_page_views_enabled"] = True
+        with self.assertRaises(ValidationError):
+            read_metrics_runner.validate_raw_record(baseline_record, baseline, SOURCE_COMMIT)
+
     def test_default_matrix_has_24_cells_with_paired_modes_and_seeds(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             arguments = make_arguments(pathlib.Path(temporary_directory) / "results")

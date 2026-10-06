@@ -70,6 +70,19 @@ VARIANT_SPECS = {
         "blink_workers": 2,
         "engine_options": ("--blink-collection-policy", "current", "--blink-workers", "2"),
     },
+    "blink-borrowed-pages": {
+        "binary_key": "phase0-borrowed-pages",
+        "binary_env": "PHASE0_BORROWED_PAGES_BINARY",
+        "binary_kind": "phase0",
+        "engine": "parallel-blink",
+        "collection_policy": "current",
+        "read_metrics_mode": "on",
+        "blink_read_observational_metrics_enabled": True,
+        "blink_borrowed_page_views_enabled": True,
+        "tokio_workers": PHASE0_TOKIO_WORKERS,
+        "blink_workers": 2,
+        "engine_options": ("--blink-collection-policy", "current", "--blink-workers", "2"),
+    },
     "rocksdb": {
         "binary_key": "rocksdb-bench",
         "binary_env": "ROCKSDB_BINARY",
@@ -479,6 +492,11 @@ def validate_raw_record(record, cell, checkout_sha):
             "blink_read_observational_metrics_enabled",
             cell["expected_read_metrics_enabled"],
         )
+        expected_borrowed_pages = VARIANT_SPECS[cell["variant"]].get(
+            "blink_borrowed_page_views_enabled", False
+        )
+        if expected_borrowed_pages or "blink_borrowed_page_views_enabled" in record:
+            assert_equal(record, "blink_borrowed_page_views_enabled", expected_borrowed_pages)
         if cell.get("expected_blink_workers") is not None:
             assert_equal(record, "blink_workers", cell["expected_blink_workers"])
         assert_equal(record, "sync_mode", "real")
@@ -519,7 +537,7 @@ def validate_raw_record(record, cell, checkout_sha):
             raise ValidationError(
                 f"raw record contains attempted writes for {cell['cell_id']}"
             )
-    if cell["variant"] in ("blink-metrics-on", "blink-metrics-off"):
+    if cell["variant"] in ("blink-metrics-on", "blink-metrics-off", "blink-borrowed-pages"):
         read_operation_metric = numeric_value(record, ("read_operations_metric",))
         if read_operation_metric is None:
             raise ValidationError(

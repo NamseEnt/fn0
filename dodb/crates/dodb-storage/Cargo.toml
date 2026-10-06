@@ -17,6 +17,7 @@ tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "proce
 churn-counters = []
 phase-i-instrumentation = []
 blink-read-metrics-disabled = []
+blink-borrowed-page-views = []
 
 [dev-dependencies]
 proptest.workspace = true

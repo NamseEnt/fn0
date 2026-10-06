@@ -3677,6 +3677,10 @@ fn add_parallel_metadata(json: &mut JsonObject, args: &Args) {
         "blink_read_observational_metrics_enabled",
         !cfg!(feature = "blink-read-metrics-disabled"),
     );
+    json.boolean(
+        "blink_borrowed_page_views_enabled",
+        cfg!(feature = "blink-borrowed-page-views"),
+    );
 }
 
 fn json_string(value: &str) -> String {

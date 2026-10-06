@@ -902,6 +902,30 @@ impl PageCell {
         }
         Ok(Arc::clone(&self.version.page))
     }
+
+    #[cfg(feature = "blink-borrowed-page-views")]
+    fn borrowed_page_at(&self, epoch: u64) -> Result<BorrowedPage<'_>> {
+        if self.version.epoch > epoch {
+            return Err(Error::corruption(
+                "published page version is newer than its generation",
+            ));
+        }
+        Ok(BorrowedPage {
+            page: &self.version.page,
+        })
+    }
+}
+
+#[cfg(feature = "blink-borrowed-page-views")]
+struct BorrowedPage<'page> {
+    page: &'page BlinkPage,
+}
+
+#[cfg(feature = "blink-borrowed-page-views")]
+impl AsRef<BlinkPage> for BorrowedPage<'_> {
+    fn as_ref(&self) -> &BlinkPage {
+        self.page
+    }
 }
 
 impl Drop for PageCell {
@@ -1514,6 +1538,25 @@ impl GenerationPublisher {
 struct GenerationPin {
     generation: Arc<PublishedGeneration>,
     metrics: Arc<PublicationMetrics>,
+}
+
+impl GenerationPin {
+    fn page_cell(&self, page_id: PageId) -> Result<&PageCell> {
+        if page_id > self.generation.high_water_page_id {
+            return Err(Error::corruption(
+                "published Blink page exceeds high-water mark",
+            ));
+        }
+        self.generation
+            .catalog
+            .get(page_id)
+            .map(AsRef::as_ref)
+            .ok_or_else(|| Error::corruption("published Blink page is missing"))
+    }
+
+    fn owned_page(&self, page_id: PageId) -> Result<Arc<BlinkPage>> {
+        self.page_cell(page_id)?.page_at(self.generation.epoch)
+    }
 }
 
 impl Drop for GenerationPin {
@@ -4195,11 +4238,17 @@ fn validate_encoded_key(key: &[u8]) -> Result<()> {
 }
 
 trait ReadPageSource {
+    type Page<'page>: AsRef<BlinkPage>
+    where
+        Self: 'page;
+
     fn root_page_id(&self) -> PageId;
-    fn page(&self, page_id: PageId) -> Result<Arc<BlinkPage>>;
+    fn page(&self, page_id: PageId) -> Result<Self::Page<'_>>;
 }
 
 impl ReadPageSource for BlinkState {
+    type Page<'page> = Arc<BlinkPage>;
+
     fn root_page_id(&self) -> PageId {
         self.root_page_id
     }
@@ -4213,21 +4262,26 @@ impl ReadPageSource for BlinkState {
 }
 
 impl ReadPageSource for GenerationPin {
+    #[cfg(not(feature = "blink-borrowed-page-views"))]
+    type Page<'page> = Arc<BlinkPage>;
+
+    #[cfg(feature = "blink-borrowed-page-views")]
+    type Page<'page> = BorrowedPage<'page>;
+
     fn root_page_id(&self) -> PageId {
         self.generation.root_page_id
     }
 
-    fn page(&self, page_id: PageId) -> Result<Arc<BlinkPage>> {
-        if page_id > self.generation.high_water_page_id {
-            return Err(Error::corruption(
-                "published Blink page exceeds high-water mark",
-            ));
+    fn page(&self, page_id: PageId) -> Result<Self::Page<'_>> {
+        #[cfg(not(feature = "blink-borrowed-page-views"))]
+        {
+            self.owned_page(page_id)
         }
-        self.generation
-            .catalog
-            .get(page_id)
-            .ok_or_else(|| Error::corruption("published Blink page is missing"))?
-            .page_at(self.generation.epoch)
+        #[cfg(feature = "blink-borrowed-page-views")]
+        {
+            self.page_cell(page_id)?
+                .borrowed_page_at(self.generation.epoch)
+        }
     }
 }
 
@@ -4937,7 +4991,7 @@ fn prepare_leaf_parallel_execution<'a, W: DurableFile>(
     let mut jobs = Vec::with_capacity(plan.leaf_groups.len());
     for (leaf_group, steps) in plan.leaf_groups.iter().zip(job_steps) {
         let leaf_id = leaf_group.leaf_hint;
-        let initial_page = published.page(leaf_id)?;
+        let initial_page = published.owned_page(leaf_id)?;
         if !matches!(*initial_page, BlinkPage::Leaf { .. }) {
             record_parallel_fallback(metrics, ParallelFallbackReason::RouteMismatch);
             return Ok(None);
@@ -6129,10 +6183,10 @@ fn scan_state<S: ReadPageSource>(
     Ok(output)
 }
 
-struct BaseRangeCursor<'state, S> {
+struct BaseRangeCursor<'state, S: ReadPageSource> {
     state: &'state S,
     leaf_id: PageId,
-    page: Arc<BlinkPage>,
+    page: S::Page<'state>,
     entry_index: usize,
     exclusive_after: Option<Vec<u8>>,
     visited: HashSet<PageId>,
@@ -6373,11 +6427,11 @@ fn published_range_state(
     Ok(output)
 }
 
-fn find_entry_with_metrics<S: ReadPageSource>(
-    state: &S,
+fn find_entry_with_metrics<'state, S: ReadPageSource>(
+    state: &'state S,
     key: &[u8],
     right_link_corrections: &mut u64,
-) -> Result<(Arc<BlinkPage>, Option<usize>)> {
+) -> Result<(S::Page<'state>, Option<usize>)> {
     let leaf_id = find_leaf_with_metrics(state, key, right_link_corrections, None)?;
     let page = state.page(leaf_id)?;
     let BlinkPage::Leaf { entries, .. } = page.as_ref() else {
@@ -13980,6 +14034,83 @@ mod tests {
         reopened.check_invariants().unwrap();
     }
 
+    #[cfg(feature = "blink-borrowed-page-views")]
+    #[test]
+    fn borrowed_pages_retain_old_values_without_page_arc_clones() {
+        let mut store = planned_store();
+        let key = DocumentKey::new(b"borrowed".to_vec(), b"first".to_vec());
+        let original_value = vec![0x37; 2 * INLINE_VALUE_LIMIT];
+        store.put(key.clone(), original_value.clone()).unwrap();
+        let pin = store.publisher.pin();
+        let root_id = pin.root_page_id();
+        let cell = pin.page_cell(root_id).unwrap();
+        let original_references = Arc::strong_count(&cell.version.page);
+        let view = pin.page(root_id).unwrap();
+        assert_eq!(Arc::strong_count(&cell.version.page), original_references);
+        assert!(std::ptr::eq(view.as_ref(), cell.version.page.as_ref()));
+        let mut corrections = 0;
+        let documents = scan_state(&pin, None, usize::MAX, &mut corrections).unwrap();
+        assert_eq!(documents.len(), 1);
+        assert_eq!(documents[0].value, original_value);
+        assert_eq!(store.versioned_read_metrics().active_generation_pins, 1);
+        assert!(!store.publisher.can_reuse_pages());
+
+        store
+            .put(key.clone(), vec![0x85; INLINE_VALUE_LIMIT])
+            .unwrap();
+        for key_index in 0..80u64 {
+            store
+                .put(
+                    DocumentKey::new(b"borrowed".to_vec(), key_index.to_be_bytes().to_vec()),
+                    vec![key_index as u8; INLINE_VALUE_LIMIT],
+                )
+                .unwrap();
+        }
+        store.checkpoint().unwrap();
+        assert!(std::ptr::eq(
+            view.as_ref(),
+            pin.page(root_id).unwrap().as_ref()
+        ));
+        assert_eq!(Arc::strong_count(&cell.version.page), 1);
+        assert_eq!(
+            scan_state(&pin, None, usize::MAX, &mut corrections).unwrap(),
+            documents
+        );
+        assert_eq!(
+            read_published_state(&pin, &key, &mut corrections)
+                .unwrap()
+                .value(),
+            Some(original_value.as_slice())
+        );
+        assert_eq!(
+            published_range_state(&pin, Some(&key.pk), None, 10, &mut corrections).unwrap(),
+            documents
+        );
+        assert!(
+            pin.page(PageId::new(pin.generation.high_water_page_id.get() + 1))
+                .is_err()
+        );
+        let future_cell = PageCell {
+            version: PageVersion {
+                epoch: pin.generation.epoch + 1,
+                page: Arc::clone(&cell.version.page),
+            },
+            metrics: Arc::clone(&pin.metrics),
+        };
+        assert!(future_cell.borrowed_page_at(pin.generation.epoch).is_err());
+        drop(future_cell);
+        drop(pin);
+        assert_eq!(store.versioned_read_metrics().active_generation_pins, 0);
+        assert!(store.publisher.can_reuse_pages());
+        let (data, wal) = store.into_files();
+        let mut reopened = reopen_memory_store(data, wal.unwrap());
+        assert_eq!(
+            reopened.versioned_read_handle().get(&key).unwrap().value(),
+            Some(vec![0x85; INLINE_VALUE_LIMIT].as_slice())
+        );
+        reopened.check_invariants().unwrap();
+    }
+
     #[cfg(not(feature = "blink-read-metrics-disabled"))]
     #[test]
     fn versioned_read_metrics_remain_enabled_by_default() {
@@ -16727,7 +16858,7 @@ mod tests {
         (FIRST_DATA_PAGE..=pin.generation.high_water_page_id.get())
             .map(|raw_page_id| {
                 let page_id = PageId::new(raw_page_id);
-                let page = pin.page(page_id).unwrap();
+                let page = pin.owned_page(page_id).unwrap();
                 let payloads = match &*page {
                     BlinkPage::Leaf { entries, .. } => entries
                         .iter()
@@ -16766,22 +16897,23 @@ mod tests {
         for snapshot in snapshots {
             let page = pin.page(snapshot.page_id).unwrap();
             assert!(
-                Arc::ptr_eq(&page, &snapshot.page),
+                std::ptr::eq(page.as_ref(), snapshot.page.as_ref()),
                 "{label}: pinned page {} was replaced",
                 snapshot.page_id
             );
             assert_eq!(
-                *page, snapshot.contents,
+                page.as_ref(),
+                &snapshot.contents,
                 "{label}: page {}",
                 snapshot.page_id
             );
             assert_eq!(
-                encode_blink_page(snapshot.page_id, &page).unwrap(),
+                encode_blink_page(snapshot.page_id, page.as_ref()).unwrap(),
                 snapshot.image,
                 "{label}: image {}",
                 snapshot.page_id
             );
-            if let BlinkPage::Leaf { entries, .. } = &*page {
+            if let BlinkPage::Leaf { entries, .. } = page.as_ref() {
                 assert_eq!(entries.len(), snapshot.payloads.len());
                 for (entry, (key_pointer, key, value)) in entries.iter().zip(&snapshot.payloads) {
                     assert_eq!(entry.key.as_ptr(), *key_pointer, "{label}: key moved");
@@ -16861,7 +16993,7 @@ mod tests {
             let current = store.publisher.pin();
             for (page_id, page) in &store.state.pages {
                 assert!(
-                    Arc::ptr_eq(page, &current.page(*page_id).unwrap()),
+                    std::ptr::eq(page.as_ref(), current.page(*page_id).unwrap().as_ref()),
                     "{label}: committed page {page_id} is not the published page object"
                 );
             }
