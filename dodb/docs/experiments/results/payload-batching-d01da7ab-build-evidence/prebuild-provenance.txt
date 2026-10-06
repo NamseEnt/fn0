@@ -1,0 +1,60 @@
+2026-10-06T09:10:39Z
+instance-20260923-1013
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+Architecture:                            aarch64
+CPU op-mode(s):                          32-bit, 64-bit
+Byte Order:                              Little Endian
+CPU(s):                                  2
+On-line CPU(s) list:                     0,1
+Vendor ID:                               ARM
+Model name:                              Neoverse-N1
+Model:                                   1
+Thread(s) per core:                      1
+Core(s) per socket:                      2
+Socket(s):                               1
+Stepping:                                r3p1
+BogoMIPS:                                50.00
+Flags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0,1
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; CSV2, BHB
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+               total        used        free      shared  buff/cache   available
+Mem:            10Gi       5.3Gi       1.6Gi        10Mi       4.1Gi       5.4Gi
+Swap:          4.0Gi       283Mi       3.7Gi
+Filesystem      Size  Used Avail Use% Mounted on
+dodbbench/db    149G   12G  137G   8% /bench/zfs/db
+dodbbench/db	sync	standard
+dodbbench/db	recordsize	4K
+dodbbench/db	compression	off
+dodbbench/db	atime	off
+stable-aarch64-unknown-linux-gnu (default)
+rustc 1.98.1 (48a229cea 2026-09-01)
+binary: rustc
+commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985
+commit-date: 2026-09-01
+host: aarch64-unknown-linux-gnu
+release: 1.98.1
+LLVM version: 22.1.8
+cargo 1.98.1 (797e8a9bc 2026-08-05)
+d01da7ab3d5f6d5998c792cfff7539d977dab231
+## HEAD (no branch)
+origin	https://github.com/NamseEnt/fn0.git (fetch)
+origin	https://github.com/NamseEnt/fn0.git (push)
+9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5  /bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+/bench/zfs/db/product-build/rocksdb-source/librocksdb.a: current ar archive

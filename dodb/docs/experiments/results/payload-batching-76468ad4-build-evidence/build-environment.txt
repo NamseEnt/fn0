@@ -1,0 +1,8 @@
+RUSTUP_TOOLCHAIN=1.97.1
+RUSTFLAGS=-C target-cpu=native
+CARGO_BUILD_JOBS=2
+CARGO_TARGET_DIR_DODB=/tmp/dodb-mixed-target-04f05824
+CARGO_TARGET_DIR_ROCKSDB=/tmp/rocksdb-mixed-static-target-04f05824
+CROSSDB_ROCKSDB_TAG=11.8.1
+CROSSDB_ROCKSDB_COMMIT=abeebd9630f11bd08c28b7bd43c7bdfc62050654
+CROSSDB_ROCKSDB_DIR=/bench/zfs/db/product-build/rocksdb-source

@@ -1,0 +1,5 @@
+phase0-bench engine=parallel-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=2s repetitions=1
+raw output: /bench/zfs/db/experiment-results/oci-a1-2ocpu-12g-zfs-payload-batching-76468ad4/raw/clients-4-mix-50-50-constant-parallel-blink-current-rep1.jsonl
+scenario                                                       repetition throughput summary
+mixed-4w-0r-get-50/50-width1-uniform                       rep=0 tx/s=     1722 mut/s=     1722 read/s=     1730 agg/s=     3451 p50=     0.0us p95=     0.0us p99=     0.0us groups= 5400 avg_group= 1.59
+completed 1 scenarios x 1 repetitions

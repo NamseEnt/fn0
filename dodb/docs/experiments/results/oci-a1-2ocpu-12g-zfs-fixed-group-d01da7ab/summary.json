@@ -1,0 +1,200 @@
+[
+  {
+    "group_size": 4,
+    "sync_mode": "real",
+    "engine": "planned-blink",
+    "workers": 0,
+    "tx_per_second_median": 4626.772,
+    "tx_per_second_min": 3665.242,
+    "tx_per_second_max": 4708.109,
+    "wal_bytes_per_tx_median": 669.4542271784233,
+    "wal_sync_mean_ms_median": 0.7536111331258645
+  },
+  {
+    "group_size": 4,
+    "sync_mode": "real",
+    "engine": "parallel-blink",
+    "workers": 1,
+    "tx_per_second_median": 4520.494,
+    "tx_per_second_min": 4158.223,
+    "tx_per_second_max": 4837.78,
+    "wal_bytes_per_tx_median": 669.4388161387365,
+    "wal_sync_mean_ms_median": 0.7800595777738453
+  },
+  {
+    "group_size": 4,
+    "sync_mode": "real",
+    "engine": "parallel-blink",
+    "workers": 2,
+    "tx_per_second_median": 4213.959,
+    "tx_per_second_min": 3977.299,
+    "tx_per_second_max": 4321.059,
+    "wal_bytes_per_tx_median": 669.5577543659833,
+    "wal_sync_mean_ms_median": 0.8180914827258922
+  },
+  {
+    "group_size": 4,
+    "sync_mode": "disabled",
+    "engine": "planned-blink",
+    "workers": 0,
+    "tx_per_second_median": 53188.508,
+    "tx_per_second_min": 52705.799,
+    "tx_per_second_max": 53894.002,
+    "wal_bytes_per_tx_median": 668.4833085160785,
+    "wal_sync_mean_ms_median": 3.392554328464553e-05
+  },
+  {
+    "group_size": 4,
+    "sync_mode": "disabled",
+    "engine": "parallel-blink",
+    "workers": 1,
+    "tx_per_second_median": 60043.854,
+    "tx_per_second_min": 59298.107,
+    "tx_per_second_max": 60391.784,
+    "wal_bytes_per_tx_median": 668.4885812690422,
+    "wal_sync_mean_ms_median": 3.602245020318433e-05
+  },
+  {
+    "group_size": 4,
+    "sync_mode": "disabled",
+    "engine": "parallel-blink",
+    "workers": 2,
+    "tx_per_second_median": 43289.158,
+    "tx_per_second_min": 38941.273,
+    "tx_per_second_max": 43538.703,
+    "wal_bytes_per_tx_median": 668.4813501396443,
+    "wal_sync_mean_ms_median": 3.726183301484639e-05
+  },
+  {
+    "group_size": 16,
+    "sync_mode": "real",
+    "engine": "planned-blink",
+    "workers": 0,
+    "tx_per_second_median": 13237.09,
+    "tx_per_second_min": 13163.932,
+    "tx_per_second_max": 13629.493,
+    "wal_bytes_per_tx_median": 668.4084984200292,
+    "wal_sync_mean_ms_median": 0.8966744851341552
+  },
+  {
+    "group_size": 16,
+    "sync_mode": "real",
+    "engine": "parallel-blink",
+    "workers": 1,
+    "tx_per_second_median": 14097.694,
+    "tx_per_second_min": 14042.308,
+    "tx_per_second_max": 14173.282,
+    "wal_bytes_per_tx_median": 668.431882660009,
+    "wal_sync_mean_ms_median": 0.8574819664094416
+  },
+  {
+    "group_size": 16,
+    "sync_mode": "real",
+    "engine": "parallel-blink",
+    "workers": 2,
+    "tx_per_second_median": 13134.18,
+    "tx_per_second_min": 12703.298,
+    "tx_per_second_max": 13245.278,
+    "wal_bytes_per_tx_median": 668.4032430730479,
+    "wal_sync_mean_ms_median": 0.9375538419001218
+  },
+  {
+    "group_size": 16,
+    "sync_mode": "disabled",
+    "engine": "planned-blink",
+    "workers": 0,
+    "tx_per_second_median": 59966.612,
+    "tx_per_second_min": 54567.553,
+    "tx_per_second_max": 62269.601,
+    "wal_bytes_per_tx_median": 668.5000128468654,
+    "wal_sync_mean_ms_median": 4.561600853788687e-05
+  },
+  {
+    "group_size": 16,
+    "sync_mode": "disabled",
+    "engine": "parallel-blink",
+    "workers": 1,
+    "tx_per_second_median": 70409.183,
+    "tx_per_second_min": 68927.047,
+    "tx_per_second_max": 70962.833,
+    "wal_bytes_per_tx_median": 668.5028660864427,
+    "wal_sync_mean_ms_median": 4.413611780211789e-05
+  },
+  {
+    "group_size": 16,
+    "sync_mode": "disabled",
+    "engine": "parallel-blink",
+    "workers": 2,
+    "tx_per_second_median": 58405.288,
+    "tx_per_second_min": 57486.318,
+    "tx_per_second_max": 60994.238,
+    "wal_bytes_per_tx_median": 668.4998801501206,
+    "wal_sync_mean_ms_median": 4.300784772082151e-05
+  },
+  {
+    "group_size": 64,
+    "sync_mode": "real",
+    "engine": "planned-blink",
+    "workers": 0,
+    "tx_per_second_median": 20909.325,
+    "tx_per_second_min": 20632.34,
+    "tx_per_second_max": 21031.911,
+    "wal_bytes_per_tx_median": 668.4258975651364,
+    "wal_sync_mean_ms_median": 1.9791893794369644
+  },
+  {
+    "group_size": 64,
+    "sync_mode": "real",
+    "engine": "parallel-blink",
+    "workers": 1,
+    "tx_per_second_median": 22007.945,
+    "tx_per_second_min": 21765.664,
+    "tx_per_second_max": 22119.878,
+    "wal_bytes_per_tx_median": 668.4588935319767,
+    "wal_sync_mean_ms_median": 1.962306948255814
+  },
+  {
+    "group_size": 64,
+    "sync_mode": "real",
+    "engine": "parallel-blink",
+    "workers": 2,
+    "tx_per_second_median": 22464.95,
+    "tx_per_second_min": 22253.81,
+    "tx_per_second_max": 22563.158,
+    "wal_bytes_per_tx_median": 668.4616775382871,
+    "wal_sync_mean_ms_median": 1.995426198525241
+  },
+  {
+    "group_size": 64,
+    "sync_mode": "disabled",
+    "engine": "planned-blink",
+    "workers": 0,
+    "tx_per_second_median": 65995.292,
+    "tx_per_second_min": 65847.773,
+    "tx_per_second_max": 66222.817,
+    "wal_bytes_per_tx_median": 668.4827016520894,
+    "wal_sync_mean_ms_median": 5.202740524781341e-05
+  },
+  {
+    "group_size": 64,
+    "sync_mode": "disabled",
+    "engine": "parallel-blink",
+    "workers": 1,
+    "tx_per_second_median": 77985.208,
+    "tx_per_second_min": 73295.734,
+    "tx_per_second_max": 78709.172,
+    "wal_bytes_per_tx_median": 668.4808485772357,
+    "wal_sync_mean_ms_median": 4.6966016260162606e-05
+  },
+  {
+    "group_size": 64,
+    "sync_mode": "disabled",
+    "engine": "parallel-blink",
+    "workers": 2,
+    "tx_per_second_median": 73436.025,
+    "tx_per_second_min": 72469.497,
+    "tx_per_second_max": 77825.618,
+    "wal_bytes_per_tx_median": 668.4854043220635,
+    "wal_sync_mean_ms_median": 4.1840536772394564e-05
+  }
+]

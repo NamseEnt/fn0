@@ -1,0 +1,46 @@
+warning: variants `Busy`, `BusySnapshot`, and `Conflict` are never constructed
+   --> src/../../common/driver.rs:184:5
+    |
+183 | pub enum RetryKind {
+    |          --------- variants in this enum
+184 |     Busy,
+    |     ^^^^
+185 |     BusySnapshot,
+    |     ^^^^^^^^^^^^
+186 |     Conflict,
+    |     ^^^^^^^^
+    |
+    = note: `RetryKind` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: variant `Retryable` is never constructed
+   --> src/../../common/driver.rs:192:5
+    |
+190 | pub enum Attempt {
+    |          ------- variant in this enum
+191 |     Committed,
+192 |     Retryable(RetryKind, String),
+    |     ^^^^^^^^^
+    |
+    = note: `Attempt` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: constant `BASE_SEED` is never used
+ --> src/../../common/workload.rs:4:11
+  |
+4 | pub const BASE_SEED: u64 = 979_000_000;
+  |           ^^^^^^^^^
+
+warning: constant `SEED_STRIDE` is never used
+ --> src/../../common/workload.rs:5:11
+  |
+5 | pub const SEED_STRIDE: u64 = 1_009;
+  |           ^^^^^^^^^^^
+
+warning: function `invocation_seed` is never used
+   --> src/../../common/workload.rs:246:8
+    |
+246 | pub fn invocation_seed(scenario_index: u64, repetition_index: u64) -> u64 {
+    |        ^^^^^^^^^^^^^^^
+
+warning: `rocksdb-bench` (bin "rocksdb-bench") generated 5 warnings
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s

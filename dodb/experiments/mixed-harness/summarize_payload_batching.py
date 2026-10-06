@@ -424,7 +424,18 @@ def verify_existing_manifest(results):
             raise ValidationError(f"artifact checksum mismatch: {relative_name}")
 
 
-def validate_matrix(results):
+def resolve_recorded_path(path, results, recorded_results_root):
+    recorded_path = pathlib.Path(path).resolve()
+    if recorded_results_root is None:
+        return recorded_path
+    try:
+        relative_path = recorded_path.relative_to(pathlib.Path(recorded_results_root).resolve())
+    except ValueError as error:
+        raise ValidationError("recorded artifact path escapes the supplied original results root") from error
+    return (results / relative_path).resolve()
+
+
+def validate_matrix(results, recorded_results_root=None):
     results = pathlib.Path(results).resolve()
     verify_existing_manifest(results)
     config = read_json(results / "matrix-config.json")
@@ -501,7 +512,7 @@ def validate_matrix(results):
             raise ValidationError(f"start/complete log path mismatch for {cell_id}")
         if started.get("binary_key") != completed.get("binary_key"):
             raise ValidationError(f"start/complete binary key mismatch for {cell_id}")
-        output_path = pathlib.Path(output_name).resolve()
+        output_path = resolve_recorded_path(output_name, results, recorded_results_root)
         raw_root = (results / "raw").resolve()
         if output_path.parent != raw_root:
             raise ValidationError(f"raw output path escapes raw directory for {cell_id}")
@@ -511,7 +522,7 @@ def validate_matrix(results):
         output_digest = sha256_file(output_path)
         if completed.get("output_sha256") != output_digest:
             raise ValidationError(f"raw output checksum mismatch for {cell_id}")
-        log_path = pathlib.Path(started.get("log", "")).resolve()
+        log_path = resolve_recorded_path(started.get("log", ""), results, recorded_results_root)
         if log_path.parent != raw_root or not log_path.is_file():
             raise ValidationError(f"benchmark log is missing or outside raw directory for {cell_id}")
         expected_log_paths.add(log_path)
@@ -888,9 +899,10 @@ def write_summary(validated):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("results", type=pathlib.Path)
+    parser.add_argument("--recorded-results-root", type=pathlib.Path)
     arguments = parser.parse_args()
     try:
-        validated = validate_matrix(arguments.results)
+        validated = validate_matrix(arguments.results, arguments.recorded_results_root)
         summary = write_summary(validated)
     except ValidationError as error:
         print(f"payload batching matrix rejected: {error}", file=sys.stderr)

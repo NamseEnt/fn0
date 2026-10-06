@@ -1,0 +1,5 @@
+{
+  "failure": "raw validation failed for clients-4-mix-50-50-constant-main-btree-rep2: raw repetition mismatch: actual=0, expected=1",
+  "failure_type": "RunnerError",
+  "timestamp_utc": "2026-10-06T09:08:42.426296+00:00"
+}

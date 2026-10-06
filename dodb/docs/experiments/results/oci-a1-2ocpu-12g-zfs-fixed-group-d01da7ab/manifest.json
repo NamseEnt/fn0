@@ -1,0 +1,25 @@
+{
+  "source_commit": "d01da7ab3d5f6d5998c792cfff7539d977dab231",
+  "binary": "/tmp/dodb-mixed-target-04f05824/release/blink-fixed-group-bench",
+  "binary_sha256": "65187cc833bb42de1bd5bb8b3ac473b6c5649a5a6f5f1566308e482af1f3342e",
+  "groups": [
+    4,
+    16,
+    64
+  ],
+  "sync_modes": [
+    "real",
+    "disabled"
+  ],
+  "repetitions": 3,
+  "warmup_ms": 2000,
+  "duration_ms": 5000,
+  "value_mode": "changing",
+  "logical_cpus": 2,
+  "hostname": "instance-20260923-1013",
+  "architecture": "aarch64",
+  "planned_count": 54,
+  "accepted": true,
+  "interpretation": "Fixed-group write diagnostic; disabled sync is not durable",
+  "completed_count": 54
+}

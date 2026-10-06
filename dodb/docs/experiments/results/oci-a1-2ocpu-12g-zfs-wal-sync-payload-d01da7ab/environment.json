@@ -1,0 +1,49 @@
+{
+  "arguments": {
+    "iterations": 100,
+    "modes": [
+      "append",
+      "ring"
+    ],
+    "payload_bytes": [
+      2676,
+      10704,
+      42816,
+      33520,
+      134080,
+      536320
+    ],
+    "repetitions": 3,
+    "ring_bytes": 67108864,
+    "seed": 979000000,
+    "warmup_iterations": 20
+  },
+  "case_count": 36,
+  "cpu": {
+    "logical_cpus": 2,
+    "machine": "aarch64",
+    "model": "aarch64"
+  },
+  "hostname": "instance-20260923-1013",
+  "interpretation_scope": "storage IO diagnostic; does not prove engine or WAL architecture behavior",
+  "probe_script_sha256_after": "c072c20a2185cb4134c4df2116d6ce48b99995c9866c3ae028998948a4693b45",
+  "probe_script_sha256_before": "c072c20a2185cb4134c4df2116d6ce48b99995c9866c3ae028998948a4693b45",
+  "probe_script_stable": true,
+  "python_version": "3.9.25 (main, Aug 12 2026, 00:00:00) \n[GCC 11.5.0 20240719 (Red Hat 11.5.0-14.0.1)]",
+  "source_commit_stable": true,
+  "source_git_commit_after": "d01da7ab3d5f6d5998c792cfff7539d977dab231",
+  "source_git_commit_before": "d01da7ab3d5f6d5998c792cfff7539d977dab231",
+  "source_git_status_after": "",
+  "source_git_status_before": "",
+  "source_git_status_error_after": null,
+  "source_git_status_error_before": null,
+  "zfs": {
+    "dataset": "dodbbench/db",
+    "dataset_list_error": null,
+    "dataset_mount": "/bench/zfs/db",
+    "mount": "dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive",
+    "mount_error": null,
+    "settings": "sync\tstandard\nrecordsize\t4K\ncompression\toff\natime\toff",
+    "settings_error": null
+  }
+}

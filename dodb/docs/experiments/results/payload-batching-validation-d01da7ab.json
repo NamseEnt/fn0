@@ -1,0 +1,52 @@
+{
+  "validated_at_utc": "2026-10-06T10:57:41.476244+00:00",
+  "measurement_source_commit": "d01da7ab3d5f6d5998c792cfff7539d977dab231",
+  "independent_validation": true,
+  "artifacts": [
+    {
+      "name": "oci-a1-2ocpu-12g-zfs-payload-batching-d01da7ab",
+      "kind": "mixed",
+      "raw_count": 48,
+      "accepted": true,
+      "checks": "config, expected cells, source, trace, inputs, error/conflict/overload gates, RocksDB reopened samples, binary/raw/log hashes"
+    },
+    {
+      "name": "oci-a1-2ocpu-12g-zfs-payload-batching-c16-d01da7ab",
+      "kind": "mixed",
+      "raw_count": 12,
+      "accepted": true,
+      "checks": "config, expected cells, source, trace, inputs, error/conflict/overload gates, RocksDB reopened samples, binary/raw/log hashes"
+    },
+    {
+      "name": "oci-a1-2ocpu-12g-zfs-payload-batching-smoke-d01da7ab",
+      "kind": "mixed",
+      "raw_count": 8,
+      "accepted": true,
+      "checks": "config, expected cells, source, trace, inputs, error/conflict/overload gates, RocksDB reopened samples, binary/raw/log hashes"
+    },
+    {
+      "name": "oci-a1-2ocpu-12g-zfs-fixed-group-d01da7ab",
+      "kind": "fixed_group",
+      "raw_count": 54,
+      "accepted": true,
+      "checks": "manifest hashes, source/release, exact group size, sync calls, paired logical request prefix; binary checks all outcomes and 16 sampled values"
+    },
+    {
+      "name": "oci-a1-2ocpu-12g-zfs-fixed-group-smoke-d01da7ab",
+      "kind": "fixed_group",
+      "raw_count": 6,
+      "accepted": true,
+      "checks": "manifest hashes, source/release, exact group size, sync calls, paired logical request prefix; binary checks all outcomes and 16 sampled values"
+    },
+    {
+      "name": "oci-a1-2ocpu-12g-zfs-wal-sync-payload-d01da7ab",
+      "kind": "storage_io",
+      "raw_count": 36,
+      "accepted": true,
+      "checks": "manifest/script hashes, source stability and cleanliness, exact case matrix, 100 measured write/sync samples per case, growing/fixed logical file lengths"
+    }
+  ],
+  "measurement_count_excluding_smoke": 150,
+  "accepted_current_source_smoke_count": 14,
+  "excluded_failed_matrix": "oci-a1-2ocpu-12g-zfs-payload-batching-76468ad4"
+}

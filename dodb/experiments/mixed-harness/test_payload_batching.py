@@ -1,5 +1,6 @@
 import json
 import pathlib
+import shutil
 import sys
 import tempfile
 import unittest
@@ -323,6 +324,19 @@ class PayloadBatchingSummaryTests(unittest.TestCase):
                 summary["rows"][0]["metrics"]["wal_bytes_per_sync"]["median"],
                 102.4,
             )
+
+    def test_validates_relocated_results_without_rewriting_recorded_paths(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = pathlib.Path(temporary_directory)
+            original = write_synthetic_matrix(root / "original")
+            relocated = root / "relocated"
+            shutil.copytree(original, relocated)
+            recorded_order = (relocated / "run-order.jsonl").read_bytes()
+            validated = validate_matrix(relocated, recorded_results_root=original)
+            self.assertEqual(len(validated["validated_runs"]), 8)
+            self.assertEqual((relocated / "run-order.jsonl").read_bytes(), recorded_order)
+            with self.assertRaisesRegex(ValidationError, "escapes"):
+                validate_matrix(relocated, recorded_results_root=root / "wrong")
 
     def test_rejects_missing_required_raw_field(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

@@ -1,0 +1,103 @@
+   Compiling libc v0.2.185
+   Compiling proc-macro2 v1.0.105
+   Compiling find-msvc-tools v0.1.6
+   Compiling shlex v1.3.0
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.45
+   Compiling cc v1.2.51
+   Compiling semver v1.0.27
+   Compiling rustc_version v0.4.1
+   Compiling syn v3.0.3
+   Compiling libmimalloc-sys v0.1.49
+   Compiling crc32c v0.6.8
+   Compiling errno v0.3.14
+   Compiling signal-hook-registry v1.4.8
+   Compiling tokio-macros v2.7.2
+   Compiling mio v1.2.2
+   Compiling socket2 v0.6.5
+   Compiling pin-project-lite v0.2.16
+   Compiling bytes v1.11.1
+   Compiling tokio v1.53.1
+   Compiling mimalloc v0.1.52
+   Compiling dodb-core v0.1.0 (/bench/zfs/db/product-build/dodb-mixed-aae183ee/dodb/crates/dodb-core)
+   Compiling dodb-storage v0.1.0 (/bench/zfs/db/product-build/dodb-mixed-aae183ee/dodb/crates/dodb-storage)
+warning: constant `BASE_SEED` is never used
+ --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:4:11
+  |
+4 | pub const BASE_SEED: u64 = 979_000_000;
+  |           ^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `SEED_STRIDE` is never used
+ --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:5:11
+  |
+5 | pub const SEED_STRIDE: u64 = 1_009;
+  |           ^^^^^^^^^^^
+
+warning: variants `SameLeafHeavy`, `DifferentLeafHeavy`, and `Hotspot` are never constructed
+  --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:14:5
+   |
+12 | pub enum Distribution {
+   |          ------------ variants in this enum
+13 |     Uniform,
+14 |     SameLeafHeavy,
+   |     ^^^^^^^^^^^^^
+15 |     DifferentLeafHeavy,
+   |     ^^^^^^^^^^^^^^^^^^
+16 |     Hotspot,
+   |     ^^^^^^^
+   |
+   = note: `Distribution` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: associated items `parse`, `as_str`, and `report_name` are never used
+  --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:51:12
+   |
+50 | impl Distribution {
+   | ----------------- associated items in this implementation
+51 |     pub fn parse(value: &str) -> Self {
+   |            ^^^^^
+...
+61 |     pub fn as_str(self) -> &'static str {
+   |            ^^^^^^
+...
+70 |     pub fn report_name(self) -> &'static str {
+   |            ^^^^^^^^^^^
+
+warning: function `invocation_seed` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:246:8
+    |
+246 | pub fn invocation_seed(scenario_index: u64, repetition_index: u64) -> u64 {
+    |        ^^^^^^^^^^^^^^^
+
+warning: struct `TraceHash` is never constructed
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:490:12
+    |
+490 | pub struct TraceHash {
+    |            ^^^^^^^^^
+
+warning: associated items `new`, `absorb`, and `push_transaction` are never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:496:12
+    |
+495 | impl TraceHash {
+    | -------------- associated items in this implementation
+496 |     pub fn new() -> Self {
+    |            ^^^
+...
+503 |     fn absorb(&mut self, bytes: &[u8]) {
+    |        ^^^^^^
+...
+510 |     pub fn push_transaction<'a>(
+    |            ^^^^^^^^^^^^^^^^
+
+warning: method `merge` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:562:12
+    |
+540 | impl LatencySamples {
+    | ------------------- method in this implementation
+...
+562 |     pub fn merge(&mut self, other: Self) {
+    |            ^^^^^
+
+warning: `dodb-storage` (bin "blink-fixed-group-bench") generated 8 warnings
+    Finished `release` profile [optimized + debuginfo] target(s) in 59.75s
