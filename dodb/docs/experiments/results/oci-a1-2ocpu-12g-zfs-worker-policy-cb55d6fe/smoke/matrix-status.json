@@ -1,0 +1,8 @@
+{
+  "accepted": true,
+  "completed_count": 8,
+  "planned_count": 8,
+  "source_commit": "cb55d6fe8325137a96e1c9615c64cb1942e328fb",
+  "summary_csv": "payload-batching-summary.csv",
+  "summary_json": "payload-batching-summary.json"
+}

@@ -1,0 +1,6 @@
+acceptance=REJECTED
+source_sha=55367600ecc588ed363683765b44867d599ed6f1
+observations=8 smoke run records were produced and preserved
+rejection_reason=runner validation rejected the RocksDB cell because the expected background dispatch metric was null instead of false
+benchmark_use=Do not include in accepted matrix results
+build_toolchain=rustc 1.97.1; cargo 1.97.1

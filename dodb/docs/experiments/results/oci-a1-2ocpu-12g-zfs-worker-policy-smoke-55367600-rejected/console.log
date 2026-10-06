@@ -1,0 +1,2 @@
+payload batching matrix rejected: expected cell clients-4-mix-50-50-changing-rocksdb-rep1 has an invalid background dispatch metric requirement
+payload batching matrix failed: payload batching summarizer rejected results with exit code 1

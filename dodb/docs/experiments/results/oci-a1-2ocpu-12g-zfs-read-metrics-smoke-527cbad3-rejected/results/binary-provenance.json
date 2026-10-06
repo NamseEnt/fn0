@@ -1,0 +1,17 @@
+{
+  "phase0-bench": {
+    "environment_variable": "PHASE0_BINARY",
+    "path": "/bench/zfs/db/experiment-build/read-policy-527cbad3/default/phase0-bench",
+    "sha256": "f14895328f274abc5de18295c35e18ad4dc5fe3f38247be4386f4a4e84bbe292"
+  },
+  "phase0-read-metrics-off": {
+    "environment_variable": "PHASE0_READ_METRICS_OFF_BINARY",
+    "path": "/bench/zfs/db/experiment-build/read-policy-527cbad3/off/phase0-bench",
+    "sha256": "6d021e0b26bef83136cefaf6507f1373a02ea694a7abe3f75b2a5bc93ca5f2dd"
+  },
+  "rocksdb-bench": {
+    "environment_variable": "ROCKSDB_BINARY",
+    "path": "/bench/zfs/db/experiment-build/read-policy-527cbad3/rocks/rocksdb-bench",
+    "sha256": "a6ad4fe191c4041a031fe7d2fd612201382e7d19447f513cdaf3cb5602e99810"
+  }
+}

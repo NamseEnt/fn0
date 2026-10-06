@@ -1,0 +1,8 @@
+{
+  "accepted": false,
+  "completed_count": 8,
+  "failure": "payload batching summarizer rejected results with exit code 1",
+  "planned_count": 8,
+  "source_commit": "55367600ecc588ed363683765b44867d599ed6f1",
+  "updated_at_utc": "2026-10-06T11:34:07.825337+00:00"
+}

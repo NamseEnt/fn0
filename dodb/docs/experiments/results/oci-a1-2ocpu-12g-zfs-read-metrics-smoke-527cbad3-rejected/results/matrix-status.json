@@ -1,0 +1,8 @@
+{
+  "accepted": false,
+  "completed_count": 0,
+  "failure": "raw suite mismatch: actual='read-scaling', expected='read'",
+  "planned_count": 8,
+  "source_commit": "527cbad3b097768dcb16349dd482532d049a1ea2",
+  "updated_at_utc": "2026-10-06T11:40:41.996923+00:00"
+}

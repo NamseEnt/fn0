@@ -1,0 +1,20 @@
+{
+  "architecture": "aarch64",
+  "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+  "cpu_model": "Neoverse-N1",
+  "data_root": "/bench/zfs/db",
+  "filesystem": "dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive",
+  "git_branch": "",
+  "git_commit": "cb55d6fe8325137a96e1c9615c64cb1942e328fb",
+  "hostname": "instance-20260923-1013",
+  "kernel": "6.12.0-206.104.4.4.el9uek.aarch64",
+  "logical_cpus": 2,
+  "memory_total_kib": 11159744,
+  "os_release": "NAME=\"Oracle Linux Server\"\nVERSION=\"9.8\"\nID=\"ol\"\nID_LIKE=\"fedora\"\nVARIANT=\"Server\"\nVARIANT_ID=\"server\"\nVERSION_ID=\"9.8\"\nPLATFORM_ID=\"platform:el9\"\nPRETTY_NAME=\"Oracle Linux Server 9.8\"\nANSI_COLOR=\"0;31\"\nCPE_NAME=\"cpe:/o:oracle:linux:9:8:server\"\nHOME_URL=\"https://linux.oracle.com/\"\nBUG_REPORT_URL=\"https://github.com/oracle/oracle-linux\"\n\nORACLE_BUGZILLA_PRODUCT=\"Oracle Linux 9\"\nORACLE_BUGZILLA_PRODUCT_VERSION=9.8\nORACLE_SUPPORT_PRODUCT=\"Oracle Linux\"\nORACLE_SUPPORT_PRODUCT_VERSION=9.8\n",
+  "python": "Python 3.9.25",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "timestamp_utc": "2026-10-06T11:54:02.868121+00:00",
+  "zfs_dataset": "dodbbench/db",
+  "zfs_properties": "NAME          PROPERTY     VALUE           SOURCE\ndodbbench/db  sync         standard        local\ndodbbench/db  recordsize   4K              local\ndodbbench/db  compression  off             inherited from dodbbench\ndodbbench/db  atime        off             inherited from dodbbench",
+  "zpool_status": "pool: dodbbench\n state: ONLINE\nconfig:\n\n\tNAME        STATE     READ WRITE CKSUM\n\tdodbbench   ONLINE       0     0     0\n\t  sda4      ONLINE       0     0     0\n\nerrors: No known data errors"
+}

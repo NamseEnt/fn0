@@ -1,0 +1,4 @@
+{
+  "failure": "raw suite mismatch: actual='read-scaling', expected='read'",
+  "failure_type": "ValidationError"
+}

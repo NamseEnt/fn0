@@ -1,0 +1,5 @@
+{
+  "failure": "payload batching summarizer rejected results with exit code 1",
+  "failure_type": "RunnerError",
+  "timestamp_utc": "2026-10-06T11:34:07.826280+00:00"
+}

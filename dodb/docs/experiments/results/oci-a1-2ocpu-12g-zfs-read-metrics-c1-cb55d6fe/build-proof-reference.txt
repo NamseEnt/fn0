@@ -1,0 +1,8 @@
+source_sha=cb55d6fe8325137a96e1c9615c64cb1942e328fb
+build_proof_relative_path=../oci-a1-2ocpu-12g-zfs-read-metrics-cb55d6fe/build-proof
+remote_build_artifact=/bench/zfs/db/experiment-build/read-policy-cb55d6fe
+phase0_default_sha256=f14895328f274abc5de18295c35e18ad4dc5fe3f38247be4386f4a4e84bbe292
+phase0_read_metrics_off_sha256=6d021e0b26bef83136cefaf6507f1373a02ea694a7abe3f75b2a5bc93ca5f2dd
+rustc=rustc 1.97.1 (8bab26f4f 2026-07-14)
+cargo=cargo 1.97.1 (c980f4866 2026-06-30)
+No binaries or database files were copied. The matrix reused the immutable binaries and source/build proof referenced above.

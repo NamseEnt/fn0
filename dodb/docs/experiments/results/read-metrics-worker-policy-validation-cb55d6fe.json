@@ -1,0 +1,338 @@
+{
+  "accepted": true,
+  "source_commit": "cb55d6fe8325137a96e1c9615c64cb1942e328fb",
+  "independent_full_case_count": 60,
+  "independent_smoke_case_count": 16,
+  "matrix_case_counts": [
+    24,
+    24,
+    12
+  ],
+  "smoke_case_counts": [
+    8,
+    8
+  ],
+  "query16_row_count_checks": 18,
+  "worker_comparisons": [
+    {
+      "clients": 4,
+      "numerator": "parallel-blink-main-parity-workers1",
+      "denominator": "parallel-blink-main-parity",
+      "throughput_ratio": {
+        "values": [
+          1.0401104154476613,
+          1.0929899384297854,
+          1.0331261158940415
+        ],
+        "median": 1.0401104154476613,
+        "min": 1.0331261158940415,
+        "max": 1.0929899384297854
+      }
+    },
+    {
+      "clients": 4,
+      "numerator": "parallel-blink-main-parity-adaptive32",
+      "denominator": "parallel-blink-main-parity",
+      "throughput_ratio": {
+        "values": [
+          1.0285945539532897,
+          1.0753364682002824,
+          0.9824973127565253
+        ],
+        "median": 1.0285945539532897,
+        "min": 0.9824973127565253,
+        "max": 1.0753364682002824
+      }
+    },
+    {
+      "clients": 4,
+      "numerator": "parallel-blink-main-parity-adaptive32",
+      "denominator": "parallel-blink-main-parity-workers1",
+      "throughput_ratio": {
+        "values": [
+          0.9889282317306521,
+          0.9838484604397506,
+          0.9509945568516547
+        ],
+        "median": 0.9838484604397506,
+        "min": 0.9509945568516547,
+        "max": 0.9889282317306521
+      }
+    },
+    {
+      "clients": 4,
+      "numerator": "parallel-blink-main-parity",
+      "denominator": "rocksdb",
+      "throughput_ratio": {
+        "values": [
+          1.4769397130131199,
+          1.3637365058455422,
+          1.459826760181574
+        ],
+        "median": 1.459826760181574,
+        "min": 1.3637365058455422,
+        "max": 1.4769397130131199
+      }
+    },
+    {
+      "clients": 64,
+      "numerator": "parallel-blink-main-parity-workers1",
+      "denominator": "parallel-blink-main-parity",
+      "throughput_ratio": {
+        "values": [
+          0.9681724790051361,
+          0.9486100141618146,
+          0.9527689312742901
+        ],
+        "median": 0.9527689312742901,
+        "min": 0.9486100141618146,
+        "max": 0.9681724790051361
+      }
+    },
+    {
+      "clients": 64,
+      "numerator": "parallel-blink-main-parity-adaptive32",
+      "denominator": "parallel-blink-main-parity",
+      "throughput_ratio": {
+        "values": [
+          0.9778362800108398,
+          0.9886842588678726,
+          1.0148209307338825
+        ],
+        "median": 0.9886842588678726,
+        "min": 0.9778362800108398,
+        "max": 1.0148209307338825
+      }
+    },
+    {
+      "clients": 64,
+      "numerator": "parallel-blink-main-parity-adaptive32",
+      "denominator": "parallel-blink-main-parity-workers1",
+      "throughput_ratio": {
+        "values": [
+          1.009981486992518,
+          1.0422452262866604,
+          1.0651280677011583
+        ],
+        "median": 1.0422452262866604,
+        "min": 1.009981486992518,
+        "max": 1.0651280677011583
+      }
+    },
+    {
+      "clients": 64,
+      "numerator": "parallel-blink-main-parity",
+      "denominator": "rocksdb",
+      "throughput_ratio": {
+        "values": [
+          1.0646825678790885,
+          1.0829991388814224,
+          1.0810459558956735
+        ],
+        "median": 1.0810459558956735,
+        "min": 1.0646825678790885,
+        "max": 1.0829991388814224
+      }
+    }
+  ],
+  "read_comparisons": [
+    {
+      "readers": 16,
+      "read_kind": "get",
+      "numerator": "blink-metrics-off",
+      "denominator": "blink-metrics-on",
+      "throughput_ratio": {
+        "values": [
+          1.0949233193092718,
+          1.0798404372643038,
+          1.1498757108327455
+        ],
+        "median": 1.0949233193092718,
+        "min": 1.0798404372643038,
+        "max": 1.1498757108327455
+      }
+    },
+    {
+      "readers": 16,
+      "read_kind": "get",
+      "numerator": "blink-metrics-on",
+      "denominator": "main-btree",
+      "throughput_ratio": {
+        "values": [
+          0.793769820301753,
+          0.8275527102775135,
+          0.7814552549342412
+        ],
+        "median": 0.793769820301753,
+        "min": 0.7814552549342412,
+        "max": 0.8275527102775135
+      }
+    },
+    {
+      "readers": 16,
+      "read_kind": "get",
+      "numerator": "blink-metrics-off",
+      "denominator": "main-btree",
+      "throughput_ratio": {
+        "values": [
+          0.8691170864123196,
+          0.8936248805253298,
+          0.8985764167514949
+        ],
+        "median": 0.8936248805253298,
+        "min": 0.8691170864123196,
+        "max": 0.8985764167514949
+      }
+    },
+    {
+      "readers": 16,
+      "read_kind": "get",
+      "numerator": "blink-metrics-on",
+      "denominator": "rocksdb",
+      "throughput_ratio": {
+        "values": [
+          0.8300776250640156,
+          0.8136408912966039,
+          0.7807393879113339
+        ],
+        "median": 0.8136408912966039,
+        "min": 0.7807393879113339,
+        "max": 0.8300776250640156
+      }
+    },
+    {
+      "readers": 16,
+      "read_kind": "get",
+      "numerator": "blink-metrics-off",
+      "denominator": "rocksdb",
+      "throughput_ratio": {
+        "values": [
+          0.9088713485194491,
+          0.8786023358338425,
+          0.8977532586496678
+        ],
+        "median": 0.8977532586496678,
+        "min": 0.8786023358338425,
+        "max": 0.9088713485194491
+      }
+    },
+    {
+      "readers": 16,
+      "read_kind": "query",
+      "numerator": "blink-metrics-off",
+      "denominator": "blink-metrics-on",
+      "throughput_ratio": {
+        "values": [
+          1.0448364315440832,
+          0.9959642577667368,
+          1.0460071239299538
+        ],
+        "median": 1.0448364315440832,
+        "min": 0.9959642577667368,
+        "max": 1.0460071239299538
+      }
+    },
+    {
+      "readers": 16,
+      "read_kind": "query",
+      "numerator": "blink-metrics-on",
+      "denominator": "main-btree",
+      "throughput_ratio": {
+        "values": [
+          0.7373339474720632,
+          0.7600330214074907,
+          0.7493804381633556
+        ],
+        "median": 0.7493804381633556,
+        "min": 0.7373339474720632,
+        "max": 0.7600330214074907
+      }
+    },
+    {
+      "readers": 16,
+      "read_kind": "query",
+      "numerator": "blink-metrics-off",
+      "denominator": "main-btree",
+      "throughput_ratio": {
+        "values": [
+          0.7703933705330229,
+          0.7569657240443219,
+          0.7838572768526201
+        ],
+        "median": 0.7703933705330229,
+        "min": 0.7569657240443219,
+        "max": 0.7838572768526201
+      }
+    },
+    {
+      "readers": 16,
+      "read_kind": "query",
+      "numerator": "blink-metrics-on",
+      "denominator": "rocksdb",
+      "throughput_ratio": {
+        "values": [
+          1.5538459493033943,
+          1.592095759344986,
+          1.5449108141269068
+        ],
+        "median": 1.5538459493033943,
+        "min": 1.5449108141269068,
+        "max": 1.592095759344986
+      }
+    },
+    {
+      "readers": 16,
+      "read_kind": "query",
+      "numerator": "blink-metrics-off",
+      "denominator": "rocksdb",
+      "throughput_ratio": {
+        "values": [
+          1.623514856839387,
+          1.5856704712495981,
+          1.6159877174131692
+        ],
+        "median": 1.6159877174131692,
+        "min": 1.5856704712495981,
+        "max": 1.623514856839387
+      }
+    },
+    {
+      "readers": 1,
+      "read_kind": "get",
+      "numerator": "blink-metrics-off",
+      "denominator": "blink-metrics-on",
+      "throughput_ratio": {
+        "values": [
+          1.0220682258366938,
+          1.0034943285818474,
+          1.0074908526814217
+        ],
+        "median": 1.0074908526814217,
+        "min": 1.0034943285818474,
+        "max": 1.0220682258366938
+      }
+    },
+    {
+      "readers": 1,
+      "read_kind": "query",
+      "numerator": "blink-metrics-off",
+      "denominator": "blink-metrics-on",
+      "throughput_ratio": {
+        "values": [
+          1.0084361147820435,
+          1.0012270040835038,
+          1.0090834937680309
+        ],
+        "median": 1.0084361147820435,
+        "min": 1.0012270040835038,
+        "max": 1.0090834937680309
+      }
+    }
+  ],
+  "limitations": [
+    "Ratios are paired by repetition seed and remain descriptive across engines with different execution models.",
+    "The lane-count intervention also changes the natural job chunk size.",
+    "Dodb pure Get success counters do not verify returned value contents. Core semantic ablation tests cover values and pin lifetime; RocksDB additionally records full-value reopen verification.",
+    "Read observational metrics are disabled only by an experimental feature. Production defaults remain enabled."
+  ]
+}

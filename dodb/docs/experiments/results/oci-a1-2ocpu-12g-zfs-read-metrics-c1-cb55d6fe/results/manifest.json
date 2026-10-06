@@ -1,0 +1,19 @@
+{
+  "accepted": true,
+  "binary_sha256": {
+    "phase0-bench": {
+      "environment_variable": "PHASE0_BINARY",
+      "path": "/bench/zfs/db/experiment-build/read-policy-cb55d6fe/default/phase0-bench",
+      "sha256": "f14895328f274abc5de18295c35e18ad4dc5fe3f38247be4386f4a4e84bbe292"
+    },
+    "phase0-read-metrics-off": {
+      "environment_variable": "PHASE0_READ_METRICS_OFF_BINARY",
+      "path": "/bench/zfs/db/experiment-build/read-policy-cb55d6fe/off/phase0-bench",
+      "sha256": "6d021e0b26bef83136cefaf6507f1373a02ea694a7abe3f75b2a5bc93ca5f2dd"
+    }
+  },
+  "completed_count": 12,
+  "planned_count": 12,
+  "results": "/bench/zfs/db/experiment-results/oci-a1-2ocpu-12g-zfs-read-metrics-c1-cb55d6fe",
+  "source_commit": "cb55d6fe8325137a96e1c9615c64cb1942e328fb"
+}

@@ -1,0 +1,2 @@
+accepted=8/8 rows=8 csv=/bench/zfs/db/experiment-results/oci-a1-2ocpu-12g-zfs-worker-policy-smoke-cb55d6fe/payload-batching-summary.csv
+accepted=8/8 results=/bench/zfs/db/experiment-results/oci-a1-2ocpu-12g-zfs-worker-policy-smoke-cb55d6fe

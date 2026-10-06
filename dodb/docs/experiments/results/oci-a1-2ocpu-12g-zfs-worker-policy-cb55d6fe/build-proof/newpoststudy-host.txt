@@ -1,0 +1,14 @@
+captured_at_utc=2026-10-06T12:18:01Z
+host=instance-20260923-1013
+uname=Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+nproc=2
+nproc_all=2
+online_processors=2
+source_head=cb55d6fe8325137a96e1c9615c64cb1942e328fb
+source_status=
+mount=dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive
+zfs_properties=sync	standard;recordsize	4K;compression	off;atime	off;
+active_build_benchmark_processes
+none
+matched_process_count=0
+first_wrong_warm_build_result_dirs=0

@@ -1,0 +1,7 @@
+remote_artifact_path=/bench/zfs/db/experiment-build/read-policy-0be17bcc0e0e14e2868620e4032e6d40abd56174
+source_sha=0be17bcc0e0e14e2868620e4032e6d40abd56174
+review_status=REJECTED_FOR_EXPERIMENTS
+review_reason=Built with active Rust/Cargo 1.98.1 instead of required Rust/Cargo 1.97.1
+measurements=none; no matching result namespace exists under /bench/zfs/db/experiment-results
+copied_items=provenance marker, default/off build logs, default/off checksum manifests
+excluded_items=binaries and database files

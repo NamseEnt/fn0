@@ -1,0 +1,2 @@
+accepted=24/24 rows=8 csv=/bench/zfs/db/experiment-results/oci-a1-2ocpu-12g-zfs-worker-policy-cb55d6fe/payload-batching-summary.csv
+accepted=24/24 results=/bench/zfs/db/experiment-results/oci-a1-2ocpu-12g-zfs-worker-policy-cb55d6fe
