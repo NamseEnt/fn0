@@ -18,7 +18,12 @@ from summarize_payload_batching import (
     metric_value,
     write_summary,
 )
-from run_payload_batching_matrix import VARIANT_SPECS, build_expected_cells, parse_arguments
+from run_payload_batching_matrix import (
+    VARIANT_SPECS,
+    build_expected_cells,
+    build_matrix_config,
+    parse_arguments,
+)
 
 
 SOURCE_COMMIT = "a" * 40
@@ -412,6 +417,51 @@ class PayloadBatchingSummaryTests(unittest.TestCase):
         self.assertEqual(len(smoke_cells), 8)
         seed_by_mode = {cell["value_mode"]: cell["seed"] for cell in smoke_cells}
         self.assertEqual(seed_by_mode["constant"], seed_by_mode["changing"])
+
+    def test_generated_schema_two_default_and_worker_matrices_match_validator(self):
+        configurations = (
+            (
+                parse_arguments(("--results", "/tmp/payload-batching-schema2-default")),
+                48,
+            ),
+            (
+                parse_arguments(
+                    (
+                        "--results",
+                        "/tmp/payload-batching-schema2-workers",
+                        "--variants",
+                        "parallel-blink-main-parity-workers1,parallel-blink-main-parity-adaptive32",
+                    )
+                ),
+                24,
+            ),
+        )
+        for arguments, expected_count in configurations:
+            with self.subTest(expected_count=expected_count):
+                matrix_config = build_matrix_config(
+                    arguments,
+                    SOURCE_COMMIT,
+                    "test-branch",
+                    pathlib.Path("/bench/zfs/db"),
+                )
+                self.assertEqual(matrix_config["schema_version"], 2)
+                self.assertEqual(matrix_config["planned_count"], expected_count)
+                self.assertEqual(len(matrix_config["expected_cells"]), expected_count)
+                validate_expected_matrix(
+                    matrix_config,
+                    matrix_config["expected_cells"],
+                )
+                rocks_cells = [
+                    cell
+                    for cell in matrix_config["expected_cells"]
+                    if cell["binary_kind"] == "rocksdb"
+                ]
+                self.assertTrue(
+                    all(
+                        cell["expected_parallel_background_worker_dispatches_metric"] is False
+                        for cell in rocks_cells
+                    )
+                )
 
     def test_accepts_complete_paired_matrix_and_writes_expected_rows(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

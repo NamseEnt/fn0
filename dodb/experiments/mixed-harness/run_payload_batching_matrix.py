@@ -373,7 +373,7 @@ def build_expected_cells(arguments, source_commit):
                                 True if variant_spec["binary_kind"] == "phase0" else None
                             ),
                             "expected_parallel_background_worker_dispatches_metric": (
-                                True if variant_spec["binary_kind"] == "phase0" else None
+                                variant_spec["binary_kind"] == "phase0"
                             ),
                             "binary_key": variant_spec["binary_key"],
                             "binary_kind": variant_spec["binary_kind"],
@@ -661,21 +661,13 @@ def write_failure_state(results, planned_count, completed_count, source_commit, 
     write_artifact_manifest(results)
 
 
-def run_matrix(arguments):
-    repository = pathlib.Path(__file__).resolve().parents[3]
-    results = arguments.results
-    source_state_before = require_clean_source(repository, results)
-    results.mkdir(parents=True, exist_ok=True)
-    if any(results.iterdir()):
-        raise RunnerError(f"results directory must be empty: {results}")
-
-    data_root = pathlib.Path(os.environ.get("BENCH_DATA_ROOT", "/bench/zfs/db")).expanduser().resolve()
-    expected_cells = build_expected_cells(arguments, source_state_before["commit"])
-    config = {
+def build_matrix_config(arguments, source_commit, source_branch, data_root):
+    expected_cells = build_expected_cells(arguments, source_commit)
+    return {
         "schema_version": 2,
         "created_at_utc": timestamp_utc(),
-        "source_commit": source_state_before["commit"],
-        "source_branch": source_state_before["branch"],
+        "source_commit": source_commit,
+        "source_branch": source_branch,
         "planned_count": len(expected_cells),
         "config": {
             "clients": arguments.clients,
@@ -698,7 +690,10 @@ def run_matrix(arguments):
                 for variant in arguments.variants
             ],
             "value_modes": arguments.value_modes,
-            "mixes": [f"{read_percent}/{write_percent}" for read_percent, write_percent in arguments.mixes],
+            "mixes": [
+                f"{read_percent}/{write_percent}"
+                for read_percent, write_percent in arguments.mixes
+            ],
             "repetitions": arguments.repetitions,
             "duration_ms": arguments.duration_ms,
             "warmup_ms": arguments.warmup_ms,
@@ -717,6 +712,24 @@ def run_matrix(arguments):
         },
         "expected_cells": expected_cells,
     }
+
+
+def run_matrix(arguments):
+    repository = pathlib.Path(__file__).resolve().parents[3]
+    results = arguments.results
+    source_state_before = require_clean_source(repository, results)
+    results.mkdir(parents=True, exist_ok=True)
+    if any(results.iterdir()):
+        raise RunnerError(f"results directory must be empty: {results}")
+
+    data_root = pathlib.Path(os.environ.get("BENCH_DATA_ROOT", "/bench/zfs/db")).expanduser().resolve()
+    config = build_matrix_config(
+        arguments,
+        source_state_before["commit"],
+        source_state_before["branch"],
+        data_root,
+    )
+    expected_cells = config["expected_cells"]
     write_json(results / "matrix-config.json", config)
     write_json(results / "environment.json", environment_record(repository, data_root))
     write_json(
