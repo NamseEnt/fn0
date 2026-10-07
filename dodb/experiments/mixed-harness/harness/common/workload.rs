@@ -381,8 +381,7 @@ pub fn value_bytes(length: usize, operation: u64, offset: usize) -> Vec<u8> {
 mod tests {
     use super::{
         Distribution, LATENCY_RESERVOIR_LIMIT, LatencySamples, MixedValueMode, WorkloadConfig,
-        WorkloadGenerator, mixed_operation_is_read, mixed_operation_seed,
-        mixed_trace_prefix_hash,
+        WorkloadGenerator, mixed_operation_is_read, mixed_operation_seed, mixed_trace_prefix_hash,
     };
     use std::time::Duration;
 

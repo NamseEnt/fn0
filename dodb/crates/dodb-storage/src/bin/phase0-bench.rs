@@ -17,8 +17,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use dodb_core::{
-    DocumentKey, Error, PrimaryKey, Result, TransactionCondition, TransactionMutation,
-    TransactionRequest, TransactionResult,
+    DocumentKey, Error, PrimaryKey, Result, RevisionState, TransactionCondition,
+    TransactionMutation, TransactionRequest, TransactionResult,
 };
 use dodb_storage::{
     AsyncShard, BTreeStore, BatchRequest, BatchResponse, BlinkBatchMetrics, BlinkReadHandle,
@@ -150,6 +150,7 @@ const DEFAULT_MAX_GROUP_REQUESTS: usize = 64;
 const DEFAULT_MAX_GROUP_BYTES: usize = 4 * 1024 * 1024;
 const DEFAULT_QUEUE_CAPACITY: usize = 256;
 const LATENCY_RESERVOIR_LIMIT: usize = 16_384;
+const READER_WORKER_SEED_MASK: u64 = 0x3000_0000;
 
 type BenchShard = AsyncShard<BenchFile, BenchFile>;
 type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -2961,8 +2962,12 @@ async fn reader_loop(
         {
             break;
         }
-        let request = generator.next_read(read_kind);
         let started = Instant::now();
+        let request = generator.next_read(read_kind);
+        let expected_get_byte = match &request {
+            BatchRequest::Get { key } => key.sk.as_bytes().last().copied(),
+            _ => None,
+        };
         let result = adapter.execute(request).await;
         let elapsed = started.elapsed();
         if warmup {
@@ -2975,22 +2980,51 @@ async fn reader_loop(
             ReadKind::Query => stats.attempted_queries += 1,
             ReadKind::Scan => stats.attempted_scans += 1,
         }
-        match result {
-            Ok(BatchResponse::Get(_)) => stats.successful_gets += 1,
-            Ok(BatchResponse::Query(rows)) => {
+        match (read_kind, result) {
+            (ReadKind::Get, Ok(BatchResponse::Get(RevisionState::Present { value, .. })))
+                if expected_get_byte.is_some_and(|expected_byte| {
+                    value_matches_byte(&value, generator.config.value_size, expected_byte)
+                }) =>
+            {
+                stats.successful_gets += 1;
+            }
+            (ReadKind::Query, Ok(BatchResponse::Query(rows)))
+                if query_result_matches(
+                    &rows,
+                    generator.config.key_size,
+                    generator.config.value_size,
+                    generator.config.read_limit,
+                ) =>
+            {
                 stats.successful_queries += 1;
                 stats.returned_rows += rows.len() as u64;
             }
-            Ok(BatchResponse::Scan(rows)) => {
+            (ReadKind::Scan, Ok(BatchResponse::Scan(rows))) if !rows.is_empty() => {
                 stats.successful_scans += 1;
                 stats.returned_rows += rows.len() as u64;
             }
-            Ok(_) => stats.errors += 1,
-            Err(Error::Overloaded(_)) => stats.overloads += 1,
-            Err(_) => stats.errors += 1,
+            (_, Err(Error::Overloaded(_))) => stats.overloads += 1,
+            _ => stats.errors += 1,
         }
     }
     stats
+}
+
+fn value_matches_byte(value: &[u8], expected_length: usize, expected_byte: u8) -> bool {
+    value.len() == expected_length && value.iter().all(|byte| *byte == expected_byte)
+}
+
+fn query_result_matches(
+    rows: &[dodb_storage::btree::Document],
+    key_size: usize,
+    value_size: usize,
+    read_limit: usize,
+) -> bool {
+    rows.len() == read_limit.min(256)
+        && rows.iter().enumerate().all(|(row_index, row)| {
+            row.key == query_key(key_size, row_index)
+                && value_matches_byte(&row.value, value_size, row_index as u8)
+        })
 }
 
 async fn mixed_client_loop(
@@ -3121,7 +3155,7 @@ async fn run_interval(
                 Arc::clone(&adapter),
                 workload.clone(),
                 scenario.read_kind.unwrap_or(ReadKind::Get),
-                seed ^ 0x2000_0000,
+                seed ^ READER_WORKER_SEED_MASK,
                 worker_id,
                 deadline,
                 quota.clone(),
@@ -4769,6 +4803,23 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn read_validation_checks_point_and_query_value_contents() {
+        let mut corrupted_value = vec![7; 512];
+        assert!(value_matches_byte(&corrupted_value, 512, 7));
+        corrupted_value[255] ^= 1;
+        assert!(!value_matches_byte(&corrupted_value, 512, 7));
+
+        let rows: Vec<dodb_storage::btree::Document> = (0..16)
+            .map(|row_index| dodb_storage::btree::Document {
+                key: query_key(16, row_index),
+                value: vec![row_index as u8; 512],
+                revision: dodb_core::Revision::ZERO,
+            })
+            .collect();
+        assert!(query_result_matches(&rows, 16, 512, 16));
+    }
 
     #[test]
     fn latency_samples_keep_a_bounded_deterministic_reservoir() {

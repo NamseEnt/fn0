@@ -428,6 +428,54 @@ struct Schedule {
     deadline: Instant,
 }
 
+fn value_matches_byte(value: &[u8], expected_length: usize, expected_byte: u8) -> bool {
+    value.len() == expected_length && value.iter().all(|byte| *byte == expected_byte)
+}
+
+fn query_result_matches(rows: &[Mutation], value_size: usize, read_limit: usize) -> bool {
+    if rows.len() != read_limit.min(256) {
+        return false;
+    }
+    let expected_primary_key = query_primary_key();
+    rows.iter().enumerate().all(|(row_index, row)| {
+        let expected_sort_key = component_bytes(0x43, row_index as u64, 8);
+        row.key.len() == expected_primary_key.len() + expected_sort_key.len()
+            && row.key.starts_with(&expected_primary_key)
+            && row.key[expected_primary_key.len()..] == expected_sort_key
+            && value_matches_byte(&row.value, value_size, row_index as u8)
+    })
+}
+
+#[cfg(test)]
+mod read_verification_tests {
+    use super::{Mutation, query_primary_key, query_result_matches, value_matches_byte};
+    use crate::common::workload::component_bytes;
+
+    #[test]
+    fn point_and_query_validation_checks_value_contents_and_order() {
+        let expected_point = vec![9; 512];
+        let mut corrupted_point = expected_point.clone();
+        corrupted_point[255] ^= 1;
+        assert!(value_matches_byte(&expected_point, 512, 9));
+        assert!(!value_matches_byte(&corrupted_point, 512, 9));
+
+        let primary_key = query_primary_key();
+        let mut rows: Vec<Mutation> = (0..16)
+            .map(|row_index| {
+                let mut key = primary_key.clone();
+                key.extend_from_slice(&component_bytes(0x43, row_index, 8));
+                Mutation {
+                    key,
+                    value: vec![row_index as u8; 512],
+                }
+            })
+            .collect();
+        assert!(query_result_matches(&rows, 512, 16));
+        rows[7].value[255] ^= 1;
+        assert!(!query_result_matches(&rows, 512, 16));
+    }
+}
+
 fn writer_thread<E: Engine>(
     engine: &E,
     args: &Args,
@@ -499,11 +547,15 @@ fn writer_thread<E: Engine>(
                 stats.read_operations += 1;
                 let succeeded = rows.as_ref().is_some_and(|result| {
                     if args.operation == "query" {
-                        !result.is_empty()
+                        query_result_matches(result, args.value_size, args.read_limit)
                     } else {
-                        result
-                            .first()
-                            .is_some_and(|row| row.value.len() == args.value_size)
+                        result.first().is_some_and(|row| {
+                            value_matches_byte(
+                                &row.value,
+                                args.value_size,
+                                key_index(&row.key) as u8,
+                            )
+                        })
                     }
                 });
                 if succeeded {
