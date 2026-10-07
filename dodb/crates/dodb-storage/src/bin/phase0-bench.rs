@@ -5,19 +5,22 @@
 //! existing cumulative metrics, so the production hot path does not gain
 //! benchmark-only timestamps or counters.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fmt::Write as _;
 use std::future::Future;
+use std::io::Write as IoWrite;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, SyncSender};
 use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use dodb_core::{
-    DocumentKey, Error, PrimaryKey, Result, RevisionState, TransactionCondition,
+    DocumentKey, Error, PrimaryKey, Result, RevisionState, SortKey, TransactionCondition,
     TransactionMutation, TransactionRequest, TransactionResult,
 };
 use dodb_storage::{
@@ -150,7 +153,6 @@ const DEFAULT_MAX_GROUP_REQUESTS: usize = 64;
 const DEFAULT_MAX_GROUP_BYTES: usize = 4 * 1024 * 1024;
 const DEFAULT_QUEUE_CAPACITY: usize = 256;
 const LATENCY_RESERVOIR_LIMIT: usize = 16_384;
-const READER_WORKER_SEED_MASK: u64 = 0x1000_0000;
 
 type BenchShard = AsyncShard<BenchFile, BenchFile>;
 type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -882,16 +884,12 @@ fn scenarios(args: &Args) -> Vec<Scenario> {
             .distributions
             .clone()
             .unwrap_or_else(|| vec![Distribution::Uniform]);
+        let mixed_widths = args.widths.clone().unwrap_or_else(|| vec![1]);
         for readers in &mixed_readers {
             for writers in &mixed_writers {
                 for distribution in &mixed_distributions {
-                    for mix in &mixes {
-                        let selected_widths = if args.mixed_clients {
-                            widths.as_slice()
-                        } else {
-                            &[1]
-                        };
-                        for width in selected_widths {
+                    for width in &mixed_widths {
+                        for mix in &mixes {
                             output.push(Scenario {
                                 suite: Suite::Mixed,
                                 workload: "mixed",
@@ -1001,6 +999,65 @@ struct MixedValueContext {
     operation_index: u64,
 }
 
+const QUERY_PK_COUNT: usize = 8;
+const QUERY_BASE_ROWS_PER_PK: usize = 32;
+const QUERY_INPUT_PLAN_REQUESTS: usize = 131_072;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct QueryRange {
+    pk_index: usize,
+    start_index: usize,
+    limit: usize,
+}
+
+impl QueryRange {
+    fn request(self, key_size: usize) -> BatchRequest {
+        BatchRequest::Query {
+            pk: PrimaryKey::new(distributed_query_pk(key_size, self.pk_index)),
+            exclusive_after_sk: (self.start_index > 0).then(|| {
+                SortKey::new(component_bytes(
+                    0x43,
+                    (self.start_index - 1) as u64,
+                    key_component_lengths(key_size).1,
+                ))
+            }),
+            limit: self.limit,
+        }
+    }
+}
+
+fn query_rows_per_pk(read_limit: usize) -> usize {
+    QUERY_BASE_ROWS_PER_PK.max(read_limit.saturating_add(16))
+}
+
+fn query_range_count(read_limit: usize) -> usize {
+    QUERY_PK_COUNT * (query_rows_per_pk(read_limit) - read_limit + 1)
+}
+
+fn query_range_for_index(index: usize, read_limit: usize) -> QueryRange {
+    let starts_per_pk = query_rows_per_pk(read_limit) - read_limit + 1;
+    QueryRange {
+        pk_index: index / starts_per_pk,
+        start_index: index % starts_per_pk,
+        limit: read_limit,
+    }
+}
+
+fn distributed_query_pk(key_size: usize, pk_index: usize) -> Vec<u8> {
+    component_bytes(0x33, pk_index as u64, key_component_lengths(key_size).0)
+}
+
+fn distributed_query_key(key_size: usize, pk_index: usize, row_index: usize) -> DocumentKey {
+    DocumentKey::new(
+        distributed_query_pk(key_size, pk_index),
+        component_bytes(0x43, row_index as u64, key_component_lengths(key_size).1),
+    )
+}
+
+fn distributed_query_value_index(pk_index: usize, row_index: usize, read_limit: usize) -> u64 {
+    (pk_index * query_rows_per_pk(read_limit) + row_index) as u64
+}
+
 impl WorkloadGenerator {
     fn new(config: WorkloadConfig, seed: u64, worker_id: usize) -> Self {
         Self {
@@ -1093,21 +1150,28 @@ impl WorkloadGenerator {
     }
 
     fn next_read(&mut self, kind: ReadKind) -> BatchRequest {
-        let index = self.next_index(0);
-        self.operation = self.operation.wrapping_add(1);
         match kind {
-            ReadKind::Get => BatchRequest::Get {
-                key: self.key_for_index(index),
-            },
-            ReadKind::Query => BatchRequest::Query {
-                pk: PrimaryKey::new(query_pk(self.config.key_size)),
-                exclusive_after_sk: None,
-                limit: self.config.read_limit,
-            },
-            ReadKind::Scan => BatchRequest::Scan {
-                exclusive_after_key: None,
-                limit: self.config.read_limit,
-            },
+            ReadKind::Get => {
+                let index = self.next_index(0);
+                self.operation = self.operation.wrapping_add(1);
+                BatchRequest::Get {
+                    key: self.key_for_index(index),
+                }
+            }
+            ReadKind::Query => {
+                let range_index =
+                    self.random_query_range_index(query_range_count(self.config.read_limit));
+                self.operation = self.operation.wrapping_add(1);
+                query_range_for_index(range_index, self.config.read_limit)
+                    .request(self.config.key_size)
+            }
+            ReadKind::Scan => {
+                self.operation = self.operation.wrapping_add(1);
+                BatchRequest::Scan {
+                    exclusive_after_key: None,
+                    limit: self.config.read_limit,
+                }
+            }
         }
     }
 
@@ -1151,6 +1215,17 @@ impl WorkloadGenerator {
         assert!(bound > 0);
         self.state = splitmix64(self.state);
         (self.state as usize) % bound
+    }
+
+    fn random_query_range_index(&mut self, bound: usize) -> usize {
+        let bound = bound as u64;
+        let rejection_threshold = bound.wrapping_neg() % bound;
+        loop {
+            self.state = splitmix64(self.state);
+            if self.state >= rejection_threshold {
+                return (self.state % bound) as usize;
+            }
+        }
     }
 
     fn key_for_index(&self, index: usize) -> DocumentKey {
@@ -1299,17 +1374,640 @@ fn component_bytes(tag: u8, value: u64, length: usize) -> Vec<u8> {
     bytes
 }
 
-fn query_pk(key_size: usize) -> Vec<u8> {
-    let (pk_len, _) = key_component_lengths(key_size);
-    component_bytes(0x33, 0, pk_len)
+fn invocation_seed(base_seed: u64, scenario_index: usize, repetition: usize) -> u64 {
+    base_seed
+        .wrapping_add((scenario_index as u64).wrapping_mul(0x9e37_79b9))
+        .wrapping_add(repetition as u64)
 }
 
-fn query_key(key_size: usize, index: usize) -> DocumentKey {
-    let (_, sk_len) = key_component_lengths(key_size);
-    DocumentKey::new(
-        query_pk(key_size),
-        component_bytes(0x43, index as u64, sk_len),
+fn query_input_plan_fingerprint(args: &Args, scenario: &Scenario, repetition_seed: u64) -> String {
+    let workload = WorkloadConfig {
+        distribution: scenario.distribution,
+        working_set: args.working_set,
+        key_size: args.key_size,
+        value_size: args.value_size,
+        width: scenario.width,
+        transaction_mode: args.transaction_mode,
+        read_limit: args.read_limit,
+    };
+    let mut fingerprint = 0xcbf2_9ce4_8422_2325u64;
+    for client_index in 0..scenario.readers {
+        let mut generator = WorkloadGenerator::new(
+            workload.clone(),
+            repetition_seed ^ 0xbbbb_0000 ^ 0x2000_0000,
+            client_index,
+        );
+        for _ in 0..QUERY_INPUT_PLAN_REQUESTS {
+            let request = generator.next_read(ReadKind::Query);
+            let BatchRequest::Query {
+                pk,
+                exclusive_after_sk,
+                limit,
+            } = request
+            else {
+                unreachable!()
+            };
+            for byte in pk.as_bytes().iter().copied().chain(
+                exclusive_after_sk
+                    .iter()
+                    .flat_map(|key| key.as_bytes().iter().copied()),
+            ) {
+                fingerprint ^= byte as u64;
+                fingerprint = fingerprint.wrapping_mul(0x100_0000_01b3);
+            }
+            for byte in (limit as u64).to_be_bytes() {
+                fingerprint ^= byte as u64;
+                fingerprint = fingerprint.wrapping_mul(0x100_0000_01b3);
+            }
+            fingerprint ^= 0xff;
+            fingerprint = fingerprint.wrapping_mul(0x100_0000_01b3);
+        }
+    }
+    format!(
+        "fnv1a64:{fingerprint:016x}:clients={}:requests_each={QUERY_INPUT_PLAN_REQUESTS}",
+        scenario.readers,
     )
+}
+
+fn query_result_is_valid(
+    request: &BatchRequest,
+    rows: &[dodb_storage::Document],
+    key_size: usize,
+    value_size: usize,
+    read_limit: usize,
+) -> bool {
+    let Some(expected_range) = query_range_from_request(request, key_size, read_limit) else {
+        return false;
+    };
+    if rows.len() != expected_range.limit {
+        return false;
+    }
+    rows.iter().enumerate().all(|(offset, row)| {
+        let row_index = expected_range.start_index + offset;
+        row.key == distributed_query_key(key_size, expected_range.pk_index, row_index)
+            && row.value
+                == value_bytes(
+                    value_size,
+                    distributed_query_value_index(expected_range.pk_index, row_index, read_limit),
+                    0,
+                )
+    })
+}
+
+fn query_range_from_request(
+    request: &BatchRequest,
+    key_size: usize,
+    read_limit: usize,
+) -> Option<QueryRange> {
+    let BatchRequest::Query {
+        pk,
+        exclusive_after_sk,
+        limit,
+    } = request
+    else {
+        return None;
+    };
+    let Some(pk_index) = (0..QUERY_PK_COUNT)
+        .find(|pk_index| pk.as_bytes() == distributed_query_pk(key_size, *pk_index))
+    else {
+        return None;
+    };
+    let start_index = match exclusive_after_sk {
+        Some(sk) => {
+            let Some(start_index) = (1..query_rows_per_pk(read_limit)).find(|row_index| {
+                sk.as_bytes()
+                    == component_bytes(
+                        0x43,
+                        (*row_index - 1) as u64,
+                        key_component_lengths(key_size).1,
+                    )
+            }) else {
+                return None;
+            };
+            start_index
+        }
+        None => 0,
+    };
+    if *limit != read_limit || start_index + limit > query_rows_per_pk(read_limit) {
+        return None;
+    }
+    Some(QueryRange {
+        pk_index,
+        start_index,
+        limit: *limit,
+    })
+}
+
+fn record_query_response(
+    request: &BatchRequest,
+    response: &BatchResponse,
+    workload: &WorkloadConfig,
+    stats: &mut WorkerStats,
+) -> bool {
+    match response {
+        BatchResponse::Query(rows) => {
+            stats.returned_rows += rows.len() as u64;
+            stats.query_checked_requests += 1;
+            stats.query_checked_rows += rows.len() as u64;
+            let valid = query_result_is_valid(
+                request,
+                &rows,
+                workload.key_size,
+                workload.value_size,
+                workload.read_limit,
+            );
+            if valid {
+                stats.successful_queries += 1;
+            } else {
+                stats.query_validation_failures += 1;
+                stats.errors += 1;
+            }
+            valid
+        }
+        _ => {
+            stats.query_checked_requests += 1;
+            stats.query_validation_failures += 1;
+            stats.errors += 1;
+            false
+        }
+    }
+}
+
+fn measured_query_verification_result(stats: &WorkerStats) -> Result<()> {
+    if stats.query_checked_requests == 0 || stats.query_validation_failures > 0 {
+        Err(Error::invariant(
+            "Measured Query response verification failed or was inconclusive",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+const MAX_SAMPLED_KEYS: usize = 1_024;
+const MAX_SAMPLE_SELECTION_CANDIDATES: usize = 131_072;
+const MAX_VERIFICATION_EVENTS: usize = 65_536;
+const MAX_VERIFICATION_MEMORY_BYTES: usize = 8 * 1024 * 1024;
+
+fn sampled_read_keys(args: &Args, scenario: &Scenario) -> Arc<HashSet<DocumentKey>> {
+    let config = WorkloadConfig {
+        distribution: scenario.distribution,
+        working_set: args.working_set,
+        key_size: args.key_size,
+        value_size: args.value_size,
+        width: scenario.width,
+        transaction_mode: args.transaction_mode,
+        read_limit: args.read_limit,
+    };
+    let generator = WorkloadGenerator::new(config, 0, 0);
+    let mut keys = HashSet::new();
+    let mut estimated_bytes = 0usize;
+    let selected_indexes = if args.working_set <= MAX_SAMPLE_SELECTION_CANDIDATES {
+        (0..args.working_set)
+            .filter(|index| splitmix64(args.seed ^ 0x5eed_0000 ^ *index as u64) % 100 == 0)
+            .collect::<Vec<_>>()
+    } else {
+        let mut selected_indexes = HashSet::with_capacity(MAX_SAMPLED_KEYS);
+        for attempt in 0..MAX_SAMPLED_KEYS * 8 {
+            let index = (splitmix64(args.seed ^ 0x5eed_0000 ^ attempt as u64)
+                % args.working_set as u64) as usize;
+            selected_indexes.insert(index);
+            if selected_indexes.len() == MAX_SAMPLED_KEYS {
+                break;
+            }
+        }
+        selected_indexes.into_iter().collect::<Vec<_>>()
+    };
+    for index in selected_indexes {
+        let key = generator.key_for_index(index);
+        let key_bytes = std::mem::size_of::<DocumentKey>()
+            + key.pk.as_bytes().len()
+            + key.sk.as_bytes().len()
+            + args.value_size
+            + 64;
+        if keys.len() == MAX_SAMPLED_KEYS
+            || estimated_bytes.saturating_add(key_bytes) > MAX_VERIFICATION_MEMORY_BYTES / 4
+        {
+            break;
+        }
+        estimated_bytes += key_bytes;
+        keys.insert(key);
+    }
+    if keys.is_empty() && args.working_set > 0 {
+        let key = generator.key_for_index(0);
+        let key_bytes = std::mem::size_of::<DocumentKey>()
+            + key.pk.as_bytes().len()
+            + key.sk.as_bytes().len()
+            + args.value_size
+            + 64;
+        if key_bytes <= MAX_VERIFICATION_MEMORY_BYTES / 4 {
+            keys.insert(key);
+        }
+    }
+    Arc::new(keys)
+}
+
+fn sampled_mutations(
+    request: &TransactionRequest,
+    sampled_keys: &HashSet<DocumentKey>,
+) -> Vec<(DocumentKey, Vec<u8>)> {
+    request
+        .mutations
+        .iter()
+        .filter_map(|mutation| match mutation {
+            TransactionMutation::Put { key, value } if sampled_keys.contains(key) => {
+                Some((key.clone(), value.clone()))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum VerificationStatus {
+    NotApplicable,
+    Passed,
+    Failed,
+    Inconclusive,
+}
+
+impl VerificationStatus {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::NotApplicable => "not_applicable",
+            Self::Passed => "passed",
+            Self::Failed => "failed",
+            Self::Inconclusive => "inconclusive",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct VerificationSummary {
+    status: VerificationStatus,
+    sampled_key_count: usize,
+    sampled_reads_observed: u64,
+    sampled_reads_checked: u64,
+    sampled_reads_failed: u64,
+    sampled_reads_indeterminate: u64,
+    sampled_writes_observed: u64,
+    sampled_writes_confirmed: u64,
+    sampled_writes_ambiguous: u64,
+    sampled_writes_stored: u64,
+    changed_key_reads_checked: u64,
+    omitted_events: u64,
+    estimated_memory_bytes: usize,
+    estimated_index_memory_bytes: usize,
+    verification_comparisons: u64,
+}
+
+impl VerificationSummary {
+    fn not_applicable() -> Self {
+        Self {
+            status: VerificationStatus::NotApplicable,
+            sampled_key_count: 0,
+            sampled_reads_observed: 0,
+            sampled_reads_checked: 0,
+            sampled_reads_failed: 0,
+            sampled_reads_indeterminate: 0,
+            sampled_writes_observed: 0,
+            sampled_writes_confirmed: 0,
+            sampled_writes_ambiguous: 0,
+            sampled_writes_stored: 0,
+            changed_key_reads_checked: 0,
+            omitted_events: 0,
+            estimated_memory_bytes: 0,
+            estimated_index_memory_bytes: 0,
+            verification_comparisons: 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct SampledMutation {
+    key: DocumentKey,
+    value: Vec<u8>,
+    revision: Option<dodb_core::Revision>,
+    started_at: Instant,
+    finished_at: Instant,
+    ambiguous: bool,
+}
+
+#[derive(Clone, Debug)]
+struct SampledRead {
+    key: DocumentKey,
+    value: Option<Vec<u8>>,
+    revision: Option<dodb_core::Revision>,
+    started_at: Instant,
+    finished_at: Instant,
+}
+
+#[derive(Clone, Debug)]
+struct SampledSeed {
+    value: Vec<u8>,
+    revision: dodb_core::Revision,
+}
+
+#[derive(Default)]
+struct AmbiguousValueWindowIndex {
+    starts: Vec<Instant>,
+    prefix_max_resolved_at: Vec<Option<Instant>>,
+    prefix_has_unresolved: Vec<bool>,
+}
+
+struct SampledReadVerifier {
+    sampled_key_count: usize,
+    seed_states: HashMap<DocumentKey, SampledSeed>,
+    mutations: Vec<SampledMutation>,
+    reads: Vec<SampledRead>,
+    sampled_reads_observed: u64,
+    sampled_writes_observed: u64,
+    sampled_writes_confirmed: u64,
+    sampled_writes_ambiguous: u64,
+    omitted_events: u64,
+    estimated_memory_bytes: usize,
+}
+
+impl SampledReadVerifier {
+    fn new(
+        sampled_keys: &HashSet<DocumentKey>,
+        seed_states: HashMap<DocumentKey, SampledSeed>,
+    ) -> Self {
+        let estimated_memory_bytes = seed_states
+            .iter()
+            .map(|(key, seed)| sampled_event_memory_bytes(key, &seed.value))
+            .sum();
+        Self {
+            sampled_key_count: sampled_keys.len(),
+            seed_states,
+            mutations: Vec::new(),
+            reads: Vec::new(),
+            sampled_reads_observed: 0,
+            sampled_writes_observed: 0,
+            sampled_writes_confirmed: 0,
+            sampled_writes_ambiguous: 0,
+            omitted_events: 0,
+            estimated_memory_bytes,
+        }
+    }
+
+    fn record_read(&mut self, read: SampledRead) {
+        self.sampled_reads_observed = self.sampled_reads_observed.saturating_add(1);
+        if !self.reserve_event_memory(&read.key, read.value.as_deref().unwrap_or_default()) {
+            return;
+        }
+        self.reads.push(read);
+    }
+
+    fn record_mutations(
+        &mut self,
+        mutations: Vec<(DocumentKey, Vec<u8>)>,
+        revision: Option<dodb_core::Revision>,
+        started_at: Instant,
+        finished_at: Instant,
+        ambiguous: bool,
+    ) {
+        for (key, value) in mutations {
+            self.sampled_writes_observed = self.sampled_writes_observed.saturating_add(1);
+            if ambiguous {
+                self.sampled_writes_ambiguous = self.sampled_writes_ambiguous.saturating_add(1);
+            } else {
+                self.sampled_writes_confirmed = self.sampled_writes_confirmed.saturating_add(1);
+            }
+            if !self.reserve_event_memory(&key, &value) {
+                continue;
+            }
+            self.mutations.push(SampledMutation {
+                key,
+                value,
+                revision,
+                started_at,
+                finished_at,
+                ambiguous,
+            });
+        }
+    }
+
+    fn reserve_event_memory(&mut self, key: &DocumentKey, value: &[u8]) -> bool {
+        let event_count = self.reads.len().saturating_add(self.mutations.len());
+        let event_bytes = sampled_event_memory_bytes(key, value);
+        if event_count >= MAX_VERIFICATION_EVENTS
+            || self.estimated_memory_bytes.saturating_add(event_bytes)
+                > MAX_VERIFICATION_MEMORY_BYTES
+        {
+            self.omitted_events = self.omitted_events.saturating_add(1);
+            return false;
+        }
+        self.estimated_memory_bytes += event_bytes;
+        true
+    }
+
+    fn summarize(&self) -> VerificationSummary {
+        let mut successful_by_key = HashMap::<DocumentKey, Vec<&SampledMutation>>::new();
+        let mut successful_by_start = HashMap::<DocumentKey, Vec<&SampledMutation>>::new();
+        let mut ambiguous_events =
+            HashMap::<DocumentKey, HashMap<Vec<u8>, Vec<(Instant, Option<Instant>)>>>::new();
+        let mut unresolved_writes = 0u64;
+        for mutation in &self.mutations {
+            if !mutation.ambiguous {
+                successful_by_key
+                    .entry(mutation.key.clone())
+                    .or_default()
+                    .push(mutation);
+                successful_by_start
+                    .entry(mutation.key.clone())
+                    .or_default()
+                    .push(mutation);
+            }
+        }
+
+        for mutation in self.mutations.iter().filter(|mutation| mutation.ambiguous) {
+            let resolved_at = successful_by_start
+                .get(&mutation.key)
+                .and_then(|successes| {
+                    successes
+                        .iter()
+                        .filter(|success| success.started_at > mutation.finished_at)
+                        .min_by_key(|success| success.finished_at)
+                        .map(|success| success.finished_at)
+                });
+            if resolved_at.is_none() {
+                unresolved_writes = unresolved_writes.saturating_add(1);
+            }
+            ambiguous_events
+                .entry(mutation.key.clone())
+                .or_default()
+                .entry(mutation.value.clone())
+                .or_default()
+                .push((mutation.started_at, resolved_at));
+        }
+
+        let mut ambiguous_windows =
+            HashMap::<DocumentKey, HashMap<Vec<u8>, AmbiguousValueWindowIndex>>::new();
+        for (key, values) in ambiguous_events {
+            let mut indexed_values = HashMap::with_capacity(values.len());
+            for (value, mut events) in values {
+                events.sort_by_key(|(started_at, _)| *started_at);
+                let mut index = AmbiguousValueWindowIndex::default();
+                let mut latest_resolved_at = None;
+                let mut has_unresolved = false;
+                for (started_at, resolved_at) in events {
+                    if let Some(resolved_at) = resolved_at {
+                        latest_resolved_at = Some(
+                            latest_resolved_at
+                                .map_or(resolved_at, |current: Instant| current.max(resolved_at)),
+                        );
+                    } else {
+                        has_unresolved = true;
+                    }
+                    index.starts.push(started_at);
+                    index.prefix_max_resolved_at.push(latest_resolved_at);
+                    index.prefix_has_unresolved.push(has_unresolved);
+                }
+                indexed_values.insert(value, index);
+            }
+            ambiguous_windows.insert(key, indexed_values);
+        }
+
+        let mut completed_frontiers =
+            HashMap::<DocumentKey, Vec<(Instant, dodb_core::Revision)>>::new();
+        let mut revisions_by_key =
+            HashMap::<DocumentKey, HashMap<dodb_core::Revision, &SampledMutation>>::new();
+        for (key, mutations) in &mut successful_by_key {
+            mutations.sort_by_key(|mutation| mutation.finished_at);
+            let mut max_revision = self.seed_states.get(key).map(|seed| seed.revision);
+            let mut frontier = Vec::with_capacity(mutations.len());
+            let mut revisions = HashMap::with_capacity(mutations.len());
+            for mutation in mutations.iter() {
+                if let Some(revision) = mutation.revision {
+                    max_revision =
+                        Some(max_revision.map_or(revision, |current| current.max(revision)));
+                    revisions.insert(revision, *mutation);
+                    if let Some(max_revision) = max_revision {
+                        frontier.push((mutation.finished_at, max_revision));
+                    }
+                }
+            }
+            completed_frontiers.insert(key.clone(), frontier);
+            revisions_by_key.insert(key.clone(), revisions);
+        }
+
+        let mut reads_checked = 0u64;
+        let mut reads_failed = 0u64;
+        let mut reads_indeterminate = 0u64;
+        let mut changed_key_reads_checked = 0u64;
+        let mut comparisons = 0u64;
+        for read in &self.reads {
+            reads_checked = reads_checked.saturating_add(1);
+            let Some(actual_value) = read.value.as_deref() else {
+                reads_failed = reads_failed.saturating_add(1);
+                continue;
+            };
+            let Some(actual_revision) = read.revision else {
+                reads_failed = reads_failed.saturating_add(1);
+                continue;
+            };
+            let Some(seed) = self.seed_states.get(&read.key) else {
+                reads_failed = reads_failed.saturating_add(1);
+                continue;
+            };
+            let frontier = completed_frontiers.get(&read.key);
+            let latest_completed_revision = frontier.and_then(|entries| {
+                let completed_count =
+                    entries.partition_point(|(finished_at, _)| *finished_at <= read.started_at);
+                completed_count.checked_sub(1).map(|index| entries[index].1)
+            });
+            let required_revision = latest_completed_revision
+                .map_or(seed.revision, |revision| revision.max(seed.revision));
+            if actual_revision < required_revision {
+                reads_failed = reads_failed.saturating_add(1);
+                continue;
+            }
+
+            let seed_matches = actual_revision == seed.revision && actual_value == seed.value;
+            comparisons = comparisons.saturating_add(1);
+            let matching_write = revisions_by_key
+                .get(&read.key)
+                .and_then(|revisions| revisions.get(&actual_revision))
+                .copied()
+                .filter(|mutation| {
+                    comparisons = comparisons.saturating_add(1);
+                    mutation.started_at < read.finished_at
+                        && mutation
+                            .revision
+                            .is_some_and(|revision| revision >= required_revision)
+                        && mutation.value == actual_value
+                });
+            if seed_matches || matching_write.is_some() {
+                if matching_write.is_some_and(|mutation| {
+                    mutation
+                        .revision
+                        .is_some_and(|revision| revision > seed.revision)
+                }) {
+                    changed_key_reads_checked = changed_key_reads_checked.saturating_add(1);
+                }
+                continue;
+            }
+
+            let ambiguous_match = ambiguous_windows
+                .get(&read.key)
+                .and_then(|values| values.get(actual_value))
+                .is_some_and(|window| {
+                    comparisons = comparisons.saturating_add(1);
+                    let event_count = window
+                        .starts
+                        .partition_point(|started_at| *started_at < read.finished_at);
+                    event_count > 0
+                        && (window.prefix_has_unresolved[event_count - 1]
+                            || window.prefix_max_resolved_at[event_count - 1]
+                                .is_some_and(|resolved_at| resolved_at > read.started_at))
+                });
+            if ambiguous_match || self.omitted_events > 0 {
+                reads_indeterminate = reads_indeterminate.saturating_add(1);
+            } else {
+                reads_failed = reads_failed.saturating_add(1);
+            }
+        }
+
+        let status = if reads_failed > 0 {
+            VerificationStatus::Failed
+        } else if self.sampled_reads_observed == 0
+            || reads_checked == 0
+            || reads_indeterminate > 0
+            || unresolved_writes > 0
+            || self.omitted_events > 0
+            || self.seed_states.len() != self.sampled_key_count
+        {
+            VerificationStatus::Inconclusive
+        } else {
+            VerificationStatus::Passed
+        };
+        VerificationSummary {
+            status,
+            sampled_key_count: self.sampled_key_count,
+            sampled_reads_observed: self.sampled_reads_observed,
+            sampled_reads_checked: reads_checked,
+            sampled_reads_failed: reads_failed,
+            sampled_reads_indeterminate: reads_indeterminate,
+            sampled_writes_observed: self.sampled_writes_observed,
+            sampled_writes_confirmed: self.sampled_writes_confirmed,
+            sampled_writes_ambiguous: self.sampled_writes_ambiguous,
+            sampled_writes_stored: self.mutations.len() as u64,
+            changed_key_reads_checked,
+            omitted_events: self.omitted_events,
+            estimated_memory_bytes: self.estimated_memory_bytes,
+            estimated_index_memory_bytes: self.mutations.len().saturating_mul(96),
+            verification_comparisons: comparisons,
+        }
+    }
+}
+
+fn sampled_event_memory_bytes(key: &DocumentKey, value: &[u8]) -> usize {
+    std::mem::size_of::<SampledRead>().max(std::mem::size_of::<SampledMutation>())
+        + std::mem::size_of::<DocumentKey>()
+        + key.pk.as_bytes().len()
+        + key.sk.as_bytes().len()
+        + value.len()
+        + 64
 }
 
 fn value_bytes(length: usize, operation: u64, offset: usize) -> Vec<u8> {
@@ -1858,6 +2556,10 @@ struct WorkerStats {
     attempted_scans: u64,
     successful_scans: u64,
     returned_rows: u64,
+    query_checked_requests: u64,
+    query_checked_rows: u64,
+    query_validation_failures: u64,
+    query_ranges: HashSet<QueryRange>,
     mutation_ops: u64,
     conflicts: u64,
     overloads: u64,
@@ -1866,6 +2568,20 @@ struct WorkerStats {
     write_latency: LatencySamples,
     read_latency: LatencySamples,
     window_timeline: Vec<(u64, u64)>,
+    client_completions: Vec<ClientCompletion>,
+}
+
+#[derive(Clone, Debug)]
+struct ClientCompletion {
+    role: &'static str,
+    client_index: usize,
+    attempted_operations: u64,
+    successful_operations: u64,
+    successful_queries: u64,
+    returned_rows: u64,
+    query_checked_requests: u64,
+    query_checked_rows: u64,
+    query_validation_failures: u64,
 }
 
 impl WorkerStats {
@@ -1880,6 +2596,10 @@ impl WorkerStats {
             attempted_scans: 0,
             successful_scans: 0,
             returned_rows: 0,
+            query_checked_requests: 0,
+            query_checked_rows: 0,
+            query_validation_failures: 0,
+            query_ranges: HashSet::new(),
             mutation_ops: 0,
             conflicts: 0,
             overloads: 0,
@@ -1888,6 +2608,7 @@ impl WorkerStats {
             write_latency: LatencySamples::with_seed(seed ^ 0x1111),
             read_latency: LatencySamples::with_seed(seed ^ 0x2222),
             window_timeline: Vec::new(),
+            client_completions: Vec::new(),
         }
     }
 
@@ -1901,6 +2622,10 @@ impl WorkerStats {
         self.attempted_scans += other.attempted_scans;
         self.successful_scans += other.successful_scans;
         self.returned_rows += other.returned_rows;
+        self.query_checked_requests += other.query_checked_requests;
+        self.query_checked_rows += other.query_checked_rows;
+        self.query_validation_failures += other.query_validation_failures;
+        self.query_ranges.extend(other.query_ranges);
         self.mutation_ops += other.mutation_ops;
         self.conflicts += other.conflicts;
         self.overloads += other.overloads;
@@ -1915,6 +2640,7 @@ impl WorkerStats {
             self.read_latency.push(value);
         }
         self.window_timeline.extend(other.window_timeline);
+        self.client_completions.extend(other.client_completions);
     }
 
     fn attempted_operations(&self) -> u64 {
@@ -1922,6 +2648,10 @@ impl WorkerStats {
             + self.attempted_gets
             + self.attempted_queries
             + self.attempted_scans
+    }
+
+    fn attempted_reads(&self) -> u64 {
+        self.attempted_gets + self.attempted_queries + self.attempted_scans
     }
 
     fn successful_operations(&self) -> u64 {
@@ -1933,6 +2663,28 @@ impl WorkerStats {
 
     fn successful_reads(&self) -> u64 {
         self.successful_gets + self.successful_queries + self.successful_scans
+    }
+
+    fn complete_client(&mut self, role: &'static str, client_index: usize) {
+        self.client_completions.push(ClientCompletion {
+            role,
+            client_index,
+            attempted_operations: self.attempted_operations(),
+            successful_operations: self.successful_operations(),
+            successful_queries: self.successful_queries,
+            returned_rows: self.returned_rows,
+            query_checked_requests: self.query_checked_requests,
+            query_checked_rows: self.query_checked_rows,
+            query_validation_failures: self.query_validation_failures,
+        });
+    }
+}
+
+fn percent(part: u64, total: u64) -> f64 {
+    if total == 0 {
+        0.0
+    } else {
+        part as f64 * 100.0 / total as f64
     }
 }
 
@@ -2750,6 +3502,354 @@ impl ProcessCpuSample {
     }
 }
 
+const RSS_SAMPLE_INTERVAL: Duration = Duration::from_millis(10);
+
+#[derive(Clone, Debug)]
+struct RssWindowMeasurement {
+    supported: bool,
+    status: &'static str,
+    start_rss_bytes: Option<u64>,
+    end_rss_bytes: Option<u64>,
+    peak_rss_bytes: Option<u64>,
+    sample_count: u64,
+    requested_sample_interval: Duration,
+    max_sample_interval: Option<Duration>,
+    collection_failures: u64,
+    start_sample_offset: Option<Duration>,
+    end_sample_offset: Option<Duration>,
+    peak_sample_offset: Option<Duration>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RssSample {
+    sampled_at: Instant,
+    resident_bytes: u64,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum RssSamplerCommand {
+    Start(Instant),
+    Stop(Instant),
+}
+
+struct RssWindowAccumulator {
+    started_at: Instant,
+    finished_at: Option<Instant>,
+    requested_sample_interval: Duration,
+    supported: bool,
+    first_sample: Option<RssSample>,
+    last_sample: Option<RssSample>,
+    peak_sample: Option<RssSample>,
+    sample_count: u64,
+    max_sample_interval: Option<Duration>,
+    previous_attempt_at: Option<Instant>,
+    collection_failures: u64,
+}
+
+impl RssWindowAccumulator {
+    fn new(started_at: Instant, requested_sample_interval: Duration, supported: bool) -> Self {
+        Self {
+            started_at,
+            finished_at: None,
+            requested_sample_interval,
+            supported,
+            first_sample: None,
+            last_sample: None,
+            peak_sample: None,
+            sample_count: 0,
+            max_sample_interval: None,
+            previous_attempt_at: None,
+            collection_failures: 0,
+        }
+    }
+
+    fn record(
+        &mut self,
+        sampled_at: Instant,
+        resident_bytes: std::result::Result<u64, ()>,
+    ) -> bool {
+        if sampled_at < self.started_at
+            || self
+                .finished_at
+                .is_some_and(|finished_at| sampled_at > finished_at)
+        {
+            return false;
+        }
+        if let Some(previous_attempt_at) = self.previous_attempt_at {
+            let sample_interval = sampled_at.saturating_duration_since(previous_attempt_at);
+            self.max_sample_interval = Some(
+                self.max_sample_interval
+                    .map_or(sample_interval, |maximum| maximum.max(sample_interval)),
+            );
+        }
+        self.previous_attempt_at = Some(sampled_at);
+        let Ok(resident_bytes) = resident_bytes else {
+            self.collection_failures += 1;
+            return true;
+        };
+        if resident_bytes == 0 {
+            self.collection_failures += 1;
+            return true;
+        }
+        let sample = RssSample {
+            sampled_at,
+            resident_bytes,
+        };
+        self.first_sample.get_or_insert(sample);
+        self.last_sample = Some(sample);
+        if self
+            .peak_sample
+            .is_none_or(|peak_sample| resident_bytes > peak_sample.resident_bytes)
+        {
+            self.peak_sample = Some(sample);
+        }
+        self.sample_count += 1;
+        true
+    }
+
+    fn finish(mut self, finished_at: Instant) -> RssWindowMeasurement {
+        self.finished_at = Some(finished_at);
+        let status = if !self.supported {
+            "unsupported"
+        } else if self.sample_count == 0 {
+            "failed"
+        } else if self.collection_failures > 0 {
+            "partial"
+        } else {
+            "complete"
+        };
+        RssWindowMeasurement {
+            supported: self.supported,
+            status,
+            start_rss_bytes: self.first_sample.map(|sample| sample.resident_bytes),
+            end_rss_bytes: self.last_sample.map(|sample| sample.resident_bytes),
+            peak_rss_bytes: self.peak_sample.map(|sample| sample.resident_bytes),
+            sample_count: self.sample_count,
+            requested_sample_interval: self.requested_sample_interval,
+            max_sample_interval: self.max_sample_interval,
+            collection_failures: self.collection_failures,
+            start_sample_offset: self
+                .first_sample
+                .map(|sample| sample.sampled_at.saturating_duration_since(self.started_at)),
+            end_sample_offset: self
+                .last_sample
+                .map(|sample| sample.sampled_at.saturating_duration_since(self.started_at)),
+            peak_sample_offset: self
+                .peak_sample
+                .map(|sample| sample.sampled_at.saturating_duration_since(self.started_at)),
+        }
+    }
+}
+
+struct ProcessRssSampler {
+    sender: SyncSender<RssSamplerCommand>,
+    stop_at: Arc<Mutex<Option<Instant>>>,
+    worker: Option<JoinHandle<RssWindowAccumulator>>,
+    started_at: Instant,
+    requested_sample_interval: Duration,
+    supported: bool,
+    start_sent: bool,
+}
+
+impl ProcessRssSampler {
+    fn spawn(requested_sample_interval: Duration) -> Self {
+        let supported = process_rss_supported();
+        let (sender, receiver) = mpsc::sync_channel(1);
+        let stop_at = Arc::new(Mutex::new(None));
+        let worker_stop_at = Arc::clone(&stop_at);
+        let worker = std::thread::spawn(move || {
+            collect_process_rss_samples(
+                receiver,
+                worker_stop_at,
+                requested_sample_interval,
+                supported,
+            )
+        });
+        Self {
+            sender,
+            stop_at,
+            worker: Some(worker),
+            started_at: Instant::now(),
+            requested_sample_interval,
+            supported,
+            start_sent: false,
+        }
+    }
+
+    fn start(&mut self, started_at: Instant) {
+        self.started_at = started_at;
+        self.start_sent = self
+            .sender
+            .send(RssSamplerCommand::Start(started_at))
+            .is_ok();
+    }
+
+    fn finish(mut self) -> (Instant, RssWindowMeasurement) {
+        let finished_at = {
+            let mut stop_at = self
+                .stop_at
+                .lock()
+                .expect("RSS sampler stop state should not be poisoned");
+            let finished_at = Instant::now();
+            *stop_at = Some(finished_at);
+            finished_at
+        };
+        let _ = self.sender.send(RssSamplerCommand::Stop(finished_at));
+        if !self.start_sent {
+            let mut accumulator = RssWindowAccumulator::new(
+                self.started_at,
+                self.requested_sample_interval,
+                self.supported,
+            );
+            accumulator.record(finished_at, Err(()));
+            return (finished_at, accumulator.finish(finished_at));
+        }
+        let accumulator = match self.worker.take().unwrap().join() {
+            Ok(accumulator) => accumulator,
+            Err(_) => {
+                let mut accumulator = RssWindowAccumulator::new(
+                    self.started_at,
+                    self.requested_sample_interval,
+                    self.supported,
+                );
+                accumulator.record(finished_at, Err(()));
+                accumulator
+            }
+        };
+        (finished_at, accumulator.finish(finished_at))
+    }
+}
+
+fn collect_process_rss_samples(
+    receiver: Receiver<RssSamplerCommand>,
+    stop_at: Arc<Mutex<Option<Instant>>>,
+    requested_sample_interval: Duration,
+    supported: bool,
+) -> RssWindowAccumulator {
+    let started_at = match receiver.recv() {
+        Ok(RssSamplerCommand::Start(started_at)) => started_at,
+        Ok(RssSamplerCommand::Stop(finished_at)) => {
+            return RssWindowAccumulator::new(finished_at, requested_sample_interval, supported);
+        }
+        Err(_) => {
+            return RssWindowAccumulator::new(Instant::now(), requested_sample_interval, supported);
+        }
+    };
+    let mut accumulator =
+        RssWindowAccumulator::new(started_at, requested_sample_interval, supported);
+    if !supported {
+        let _ = receiver.recv();
+        return accumulator;
+    }
+    let mut next_sample_at = started_at;
+    loop {
+        let current_time = Instant::now();
+        if stop_at
+            .lock()
+            .expect("RSS sampler stop state should not be poisoned")
+            .is_some_and(|finished_at| current_time >= finished_at)
+        {
+            break;
+        }
+        let wait = next_sample_at.saturating_duration_since(current_time);
+        if !wait.is_zero() {
+            match receiver.recv_timeout(wait) {
+                Ok(RssSamplerCommand::Start(_)) => continue,
+                Ok(RssSamplerCommand::Stop(_)) => {}
+                Err(RecvTimeoutError::Timeout) => {}
+                Err(RecvTimeoutError::Disconnected) => break,
+            }
+        }
+        let attempt_started_at = Instant::now();
+        if stop_at
+            .lock()
+            .expect("RSS sampler stop state should not be poisoned")
+            .is_some_and(|finished_at| attempt_started_at >= finished_at)
+        {
+            break;
+        }
+        let rss_result = process_rss_bytes();
+        let sampled_at = Instant::now();
+        let finished_at = *stop_at
+            .lock()
+            .expect("RSS sampler stop state should not be poisoned");
+        if !finished_at.is_some_and(|finished_at| sampled_at > finished_at) {
+            accumulator.record(sampled_at, rss_result);
+        }
+        if finished_at.is_some_and(|finished_at| sampled_at >= finished_at) {
+            break;
+        }
+        next_sample_at = attempt_started_at + requested_sample_interval;
+        if next_sample_at <= sampled_at {
+            next_sample_at = sampled_at + requested_sample_interval;
+        }
+    }
+    accumulator
+}
+
+fn process_rss_supported() -> bool {
+    cfg!(any(target_os = "macos", target_os = "linux"))
+}
+
+fn process_rss_method() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "libc proc_pidinfo PROC_PIDTASKINFO pti_resident_size bytes"
+    } else if cfg!(target_os = "linux") {
+        "Linux /proc/self/statm resident pages multiplied by sysconf page size"
+    } else {
+        "unsupported target"
+    }
+}
+
+fn process_rss_bytes() -> std::result::Result<u64, ()> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut task_info = std::mem::MaybeUninit::<libc::proc_taskinfo>::zeroed();
+        let task_info_size = std::mem::size_of::<libc::proc_taskinfo>() as libc::c_int;
+        let result = unsafe {
+            libc::proc_pidinfo(
+                libc::getpid(),
+                libc::PROC_PIDTASKINFO,
+                0,
+                task_info.as_mut_ptr().cast(),
+                task_info_size,
+            )
+        };
+        if result != task_info_size {
+            return Err(());
+        }
+        let resident_bytes = unsafe { task_info.assume_init() }.pti_resident_size;
+        return (resident_bytes > 0).then_some(resident_bytes).ok_or(());
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let statm = std::fs::read_to_string("/proc/self/statm").map_err(|_| ())?;
+        let resident_pages = statm
+            .split_whitespace()
+            .nth(1)
+            .ok_or(())?
+            .parse::<u64>()
+            .map_err(|_| ())?;
+        let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+        if page_size <= 0 {
+            return Err(());
+        }
+        let resident_bytes = resident_pages_to_bytes(resident_pages, page_size as u64).ok_or(())?;
+        return (resident_bytes > 0).then_some(resident_bytes).ok_or(());
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        Err(())
+    }
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn resident_pages_to_bytes(resident_pages: u64, page_size_bytes: u64) -> Option<u64> {
+    resident_pages.checked_mul(page_size_bytes)
+}
+
 #[derive(Clone, Debug)]
 struct MachineInfo {
     cpu_model: String,
@@ -2880,7 +3980,7 @@ impl MixQuota {
                 return false;
             }
             let slot = self.next.load(Ordering::Relaxed);
-            let read_slot = (slot % 100) < u64::from(self.read_percent);
+            let read_slot = is_read_slot(slot, self.read_percent);
             let wanted = matches!(role, Role::Reader) == read_slot;
             if !wanted {
                 tokio::task::yield_now().await;
@@ -2895,6 +3995,16 @@ impl MixQuota {
             }
         }
     }
+
+    fn slots_claimed(&self) -> u64 {
+        self.next.load(Ordering::Relaxed)
+    }
+}
+
+fn is_read_slot(slot: u64, read_percent: u8) -> bool {
+    let reads_before = (u128::from(slot) * u128::from(read_percent)) / 100;
+    let reads_after = (u128::from(slot.saturating_add(1)) * u128::from(read_percent)) / 100;
+    reads_after > reads_before
 }
 
 async fn writer_loop(
@@ -2902,46 +4012,87 @@ async fn writer_loop(
     workload: WorkloadConfig,
     seed: u64,
     worker_id: usize,
-    deadline: Instant,
+    start_gate: tokio::sync::watch::Receiver<Option<(Instant, Instant)>>,
     quota: Option<MixQuota>,
     warmup: bool,
     timeline_start: Option<Instant>,
+    sampled_keys: Arc<HashSet<DocumentKey>>,
+    verifier: Option<Arc<Mutex<SampledReadVerifier>>>,
 ) -> WorkerStats {
-    let mut generator = WorkloadGenerator::new(workload, seed, worker_id);
+    let mut generator = WorkloadGenerator::new(workload.clone(), seed, worker_id);
     let mut stats = WorkerStats::new(seed ^ worker_id as u64);
+    let (_, deadline) = await_start_window(start_gate).await;
     while Instant::now() < deadline {
         if let Some(quota) = &quota
             && !quota.claim(Role::Writer, deadline).await
         {
             break;
         }
+        if Instant::now() >= deadline {
+            break;
+        }
         let request = generator.next_transaction();
         let width = request.mutations.len() as u64;
+        let sampled_mutations = if warmup || verifier.is_none() {
+            Vec::new()
+        } else {
+            sampled_mutations(&request, &sampled_keys)
+        };
         let started = Instant::now();
+        if started >= deadline {
+            break;
+        }
         let result = adapter.execute_transaction(request).await;
-        let elapsed = started.elapsed();
+        let finished = Instant::now();
+        let elapsed = finished - started;
         if !warmup {
             stats.attempted_transactions += 1;
             stats.e2e_latency.push(elapsed);
             stats.write_latency.push(elapsed);
             match result {
-                Ok(_) => {
+                Ok(transaction_result) => {
                     stats.successful_transactions += 1;
                     stats.mutation_ops += width;
                     if let Some(timeline_start) = timeline_start {
                         stats.window_timeline.push((
-                            (started + elapsed - timeline_start).as_nanos() as u64,
+                            (finished - timeline_start).as_nanos() as u64,
                             elapsed.as_nanos() as u64,
                         ));
+                    }
+                    if let Some(verifier) = &verifier {
+                        verifier
+                            .lock()
+                            .expect("sample verifier lock should not be poisoned")
+                            .record_mutations(
+                                sampled_mutations,
+                                transaction_result.commit_lsn.map(dodb_core::Revision::from),
+                                started,
+                                finished,
+                                false,
+                            );
                     }
                 }
                 Err(Error::Conflict(_)) => stats.conflicts += 1,
                 Err(Error::Overloaded(_)) => stats.overloads += 1,
+                Err(Error::DurabilityFailure(_)) => {
+                    stats.errors += 1;
+                    if let Some(verifier) = &verifier {
+                        verifier
+                            .lock()
+                            .expect("sample verifier lock should not be poisoned")
+                            .record_mutations(sampled_mutations, None, started, finished, true);
+                    }
+                }
                 Err(_) => stats.errors += 1,
             }
         }
     }
+    stats.complete_client("writer", worker_id);
     stats
+}
+
+fn value_matches_byte(value: &[u8], expected_length: usize, expected_byte: u8) -> bool {
+    value.len() == expected_length && value.iter().all(|byte| *byte == expected_byte)
 }
 
 async fn reader_loop(
@@ -2950,81 +4101,112 @@ async fn reader_loop(
     read_kind: ReadKind,
     seed: u64,
     worker_id: usize,
-    deadline: Instant,
+    start_gate: tokio::sync::watch::Receiver<Option<(Instant, Instant)>>,
     quota: Option<MixQuota>,
     warmup: bool,
+    sampled_keys: Arc<HashSet<DocumentKey>>,
+    verifier: Option<Arc<Mutex<SampledReadVerifier>>>,
 ) -> WorkerStats {
-    let mut generator = WorkloadGenerator::new(workload, seed, worker_id);
+    let mut generator = WorkloadGenerator::new(workload.clone(), seed, worker_id);
     let mut stats = WorkerStats::new(seed ^ worker_id as u64 ^ 0xfeed);
+    let (_, deadline) = await_start_window(start_gate).await;
     while Instant::now() < deadline {
         if let Some(quota) = &quota
             && !quota.claim(Role::Reader, deadline).await
         {
             break;
         }
-        let started = Instant::now();
+        if Instant::now() >= deadline {
+            break;
+        }
         let request = generator.next_read(read_kind);
         let expected_get_byte = match &request {
             BatchRequest::Get { key } => key.sk.as_bytes().last().copied(),
             _ => None,
         };
-        let result = adapter.execute(request).await;
-        let elapsed = started.elapsed();
+        let requested_query_range =
+            query_range_from_request(&request, workload.key_size, workload.read_limit);
+        let sampled_read_key = match &request {
+            BatchRequest::Get { key } if verifier.is_some() && sampled_keys.contains(key) => {
+                Some(key.clone())
+            }
+            _ => None,
+        };
+        let started = Instant::now();
+        if started >= deadline {
+            break;
+        }
+        let result = adapter.execute(request.clone()).await;
+        let mut finished = Instant::now();
         if warmup {
             continue;
         }
-        stats.e2e_latency.push(elapsed);
-        stats.read_latency.push(elapsed);
         match read_kind {
             ReadKind::Get => stats.attempted_gets += 1,
             ReadKind::Query => stats.attempted_queries += 1,
             ReadKind::Scan => stats.attempted_scans += 1,
         }
-        match (read_kind, result) {
-            (ReadKind::Get, Ok(BatchResponse::Get(RevisionState::Present { value, .. })))
-                if expected_get_byte.is_some_and(|expected_byte| {
-                    value_matches_byte(&value, generator.config.value_size, expected_byte)
-                }) =>
-            {
-                stats.successful_gets += 1;
+        if let Some(query_range) = requested_query_range {
+            stats.query_ranges.insert(query_range);
+        }
+        match result {
+            Ok(response) if read_kind == ReadKind::Query => {
+                record_query_response(&request, &response, &workload, &mut stats);
+                finished = Instant::now();
             }
-            (ReadKind::Query, Ok(BatchResponse::Query(rows)))
-                if query_result_matches(
-                    &rows,
-                    generator.config.key_size,
-                    generator.config.value_size,
-                    generator.config.read_limit,
-                ) =>
-            {
-                stats.successful_queries += 1;
-                stats.returned_rows += rows.len() as u64;
+            Ok(BatchResponse::Get(state)) => {
+                let (value, revision, found) = match state {
+                    RevisionState::Present { value, revision } => {
+                        (Some(value), Some(revision), true)
+                    }
+                    RevisionState::Missing { revision } => (None, Some(revision), false),
+                };
+                let valid_value = value.as_ref().is_some_and(|value| {
+                    expected_get_byte.is_some_and(|expected_byte| {
+                        value_matches_byte(value, workload.value_size, expected_byte)
+                    })
+                });
+                if let Some(key) = sampled_read_key
+                    && let Some(verifier) = &verifier
+                {
+                    verifier
+                        .lock()
+                        .expect("sample verifier lock should not be poisoned")
+                        .record_read(SampledRead {
+                            key,
+                            value,
+                            revision,
+                            started_at: started,
+                            finished_at: finished,
+                        });
+                }
+                if found && valid_value {
+                    stats.successful_gets += 1;
+                } else {
+                    stats.errors += 1;
+                }
             }
-            (ReadKind::Scan, Ok(BatchResponse::Scan(rows))) if !rows.is_empty() => {
+            Ok(BatchResponse::Scan(rows)) => {
                 stats.successful_scans += 1;
                 stats.returned_rows += rows.len() as u64;
             }
-            (_, Err(Error::Overloaded(_))) => stats.overloads += 1,
-            _ => stats.errors += 1,
+            Ok(response) => {
+                if matches!(response, BatchResponse::Query(_)) {
+                    record_query_response(&request, &response, &workload, &mut stats);
+                    finished = Instant::now();
+                } else {
+                    stats.errors += 1;
+                }
+            }
+            Err(Error::Overloaded(_)) => stats.overloads += 1,
+            Err(_) => stats.errors += 1,
         }
+        let elapsed = finished - started;
+        stats.e2e_latency.push(elapsed);
+        stats.read_latency.push(elapsed);
     }
+    stats.complete_client("reader", worker_id);
     stats
-}
-
-fn value_matches_byte(value: &[u8], expected_length: usize, expected_byte: u8) -> bool {
-    value.len() == expected_length && value.iter().all(|byte| *byte == expected_byte)
-}
-
-fn query_result_matches(
-    rows: &[dodb_storage::btree::Document],
-    key_size: usize,
-    value_size: usize,
-    read_limit: usize,
-) -> bool {
-    rows.len() == read_limit.min(256)
-        && rows.iter().enumerate().all(|(row_index, row)| {
-            row.key == query_key(key_size, row_index)
-                && value_matches_byte(&row.value, value_size, row_index as u8)
-        })
 }
 
 async fn mixed_client_loop(
@@ -3035,12 +4217,15 @@ async fn mixed_client_loop(
     read_percent: u8,
     value_mode: MixedValueMode,
     next_operation: Arc<AtomicU64>,
-    deadline: Instant,
+    start_gate: tokio::sync::watch::Receiver<Option<(Instant, Instant)>>,
     warmup: bool,
     timeline_start: Option<Instant>,
+    sampled_keys: Arc<HashSet<DocumentKey>>,
+    verifier: Option<Arc<Mutex<SampledReadVerifier>>>,
 ) -> WorkerStats {
     let mut stats = WorkerStats::new(seed ^ worker_id as u64 ^ 0xfeed);
     let phase_seed = seed ^ 0x1000_0000;
+    let (_, deadline) = await_start_window(start_gate).await;
     while Instant::now() < deadline {
         let operation_index = next_operation.fetch_add(1, Ordering::Relaxed);
         let operation_seed = mixed_operation_seed(phase_seed, operation_index);
@@ -3054,15 +4239,57 @@ async fn mixed_client_loop(
         let started = Instant::now();
         if mixed_operation_is_read(operation_index, read_percent) {
             let request = generator.next_read(ReadKind::Get);
+            let expected_get_byte = match &request {
+                BatchRequest::Get { key } => key.sk.as_bytes().last().copied(),
+                _ => None,
+            };
+            let sampled_read_key = match &request {
+                BatchRequest::Get { key } if verifier.is_some() && sampled_keys.contains(key) => {
+                    Some(key.clone())
+                }
+                _ => None,
+            };
             let result = adapter.execute(request).await;
-            let elapsed = started.elapsed();
+            let finished = Instant::now();
+            let elapsed = finished - started;
             if warmup {
                 continue;
             }
             stats.attempted_gets += 1;
             stats.read_latency.push(elapsed);
             match result {
-                Ok(BatchResponse::Get(_)) => stats.successful_gets += 1,
+                Ok(BatchResponse::Get(state)) => {
+                    let (value, revision, found) = match state {
+                        RevisionState::Present { value, revision } => {
+                            (Some(value), Some(revision), true)
+                        }
+                        RevisionState::Missing { revision } => (None, Some(revision), false),
+                    };
+                    let valid_value = value.as_ref().is_some_and(|value| {
+                        value_matches_byte(
+                            value,
+                            workload.value_size,
+                            expected_get_byte.unwrap_or_default(),
+                        )
+                    });
+                    if let (Some(key), Some(verifier)) = (sampled_read_key, &verifier) {
+                        verifier
+                            .lock()
+                            .expect("sample verifier lock should not be poisoned")
+                            .record_read(SampledRead {
+                                key,
+                                value,
+                                revision,
+                                started_at: started,
+                                finished_at: finished,
+                            });
+                    }
+                    if found && valid_value {
+                        stats.successful_gets += 1;
+                    } else {
+                        stats.errors += 1;
+                    }
+                }
                 Ok(_) => stats.errors += 1,
                 Err(Error::Overloaded(_)) => stats.overloads += 1,
                 Err(_) => stats.errors += 1,
@@ -3076,24 +4303,52 @@ async fn mixed_client_loop(
         } else {
             let request = generator.next_transaction();
             let width = request.mutations.len() as u64;
+            let sampled_mutations = if warmup || verifier.is_none() {
+                Vec::new()
+            } else {
+                sampled_mutations(&request, &sampled_keys)
+            };
             let result = adapter.execute_transaction(request).await;
-            let elapsed = started.elapsed();
+            let finished = Instant::now();
+            let elapsed = finished - started;
             if warmup {
                 continue;
             }
             stats.attempted_transactions += 1;
             stats.write_latency.push(elapsed);
             match result {
-                Ok(_) => {
+                Ok(transaction_result) => {
                     stats.successful_transactions += 1;
                     stats.mutation_ops += width;
+                    if let Some(verifier) = &verifier {
+                        verifier
+                            .lock()
+                            .expect("sample verifier lock should not be poisoned")
+                            .record_mutations(
+                                sampled_mutations,
+                                transaction_result.commit_lsn.map(dodb_core::Revision::from),
+                                started,
+                                finished,
+                                false,
+                            );
+                    }
                 }
                 Err(Error::Conflict(_)) => stats.conflicts += 1,
                 Err(Error::Overloaded(_)) => stats.overloads += 1,
+                Err(Error::DurabilityFailure(_)) => {
+                    stats.errors += 1;
+                    if let Some(verifier) = &verifier {
+                        verifier
+                            .lock()
+                            .expect("sample verifier lock should not be poisoned")
+                            .record_mutations(sampled_mutations, None, started, finished, true);
+                    }
+                }
                 Err(_) => stats.errors += 1,
             }
         }
     }
+    stats.complete_client("mixed", worker_id);
     stats
 }
 
@@ -3104,10 +4359,9 @@ async fn run_interval(
     seed: u64,
     duration: Duration,
     warmup: bool,
-) -> WorkerStats {
-    let interval_start = Instant::now();
-    let deadline = interval_start + duration;
-    let timeline_start = (!warmup && args.window_seconds.is_some()).then_some(interval_start);
+    sampled_keys: Arc<HashSet<DocumentKey>>,
+    verifier: Option<Arc<Mutex<SampledReadVerifier>>>,
+) -> IntervalResult {
     let workload = WorkloadConfig {
         distribution: scenario.distribution,
         working_set: args.working_set,
@@ -3117,10 +4371,15 @@ async fn run_interval(
         transaction_mode: args.transaction_mode,
         read_limit: args.read_limit,
     };
+    let quota = scenario.mix.map(|mix| MixQuota::new(mix.read_percent));
+    let (start_sender, start_receiver) = tokio::sync::watch::channel(None);
+    let timeline_start = (!warmup && args.window_seconds.is_some()).then_some(Instant::now());
+    let use_mixed_clients = args.mixed_clients && scenario.mix.is_some();
     let mut tasks = Vec::with_capacity(scenario.writers + scenario.readers);
-    if args.mixed_clients
-        && let Some(mix) = scenario.mix
-    {
+    if use_mixed_clients {
+        let mix = scenario
+            .mix
+            .expect("mixed client scenario should have a mix");
         let next_operation = Arc::new(AtomicU64::new(0));
         for worker_id in 0..scenario.writers {
             tasks.push(tokio::spawn(mixed_client_loop(
@@ -3131,23 +4390,26 @@ async fn run_interval(
                 mix.read_percent,
                 args.mixed_value_mode,
                 Arc::clone(&next_operation),
-                deadline,
+                start_receiver.clone(),
                 warmup,
                 timeline_start,
+                Arc::clone(&sampled_keys),
+                verifier.clone(),
             )));
         }
     } else {
-        let quota = scenario.mix.map(|mix| MixQuota::new(mix.read_percent));
         for worker_id in 0..scenario.writers {
             tasks.push(tokio::spawn(writer_loop(
                 Arc::clone(&adapter),
                 workload.clone(),
                 seed ^ 0x1000_0000,
                 worker_id,
-                deadline,
+                start_receiver.clone(),
                 quota.clone(),
                 warmup,
                 timeline_start,
+                Arc::clone(&sampled_keys),
+                verifier.clone(),
             )));
         }
         for worker_id in 0..scenario.readers {
@@ -3155,19 +4417,61 @@ async fn run_interval(
                 Arc::clone(&adapter),
                 workload.clone(),
                 scenario.read_kind.unwrap_or(ReadKind::Get),
-                seed ^ READER_WORKER_SEED_MASK,
+                seed ^ 0x2000_0000,
                 worker_id,
-                deadline,
+                start_receiver.clone(),
                 quota.clone(),
                 warmup,
+                Arc::clone(&sampled_keys),
+                verifier.clone(),
             )));
         }
     }
+    let mut rss_sampler = ProcessRssSampler::spawn(RSS_SAMPLE_INTERVAL);
+    let cpu_start = ProcessCpuSample::capture();
+    let started_at = Instant::now();
+    let deadline = started_at + duration;
+    rss_sampler.start(started_at);
+    start_sender.send_replace(Some((started_at, deadline)));
     let mut stats = WorkerStats::new(seed ^ 0xabcd);
     for task in tasks {
         stats.merge(task.await.expect("benchmark worker task should not panic"));
     }
-    stats
+    let (finished_at, process_rss) = rss_sampler.finish();
+    IntervalResult {
+        stats,
+        started_at,
+        finished_at,
+        cpu_start,
+        process_rss,
+        quota_slots_claimed: if use_mixed_clients {
+            None
+        } else {
+            quota.as_ref().map(MixQuota::slots_claimed)
+        },
+    }
+}
+
+struct IntervalResult {
+    stats: WorkerStats,
+    started_at: Instant,
+    finished_at: Instant,
+    cpu_start: ProcessCpuSample,
+    process_rss: RssWindowMeasurement,
+    quota_slots_claimed: Option<u64>,
+}
+
+async fn await_start_window(
+    mut start_receiver: tokio::sync::watch::Receiver<Option<(Instant, Instant)>>,
+) -> (Instant, Instant) {
+    loop {
+        if let Some(window) = *start_receiver.borrow_and_update() {
+            return window;
+        }
+        if start_receiver.changed().await.is_err() {
+            panic!("benchmark start gate closed before release");
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -3484,19 +4788,24 @@ fn seed_requests(args: &Args, scenario: &Scenario) -> Vec<TransactionRequest> {
         requests.push(TransactionRequest::new(Vec::new(), mutations));
     }
 
-    if scenario.read_kind == Some(ReadKind::Query) {
-        let query_rows = args.working_set.min(256);
+    if scenario.read_kind.is_some() || scenario.mix.is_some() {
         let mut query_mutations = Vec::new();
-        for index in 0..query_rows {
-            query_mutations.push(TransactionMutation::Put {
-                key: query_key(args.key_size, index),
-                value: value_bytes(args.value_size, index as u64, 0),
-            });
-            if query_mutations.len() >= 25 {
-                requests.push(TransactionRequest::new(
-                    Vec::new(),
-                    std::mem::take(&mut query_mutations),
-                ));
+        for pk_index in 0..QUERY_PK_COUNT {
+            for row_index in 0..query_rows_per_pk(args.read_limit) {
+                query_mutations.push(TransactionMutation::Put {
+                    key: distributed_query_key(args.key_size, pk_index, row_index),
+                    value: value_bytes(
+                        args.value_size,
+                        distributed_query_value_index(pk_index, row_index, args.read_limit),
+                        0,
+                    ),
+                });
+                if query_mutations.len() >= 25 {
+                    requests.push(TransactionRequest::new(
+                        Vec::new(),
+                        std::mem::take(&mut query_mutations),
+                    ));
+                }
             }
         }
         if !query_mutations.is_empty() {
@@ -3656,6 +4965,10 @@ fn unix_timestamp_ms() -> u128 {
         .as_millis()
 }
 
+fn duration_to_nanos(duration: Duration) -> u64 {
+    duration.as_nanos().min(u64::MAX as u128) as u64
+}
+
 #[derive(Clone, Debug)]
 struct JsonObject {
     fields: Vec<(String, String)>,
@@ -3682,6 +4995,13 @@ impl JsonObject {
         self.fields.push((key.to_owned(), value.to_string()));
     }
 
+    fn bool(&mut self, key: &str, value: bool) {
+        self.fields.push((key.to_owned(), value.to_string()));
+    }
+
+    fn raw(&mut self, key: &str, value: String) {
+        self.fields.push((key.to_owned(), value));
+    }
     fn f64(&mut self, key: &str, value: f64) {
         self.fields.push((
             key.to_owned(),
@@ -3696,6 +5016,13 @@ impl JsonObject {
     fn optional_f64(&mut self, key: &str, value: Option<f64>) {
         match value {
             Some(value) => self.f64(key, value),
+            None => self.fields.push((key.to_owned(), "null".to_owned())),
+        }
+    }
+
+    fn optional_u64(&mut self, key: &str, value: Option<u64>) {
+        match value {
+            Some(value) => self.u64(key, value),
             None => self.fields.push((key.to_owned(), "null".to_owned())),
         }
     }
@@ -3754,11 +5081,16 @@ fn build_record(
     machine: &MachineInfo,
     args: &Args,
     scenario: &Scenario,
+    scenario_index: usize,
     repetition: usize,
     seed: u64,
     seeded_rows: usize,
     measured: &WorkerStats,
     delta: &MetricDelta,
+    verification: VerificationSummary,
+    process_rss: &RssWindowMeasurement,
+    query_preflight_passed: Option<bool>,
+    quota_slots_claimed: Option<u64>,
     wall: Duration,
     cpu_start: &ProcessCpuSample,
     cpu_end: &ProcessCpuSample,
@@ -3812,6 +5144,28 @@ fn build_record(
         "benchmark_data_dir",
         &benchmark_directory().display().to_string(),
     );
+    json.usize("scenario_index", scenario_index);
+    json.string(
+        "seed_formula",
+        "base_seed + scenario_index * 0x9e3779b9 + repetition, wrapping u64",
+    );
+    json.bool("source_dirty", current_git_dirty().unwrap_or(true));
+    json.string("source_sha256", &benchmark_source_sha256());
+    json.string("cargo_lock_sha256", &cargo_lock_sha256());
+    json.string("binary_sha256", &current_binary_sha256());
+    json.string(
+        "build_target",
+        &format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS),
+    );
+    json.string(
+        "rustflags",
+        &std::env::var("RUSTFLAGS").unwrap_or_else(|_| "unset".to_owned()),
+    );
+    let command_line = std::env::args()
+        .map(|argument| json_string(&argument))
+        .collect::<Vec<_>>()
+        .join(",");
+    json.raw("command_line", format!("[{command_line}]"));
     json.string("baseline_commit", BASELINE_COMMIT);
     json.string("engine", args.engine.as_str());
     json.string(
@@ -3862,42 +5216,105 @@ fn build_record(
         scenario.read_kind.map_or("none", ReadKind::as_str),
     );
     json.string("mix", scenario.mix.map_or("none", Mix::as_str));
-    json.string("mixed_value_mode", args.mixed_value_mode.as_str());
-    json.string(
-        "mixed_value_generator",
-        args.mixed_value_mode.generator_name(),
-    );
-    if args.mixed_clients
-        && let Some(mix) = scenario.mix
-    {
-        json.u64("requested_read_percent", u64::from(mix.read_percent));
+    if let Some(mix) = scenario.mix {
+        json.string("mixed_value_mode", args.mixed_value_mode.as_str());
         json.string(
-            "mixed_schedule",
-            "global_fetch_add; operation_index_mod_100_lt_read_percent; shared_seeded_request_v2",
+            "mixed_value_generator",
+            args.mixed_value_mode.generator_name(),
         );
-        json.string("mixed_schedule_version", "shared_seeded_request_v2");
-        let workload = WorkloadConfig {
-            distribution: scenario.distribution,
-            working_set: args.working_set,
-            key_size: args.key_size,
-            value_size: args.value_size,
-            width: scenario.width,
-            transaction_mode: args.transaction_mode,
-            read_limit: args.read_limit,
-        };
-        json.u64("logical_trace_prefix_operations", 1_000);
-        json.string(
-            "logical_trace_prefix_hash",
-            &format!(
-                "{:016x}",
-                mixed_trace_prefix_hash(
-                    workload,
-                    seed ^ 0xbbbb_0000 ^ 0x1000_0000,
-                    mix.read_percent,
-                    args.mixed_value_mode,
-                    1_000,
-                )
+        if args.mixed_clients {
+            json.string(
+                "mixed_schedule",
+                "global_fetch_add; operation_index_mod_100_lt_read_percent; shared_seeded_request_v2",
+            );
+            json.string("mixed_schedule_version", "shared_seeded_request_v2");
+            let workload = WorkloadConfig {
+                distribution: scenario.distribution,
+                working_set: args.working_set,
+                key_size: args.key_size,
+                value_size: args.value_size,
+                width: scenario.width,
+                transaction_mode: args.transaction_mode,
+                read_limit: args.read_limit,
+            };
+            json.u64("logical_trace_prefix_operations", 1_000);
+            json.string(
+                "logical_trace_prefix_hash",
+                &format!(
+                    "{:016x}",
+                    mixed_trace_prefix_hash(
+                        workload,
+                        seed ^ 0xbbbb_0000 ^ 0x1000_0000,
+                        mix.read_percent,
+                        args.mixed_value_mode,
+                        1_000,
+                    )
+                ),
+            );
+        }
+        json.string("mix_basis", "one read request per one write transaction");
+        json.u64("requested_read_percent", u64::from(mix.read_percent));
+        json.u64("requested_write_percent", u64::from(100 - mix.read_percent));
+        let attempted_mix_operations = measured.attempted_transactions + measured.attempted_reads();
+        let cancelled_quota_claims = quota_slots_claimed
+            .unwrap_or(attempted_mix_operations)
+            .saturating_sub(attempted_mix_operations);
+        let attempted_share_error = (measured.attempted_reads() as f64
+            - attempted_mix_operations as f64 * f64::from(mix.read_percent) / 100.0)
+            .abs();
+        let attempted_share_error_bound = 1.0 + cancelled_quota_claims as f64;
+        json.u64("quota_slots_claimed", quota_slots_claimed.unwrap_or(0));
+        json.u64("quota_claims_without_attempt", cancelled_quota_claims);
+        json.f64(
+            "attempted_read_share_error_operations",
+            attempted_share_error,
+        );
+        json.f64(
+            "attempted_read_share_error_bound_operations",
+            attempted_share_error_bound,
+        );
+        json.bool(
+            "attempted_mix_within_interleaved_quota_bound",
+            attempted_share_error <= attempted_share_error_bound,
+        );
+        json.usize(
+            "max_inflight_operations_at_deadline",
+            scenario.writers + scenario.readers,
+        );
+        let successful_mixed_operations =
+            measured.successful_transactions + measured.successful_reads();
+        json.u64("attempted_read_operations", measured.attempted_reads());
+        json.u64(
+            "attempted_write_transactions",
+            measured.attempted_transactions,
+        );
+        json.u64("successful_read_operations", measured.successful_reads());
+        json.u64(
+            "successful_write_transactions",
+            measured.successful_transactions,
+        );
+        json.f64(
+            "attempted_read_percent",
+            percent(measured.attempted_reads(), attempted_mix_operations),
+        );
+        json.f64(
+            "attempted_write_percent",
+            percent(measured.attempted_transactions, attempted_mix_operations),
+        );
+        json.f64(
+            "successful_read_percent",
+            percent(measured.successful_reads(), successful_mixed_operations),
+        );
+        json.f64(
+            "successful_write_percent",
+            percent(
+                measured.successful_transactions,
+                successful_mixed_operations,
             ),
+        );
+        json.string(
+            "mix_boundary_note",
+            "quota is assigned per request/transaction with interleaved slots; stop-at-deadline cancels counted quota claims that did not start and drains at most one in-flight request per client",
         );
     }
     json.string("transaction_mode", args.transaction_mode.as_str());
@@ -3926,10 +5343,105 @@ fn build_record(
     );
     json.u64("sync_delay_us", sync_delay.as_micros() as u64);
     json.u64("seed", seed);
-    json.u64("duration_ms", wall.as_millis() as u64);
     json.u64("requested_duration_ms", args.duration.as_millis() as u64);
+    json.u64("duration_ms", wall.as_millis() as u64);
+    json.string(
+        "measurement_stop_policy",
+        "stop admissions at deadline, drain in-flight operations, and divide counted outcomes by elapsed time through final client completion; request generation after the shared start is included in wall time",
+    );
     json.u64("warmup_ms", args.warmup.as_millis() as u64);
     json.usize("repetition", repetition);
+    if scenario.read_kind == Some(ReadKind::Query) {
+        let rows_per_pk = query_rows_per_pk(args.read_limit);
+        let ranges_per_pk = rows_per_pk - args.read_limit + 1;
+        json.string("query_workload", "distributed-query16-v1");
+        json.string(
+            "query_selection",
+            "splitmix64 with rejection sampling over flattened legal PK/start ranges",
+        );
+        json.usize("query_seeded_pk_count", QUERY_PK_COUNT);
+        json.usize("query_seeded_rows_per_pk", rows_per_pk);
+        json.usize("query_seeded_rows_total", QUERY_PK_COUNT * rows_per_pk);
+        json.usize("query_start_index_min", 0);
+        json.usize("query_start_index_max", rows_per_pk - args.read_limit);
+        json.usize("query_legal_ranges_per_pk", ranges_per_pk);
+        json.usize(
+            "query_legal_range_count",
+            query_range_count(args.read_limit),
+        );
+        json.string(
+            "query_input_plan_fingerprint",
+            &query_input_plan_fingerprint(args, scenario, seed),
+        );
+        json.usize(
+            "query_input_plan_requests_per_client",
+            QUERY_INPUT_PLAN_REQUESTS,
+        );
+        json.string(
+            "query_validation_scope",
+            "every measured Query response; full key/value validation",
+        );
+        json.string(
+            "query_validation_cost_scope",
+            "request generation is inside measurement wall but outside per-request latency; per-response verification is inside both measurement wall and per-request latency; input plan fingerprint and preflight are outside measurement; JSONL serialization and flush are after measurement",
+        );
+        json.u64("query_checked_requests", measured.query_checked_requests);
+        json.u64("query_checked_rows", measured.query_checked_rows);
+        json.u64(
+            "query_validation_failures",
+            measured.query_validation_failures,
+        );
+        json.usize("query_actual_range_count", measured.query_ranges.len());
+        json.string(
+            "query_validation_status",
+            if measured.query_validation_failures > 0 {
+                "failed"
+            } else if measured.query_checked_requests == 0 {
+                "inconclusive"
+            } else {
+                "passed"
+            },
+        );
+        json.bool(
+            "query_client_aggregation_passed",
+            measured
+                .client_completions
+                .iter()
+                .map(|client| client.successful_queries)
+                .sum::<u64>()
+                == measured.successful_queries
+                && measured
+                    .client_completions
+                    .iter()
+                    .map(|client| client.returned_rows)
+                    .sum::<u64>()
+                    == measured.returned_rows
+                && measured
+                    .client_completions
+                    .iter()
+                    .map(|client| client.query_checked_requests)
+                    .sum::<u64>()
+                    == measured.query_checked_requests
+                && measured
+                    .client_completions
+                    .iter()
+                    .map(|client| client.query_checked_rows)
+                    .sum::<u64>()
+                    == measured.query_checked_rows
+                && measured
+                    .client_completions
+                    .iter()
+                    .map(|client| client.query_validation_failures)
+                    .sum::<u64>()
+                    == measured.query_validation_failures,
+        );
+        json.bool(
+            "query_returned_row_count_consistent",
+            measured.query_validation_failures == 0
+                && measured.query_checked_requests == measured.successful_queries
+                && measured.returned_rows == measured.successful_queries * args.read_limit as u64,
+        );
+    }
     json.u64("attempted_operations", measured.attempted_operations());
     json.u64("successful_operations", measured.successful_operations());
     json.u64("attempted_transactions", measured.attempted_transactions);
@@ -3943,6 +5455,169 @@ fn build_record(
     json.u64("conflicts", measured.conflicts);
     json.u64("overloads", measured.overloads);
     json.u64("errors", measured.errors);
+    let client_attempted_operations = measured
+        .client_completions
+        .iter()
+        .map(|client| client.attempted_operations)
+        .sum::<u64>();
+    let client_successful_operations = measured
+        .client_completions
+        .iter()
+        .map(|client| client.successful_operations)
+        .sum::<u64>();
+    json.bool(
+        "client_aggregation_passed",
+        client_attempted_operations == measured.attempted_operations()
+            && client_successful_operations == measured.successful_operations(),
+    );
+    let clients = measured
+        .client_completions
+        .iter()
+        .map(|client| {
+            format!(
+                "{{\"role\":{},\"client_index\":{},\"attempted_operations\":{},\"successful_operations\":{},\"successful_queries\":{},\"returned_rows\":{},\"query_checked_requests\":{},\"query_checked_rows\":{},\"query_validation_failures\":{}}}",
+                json_string(client.role),
+                client.client_index,
+                client.attempted_operations,
+                client.successful_operations,
+                client.successful_queries,
+                client.returned_rows,
+                client.query_checked_requests,
+                client.query_checked_rows,
+                client.query_validation_failures,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    json.raw("clients", format!("[{clients}]"));
+    json.string(
+        "sampled_read_verification_status",
+        verification.status.as_str(),
+    );
+    json.usize("sampled_key_count", verification.sampled_key_count);
+    json.usize("sampled_key_limit", MAX_SAMPLED_KEYS);
+    json.usize(
+        "sample_key_selection_scan_limit",
+        MAX_SAMPLE_SELECTION_CANDIDATES,
+    );
+    json.u64(
+        "sampled_reads_observed",
+        verification.sampled_reads_observed,
+    );
+    json.u64("sampled_reads_checked", verification.sampled_reads_checked);
+    json.u64("sampled_reads_failed", verification.sampled_reads_failed);
+    json.u64(
+        "sampled_reads_indeterminate",
+        verification.sampled_reads_indeterminate,
+    );
+    json.u64(
+        "sampled_writes_observed",
+        verification.sampled_writes_observed,
+    );
+    json.u64(
+        "sampled_writes_confirmed",
+        verification.sampled_writes_confirmed,
+    );
+    json.u64(
+        "sampled_writes_ambiguous",
+        verification.sampled_writes_ambiguous,
+    );
+    json.u64("sampled_writes_stored", verification.sampled_writes_stored);
+    json.u64(
+        "changed_key_reads_checked",
+        verification.changed_key_reads_checked,
+    );
+    json.u64("verification_omitted_events", verification.omitted_events);
+    json.usize(
+        "verification_estimated_memory_bytes",
+        verification.estimated_memory_bytes,
+    );
+    json.usize(
+        "verification_estimated_index_memory_bytes",
+        verification.estimated_index_memory_bytes,
+    );
+    json.usize(
+        "verification_estimated_peak_memory_bytes",
+        verification
+            .estimated_memory_bytes
+            .saturating_add(verification.estimated_index_memory_bytes)
+            .saturating_add(MAX_VERIFICATION_MEMORY_BYTES / 4),
+    );
+    json.usize(
+        "verification_memory_limit_bytes",
+        MAX_VERIFICATION_MEMORY_BYTES,
+    );
+    json.bool("process_rss_supported", process_rss.supported);
+    json.string("process_rss_status", process_rss.status);
+    json.string("process_rss_unit", "bytes");
+    json.string("process_rss_method", process_rss_method());
+    json.string(
+        "process_rss_sampling_execution",
+        "dedicated standard thread using in-process OS APIs; no subprocess per sample; sampling work contributes to process RSS and execution cost",
+    );
+    json.string(
+        "process_rss_boundary_sample_semantics",
+        "start and end RSS are the first and last successful in-window samples; offsets identify their observation times relative to common start",
+    );
+    json.string(
+        "process_rss_window_semantics",
+        "samples are restricted to common measurement start through final client completion; samples outside the interval are excluded",
+    );
+    json.optional_u64("process_rss_start_bytes", process_rss.start_rss_bytes);
+    json.optional_u64("process_rss_end_bytes", process_rss.end_rss_bytes);
+    json.optional_u64(
+        "process_rss_peak_observed_bytes",
+        process_rss.peak_rss_bytes,
+    );
+    json.u64("process_rss_sample_count", process_rss.sample_count);
+    json.u64(
+        "process_rss_requested_sample_interval_ns",
+        duration_to_nanos(process_rss.requested_sample_interval),
+    );
+    json.optional_u64(
+        "process_rss_max_sample_interval_ns",
+        process_rss.max_sample_interval.map(duration_to_nanos),
+    );
+    json.u64(
+        "process_rss_collection_failures",
+        process_rss.collection_failures,
+    );
+    json.u64("process_rss_window_start_offset_ns", 0);
+    json.u64("process_rss_window_end_offset_ns", duration_to_nanos(wall));
+    json.optional_u64(
+        "process_rss_start_sample_offset_ns",
+        process_rss.start_sample_offset.map(duration_to_nanos),
+    );
+    json.optional_u64(
+        "process_rss_end_sample_offset_ns",
+        process_rss.end_sample_offset.map(duration_to_nanos),
+    );
+    json.optional_u64(
+        "process_rss_peak_sample_offset_ns",
+        process_rss.peak_sample_offset.map(duration_to_nanos),
+    );
+    json.string(
+        "process_rss_peak_semantics",
+        "maximum successfully observed RSS sample within the measured interval; unsampled instantaneous peaks may be missed",
+    );
+    json.usize("verification_event_limit", MAX_VERIFICATION_EVENTS);
+    json.u64(
+        "verification_work_events",
+        verification
+            .sampled_reads_checked
+            .saturating_add(verification.sampled_writes_stored),
+    );
+    json.u64(
+        "verification_candidate_comparisons",
+        verification.verification_comparisons,
+    );
+    json.string(
+        "verification_cost_policy",
+        "bounded event history; per-key sort O(W log W), read frontier lookup O(log W), revision lookup O(1), ambiguous-value lookup O(1)",
+    );
+    if let Some(passed) = query_preflight_passed {
+        json.bool("query_preflight_passed", passed);
+    }
     json.u64("mutation_ops", measured.mutation_ops);
     json.u64(
         "attempted_reads",
@@ -4612,6 +6287,77 @@ fn current_git_commit() -> String {
     command_output("git", &["rev-parse", "HEAD"])
 }
 
+fn current_git_dirty() -> Option<bool> {
+    let output = Command::new("git")
+        .args(["status", "--porcelain", "--untracked-files=all"])
+        .output()
+        .ok()?;
+    output.status.success().then(|| !output.stdout.is_empty())
+}
+
+fn benchmark_source_sha256() -> String {
+    sha256_bytes(include_bytes!("phase0-bench.rs"))
+}
+
+fn cargo_lock_sha256() -> String {
+    sha256_bytes(include_bytes!("../../../../../Cargo.lock"))
+}
+
+fn current_binary_sha256() -> String {
+    std::env::current_exe()
+        .ok()
+        .map(|path| sha256_file(&path))
+        .unwrap_or_else(|| "unknown".to_owned())
+}
+
+fn sha256_file(path: &Path) -> String {
+    let output = Command::new("shasum")
+        .args(["-a", "256"])
+        .arg(path)
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .or_else(|| {
+            Command::new("sha256sum")
+                .arg(path)
+                .output()
+                .ok()
+                .filter(|output| output.status.success())
+        });
+    output
+        .map(|output| {
+            String::from_utf8_lossy(&output.stdout)
+                .split_whitespace()
+                .next()
+                .unwrap_or("unknown")
+                .to_owned()
+        })
+        .unwrap_or_else(|| "unknown".to_owned())
+}
+
+fn sha256_bytes(bytes: &[u8]) -> String {
+    let hash = [("shasum", vec!["-a", "256"]), ("sha256sum", Vec::new())]
+        .into_iter()
+        .find_map(|(command, arguments)| {
+            let mut child = Command::new(command)
+                .args(arguments)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn()
+                .ok()?;
+            child.stdin.take()?.write_all(bytes).ok()?;
+            let output = child.wait_with_output().ok()?;
+            if !output.status.success() {
+                return None;
+            }
+            String::from_utf8_lossy(&output.stdout)
+                .split_whitespace()
+                .next()
+                .map(str::to_owned)
+        });
+    hash.unwrap_or_else(|| "unknown".to_owned())
+}
+
 fn print_run_summary(
     scenario: &Scenario,
     repetition: usize,
@@ -4640,6 +6386,7 @@ async fn run_repetition(
     args: &Args,
     scenario: &Scenario,
     machine: &MachineInfo,
+    scenario_index: usize,
     repetition: usize,
     seed: u64,
     output: &mut std::fs::File,
@@ -4649,16 +6396,52 @@ async fn run_repetition(
     if args.window_seconds.is_some() {
         samples.push(ResourceSample::capture(&*adapter, "seeded".to_string()));
     }
-    let warmup_stats = run_interval(
+    let query_preflight_passed = if scenario.read_kind == Some(ReadKind::Query) {
+        let request = query_range_for_index(0, args.read_limit).request(args.key_size);
+        match adapter.execute(request.clone()).await? {
+            BatchResponse::Query(rows) => Some(query_result_is_valid(
+                &request,
+                &rows,
+                args.key_size,
+                args.value_size,
+                args.read_limit,
+            )),
+            _ => Some(false),
+        }
+    } else {
+        None
+    };
+    if query_preflight_passed == Some(false) {
+        adapter.shutdown().await?;
+        remove_database_files(&data_path);
+        return Err(Error::invariant(
+            "Query result contract verification failed",
+        ));
+    }
+    let verifies_gets = scenario.mix.is_some() || scenario.read_kind == Some(ReadKind::Get);
+    let sampled_keys = if verifies_gets && scenario.readers > 0 {
+        sampled_read_keys(args, scenario)
+    } else {
+        Arc::new(HashSet::new())
+    };
+    if verifies_gets {
+        if let Err(error) = capture_sampled_seed_states(&adapter, args, &sampled_keys, true).await {
+            let _ = adapter.shutdown().await;
+            remove_database_files(&data_path);
+            return Err(error);
+        }
+    }
+    let _warmup = run_interval(
         Arc::clone(&adapter),
         args,
         scenario,
         seed ^ 0xaaaa_0000,
         args.warmup,
         true,
+        Arc::new(HashSet::new()),
+        None,
     )
     .await;
-    let _ = warmup_stats;
     #[cfg(feature = "phase-i-instrumentation")]
     let _ = dodb_storage::blink::take_phase_i_group_locality_samples();
     if args.window_seconds.is_some() {
@@ -4668,28 +6451,46 @@ async fn run_repetition(
         ));
     }
     adapter.reset_checkpoint_metrics();
-    let before = adapter.snapshot();
     let churn_before = dodb_storage::churn::snapshot();
     let (leaf_sample_start, _) = dodb_storage::churn::leaf_samples_since(usize::MAX);
-    let cpu_start = ProcessCpuSample::capture();
-    let started = Instant::now();
     let sampler = args.window_seconds.map(|window_seconds| {
         ResourceSampler::start(
             Arc::clone(&adapter),
-            started,
+            Instant::now(),
             Duration::from_secs(window_seconds),
         )
     });
-    let measured = run_interval(
+    let seed_states = if verifies_gets {
+        match capture_sampled_seed_states(&adapter, args, &sampled_keys, false).await {
+            Ok(seed_states) => seed_states,
+            Err(error) => {
+                let _ = adapter.shutdown().await;
+                remove_database_files(&data_path);
+                return Err(error);
+            }
+        }
+    } else {
+        HashMap::new()
+    };
+    let verifier = verifies_gets.then(|| {
+        Arc::new(Mutex::new(SampledReadVerifier::new(
+            &sampled_keys,
+            seed_states,
+        )))
+    });
+    let before = adapter.snapshot();
+    let measured_interval = run_interval(
         Arc::clone(&adapter),
         args,
         scenario,
         seed ^ 0xbbbb_0000,
         args.duration,
         false,
+        Arc::clone(&sampled_keys),
+        verifier.clone(),
     )
     .await;
-    let wall = started.elapsed();
+    let wall = measured_interval.finished_at - measured_interval.started_at;
     let cpu_end = ProcessCpuSample::capture();
     if let Some(sampler) = sampler {
         samples.extend(sampler.finish());
@@ -4704,20 +6505,33 @@ async fn run_repetition(
     let mut churn = churn_delta(&churn_before, &churn_after);
     let (_, leaf_samples) = dodb_storage::churn::leaf_samples_since(leaf_sample_start);
     churn.extend(leaf_sample_summary(&leaf_samples));
-    print_run_summary(scenario, repetition, &measured, wall, &delta);
+    let verification = if let Some(verifier) = verifier {
+        verifier
+            .lock()
+            .expect("sample verifier lock should not be poisoned")
+            .summarize()
+    } else {
+        VerificationSummary::not_applicable()
+    };
+    print_run_summary(scenario, repetition, &measured_interval.stats, wall, &delta);
     let line = build_record(
         machine,
         args,
         scenario,
+        scenario_index,
         repetition,
         seed,
         seeded_rows,
-        &measured,
+        &measured_interval.stats,
         &delta,
+        verification,
+        &measured_interval.process_rss,
+        query_preflight_passed,
+        measured_interval.quota_slots_claimed,
         wall,
-        &cpu_start,
+        &measured_interval.cpu_start,
         &cpu_end,
-        started,
+        measured_interval.started_at,
         &samples,
         &churn,
     );
@@ -4728,7 +6542,62 @@ async fn run_repetition(
     output.flush()?;
     adapter.shutdown().await?;
     remove_database_files(&data_path);
+    if scenario.read_kind == Some(ReadKind::Query) {
+        measured_query_verification_result(&measured_interval.stats)?;
+    }
+    match verification.status {
+        VerificationStatus::Failed => {
+            return Err(Error::invariant("Sampled read verification failed"));
+        }
+        VerificationStatus::Inconclusive => {
+            return Err(Error::invariant(
+                "Sampled read verification was inconclusive",
+            ));
+        }
+        VerificationStatus::NotApplicable | VerificationStatus::Passed => {}
+    }
     Ok(())
+}
+
+async fn capture_sampled_seed_states(
+    adapter: &Arc<dyn EngineAdapter>,
+    args: &Args,
+    sampled_keys: &HashSet<DocumentKey>,
+    validate_seed_value: bool,
+) -> Result<HashMap<DocumentKey, SampledSeed>> {
+    let mut seed_states = HashMap::with_capacity(sampled_keys.len());
+    for key in sampled_keys {
+        let index = key
+            .sk
+            .as_bytes()
+            .get(key.sk.as_bytes().len().saturating_sub(8)..)
+            .and_then(|bytes| <[u8; 8]>::try_from(bytes).ok())
+            .map(u64::from_be_bytes)
+            .filter(|index| *index < args.working_set as u64)
+            .ok_or_else(|| Error::invariant("sampled key has no valid seeded index"))?;
+        let expected_value = value_bytes(args.value_size, index, 0);
+        match adapter
+            .execute(BatchRequest::Get { key: key.clone() })
+            .await?
+        {
+            BatchResponse::Get(RevisionState::Present { value, revision })
+                if !validate_seed_value || value == expected_value =>
+            {
+                seed_states.insert(key.clone(), SampledSeed { value, revision });
+            }
+            BatchResponse::Get(_) => {
+                return Err(Error::invariant(
+                    "sampled seed key was missing or contained an unexpected value",
+                ));
+            }
+            _ => {
+                return Err(Error::invariant(
+                    "sampled seed Get returned an unexpected response",
+                ));
+            }
+        }
+    }
+    Ok(seed_states)
 }
 
 fn open_output(path: &Path) -> std::fs::File {
@@ -4774,11 +6643,17 @@ fn run(args: Args) -> Result<()> {
     runtime.block_on(async {
         for (scenario_index, scenario) in scenarios.iter().enumerate() {
             for repetition in 0..args.repetitions {
-                let seed = args
-                    .seed
-                    .wrapping_add((scenario_index as u64).wrapping_mul(0x9e37_79b9))
-                    .wrapping_add(repetition as u64);
-                run_repetition(&args, scenario, &machine, repetition, seed, &mut output).await?;
+                let seed = invocation_seed(args.seed, scenario_index, repetition);
+                run_repetition(
+                    &args,
+                    scenario,
+                    &machine,
+                    scenario_index,
+                    repetition,
+                    seed,
+                    &mut output,
+                )
+                .await?;
             }
         }
         Ok::<(), Error>(())
@@ -4803,20 +6678,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn read_validation_checks_point_and_query_value_contents() {
+    fn read_validation_checks_point_and_distributed_query_value_contents() {
         let mut corrupted_value = vec![7; 512];
         assert!(value_matches_byte(&corrupted_value, 512, 7));
         corrupted_value[255] ^= 1;
         assert!(!value_matches_byte(&corrupted_value, 512, 7));
 
-        let rows: Vec<dodb_storage::btree::Document> = (0..16)
-            .map(|row_index| dodb_storage::btree::Document {
-                key: query_key(16, row_index),
-                value: vec![row_index as u8; 512],
+        let args = Args::default();
+        let range = query_range_for_index(7, args.read_limit);
+        let request = range.request(args.key_size);
+        let rows: Vec<dodb_storage::Document> = (range.start_index
+            ..range.start_index + range.limit)
+            .map(|row_index| dodb_storage::Document {
+                key: distributed_query_key(args.key_size, range.pk_index, row_index),
+                value: value_bytes(
+                    args.value_size,
+                    distributed_query_value_index(range.pk_index, row_index, args.read_limit),
+                    0,
+                ),
                 revision: dodb_core::Revision::ZERO,
             })
             .collect();
-        assert!(query_result_matches(&rows, 16, 512, 16));
+        assert!(query_result_is_valid(
+            &request,
+            &rows,
+            args.key_size,
+            args.value_size,
+            args.read_limit,
+        ));
     }
 
     #[test]
@@ -5086,6 +6975,95 @@ mod tests {
         assert_eq!(pending.as_ref().map(queued_blink_work_tag), Some(2));
     }
 
+    #[test]
+    fn rss_window_excludes_outside_samples_and_tracks_growth_and_intervals() {
+        let started_at = Instant::now();
+        let mut accumulator =
+            RssWindowAccumulator::new(started_at, Duration::from_millis(10), true);
+        assert!(!accumulator.record(started_at - Duration::from_millis(1), Ok(900),));
+        assert!(accumulator.record(started_at + Duration::from_millis(2), Ok(100)));
+        assert!(accumulator.record(started_at + Duration::from_millis(12), Ok(250)));
+        assert!(accumulator.record(started_at + Duration::from_millis(22), Err(())));
+        assert!(accumulator.record(started_at + Duration::from_millis(32), Ok(400)));
+        let finished_at = started_at + Duration::from_millis(34);
+        accumulator.finished_at = Some(finished_at);
+        assert!(!accumulator.record(finished_at + Duration::from_nanos(1), Ok(1_000)));
+
+        let measurement = accumulator.finish(finished_at);
+        assert_eq!(measurement.status, "partial");
+        assert_eq!(measurement.start_rss_bytes, Some(100));
+        assert_eq!(measurement.end_rss_bytes, Some(400));
+        assert_eq!(measurement.peak_rss_bytes, Some(400));
+        assert_eq!(measurement.sample_count, 3);
+        assert_eq!(measurement.collection_failures, 1);
+        assert_eq!(
+            measurement.max_sample_interval,
+            Some(Duration::from_millis(10))
+        );
+        assert_eq!(
+            measurement.start_sample_offset,
+            Some(Duration::from_millis(2))
+        );
+        assert_eq!(
+            measurement.end_sample_offset,
+            Some(Duration::from_millis(32))
+        );
+        assert_eq!(
+            measurement.peak_sample_offset,
+            Some(Duration::from_millis(32))
+        );
+    }
+
+    #[test]
+    fn rss_failures_and_unsupported_status_never_serialize_as_zero_bytes() {
+        let started_at = Instant::now();
+        let mut failed = RssWindowAccumulator::new(started_at, Duration::from_millis(10), true);
+        failed.record(started_at + Duration::from_millis(1), Err(()));
+        let failed = failed.finish(started_at + Duration::from_millis(2));
+        assert_eq!(failed.status, "failed");
+        assert_eq!(failed.start_rss_bytes, None);
+        assert_eq!(failed.end_rss_bytes, None);
+        assert_eq!(failed.peak_rss_bytes, None);
+        assert_eq!(failed.sample_count, 0);
+        assert_eq!(failed.collection_failures, 1);
+
+        let unsupported = RssWindowAccumulator::new(started_at, Duration::from_millis(10), false)
+            .finish(started_at + Duration::from_millis(2));
+        assert_eq!(unsupported.status, "unsupported");
+        assert_eq!(unsupported.start_rss_bytes, None);
+        assert_eq!(unsupported.sample_count, 0);
+        assert_eq!(unsupported.collection_failures, 0);
+        assert_eq!(duration_to_nanos(Duration::from_micros(7)), 7_000);
+        assert_eq!(resident_pages_to_bytes(5, 4_096), Some(20_480));
+        assert_eq!(resident_pages_to_bytes(u64::MAX, 4_096), None);
+    }
+
+    #[test]
+    fn platform_rss_reader_returns_bytes_for_the_current_process() {
+        if process_rss_supported() {
+            assert!(process_rss_bytes().unwrap() > 0);
+        }
+    }
+
+    #[test]
+    fn rss_sampler_runs_independently_while_caller_is_busy() {
+        let mut sampler = ProcessRssSampler::spawn(Duration::from_millis(5));
+        let started_at = Instant::now();
+        sampler.start(started_at);
+        let deadline = started_at + Duration::from_millis(60);
+        let mut work_value = 1u64;
+        while Instant::now() < deadline {
+            work_value = work_value.wrapping_mul(3).wrapping_add(1);
+        }
+        std::hint::black_box(work_value);
+        let (finished_at, measurement) = sampler.finish();
+        assert_eq!(measurement.status, "complete");
+        assert!(measurement.sample_count >= 2);
+        assert_eq!(measurement.collection_failures, 0);
+        assert!(measurement.start_sample_offset.unwrap() <= finished_at - started_at);
+        assert!(measurement.end_sample_offset.unwrap() <= finished_at - started_at);
+    }
+
     fn workload(distribution: Distribution, width: usize) -> WorkloadConfig {
         WorkloadConfig {
             distribution,
@@ -5096,6 +7074,18 @@ mod tests {
             transaction_mode: TransactionMode::Unconditional,
             read_limit: 16,
         }
+    }
+
+    fn verifier_with_seed(key: DocumentKey, revision: u64) -> SampledReadVerifier {
+        let sampled_keys = HashSet::from([key.clone()]);
+        let seed_states = HashMap::from([(
+            key,
+            SampledSeed {
+                value: value_bytes(8, 0, 0),
+                revision: dodb_core::Revision::new(revision),
+            },
+        )]);
+        SampledReadVerifier::new(&sampled_keys, seed_states)
     }
 
     #[test]
@@ -5128,6 +7118,126 @@ mod tests {
         for _ in 0..32 {
             assert_eq!(left.next_transaction(), right.next_transaction());
         }
+    }
+
+    #[test]
+    fn query16_uses_many_deterministic_pk_and_start_ranges() {
+        let config = workload(Distribution::Uniform, 1);
+        let mut first_generator = WorkloadGenerator::new(config.clone(), 0xabc, 2);
+        let mut second_generator = WorkloadGenerator::new(config, 0xabc, 2);
+        let mut requested_ranges = HashSet::new();
+        for _ in 0..QUERY_INPUT_PLAN_REQUESTS {
+            let first_request = first_generator.next_read(ReadKind::Query);
+            let second_request = second_generator.next_read(ReadKind::Query);
+            assert_eq!(first_request, second_request);
+            requested_ranges.insert(
+                query_range_from_request(&first_request, DEFAULT_KEY_SIZE, DEFAULT_READ_LIMIT)
+                    .unwrap(),
+            );
+        }
+        assert!(
+            requested_ranges
+                .iter()
+                .map(|range| range.pk_index)
+                .collect::<HashSet<_>>()
+                .len()
+                > 1
+        );
+        assert!(
+            requested_ranges
+                .iter()
+                .map(|range| range.start_index)
+                .collect::<HashSet<_>>()
+                .len()
+                > 1
+        );
+        assert!(requested_ranges.len() > 100);
+        assert_eq!(query_range_count(DEFAULT_READ_LIMIT), 8 * 17);
+    }
+
+    #[test]
+    fn invocation_seed_records_scenario_and_repetition_inputs() {
+        assert_eq!(invocation_seed(100, 0, 0), 100);
+        assert_eq!(invocation_seed(100, 1, 0), 100 + 0x9e37_79b9);
+        assert_eq!(invocation_seed(100, 1, 2), 100 + 0x9e37_79b9 + 2);
+        assert_eq!(invocation_seed(u64::MAX, 1, 1), 0x9e37_79b9);
+    }
+
+    #[test]
+    fn mix_quota_interleaves_slots_at_the_requested_operation_ratio() {
+        for (read_percent, expected_reads) in [(95, 95), (50, 50), (20, 20)] {
+            let roles = (0..100)
+                .map(|slot| is_read_slot(slot, read_percent))
+                .collect::<Vec<_>>();
+            assert_eq!(
+                roles.iter().filter(|is_read| **is_read).count(),
+                expected_reads
+            );
+            let longest_read_run = roles
+                .split(|is_read| !*is_read)
+                .map(<[bool]>::len)
+                .max()
+                .unwrap_or(0);
+            let longest_write_run = roles
+                .split(|is_read| *is_read)
+                .map(<[bool]>::len)
+                .max()
+                .unwrap_or(0);
+            match read_percent {
+                95 => assert!(longest_read_run <= 19 && longest_write_run == 1),
+                50 => assert!(longest_read_run == 1 && longest_write_run == 1),
+                20 => assert!(longest_read_run == 1 && longest_write_run <= 4),
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    #[test]
+    fn mixed_scenarios_keep_default_width_and_accept_explicit_widths() {
+        let mut args = Args::default();
+        args.suite = Suite::Mixed;
+        args.writers = Some(vec![2]);
+        args.readers = Some(vec![2]);
+        args.mixes = Some(vec![Mix::BALANCED]);
+        assert_eq!(
+            scenarios(&args)
+                .iter()
+                .map(|scenario| scenario.width)
+                .collect::<Vec<_>>(),
+            vec![1]
+        );
+
+        args.widths = Some(vec![4, 8]);
+        assert_eq!(
+            scenarios(&args)
+                .iter()
+                .map(|scenario| scenario.width)
+                .collect::<Vec<_>>(),
+            vec![4, 8]
+        );
+    }
+
+    #[test]
+    fn verification_history_is_bounded_and_reports_omitted_reads() {
+        let key = WorkloadGenerator::new(workload(Distribution::Uniform, 1), 0, 0).key_for_index(0);
+        let mut verifier = verifier_with_seed(key.clone(), 5);
+        let timestamp = Instant::now();
+        for _ in 0..50_000 {
+            verifier.record_read(SampledRead {
+                key: key.clone(),
+                value: Some(value_bytes(8, 0, 0)),
+                revision: Some(dodb_core::Revision::new(5)),
+                started_at: timestamp,
+                finished_at: timestamp,
+            });
+        }
+
+        let summary = verifier.summarize();
+        assert_eq!(summary.status, VerificationStatus::Inconclusive);
+        assert_eq!(summary.sampled_reads_observed, 50_000);
+        assert!(summary.sampled_reads_checked < summary.sampled_reads_observed);
+        assert!(summary.omitted_events > 0);
+        assert!(summary.estimated_memory_bytes <= MAX_VERIFICATION_MEMORY_BYTES);
     }
 
     #[test]
@@ -5165,6 +7275,464 @@ mod tests {
                 .windows(2)
                 .any(|pair| pair[0].pk != pair[1].pk)
         );
+    }
+
+    #[test]
+    fn query16_response_contract_rejects_wrong_pk_boundary_order_duplicates_count_and_values() {
+        let mut args = Args::default();
+        args.working_set = 32;
+        args.read_limit = 16;
+        let range = QueryRange {
+            pk_index: 3,
+            start_index: 5,
+            limit: args.read_limit,
+        };
+        let request = range.request(args.key_size);
+        let mut rows = (range.start_index..range.start_index + args.read_limit)
+            .map(|row_index| dodb_storage::Document {
+                key: distributed_query_key(args.key_size, range.pk_index, row_index),
+                value: value_bytes(
+                    args.value_size,
+                    distributed_query_value_index(range.pk_index, row_index, args.read_limit),
+                    0,
+                ),
+                revision: dodb_core::Revision::new(row_index as u64 + 1),
+            })
+            .collect::<Vec<_>>();
+
+        assert!(query_result_is_valid(
+            &request,
+            &rows,
+            args.key_size,
+            args.value_size,
+            args.read_limit,
+        ));
+
+        rows.swap(0, 1);
+        assert!(!query_result_is_valid(
+            &request,
+            &rows,
+            args.key_size,
+            args.value_size,
+            args.read_limit,
+        ));
+        rows.swap(0, 1);
+
+        rows[1].key = rows[0].key.clone();
+        assert!(!query_result_is_valid(
+            &request,
+            &rows,
+            args.key_size,
+            args.value_size,
+            args.read_limit,
+        ));
+        rows[1].key = distributed_query_key(args.key_size, range.pk_index, range.start_index + 1);
+
+        rows.pop();
+        assert!(!query_result_is_valid(
+            &request,
+            &rows,
+            args.key_size,
+            args.value_size,
+            args.read_limit,
+        ));
+        rows.push(dodb_storage::Document {
+            key: distributed_query_key(args.key_size, range.pk_index, range.start_index + 15),
+            value: value_bytes(
+                args.value_size,
+                distributed_query_value_index(
+                    range.pk_index,
+                    range.start_index + 15,
+                    args.read_limit,
+                ),
+                0,
+            ),
+            revision: dodb_core::Revision::new(16),
+        });
+
+        let wrong_pk_request = QueryRange {
+            pk_index: QUERY_PK_COUNT,
+            ..range
+        }
+        .request(args.key_size);
+        assert!(!query_result_is_valid(
+            &wrong_pk_request,
+            &rows,
+            args.key_size,
+            args.value_size,
+            args.read_limit,
+        ));
+
+        let wrong_boundary_request = BatchRequest::Query {
+            pk: PrimaryKey::new(distributed_query_pk(args.key_size, range.pk_index)),
+            exclusive_after_sk: Some(SortKey::new(component_bytes(
+                0x43,
+                (query_rows_per_pk(args.read_limit) - 1) as u64,
+                key_component_lengths(args.key_size).1,
+            ))),
+            limit: args.read_limit,
+        };
+        assert!(!query_result_is_valid(
+            &wrong_boundary_request,
+            &rows,
+            args.key_size,
+            args.value_size,
+            args.read_limit,
+        ));
+
+        rows[0].value[0] ^= 0xff;
+        assert!(!query_result_is_valid(
+            &request,
+            &rows,
+            args.key_size,
+            args.value_size,
+            args.read_limit,
+        ));
+    }
+
+    #[test]
+    fn damaged_measured_response_is_counted_and_invalidates_the_run() {
+        let args = Args::default();
+        let workload = WorkloadConfig {
+            distribution: Distribution::Uniform,
+            working_set: args.working_set,
+            key_size: args.key_size,
+            value_size: args.value_size,
+            width: 1,
+            transaction_mode: args.transaction_mode,
+            read_limit: args.read_limit,
+        };
+        let range = QueryRange {
+            pk_index: 2,
+            start_index: 4,
+            limit: args.read_limit,
+        };
+        let request = range.request(args.key_size);
+        let rows = (range.start_index..range.start_index + range.limit)
+            .map(|row_index| dodb_storage::Document {
+                key: distributed_query_key(args.key_size, range.pk_index, row_index),
+                value: value_bytes(
+                    args.value_size,
+                    distributed_query_value_index(range.pk_index, row_index, args.read_limit),
+                    0,
+                ),
+                revision: dodb_core::Revision::new(row_index as u64 + 1),
+            })
+            .collect::<Vec<_>>();
+        let mut damaged_rows = rows;
+        damaged_rows[0].value[0] ^= 1;
+        let mut stats = WorkerStats::new(2);
+        assert!(!record_query_response(
+            &request,
+            &BatchResponse::Query(damaged_rows),
+            &workload,
+            &mut stats,
+        ));
+        stats.complete_client("reader", 0);
+        assert_eq!(stats.query_checked_requests, 1);
+        assert_eq!(stats.query_checked_rows, args.read_limit as u64);
+        assert_eq!(stats.query_validation_failures, 1);
+        assert_eq!(stats.errors, 1);
+        assert_eq!(stats.successful_queries, 0);
+        assert_eq!(stats.returned_rows, args.read_limit as u64);
+        assert_eq!(stats.client_completions[0].successful_queries, 0);
+        assert_eq!(
+            stats.client_completions[0].returned_rows,
+            args.read_limit as u64
+        );
+        assert!(measured_query_verification_result(&stats).is_err());
+
+        let clean_response = BatchResponse::Query(
+            (range.start_index..range.start_index + range.limit)
+                .map(|row_index| dodb_storage::Document {
+                    key: distributed_query_key(args.key_size, range.pk_index, row_index),
+                    value: value_bytes(
+                        args.value_size,
+                        distributed_query_value_index(range.pk_index, row_index, args.read_limit),
+                        0,
+                    ),
+                    revision: dodb_core::Revision::new(row_index as u64 + 1),
+                })
+                .collect(),
+        );
+        let mut clean_stats = WorkerStats::new(3);
+        assert!(record_query_response(
+            &request,
+            &clean_response,
+            &workload,
+            &mut clean_stats,
+        ));
+        assert_eq!(
+            clean_stats.returned_rows,
+            clean_stats.successful_queries * args.read_limit as u64
+        );
+        assert!(measured_query_verification_result(&clean_stats).is_ok());
+    }
+
+    #[test]
+    fn sampled_read_verification_accepts_seed_and_revisioned_updates_but_rejects_corruption() {
+        let key = WorkloadGenerator::new(workload(Distribution::Uniform, 1), 0, 0).key_for_index(0);
+        let interval_start = Instant::now();
+        let seed_revision = dodb_core::Revision::new(5);
+        let write_revision = dodb_core::Revision::new(10);
+        let seed_value = value_bytes(8, 0, 0);
+        let write_value = vec![0x91; 8];
+        let mut verifier = verifier_with_seed(key.clone(), seed_revision.get());
+        verifier.seed_states.insert(
+            key.clone(),
+            SampledSeed {
+                value: seed_value.clone(),
+                revision: seed_revision,
+            },
+        );
+        verifier.record_mutations(
+            vec![(key.clone(), write_value.clone())],
+            Some(write_revision),
+            interval_start + Duration::from_millis(2),
+            interval_start + Duration::from_millis(3),
+            false,
+        );
+        verifier.record_read(SampledRead {
+            key: key.clone(),
+            value: Some(seed_value),
+            revision: Some(seed_revision),
+            started_at: interval_start,
+            finished_at: interval_start + Duration::from_millis(1),
+        });
+        verifier.record_read(SampledRead {
+            key: key.clone(),
+            value: Some(write_value.clone()),
+            revision: Some(write_revision),
+            started_at: interval_start + Duration::from_millis(1),
+            finished_at: interval_start + Duration::from_millis(4),
+        });
+        verifier.record_read(SampledRead {
+            key: key.clone(),
+            value: Some(write_value.clone()),
+            revision: Some(write_revision),
+            started_at: interval_start + Duration::from_millis(4),
+            finished_at: interval_start + Duration::from_millis(5),
+        });
+        let summary = verifier.summarize();
+        assert_eq!(summary.status, VerificationStatus::Passed);
+        assert_eq!(summary.sampled_reads_checked, 3);
+        assert_eq!(summary.changed_key_reads_checked, 2);
+
+        let mut corrupted_verifier = verifier_with_seed(key.clone(), seed_revision.get());
+        corrupted_verifier.seed_states.insert(
+            key.clone(),
+            SampledSeed {
+                value: value_bytes(8, 0, 0),
+                revision: seed_revision,
+            },
+        );
+        corrupted_verifier.record_mutations(
+            vec![(key.clone(), write_value)],
+            Some(write_revision),
+            interval_start + Duration::from_millis(2),
+            interval_start + Duration::from_millis(3),
+            false,
+        );
+        corrupted_verifier.record_read(SampledRead {
+            key,
+            value: Some(vec![0x92; 8]),
+            revision: Some(write_revision),
+            started_at: interval_start + Duration::from_millis(4),
+            finished_at: interval_start + Duration::from_millis(5),
+        });
+        assert_eq!(
+            corrupted_verifier.summarize().status,
+            VerificationStatus::Failed
+        );
+    }
+
+    #[test]
+    fn empty_samples_are_inconclusive_and_ambiguous_writes_are_not_permanent_candidates() {
+        let key = WorkloadGenerator::new(workload(Distribution::Uniform, 1), 0, 0).key_for_index(0);
+        let interval_start = Instant::now();
+        let empty_verifier = verifier_with_seed(key.clone(), 5);
+        assert_eq!(
+            empty_verifier.summarize().status,
+            VerificationStatus::Inconclusive
+        );
+
+        let unknown_value = vec![0xa1; 8];
+        let mut verifier = verifier_with_seed(key.clone(), 5);
+        verifier.record_mutations(
+            vec![(key.clone(), unknown_value.clone())],
+            None,
+            interval_start + Duration::from_millis(1),
+            interval_start + Duration::from_millis(2),
+            true,
+        );
+        verifier.record_read(SampledRead {
+            key: key.clone(),
+            value: Some(unknown_value),
+            revision: Some(dodb_core::Revision::new(6)),
+            started_at: interval_start + Duration::from_millis(3),
+            finished_at: interval_start + Duration::from_millis(4),
+        });
+        assert_eq!(
+            verifier.summarize().status,
+            VerificationStatus::Inconclusive
+        );
+        verifier.record_mutations(
+            vec![(key.clone(), vec![0xb2; 8])],
+            Some(dodb_core::Revision::new(7)),
+            interval_start + Duration::from_millis(5),
+            interval_start + Duration::from_millis(6),
+            false,
+        );
+        verifier.record_read(SampledRead {
+            key: key.clone(),
+            value: Some(vec![0xa1; 8]),
+            revision: Some(dodb_core::Revision::new(6)),
+            started_at: interval_start + Duration::from_millis(7),
+            finished_at: interval_start + Duration::from_millis(8),
+        });
+        assert_eq!(verifier.summarize().status, VerificationStatus::Failed);
+
+        let mut resolved_verifier = verifier_with_seed(key.clone(), 5);
+        resolved_verifier.record_mutations(
+            vec![(key.clone(), vec![0xa1; 8])],
+            None,
+            interval_start + Duration::from_millis(1),
+            interval_start + Duration::from_millis(2),
+            true,
+        );
+        resolved_verifier.record_mutations(
+            vec![(key.clone(), vec![0xb2; 8])],
+            Some(dodb_core::Revision::new(7)),
+            interval_start + Duration::from_millis(3),
+            interval_start + Duration::from_millis(4),
+            false,
+        );
+        resolved_verifier.record_read(SampledRead {
+            key,
+            value: Some(vec![0xb2; 8]),
+            revision: Some(dodb_core::Revision::new(7)),
+            started_at: interval_start + Duration::from_millis(5),
+            finished_at: interval_start + Duration::from_millis(6),
+        });
+        let resolved_summary = resolved_verifier.summarize();
+        assert_eq!(resolved_summary.status, VerificationStatus::Passed);
+        assert_eq!(resolved_summary.sampled_reads_indeterminate, 0);
+    }
+
+    #[test]
+    fn concurrent_write_response_order_does_not_define_latest_value() {
+        let key = WorkloadGenerator::new(workload(Distribution::Uniform, 1), 0, 0).key_for_index(0);
+        let interval_start = Instant::now();
+        let value_a = vec![0xa1; 8];
+        let value_b = vec![0xb2; 8];
+        let mut verifier = verifier_with_seed(key.clone(), 5);
+        verifier.record_mutations(
+            vec![(key.clone(), value_b.clone())],
+            Some(dodb_core::Revision::new(20)),
+            interval_start + Duration::from_millis(2),
+            interval_start + Duration::from_millis(7),
+            false,
+        );
+        verifier.record_mutations(
+            vec![(key.clone(), value_a.clone())],
+            Some(dodb_core::Revision::new(10)),
+            interval_start + Duration::from_millis(1),
+            interval_start + Duration::from_millis(8),
+            false,
+        );
+        verifier.record_read(SampledRead {
+            key: key.clone(),
+            value: Some(value_b.clone()),
+            revision: Some(dodb_core::Revision::new(20)),
+            started_at: interval_start + Duration::from_millis(9),
+            finished_at: interval_start + Duration::from_millis(10),
+        });
+        assert_eq!(verifier.summarize().status, VerificationStatus::Passed);
+
+        let mut stale_verifier = verifier_with_seed(key.clone(), 5);
+        stale_verifier.record_mutations(
+            vec![(key.clone(), value_b)],
+            Some(dodb_core::Revision::new(20)),
+            interval_start + Duration::from_millis(2),
+            interval_start + Duration::from_millis(7),
+            false,
+        );
+        stale_verifier.record_mutations(
+            vec![(key.clone(), value_a.clone())],
+            Some(dodb_core::Revision::new(10)),
+            interval_start + Duration::from_millis(1),
+            interval_start + Duration::from_millis(8),
+            false,
+        );
+        stale_verifier.record_read(SampledRead {
+            key,
+            value: Some(value_a),
+            revision: Some(dodb_core::Revision::new(10)),
+            started_at: interval_start + Duration::from_millis(9),
+            finished_at: interval_start + Duration::from_millis(10),
+        });
+        assert_eq!(
+            stale_verifier.summarize().status,
+            VerificationStatus::Failed
+        );
+    }
+
+    #[test]
+    fn prior_mixed_smoke_selected_no_sampled_gets() {
+        let mut args = Args::default();
+        args.seed = 15_049_657_927_369_490_433;
+        args.working_set = 256;
+        let scenario = Scenario {
+            suite: Suite::Mixed,
+            workload: "mixed",
+            writers: 1,
+            readers: 1,
+            width: 1,
+            distribution: Distribution::Uniform,
+            read_kind: Some(ReadKind::Get),
+            mix: Some(Mix::BALANCED),
+            collection_delay: Duration::ZERO,
+            sync_delay: Duration::ZERO,
+        };
+        let sampled_keys = sampled_read_keys(&args, &scenario);
+        let mut sampled_indexes = sampled_keys
+            .iter()
+            .map(|key| {
+                u64::from_be_bytes(
+                    key.sk.as_bytes()[key.sk.as_bytes().len() - 8..]
+                        .try_into()
+                        .unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        sampled_indexes.sort_unstable();
+        assert_eq!(sampled_indexes, vec![105, 213, 214]);
+
+        let measured_seed = invocation_seed(args.seed, 0, 0) ^ 0xbbbb_0000;
+        let read_seed = measured_seed ^ 0x2000_0000;
+        let mut read_generator = WorkloadGenerator::new(
+            WorkloadConfig {
+                distribution: scenario.distribution,
+                working_set: args.working_set,
+                key_size: args.key_size,
+                value_size: args.value_size,
+                width: scenario.width,
+                transaction_mode: args.transaction_mode,
+                read_limit: args.read_limit,
+            },
+            read_seed,
+            0,
+        );
+        let sampled_gets = (0..50)
+            .filter(|_| {
+                matches!(
+                    read_generator.next_read(ReadKind::Get),
+                    BatchRequest::Get { ref key } if sampled_keys.contains(key)
+                )
+            })
+            .count();
+
+        assert_eq!(sampled_gets, 0);
     }
 
     #[test]
