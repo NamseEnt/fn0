@@ -6,6 +6,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 
 from summarize_payload_batching import ValidationError, validate_raw_record, write_artifact_manifest
@@ -141,6 +142,45 @@ def command_output(*command):
     except (OSError, subprocess.CalledProcessError):
         return None
     return completed.stdout.strip()
+
+
+def process_rss_kib(process_id):
+    try:
+        status = pathlib.Path(f"/proc/{process_id}/status").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    values = {}
+    for line in status.splitlines():
+        if line.startswith("VmRSS:"):
+            values["end"] = int(line.split()[1])
+        elif line.startswith("VmHWM:"):
+            values["hwm"] = int(line.split()[1])
+    return values if len(values) == 2 else None
+
+
+def run_process_with_rss(command, cwd, environment, stdout):
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        stdout=stdout,
+        stderr=subprocess.STDOUT,
+        env=environment,
+    )
+    final_sample = None
+    peak_hwm_kib = 0
+    while True:
+        sample = process_rss_kib(process.pid)
+        if sample is not None:
+            final_sample = sample
+            peak_hwm_kib = max(peak_hwm_kib, sample["hwm"])
+        return_code = process.poll()
+        if return_code is not None:
+            break
+        time.sleep(0.02)
+    return_code = process.wait()
+    if final_sample is None:
+        raise RunnerError(f"unable to sample benchmark process memory: pid={process.pid}")
+    return return_code, {"end": final_sample["end"], "hwm": peak_hwm_kib}
 
 
 def parse_integer_list(value, name, minimum=1):
@@ -595,15 +635,21 @@ def execute_cell(arguments, results, repository, cell, binary_registry, source_s
     )
     data_dir.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("x", encoding="utf-8") as log_file:
-        process = subprocess.run(
+        return_code, process_rss = run_process_with_rss(
             command,
-            cwd=repository,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            env=environment,
+            repository,
+            environment,
+            log_file,
         )
 
-    output_digest = sha256_file(output_path) if output_path.is_file() else None
+    output_digest = None
+    if output_path.is_file():
+        output_lines = [line for line in output_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        if len(output_lines) == 1:
+            raw_record = json.loads(output_lines[0])
+            raw_record["rss_kib"] = process_rss
+            output_path.write_text(json.dumps(raw_record, sort_keys=True) + "\n", encoding="utf-8")
+            output_digest = sha256_file(output_path)
     log_digest = sha256_file(log_path) if log_path.is_file() else None
     record_event(
         results,
@@ -614,17 +660,18 @@ def execute_cell(arguments, results, repository, cell, binary_registry, source_s
             "binary_key": cell["binary_key"],
             "binary_path": str(binary),
             "binary_sha256": binary_hash,
-            "exit_code": process.returncode,
+            "exit_code": return_code,
             "output": str(output_path),
             "log": str(log_path),
             "output_sha256": output_digest,
             "log_sha256": log_digest,
+            "process_rss_kib": process_rss,
         },
     )
-    if process.returncode != 0:
+    if return_code != 0:
         raise RunnerError(
             f"benchmark failed: variant={cell['variant']} mode={cell['value_mode']} "
-            f"clients={cell['clients']} repetition={cell['repetition']} exit_code={process.returncode}"
+            f"clients={cell['clients']} repetition={cell['repetition']} exit_code={return_code}"
         )
     if output_digest is None:
         raise RunnerError(f"benchmark output is missing: {output_path}")

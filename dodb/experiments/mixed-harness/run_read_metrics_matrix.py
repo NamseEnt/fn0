@@ -15,6 +15,7 @@ from run_payload_batching_matrix import (
     environment_record,
     parse_string_list,
     record_event,
+    run_process_with_rss,
     require_clean_source,
     sha256_file,
     timestamp_utc,
@@ -389,19 +390,23 @@ def execute_cell(arguments, results, repository, cell, binary_registry, source_s
     record_event(results, started)
     try:
         with log_path.open("x", encoding="utf-8") as log_file:
-            subprocess.run(
+            return_code, process_rss = run_process_with_rss(
                 command,
-                cwd=repository,
-                env=environment,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                check=True,
+                repository,
+                environment,
+                log_file,
             )
+        if return_code != 0:
+            raise subprocess.CalledProcessError(return_code, command)
         raw_records = load_json_lines(output_path)
         if len(raw_records) != 1:
             raise ValidationError(
                 f"expected one raw record for {cell['cell_id']}, found {len(raw_records)}"
             )
+        raw_records[0]["rss_kib"] = process_rss
+        output_path.write_text(
+            json.dumps(raw_records[0], sort_keys=True) + "\n", encoding="utf-8"
+        )
         validate_raw_record(raw_records[0], cell, source_state_before["commit"])
         completed = {
             "event": "complete",
@@ -410,11 +415,12 @@ def execute_cell(arguments, results, repository, cell, binary_registry, source_s
             "binary_env": cell["binary_env"],
             "binary_path": str(binary_path),
             "binary_sha256": binary_hash,
-            "exit_code": 0,
+            "exit_code": return_code,
             "output": str(output_path.resolve()),
             "log": str(log_path.resolve()),
             "output_sha256": sha256_file(output_path),
             "log_sha256": sha256_file(log_path),
+            "process_rss_kib": process_rss,
         }
         record_event(results, completed)
     except BaseException as error:
