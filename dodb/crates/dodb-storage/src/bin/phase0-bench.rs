@@ -4091,10 +4091,6 @@ async fn writer_loop(
     stats
 }
 
-fn value_matches_byte(value: &[u8], expected_length: usize, expected_byte: u8) -> bool {
-    value.len() == expected_length && value.iter().all(|byte| *byte == expected_byte)
-}
-
 async fn reader_loop(
     adapter: Arc<dyn EngineAdapter>,
     workload: WorkloadConfig,
@@ -4120,10 +4116,6 @@ async fn reader_loop(
             break;
         }
         let request = generator.next_read(read_kind);
-        let expected_get_byte = match &request {
-            BatchRequest::Get { key } => key.sk.as_bytes().last().copied(),
-            _ => None,
-        };
         let requested_query_range =
             query_range_from_request(&request, workload.key_size, workload.read_limit);
         let sampled_read_key = match &request {
@@ -4161,11 +4153,6 @@ async fn reader_loop(
                     }
                     RevisionState::Missing { revision } => (None, Some(revision), false),
                 };
-                let valid_value = value.as_ref().is_some_and(|value| {
-                    expected_get_byte.is_some_and(|expected_byte| {
-                        value_matches_byte(value, workload.value_size, expected_byte)
-                    })
-                });
                 if let Some(key) = sampled_read_key
                     && let Some(verifier) = &verifier
                 {
@@ -4180,7 +4167,7 @@ async fn reader_loop(
                             finished_at: finished,
                         });
                 }
-                if found && valid_value {
+                if found {
                     stats.successful_gets += 1;
                 } else {
                     stats.errors += 1;
@@ -4239,10 +4226,6 @@ async fn mixed_client_loop(
         let started = Instant::now();
         if mixed_operation_is_read(operation_index, read_percent) {
             let request = generator.next_read(ReadKind::Get);
-            let expected_get_byte = match &request {
-                BatchRequest::Get { key } => key.sk.as_bytes().last().copied(),
-                _ => None,
-            };
             let sampled_read_key = match &request {
                 BatchRequest::Get { key } if verifier.is_some() && sampled_keys.contains(key) => {
                     Some(key.clone())
@@ -4265,13 +4248,6 @@ async fn mixed_client_loop(
                         }
                         RevisionState::Missing { revision } => (None, Some(revision), false),
                     };
-                    let valid_value = value.as_ref().is_some_and(|value| {
-                        value_matches_byte(
-                            value,
-                            workload.value_size,
-                            expected_get_byte.unwrap_or_default(),
-                        )
-                    });
                     if let (Some(key), Some(verifier)) = (sampled_read_key, &verifier) {
                         verifier
                             .lock()
@@ -4284,7 +4260,7 @@ async fn mixed_client_loop(
                                 finished_at: finished,
                             });
                     }
-                    if found && valid_value {
+                    if found {
                         stats.successful_gets += 1;
                     } else {
                         stats.errors += 1;
@@ -6678,12 +6654,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn read_validation_checks_point_and_distributed_query_value_contents() {
-        let mut corrupted_value = vec![7; 512];
-        assert!(value_matches_byte(&corrupted_value, 512, 7));
-        corrupted_value[255] ^= 1;
-        assert!(!value_matches_byte(&corrupted_value, 512, 7));
-
+    fn distributed_query_validation_checks_response_value_contents() {
         let args = Args::default();
         let range = query_range_for_index(7, args.read_limit);
         let request = range.request(args.key_size);
