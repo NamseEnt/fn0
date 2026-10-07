@@ -1,0 +1,5 @@
+phase0-bench engine=parallel-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=300ms warmup=200ms repetitions=1
+raw output: /bench/zfs/db/experiment-results/dodb-rocksdb-81f6ce268-20261007/smoke/mixed-width1/raw/clients-4-mix-50-50-changing-parallel-blink-main-parity-borrowed-rep1.jsonl
+scenario                                                       repetition throughput summary
+mixed-4w-0r-get-50/50-width1-uniform                       rep=0 tx/s=     4012 mut/s=     4012 read/s=     4144 agg/s=     8156 p50=     0.0us p95=     0.0us p99=     0.0us groups=  309 avg_group= 3.92
+completed 1 scenarios x 1 repetitions

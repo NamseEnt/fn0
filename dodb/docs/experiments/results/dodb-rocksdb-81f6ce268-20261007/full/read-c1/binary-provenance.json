@@ -1,0 +1,12 @@
+{
+  "phase0-borrowed-pages": {
+    "environment_variable": "PHASE0_BORROWED_PAGES_BINARY",
+    "path": "/bench/zfs/db/experiment-results/dodb-rocksdb-81f6ce268-20261007/bin/phase0-borrowed",
+    "sha256": "db83cdbcf53073c16306b4c74bb07b3679f0eac3fc8722b856c32fa10f853ad5"
+  },
+  "rocksdb-bench": {
+    "environment_variable": "ROCKSDB_BINARY",
+    "path": "/bench/zfs/db/experiment-results/dodb-rocksdb-81f6ce268-20261007/bin/rocksdb-bench",
+    "sha256": "2ff16b5563d2a7be077dc8c0f8bb790006225394823517bb9c4e2049f87079c9"
+  }
+}

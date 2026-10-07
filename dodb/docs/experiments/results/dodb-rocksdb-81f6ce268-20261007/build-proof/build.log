@@ -1,0 +1,84 @@
++ rustup run 1.97.1 cargo build -p dodb-storage --release --locked -j2 --bin phase0-bench --features blink-borrowed-page-views
+   Compiling libc v0.2.185
+   Compiling proc-macro2 v1.0.105
+   Compiling find-msvc-tools v0.1.6
+   Compiling unicode-ident v1.0.24
+   Compiling shlex v1.3.0
+   Compiling quote v1.0.45
+   Compiling cc v1.2.51
+   Compiling semver v1.0.27
+   Compiling rustc_version v0.4.1
+   Compiling libmimalloc-sys v0.1.49
+   Compiling syn v3.0.3
+   Compiling crc32c v0.6.8
+   Compiling errno v0.3.14
+   Compiling signal-hook-registry v1.4.8
+   Compiling tokio-macros v2.7.2
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.2
+   Compiling bytes v1.11.1
+   Compiling pin-project-lite v0.2.16
+   Compiling mimalloc v0.1.52
+   Compiling tokio v1.53.1
+   Compiling dodb-core v0.1.0 (/home/opc/fn0-dodb-bench-8a6f3dc/dodb/crates/dodb-core)
+   Compiling dodb-storage v0.1.0 (/home/opc/fn0-dodb-bench-8a6f3dc/dodb/crates/dodb-storage)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 02s
++ cp /bench/zfs/db/experiment-build/dodb-81f6ce268/release/phase0-bench /bench/zfs/db/experiment-results/dodb-rocksdb-81f6ce268-20261007/bin/phase0-borrowed
++ rustup run 1.97.1 cargo build --release --locked -j2 --manifest-path dodb/experiments/mixed-harness/harness/rocksdb-bench/Cargo.toml
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.14
+   Compiling zmij v1.0.23
+   Compiling serde_core v1.0.229
+   Compiling cc v1.5.0
+   Compiling libc v0.2.189
+   Compiling serde_json v1.0.151
+   Compiling rocksdb-bench v0.1.0 (/home/opc/fn0-dodb-bench-8a6f3dc/dodb/experiments/mixed-harness/harness/rocksdb-bench)
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.3
+warning: variants `Busy`, `BusySnapshot`, and `Conflict` are never constructed
+   --> src/../../common/driver.rs:184:5
+    |
+183 | pub enum RetryKind {
+    |          --------- variants in this enum
+184 |     Busy,
+    |     ^^^^
+185 |     BusySnapshot,
+    |     ^^^^^^^^^^^^
+186 |     Conflict,
+    |     ^^^^^^^^
+    |
+    = note: `RetryKind` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: variant `Retryable` is never constructed
+   --> src/../../common/driver.rs:192:5
+    |
+190 | pub enum Attempt {
+    |          ------- variant in this enum
+191 |     Committed,
+192 |     Retryable(RetryKind, String),
+    |     ^^^^^^^^^
+    |
+    = note: `Attempt` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: constant `BASE_SEED` is never used
+ --> src/../../common/workload.rs:4:11
+  |
+4 | pub const BASE_SEED: u64 = 979_000_000;
+  |           ^^^^^^^^^
+
+warning: constant `SEED_STRIDE` is never used
+ --> src/../../common/workload.rs:5:11
+  |
+5 | pub const SEED_STRIDE: u64 = 1_009;
+  |           ^^^^^^^^^^^
+
+warning: function `invocation_seed` is never used
+   --> src/../../common/workload.rs:258:8
+    |
+258 | pub fn invocation_seed(scenario_index: u64, repetition_index: u64) -> u64 {
+    |        ^^^^^^^^^^^^^^^
+
+warning: `rocksdb-bench` (bin "rocksdb-bench") generated 5 warnings
+    Finished `release` profile [optimized + debuginfo] target(s) in 22.23s
++ cp /bench/zfs/db/experiment-build/dodb-81f6ce268/release/rocksdb-bench /bench/zfs/db/experiment-results/dodb-rocksdb-81f6ce268-20261007/bin/rocksdb-bench

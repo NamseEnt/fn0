@@ -1,0 +1,441 @@
+{
+  "accepted": true,
+  "analysis_scope": "Descriptive pure-read measurements. B-link metrics-on and metrics-off share the phase0 workload seed; phase0 uses reader tasks on two Tokio workers while RocksDB uses one OS thread per reader. The RocksDB driver uses an independent key stream, so cross-engine key-trace equality is not claimed.",
+  "completed_count": 4,
+  "environment": {
+    "architecture": "aarch64",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "cpu_model": "Neoverse-N1",
+    "data_root": "/bench/zfs/db/experiment-data/dodb-rocksdb-81f6ce268-20261007/smoke-read-c4",
+    "filesystem": null,
+    "git_branch": "",
+    "git_commit": "81f6ce268a26e6521d62de7cd50797052b408c9b",
+    "hostname": "instance-20260923-1013",
+    "kernel": "6.12.0-206.104.4.4.el9uek.aarch64",
+    "logical_cpus": 2,
+    "memory_total_kib": 11159744,
+    "os_release": "NAME=\"Oracle Linux Server\"\nVERSION=\"9.8\"\nID=\"ol\"\nID_LIKE=\"fedora\"\nVARIANT=\"Server\"\nVARIANT_ID=\"server\"\nVERSION_ID=\"9.8\"\nPLATFORM_ID=\"platform:el9\"\nPRETTY_NAME=\"Oracle Linux Server 9.8\"\nANSI_COLOR=\"0;31\"\nCPE_NAME=\"cpe:/o:oracle:linux:9:8:server\"\nHOME_URL=\"https://linux.oracle.com/\"\nBUG_REPORT_URL=\"https://github.com/oracle/oracle-linux\"\n\nORACLE_BUGZILLA_PRODUCT=\"Oracle Linux 9\"\nORACLE_BUGZILLA_PRODUCT_VERSION=9.8\nORACLE_SUPPORT_PRODUCT=\"Oracle Linux\"\nORACLE_SUPPORT_PRODUCT_VERSION=9.8\n",
+    "python": "Python 3.9.25",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "timestamp_utc": "2026-10-07T00:46:13.583318+00:00",
+    "zfs_dataset": "dodbbench/db",
+    "zfs_properties": "NAME          PROPERTY     VALUE           SOURCE\ndodbbench/db  sync         standard        local\ndodbbench/db  recordsize   4K              local\ndodbbench/db  compression  off             inherited from dodbbench\ndodbbench/db  atime        off             inherited from dodbbench",
+    "zpool_status": "pool: dodbbench\n state: ONLINE\nconfig:\n\n\tNAME        STATE     READ WRITE CKSUM\n\tdodbbench   ONLINE       0     0     0\n\t  sda4      ONLINE       0     0     0\n\nerrors: No known data errors"
+  },
+  "generated_at_utc": "2026-10-07T00:46:20.253218+00:00",
+  "matrix_config": {
+    "config": {
+      "base_seed": 979000000,
+      "cache_capacity": 16384,
+      "data_namespace": "/bench/zfs/db/experiment-data/dodb-rocksdb-81f6ce268-20261007/smoke-read-c4/read-c4",
+      "data_root": "/bench/zfs/db/experiment-data/dodb-rocksdb-81f6ce268-20261007/smoke-read-c4",
+      "distribution": "uniform",
+      "duration_ms": 300,
+      "key_size": 16,
+      "read_kinds": [
+        "get",
+        "query"
+      ],
+      "read_limit": 16,
+      "reader_execution_models": {
+        "phase0": "one async reader task per reader on two Tokio workers",
+        "rocksdb": "one OS thread per reader"
+      },
+      "readers": 4,
+      "repetitions": 1,
+      "seed_stride": 1009,
+      "sync_contract": "durable-return",
+      "sync_mode": "real",
+      "tokio_workers": 2,
+      "transaction_width": 1,
+      "value_size": 512,
+      "variants": [
+        {
+          "binary_env": "PHASE0_BORROWED_PAGES_BINARY",
+          "binary_key": "phase0-borrowed-pages",
+          "binary_kind": "phase0",
+          "blink_read_observational_metrics_enabled": true,
+          "blink_workers": 2,
+          "collection_policy": "current",
+          "engine": "parallel-blink",
+          "engine_options": [
+            "--blink-collection-policy",
+            "current",
+            "--blink-workers",
+            "2"
+          ],
+          "name": "blink-borrowed-pages",
+          "read_metrics_mode": "on",
+          "tokio_workers": 2
+        },
+        {
+          "binary_env": "ROCKSDB_BINARY",
+          "binary_key": "rocksdb-bench",
+          "binary_kind": "rocksdb",
+          "blink_read_observational_metrics_enabled": null,
+          "blink_workers": null,
+          "collection_policy": "not-applicable",
+          "engine": "rocksdb",
+          "engine_options": [],
+          "name": "rocksdb",
+          "read_metrics_mode": "not-applicable",
+          "tokio_workers": null
+        }
+      ],
+      "warmup_ms": 200,
+      "working_set": 10000
+    },
+    "created_at_utc": "2026-10-07T00:46:13.542514+00:00",
+    "expected_cells": [
+      {
+        "binary_env": "PHASE0_BORROWED_PAGES_BINARY",
+        "binary_key": "phase0-borrowed-pages",
+        "binary_kind": "phase0",
+        "cache_capacity": 16384,
+        "cell_id": "readers-4-get-blink-borrowed-pages-rep1",
+        "distribution": "uniform",
+        "duration_ms": 300,
+        "expected_blink_workers": 2,
+        "expected_collection_policy": "current",
+        "expected_engine": "parallel-blink",
+        "expected_raw_repetition": 0,
+        "expected_read_metrics_enabled": true,
+        "expected_tokio_workers": 2,
+        "key_size": 16,
+        "read_kind": "get",
+        "read_limit": 16,
+        "read_metrics_mode": "on",
+        "readers": 4,
+        "repetition": 1,
+        "scenario_index": 4100,
+        "seed": 983136900,
+        "source_commit": "81f6ce268a26e6521d62de7cd50797052b408c9b",
+        "transaction_width": 1,
+        "value_size": 512,
+        "variant": "blink-borrowed-pages",
+        "warmup_ms": 200,
+        "working_set": 10000
+      },
+      {
+        "binary_env": "ROCKSDB_BINARY",
+        "binary_key": "rocksdb-bench",
+        "binary_kind": "rocksdb",
+        "cache_capacity": 16384,
+        "cell_id": "readers-4-get-rocksdb-rep1",
+        "distribution": "uniform",
+        "duration_ms": 300,
+        "expected_blink_workers": null,
+        "expected_collection_policy": "not-applicable",
+        "expected_engine": "rocksdb",
+        "expected_raw_repetition": 1,
+        "expected_read_metrics_enabled": null,
+        "expected_tokio_workers": null,
+        "key_size": 16,
+        "read_kind": "get",
+        "read_limit": 16,
+        "read_metrics_mode": "not-applicable",
+        "readers": 4,
+        "repetition": 1,
+        "scenario_index": 4100,
+        "seed": 983136900,
+        "source_commit": "81f6ce268a26e6521d62de7cd50797052b408c9b",
+        "transaction_width": 1,
+        "value_size": 512,
+        "variant": "rocksdb",
+        "warmup_ms": 200,
+        "working_set": 10000
+      },
+      {
+        "binary_env": "PHASE0_BORROWED_PAGES_BINARY",
+        "binary_key": "phase0-borrowed-pages",
+        "binary_kind": "phase0",
+        "cache_capacity": 16384,
+        "cell_id": "readers-4-query-blink-borrowed-pages-rep1",
+        "distribution": "uniform",
+        "duration_ms": 300,
+        "expected_blink_workers": 2,
+        "expected_collection_policy": "current",
+        "expected_engine": "parallel-blink",
+        "expected_raw_repetition": 0,
+        "expected_read_metrics_enabled": true,
+        "expected_tokio_workers": 2,
+        "key_size": 16,
+        "read_kind": "query",
+        "read_limit": 16,
+        "read_metrics_mode": "on",
+        "readers": 4,
+        "repetition": 1,
+        "scenario_index": 4200,
+        "seed": 983237800,
+        "source_commit": "81f6ce268a26e6521d62de7cd50797052b408c9b",
+        "transaction_width": 1,
+        "value_size": 512,
+        "variant": "blink-borrowed-pages",
+        "warmup_ms": 200,
+        "working_set": 10000
+      },
+      {
+        "binary_env": "ROCKSDB_BINARY",
+        "binary_key": "rocksdb-bench",
+        "binary_kind": "rocksdb",
+        "cache_capacity": 16384,
+        "cell_id": "readers-4-query-rocksdb-rep1",
+        "distribution": "uniform",
+        "duration_ms": 300,
+        "expected_blink_workers": null,
+        "expected_collection_policy": "not-applicable",
+        "expected_engine": "rocksdb",
+        "expected_raw_repetition": 1,
+        "expected_read_metrics_enabled": null,
+        "expected_tokio_workers": null,
+        "key_size": 16,
+        "read_kind": "query",
+        "read_limit": 16,
+        "read_metrics_mode": "not-applicable",
+        "readers": 4,
+        "repetition": 1,
+        "scenario_index": 4200,
+        "seed": 983237800,
+        "source_commit": "81f6ce268a26e6521d62de7cd50797052b408c9b",
+        "transaction_width": 1,
+        "value_size": 512,
+        "variant": "rocksdb",
+        "warmup_ms": 200,
+        "working_set": 10000
+      }
+    ],
+    "planned_count": 4,
+    "schema_version": 1,
+    "source_branch": "",
+    "source_commit": "81f6ce268a26e6521d62de7cd50797052b408c9b"
+  },
+  "planned_count": 4,
+  "rows": [
+    {
+      "blink_read_observational_metrics_enabled": true,
+      "collection_policy": "current",
+      "distribution": "uniform",
+      "duration_ms": 300,
+      "engine": "parallel-blink",
+      "key_size": 16,
+      "metrics": {
+        "cpu_utilization_percent_one_core": {
+          "max": 187.643145,
+          "median": 187.643145,
+          "min": 187.643145
+        },
+        "read_operations_metric": {
+          "max": 364945.0,
+          "median": 364945.0,
+          "min": 364945.0
+        },
+        "read_p99_us": {
+          "max": 2.04,
+          "median": 2.04,
+          "min": 2.04
+        },
+        "rss_end_kib": {
+          "max": 90408.0,
+          "median": 90408.0,
+          "min": 90408.0
+        },
+        "rss_hwm_kib": {
+          "max": 90408.0,
+          "median": 90408.0,
+          "min": 90408.0
+        },
+        "throughput_ops_per_second": {
+          "max": 1160668.262882,
+          "median": 1160668.262882,
+          "min": 1160668.262882
+        }
+      },
+      "read_kind": "get",
+      "read_limit": 16,
+      "read_metrics_mode": "on",
+      "reader_execution_model": "4 reader tasks on 2 Tokio workers",
+      "readers": 4,
+      "repetitions": 1,
+      "seeds": [
+        983136900
+      ],
+      "source_commit": "81f6ce268a26e6521d62de7cd50797052b408c9b",
+      "sync_contract": "durable-return",
+      "transaction_width": 1,
+      "value_size": 512,
+      "variant": "blink-borrowed-pages",
+      "warmup_ms": 200,
+      "working_set": 10000
+    },
+    {
+      "blink_read_observational_metrics_enabled": null,
+      "collection_policy": "not-applicable",
+      "distribution": "uniform",
+      "duration_ms": 300,
+      "engine": "rocksdb",
+      "key_size": 16,
+      "metrics": {
+        "cpu_utilization_percent_one_core": {
+          "max": 196.59996881657918,
+          "median": 196.59996881657918,
+          "min": 196.59996881657918
+        },
+        "read_operations_metric": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "read_p99_us": {
+          "max": 2.12,
+          "median": 2.12,
+          "min": 2.12
+        },
+        "rss_end_kib": {
+          "max": 55224.0,
+          "median": 55224.0,
+          "min": 55224.0
+        },
+        "rss_hwm_kib": {
+          "max": 58492.0,
+          "median": 58492.0,
+          "min": 58492.0
+        },
+        "throughput_ops_per_second": {
+          "max": 1324963.830520737,
+          "median": 1324963.830520737,
+          "min": 1324963.830520737
+        }
+      },
+      "read_kind": "get",
+      "read_limit": 16,
+      "read_metrics_mode": "not-applicable",
+      "reader_execution_model": "4 RocksDB reader OS threads",
+      "readers": 4,
+      "repetitions": 1,
+      "seeds": [
+        983136900
+      ],
+      "source_commit": "81f6ce268a26e6521d62de7cd50797052b408c9b",
+      "sync_contract": "durable-return",
+      "transaction_width": 1,
+      "value_size": 512,
+      "variant": "rocksdb",
+      "warmup_ms": 200,
+      "working_set": 10000
+    },
+    {
+      "blink_read_observational_metrics_enabled": true,
+      "collection_policy": "current",
+      "distribution": "uniform",
+      "duration_ms": 300,
+      "engine": "parallel-blink",
+      "key_size": 16,
+      "metrics": {
+        "cpu_utilization_percent_one_core": {
+          "max": 195.407916,
+          "median": 195.407916,
+          "min": 195.407916
+        },
+        "read_operations_metric": {
+          "max": 167835.0,
+          "median": 167835.0,
+          "min": 167835.0
+        },
+        "read_p99_us": {
+          "max": 3.48,
+          "median": 3.48,
+          "min": 3.48
+        },
+        "rss_end_kib": {
+          "max": 70468.0,
+          "median": 70468.0,
+          "min": 70468.0
+        },
+        "rss_hwm_kib": {
+          "max": 86920.0,
+          "median": 86920.0,
+          "min": 86920.0
+        },
+        "throughput_ops_per_second": {
+          "max": 546604.792834,
+          "median": 546604.792834,
+          "min": 546604.792834
+        }
+      },
+      "read_kind": "query",
+      "read_limit": 16,
+      "read_metrics_mode": "on",
+      "reader_execution_model": "4 reader tasks on 2 Tokio workers",
+      "readers": 4,
+      "repetitions": 1,
+      "seeds": [
+        983237800
+      ],
+      "source_commit": "81f6ce268a26e6521d62de7cd50797052b408c9b",
+      "sync_contract": "durable-return",
+      "transaction_width": 1,
+      "value_size": 512,
+      "variant": "blink-borrowed-pages",
+      "warmup_ms": 200,
+      "working_set": 10000
+    },
+    {
+      "blink_read_observational_metrics_enabled": null,
+      "collection_policy": "not-applicable",
+      "distribution": "uniform",
+      "duration_ms": 300,
+      "engine": "rocksdb",
+      "key_size": 16,
+      "metrics": {
+        "cpu_utilization_percent_one_core": {
+          "max": 196.5959327606989,
+          "median": 196.5959327606989,
+          "min": 196.5959327606989
+        },
+        "read_operations_metric": {
+          "max": null,
+          "median": null,
+          "min": null
+        },
+        "read_p99_us": {
+          "max": 7.04,
+          "median": 7.04,
+          "min": 7.04
+        },
+        "rss_end_kib": {
+          "max": 21544.0,
+          "median": 21544.0,
+          "min": 21544.0
+        },
+        "rss_hwm_kib": {
+          "max": 32852.0,
+          "median": 32852.0,
+          "min": 32852.0
+        },
+        "throughput_ops_per_second": {
+          "max": 278979.6249907925,
+          "median": 278979.6249907925,
+          "min": 278979.6249907925
+        }
+      },
+      "read_kind": "query",
+      "read_limit": 16,
+      "read_metrics_mode": "not-applicable",
+      "reader_execution_model": "4 RocksDB reader OS threads",
+      "readers": 4,
+      "repetitions": 1,
+      "seeds": [
+        983237800
+      ],
+      "source_commit": "81f6ce268a26e6521d62de7cd50797052b408c9b",
+      "sync_contract": "durable-return",
+      "transaction_width": 1,
+      "value_size": 512,
+      "variant": "rocksdb",
+      "warmup_ms": 200,
+      "working_set": 10000
+    }
+  ],
+  "schema_version": 1,
+  "source_commit": "81f6ce268a26e6521d62de7cd50797052b408c9b"
+}
