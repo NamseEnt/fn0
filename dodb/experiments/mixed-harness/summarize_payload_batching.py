@@ -701,7 +701,7 @@ def metric_value(record, metric_name):
     aliases = {
         "aggregate_ops_per_second": ("aggregate_ops_per_second", "total_operations_per_second"),
         "read_ops_per_second": ("read_ops_per_second", "successful_read_operations_per_second", "read_operations_per_second"),
-        "write_tx_per_second": ("logical_tx_per_second", "write_tx_per_second", "write_transactions_per_second"),
+        "write_tx_per_second": ("write_tx_per_second", "write_transactions_per_second", "successful_write_transactions_per_second"),
         "read_p50_us": ("read_p50_us",),
         "read_p95_us": ("read_p95_us",),
         "read_p99_us": ("read_p99_us",),
@@ -740,6 +740,24 @@ def metric_value(record, metric_name):
         return successful_read_write_percentages(record)[0]
     if metric_name == "successful_write_percent":
         return successful_read_write_percentages(record)[1]
+    if metric_name == "write_tx_per_second":
+        direct_value = numeric_value(
+            record,
+            (
+                "write_tx_per_second",
+                "write_transactions_per_second",
+                "successful_write_transactions_per_second",
+            ),
+        )
+        if direct_value is not None:
+            return direct_value
+        mutation_ops_per_second = numeric_value(record, ("mutation_ops_per_second",))
+        if mutation_ops_per_second is not None:
+            transaction_width = numeric_value(record, ("transaction_width",))
+            return mutation_ops_per_second / (transaction_width or 1)
+        if record.get("operation") == "write":
+            return numeric_value(record, ("logical_tx_per_second",))
+        return None
     if metric_name in ("rss_end_kib", "rss_hwm_kib"):
         rss = record.get("rss_kib")
         if isinstance(rss, dict):

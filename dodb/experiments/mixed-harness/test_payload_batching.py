@@ -237,6 +237,24 @@ def write_synthetic_matrix(results, mutation=None, drop_last_complete=False):
 
 
 class PayloadBatchingSummaryTests(unittest.TestCase):
+    def test_write_throughput_uses_write_transaction_rate(self):
+        rocksdb_record = {
+            "engine": "rocksdb",
+            "operation": "mixed",
+            "transaction_width": 4,
+            "logical_tx_per_second": 500.0,
+            "measured": {"write_transactions_per_second": 25.0},
+        }
+        blink_record = {
+            "engine": "parallel-blink",
+            "operation": "mixed",
+            "transaction_width": 4,
+            "logical_tx_per_second": 500.0,
+            "mutation_ops_per_second": 400.0,
+        }
+        self.assertEqual(metric_value(rocksdb_record, "write_tx_per_second"), 25.0)
+        self.assertEqual(metric_value(blink_record, "write_tx_per_second"), 100.0)
+
     def test_compact_main_wal_variant_requires_its_runtime_flag(self):
         arguments = parse_arguments(("--results", "/tmp/compact-main-test", "--clients", "4", "--variants", "main-btree-compact-wal", "--value-modes", "changing", "--repetitions", "1"))
         cell = build_expected_cells(arguments, SOURCE_COMMIT)[0]
