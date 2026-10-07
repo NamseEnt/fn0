@@ -3484,9 +3484,7 @@ fn seed_requests(args: &Args, scenario: &Scenario) -> Vec<TransactionRequest> {
         requests.push(TransactionRequest::new(Vec::new(), mutations));
     }
 
-    // Query/scan rows use a separate PK so that every read scenario returns a
-    // stable, non-empty result without changing the write key distribution.
-    if scenario.read_kind.is_some() || scenario.mix.is_some() {
+    if scenario.read_kind == Some(ReadKind::Query) {
         let query_rows = args.working_set.min(256);
         let mut query_mutations = Vec::new();
         for index in 0..query_rows {

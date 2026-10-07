@@ -998,7 +998,7 @@ fn verify<E: Engine>(engine: &E, args: &Args, reports: &[WriterReport]) -> Value
         .keys()
         .filter(|key| key_index(key) >= working_set && !candidates.contains_key(*key))
         .count() as u64;
-    let query_seed_rows = if matches!(args.operation.as_str(), "query" | "mixed") {
+    let query_seed_rows = if args.operation == "query" {
         args.working_set.min(256)
     } else {
         0usize
@@ -1299,7 +1299,7 @@ fn run_bench<F: EngineFactory>(args: &Args) {
         for chunk in rows.chunks(SEED_CHUNK_ROWS) {
             engine.seed(&mut seeder, chunk);
         }
-        if matches!(args.operation.as_str(), "query" | "mixed") {
+        if args.operation == "query" {
             let rows = query_rows(args.value_size, args.working_set);
             let overlaps = (0..rows.len().min(args.working_set)).step_by(128).count();
             seeded_rows += rows.len() - overlaps;
