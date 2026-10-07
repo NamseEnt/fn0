@@ -1,0 +1,12 @@
+{
+  "source_sha": "a7c9d396d8b7a74a5959beee09b739696e391ad2",
+  "host": "instance-20260923-1013",
+  "rustc": "1.97.1",
+  "rustflags_phase0": "-C target-cpu=native",
+  "rustflags_rocksdb": "-C target-cpu=native -C link-arg=-no-pie",
+  "cache_directory": "/bench/zfs/db/experiment-build/b5aad16",
+  "phase0_binary": "/bench/zfs/db/experiment-build/b5aad16/release/phase0-bench",
+  "phase0_binary_sha256": "805ce0a50088147a911cfcc8fe6b94aea321e608510ad7a499cf285ff0413eb8",
+  "rocksdb_binary": "/bench/zfs/db/experiment-build/b5aad16/rocksdb/release/rocksdb-bench",
+  "rocksdb_binary_sha256": "c2330d38dfe1762fae9ecbefc6794768fd7aa3a2480363d9c4b9e0ffd27f1f54"
+}
