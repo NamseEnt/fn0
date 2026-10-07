@@ -56,6 +56,14 @@ The corrected smoke binary hashes, raw checksums, host, filesystem, and
 commands are recorded in the result manifest and provenance files. The source
 checkout was clean before and after the build and run.
 
+Two earlier smoke pairs are preserved but excluded. The `b5aad16` pair lacked
+the new per-read full-value check and seeded 256 extra B-link rows for Get.
+The `406d93d` pair fixed value checking and row counts but still used a
+differently masked B-link reader seed. The later seed correction is the first
+smoke whose generator seed formula matches across both paths. An initial
+RocksDB link attempt also failed because the available static archive could
+not link as PIE; rebuilding with `-no-pie` succeeded without changing source.
+
 ## 3. Requested baseline matrix
 
 The planned core remains 24 measured executions: 10,000-row Get at c1 and
