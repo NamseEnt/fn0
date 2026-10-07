@@ -2575,6 +2575,7 @@ struct WorkerStats {
 struct ClientCompletion {
     role: &'static str,
     client_index: usize,
+    completed_at: Instant,
     attempted_operations: u64,
     successful_operations: u64,
     successful_queries: u64,
@@ -2669,6 +2670,7 @@ impl WorkerStats {
         self.client_completions.push(ClientCompletion {
             role,
             client_index,
+            completed_at: Instant::now(),
             attempted_operations: self.attempted_operations(),
             successful_operations: self.successful_operations(),
             successful_queries: self.successful_queries,
@@ -2686,6 +2688,14 @@ fn percent(part: u64, total: u64) -> f64 {
     } else {
         part as f64 * 100.0 / total as f64
     }
+}
+
+fn client_completion_skew_ns(completion_times: &[Instant]) -> Option<u64> {
+    let earliest_completion = completion_times.iter().min()?;
+    let latest_completion = completion_times.iter().max()?;
+    Some(duration_to_nanos(
+        latest_completion.saturating_duration_since(*earliest_completion),
+    ))
 }
 
 #[derive(Clone, Debug, Default)]
@@ -5446,14 +5456,42 @@ fn build_record(
         client_attempted_operations == measured.attempted_operations()
             && client_successful_operations == measured.successful_operations(),
     );
+    let client_completion_times = measured
+        .client_completions
+        .iter()
+        .map(|client| client.completed_at)
+        .collect::<Vec<_>>();
+    let earliest_client_completion = client_completion_times.iter().min().map(|completed_at| {
+        duration_to_nanos(completed_at.saturating_duration_since(measurement_started))
+    });
+    let latest_client_completion = client_completion_times.iter().max().map(|completed_at| {
+        duration_to_nanos(completed_at.saturating_duration_since(measurement_started))
+    });
+    json.optional_u64(
+        "client_earliest_completion_offset_ns",
+        earliest_client_completion,
+    );
+    json.optional_u64(
+        "client_latest_completion_offset_ns",
+        latest_client_completion,
+    );
+    json.optional_u64(
+        "client_completion_skew_ns",
+        client_completion_skew_ns(&client_completion_times),
+    );
+    json.string(
+        "client_completion_skew_basis",
+        "latest client completion minus earliest client completion",
+    );
     let clients = measured
         .client_completions
         .iter()
         .map(|client| {
             format!(
-                "{{\"role\":{},\"client_index\":{},\"attempted_operations\":{},\"successful_operations\":{},\"successful_queries\":{},\"returned_rows\":{},\"query_checked_requests\":{},\"query_checked_rows\":{},\"query_validation_failures\":{}}}",
+                "{{\"role\":{},\"client_index\":{},\"completion_offset_ns\":{},\"attempted_operations\":{},\"successful_operations\":{},\"successful_queries\":{},\"returned_rows\":{},\"query_checked_requests\":{},\"query_checked_rows\":{},\"query_validation_failures\":{}}}",
                 json_string(client.role),
                 client.client_index,
+                duration_to_nanos(client.completed_at.saturating_duration_since(measurement_started)),
                 client.attempted_operations,
                 client.successful_operations,
                 client.successful_queries,
@@ -6652,6 +6690,21 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn client_completion_skew_uses_latest_minus_earliest_client() {
+        let interval_started = Instant::now();
+        let completion_times = [
+            interval_started + Duration::from_millis(5),
+            interval_started + Duration::from_millis(11),
+            interval_started + Duration::from_millis(20),
+        ];
+        assert_eq!(
+            client_completion_skew_ns(&completion_times),
+            Some(15_000_000)
+        );
+        assert_eq!(client_completion_skew_ns(&[]), None);
+    }
 
     #[test]
     fn distributed_query_validation_checks_response_value_contents() {
