@@ -6,7 +6,7 @@ pub const SEED_STRIDE: u64 = 1_009;
 pub const WARMUP_SEED_MASK: u64 = 0xaaaa_0000;
 pub const MEASURED_SEED_MASK: u64 = 0xbbbb_0000;
 pub const WRITER_SEED_MASK: u64 = 0x1000_0000;
-pub const LATENCY_RESERVOIR_LIMIT: usize = 1_000_000;
+pub const LATENCY_RESERVOIR_LIMIT: usize = 16_384;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Distribution {
@@ -380,9 +380,23 @@ pub fn value_bytes(length: usize, operation: u64, offset: usize) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::{
-        Distribution, MixedValueMode, WorkloadConfig, WorkloadGenerator, mixed_operation_is_read,
-        mixed_operation_seed, mixed_trace_prefix_hash,
+        Distribution, LATENCY_RESERVOIR_LIMIT, LatencySamples, MixedValueMode, WorkloadConfig,
+        WorkloadGenerator, mixed_operation_is_read, mixed_operation_seed,
+        mixed_trace_prefix_hash,
     };
+    use std::time::Duration;
+
+    #[test]
+    fn latency_samples_keep_a_bounded_deterministic_reservoir() {
+        let mut samples = LatencySamples::with_seed(0x1234_5678);
+        for sample_index in 0..(LATENCY_RESERVOIR_LIMIT * 4) {
+            samples.push(Duration::from_nanos(sample_index as u64));
+        }
+
+        assert_eq!(samples.values.len(), LATENCY_RESERVOIR_LIMIT);
+        assert_eq!(samples.seen, (LATENCY_RESERVOIR_LIMIT * 4) as u64);
+        assert!(samples.percentile_us(0.99).is_finite());
+    }
 
     #[test]
     fn mixed_schedule_preserves_each_ratio_per_hundred_operations() {

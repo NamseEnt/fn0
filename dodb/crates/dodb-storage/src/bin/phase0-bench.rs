@@ -149,7 +149,7 @@ const DEFAULT_READ_LIMIT: usize = 16;
 const DEFAULT_MAX_GROUP_REQUESTS: usize = 64;
 const DEFAULT_MAX_GROUP_BYTES: usize = 4 * 1024 * 1024;
 const DEFAULT_QUEUE_CAPACITY: usize = 256;
-const LATENCY_RESERVOIR_LIMIT: usize = 1_000_000;
+const LATENCY_RESERVOIR_LIMIT: usize = 16_384;
 
 type BenchShard = AsyncShard<BenchFile, BenchFile>;
 type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -4769,6 +4769,18 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn latency_samples_keep_a_bounded_deterministic_reservoir() {
+        let mut samples = LatencySamples::with_seed(0x1234_5678);
+        for sample_index in 0..(LATENCY_RESERVOIR_LIMIT * 4) {
+            samples.push(Duration::from_nanos(sample_index as u64));
+        }
+
+        assert_eq!(samples.values.len(), LATENCY_RESERVOIR_LIMIT);
+        assert_eq!(samples.seen, (LATENCY_RESERVOIR_LIMIT * 4) as u64);
+        assert!(samples.percentile_us(0.99).is_finite());
+    }
 
     #[test]
     fn parallel_background_threshold_defaults_to_zero() {
