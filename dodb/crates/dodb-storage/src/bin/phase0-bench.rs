@@ -150,7 +150,7 @@ const DEFAULT_MAX_GROUP_REQUESTS: usize = 64;
 const DEFAULT_MAX_GROUP_BYTES: usize = 4 * 1024 * 1024;
 const DEFAULT_QUEUE_CAPACITY: usize = 256;
 const LATENCY_RESERVOIR_LIMIT: usize = 16_384;
-const READER_WORKER_SEED_MASK: u64 = 0x3000_0000;
+const READER_WORKER_SEED_MASK: u64 = 0x1000_0000;
 
 type BenchShard = AsyncShard<BenchFile, BenchFile>;
 type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
