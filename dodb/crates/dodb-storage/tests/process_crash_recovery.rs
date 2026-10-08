@@ -876,6 +876,7 @@ fn kill_and_wait(child: &mut Child) -> std::io::Result<std::process::ExitStatus>
 fn append_line(path: &Path, text: String) {
     let mut file = fs::OpenOptions::new()
         .append(true)
+        .create(true)
         .open(path)
         .expect("artifact log should open");
     file.write_all(text.as_bytes())
