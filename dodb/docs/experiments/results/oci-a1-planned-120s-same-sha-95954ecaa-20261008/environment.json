@@ -1,0 +1,25 @@
+{
+  "host": "instance-20260923-1013",
+  "address": "217.142.246.204",
+  "os": "Oracle Linux Server 9.8",
+  "architecture": "aarch64-unknown-linux-gnu",
+  "logical_cpus": 2,
+  "filesystem": {
+    "mount": "/bench/zfs/db",
+    "source": "dodbbench/db",
+    "type": "zfs",
+    "recordsize": "4K",
+    "sync": "standard",
+    "compression": "off",
+    "atime": "off"
+  },
+  "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "ssh_identities_only": true,
+  "host_key_verification": "OpenSSH default validation enabled",
+  "evidence": [
+    "preflight.txt",
+    "postflight.txt",
+    "paths.txt"
+  ]
+}

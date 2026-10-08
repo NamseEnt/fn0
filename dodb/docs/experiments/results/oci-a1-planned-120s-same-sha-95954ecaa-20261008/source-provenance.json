@@ -1,0 +1,8 @@
+{
+  "source_sha": "95954ecaaae94757cc3705bc2aacf8c6bb78915f",
+  "remote_checkout": "/bench/zfs/db/oci-a1-query-cursor-95954ecaa/candidate",
+  "preflight_status": "clean; exact commit recorded in preflight.txt",
+  "postflight_status": "clean; exact commit recorded in postflight.txt",
+  "source_code_changed": false,
+  "note": "The first run wrote its JSONL to a source-relative output path; that raw file was copied with the same SHA-256 into raw/ and the generated source-tree path was removed before subsequent runs. The checkout was clean after that recovery and after all runs."
+}

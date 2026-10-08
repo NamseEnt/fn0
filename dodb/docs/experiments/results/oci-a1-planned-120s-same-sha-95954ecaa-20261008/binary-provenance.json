@@ -1,0 +1,13 @@
+{
+  "path": "/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-candidate/aarch64-unknown-linux-gnu/release/phase0-bench",
+  "sha256": "89c6e622b3f05c597a740353b30464bbc30cbe3e910195bfc545967a9dca4c87",
+  "source_sha": "95954ecaaae94757cc3705bc2aacf8c6bb78915f",
+  "source_status": "clean",
+  "build_command": "cargo build --release --target aarch64-unknown-linux-gnu -p dodb-storage --bin phase0-bench",
+  "build_architecture": "aarch64-unknown-linux-gnu native Release",
+  "cargo_target_rustflags": "-C target-feature=+crc",
+  "cargo_lock_sha256": "9702ecfb45d6edab98f5aa3e849ad6f456faed7f75d5b37bd9b545eb2d5d4da6",
+  "cargo_config_sha256": "d7f22f835a631b08459a9662e207df20f4abfbf8110e198cbac04582f5c42c9f",
+  "build_reused_from": "oci-a1-query-cursor-95954ecaa/proofs/build-candidate.log",
+  "reused_for_both_engines": true
+}

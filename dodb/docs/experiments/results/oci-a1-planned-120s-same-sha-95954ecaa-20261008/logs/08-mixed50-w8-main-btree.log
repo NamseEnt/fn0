@@ -1,0 +1,5 @@
+phase0-bench engine=main-btree build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=120s warmup=1s repetitions=1
+raw output: /bench/zfs/db/oci-a1-planned-120s-same-sha-95954ecaa-20261008/raw/08-mixed50-w8-main-btree.jsonl
+scenario                                                       repetition throughput summary
+mixed-1w-1r-get-50/50-width8-uniform                       rep=0 tx/s=      393 mut/s=     3143 read/s=      393 agg/s=      786 p50=  1688.9us p95=  2832.9us p99=  3164.6us groups=47145 avg_group= 1.00
+completed 1 scenarios x 1 repetitions

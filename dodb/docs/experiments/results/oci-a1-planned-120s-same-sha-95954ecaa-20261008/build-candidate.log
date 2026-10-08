@@ -1,0 +1,24 @@
+   Compiling libc v0.2.185
+   Compiling proc-macro2 v1.0.105
+   Compiling shlex v1.3.0
+   Compiling quote v1.0.45
+   Compiling find-msvc-tools v0.1.6
+   Compiling unicode-ident v1.0.24
+   Compiling cc v1.2.51
+   Compiling semver v1.0.27
+   Compiling rustc_version v0.4.1
+   Compiling syn v3.0.3
+   Compiling libmimalloc-sys v0.1.49
+   Compiling crc32c v0.6.8
+   Compiling errno v0.3.14
+   Compiling signal-hook-registry v1.4.8
+   Compiling tokio-macros v2.7.2
+   Compiling mio v1.2.2
+   Compiling socket2 v0.6.5
+   Compiling pin-project-lite v0.2.16
+   Compiling bytes v1.11.1
+   Compiling tokio v1.53.1
+   Compiling mimalloc v0.1.52
+   Compiling dodb-core v0.1.0 (/bench/zfs/db/oci-a1-query-cursor-95954ecaa/candidate/dodb/crates/dodb-core)
+   Compiling dodb-storage v0.1.0 (/bench/zfs/db/oci-a1-query-cursor-95954ecaa/candidate/dodb/crates/dodb-storage)
+    Finished `release` profile [optimized + debuginfo] target(s) in 58.72s

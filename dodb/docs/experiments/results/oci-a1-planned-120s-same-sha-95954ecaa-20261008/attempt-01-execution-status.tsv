@@ -1,0 +1,2 @@
+run_id	started_utc	ended_utc	actual_elapsed_seconds	exit_code	jsonl_records	result_duration_ms	state
+01-get-main-btree-r1	2026-10-08T02:46:08.638702+00:00	2026-10-08T02:48:10.246162+00:00	121.607424628	0	0		invalid-output
