@@ -306,6 +306,30 @@ fn run_case(
 
     let target = target_mutations(seed, width);
     let before_target = expected.clone();
+    let prefix_max_revision = before_target
+        .values()
+        .map(|row| row.revision)
+        .max()
+        .unwrap_or(Revision::new(0));
+    let expected_target_revision = Revision::new(
+        prefix_max_revision
+            .get()
+            .checked_add(1)
+            .ok_or_else(|| "expected target revision overflow".to_owned())?,
+    );
+    let mut expected_target_state = before_target.clone();
+    apply_target_expected(
+        &mut expected_target_state,
+        &target,
+        expected_target_revision,
+    );
+    write_expected_file(&case_dir.join("expected-prefix-state.tsv"), &before_target)
+        .map_err(|error| format!("prefix expectation write failed: {error}"))?;
+    write_expected_file(
+        &case_dir.join("expected-target-state.tsv"),
+        &expected_target_state,
+    )
+    .map_err(|error| format!("target expectation write failed: {error}"))?;
     let target_dir = PathBuf::from(
         std::env::var_os("CARGO_BIN_EXE_process-crash-recovery-child")
             .ok_or_else(|| "Cargo did not expose child binary".to_owned())?,
@@ -438,16 +462,17 @@ fn run_case(
     copy_pre_recovery(&data_path, &wal_path, case_dir)
         .map_err(|error| format!("pre-recovery snapshot failed: {error}"))?;
 
-    let prefix_max_revision = before_target
-        .values()
-        .map(|row| row.revision)
-        .max()
-        .unwrap_or(Revision::new(0));
     let mut expected_final = before_target.clone();
     let mut allow_target = false;
     let target_revision = success_revision.map(Revision::new);
-    if let Some(revision) = target_revision {
-        apply_target_expected(&mut expected_final, &target, revision);
+    if let Some(returned_revision) = target_revision {
+        if returned_revision != expected_target_revision {
+            return Err(format!(
+                "target response revision mismatch: expected {:?}, got {:?}",
+                expected_target_revision, returned_revision
+            ));
+        }
+        apply_target_expected(&mut expected_final, &target, expected_target_revision);
         allow_target = true;
     }
     let recovered = read_actual(engine, &data_path, &wal_path)
@@ -468,7 +493,9 @@ fn run_case(
         Boundary::Returned | Boundary::NormalExit => {
             let revision = target_revision
                 .ok_or_else(|| "successful target returned no revision".to_owned())?;
-            if !target_is_fully_present(&recovered, &target, revision) {
+            if revision != expected_target_revision
+                || !target_is_fully_present(&recovered, &target, expected_target_revision)
+            {
                 return Err(
                     "target transaction was not wholly recovered after successful return"
                         .to_owned(),
@@ -486,21 +513,10 @@ fn run_case(
                     return Err("after_wal_sync transaction was not recovered".to_owned());
                 }
             } else {
-                let observed_revision = target
-                    .first()
-                    .and_then(|mutation| match mutation {
-                        TransactionMutation::Put { key, .. } => {
-                            recovered.get(key).map(|row| row.revision)
-                        }
-                        TransactionMutation::Delete { .. } => None,
-                    })
-                    .ok_or_else(|| "target revision could not be observed".to_owned())?;
-                if observed_revision <= prefix_max_revision
-                    || !target_is_fully_present(&recovered, &target, observed_revision)
-                {
-                    return Err("target transaction was only partially recovered or has an invalid revision".to_owned());
+                if !target_is_fully_present(&recovered, &target, expected_target_revision) {
+                    return Err("target transaction was only partially recovered or has an unexpected revision".to_owned());
                 }
-                apply_target_expected(&mut expected_final, &target, observed_revision);
+                apply_target_expected(&mut expected_final, &target, expected_target_revision);
                 allow_target = true;
             }
         }
@@ -845,6 +861,26 @@ fn write_expected(
         ));
     }
     append_line(path, output);
+}
+
+fn write_expected_file(
+    path: &Path,
+    expected: &BTreeMap<DocumentKey, ExpectedRow>,
+) -> std::io::Result<()> {
+    let mut output = String::new();
+    for (key, row) in expected {
+        output.push_str(&format!(
+            "{}\t{}\t{}\n",
+            hex(&key.encode()),
+            hex(&row.value),
+            row.revision.get()
+        ));
+    }
+    fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)?
+        .write_all(output.as_bytes())
 }
 
 fn copy_pre_recovery(data_path: &Path, wal_path: &Path, case_dir: &Path) -> std::io::Result<()> {

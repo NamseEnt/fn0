@@ -73,6 +73,17 @@ if [[ -n "$(git -C "$checkout_path" status --porcelain)" ]]; then
   exit 1
 fi
 
+(
+  cd "$checkout_path"
+  {
+    rustup show active-toolchain
+    rustup which rustc
+    rustup which cargo
+    rustc -vV
+    cargo -V
+  }
+) > "$result_path/build-toolchain.txt" 2>&1
+
 {
   git -C "$checkout_path" status --short --branch
   printf 'checkout_sha=%s\n' "$actual_sha"
