@@ -1,0 +1,95 @@
+{
+  "checks": [
+    {
+      "fingerprint": "fnv1a64:9f6c773bc1f0df41",
+      "repetition": 1,
+      "request_count": 131072,
+      "seed": 3504021542
+    },
+    {
+      "fingerprint": "fnv1a64:ca087ee4324b26fc",
+      "repetition": 1,
+      "request_count": 262144,
+      "seed": 3504021542
+    },
+    {
+      "fingerprint": "fnv1a64:6797cdffb03514f7",
+      "repetition": 1,
+      "request_count": 393216,
+      "seed": 3504021542
+    },
+    {
+      "fingerprint": "fnv1a64:105c1440d68caa00",
+      "repetition": 1,
+      "request_count": 524288,
+      "seed": 3504021542
+    },
+    {
+      "fingerprint": "fnv1a64:0a3c5a181716c16b",
+      "repetition": 1,
+      "request_count": 655360,
+      "seed": 3504021542
+    },
+    {
+      "fingerprint": "fnv1a64:7efb9ce237eaefd5",
+      "repetition": 2,
+      "request_count": 131072,
+      "seed": 3504021543
+    },
+    {
+      "fingerprint": "fnv1a64:4ddf4c7ca1396478",
+      "repetition": 2,
+      "request_count": 262144,
+      "seed": 3504021543
+    },
+    {
+      "fingerprint": "fnv1a64:bd80714480bca3ff",
+      "repetition": 2,
+      "request_count": 393216,
+      "seed": 3504021543
+    },
+    {
+      "fingerprint": "fnv1a64:c338a7d20973301a",
+      "repetition": 2,
+      "request_count": 524288,
+      "seed": 3504021543
+    },
+    {
+      "fingerprint": "fnv1a64:27b57a73a4f301f1",
+      "repetition": 2,
+      "request_count": 655360,
+      "seed": 3504021543
+    },
+    {
+      "fingerprint": "fnv1a64:26e29813c0c6ef5e",
+      "repetition": 3,
+      "request_count": 131072,
+      "seed": 3504021544
+    },
+    {
+      "fingerprint": "fnv1a64:951d8a57ee53552d",
+      "repetition": 3,
+      "request_count": 262144,
+      "seed": 3504021544
+    },
+    {
+      "fingerprint": "fnv1a64:7c5ccb8c6bcf8a68",
+      "repetition": 3,
+      "request_count": 393216,
+      "seed": 3504021544
+    },
+    {
+      "fingerprint": "fnv1a64:756a9ae0c64cbdfa",
+      "repetition": 3,
+      "request_count": 524288,
+      "seed": 3504021544
+    },
+    {
+      "fingerprint": "fnv1a64:733b4386715f4782",
+      "repetition": 3,
+      "request_count": 655360,
+      "seed": 3504021544
+    }
+  ],
+  "passed": true
+}

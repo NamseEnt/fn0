@@ -1,0 +1,4 @@
+attempt=preflight-01
+state=invalid-before-benchmark
+reason=results directory and default benchmark data namespace resolved to the same ZFS path
+benchmark_started=false

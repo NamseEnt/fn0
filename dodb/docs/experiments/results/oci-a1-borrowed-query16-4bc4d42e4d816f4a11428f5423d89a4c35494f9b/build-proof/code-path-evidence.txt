@@ -1,0 +1,7 @@
+dodb/crates/dodb-storage/Cargo.toml:20 declares blink-borrowed-page-views.
+dodb/crates/dodb-storage/src/blink/mod.rs:4264-4284 selects Arc<BlinkPage> when the feature is off and BorrowedPage<'page> through GenerationPin::page_cell when it is on.
+dodb/crates/dodb-storage/src/blink/mod.rs:1205-1231 pins the published generation and increments active_generation_pins; the same code is compiled in both feature configurations.
+dodb/crates/dodb-storage/src/blink/mod.rs:1562-1567 decrements active_generation_pins in GenerationPin::drop; the same code is compiled in both feature configurations.
+dodb/crates/dodb-storage/src/blink/mod.rs:1528-1530 permits page reuse only when active_generation_pins is zero.
+dodb/crates/dodb-storage/src/blink/mod.rs:2622-2625 passes the pin-based reuse decision to the working state; dodb/crates/dodb-storage/src/blink/mod.rs:7204-7216 checks it before reusing a free page ID.
+dodb/crates/dodb-storage/src/bin/phase0-bench.rs:5220-5227 records observational read metrics and the active borrowed-page feature; lines 6168-6176 emit generation pin and read metrics.

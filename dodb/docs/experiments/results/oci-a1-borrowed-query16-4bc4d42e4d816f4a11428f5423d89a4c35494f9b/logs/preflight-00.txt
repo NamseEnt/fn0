@@ -1,0 +1,4 @@
+attempt=preflight-00
+state=invalid-before-benchmark
+reason=remote result path typo caused the result-directory precondition to fail
+benchmark_started=false

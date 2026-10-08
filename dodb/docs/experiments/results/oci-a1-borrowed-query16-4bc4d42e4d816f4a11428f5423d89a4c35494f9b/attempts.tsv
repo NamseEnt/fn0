@@ -1,0 +1,4 @@
+attempt_id	state	benchmark_started	reason
+preflight-00	invalid	false	result path typo failed a precondition before benchmark launch
+preflight-01	invalid	false	results and default data namespace overlapped before benchmark launch
+matrix-18	accepted	true	18 of 18 executions completed and passed validation

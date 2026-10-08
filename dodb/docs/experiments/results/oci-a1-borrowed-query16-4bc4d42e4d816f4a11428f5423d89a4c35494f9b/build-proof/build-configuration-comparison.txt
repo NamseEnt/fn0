@@ -1,0 +1,11 @@
+source_sha=4bc4d42e4d816f4a11428f5423d89a4c35494f9b
+architecture=aarch64-unknown-linux-gnu native
+rustc=1.97.1 (8bab26f4f 2026-07-14)
+cargo=1.97.1 (c980f4866 2026-06-30)
+Cargo.lock_sha256=9702ecfb45d6edab98f5aa3e849ad6f456faed7f75d5b37bd9b545eb2d5d4da6
+Cargo_config_sha256=d7f22f835a631b08459a9662e207df20f4abfbf8110e198cbac04582f5c42c9f
+Cargo_configured_target_rustflags=-C target-feature=+crc
+RUSTFLAGS=unset
+CARGO_TARGET_DIR=separate directory per feature configuration
+base_configuration=workspace defaults, no blink-borrowed-page-views
+borrowed_configuration=workspace defaults plus --features blink-borrowed-page-views
