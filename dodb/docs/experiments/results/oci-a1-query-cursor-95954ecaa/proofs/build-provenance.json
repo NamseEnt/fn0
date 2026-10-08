@@ -1,0 +1,35 @@
+{
+  "architectures": {
+    "base": "aarch64-unknown-linux-gnu native",
+    "candidate": "aarch64-unknown-linux-gnu native"
+  },
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: aarch64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+  "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)\n",
+  "cargo_target_rustflags": "-C target-feature=+crc",
+  "configurations": {
+    "base": {
+      "source_sha": "4bc4d42e4d816f4a11428f5423d89a4c35494f9b",
+      "source_status": "",
+      "cargo_lock_sha256": "9702ecfb45d6edab98f5aa3e849ad6f456faed7f75d5b37bd9b545eb2d5d4da6",
+      "cargo_config_sha256": "d7f22f835a631b08459a9662e207df20f4abfbf8110e198cbac04582f5c42c9f",
+      "phase0_bench_source_sha256": "bae7b7b6fe13223c6ef579715c773b87a843b1b8caeeff4659a67818d7387e90",
+      "blink_source_sha256": "210d43ce3b4992bfa0df677ab301d5c2d329bee04daec67277d05c850d60e14a",
+      "binary_path": "/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-base/aarch64-unknown-linux-gnu/release/phase0-bench",
+      "binary_sha256": "1de9bab43902c81770afa6fa466ecc19e4307d7c71444eb05232e51df17553c3",
+      "build_command": "cargo build --release --target aarch64-unknown-linux-gnu -p dodb-storage --bin phase0-bench",
+      "build_log": "/bench/zfs/db/oci-a1-query-cursor-95954ecaa/proofs/build-base.log"
+    },
+    "candidate": {
+      "source_sha": "95954ecaaae94757cc3705bc2aacf8c6bb78915f",
+      "source_status": "",
+      "cargo_lock_sha256": "9702ecfb45d6edab98f5aa3e849ad6f456faed7f75d5b37bd9b545eb2d5d4da6",
+      "cargo_config_sha256": "d7f22f835a631b08459a9662e207df20f4abfbf8110e198cbac04582f5c42c9f",
+      "phase0_bench_source_sha256": "bae7b7b6fe13223c6ef579715c773b87a843b1b8caeeff4659a67818d7387e90",
+      "blink_source_sha256": "991910fc5833784c69c0297a4b2e59f5bc6e1d03290368b2d54b2cbee09bb812",
+      "binary_path": "/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-candidate/aarch64-unknown-linux-gnu/release/phase0-bench",
+      "binary_sha256": "89c6e622b3f05c597a740353b30464bbc30cbe3e910195bfc545967a9dca4c87",
+      "build_command": "cargo build --release --target aarch64-unknown-linux-gnu -p dodb-storage --bin phase0-bench",
+      "build_log": "/bench/zfs/db/oci-a1-query-cursor-95954ecaa/proofs/build-candidate.log"
+    }
+  }
+}

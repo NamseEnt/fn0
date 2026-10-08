@@ -1,0 +1,5 @@
+dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive
+dodbbench/db	sync	standard
+dodbbench/db	recordsize	4K
+dodbbench/db	compression	off
+dodbbench/db	atime	off

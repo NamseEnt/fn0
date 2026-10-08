@@ -1,0 +1,7 @@
+workload	repetition	seed	C/B	B/A	C/A
+get	1	0xd0db2026	1.0090x	0.9886x	0.9975x
+get	2	0xd0db2027	0.9981x	0.9924x	0.9905x
+get	3	0xd0db2028	1.0077x	0.9866x	0.9942x
+query	1	0xd0db2026	1.3110x	0.6915x	0.9066x
+query	2	0xd0db2027	1.3219x	0.7393x	0.9773x
+query	3	0xd0db2028	1.3243x	0.6876x	0.9106x

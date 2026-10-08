@@ -1,0 +1,17 @@
+{
+  "blink-candidate": {
+    "environment_variable": "PHASE0_CANDIDATE_BINARY",
+    "path": "/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-candidate/aarch64-unknown-linux-gnu/release/phase0-bench",
+    "sha256": "89c6e622b3f05c597a740353b30464bbc30cbe3e910195bfc545967a9dca4c87"
+  },
+  "blink-metrics-on": {
+    "environment_variable": "PHASE0_BINARY",
+    "path": "/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-base/aarch64-unknown-linux-gnu/release/phase0-bench",
+    "sha256": "1de9bab43902c81770afa6fa466ecc19e4307d7c71444eb05232e51df17553c3"
+  },
+  "main-btree": {
+    "environment_variable": "PHASE0_BINARY",
+    "path": "/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-base/aarch64-unknown-linux-gnu/release/phase0-bench",
+    "sha256": "1de9bab43902c81770afa6fa466ecc19e4307d7c71444eb05232e51df17553c3"
+  }
+}

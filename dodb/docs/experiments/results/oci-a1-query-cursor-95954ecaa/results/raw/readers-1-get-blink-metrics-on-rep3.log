@@ -1,0 +1,5 @@
+phase0-bench engine=parallel-blink build=release cpu="unknown" logical_cpus=2 tokio_workers=2 duration=5s warmup=1s repetitions=1
+raw output: /bench/zfs/db/oci-a1-query-cursor-95954ecaa/results/raw/readers-1-get-blink-metrics-on-rep3.jsonl
+scenario                                                       repetition throughput summary
+100%-read-get-0w-1r-get-width1-uniform                     rep=0 tx/s=        0 mut/s=        0 read/s=  1223902 agg/s=  1223902 p50=     0.6us p95=     0.7us p99=     0.8us groups=    0 avg_group= 0.00
+completed 1 scenarios x 1 repetitions

@@ -1,0 +1,3 @@
+attempt	state	detail
+00	preflight-only	ZFS property query used invalid argument syntax; stopped before any benchmark process. Corrected the query and verified the ZFS mount and properties.
+01	accepted	18 of 18 benchmark runs completed and passed per-run validation; no performance run was invalidated or repeated.

@@ -1,0 +1,82 @@
+{
+  "method": "reconstruct the deterministic measured QueryRange stream from the benchmark seed and request count; each QueryRange start index is the exact count of same-primary-key entries at or before its exclusive cursor",
+  "query_range_count": 136,
+  "starts_per_pk": 17,
+  "limit": 16,
+  "same_primary_key_pre_cursor_entries_per_query_expected": 8,
+  "rows": [
+    {
+      "repetition": 1,
+      "variant": "B",
+      "successful_queries": 726132,
+      "cursor_queries": 683514,
+      "cursor_query_percent": 94.13081918989936,
+      "same_pk_pre_cursor_entries": 5811203,
+      "same_pk_pre_cursor_entries_per_query": 8.002956762682267,
+      "baseline_decodes_avoided_lower_bound": 5811203,
+      "baseline_documentkey_clones_avoided_lower_bound": 17430941,
+      "post_cursor_comparison_clones_avoided": 11619738
+    },
+    {
+      "repetition": 1,
+      "variant": "C",
+      "successful_queries": 952048,
+      "cursor_queries": 896117,
+      "cursor_query_percent": 94.12519116683193,
+      "same_pk_pre_cursor_entries": 7618563,
+      "same_pk_pre_cursor_entries_per_query": 8.002288750147052,
+      "baseline_decodes_avoided_lower_bound": 7618563,
+      "baseline_documentkey_clones_avoided_lower_bound": 22852552,
+      "post_cursor_comparison_clones_avoided": 15233989
+    },
+    {
+      "repetition": 2,
+      "variant": "B",
+      "successful_queries": 724980,
+      "cursor_queries": 682339,
+      "cursor_query_percent": 94.11832050539326,
+      "same_pk_pre_cursor_entries": 5808953,
+      "same_pk_pre_cursor_entries_per_query": 8.012570001931088,
+      "baseline_decodes_avoided_lower_bound": 5808953,
+      "baseline_documentkey_clones_avoided_lower_bound": 17408716,
+      "post_cursor_comparison_clones_avoided": 11599763
+    },
+    {
+      "repetition": 2,
+      "variant": "C",
+      "successful_queries": 958331,
+      "cursor_queries": 902030,
+      "cursor_query_percent": 94.12509873937084,
+      "same_pk_pre_cursor_entries": 7671689,
+      "same_pk_pre_cursor_entries_per_query": 8.005260186720454,
+      "baseline_decodes_avoided_lower_bound": 7671689,
+      "baseline_documentkey_clones_avoided_lower_bound": 23006199,
+      "post_cursor_comparison_clones_avoided": 15334510
+    },
+    {
+      "repetition": 3,
+      "variant": "B",
+      "successful_queries": 719667,
+      "cursor_queries": 677222,
+      "cursor_query_percent": 94.10213334778446,
+      "same_pk_pre_cursor_entries": 5762265,
+      "same_pk_pre_cursor_entries_per_query": 8.006849000996294,
+      "baseline_decodes_avoided_lower_bound": 5762265,
+      "baseline_documentkey_clones_avoided_lower_bound": 17275039,
+      "post_cursor_comparison_clones_avoided": 11512774
+    },
+    {
+      "repetition": 3,
+      "variant": "C",
+      "successful_queries": 953051,
+      "cursor_queries": 897114,
+      "cursor_query_percent": 94.1307443148373,
+      "same_pk_pre_cursor_entries": 7635596,
+      "same_pk_pre_cursor_entries_per_query": 8.0117391409274,
+      "baseline_decodes_avoided_lower_bound": 7635596,
+      "baseline_documentkey_clones_avoided_lower_bound": 22886534,
+      "post_cursor_comparison_clones_avoided": 15250938
+    }
+  ],
+  "interpretation": "Counts are the same-PK portion. Entries earlier in the starting leaf from neighboring PKs, if present, add more baseline decode and cursor-clone work. The candidate validates skipped encoded keys without allocation, preserving malformed-key detection."
+}

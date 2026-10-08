@@ -1,0 +1,26 @@
+{
+  "base_source_after": {
+    "branch": "",
+    "commit": "4bc4d42e4d816f4a11428f5423d89a4c35494f9b",
+    "tracked_changes": [],
+    "unrelated_untracked": []
+  },
+  "base_source_before": {
+    "branch": "",
+    "commit": "4bc4d42e4d816f4a11428f5423d89a4c35494f9b",
+    "tracked_changes": [],
+    "unrelated_untracked": []
+  },
+  "candidate_source_after": {
+    "branch": "",
+    "commit": "95954ecaaae94757cc3705bc2aacf8c6bb78915f",
+    "tracked_changes": [],
+    "unrelated_untracked": []
+  },
+  "candidate_source_before": {
+    "branch": "",
+    "commit": "95954ecaaae94757cc3705bc2aacf8c6bb78915f",
+    "tracked_changes": [],
+    "unrelated_untracked": []
+  }
+}
