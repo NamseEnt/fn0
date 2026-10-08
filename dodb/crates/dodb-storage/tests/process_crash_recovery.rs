@@ -306,16 +306,40 @@ fn run_case(
 
     let target = target_mutations(seed, width);
     let before_target = expected.clone();
-    let prefix_max_revision = before_target
-        .values()
-        .map(|row| row.revision)
-        .max()
-        .unwrap_or(Revision::new(0));
-    let expected_target_revision = Revision::new(
-        prefix_max_revision
-            .get()
-            .checked_add(1)
-            .ok_or_else(|| "expected target revision overflow".to_owned())?,
+    let oracle_dir = case_dir.join("target-revision-oracle");
+    fs::create_dir_all(&oracle_dir).map_err(|error| error.to_string())?;
+    let oracle_data_path = oracle_dir.join("oracle.db");
+    let oracle_wal_path = oracle_dir.join("oracle.wal");
+    fs::copy(&data_path, &oracle_data_path)
+        .map_err(|error| format!("oracle database copy failed: {error}"))?;
+    fs::copy(&wal_path, &oracle_wal_path)
+        .map_err(|error| format!("oracle WAL copy failed: {error}"))?;
+    let mut oracle_store = open_store(engine, &oracle_data_path, &oracle_wal_path)
+        .map_err(|error| format!("target revision oracle open failed: {error}"))?;
+    let oracle_result = oracle_store
+        .transact(TransactionRequest::new(Vec::new(), target.clone()))
+        .map_err(|error| format!("target revision oracle transaction failed: {error}"))?;
+    let expected_target_revision = oracle_result
+        .revision
+        .ok_or_else(|| "target revision oracle returned no revision".to_owned())?;
+    drop(oracle_store);
+    fs::write(
+        case_dir.join("target-revision-oracle.txt"),
+        format!(
+            "engine={}\nrevision={}\nsource=parent ProductionFile transaction on copied prefix state\n",
+            engine.as_str(),
+            expected_target_revision.get()
+        ),
+    )
+    .map_err(|error| format!("target oracle record write failed: {error}"))?;
+    append_response(
+        response_log,
+        engine,
+        width,
+        seed,
+        case_dir,
+        "target-revision-oracle",
+        expected_target_revision,
     );
     let mut expected_target_state = before_target.clone();
     apply_target_expected(
