@@ -6077,6 +6077,7 @@ fn query_state<S: ReadPageSource>(
     let start = DocumentKey::new(pk.as_bytes().to_vec(), Vec::new());
     let cursor = exclusive_after_sk
         .map(|sk| DocumentKey::new(pk.as_bytes().to_vec(), sk.as_bytes().to_vec()));
+    let encoded_cursor = cursor.as_ref().map(DocumentKey::encode);
     let mut leaf_id = find_leaf_with_metrics(state, &start.encode(), right_link_corrections, None)?;
     let mut first = true;
     let mut visited = HashSet::new();
@@ -6095,11 +6096,18 @@ fn query_state<S: ReadPageSource>(
             return Err(Error::corruption("Blink query reached non-leaf page"));
         };
         for entry in entries.iter() {
-            let key = DocumentKey::decode(entry.key)
-                .map_err(|error| Error::corruption(format!("Blink key decode failed: {error}")))?;
-            if first && cursor.as_ref().is_some_and(|cursor| key <= cursor.clone()) {
+            if first
+                && encoded_cursor
+                    .as_deref()
+                    .is_some_and(|cursor| &entry.key[..] <= cursor)
+            {
+                DocumentKey::validate_encoded(entry.key).map_err(|error| {
+                    Error::corruption(format!("Blink key decode failed: {error}"))
+                })?;
                 continue;
             }
+            let key = DocumentKey::decode(entry.key)
+                .map_err(|error| Error::corruption(format!("Blink key decode failed: {error}")))?;
             first = false;
             if key.pk != *pk {
                 if key.pk > *pk {
@@ -6107,7 +6115,7 @@ fn query_state<S: ReadPageSource>(
                 }
                 continue;
             }
-            if cursor.as_ref().is_some_and(|cursor| key <= cursor.clone()) {
+            if cursor.as_ref().is_some_and(|cursor| key <= *cursor) {
                 continue;
             }
             if let Some(value) = entry.value {
@@ -14032,6 +14040,114 @@ mod tests {
             query
         );
         reopened.check_invariants().unwrap();
+    }
+
+    #[test]
+    fn query_cursor_preserves_exclusive_order_across_leaf_boundaries() {
+        let config = DatabaseConfig::default();
+        let mut store = BlinkStore::<MemoryFile, MemoryFile>::open_with_wal(
+            MemoryFile::default(),
+            MemoryFile::default(),
+            config,
+        )
+        .unwrap();
+        let primary_key = PrimaryKey::new(b"cursor-query".to_vec());
+        for row_index in 0..240u64 {
+            let key = DocumentKey::new(
+                primary_key.as_bytes().to_vec(),
+                row_index.to_be_bytes().to_vec(),
+            );
+            let value = if row_index == 80 {
+                vec![0x71; 2 * INLINE_VALUE_LIMIT]
+            } else {
+                row_index.to_be_bytes().to_vec()
+            };
+            store.put(key.clone(), value.clone()).unwrap();
+        }
+        store
+            .put(
+                DocumentKey::new(b"cursor-query-before".to_vec(), b"last".to_vec()),
+                b"before".to_vec(),
+            )
+            .unwrap();
+        store
+            .put(
+                DocumentKey::new(b"cursor-query-after".to_vec(), b"first".to_vec()),
+                b"after".to_vec(),
+            )
+            .unwrap();
+        store
+            .delete(DocumentKey::new(
+                primary_key.as_bytes().to_vec(),
+                42u64.to_be_bytes().to_vec(),
+            ))
+            .unwrap();
+
+        let expected = store.query(&primary_key, None, usize::MAX).unwrap();
+        assert_eq!(expected.len(), 239);
+        assert!(store.query(&primary_key, None, 0).unwrap().is_empty());
+        assert_eq!(
+            store
+                .query(&primary_key, Some(&SortKey::new(Vec::new())), 16)
+                .unwrap(),
+            expected[..16]
+        );
+        assert_eq!(
+            store
+                .query(
+                    &primary_key,
+                    Some(&SortKey::new(100u64.to_be_bytes().to_vec())),
+                    16,
+                )
+                .unwrap(),
+            expected
+                .iter()
+                .filter(|document| document.key.sk > SortKey::new(100u64.to_be_bytes().to_vec()))
+                .take(16)
+                .cloned()
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            store
+                .query(
+                    &primary_key,
+                    Some(&SortKey::new(42u64.to_be_bytes().to_vec())),
+                    16,
+                )
+                .unwrap(),
+            expected
+                .iter()
+                .filter(|document| document.key.sk > SortKey::new(42u64.to_be_bytes().to_vec()))
+                .take(16)
+                .cloned()
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            store
+                .query(
+                    &primary_key,
+                    Some(&SortKey::new(240u64.to_be_bytes().to_vec())),
+                    16,
+                )
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            store
+                .query(
+                    &primary_key,
+                    Some(&SortKey::new(79u64.to_be_bytes().to_vec())),
+                    1,
+                )
+                .unwrap(),
+            expected
+                .iter()
+                .find(|document| document.key.sk == SortKey::new(80u64.to_be_bytes().to_vec()))
+                .cloned()
+                .into_iter()
+                .collect::<Vec<_>>()
+        );
+        store.check_invariants().unwrap();
     }
 
     #[cfg(feature = "blink-borrowed-page-views")]
