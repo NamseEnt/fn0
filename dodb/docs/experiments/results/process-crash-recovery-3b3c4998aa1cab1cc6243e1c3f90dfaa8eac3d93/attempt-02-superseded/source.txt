@@ -1,0 +1,4 @@
+## HEAD (no branch)
+checkout_sha=6b5b93fa921225b5acb80d23c32509eb56165dc4
+rust_target= aarch64-unknown-linux-gnu
+engine_wal_source_matches_95954ecaa=true

@@ -1,0 +1,54 @@
+engine	width	boundary	seed	status	detail
+main-btree	4	returned	d0db2026	FAIL	target response revision mismatch: expected Revision(1051), got Revision(1056)
+main-btree	4	returned	d0db2027	FAIL	target response revision mismatch: expected Revision(1051), got Revision(1056)
+main-btree	4	returned	d0db2028	FAIL	target response revision mismatch: expected Revision(1051), got Revision(1056)
+main-btree	4	before_wal_append	d0db2026	PASS	hook_reached=true;sigkill=true;recovered_rows=4096;target=absent
+main-btree	4	before_wal_append	d0db2027	PASS	hook_reached=true;sigkill=true;recovered_rows=4096;target=absent
+main-btree	4	before_wal_append	d0db2028	PASS	hook_reached=true;sigkill=true;recovered_rows=4096;target=absent
+main-btree	4	before_wal_sync	d0db2026	FAIL	target transaction was only partially recovered or has an unexpected revision
+main-btree	4	before_wal_sync	d0db2027	FAIL	target transaction was only partially recovered or has an unexpected revision
+main-btree	4	before_wal_sync	d0db2028	FAIL	target transaction was only partially recovered or has an unexpected revision
+main-btree	4	after_wal_sync	d0db2026	FAIL	target transaction was only partially recovered or has an unexpected revision
+main-btree	4	after_wal_sync	d0db2027	FAIL	target transaction was only partially recovered or has an unexpected revision
+main-btree	4	after_wal_sync	d0db2028	FAIL	target transaction was only partially recovered or has an unexpected revision
+main-btree	4	normal_exit	d0db2026	FAIL	target response revision mismatch: expected Revision(1051), got Revision(1056)
+main-btree	8	returned	d0db2026	FAIL	target response revision mismatch: expected Revision(1563), got Revision(1572)
+main-btree	8	returned	d0db2027	FAIL	target response revision mismatch: expected Revision(1563), got Revision(1572)
+main-btree	8	returned	d0db2028	FAIL	target response revision mismatch: expected Revision(1563), got Revision(1572)
+main-btree	8	before_wal_append	d0db2026	PASS	hook_reached=true;sigkill=true;recovered_rows=4096;target=absent
+main-btree	8	before_wal_append	d0db2027	PASS	hook_reached=true;sigkill=true;recovered_rows=4096;target=absent
+main-btree	8	before_wal_append	d0db2028	PASS	hook_reached=true;sigkill=true;recovered_rows=4096;target=absent
+main-btree	8	before_wal_sync	d0db2026	FAIL	target transaction was only partially recovered or has an unexpected revision
+main-btree	8	before_wal_sync	d0db2027	FAIL	target transaction was only partially recovered or has an unexpected revision
+main-btree	8	before_wal_sync	d0db2028	FAIL	target transaction was only partially recovered or has an unexpected revision
+main-btree	8	after_wal_sync	d0db2026	FAIL	target transaction was only partially recovered or has an unexpected revision
+main-btree	8	after_wal_sync	d0db2027	FAIL	target transaction was only partially recovered or has an unexpected revision
+main-btree	8	after_wal_sync	d0db2028	FAIL	target transaction was only partially recovered or has an unexpected revision
+main-btree	8	normal_exit	d0db2026	FAIL	target response revision mismatch: expected Revision(1563), got Revision(1572)
+planned-blink	4	returned	d0db2026	FAIL	target response revision mismatch: expected Revision(924), got Revision(928)
+planned-blink	4	returned	d0db2027	FAIL	target response revision mismatch: expected Revision(924), got Revision(928)
+planned-blink	4	returned	d0db2028	FAIL	target response revision mismatch: expected Revision(924), got Revision(928)
+planned-blink	4	before_wal_append	d0db2026	PASS	hook_reached=true;sigkill=true;recovered_rows=4096;target=absent
+planned-blink	4	before_wal_append	d0db2027	PASS	hook_reached=true;sigkill=true;recovered_rows=4096;target=absent
+planned-blink	4	before_wal_append	d0db2028	PASS	hook_reached=true;sigkill=true;recovered_rows=4096;target=absent
+planned-blink	4	before_wal_sync	d0db2026	FAIL	target transaction was only partially recovered or has an unexpected revision
+planned-blink	4	before_wal_sync	d0db2027	FAIL	target transaction was only partially recovered or has an unexpected revision
+planned-blink	4	before_wal_sync	d0db2028	FAIL	target transaction was only partially recovered or has an unexpected revision
+planned-blink	4	after_wal_sync	d0db2026	FAIL	target transaction was only partially recovered or has an unexpected revision
+planned-blink	4	after_wal_sync	d0db2027	FAIL	target transaction was only partially recovered or has an unexpected revision
+planned-blink	4	after_wal_sync	d0db2028	FAIL	target transaction was only partially recovered or has an unexpected revision
+planned-blink	4	normal_exit	d0db2026	FAIL	target response revision mismatch: expected Revision(924), got Revision(928)
+planned-blink	8	returned	d0db2026	FAIL	target response revision mismatch: expected Revision(1436), got Revision(1444)
+planned-blink	8	returned	d0db2027	FAIL	target response revision mismatch: expected Revision(1436), got Revision(1444)
+planned-blink	8	returned	d0db2028	FAIL	target response revision mismatch: expected Revision(1436), got Revision(1444)
+planned-blink	8	before_wal_append	d0db2026	PASS	hook_reached=true;sigkill=true;recovered_rows=4096;target=absent
+planned-blink	8	before_wal_append	d0db2027	PASS	hook_reached=true;sigkill=true;recovered_rows=4096;target=absent
+planned-blink	8	before_wal_append	d0db2028	PASS	hook_reached=true;sigkill=true;recovered_rows=4096;target=absent
+planned-blink	8	before_wal_sync	d0db2026	FAIL	target transaction was only partially recovered or has an unexpected revision
+planned-blink	8	before_wal_sync	d0db2027	FAIL	target transaction was only partially recovered or has an unexpected revision
+planned-blink	8	before_wal_sync	d0db2028	FAIL	target transaction was only partially recovered or has an unexpected revision
+planned-blink	8	after_wal_sync	d0db2026	FAIL	target transaction was only partially recovered or has an unexpected revision
+planned-blink	8	after_wal_sync	d0db2027	FAIL	target transaction was only partially recovered or has an unexpected revision
+planned-blink	8	after_wal_sync	d0db2028	FAIL	target transaction was only partially recovered or has an unexpected revision
+planned-blink	8	normal_exit	d0db2026	FAIL	target response revision mismatch: expected Revision(1436), got Revision(1444)
+TOTAL	52	-	-	12/52 PASS, 40/52 FAIL	checker_self_test=passed

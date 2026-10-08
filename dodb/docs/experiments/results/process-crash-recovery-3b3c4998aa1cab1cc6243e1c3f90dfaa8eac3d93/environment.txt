@@ -1,0 +1,23 @@
+utc=2026-10-08T06:33:44Z
+host=instance-20260923-1013.subnet09231046.vcn09231046.oraclevcn.com
+source_sha=3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93
+filesystem_type=zfs
+TARGET        SOURCE       FSTYPE OPTIONS
+/bench/zfs/db dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive
+Filesystem     Type  Size  Used Avail Use% Mounted on
+dodbbench/db   zfs   149G   44G  105G  30% /bench/zfs/db
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+rustc 1.98.1 (48a229cea 2026-09-01)
+binary: rustc
+commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985
+commit-date: 2026-09-01
+host: aarch64-unknown-linux-gnu
+release: 1.98.1
+LLVM version: 22.1.8
+cargo 1.98.1 (797e8a9bc 2026-08-05)
+git version 2.52.0
+
+checkout_path=/bench/zfs/db/process-crash-checkout-3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93
+result_path=/bench/zfs/db/process-crash-recovery-3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93
+target_path=/bench/zfs/db/process-crash-target-3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93
+tmp_path=/bench/zfs/db/process-crash-tmp-3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93

@@ -1,0 +1,19 @@
+Final test source SHA: 3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93
+OCI primary result: /bench/zfs/db/process-crash-recovery-3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93
+OCI source checkout: /bench/zfs/db/process-crash-checkout-3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93
+OCI Cargo target: /bench/zfs/db/process-crash-target-3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93
+OCI TMPDIR: /bench/zfs/db/process-crash-tmp-3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93
+Case databases and WALs: primary result/cases/<case>/target.db and target.wal
+Parent revision oracle files: primary result/cases/<case>/target-revision-oracle/oracle.db and oracle.wal
+Pre-recovery copies: primary result/cases/<case>/pre-recovery/target.db and target.wal
+Independent prefix expectation: primary result/cases/<case>/expected-prefix-state.tsv
+Independent target expectation: primary result/cases/<case>/expected-target-state.tsv
+Final recovery expectation: primary result/cases/expected-final-states.tsv
+Parent successful responses: primary result/cases/successful-responses.tsv
+Case decision table: primary result/cases/case-results.csv
+Child handshake and exit signal: primary result/cases/<case>/child-handshake.txt
+Restart and verification logs: primary result/cases/<case>/recovery.log
+All OCI result checksums: primary result/SHA256SUMS
+Superseded attempt 1: /bench/zfs/db/process-crash-recovery-5d34c23bd3d594c93419eda66c5177161e56ff24
+Superseded attempt 2: /bench/zfs/db/process-crash-recovery-6b5b93fa921225b5acb80d23c32509eb56165dc4
+Superseded attempt 3: /bench/zfs/db/process-crash-recovery-a3b554191e6c003fd723d4f2b9ade886cbd1d5ee

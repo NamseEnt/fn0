@@ -1,0 +1,1 @@
+SHA `a3b554191e6c003fd723d4f2b9ade886cbd1d5ee`의 실행은 52 case를 모두 시도했다. 부모가 대상 revision을 `prefix max + 1`로 예측한 산식이 엔진 revision 진행과 달라 12개만 판정 통과, 40개가 verifier failure로 기록됐다. 기대값 산식의 오류를 찾은 원본으로 보존하며 엔진 결함 증거로 사용하지 않는다. 이후 부모가 prefix 복제본에서 같은 storage API target transaction을 실행해 반환 revision을 기록하도록 보완했다.
