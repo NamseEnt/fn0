@@ -1,0 +1,76 @@
+   Compiling cfg-if v1.0.4
+   Compiling getrandom v0.3.4
+   Compiling getrandom v0.4.2
+   Compiling zerocopy v0.8.31
+   Compiling rustix v1.1.4
+   Compiling rand_core v0.9.5
+   Compiling bitflags v2.13.1
+   Compiling autocfg v1.5.0
+   Compiling linux-raw-sys v0.12.1
+   Compiling num-traits v0.2.19
+   Compiling fastrand v2.3.0
+   Compiling once_cell v1.21.3
+   Compiling tempfile v3.27.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling wait-timeout v0.2.1
+   Compiling bit-vec v0.8.0
+   Compiling quick-error v1.2.3
+   Compiling fnv v1.0.7
+   Compiling rusty-fork v0.3.1
+   Compiling bit-set v0.8.0
+   Compiling rand_chacha v0.9.0
+   Compiling rand v0.9.2
+   Compiling rand_xorshift v0.4.0
+   Compiling regex-syntax v0.8.8
+   Compiling unarray v0.1.4
+   Compiling proptest v1.11.0
+   Compiling dodb-storage v0.1.0 (/bench/zfs/db/oci-phase0-followup-4bc4d42e4d816f4a11428f5423d89a4c35494f9b/source/dodb/crates/dodb-storage)
+    Finished `release` profile [optimized + debuginfo] target(s) in 32.51s
+     Running unittests src/bin/phase0-bench.rs (/bench/zfs/db/oci-phase0-followup-4bc4d42e4d816f4a11428f5423d89a4c35494f9b/target/release/deps/phase0_bench-22c66f8ac4640058)
+
+running 42 tests
+test tests::changing_mixed_values_are_deterministic_and_nonconstant ... ok
+test tests::client_completion_skew_uses_latest_minus_earliest_client ... ok
+test tests::concurrent_write_response_order_does_not_define_latest_value ... ok
+test tests::constant_mixed_values_keep_the_existing_bytes ... ok
+test tests::damaged_measured_response_is_counted_and_invalidates_the_run ... ok
+test tests::disabled_benchmark_sync_does_not_call_real_sync ... ok
+test tests::disabled_sync_mode_aliases_parse_and_report_canonical_name ... ok
+test tests::distributed_query_validation_checks_response_value_contents ... ok
+test tests::duration_parser_supports_required_units ... ok
+test tests::empty_samples_are_inconclusive_and_ambiguous_writes_are_not_permanent_candidates ... ok
+test tests::injected_benchmark_sync_calls_real_sync_once ... ok
+test tests::invocation_seed_records_scenario_and_repetition_inputs ... ok
+test tests::json_string_escapes_control_characters ... ok
+test tests::latency_samples_keep_a_bounded_deterministic_reservoir ... ok
+test tests::locality_generators_have_distinct_pk_shapes ... ok
+test tests::main_parity_collection_keeps_an_oversized_first_request_alone ... ok
+test tests::main_parity_collection_preserves_fifo_at_the_byte_boundary ... ok
+test tests::changing_mixed_trace_and_values_are_seeded ... ok
+test tests::measured_query_input_fingerprint_is_stable_and_detects_changed_input ... ok
+test tests::mix_quota_interleaves_slots_at_the_requested_operation_ratio ... ok
+test tests::mixed_scenarios_keep_default_width_and_accept_explicit_widths ... ok
+test tests::mixed_schedule_preserves_exact_requested_ratio ... ok
+test tests::mixed_trace_prefix_matches_external_adapter_vector ... ok
+test tests::mixed_value_modes_parse_and_keep_current_collection_default ... ok
+test tests::parallel_background_threshold_cli_value_is_reported_in_json ... ok
+test tests::parallel_background_threshold_defaults_to_zero ... ok
+test tests::parallel_engine_aliases_and_worker_default_are_stable ... ok
+test tests::platform_rss_reader_returns_bytes_for_the_current_process ... ok
+test tests::prior_mixed_smoke_selected_no_sampled_gets ... ok
+test tests::query16_response_contract_rejects_wrong_pk_boundary_order_duplicates_count_and_values ... ok
+test tests::query16_uses_many_deterministic_pk_and_start_ranges ... ok
+test tests::read_only_get_value_revision_and_missing_failures_reach_operation_counts ... ok
+test tests::read_only_get_verification_keeps_memory_constant_as_samples_grow ... ok
+test tests::real_benchmark_sync_calls_real_sync_once ... ok
+test tests::rss_failures_and_unsupported_status_never_serialize_as_zero_bytes ... ok
+test tests::measured_query_fingerprint_compares_unequal_runs_at_longest_common_checkpoint ... ok
+test tests::rss_window_excludes_outside_samples_and_tracks_growth_and_intervals ... ok
+test tests::same_seed_produces_same_transaction_sequence ... ok
+test tests::sampled_read_verification_accepts_seed_and_revisioned_updates_but_rejects_corruption ... ok
+test tests::transaction_width_and_key_uniqueness_are_preserved ... ok
+test tests::verification_history_is_bounded_and_reports_omitted_reads ... ok
+test tests::rss_sampler_runs_independently_while_caller_is_busy ... ok
+
+test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+

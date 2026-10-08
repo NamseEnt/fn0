@@ -1,0 +1,7 @@
+attempt-01 runner 결함과 보존 기록
+
+초기 manifest.tsv에서 Get/Query 행의 width 필드는 비어 있었다. Bash read는 IFS 공백 구분을 적용해 연속 tab delimiter를 하나처럼 취급했고 뒤 열이 이동했다. command 변수는 빈 값이 되어 runner는 `bash -c ""`를 실행하고 종료 코드 0을 기록했다. phase0-bench 프로세스는 시작되지 않았고 해당 JSONL은 생성되지 않았다. 빈 로그와 잘못된 0 종료 상태는 그대로 보존했다.
+
+해당 12개는 유효한 벤치마크가 아니다. 폭 값이 있던 mixed 12개만 attempt-01에서 실제로 실행했고 원본 JSONL을 보존했다. Get/Query는 파서 수정 후 attempt-02 고유 명령·로그·JSONL로 재실행했다. 이전 빈 로그를 덮어쓰지 않았다.
+
+`commands.planned-attempt-01.txt`는 최초에 계획한 명령을 보관한다. attempt-01의 실제 shell 호출 여부와 command_line은 `attempt-01-actual-invocations.tsv`에 기록한다. attempt-02의 유효 Get/Query 명령과 외부 반복·JSONL 반복 연결은 `attempt-02-manifest.tsv`에 있다.

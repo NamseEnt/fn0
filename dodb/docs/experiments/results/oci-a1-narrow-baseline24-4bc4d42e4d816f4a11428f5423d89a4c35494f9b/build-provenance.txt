@@ -1,0 +1,16 @@
+source_sha=4bc4d42e4d816f4a11428f5423d89a4c35494f9b
+source_status=clean
+phase0_bench_source_sha256=bae7b7b6fe13223c6ef579715c773b87a843b1b8caeeff4659a67818d7387e90
+Cargo.lock_sha256=9702ecfb45d6edab98f5aa3e849ad6f456faed7f75d5b37bd9b545eb2d5d4da6
+release_binary_sha256=9f8cadd3d432b95e9bb9ac4570da70e104fc5ad4254e39bbcb1953251a5a1981
+build_mode=release
+build_target=aarch64-linux (native aarch64-unknown-linux-gnu host)
+rustc=1.97.1 (8bab26f4f 2026-07-14)
+cargo=1.97.1 (c980f4866 2026-06-30)
+Cargo_config=.cargo/config.toml
+Cargo_config_sha256=d7f22f835a631b08459a9662e207df20f4abfbf8110e198cbac04582f5c42c9f
+Cargo_target_rustflags=-C target-feature=+crc
+JSON_rustflags_field=unset (environment variable unset; Cargo target configuration above applies)
+provenance=release binary reused from prior verification of the exact same source SHA, source hash, Cargo.lock hash, Cargo configuration and build target; no OCI source edit or rebuild was done for this run
+previous_release_build=build-release-reused.log
+previous_release_tests=test-release-reused.log (42 passed, 0 failed)

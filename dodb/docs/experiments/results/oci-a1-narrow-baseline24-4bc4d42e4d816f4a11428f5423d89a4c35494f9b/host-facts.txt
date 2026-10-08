@@ -1,0 +1,63 @@
+2026-10-08T01:19:23+00:00
+NAME="Oracle Linux Server"
+VERSION="9.8"
+ID="ol"
+ID_LIKE="fedora"
+VARIANT="Server"
+VARIANT_ID="server"
+VERSION_ID="9.8"
+PLATFORM_ID="platform:el9"
+PRETTY_NAME="Oracle Linux Server 9.8"
+ANSI_COLOR="0;31"
+CPE_NAME="cpe:/o:oracle:linux:9:8:server"
+HOME_URL="https://linux.oracle.com/"
+BUG_REPORT_URL="https://github.com/oracle/oracle-linux"
+
+ORACLE_BUGZILLA_PRODUCT="Oracle Linux 9"
+ORACLE_BUGZILLA_PRODUCT_VERSION=9.8
+ORACLE_SUPPORT_PRODUCT="Oracle Linux"
+ORACLE_SUPPORT_PRODUCT_VERSION=9.8
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+Architecture:                            aarch64
+CPU op-mode(s):                          32-bit, 64-bit
+Byte Order:                              Little Endian
+CPU(s):                                  2
+On-line CPU(s) list:                     0,1
+Vendor ID:                               ARM
+Model name:                              Neoverse-N1
+Model:                                   1
+Thread(s) per core:                      1
+Core(s) per socket:                      2
+Socket(s):                               1
+Stepping:                                r3p1
+BogoMIPS:                                50.00
+Flags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0,1
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; CSV2, BHB
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+               total        used        free      shared  buff/cache   available
+Mem:            10Gi       5.8Gi       1.8Gi        24Mi       3.4Gi       4.9Gi
+Swap:          4.0Gi       301Mi       3.7Gi
+Filesystem                 Type  Size  Used Avail Use% Mounted on
+/dev/mapper/ocivolume-root xfs    30G   29G  489M  99% /
+dodbbench/db               zfs   149G   38G  111G  26% /bench/zfs/db
+TARGET        SOURCE       FSTYPE OPTIONS
+/bench/zfs/db dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive
+NAME           USED  AVAIL  REFER  MOUNTPOINT
+dodbbench/db  37.3G   111G  37.3G  /bench/zfs/db

@@ -1,0 +1,47 @@
+[
+  {
+    "조건": "분산 Query16",
+    "외부 반복": 1,
+    "seed": "0xd0db2026",
+    "클라이언트": 0,
+    "main 실제 요청 수": 1049372,
+    "planned 실제 요청 수": 730582,
+    "동일 길이 공통 구간 요청 수": 655360,
+    "동일한 공통 checkpoint 수": 5,
+    "비교 가능한 checkpoint 수": 5,
+    "양쪽 최종 지문": "비교 안 함",
+    "공통 입력 지문 결과": "일치",
+    "main final fingerprint": "fnv1a64:d292fbc46da61715:requests=1049372",
+    "planned final fingerprint": "fnv1a64:45032270f59ce3f0:requests=730582"
+  },
+  {
+    "조건": "분산 Query16",
+    "외부 반복": 2,
+    "seed": "0xd0db2027",
+    "클라이언트": 0,
+    "main 실제 요청 수": 1051215,
+    "planned 실제 요청 수": 727439,
+    "동일 길이 공통 구간 요청 수": 655360,
+    "동일한 공통 checkpoint 수": 5,
+    "비교 가능한 checkpoint 수": 5,
+    "양쪽 최종 지문": "비교 안 함",
+    "공통 입력 지문 결과": "일치",
+    "main final fingerprint": "fnv1a64:686d802aceee2440:requests=1051215",
+    "planned final fingerprint": "fnv1a64:75de7cfe4befbe67:requests=727439"
+  },
+  {
+    "조건": "분산 Query16",
+    "외부 반복": 3,
+    "seed": "0xd0db2028",
+    "클라이언트": 0,
+    "main 실제 요청 수": 1051442,
+    "planned 실제 요청 수": 729902,
+    "동일 길이 공통 구간 요청 수": 655360,
+    "동일한 공통 checkpoint 수": 5,
+    "비교 가능한 checkpoint 수": 5,
+    "양쪽 최종 지문": "비교 안 함",
+    "공통 입력 지문 결과": "일치",
+    "main final fingerprint": "fnv1a64:319ecc033755557e:requests=1051442",
+    "planned final fingerprint": "fnv1a64:7e803e758fe98aef:requests=729902"
+  }
+]
