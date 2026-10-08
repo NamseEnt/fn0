@@ -7032,13 +7032,23 @@ mod tests {
     #[test]
     fn measured_query_fingerprint_compares_unequal_runs_at_longest_common_checkpoint() {
         let request = query_range_for_index(19, 16).request(16);
+        let changed_request = query_range_for_index(20, 16).request(16);
         let mut shorter_run = QueryInputFingerprint::new();
         let mut longer_run = QueryInputFingerprint::new();
+        let mut changed_late_input_run = QueryInputFingerprint::new();
         for _ in 0..(QUERY_INPUT_FINGERPRINT_CHECKPOINT_INTERVAL * 2 + 7) {
             shorter_run.record_request(0, &request);
         }
-        for _ in 0..(QUERY_INPUT_FINGERPRINT_CHECKPOINT_INTERVAL * 3 + 5) {
+        for request_index in 0..(QUERY_INPUT_FINGERPRINT_CHECKPOINT_INTERVAL * 3 + 5) {
             longer_run.record_request(0, &request);
+            changed_late_input_run.record_request(
+                0,
+                if request_index == QUERY_INPUT_FINGERPRINT_CHECKPOINT_INTERVAL + 5 {
+                    &changed_request
+                } else {
+                    &request
+                },
+            );
         }
 
         assert_ne!(shorter_run.request_count, longer_run.request_count);
@@ -7065,6 +7075,12 @@ mod tests {
             .unwrap()
             .fingerprint;
         assert_eq!(shorter_fingerprint, longer_fingerprint);
+        let changed_late_checkpoint = changed_late_input_run
+            .checkpoints
+            .iter()
+            .find(|checkpoint| checkpoint.request_count == common_checkpoint.request_count)
+            .unwrap();
+        assert_ne!(shorter_fingerprint, changed_late_checkpoint.fingerprint);
         assert!(shorter_run.checkpoints.iter().any(|checkpoint| {
             checkpoint.request_count > QUERY_INPUT_FINGERPRINT_CHECKPOINT_INTERVAL
         }));
