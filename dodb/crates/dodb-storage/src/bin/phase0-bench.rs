@@ -1002,6 +1002,7 @@ struct MixedValueContext {
 const QUERY_PK_COUNT: usize = 8;
 const QUERY_BASE_ROWS_PER_PK: usize = 32;
 const QUERY_INPUT_PLAN_REQUESTS: usize = 131_072;
+const QUERY_INPUT_FINGERPRINT_CHECKPOINT_INTERVAL: u64 = QUERY_INPUT_PLAN_REQUESTS as u64;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct QueryRange {
@@ -1429,6 +1430,89 @@ fn query_input_plan_fingerprint(args: &Args, scenario: &Scenario, repetition_see
     )
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct QueryInputFingerprintCheckpoint {
+    request_count: u64,
+    fingerprint: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct QueryInputFingerprint {
+    request_count: u64,
+    fingerprint: u64,
+    checkpoints: Vec<QueryInputFingerprintCheckpoint>,
+}
+
+impl QueryInputFingerprint {
+    fn new() -> Self {
+        Self {
+            request_count: 0,
+            fingerprint: 0xcbf2_9ce4_8422_2325,
+            checkpoints: Vec::new(),
+        }
+    }
+
+    fn record_request(&mut self, client_index: usize, request: &BatchRequest) {
+        let BatchRequest::Query {
+            pk,
+            exclusive_after_sk,
+            limit,
+        } = request
+        else {
+            return;
+        };
+
+        absorb_trace(&mut self.fingerprint, b"query-input-v1");
+        absorb_trace(&mut self.fingerprint, &(client_index as u64).to_be_bytes());
+        absorb_trace(&mut self.fingerprint, &self.request_count.to_be_bytes());
+        absorb_trace(
+            &mut self.fingerprint,
+            &(pk.as_bytes().len() as u64).to_be_bytes(),
+        );
+        absorb_trace(&mut self.fingerprint, pk.as_bytes());
+        if let Some(exclusive_after_sk) = exclusive_after_sk {
+            absorb_trace(&mut self.fingerprint, &[1]);
+            absorb_trace(
+                &mut self.fingerprint,
+                &(exclusive_after_sk.as_bytes().len() as u64).to_be_bytes(),
+            );
+            absorb_trace(&mut self.fingerprint, exclusive_after_sk.as_bytes());
+        } else {
+            absorb_trace(&mut self.fingerprint, &[0]);
+        }
+        absorb_trace(&mut self.fingerprint, &(*limit as u64).to_be_bytes());
+        self.request_count = self.request_count.saturating_add(1);
+
+        if self.request_count % QUERY_INPUT_FINGERPRINT_CHECKPOINT_INTERVAL == 0 {
+            self.checkpoints.push(QueryInputFingerprintCheckpoint {
+                request_count: self.request_count,
+                fingerprint: self.fingerprint,
+            });
+        }
+    }
+
+    fn final_fingerprint(&self) -> String {
+        format!(
+            "fnv1a64:{:016x}:requests={}",
+            self.fingerprint, self.request_count
+        )
+    }
+}
+
+fn common_query_input_fingerprint_checkpoint(
+    left: &[QueryInputFingerprintCheckpoint],
+    right: &[QueryInputFingerprintCheckpoint],
+) -> Option<QueryInputFingerprintCheckpoint> {
+    left.iter()
+        .filter(|left_checkpoint| {
+            right.iter().any(|right_checkpoint| {
+                left_checkpoint.request_count == right_checkpoint.request_count
+            })
+        })
+        .max_by_key(|checkpoint| checkpoint.request_count)
+        .copied()
+}
+
 fn query_result_is_valid(
     request: &BatchRequest,
     rows: &[dodb_storage::Document],
@@ -1630,6 +1714,28 @@ enum VerificationStatus {
     Inconclusive,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SampledReadVerificationMode {
+    ReadOnlyGet,
+    ConcurrentMixed,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ReadValidationOutcome {
+    Deferred,
+    Passed,
+    Failed,
+}
+
+impl SampledReadVerificationMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::ReadOnlyGet => "read_only_get_seed_state",
+            Self::ConcurrentMixed => "concurrent_mixed_revision_history",
+        }
+    }
+}
+
 impl VerificationStatus {
     fn as_str(self) -> &'static str {
         match self {
@@ -1655,7 +1761,9 @@ struct VerificationSummary {
     sampled_writes_stored: u64,
     changed_key_reads_checked: u64,
     omitted_events: u64,
+    history_event_count: u64,
     estimated_memory_bytes: usize,
+    estimated_memory_growth_bytes: usize,
     estimated_index_memory_bytes: usize,
     verification_comparisons: u64,
 }
@@ -1675,7 +1783,9 @@ impl VerificationSummary {
             sampled_writes_stored: 0,
             changed_key_reads_checked: 0,
             omitted_events: 0,
+            history_event_count: 0,
             estimated_memory_bytes: 0,
+            estimated_memory_growth_bytes: 0,
             estimated_index_memory_bytes: 0,
             verification_comparisons: 0,
         }
@@ -1715,11 +1825,15 @@ struct AmbiguousValueWindowIndex {
 }
 
 struct SampledReadVerifier {
+    mode: SampledReadVerificationMode,
     sampled_key_count: usize,
     seed_states: HashMap<DocumentKey, SampledSeed>,
+    seed_memory_bytes: usize,
     mutations: Vec<SampledMutation>,
     reads: Vec<SampledRead>,
     sampled_reads_observed: u64,
+    immediate_reads_checked: u64,
+    immediate_reads_failed: u64,
     sampled_writes_observed: u64,
     sampled_writes_confirmed: u64,
     sampled_writes_ambiguous: u64,
@@ -1729,6 +1843,7 @@ struct SampledReadVerifier {
 
 impl SampledReadVerifier {
     fn new(
+        mode: SampledReadVerificationMode,
         sampled_keys: &HashSet<DocumentKey>,
         seed_states: HashMap<DocumentKey, SampledSeed>,
     ) -> Self {
@@ -1737,11 +1852,15 @@ impl SampledReadVerifier {
             .map(|(key, seed)| sampled_event_memory_bytes(key, &seed.value))
             .sum();
         Self {
+            mode,
             sampled_key_count: sampled_keys.len(),
             seed_states,
+            seed_memory_bytes: estimated_memory_bytes,
             mutations: Vec::new(),
             reads: Vec::new(),
             sampled_reads_observed: 0,
+            immediate_reads_checked: 0,
+            immediate_reads_failed: 0,
             sampled_writes_observed: 0,
             sampled_writes_confirmed: 0,
             sampled_writes_ambiguous: 0,
@@ -1750,12 +1869,28 @@ impl SampledReadVerifier {
         }
     }
 
-    fn record_read(&mut self, read: SampledRead) {
+    fn record_read(&mut self, read: SampledRead) -> ReadValidationOutcome {
         self.sampled_reads_observed = self.sampled_reads_observed.saturating_add(1);
+        if self.mode == SampledReadVerificationMode::ReadOnlyGet {
+            self.immediate_reads_checked = self.immediate_reads_checked.saturating_add(1);
+            let passed = self.seed_states.get(&read.key).is_some_and(|seed| {
+                read.value.as_deref() == Some(seed.value.as_slice())
+                    && read.revision == Some(seed.revision)
+            });
+            if !passed {
+                self.immediate_reads_failed = self.immediate_reads_failed.saturating_add(1);
+            }
+            return if passed {
+                ReadValidationOutcome::Passed
+            } else {
+                ReadValidationOutcome::Failed
+            };
+        }
         if !self.reserve_event_memory(&read.key, read.value.as_deref().unwrap_or_default()) {
-            return;
+            return ReadValidationOutcome::Deferred;
         }
         self.reads.push(read);
+        ReadValidationOutcome::Deferred
     }
 
     fn record_mutations(
@@ -1802,6 +1937,37 @@ impl SampledReadVerifier {
     }
 
     fn summarize(&self) -> VerificationSummary {
+        if self.mode == SampledReadVerificationMode::ReadOnlyGet {
+            let status = if self.immediate_reads_failed > 0 {
+                VerificationStatus::Failed
+            } else if self.sampled_reads_observed == 0
+                || self.immediate_reads_checked == 0
+                || self.seed_states.len() != self.sampled_key_count
+            {
+                VerificationStatus::Inconclusive
+            } else {
+                VerificationStatus::Passed
+            };
+            return VerificationSummary {
+                status,
+                sampled_key_count: self.sampled_key_count,
+                sampled_reads_observed: self.sampled_reads_observed,
+                sampled_reads_checked: self.immediate_reads_checked,
+                sampled_reads_failed: self.immediate_reads_failed,
+                sampled_reads_indeterminate: 0,
+                sampled_writes_observed: 0,
+                sampled_writes_confirmed: 0,
+                sampled_writes_ambiguous: 0,
+                sampled_writes_stored: 0,
+                changed_key_reads_checked: 0,
+                omitted_events: 0,
+                history_event_count: 0,
+                estimated_memory_bytes: self.estimated_memory_bytes,
+                estimated_memory_growth_bytes: 0,
+                estimated_index_memory_bytes: 0,
+                verification_comparisons: self.immediate_reads_checked,
+            };
+        }
         let mut successful_by_key = HashMap::<DocumentKey, Vec<&SampledMutation>>::new();
         let mut successful_by_start = HashMap::<DocumentKey, Vec<&SampledMutation>>::new();
         let mut ambiguous_events =
@@ -1994,7 +2160,11 @@ impl SampledReadVerifier {
             sampled_writes_stored: self.mutations.len() as u64,
             changed_key_reads_checked,
             omitted_events: self.omitted_events,
+            history_event_count: self.reads.len().saturating_add(self.mutations.len()) as u64,
             estimated_memory_bytes: self.estimated_memory_bytes,
+            estimated_memory_growth_bytes: self
+                .estimated_memory_bytes
+                .saturating_sub(self.seed_memory_bytes),
             estimated_index_memory_bytes: self.mutations.len().saturating_mul(96),
             verification_comparisons: comparisons,
         }
@@ -2576,6 +2746,7 @@ struct ClientCompletion {
     role: &'static str,
     client_index: usize,
     completed_at: Instant,
+    query_input_fingerprint: Option<QueryInputFingerprint>,
     attempted_operations: u64,
     successful_operations: u64,
     successful_queries: u64,
@@ -2666,11 +2837,17 @@ impl WorkerStats {
         self.successful_gets + self.successful_queries + self.successful_scans
     }
 
-    fn complete_client(&mut self, role: &'static str, client_index: usize) {
+    fn complete_client(
+        &mut self,
+        role: &'static str,
+        client_index: usize,
+        query_input_fingerprint: Option<QueryInputFingerprint>,
+    ) {
         self.client_completions.push(ClientCompletion {
             role,
             client_index,
             completed_at: Instant::now(),
+            query_input_fingerprint,
             attempted_operations: self.attempted_operations(),
             successful_operations: self.successful_operations(),
             successful_queries: self.successful_queries,
@@ -4017,6 +4194,18 @@ fn is_read_slot(slot: u64, read_percent: u8) -> bool {
     reads_after > reads_before
 }
 
+fn record_get_outcome(
+    stats: &mut WorkerStats,
+    found: bool,
+    sampled_read_validation: ReadValidationOutcome,
+) {
+    if found && sampled_read_validation != ReadValidationOutcome::Failed {
+        stats.successful_gets += 1;
+    } else {
+        stats.errors += 1;
+    }
+}
+
 async fn writer_loop(
     adapter: Arc<dyn EngineAdapter>,
     workload: WorkloadConfig,
@@ -4097,7 +4286,7 @@ async fn writer_loop(
             }
         }
     }
-    stats.complete_client("writer", worker_id);
+    stats.complete_client("writer", worker_id, None);
     stats
 }
 
@@ -4115,6 +4304,8 @@ async fn reader_loop(
 ) -> WorkerStats {
     let mut generator = WorkloadGenerator::new(workload.clone(), seed, worker_id);
     let mut stats = WorkerStats::new(seed ^ worker_id as u64 ^ 0xfeed);
+    let mut query_input_fingerprint =
+        (read_kind == ReadKind::Query && !warmup).then(QueryInputFingerprint::new);
     let (_, deadline) = await_start_window(start_gate).await;
     while Instant::now() < deadline {
         if let Some(quota) = &quota
@@ -4137,6 +4328,9 @@ async fn reader_loop(
         let started = Instant::now();
         if started >= deadline {
             break;
+        }
+        if let Some(query_input_fingerprint) = &mut query_input_fingerprint {
+            query_input_fingerprint.record_request(worker_id, &request);
         }
         let result = adapter.execute(request.clone()).await;
         let mut finished = Instant::now();
@@ -4163,7 +4357,7 @@ async fn reader_loop(
                     }
                     RevisionState::Missing { revision } => (None, Some(revision), false),
                 };
-                if let Some(key) = sampled_read_key
+                let sampled_read_passed = if let Some(key) = sampled_read_key
                     && let Some(verifier) = &verifier
                 {
                     verifier
@@ -4175,13 +4369,11 @@ async fn reader_loop(
                             revision,
                             started_at: started,
                             finished_at: finished,
-                        });
-                }
-                if found {
-                    stats.successful_gets += 1;
+                        })
                 } else {
-                    stats.errors += 1;
-                }
+                    ReadValidationOutcome::Deferred
+                };
+                record_get_outcome(&mut stats, found, sampled_read_passed);
             }
             Ok(BatchResponse::Scan(rows)) => {
                 stats.successful_scans += 1;
@@ -4202,7 +4394,7 @@ async fn reader_loop(
         stats.e2e_latency.push(elapsed);
         stats.read_latency.push(elapsed);
     }
-    stats.complete_client("reader", worker_id);
+    stats.complete_client("reader", worker_id, query_input_fingerprint);
     stats
 }
 
@@ -4259,7 +4451,7 @@ async fn mixed_client_loop(
                         RevisionState::Missing { revision } => (None, Some(revision), false),
                     };
                     if let (Some(key), Some(verifier)) = (sampled_read_key, &verifier) {
-                        verifier
+                        let _ = verifier
                             .lock()
                             .expect("sample verifier lock should not be poisoned")
                             .record_read(SampledRead {
@@ -4270,11 +4462,7 @@ async fn mixed_client_loop(
                                 finished_at: finished,
                             });
                     }
-                    if found {
-                        stats.successful_gets += 1;
-                    } else {
-                        stats.errors += 1;
-                    }
+                    record_get_outcome(&mut stats, found, ReadValidationOutcome::Deferred);
                 }
                 Ok(_) => stats.errors += 1,
                 Err(Error::Overloaded(_)) => stats.overloads += 1,
@@ -4334,7 +4522,7 @@ async fn mixed_client_loop(
             }
         }
     }
-    stats.complete_client("mixed", worker_id);
+    stats.complete_client("mixed", worker_id, None);
     stats
 }
 
@@ -5063,6 +5251,31 @@ fn metric_field_name(prefix: &str, field: &str) -> String {
     format!("{prefix}_{field}")
 }
 
+fn query_input_fingerprint_json(fingerprint: Option<&QueryInputFingerprint>) -> String {
+    let Some(fingerprint) = fingerprint else {
+        return "null".to_string();
+    };
+    let checkpoints = fingerprint
+        .checkpoints
+        .iter()
+        .map(|checkpoint| {
+            format!(
+                "{{\"request_count\":{},\"fingerprint\":{}}}",
+                checkpoint.request_count,
+                json_string(&format!("fnv1a64:{:016x}", checkpoint.fingerprint)),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "{{\"request_count\":{},\"final_fingerprint\":{},\"checkpoint_interval_requests\":{},\"checkpoints\":[{}]}}",
+        fingerprint.request_count,
+        json_string(&fingerprint.final_fingerprint()),
+        QUERY_INPUT_FINGERPRINT_CHECKPOINT_INTERVAL,
+        checkpoints,
+    )
+}
+
 fn build_record(
     machine: &MachineInfo,
     args: &Args,
@@ -5359,9 +5572,37 @@ fn build_record(
             "query_input_plan_fingerprint",
             &query_input_plan_fingerprint(args, scenario, seed),
         );
+        json.string(
+            "query_input_plan_scope",
+            "synthetic deterministic plan generated before measurement; does not fingerprint measured requests",
+        );
         json.usize(
             "query_input_plan_requests_per_client",
             QUERY_INPUT_PLAN_REQUESTS,
+        );
+        json.string(
+            "query_measured_input_fingerprint_scope",
+            "actual measured Query requests, separately accumulated per client",
+        );
+        json.string(
+            "query_measured_input_fingerprint_fields",
+            "client index, zero-based client request number, PK bytes, exclusive-after-SK presence and bytes, and limit",
+        );
+        json.u64(
+            "query_measured_input_fingerprint_checkpoint_interval_requests",
+            QUERY_INPUT_FINGERPRINT_CHECKPOINT_INTERVAL,
+        );
+        json.string(
+            "query_measured_input_fingerprint_retention",
+            "one cumulative 64-bit fingerprint per client at each 131072-request boundary, plus one final fingerprint; no request objects are retained",
+        );
+        json.string(
+            "query_measured_input_fingerprint_cost_scope",
+            "request fingerprinting occurs after request admission and after the per-request timer starts, before adapter execution; included in measurement wall time and per-request latency; JSON serialization occurs after measurement",
+        );
+        json.string(
+            "query_measured_input_fingerprint_contract",
+            "compare only matching per-client checkpoint request counts across runs; never compare final fingerprints with different request counts; input fingerprint does not replace response validation",
         );
         json.string(
             "query_validation_scope",
@@ -5488,10 +5729,11 @@ fn build_record(
         .iter()
         .map(|client| {
             format!(
-                "{{\"role\":{},\"client_index\":{},\"completion_offset_ns\":{},\"attempted_operations\":{},\"successful_operations\":{},\"successful_queries\":{},\"returned_rows\":{},\"query_checked_requests\":{},\"query_checked_rows\":{},\"query_validation_failures\":{}}}",
+                "{{\"role\":{},\"client_index\":{},\"completion_offset_ns\":{},\"query_input_fingerprint\":{},\"attempted_operations\":{},\"successful_operations\":{},\"successful_queries\":{},\"returned_rows\":{},\"query_checked_requests\":{},\"query_checked_rows\":{},\"query_validation_failures\":{}}}",
                 json_string(client.role),
                 client.client_index,
                 duration_to_nanos(client.completed_at.saturating_duration_since(measurement_started)),
+                query_input_fingerprint_json(client.query_input_fingerprint.as_ref()),
                 client.attempted_operations,
                 client.successful_operations,
                 client.successful_queries,
@@ -5504,6 +5746,29 @@ fn build_record(
         .collect::<Vec<_>>()
         .join(",");
     json.raw("clients", format!("[{clients}]"));
+    let sampled_read_verification_mode = if scenario.mix.is_some() {
+        Some(SampledReadVerificationMode::ConcurrentMixed)
+    } else if scenario.read_kind == Some(ReadKind::Get) {
+        Some(SampledReadVerificationMode::ReadOnlyGet)
+    } else {
+        None
+    };
+    json.string(
+        "sampled_read_verification_mode",
+        sampled_read_verification_mode.map_or("not_applicable", |mode| mode.as_str()),
+    );
+    json.string(
+        "sampled_read_verification_contract",
+        match sampled_read_verification_mode {
+            Some(SampledReadVerificationMode::ReadOnlyGet) => {
+                "read-only Get has no measured writers; sampled responses are immediately matched to the seeded value and revision without retaining per-read history"
+            }
+            Some(SampledReadVerificationMode::ConcurrentMixed) => {
+                "mixed reads retain bounded revision history to validate concurrent writes; history may become inconclusive at its configured limits"
+            }
+            None => "sampled Get verification is not applicable",
+        },
+    );
     json.string(
         "sampled_read_verification_status",
         verification.status.as_str(),
@@ -5542,9 +5807,17 @@ fn build_record(
         verification.changed_key_reads_checked,
     );
     json.u64("verification_omitted_events", verification.omitted_events);
+    json.u64(
+        "verification_history_event_count",
+        verification.history_event_count,
+    );
     json.usize(
         "verification_estimated_memory_bytes",
         verification.estimated_memory_bytes,
+    );
+    json.usize(
+        "verification_estimated_memory_growth_bytes",
+        verification.estimated_memory_growth_bytes,
     );
     json.usize(
         "verification_estimated_index_memory_bytes",
@@ -6487,7 +6760,13 @@ async fn run_repetition(
         HashMap::new()
     };
     let verifier = verifies_gets.then(|| {
+        let mode = if scenario.mix.is_some() {
+            SampledReadVerificationMode::ConcurrentMixed
+        } else {
+            SampledReadVerificationMode::ReadOnlyGet
+        };
         Arc::new(Mutex::new(SampledReadVerifier::new(
+            mode,
             &sampled_keys,
             seed_states,
         )))
@@ -6730,6 +7009,64 @@ mod tests {
             args.value_size,
             args.read_limit,
         ));
+    }
+
+    #[test]
+    fn measured_query_input_fingerprint_is_stable_and_detects_changed_input() {
+        let original_request = query_range_for_index(19, 16).request(16);
+        let changed_request = query_range_for_index(20, 16).request(16);
+        let mut first = QueryInputFingerprint::new();
+        let mut matching = QueryInputFingerprint::new();
+        let mut changed = QueryInputFingerprint::new();
+        for _ in 0..8 {
+            first.record_request(0, &original_request);
+            matching.record_request(0, &original_request);
+            changed.record_request(0, &original_request);
+        }
+        changed.record_request(0, &changed_request);
+        assert_eq!(first.final_fingerprint(), matching.final_fingerprint());
+        assert_ne!(first.final_fingerprint(), changed.final_fingerprint());
+    }
+
+    #[test]
+    fn measured_query_fingerprint_compares_unequal_runs_at_longest_common_checkpoint() {
+        let request = query_range_for_index(19, 16).request(16);
+        let mut shorter_run = QueryInputFingerprint::new();
+        let mut longer_run = QueryInputFingerprint::new();
+        for _ in 0..(QUERY_INPUT_FINGERPRINT_CHECKPOINT_INTERVAL * 2 + 7) {
+            shorter_run.record_request(0, &request);
+        }
+        for _ in 0..(QUERY_INPUT_FINGERPRINT_CHECKPOINT_INTERVAL * 3 + 5) {
+            longer_run.record_request(0, &request);
+        }
+
+        assert_ne!(shorter_run.request_count, longer_run.request_count);
+        assert_ne!(
+            shorter_run.final_fingerprint(),
+            longer_run.final_fingerprint()
+        );
+        let common_checkpoint = common_query_input_fingerprint_checkpoint(
+            &shorter_run.checkpoints,
+            &longer_run.checkpoints,
+        )
+        .expect("runs should retain matching 131072-request checkpoints");
+        assert_eq!(common_checkpoint.request_count, 262_144);
+        let shorter_fingerprint = shorter_run
+            .checkpoints
+            .iter()
+            .find(|checkpoint| checkpoint.request_count == common_checkpoint.request_count)
+            .unwrap()
+            .fingerprint;
+        let longer_fingerprint = longer_run
+            .checkpoints
+            .iter()
+            .find(|checkpoint| checkpoint.request_count == common_checkpoint.request_count)
+            .unwrap()
+            .fingerprint;
+        assert_eq!(shorter_fingerprint, longer_fingerprint);
+        assert!(shorter_run.checkpoints.iter().any(|checkpoint| {
+            checkpoint.request_count > QUERY_INPUT_FINGERPRINT_CHECKPOINT_INTERVAL
+        }));
     }
 
     #[test]
@@ -7100,7 +7437,11 @@ mod tests {
         }
     }
 
-    fn verifier_with_seed(key: DocumentKey, revision: u64) -> SampledReadVerifier {
+    fn verifier_with_seed_mode(
+        key: DocumentKey,
+        revision: u64,
+        mode: SampledReadVerificationMode,
+    ) -> SampledReadVerifier {
         let sampled_keys = HashSet::from([key.clone()]);
         let seed_states = HashMap::from([(
             key,
@@ -7109,7 +7450,101 @@ mod tests {
                 revision: dodb_core::Revision::new(revision),
             },
         )]);
-        SampledReadVerifier::new(&sampled_keys, seed_states)
+        SampledReadVerifier::new(mode, &sampled_keys, seed_states)
+    }
+
+    fn verifier_with_seed(key: DocumentKey, revision: u64) -> SampledReadVerifier {
+        verifier_with_seed_mode(key, revision, SampledReadVerificationMode::ConcurrentMixed)
+    }
+
+    #[test]
+    fn read_only_get_verification_keeps_memory_constant_as_samples_grow() {
+        let key = WorkloadGenerator::new(workload(Distribution::Uniform, 1), 0, 0).key_for_index(0);
+        let mut verifier =
+            verifier_with_seed_mode(key.clone(), 5, SampledReadVerificationMode::ReadOnlyGet);
+        let timestamp = Instant::now();
+        let initial_memory_bytes = verifier.estimated_memory_bytes;
+        let value = value_bytes(8, 0, 0);
+        for _ in 0..100_000 {
+            assert_eq!(
+                verifier.record_read(SampledRead {
+                    key: key.clone(),
+                    value: Some(value.clone()),
+                    revision: Some(dodb_core::Revision::new(5)),
+                    started_at: timestamp,
+                    finished_at: timestamp,
+                }),
+                ReadValidationOutcome::Passed
+            );
+        }
+
+        let summary = verifier.summarize();
+        assert_eq!(summary.status, VerificationStatus::Passed);
+        assert_eq!(summary.sampled_key_count, 1);
+        assert_eq!(summary.sampled_reads_observed, 100_000);
+        assert_eq!(summary.sampled_reads_checked, 100_000);
+        assert_eq!(summary.sampled_reads_failed, 0);
+        assert_eq!(summary.history_event_count, 0);
+        assert_eq!(summary.estimated_memory_bytes, initial_memory_bytes);
+        assert_eq!(summary.estimated_memory_growth_bytes, 0);
+        assert!(verifier.reads.is_empty());
+    }
+
+    #[test]
+    fn read_only_get_value_revision_and_missing_failures_reach_operation_counts() {
+        let key = WorkloadGenerator::new(workload(Distribution::Uniform, 1), 0, 0).key_for_index(0);
+        let timestamp = Instant::now();
+        let invalid_reads = [
+            SampledRead {
+                key: key.clone(),
+                value: Some(value_bytes(8, 1, 0)),
+                revision: Some(dodb_core::Revision::new(5)),
+                started_at: timestamp,
+                finished_at: timestamp,
+            },
+            SampledRead {
+                key: key.clone(),
+                value: Some(value_bytes(8, 0, 0)),
+                revision: Some(dodb_core::Revision::new(6)),
+                started_at: timestamp,
+                finished_at: timestamp,
+            },
+            SampledRead {
+                key,
+                value: None,
+                revision: Some(dodb_core::Revision::new(5)),
+                started_at: timestamp,
+                finished_at: timestamp,
+            },
+        ];
+
+        for invalid_read in invalid_reads {
+            let mut verifier = verifier_with_seed_mode(
+                invalid_read.key.clone(),
+                5,
+                SampledReadVerificationMode::ReadOnlyGet,
+            );
+            let validation = verifier.record_read(invalid_read);
+            let mut stats = WorkerStats::new(1);
+            stats.attempted_gets = 1;
+            record_get_outcome(&mut stats, true, validation);
+            let summary = verifier.summarize();
+            assert_eq!(stats.successful_gets, 0);
+            assert_eq!(stats.errors, 1);
+            assert_eq!(summary.status, VerificationStatus::Failed);
+            assert_eq!(summary.sampled_reads_checked, 1);
+            assert_eq!(summary.sampled_reads_failed, 1);
+            assert_eq!(summary.history_event_count, 0);
+        }
+
+        let missing_key =
+            WorkloadGenerator::new(workload(Distribution::Uniform, 1), 0, 0).key_for_index(0);
+        let empty_verifier =
+            verifier_with_seed_mode(missing_key, 5, SampledReadVerificationMode::ReadOnlyGet);
+        assert_eq!(
+            empty_verifier.summarize().status,
+            VerificationStatus::Inconclusive
+        );
     }
 
     #[test]
@@ -7452,7 +7887,7 @@ mod tests {
             &workload,
             &mut stats,
         ));
-        stats.complete_client("reader", 0);
+        stats.complete_client("reader", 0, None);
         assert_eq!(stats.query_checked_requests, 1);
         assert_eq!(stats.query_checked_rows, args.read_limit as u64);
         assert_eq!(stats.query_validation_failures, 1);
