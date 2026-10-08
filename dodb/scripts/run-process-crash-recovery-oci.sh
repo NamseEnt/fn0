@@ -111,8 +111,10 @@ cargo test --release --locked -p dodb-storage --test process_crash_recovery -- -
 test_status=$?
 set -e
 printf '%s\n' "$test_status" > "$result_path/test-exit-status.txt"
-find "$target_path/release/deps" -maxdepth 1 -type f -perm -111 \
-  \( -name 'process_crash_recovery-*' -o -name 'process-crash-recovery-child-*' \) \
+find "$target_path/release" -type f -perm -111 \
+  \( -path "$target_path/release/deps/process_crash_recovery-*" \
+  -o -path "$target_path/release/deps/process_crash_recovery_child-*" \
+  -o -path "$target_path/release/process-crash-recovery-child" \) \
   -print0 | sort -z | xargs -0 -r sha256sum > "$result_path/binary-sha256.txt"
 
 find "$result_path" -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > "$result_path/SHA256SUMS"
