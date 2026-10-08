@@ -1499,6 +1499,7 @@ impl QueryInputFingerprint {
     }
 }
 
+#[cfg(test)]
 fn common_query_input_fingerprint_checkpoint(
     left: &[QueryInputFingerprintCheckpoint],
     right: &[QueryInputFingerprintCheckpoint],
