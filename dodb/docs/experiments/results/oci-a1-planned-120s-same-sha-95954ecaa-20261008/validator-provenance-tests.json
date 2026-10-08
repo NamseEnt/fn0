@@ -1,0 +1,114 @@
+{
+  "passed": true,
+  "case_count": 12,
+  "cases": [
+    {
+      "name": "valid",
+      "expected_accepted_runs": 8,
+      "accepted_runs": 8,
+      "expected_passed": true,
+      "passed": true,
+      "exit_code": 0,
+      "test_passed": true
+    },
+    {
+      "name": "missing-source_dirty",
+      "expected_accepted_runs": 7,
+      "accepted_runs": 7,
+      "expected_passed": false,
+      "passed": false,
+      "exit_code": 1,
+      "test_passed": true
+    },
+    {
+      "name": "missing-git_commit",
+      "expected_accepted_runs": 7,
+      "accepted_runs": 7,
+      "expected_passed": false,
+      "passed": false,
+      "exit_code": 1,
+      "test_passed": true
+    },
+    {
+      "name": "missing-binary_sha256",
+      "expected_accepted_runs": 7,
+      "accepted_runs": 7,
+      "expected_passed": false,
+      "passed": false,
+      "exit_code": 1,
+      "test_passed": true
+    },
+    {
+      "name": "missing-source_sha256",
+      "expected_accepted_runs": 7,
+      "accepted_runs": 7,
+      "expected_passed": false,
+      "passed": false,
+      "exit_code": 1,
+      "test_passed": true
+    },
+    {
+      "name": "missing-cargo_lock_sha256",
+      "expected_accepted_runs": 7,
+      "accepted_runs": 7,
+      "expected_passed": false,
+      "passed": false,
+      "exit_code": 1,
+      "test_passed": true
+    },
+    {
+      "name": "dirty-source",
+      "expected_accepted_runs": 7,
+      "accepted_runs": 7,
+      "expected_passed": false,
+      "passed": false,
+      "exit_code": 1,
+      "test_passed": true
+    },
+    {
+      "name": "nonboolean-source-dirty",
+      "expected_accepted_runs": 7,
+      "accepted_runs": 7,
+      "expected_passed": false,
+      "passed": false,
+      "exit_code": 1,
+      "test_passed": true
+    },
+    {
+      "name": "wrong-git-commit",
+      "expected_accepted_runs": 7,
+      "accepted_runs": 7,
+      "expected_passed": false,
+      "passed": false,
+      "exit_code": 1,
+      "test_passed": true
+    },
+    {
+      "name": "wrong-binary-hash",
+      "expected_accepted_runs": 7,
+      "accepted_runs": 7,
+      "expected_passed": false,
+      "passed": false,
+      "exit_code": 1,
+      "test_passed": true
+    },
+    {
+      "name": "wrong-source-hash",
+      "expected_accepted_runs": 7,
+      "accepted_runs": 7,
+      "expected_passed": false,
+      "passed": false,
+      "exit_code": 1,
+      "test_passed": true
+    },
+    {
+      "name": "wrong-cargo-lock-hash",
+      "expected_accepted_runs": 7,
+      "accepted_runs": 7,
+      "expected_passed": false,
+      "passed": false,
+      "exit_code": 1,
+      "test_passed": true
+    }
+  ]
+}

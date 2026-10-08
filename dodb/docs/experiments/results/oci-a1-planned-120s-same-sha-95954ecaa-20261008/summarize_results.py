@@ -17,17 +17,17 @@ latest = {}
 for row in history_rows:
     if row.get("state") == "process-exited" and row.get("jsonl_records") == "1":
         latest[row["run_id"]] = row
-first = {
-    "run_id": "01-get-main-btree-r1",
-    "started_utc": "2026-10-08T02:46:08.638702+00:00",
-    "ended_utc": "2026-10-08T02:48:10.246162+00:00",
-    "actual_elapsed_seconds": "121.607424628",
-    "exit_code": "0",
-    "jsonl_records": "1",
-    "result_duration_ms": str(records["01-get-main-btree-r1"]["duration_ms"]),
-    "state": "recovered-output-relocated",
+rerun_event = json.loads((root / "logs/09-get-main-btree-provenance-clean-r1.event.json").read_text())
+latest["09-get-main-btree-provenance-clean-r1"] = {
+    "run_id": rerun_event["run_id"],
+    "started_utc": rerun_event["started_utc"],
+    "ended_utc": rerun_event["ended_utc"],
+    "actual_elapsed_seconds": str(rerun_event["actual_elapsed_seconds"]),
+    "exit_code": str(rerun_event["exit_code"]),
+    "jsonl_records": str(rerun_event["jsonl_records"]),
+    "result_duration_ms": str(rerun_event["result_duration_ms"]),
+    "state": rerun_event["state"],
 }
-latest[first["run_id"]] = first
 with (root / "execution-status.tsv").open("w", newline="") as status_file:
     fields = ["run_id", "started_utc", "ended_utc", "actual_elapsed_seconds", "exit_code", "jsonl_records", "result_duration_ms", "state"]
     writer = csv.DictWriter(status_file, fieldnames=fields, delimiter="\t", lineterminator="\n")
@@ -115,7 +115,9 @@ for run_id in sorted(records):
 (root / "commands.txt").write_text("".join(commands))
 
 attempts = ["attempt\trun_id	start_utc	end_utc	elapsed_seconds	status	detail\n"]
-attempts.append("01\t01-get-main-btree-r1\t2026-10-08T02:46:08.638702+00:00\t2026-10-08T02:48:10.246162+00:00\t121.607424628\trecovered-and-accepted\tJSONL was written to a source-relative path, copied with SHA-256 preserved, and checkout was restored clean\n")
+attempts.append("01\t01-get-main-btree-r1\t2026-10-08T02:46:08.638702+00:00\t2026-10-08T02:48:10.246162+00:00\t121.607424628\texcluded-provenance-dirty\tsource_dirty=true; original bytes, checksum and relocation evidence preserved under invalid/source-dirty-first-get\n")
+new_run = latest["09-get-main-btree-provenance-clean-r1"]
+attempts.append(f"05\t09-get-main-btree-provenance-clean-r1\t{new_run['started_utc']}\t{new_run['ended_utc']}\t{new_run['actual_elapsed_seconds']}\taccepted\tClean checkout and verified provenance; output outside checkout\n")
 for row in history_rows:
     if row["run_id"] == "02-get-planned-blink-r1" and row["state"] == "invalid-output":
         attempts.append(f"02\t{row['run_id']}\t{row['started_utc']}\t{row['ended_utc']}\t{row['actual_elapsed_seconds']}\tinvalid-stopped\tWrong output path; stopped after 105s; no JSONL record\n")
@@ -123,14 +125,14 @@ for run_id in ("05-mixed50-w4-main-btree", "06-mixed50-w4-planned-blink", "07-mi
     row = next(item for item in history_rows if item["run_id"] == run_id and item["started_utc"] < "2026-10-08T03:07:00")
     attempts.append(f"03\t{run_id}\t{row['started_utc']}\t{row['ended_utc']}\t{row['actual_elapsed_seconds']}\tinvalid-client-model\t--mixed-clients ran one mixed client instead of separate writer and reader clients; raw JSONL preserved under invalid/attempt-03-one-mixed-client\n")
 for run_id in sorted(records):
-    if run_id != "01-get-main-btree-r1":
+    if run_id != "09-get-main-btree-provenance-clean-r1":
         row = latest[run_id]
         attempts.append(f"04\t{run_id}\t{row['started_utc']}\t{row['ended_utc']}\t{row['actual_elapsed_seconds']}\taccepted\tFinal run\n")
 (root / "attempt-ledger.tsv").write_text("".join(attempts))
 
 ratios = []
 for workload, main_id, planned_id, metric in [
-    ("Get", "01-get-main-btree-r1", "02-get-planned-blink-r1", "read_ops_per_second"),
+    ("Get", "09-get-main-btree-provenance-clean-r1", "02-get-planned-blink-r1", "read_ops_per_second"),
     ("Query16", "04-query16-main-btree-r1", "03-query16-planned-blink-r1", "query_ops_per_second"),
     ("mixed-width4", "05-mixed50-w4-main-btree", "06-mixed50-w4-planned-blink", "aggregate_ops_per_second"),
     ("mixed-width8", "08-mixed50-w8-main-btree", "07-mixed50-w8-planned-blink", "aggregate_ops_per_second"),

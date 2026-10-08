@@ -1,5 +1,6 @@
 attempt	run_id	start_utc	end_utc	elapsed_seconds	status	detail
-01	01-get-main-btree-r1	2026-10-08T02:46:08.638702+00:00	2026-10-08T02:48:10.246162+00:00	121.607424628	recovered-and-accepted	JSONL was written to a source-relative path, copied with SHA-256 preserved, and checkout was restored clean
+01	01-get-main-btree-r1	2026-10-08T02:46:08.638702+00:00	2026-10-08T02:48:10.246162+00:00	121.607424628	excluded-provenance-dirty	source_dirty=true; original bytes, checksum and relocation evidence preserved under invalid/source-dirty-first-get
+05	09-get-main-btree-provenance-clean-r1	2026-10-08T04:27:16.190459+00:00	2026-10-08T04:29:17.734525+00:00	121.54398542	accepted	Clean checkout and verified provenance; output outside checkout
 02	02-get-planned-blink-r1	2026-10-08T02:49:10.268077+00:00	2026-10-08T02:50:55.351351+00:00	105.083215496	invalid-stopped	Wrong output path; stopped after 105s; no JSONL record
 03	05-mixed50-w4-main-btree	2026-10-08T02:57:42.938929+00:00	2026-10-08T02:59:44.670482+00:00	121.731522175	invalid-client-model	--mixed-clients ran one mixed client instead of separate writer and reader clients; raw JSONL preserved under invalid/attempt-03-one-mixed-client
 03	06-mixed50-w4-planned-blink	2026-10-08T02:59:44.675381+00:00	2026-10-08T03:01:46.262023+00:00	121.586608953	invalid-client-model	--mixed-clients ran one mixed client instead of separate writer and reader clients; raw JSONL preserved under invalid/attempt-03-one-mixed-client

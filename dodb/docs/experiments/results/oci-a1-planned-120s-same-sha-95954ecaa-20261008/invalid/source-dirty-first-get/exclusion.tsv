@@ -1,0 +1,2 @@
+run_id	artifact	sha256	reason	final_comparison
+01-get-main-btree-r1	invalid/source-dirty-first-get/01-get-main-btree-r1.jsonl	6dc4fdef7e9a18cce697463fbdaec4dab4de58ed42e05596e2be429e2937013a	source_dirty=true; output was written under checkout	no

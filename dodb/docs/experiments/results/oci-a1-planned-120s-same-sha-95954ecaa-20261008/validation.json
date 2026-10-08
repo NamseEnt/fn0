@@ -1,6 +1,17 @@
 {
   "accepted_runs": 8,
+  "accepted_run_ids": [
+    "09-get-main-btree-provenance-clean-r1",
+    "02-get-planned-blink-r1",
+    "03-query16-planned-blink-r1",
+    "04-query16-main-btree-r1",
+    "05-mixed50-w4-main-btree",
+    "06-mixed50-w4-planned-blink",
+    "07-mixed50-w8-planned-blink",
+    "08-mixed50-w8-main-btree"
+  ],
   "expected_runs": 8,
   "passed": true,
-  "errors": []
+  "errors": [],
+  "run_errors": {}
 }

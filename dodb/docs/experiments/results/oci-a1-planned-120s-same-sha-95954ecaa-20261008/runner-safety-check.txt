@@ -1,0 +1,2 @@
+checkout-internal-output	rejected before execution: RuntimeError, output artifact path is inside the checkout
+existing-output	rejected before execution: RuntimeError, refusing to overwrite existing path

@@ -1,0 +1,11 @@
+run_id	09-get-main-btree-provenance-clean-r1
+host	instance-20260923-1013
+source_commit	95954ecaaae94757cc3705bc2aacf8c6bb78915f
+source_status	clean
+binary_sha256	89c6e622b3f05c597a740353b30464bbc30cbe3e910195bfc545967a9dca4c87
+source_sha256	bae7b7b6fe13223c6ef579715c773b87a843b1b8caeeff4659a67818d7387e90
+cargo_lock_sha256	9702ecfb45d6edab98f5aa3e849ad6f456faed7f75d5b37bd9b545eb2d5d4da6
+filesystem	/bench/zfs/db zfs    dodbbench/db rw,noatime,seclabel,xattr,noacl,casesensitive
+DODB_BENCH_DIR	/bench/zfs/db/oci-a1-planned-120s-same-sha-95954ecaa-20261008/db/09-get-main-btree-provenance-clean-r1
+TMPDIR	/bench/zfs/db/oci-a1-planned-120s-same-sha-95954ecaa-20261008/tmp/09-get-main-btree-provenance-clean-r1
+output_path	/bench/zfs/db/oci-a1-planned-120s-same-sha-95954ecaa-20261008/runs/09-get-main-btree-provenance-clean-r1/raw/09-get-main-btree-provenance-clean-r1.jsonl
