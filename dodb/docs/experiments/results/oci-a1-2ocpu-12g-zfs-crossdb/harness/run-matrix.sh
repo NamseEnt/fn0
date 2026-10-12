@@ -224,12 +224,12 @@ assert measured.get("failed_write_transactions") == 0
 if condition.startswith("mixed-"):
     assert record["verification"]["mixed_read_history"]["status"] == "passed"
 settings = record.get("settings", {})
+effective = settings.get("effective", {})
 if engine == "rocksdb":
-    assert settings.get("write_options_sync") is True
-    assert settings.get("write_options_disable_wal") is False
-    assert settings.get("rocksdb_version") == "11.8.1"
+    assert effective.get("write_options_sync") is True
+    assert effective.get("write_options_disable_wal") is False
+    assert effective.get("rocksdb_version") == "11.8.1"
 else:
-    effective = settings.get("effective", {})
     assert effective.get("sync_mode") == "ProductionFile real sync"
     assert effective.get("tokio_runtime_workers") == int(dodb_workers)
     if engine == "planned-blink":
