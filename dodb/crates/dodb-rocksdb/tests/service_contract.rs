@@ -396,6 +396,30 @@ async fn rocksdb_service_r1a_contract_and_reopen() {
         Err(Error::InvalidRequest(_))
     ));
 
+    let cold_tenant_writes = (0..4).map(|position| {
+        let service = &service;
+        async move {
+            let cold_key = key(b"concurrent-cold-open", &[position]);
+            execute(
+                service,
+                2,
+                Request::Put {
+                    key: cold_key,
+                    value: vec![position, 0],
+                },
+            )
+            .await
+        }
+    });
+    let cold_open_results = futures::future::join_all(cold_tenant_writes).await;
+    assert!(cold_open_results.iter().all(|result| result.is_ok()));
+    for position in 0..4 {
+        assert_eq!(
+            get(&service, 2, key(b"concurrent-cold-open", &[position])).await,
+            RevisionState::present(vec![position, 0], Revision::new(u64::from(position) + 1))
+        );
+    }
+
     let aba_key = key(b"aba", b"missing");
     let missing_revision = get(&service, 1, aba_key.clone()).await.revision();
     execute(

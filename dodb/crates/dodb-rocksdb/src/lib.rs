@@ -132,9 +132,13 @@ impl RocksDbService {
         create: bool,
     ) -> Result<Option<Arc<TenantDatabase>>, Error> {
         let path = self.tenant_path(tenant);
-        if !create && !path.exists() {
-            return Ok(None);
+        if !create {
+            let path_exists = self.run_blocking(move || Ok(path.exists())).await?;
+            if !path_exists {
+                return Ok(None);
+            }
         }
+        let path = self.tenant_path(tenant);
         let cell = self
             .databases
             .entry(tenant)
