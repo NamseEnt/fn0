@@ -155,6 +155,51 @@ async fn rocksdb_service_r1a_contract_and_reopen() {
         .unwrap(),
         Response::Transact(dodb_service::TransactionOutcome::conditions_satisfied())
     );
+    assert_eq!(
+        execute(
+            &service,
+            1,
+            Request::Transact {
+                request: TransactionRequest::new(
+                    vec![TransactionCondition::Exists {
+                        key: exists_key.clone(),
+                    }],
+                    Vec::new(),
+                ),
+            }
+        )
+        .await
+        .unwrap(),
+        Response::Transact(dodb_service::TransactionOutcome::conditions_satisfied())
+    );
+    let not_exists_existing = TransactionRequest::new(
+        vec![TransactionCondition::NotExists {
+            key: exists_key.clone(),
+        }],
+        vec![
+            put(key(b"not-exists", b"put"), vec![1]),
+            delete(key(b"not-exists", b"delete")),
+        ],
+    );
+    assert!(matches!(
+        execute(
+            &service,
+            1,
+            Request::Transact {
+                request: not_exists_existing,
+            }
+        )
+        .await,
+        Err(Error::Conflict(_))
+    ));
+    assert_eq!(
+        get(&service, 1, key(b"not-exists", b"put")).await,
+        RevisionState::missing(Revision::ZERO)
+    );
+    assert_eq!(
+        get(&service, 1, key(b"not-exists", b"delete")).await,
+        RevisionState::missing(Revision::ZERO)
+    );
     let condition_failure = TransactionRequest::new(
         vec![TransactionCondition::RevisionEquals {
             key: exists_key.clone(),
