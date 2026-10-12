@@ -1,0 +1,2 @@
+suite=core run=1791784716923876789-query-c16-r1-rocksdb engine=rocksdb condition=query-c16 seed=979004037 start=2026-10-12T06:04:48Z
+rocksdb w16 width1 uniform rep1: 111204.4 tx/s committed, 111204.4 attempted/s, busy=0 conflicts=0 abandoned=0 errors=0 p99=25us verify=true

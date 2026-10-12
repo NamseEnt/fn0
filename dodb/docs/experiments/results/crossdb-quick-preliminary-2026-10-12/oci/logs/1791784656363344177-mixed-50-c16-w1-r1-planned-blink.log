@@ -1,0 +1,2 @@
+suite=smoke run=1791784656363344177-mixed-50-c16-w1-r1-planned-blink engine=planned-blink condition=mixed-50-c16-w1 seed=979009082 start=2026-10-12T05:57:56Z
+planned-blink w16 width1 uniform rep1: 16579.5 tx/s committed, 16579.5 attempted/s, busy=0 conflicts=0 abandoned=0 errors=0 p99=2819us verify=true

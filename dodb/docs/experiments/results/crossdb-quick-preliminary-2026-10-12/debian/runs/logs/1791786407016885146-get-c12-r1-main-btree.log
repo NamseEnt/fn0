@@ -1,0 +1,5 @@
+run=1791786407016885146-get-c12-r1-main-btree engine=main-btree condition=get-c12 seed=979002019 start=2026-10-12T06:26:47Z
+
+thread 'main' (866316) panicked at src/../../common/driver.rs:1557:5:
+database files must live under the configured benchmark data root
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -1,0 +1,12 @@
+Selected executions are reused from source SHA d3f4958cdcbba3508f79e6d5680b8d1dacbd3345.
+
+Point Get c16: core repetition 1, seed 979002019, 2,000 ms warmup, 10,000 ms measurement.
+Distributed Query16 c16: core repetition 1, seed 979004037, 2,000 ms warmup, 10,000 ms measurement.
+Pure write c16 width 1: core repetition 1, seed 979005046, 2,000 ms warmup, 10,000 or 10,001 ms measurement as recorded by each engine.
+Mixed 50/50 c16 width 1: smoke repetition 1, seed 979009082, 500 ms warmup, 1,501 or 1,502 ms measurement as recorded by each engine.
+
+All 12 selected executions use 10,000 uniform rows, 16-byte keys, 512-byte values, c16, and width 1. All three engines share the same seed for each condition and repetition. Full common input trace prefixes match across all emitted checkpoints: 31,020 Get checkpoints, 3,340 Query16 checkpoints, 159 write checkpoints, and 42 mixed checkpoints. All verification records passed; mixed history validation passed for all engines.
+
+OCI settings: dodb page cache 64 MiB, ProductionFile real sync, Tokio runtime 2 workers, one coordinator worker, parallel execution disabled, borrowed-page views disabled, read observation metrics enabled. Planned B-link queue capacity 256 and 64 request collection limit; main B-tree uses the same request limit and a 4 MiB group byte limit. RocksDB 11.8.1 uses 64 MiB block cache, WAL enabled, WriteOptions.sync=true, one atomic WriteBatch per transaction, pipelined writes disabled.
+
+The reused conditions retain their recorded measurement boundaries. The mixed runs are smoke-length results and are not presented as newly executed 1,000/5,000 ms runs.

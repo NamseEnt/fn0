@@ -1,0 +1,7 @@
+Same-seed cross-engine checks compare measured request-input hashes at shared writer/checkpoint positions. Different final trace lengths are expected.
+get-c12	engines=3	common_measured_checkpoints=97081	status=matched
+mixed-50-c12-w1	engines=3	common_measured_checkpoints=29	status=matched
+query-c12	engines=3	common_measured_checkpoints=11945	status=matched
+write-c12-w1	engines=3	common_measured_checkpoints=12	status=matched
+total_selected_runs=12
+all_record_validation=passed

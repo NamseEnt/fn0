@@ -1,0 +1,1 @@
+The first Debian benchmark process exited 101 at the harness data-root guard before creating database files. Its stdout/stderr log and failed attempt ledger row are preserved. CROSSDB_DATA_ROOT now points to the dedicated ext4 runs/db directory. The runner reuses the same results root and skips only engine-condition rows already recorded as passed.

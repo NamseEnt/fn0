@@ -1,0 +1,9 @@
+runner_path=debian/run-quick.sh
+runner_sha256=2c3ca44aa9d14420c6243a0270ac88ed3efa7d4dd5cd940703c2b3d2fc30d62e
+remote_runner_sha256=2c3ca44aa9d14420c6243a0270ac88ed3efa7d4dd5cd940703c2b3d2fc30d62e
+source_sha=d3f4958cdcbba3508f79e6d5680b8d1dacbd3345
+run_root=/home/namse/crossdb-quick-preliminary-2026-10-12/runs
+filesystem=ext4
+external_clients=12
+warmup_ms=1000
+requested_duration_ms=5000

@@ -1,0 +1,5 @@
+c++ (GCC) 11.5.0 20240719 (Red Hat 11.5.0-14.0.1)
+Copyright (C) 2021 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+

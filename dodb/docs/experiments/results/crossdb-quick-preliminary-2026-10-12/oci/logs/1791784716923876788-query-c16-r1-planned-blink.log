@@ -1,0 +1,2 @@
+suite=core run=1791784716923876788-query-c16-r1-planned-blink engine=planned-blink condition=query-c16 seed=979004037 start=2026-10-12T06:04:35Z
+planned-blink w16 width1 uniform rep1: 71735.2 tx/s committed, 71735.2 attempted/s, busy=0 conflicts=0 abandoned=0 errors=0 p99=68us verify=true

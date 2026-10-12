@@ -1,0 +1,3 @@
+/home/namse/crossdb-quick-preliminary-2026-10-12/build-retry-1/target-dodb/release/dodb-bench:       ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=b366156702996cc4277768a91ca3ef2448c3e902, with debug_info, not stripped
+/home/namse/crossdb-quick-preliminary-2026-10-12/build-retry-1/target-rocksdb/release/rocksdb-bench: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=0b5c49e8b1db18fbd3f3428d36961495d8ab56e4, with debug_info, not stripped
+/home/namse/crossdb-quick-preliminary-2026-10-12/rocksdb-source-retry-1/librocksdb.a:                current ar archive

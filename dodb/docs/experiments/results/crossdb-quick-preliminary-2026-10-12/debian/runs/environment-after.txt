@@ -1,0 +1,42 @@
+2026-10-12T06:28:40Z
+               total        used        free      shared  buff/cache   available
+Mem:            31Gi       3.3Gi       7.9Gi       436Mi        20Gi        27Gi
+Swap:           12Gi       211Mi        11Gi
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda2       216G  174G   32G  85% /
+some avg10=0.00 avg60=0.01 avg300=0.06 total=11361792637
+full avg10=0.00 avg60=0.00 avg300=0.00 total=0
+some avg10=0.00 avg60=0.00 avg300=0.00 total=3745539
+full avg10=0.00 avg60=0.00 avg300=0.00 total=3601155
+some avg10=36.82 avg60=19.80 avg300=6.35 total=1141874393
+full avg10=36.82 avg60=19.79 avg300=6.34 total=1111320494
+    PID    PPID COMMAND         %CPU %MEM   RSS ELAPSED
+ 853689  853688 oz-v0.2026.09.0  1.0  0.3 127472    690
+ 854911  853667 codex            0.8  1.2 398136    650
+ 603403  174988 codex            0.5  1.4 488584 541035
+ 853712  853689 oz-v0.2026.09.0  0.3  0.0 28640     690
+    825       1 tailscaled       0.1  0.3 105996 1355212
+ 853579       2 kworker/u48:3-w  0.0  0.0     0     892
+ 853666  853659 sshd-session     0.0  0.0 10276     690
+    890       2 nv_queue         0.0  0.0     0 1355212
+    912       1 containerd       0.0  0.1 51144 1355212
+ 786138  113621 codex            0.0  1.9 648936 207221
+ 866830       2 kworker/u48:1-w  0.0  0.0     0      28
+ 853262       2 kworker/u48:2-k  0.0  0.0     0    2179
+ 853667  853666 bash             0.0  0.0 11112     690
+ 174987       1 dtach            0.0  0.0   924 1178959
+ 852288  850948 codex            0.0  1.1 388384   4087
+    108       2 kcompactd0       0.0  0.0     0 1355218
+    888       2 irq/66-nvidia    0.0  0.0     0 1355212
+ 866369  866368 bash             0.0  0.0  3356      79
+    967       1 dockerd          0.0  0.2 68844 1355211
+     18       2 rcu_preempt      0.0  0.0     0 1355218
+    405       1 systemd-journal  0.0  0.4 159120 1355215
+    904       1 sshd             0.0  0.0  6928 1355212
+ 849635       2 kworker/u48:0-k  0.0  0.0     0   12494
+ 699270       2 kworker/1:0-mm_  0.0  0.0     0  408893
+ 769562       2 kworker/0:0-eve  0.0  0.0     0  241310
+     32       2 migration/2      0.0  0.0     0 1355218
+ 850948       1 bash             0.0  0.0 11060    4160
+ 753834       2 kworker/8:0-eve  0.0  0.0     0  308708
+     38       2 migration/3      0.0  0.0     0 1355218

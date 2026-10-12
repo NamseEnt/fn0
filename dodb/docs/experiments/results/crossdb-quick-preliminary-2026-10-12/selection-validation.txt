@@ -1,0 +1,6 @@
+OCI reused selected raw records: 12; source SHA and full validation passed.
+Debian native Release new selected raw records: 12; source SHA and full validation passed.
+Debian run ledger: 12 passed plus 1 exit-101 data-root guard failure preserved.
+All 24 selected records: full-value/read/query validation passed; zero measured failed reads/writes, errors, conflicts, overloads, or retries.
+Same-condition seeds and measured input trace checkpoint hashes matched across all three engines per host.
+DB close/reopen verification passed for all 24 selected records.

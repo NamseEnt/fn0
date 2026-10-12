@@ -1,0 +1,106 @@
+Mon Oct 12 06:18:00 UTC 2026
+debian
+Linux debian 6.12.107+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.107-1 (2026-08-29) x86_64 GNU/Linux
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           48 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  12
+On-line CPU(s) list:                     0-11
+Vendor ID:                               AuthenticAMD
+Model name:                              AMD Ryzen 5 5600 6-Core Processor
+CPU family:                              25
+Model:                                   33
+Thread(s) per core:                      2
+Core(s) per socket:                      6
+Socket(s):                               1
+Stepping:                                2
+Frequency boost:                         enabled
+CPU(s) scaling MHz:                      75%
+CPU max MHz:                             4468.0000
+CPU min MHz:                             550.0000
+BogoMIPS:                                6986.40
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk clzero irperf xsaveerptr rdpru wbnoinvd arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm debug_swap
+L1d cache:                               192 KiB (6 instances)
+L1i cache:                               192 KiB (6 instances)
+L2 cache:                                3 MiB (6 instances)
+L3 cache:                                32 MiB (1 instance)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-11
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Mitigation; Safe RET
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP always-on; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Vulnerable: Clear CPU buffers attempted, no microcode
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Mitigation; IBPB before exit to userspace
+NUMA
+0
+MEMORY
+               total        used        free      shared  buff/cache   available
+Mem:            31Gi       3.4Gi        13Gi       436Mi        14Gi        27Gi
+Swap:           12Gi       211Mi        11Gi
+Filename				Type		Size		Used		Priority
+/dev/sda3                               partition	12596220	216988		-2
+STORAGE
+NAME   TYPE   SIZE FSTYPE MOUNTPOINTS MODEL
+sda    disk 232.9G                    Samsung SSD 860 EVO 250GB
+├─sda1 part   976M vfat   /boot/efi   
+├─sda2 part 219.9G ext4   /           
+└─sda3 part    12G swap   [SWAP]      
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/sda2      ext4  216G  168G   37G  82% /
+Filesystem       Inodes   IUsed    IFree IUse% Mounted on
+/dev/sda2      14417920 1385148 13032772   10% /
+TARGET SOURCE    FSTYPE OPTIONS
+/      /dev/sda2 ext4   rw,relatime,errors=remount-ro
+LIMITS
+pid 855118's current affinity list: 0-11
+0::/user.slice/user-1000.slice/session-2365.scope
+/sys/fs/cgroup/user.slice/user-1000.slice/cpu.max=max 100000
+/sys/fs/cgroup/user.slice/user-1000.slice/memory.max=max
+PRESSURE
+some avg10=0.00 avg60=0.00 avg300=0.00 total=11358735062
+full avg10=0.00 avg60=0.00 avg300=0.00 total=0
+some avg10=0.00 avg60=0.00 avg300=0.00 total=3745537
+full avg10=0.00 avg60=0.00 avg300=0.00 total=3601154
+some avg10=0.00 avg60=0.00 avg300=0.00 total=1116444847
+full avg10=0.00 avg60=0.00 avg300=0.00 total=1086397028
+COMPETING_PROCESSES
+    PID    PPID COMMAND         %CPU %MEM   RSS ELAPSED
+ 853689  853688 oz-v0.2026.09.0  9.5  0.3 127424     50
+ 854911  853667 codex            5.5  1.5 510844     10
+ 603403  174988 codex            0.5  1.4 488508 540396
+ 853712  853689 oz-v0.2026.09.0  0.4  0.0 28636      50
+ 853667  853666 bash             0.4  0.0 11112      50
+    825       1 tailscaled       0.1  0.3 105996 1354572
+ 853666  853659 sshd-session     0.1  0.0 10276      50
+    890       2 nv_queue         0.0  0.0     0 1354572
+    912       1 containerd       0.0  0.1 51144 1354572
+ 786138  113621 codex            0.0  2.4 787092 206581
+ 852288  850948 codex            0.0  1.1 385920   3447
+ 174987       1 dtach            0.0  0.0   924 1178320
+ 853688  853666 oz-v0.2026.09.0  0.0  0.0 25844      50
+    108       2 kcompactd0       0.0  0.0     0 1354579
+    888       2 irq/66-nvidia    0.0  0.0     0 1354572
+    967       1 dockerd          0.0  0.2 68844 1354572
+     18       2 rcu_preempt      0.0  0.0     0 1354579
+    405       1 systemd-journal  0.0  0.4 158704 1354576
+    904       1 sshd             0.0  0.0  6928 1354572
+ 699270       2 kworker/1:0-mm_  0.0  0.0     0  408253
+ 769562       2 kworker/0:0-eve  0.0  0.0     0  240670
+ 850948       1 bash             0.0  0.0 11060    3520
+ 853262       2 kworker/u48:2-e  0.0  0.0     0    1539
+     32       2 migration/2      0.0  0.0     0 1354579
+EXISTING_BENCHMARKS
+855118 bash -c set -eu; root=/home/namse/crossdb-quick-preliminary-2026-10-12; test ! -e "$root"; mkdir -p "$root"; { date -u; hostname -f; uname -a; lscpu; echo NUMA; cat /sys/devices/system/node/online 2>&1 || true; echo MEMORY; free -h; cat /proc/swaps; echo STORAGE; lsblk -o NAME,TYPE,SIZE,FSTYPE,MOUNTPOINTS,MODEL; df -hT /home/namse; df -i /home/namse; findmnt -T "$root" -o TARGET,SOURCE,FSTYPE,OPTIONS; echo LIMITS; taskset -pc $$; cat /proc/self/cgroup; for limit in /sys/fs/cgroup/user.slice/user-1000.slice/cpu.max /sys/fs/cgroup/user.slice/user-1000.slice/memory.max; do if test -r "$limit"; then printf "%s=" "$limit"; cat "$limit"; fi; done; echo PRESSURE; cat /proc/pressure/cpu /proc/pressure/memory /proc/pressure/io 2>&1 || true; echo COMPETING_PROCESSES; ps -eo pid,ppid,comm,%cpu,%mem,rss,etimes --sort=-%cpu | head -25; echo EXISTING_BENCHMARKS; pgrep -af "dodb-bench|rocksdb-bench|sqlite-bench|fio|stress-ng|sysbench" || true; } > "$root/environment-before.txt"; cat "$root/environment-before.txt"; df -hT "$root"

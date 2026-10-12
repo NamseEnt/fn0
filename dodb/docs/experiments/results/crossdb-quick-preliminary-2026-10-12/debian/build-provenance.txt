@@ -1,0 +1,20 @@
+source_sha=d3f4958cdcbba3508f79e6d5680b8d1dacbd3345
+source_clean=true
+architecture=x86_64
+cargo_build_command=dodb: cargo build --locked --release --manifest-path /home/namse/crossdb-quick-preliminary-2026-10-12/source/dodb/docs/experiments/results/oci-a1-2ocpu-12g-zfs-crossdb/harness/dodb-bench/Cargo.toml
+cargo_build_command=rocksdb: cargo build --locked --release --manifest-path /home/namse/crossdb-quick-preliminary-2026-10-12/source/dodb/docs/experiments/results/oci-a1-2ocpu-12g-zfs-crossdb/harness/rocksdb-bench/Cargo.toml
+rocksdb_build_command=make -C /home/namse/crossdb-quick-preliminary-2026-10-12/rocksdb-source-retry-1 -j12 EXTRA_CXXFLAGS=-Wno-error=unused-parameter -fPIC static_lib
+rustflags=-C target-cpu=native
+rocksdb_source_sha=abeebd9630f11bd08c28b7bd43c7bdfc62050654
+rocksdb_tag=v11.8.1
+rocksdb_library_sha256=0ed35af9bb52f65840badab67f79ff59caa221f326882df456913f18472cc697
+rocksdb_make_config_sha256=9e8fcd0792536758e8f82c6c88b7e9aa39b482cd31a0e4b3e05dc269d6a9cb48
+dodb_cargo_lock_sha256=654c416ddc6e9c88fb9c0fa5280dbe8a9ce693c22bdacdfc7dab3e41c5775324
+rocksdb_cargo_lock_sha256=9f38cd60946e076db5b8b773ccf02cb1f53494fe3a6370bd5b8964426f478a14
+cargo_config_sha256=d7f22f835a631b08459a9662e207df20f4abfbf8110e198cbac04582f5c42c9f
+dodb_harness_sha256=649cdc7293e7d38518781453c648b6f06e8a859f02dcc5e10b9a72a555f333c1
+rocksdb_harness_sha256=4675b627a973bfb674fa61209839a59a8d0e8b9ed87c296fc2306866a1fd55c0
+dodb_binary_sha256=55949627cce6e48ce23de70926b4c894efecf0a7c8ef6ac77614fdf71338f98b
+rocksdb_binary_sha256=09f5a7b6429593b6055f8b0c7a9a89425181ad4dbb4c77116d1eac2b7bfbad30
+host=debian
+kernel=Linux debian 6.12.107+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.107-1 (2026-08-29) x86_64 GNU/Linux

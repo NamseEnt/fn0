@@ -1,0 +1,1 @@
+Initial runner preflight stopped before creating a run directory because findmnt returned no filesystem type for the nonexistent target path. No benchmark binary ran and no benchmark database was created. The runner now creates only the planned fresh run root before checking that it resolves to ext4.

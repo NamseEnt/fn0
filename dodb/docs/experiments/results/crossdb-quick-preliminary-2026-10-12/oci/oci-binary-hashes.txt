@@ -1,0 +1,3 @@
+dd13cd3e6dcd214925dc8c7a0d87823d8b0ba1fca4d462bb5c40f72d38b3d12e  /bench/zfs/db/crossdb-d3f4958-oci/build/target-dodb/release/dodb-bench
+205d3923d2e7765cb0383bda27115730623161318f65aa471243eb0fe751e718  /bench/zfs/db/crossdb-d3f4958-oci/build/target-rocksdb/release/rocksdb-bench
+db0d4ba17b699f3b7cace0cf19a0113c27fa8a0d684d618bcaab002ebb9e5abf  /bench/zfs/db/crossdb-d3f4958-oci/rocksdb-source/librocksdb.a
