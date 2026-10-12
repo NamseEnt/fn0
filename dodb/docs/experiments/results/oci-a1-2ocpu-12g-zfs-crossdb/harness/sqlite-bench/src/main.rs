@@ -60,7 +60,10 @@ impl Engine for SqliteEngine {
             }
         }
         match transaction.commit() {
-            Ok(()) => Attempt::Committed(None),
+            Ok(()) => Attempt::Committed {
+                revision: None,
+                completed_at: std::time::Instant::now(),
+            },
             Err(error) => classify(error),
         }
     }

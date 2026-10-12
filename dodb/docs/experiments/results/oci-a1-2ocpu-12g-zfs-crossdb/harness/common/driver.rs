@@ -167,7 +167,10 @@ pub enum RetryKind {
 
 #[derive(Debug)]
 pub enum Attempt {
-    Committed(Option<u64>),
+    Committed {
+        revision: Option<u64>,
+        completed_at: Instant,
+    },
     Retryable(RetryKind, String),
     Failed(String),
 }
@@ -219,7 +222,10 @@ pub trait EngineFactory {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Outcome {
-    Committed(Option<u64>),
+    Committed {
+        revision: Option<u64>,
+        completed_at: Instant,
+    },
     Abandoned,
     Failed,
 }
@@ -364,7 +370,15 @@ fn execute_with_retry<E: Engine>(
         stats.attempts += 1;
         stats.max_attempts_used = stats.max_attempts_used.max(attempt_number);
         match engine.attempt(writer, mutations) {
-            Attempt::Committed(revision) => return Outcome::Committed(revision),
+            Attempt::Committed {
+                revision,
+                completed_at,
+            } => {
+                return Outcome::Committed {
+                    revision,
+                    completed_at,
+                };
+            }
             Attempt::Retryable(kind, message) => {
                 match kind {
                     RetryKind::Busy => stats.busy += 1,
@@ -605,7 +619,10 @@ fn writer_thread<E: Engine>(
             stats.attempted_write_transactions += 1;
             stats.all_latency.push(elapsed);
             match outcome {
-                Outcome::Committed(revision) => {
+                Outcome::Committed {
+                    revision,
+                    completed_at,
+                } => {
                     stats.successful_write_transactions += 1;
                     stats.successful_transactions += 1;
                     stats.mutation_ops += mutations.len() as u64;
@@ -627,7 +644,7 @@ fn writer_thread<E: Engine>(
                                 mutation_offset,
                                 revision,
                                 started_at: engine_call_started,
-                                finished_at: finished,
+                                finished_at: completed_at,
                             });
                         } else {
                             report.write_history_overflow = true;
@@ -660,7 +677,7 @@ fn writer_thread<E: Engine>(
                 stats.timeline.push((
                     (finished - phase_start).as_nanos() as u64,
                     elapsed.as_nanos() as u64,
-                    matches!(outcome, Outcome::Committed(_)),
+                    matches!(outcome, Outcome::Committed { .. }),
                     false,
                 ));
             }
@@ -1811,7 +1828,7 @@ fn run_probe<F: EngineFactory>(args: &Args) {
         strace_marker(args, &format!("commit-begin-{transaction_index}"));
         let result = engine.attempt(&mut writer, &mutations);
         strace_marker(args, &format!("commit-returned-{transaction_index}"));
-        let committed = matches!(result, Attempt::Committed(_));
+        let committed = matches!(result, Attempt::Committed { .. });
         transactions.push(json!({
             "transaction": transaction_index,
             "width": width,
@@ -1895,7 +1912,7 @@ fn run_atomicity<F: EngineFactory>(args: &Args) {
                             .collect();
                         stats.attempted_transactions += 1;
                         match execute_with_retry(engine, &mut writer, &mutations, &mut stats) {
-                            Outcome::Committed(_) => {
+                            Outcome::Committed { .. } => {
                                 stats.successful_transactions += 1;
                                 committed.push(tag);
                             }

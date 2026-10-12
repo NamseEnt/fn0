@@ -361,7 +361,10 @@ impl Engine for DodbEngine {
 
     fn attempt(&self, writer: &mut Self::Writer, mutations: &[Mutation]) -> Attempt {
         match self.transact(writer, mutations) {
-            Ok(result) => Attempt::Committed(result.revision.map(|revision| revision.get())),
+            Ok(result) => Attempt::Committed {
+                revision: result.revision.map(|revision| revision.get()),
+                completed_at: std::time::Instant::now(),
+            },
             Err(Error::Conflict(error)) => {
                 Attempt::Retryable(common::driver::RetryKind::Conflict, error.to_string())
             }

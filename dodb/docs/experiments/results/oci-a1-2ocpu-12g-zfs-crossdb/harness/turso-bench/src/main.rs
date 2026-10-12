@@ -198,7 +198,10 @@ impl Engine for TursoEngine {
                         connection.is_autocommit().unwrap_or(false),
                         "commit must end the transaction"
                     );
-                    Attempt::Committed(None)
+                    Attempt::Committed {
+                        revision: None,
+                        completed_at: std::time::Instant::now(),
+                    }
                 }
                 Err(error) => {
                     rollback(connection).await;

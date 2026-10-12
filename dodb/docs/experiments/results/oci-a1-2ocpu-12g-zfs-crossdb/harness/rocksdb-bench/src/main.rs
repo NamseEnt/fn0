@@ -168,7 +168,10 @@ impl Engine for RocksEngine {
             )
         };
         if status == 0 {
-            Attempt::Committed(None)
+            Attempt::Committed {
+                revision: None,
+                completed_at: std::time::Instant::now(),
+            }
         } else {
             Attempt::Failed(take_string(error).unwrap_or_default())
         }
@@ -176,7 +179,7 @@ impl Engine for RocksEngine {
 
     fn seed(&self, writer: &mut Self::Writer, rows: &[Mutation]) {
         match self.attempt(writer, rows) {
-            Attempt::Committed(_) => {}
+            Attempt::Committed { .. } => {}
             other => panic!("seed write failed: {other:?}"),
         }
     }
