@@ -35,7 +35,7 @@ export CROSSDB_SOURCE_CLEAN=true
 export CROSSDB_ROCKSDB_TAG=v11.8.1
 export CROSSDB_ROCKSDB_COMMIT=abeebd9630f11bd08c28b7bd43c7bdfc62050654
 export CROSSDB_ROCKSDB_DIR="$rocksdb_source"
-rocksdb_extra_cxxflags=-Wno-error=unused-parameter
+rocksdb_extra_cxxflags='-Wno-error=unused-parameter -fPIC'
 make -C "$rocksdb_source" -j"$(getconf _NPROCESSORS_ONLN)" EXTRA_CXXFLAGS="$rocksdb_extra_cxxflags" static_lib
 export CARGO_TARGET_DIR="$build_root/target-dodb"
 cargo build --locked --release --manifest-path "$harness_root/dodb-bench/Cargo.toml"
