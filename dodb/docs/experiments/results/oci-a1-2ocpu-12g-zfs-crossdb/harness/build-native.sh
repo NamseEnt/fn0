@@ -14,8 +14,8 @@ source_sha=$(git -C "$repo_root" rev-parse HEAD)
     printf 'RocksDB source commit does not match the pinned build\n' >&2
     exit 2
 }
-[[ "$(git -C "$rocksdb_source" describe --tags --exact-match HEAD)" == v11.8.1 ]] || {
-    printf 'RocksDB source tag is not v11.8.1\n' >&2
+[[ "$(git -C "$rocksdb_source" rev-parse refs/tags/v11.8.1^{commit})" == abeebd9630f11bd08c28b7bd43c7bdfc62050654 ]] || {
+    printf 'RocksDB v11.8.1 tag does not point to the pinned source commit\n' >&2
     exit 2
 }
 [[ -z "$(git -C "$rocksdb_source" status --porcelain)" ]] || {
@@ -60,7 +60,7 @@ git -C "$rocksdb_source" status --porcelain > "$build_root/rocksdb-status-after-
     printf 'rocksdb_build_command=make -C %s -j%s static_lib\n' "$rocksdb_source" "$(getconf _NPROCESSORS_ONLN)"
     printf 'rustflags=%s\n' "$RUSTFLAGS"
     printf 'rocksdb_source_sha=%s\n' "$(git -C "$rocksdb_source" rev-parse HEAD)"
-    printf 'rocksdb_tag=%s\n' "$(git -C "$rocksdb_source" describe --tags --exact-match HEAD)"
+    printf 'rocksdb_tag=v11.8.1\n'
     printf 'rocksdb_library_sha256=%s\n' "$(sha256sum "$rocksdb_source/librocksdb.a" | cut -d' ' -f1)"
     printf 'rocksdb_make_config_sha256=%s\n' "$(sha256sum "$rocksdb_source/make_config.mk" | cut -d' ' -f1)"
     printf 'dodb_cargo_lock_sha256=%s\n' "$(sha256sum "$harness_root/dodb-bench/Cargo.lock" | cut -d' ' -f1)"
