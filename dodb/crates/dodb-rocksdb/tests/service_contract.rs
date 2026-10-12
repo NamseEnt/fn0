@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use dodb_core::{
     DocumentKey, Error, Revision, RevisionState, TenantId, TransactionCondition,
     TransactionMutation, TransactionRequest,
@@ -413,12 +415,16 @@ async fn rocksdb_service_r1a_contract_and_reopen() {
     });
     let cold_open_results = futures::future::join_all(cold_tenant_writes).await;
     assert!(cold_open_results.iter().all(|result| result.is_ok()));
+    let mut cold_open_revisions = BTreeSet::new();
     for position in 0..4 {
-        assert_eq!(
-            get(&service, 2, key(b"concurrent-cold-open", &[position])).await,
-            RevisionState::present(vec![position, 0], Revision::new(u64::from(position) + 1))
-        );
+        let state = get(&service, 2, key(b"concurrent-cold-open", &[position])).await;
+        assert!(matches!(
+            &state,
+            RevisionState::Present { value, .. } if value.as_slice() == [position, 0]
+        ));
+        cold_open_revisions.insert(state.revision().get());
     }
+    assert_eq!(cold_open_revisions, BTreeSet::from([1, 2, 3, 4]));
 
     let aba_key = key(b"aba", b"missing");
     let missing_revision = get(&service, 1, aba_key.clone()).await.revision();
