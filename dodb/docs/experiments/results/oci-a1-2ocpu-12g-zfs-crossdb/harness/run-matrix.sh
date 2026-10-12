@@ -58,6 +58,7 @@ if [[ ! -f "$output_root/provenance.txt" ]]; then
     {
         printf 'source_sha=%s\n' "$source_sha"
         printf 'source_clean=true\n'
+        printf 'seed_policy=one_seed_per_condition_shared_by_engines_and_repetitions\n'
         printf 'cargo_lock_sha256=%s\n' "$(sha256sum "$harness_root/dodb-bench/Cargo.lock" | cut -d' ' -f1)"
         printf 'rocksdb_cargo_lock_sha256=%s\n' "$(sha256sum "$harness_root/rocksdb-bench/Cargo.lock" | cut -d' ' -f1)"
         printf 'cargo_config_sha256=%s\n' "$(sha256sum "$repo_root/.cargo/config.toml" | cut -d' ' -f1)"
@@ -162,7 +163,7 @@ run_one() {
     if [[ "$suite" == scale || "$suite" == scale-sustained ]]; then
         dodb_workers=$writers
     fi
-    local seed=$((979000000 + scenario_index * 1009 + repetition))
+    local seed=$((979000000 + scenario_index * 1009))
     local run_id=$(printf '%03d-%s-r%d-%s' "$run_number" "$condition" "$repetition" "$engine")
     run_number=$((run_number + 1))
     local data_dir="$output_root/db/$run_id"
@@ -205,11 +206,11 @@ run_one() {
         printf '%s\t%s\t%s\t%s\t%s\t%s\tprocess_failed\n' "$run_id" "$engine" "$condition" "$repetition" "$seed" "$process_exit" >> "$output_root/attempt-ledger.tsv"
         return "$process_exit"
     fi
-    if python3 - "$output_file" "$source_sha" "$engine" "$condition" "$dodb_workers" <<'PY'
+    if python3 - "$output_file" "$source_sha" "$engine" "$condition" "$dodb_workers" "$seed" <<'PY'
 import json
 import sys
 
-path, source_sha, engine, condition, dodb_workers = sys.argv[1:]
+path, source_sha, engine, condition, dodb_workers, expected_seed = sys.argv[1:]
 with open(path, encoding="utf-8") as source:
     records = [json.loads(line) for line in source if line.strip()]
 record = records[-1]
@@ -217,6 +218,7 @@ assert record.get("record_type") == "crossdb-run"
 assert record.get("engine") == engine
 assert record.get("build", {}).get("source_sha") == source_sha
 assert record.get("build", {}).get("source_clean") == "true"
+assert record.get("seed") == int(expected_seed)
 assert record.get("verification", {}).get("passed") is True
 measured = record.get("measured", {})
 assert measured.get("failed_reads") == 0
@@ -271,6 +273,20 @@ else
 fi
 completed_runs=$(awk -F '\t' '$7 == "passed" { count += 1 } END { print count + 0 }' "$output_root/attempt-ledger.tsv")
 printf 'suite=%s planned_runs=%s completed_runs=%s attempts=%s end=%s\n' "$suite" "$planned_runs" "$completed_runs" "$run_number" "$(date -u +%FT%TZ)" | tee -a "$output_root/logs/SUITE.log"
+python3 - "$output_root/attempt-ledger.tsv" "$planned_runs" "$completed_runs" <<'PY'
+import csv
+import sys
+
+ledger_path, planned_runs, completed_runs = sys.argv[1:]
+condition_seeds = {}
+with open(ledger_path, newline="", encoding="utf-8") as ledger_file:
+    for attempt in csv.DictReader(ledger_file, delimiter="\t"):
+        condition = attempt["condition"]
+        seed = attempt["seed"]
+        previous_seed = condition_seeds.setdefault(condition, seed)
+        assert previous_seed == seed, f"condition seed changed: {condition}"
+assert int(completed_runs) == int(planned_runs), "suite did not reach its planned valid run count"
+PY
 {
     date -u +%FT%TZ
     free -h
