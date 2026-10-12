@@ -35,7 +35,8 @@ export CROSSDB_SOURCE_CLEAN=true
 export CROSSDB_ROCKSDB_TAG=v11.8.1
 export CROSSDB_ROCKSDB_COMMIT=abeebd9630f11bd08c28b7bd43c7bdfc62050654
 export CROSSDB_ROCKSDB_DIR="$rocksdb_source"
-make -C "$rocksdb_source" -j"$(getconf _NPROCESSORS_ONLN)" static_lib
+rocksdb_extra_cxxflags=-Wno-error=unused-parameter
+make -C "$rocksdb_source" -j"$(getconf _NPROCESSORS_ONLN)" EXTRA_CXXFLAGS="$rocksdb_extra_cxxflags" static_lib
 export CARGO_TARGET_DIR="$build_root/target-dodb"
 cargo build --locked --release --manifest-path "$harness_root/dodb-bench/Cargo.toml"
 export CARGO_TARGET_DIR="$build_root/target-rocksdb"
@@ -57,7 +58,7 @@ git -C "$rocksdb_source" status --porcelain > "$build_root/rocksdb-status-after-
     printf 'architecture=%s\n' "$(uname -m)"
     printf 'cargo_build_command=dodb: cargo build --locked --release --manifest-path %s\n' "$harness_root/dodb-bench/Cargo.toml"
     printf 'cargo_build_command=rocksdb: cargo build --locked --release --manifest-path %s\n' "$harness_root/rocksdb-bench/Cargo.toml"
-    printf 'rocksdb_build_command=make -C %s -j%s static_lib\n' "$rocksdb_source" "$(getconf _NPROCESSORS_ONLN)"
+    printf 'rocksdb_build_command=make -C %s -j%s EXTRA_CXXFLAGS=%s static_lib\n' "$rocksdb_source" "$(getconf _NPROCESSORS_ONLN)" "$rocksdb_extra_cxxflags"
     printf 'rustflags=%s\n' "$RUSTFLAGS"
     printf 'rocksdb_source_sha=%s\n' "$(git -C "$rocksdb_source" rev-parse HEAD)"
     printf 'rocksdb_tag=v11.8.1\n'
