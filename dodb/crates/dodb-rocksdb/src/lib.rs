@@ -6,10 +6,12 @@ use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
 use dodb_core::{
-    DocumentKey, Error, Revision, RevisionState, TenantId, TransactionCondition,
-    TransactionConflict, TransactionMutation, TransactionRequest,
+    DocumentKey, Error, PrimaryKey, Revision, RevisionState, SortKey, TenantId,
+    TransactionCondition, TransactionConflict, TransactionMutation, TransactionRequest,
 };
-use dodb_protocol::{ProtocolLimits, ResponseEnvelope, encode_response};
+use dodb_protocol::{
+    MAX_STORAGE_ENCODED_KEY_SIZE, ProtocolLimits, ResponseEnvelope, encode_response,
+};
 use dodb_service::{
     DodbService, ExecutionBudget, Request, Response, ServiceFuture, ShutdownFuture,
     TransactionOutcome,
@@ -25,6 +27,18 @@ const MISSING_TAG: u8 = 2;
 unsafe extern "C" {
     fn dodb_rocksdb_open(path: *const c_char, error: *mut *mut c_char) -> *mut c_void;
     fn dodb_rocksdb_close(database: *mut c_void);
+    fn dodb_rocksdb_iterator_new(
+        database: *mut c_void,
+        start_key: *const u8,
+        start_key_length: usize,
+        error: *mut *mut c_char,
+    ) -> *mut c_void;
+    fn dodb_rocksdb_iterator_valid(iterator: *mut c_void) -> i32;
+    fn dodb_rocksdb_iterator_key(iterator: *mut c_void, key_length: *mut usize) -> *const u8;
+    fn dodb_rocksdb_iterator_value(iterator: *mut c_void, value_length: *mut usize) -> *const u8;
+    fn dodb_rocksdb_iterator_status(iterator: *mut c_void, error: *mut *mut c_char) -> i32;
+    fn dodb_rocksdb_iterator_next(iterator: *mut c_void);
+    fn dodb_rocksdb_iterator_destroy(iterator: *mut c_void);
     fn dodb_rocksdb_begin(database: *mut c_void, error: *mut *mut c_char) -> *mut c_void;
     fn dodb_rocksdb_get(
         database: *mut c_void,
@@ -88,6 +102,10 @@ unsafe impl Sync for TenantDatabase {}
 struct TransactionGuard {
     handle: NonNull<c_void>,
     active: bool,
+}
+
+struct TenantReadIterator {
+    handle: NonNull<c_void>,
 }
 
 impl RocksDbService {
@@ -250,9 +268,45 @@ impl RocksDbService {
                 enforce_response_budget(&response, budget)?;
                 Ok(response)
             }
-            Request::Query { .. } | Request::Scan { .. } => Err(Error::invalid_request(
-                "Query and Scan are not implemented by dodb-rocksdb R1a",
-            )),
+            Request::Query {
+                pk,
+                exclusive_after_sk,
+                limit,
+            } => {
+                let rows = match self.database(tenant, false).await? {
+                    Some(database) => {
+                        self.run_blocking(move || {
+                            database.query(&pk, exclusive_after_sk.as_ref(), limit, budget)
+                        })
+                        .await?
+                    }
+                    None => {
+                        let response = Response::Query(Vec::new());
+                        enforce_response_budget(&response, budget)?;
+                        return Ok(response);
+                    }
+                };
+                Ok(Response::Query(rows))
+            }
+            Request::Scan {
+                exclusive_after_key,
+                limit,
+            } => {
+                let rows = match self.database(tenant, false).await? {
+                    Some(database) => {
+                        self.run_blocking(move || {
+                            database.scan(exclusive_after_key.as_ref(), limit, budget)
+                        })
+                        .await?
+                    }
+                    None => {
+                        let response = Response::Scan(Vec::new());
+                        enforce_response_budget(&response, budget)?;
+                        return Ok(response);
+                    }
+                };
+                Ok(Response::Scan(rows))
+            }
         }
     }
 }
@@ -299,6 +353,136 @@ impl TenantDatabase {
                 decode_state(&bytes)
             }
         }
+    }
+
+    fn read_iterator(&self, start_key: &[u8]) -> Result<TenantReadIterator, Error> {
+        let guard = self
+            .handle
+            .lock()
+            .map_err(|_| Error::invariant("tenant RocksDB lock was poisoned"))?;
+        let mut error = std::ptr::null_mut();
+        let iterator = unsafe {
+            dodb_rocksdb_iterator_new(
+                guard.as_ptr(),
+                start_key.as_ptr(),
+                start_key.len(),
+                &mut error,
+            )
+        };
+        NonNull::new(iterator)
+            .map(|handle| TenantReadIterator { handle })
+            .ok_or_else(|| ffi_error(error, "RocksDB snapshot iterator creation failed"))
+    }
+
+    fn query(
+        &self,
+        pk: &PrimaryKey,
+        exclusive_after_sk: Option<&SortKey>,
+        limit: usize,
+        maximum_response_bytes: ExecutionBudget,
+    ) -> Result<Vec<dodb_service::Document>, Error> {
+        let mut budget = ReadResponseBudget::new(maximum_response_bytes.max_response_bytes)?;
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        validate_encoded_key(&DocumentKey::new(pk.as_bytes().to_vec(), Vec::new()))?;
+        if let Some(cursor) = exclusive_after_sk {
+            validate_encoded_key(&DocumentKey::new(
+                pk.as_bytes().to_vec(),
+                cursor.as_bytes().to_vec(),
+            ))?;
+        }
+        let start_key = exclusive_after_sk
+            .map(|sort_key| {
+                user_key(&DocumentKey::new(
+                    pk.as_bytes().to_vec(),
+                    sort_key.as_bytes().to_vec(),
+                ))
+            })
+            .unwrap_or_else(|| user_partition_prefix(pk));
+        let iterator = self.read_iterator(&start_key)?;
+        let mut documents = Vec::new();
+        while let Some((encoded_key, value_pointer, value_length)) = iterator.current()? {
+            if encoded_key.first() != Some(&USER_KEY_PREFIX) {
+                break;
+            }
+            let document_key = DocumentKey::decode(&encoded_key[1..]).map_err(|error| {
+                Error::corruption(format!("RocksDB document key decode failed: {error}"))
+            })?;
+            if document_key.pk != *pk {
+                break;
+            }
+            if exclusive_after_sk.is_some_and(|cursor| document_key.sk <= *cursor) {
+                iterator.next();
+                continue;
+            }
+            if let Some((revision, value_length)) =
+                decode_present_record(value_pointer, value_length)?
+            {
+                budget.reserve_document(&document_key, value_length)?;
+                documents.push(dodb_service::Document {
+                    key: document_key,
+                    value: unsafe {
+                        std::slice::from_raw_parts(value_pointer.add(10), value_length).to_vec()
+                    },
+                    revision,
+                });
+                if documents.len() == limit {
+                    return Ok(documents);
+                }
+            }
+            iterator.next();
+        }
+        Ok(documents)
+    }
+
+    fn scan(
+        &self,
+        exclusive_after_key: Option<&DocumentKey>,
+        limit: usize,
+        maximum_response_bytes: ExecutionBudget,
+    ) -> Result<Vec<dodb_service::Document>, Error> {
+        let mut budget = ReadResponseBudget::new(maximum_response_bytes.max_response_bytes)?;
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        if let Some(cursor) = exclusive_after_key {
+            validate_encoded_key(cursor)?;
+        }
+        let start_key = exclusive_after_key
+            .map(user_key)
+            .unwrap_or_else(|| vec![USER_KEY_PREFIX]);
+        let iterator = self.read_iterator(&start_key)?;
+        let mut documents = Vec::new();
+        while let Some((encoded_key, value_pointer, value_length)) = iterator.current()? {
+            if encoded_key.first() != Some(&USER_KEY_PREFIX) {
+                break;
+            }
+            let document_key = DocumentKey::decode(&encoded_key[1..]).map_err(|error| {
+                Error::corruption(format!("RocksDB document key decode failed: {error}"))
+            })?;
+            if exclusive_after_key.is_some_and(|cursor| document_key <= *cursor) {
+                iterator.next();
+                continue;
+            }
+            if let Some((revision, value_length)) =
+                decode_present_record(value_pointer, value_length)?
+            {
+                budget.reserve_document(&document_key, value_length)?;
+                documents.push(dodb_service::Document {
+                    key: document_key,
+                    value: unsafe {
+                        std::slice::from_raw_parts(value_pointer.add(10), value_length).to_vec()
+                    },
+                    revision,
+                });
+                if documents.len() == limit {
+                    return Ok(documents);
+                }
+            }
+            iterator.next();
+        }
+        Ok(documents)
     }
 
     fn transact(&self, request: TransactionRequest) -> Result<LogicalTransactionResult, Error> {
@@ -420,6 +604,35 @@ impl TransactionGuard {
     }
 }
 
+impl TenantReadIterator {
+    fn current(&self) -> Result<Option<(Vec<u8>, *const u8, usize)>, Error> {
+        if unsafe { dodb_rocksdb_iterator_valid(self.handle.as_ptr()) } == 0 {
+            let mut error = std::ptr::null_mut();
+            let result = unsafe { dodb_rocksdb_iterator_status(self.handle.as_ptr(), &mut error) };
+            if result != 0 {
+                return Err(ffi_error(error, "RocksDB iterator failed"));
+            }
+            return Ok(None);
+        }
+        let mut key_length = 0;
+        let key = unsafe { dodb_rocksdb_iterator_key(self.handle.as_ptr(), &mut key_length) };
+        let mut value_length = 0;
+        let value = unsafe { dodb_rocksdb_iterator_value(self.handle.as_ptr(), &mut value_length) };
+        let key = unsafe { std::slice::from_raw_parts(key, key_length) }.to_vec();
+        Ok(Some((key, value, value_length)))
+    }
+
+    fn next(&self) {
+        unsafe { dodb_rocksdb_iterator_next(self.handle.as_ptr()) };
+    }
+}
+
+impl Drop for TenantReadIterator {
+    fn drop(&mut self) {
+        unsafe { dodb_rocksdb_iterator_destroy(self.handle.as_ptr()) };
+    }
+}
+
 impl Drop for TransactionGuard {
     fn drop(&mut self) {
         self.rollback();
@@ -452,6 +665,109 @@ fn user_key(key: &DocumentKey) -> Vec<u8> {
     encoded.push(USER_KEY_PREFIX);
     encoded.extend_from_slice(&key.encode());
     encoded
+}
+
+fn user_partition_prefix(pk: &PrimaryKey) -> Vec<u8> {
+    let mut encoded = Vec::with_capacity(pk.as_bytes().len() + 3);
+    encoded.push(USER_KEY_PREFIX);
+    let partition = DocumentKey::new(pk.as_bytes().to_vec(), Vec::new()).encode();
+    encoded.extend_from_slice(&partition[..partition.len() - 2]);
+    encoded
+}
+
+fn validate_encoded_key(key: &DocumentKey) -> Result<(), Error> {
+    let encoded_length = key.encoded_len();
+    if encoded_length > MAX_STORAGE_ENCODED_KEY_SIZE {
+        return Err(Error::invalid_input(format!(
+            "encoded document key is {encoded_length} bytes, maximum is {MAX_STORAGE_ENCODED_KEY_SIZE}"
+        )));
+    }
+    Ok(())
+}
+
+fn decode_present_record(
+    encoded_pointer: *const u8,
+    encoded_length: usize,
+) -> Result<Option<(Revision, usize)>, Error> {
+    if encoded_length < 10 {
+        return Err(Error::corruption(
+            "unsupported RocksDB logical value format",
+        ));
+    }
+    let encoded = unsafe { std::slice::from_raw_parts(encoded_pointer, encoded_length) };
+    if encoded[0] != VALUE_FORMAT {
+        return Err(Error::corruption(
+            "unsupported RocksDB logical value format",
+        ));
+    }
+    let revision = Revision::new(u64::from_be_bytes(
+        encoded[2..10]
+            .try_into()
+            .map_err(|_| Error::corruption("invalid RocksDB revision bytes"))?,
+    ));
+    match encoded[1] {
+        PRESENT_TAG => Ok(Some((revision, encoded_length - 10))),
+        MISSING_TAG if encoded.len() == 10 => Ok(None),
+        MISSING_TAG => Err(Error::corruption("tombstone contains value bytes")),
+        _ => Err(Error::corruption("unknown RocksDB logical value state")),
+    }
+}
+
+struct ReadResponseBudget {
+    maximum_wire: usize,
+    maximum_memory: usize,
+    used_wire: usize,
+    used_memory: usize,
+}
+
+impl ReadResponseBudget {
+    fn new(maximum: usize) -> Result<Self, Error> {
+        if maximum < 17 {
+            return Err(Error::response_too_large(format!(
+                "response envelope exceeds {maximum} bytes"
+            )));
+        }
+        Ok(Self {
+            maximum_wire: maximum,
+            maximum_memory: maximum.saturating_add(64 * 1024),
+            used_wire: 17,
+            used_memory: 0,
+        })
+    }
+
+    fn reserve_document(&mut self, key: &DocumentKey, value_length: usize) -> Result<(), Error> {
+        let materialized = key
+            .pk
+            .as_bytes()
+            .len()
+            .saturating_add(key.sk.as_bytes().len())
+            .saturating_add(value_length)
+            .saturating_add(64);
+        let wire = key
+            .pk
+            .as_bytes()
+            .len()
+            .saturating_add(key.sk.as_bytes().len())
+            .saturating_add(value_length)
+            .saturating_add(20);
+        let next_wire = self
+            .used_wire
+            .checked_add(wire)
+            .ok_or_else(|| Error::response_too_large("encoded response size overflows"))?;
+        let next_memory = self
+            .used_memory
+            .checked_add(materialized.max(wire))
+            .ok_or_else(|| Error::response_too_large("response materialization size overflows"))?;
+        if next_wire > self.maximum_wire || next_memory > self.maximum_memory {
+            return Err(Error::response_too_large(format!(
+                "response materialization exceeds {} bytes",
+                self.maximum_wire
+            )));
+        }
+        self.used_wire = next_wire;
+        self.used_memory = next_memory;
+        Ok(())
+    }
 }
 
 fn encode_state(state: &RevisionState) -> Vec<u8> {
@@ -596,4 +912,87 @@ unsafe fn take_error(error: *mut c_char, fallback: &str) -> String {
         .into_owned();
     unsafe { dodb_rocksdb_error_free(error.as_ptr()) };
     message
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn read_iterator_keeps_one_snapshot_across_atomic_transaction_commit() {
+        let directory = TempDir::new().unwrap();
+        let database = TenantDatabase::open(directory.path()).unwrap();
+        let first_key = DocumentKey::new(b"snapshot".to_vec(), b"a".to_vec());
+        let second_key = DocumentKey::new(b"snapshot".to_vec(), b"b".to_vec());
+        database
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![
+                    TransactionMutation::Put {
+                        key: first_key.clone(),
+                        value: b"old-a".to_vec(),
+                    },
+                    TransactionMutation::Put {
+                        key: second_key.clone(),
+                        value: b"old-b".to_vec(),
+                    },
+                ],
+            ))
+            .unwrap();
+
+        let iterator = database
+            .read_iterator(&user_partition_prefix(&PrimaryKey::new(
+                b"snapshot".to_vec(),
+            )))
+            .unwrap();
+        assert_eq!(
+            iterator_value(&iterator),
+            (first_key.clone(), b"old-a".to_vec())
+        );
+        database
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![
+                    TransactionMutation::Put {
+                        key: first_key,
+                        value: b"new-a".to_vec(),
+                    },
+                    TransactionMutation::Put {
+                        key: second_key.clone(),
+                        value: b"new-b".to_vec(),
+                    },
+                ],
+            ))
+            .unwrap();
+        iterator.next();
+        assert_eq!(
+            iterator_value(&iterator),
+            (second_key.clone(), b"old-b".to_vec())
+        );
+        drop(iterator);
+
+        let current = database
+            .query(
+                &PrimaryKey::new(b"snapshot".to_vec()),
+                None,
+                10,
+                ExecutionBudget::new(1024),
+            )
+            .unwrap();
+        assert_eq!(current[0].value, b"new-a");
+        assert_eq!(current[1].value, b"new-b");
+    }
+
+    fn iterator_value(iterator: &TenantReadIterator) -> (DocumentKey, Vec<u8>) {
+        let (encoded_key, value_pointer, value_length) = iterator.current().unwrap().unwrap();
+        let document_key = DocumentKey::decode(&encoded_key[1..]).unwrap();
+        let (revision, content_length) = decode_present_record(value_pointer, value_length)
+            .unwrap()
+            .unwrap();
+        let content =
+            unsafe { std::slice::from_raw_parts(value_pointer.add(10), content_length).to_vec() };
+        assert!(revision.get() > 0);
+        (document_key, content)
+    }
 }

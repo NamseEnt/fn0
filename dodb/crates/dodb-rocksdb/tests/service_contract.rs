@@ -429,7 +429,7 @@ async fn rocksdb_service_r1a_contract_and_reopen() {
         .await,
         Err(Error::InvalidRequest(_))
     ));
-    assert!(matches!(
+    assert_eq!(
         execute(
             &service,
             1,
@@ -439,9 +439,10 @@ async fn rocksdb_service_r1a_contract_and_reopen() {
                 limit: 1
             }
         )
-        .await,
-        Err(Error::InvalidRequest(_))
-    ));
+        .await
+        .unwrap(),
+        Response::Query(Vec::new())
+    );
 
     let cold_tenant_writes = (0..4).map(|position| {
         let service = &service;

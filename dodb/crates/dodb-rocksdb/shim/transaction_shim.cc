@@ -1,13 +1,28 @@
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 
+#include "rocksdb/db.h"
 #include "rocksdb/options.h"
+#include "rocksdb/slice.h"
+#include "rocksdb/iterator.h"
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
 #include "rocksdb/version.h"
 
 namespace {
+
+struct ReadIterator {
+  rocksdb::TransactionDB* database;
+  const rocksdb::Snapshot* snapshot;
+  std::unique_ptr<rocksdb::Iterator> iterator;
+
+  ~ReadIterator() {
+    iterator.reset();
+    database->ReleaseSnapshot(snapshot);
+  }
+};
 
 char* copy_string(const std::string& value) {
   auto* output = static_cast<char*>(std::malloc(value.size() + 1));
@@ -52,6 +67,66 @@ void* dodb_rocksdb_open(const char* path, char** error) {
 
 void dodb_rocksdb_close(void* database) {
   delete static_cast<rocksdb::TransactionDB*>(database);
+}
+
+void* dodb_rocksdb_iterator_new(void* database, const unsigned char* start_key,
+                                size_t start_key_length, char** error) {
+  auto* database_handle = static_cast<rocksdb::TransactionDB*>(database);
+  const auto* snapshot = database_handle->GetSnapshot();
+  if (snapshot == nullptr) {
+    if (error != nullptr) {
+      *error = copy_string("RocksDB snapshot creation returned null");
+    }
+    return nullptr;
+  }
+  rocksdb::ReadOptions read_options;
+  read_options.snapshot = snapshot;
+  auto* read_iterator = new ReadIterator{
+      database_handle, snapshot,
+      std::unique_ptr<rocksdb::Iterator>(database_handle->NewIterator(read_options))};
+  if (read_iterator->iterator == nullptr) {
+    delete read_iterator;
+    if (error != nullptr) {
+      *error = copy_string("RocksDB iterator creation returned null");
+    }
+    return nullptr;
+  }
+  read_iterator->iterator->Seek(rocksdb::Slice(
+      reinterpret_cast<const char*>(start_key), start_key_length));
+  return read_iterator;
+}
+
+int dodb_rocksdb_iterator_valid(void* iterator) {
+  return static_cast<ReadIterator*>(iterator)->iterator->Valid() ? 1 : 0;
+}
+
+const unsigned char* dodb_rocksdb_iterator_key(void* iterator, size_t* key_length) {
+  const auto key = static_cast<ReadIterator*>(iterator)->iterator->key();
+  *key_length = key.size();
+  return reinterpret_cast<const unsigned char*>(key.data());
+}
+
+const unsigned char* dodb_rocksdb_iterator_value(void* iterator, size_t* value_length) {
+  const auto value = static_cast<ReadIterator*>(iterator)->iterator->value();
+  *value_length = value.size();
+  return reinterpret_cast<const unsigned char*>(value.data());
+}
+
+int dodb_rocksdb_iterator_status(void* iterator, char** error) {
+  const auto status = static_cast<ReadIterator*>(iterator)->iterator->status();
+  if (status.ok()) {
+    return 0;
+  }
+  set_error(error, status);
+  return 1;
+}
+
+void dodb_rocksdb_iterator_next(void* iterator) {
+  static_cast<ReadIterator*>(iterator)->iterator->Next();
+}
+
+void dodb_rocksdb_iterator_destroy(void* iterator) {
+  delete static_cast<ReadIterator*>(iterator);
 }
 
 void* dodb_rocksdb_begin(void* database, char** error) {
