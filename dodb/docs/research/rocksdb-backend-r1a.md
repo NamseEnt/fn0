@@ -94,10 +94,16 @@ service under test.
 
 | Environment | RocksDB source | Command | Result |
 | --- | --- | --- | --- |
-| Local macOS ARM64 working tree based on `eea17e4167a95eacb408f89c5b868441bec49d5e` | `abeebd9630f11bd08c28b7bd43c7bdfc62050654`; static library built with `make static_lib -j6 DISABLE_WARNING_AS_ERROR=1` | `DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 cargo test -p dodb-rocksdb --all-targets` | Passed: 1 on-disk integration test; 0 failed. |
-| OCI ARM64 Release | Pending | Pending | Pending |
+| Local macOS 25.4 ARM64 | dodb source `f7325bc24a46afe0912e200ae8a08b9275157c6e`; RocksDB `abeebd9630f11bd08c28b7bd43c7bdfc62050654` | `DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 cargo test --locked -p dodb-rocksdb --all-targets` | Passed: 1 on-disk integration test; 0 failed. Parent SHA `e5a4692c229dcfe211db02b58552e3da63a8bff2` also passed 5 consecutive repeats. |
+| OCI A1 Linux aarch64 Release | dodb source `f7325bc24a46afe0912e200ae8a08b9275157c6e`; RocksDB `abeebd9630f11bd08c28b7bd43c7bdfc62050654` | `env DODB_ROCKSDB_DIR=/bench/zfs/db/product-build/rocksdb-source CARGO_TARGET_DIR=/bench/zfs/db/dodb-rocksdb-r1a-70105e0f871a25a9/target TMPDIR=/bench/zfs/db/dodb-rocksdb-r1a-70105e0f871a25a9/tmp cargo test --locked -p dodb-rocksdb --release --all-targets` | Passed: native ARM64 Release build and 1 on-disk integration test; 0 failed. |
 
 The local Rust all-target check and formatting check passed. The local RocksDB
-build disabled warning-as-error because the pinned source has an unrelated
-unused-parameter warning under this macOS clang. No performance test is part of
-R1a.
+static library was built with `make static_lib -j6 DISABLE_WARNING_AS_ERROR=1`
+because pinned RocksDB source emits an unrelated unused-parameter warning
+under this macOS clang. OCI reused an existing clean ARM64 static archive at the
+pinned source SHA; its 11.8.1 version macros, AArch64 archive object, defined
+TransactionDB symbols, and SHA-256 were recorded in the
+[correctness report](../experiments/results/rocksdb-service-r1a-70105e0f/REPORT.md).
+The preserved pre-fix cold-open assertion failure and its corrected commit-order
+invariant are recorded in the [R1a correctness report](../experiments/results/rocksdb-service-r1a-70105e0f/REPORT.md).
+No performance test is part of R1a.

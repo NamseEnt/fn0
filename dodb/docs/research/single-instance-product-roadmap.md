@@ -128,6 +128,17 @@ next increment adds Query/Scan, the remaining contract cases, lifecycle limits,
 and process-crash evidence. Neither increment starts a performance campaign
 before the complete R1 exit condition is met.
 
+R1a source SHA `f7325bc24a46afe0912e200ae8a08b9275157c6e` passed the disk-backed
+integration test locally on macOS ARM64 and in an OCI A1 native ARM64 Release
+build. The parent SHA `e5a4692c229dcfe211db02b58552e3da63a8bff2` passed five
+consecutive local repeats of the cold-open and concurrency suite. The OCI run used a clean detached
+checkout and the pinned RocksDB 11.8.1 archive; the
+[run report](../experiments/results/rocksdb-service-r1a-70105e0f/REPORT.md)
+records commands, provenance, failed-attempt correction, and coverage.
+Query/Scan, common native-backend
+coverage, full lifecycle management, process-kill recovery, and all other R1
+exit conditions remain pending.
+
 ### R1 implementation order
 
 1. Add an experimental backend module/crate implementing existing `DodbService`.
