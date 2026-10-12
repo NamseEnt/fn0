@@ -106,25 +106,27 @@ raw engine calls as diagnostics, with their boundary clearly named.
 | Stage | Status | Deliverable | Exit condition |
 | --- | --- | --- | --- |
 | R0: foundation | Complete for this inventory | This roadmap, backend contract, workload definitions, policy cross-reference | Existing behavior and proposed work are separated; required mixes and multi-tenancy are explicit. |
-| R1: equivalent backend | Pending; next implementation | Experimental `dodb-rocksdb` service, reusable contract suite, format/revision design note | KV, Query/Scan, conditional and multi-key writes, tenant isolation, reopen, and process-crash cases pass on both backends. |
+| R1: equivalent backend | Partial; R1a slice implemented, remaining R1 work pending | Experimental `dodb-rocksdb` service, shared contract coverage, format/revision design note | KV, Query/Scan, conditional and multi-key writes, tenant isolation, reopen, and process-crash cases pass on both backends. |
 | R2: product driver | Pending | Stateful application-workload driver through `DodbService`; one process with multiple DBs | Logical input equivalence, actual operation accounting, correctness, resource bounds, and all mandatory profiles pass short smoke. |
 | R3: first product evidence | Pending | Small single-tenant and multi-tenant OCI results, followed by Debian | All mandatory mixes are present, per-tenant behavior is visible, source/binary/host provenance is valid. |
 | R4: focused improvement | Pending | One measured bottleneck, one implementation change, before/after evidence | Same contract and frozen workloads pass; gains and regressions are recorded. |
 | R5: confirmation | Pending | Targeted repetitions, sustained storage behavior, bursts, cold-tenant and capacity checks, common transport | Claims survive observed noise, DB lifecycle transitions, and meaningful storage activity. |
 
-R1 is the immediate implementation task. Complete its code and correctness
-evidence before launching a broad performance matrix. R2 must start with the
+R1 remains incomplete until its remaining implementation and correctness gates
+pass. Complete its code and correctness evidence before launching a broad
+performance matrix. R2 must start with the
 small profiles below and must not revive the previous 126-run plan by default.
 Update this table after each deliverable with source SHA, artifact path, actual
 checks performed, and remaining gates. Documentation alone does not complete R1.
 
-The first R1 increment is a small vertical slice: existing service types,
+R1a is the first small vertical slice: existing service types,
 recoverable revision/tombstone representation, Get/Put/Delete, width-four
 conditional Transact, four independent tenant DBs, conflict/ABA checks, and
-close/reopen. Record its limitations without claiming complete conformance.
-The next increment adds Query/Scan, the remaining contract cases, lifecycle
-limits, and process-crash evidence. Neither increment starts a performance
-campaign before the complete R1 exit condition is met.
+close/reopen. Its implementation and correctness evidence are recorded in
+[the R1a backend note](rocksdb-backend-r1a.md). It does not complete R1. The
+next increment adds Query/Scan, the remaining contract cases, lifecycle limits,
+and process-crash evidence. Neither increment starts a performance campaign
+before the complete R1 exit condition is met.
 
 ### R1 implementation order
 

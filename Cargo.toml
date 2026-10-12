@@ -25,6 +25,7 @@ doc-db = { package = "fn0-doc-db", path = "doc-db", version = "=0.4.16" }
 dodb-client = { path = "dodb/crates/dodb-client", version = "=0.1.0" }
 dodb-core = { path = "dodb/crates/dodb-core", version = "=0.1.0" }
 dodb-protocol = { path = "dodb/crates/dodb-protocol", version = "=0.1.0" }
+dodb-rocksdb = { path = "dodb/crates/dodb-rocksdb", version = "=0.1.0" }
 dodb-server = { path = "dodb/crates/dodb-server", version = "=0.1.0" }
 dodb-service = { path = "dodb/crates/dodb-service", version = "=0.1.0" }
 dodb-storage = { path = "dodb/crates/dodb-storage", version = "=0.1.0" }
@@ -49,6 +50,7 @@ cookie = "=0.18.1"
 crc32c = "=0.6.8"
 crossbeam-channel = "=0.5.15"
 dashmap = "=6.1.0"
+cc = "=1.2.55"
 deno_core = "=0.394.0"
 deno_error = "=0.7.1"
 deno_webidl = "=0.241.0"
