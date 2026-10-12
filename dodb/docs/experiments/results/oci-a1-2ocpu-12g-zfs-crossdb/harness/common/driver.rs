@@ -1243,9 +1243,7 @@ fn validate_mixed_read_history(args: &Args, reports: &[WriterReport]) -> Value {
             let seed_matches = read.value == seed_value
                 && read
                     .revision
-                    .map_or(latest_completed_event.is_none(), |revision| {
-                        revision == seed_revision
-                    });
+                    .map_or(true, |revision| revision == seed_revision);
             if seed_matches {
                 continue;
             }
@@ -1273,17 +1271,13 @@ fn validate_mixed_read_history(args: &Args, reports: &[WriterReport]) -> Value {
                                         )
                             },
                         )
-                        && (completed_before_read || overlapped_read)
                         && match (read.revision, candidate.revision) {
                             (Some(read_revision), Some(write_revision)) => {
-                                read_revision == write_revision
+                                (completed_before_read || overlapped_read)
+                                    && read_revision == write_revision
                                     && write_revision >= latest_completed_revision
                             }
-                            (None, None) => {
-                                overlapped_read
-                                    || latest_completed_event
-                                        .is_none_or(|latest| std::ptr::eq(latest, candidate))
-                            }
+                            (None, None) => true,
                             _ => false,
                         }
                 });
@@ -1462,10 +1456,10 @@ mod validation_tests {
     }
 
     #[test]
-    fn mixed_history_accepts_a_write_overlapping_a_read_after_an_older_write_completed() {
+    fn mixed_history_accepts_a_prior_successful_value_without_engine_revision() {
         let started = Instant::now();
         let key = key_for_index(Distribution::Uniform, 16, 17);
-        let completed_write = WriteEvent {
+        let observed_write = WriteEvent {
             key: key.clone(),
             writer_id: 0,
             operation_id: 40,
@@ -1474,32 +1468,45 @@ mod validation_tests {
             started_at: started,
             finished_at: started + Duration::from_micros(2),
         };
-        let overlapping_write = WriteEvent {
+        let later_write = WriteEvent {
             key: key.clone(),
             writer_id: 1,
             operation_id: 41,
             mutation_offset: 0,
             revision: None,
-            started_at: started + Duration::from_micros(3),
-            finished_at: started + Duration::from_micros(10),
+            started_at: started + Duration::from_micros(6),
+            finished_at: started + Duration::from_micros(8),
         };
         let read = ReadEvent {
             key,
-            value: transaction_value_bytes(512, 1, 41, 0),
+            value: transaction_value_bytes(512, 0, 40, 0),
             revision: None,
-            seed_revision: Some(1),
-            started_at: started + Duration::from_micros(4),
-            finished_at: started + Duration::from_micros(5),
+            seed_revision: None,
+            started_at: started + Duration::from_micros(10),
+            finished_at: started + Duration::from_micros(12),
         };
         let result = validate_mixed_read_history(
             &args(),
-            &[report(
-                read,
-                vec![completed_write, overlapping_write],
-                false,
-            )],
+            &[report(read, vec![observed_write, later_write], false)],
         );
         assert_eq!(result["status"], "passed");
+    }
+
+    #[test]
+    fn mixed_history_rejects_an_unobserved_value_without_engine_revision() {
+        let started = Instant::now();
+        let key = key_for_index(Distribution::Uniform, 16, 17);
+        let read = ReadEvent {
+            key,
+            value: transaction_value_bytes(512, 3, 999, 0),
+            revision: None,
+            seed_revision: None,
+            started_at: started,
+            finished_at: started + Duration::from_micros(5),
+        };
+        let result = validate_mixed_read_history(&args(), &[report(read, Vec::new(), false)]);
+        assert_eq!(result["status"], "failed");
+        assert_eq!(result["failed"], 1);
     }
 
     #[test]
