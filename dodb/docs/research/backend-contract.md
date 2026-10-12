@@ -1,8 +1,10 @@
 # Backend contract for the product comparison
 
-Status: R0 specification, 2026-10-12. This describes the common contract and the
-next RocksDB implementation. It does not claim a RocksDB-backed dodb exists.
-See [the roadmap](single-instance-product-roadmap.md) for execution order.
+Status: R1b-1 implementation slice verified, 2026-10-12. This remains the
+common contract for both backends; it does not claim that all R1 gates pass.
+See [the roadmap](single-instance-product-roadmap.md) for execution order and
+the [R1b-1 verification report](../experiments/results/rocksdb-service-r1b1-2774bd1c/REPORT.md)
+for the tested implementation.
 
 ## Existing API boundary
 
@@ -26,6 +28,13 @@ The first comparison does not add cross-tenant atomicity or range predicates.
 Reading an uncreated tenant returns the native empty/missing results without
 creating storage. A condition-only request on an uncreated tenant also follows
 the native missing-state semantics without creating a database just to check it.
+
+R1b-1 implements Query and Scan with one RocksDB snapshot per request. The
+snapshot is attached to the iterator's `ReadOptions`; a request does not retain
+that snapshot across calls or pages. Read response budgets reject oversized
+results without truncating them and are reserved per live document before its
+value bytes are copied into the response. The RocksDB cursor seeks use the
+canonical escaped `DocumentKey` encoding and RocksDB's bytewise comparator.
 
 ## Transaction validation and state identity
 

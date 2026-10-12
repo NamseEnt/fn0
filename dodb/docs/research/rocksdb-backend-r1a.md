@@ -1,7 +1,8 @@
 # RocksDB service backend R1a
 
-Status: R1a implementation and local correctness check complete; OCI validation
-is pending. This is not a claim of complete backend conformance.
+Status: R1a scope passed locally and on OCI. Query/Scan and remaining R1 gates
+are tracked in the [R1b-1 backend note](rocksdb-backend-r1b1.md). This is not a
+claim of complete backend conformance.
 
 ## Storage format
 
@@ -50,8 +51,8 @@ again with the same data directory.
 
 ## Scope and limits
 
-R1a implements Get, Put, Delete, and the existing conditional transaction API.
-Query and Scan return an explicit invalid-request error. The crate has no
+R1a implemented Get, Put, Delete, and the existing conditional transaction API.
+Query and Scan were added in R1b-1. The crate has no
 transport CLI integration, eviction, hard memory limit, configured open-handle
 capacity, or cross-tenant transaction support. Shutdown assumes admission has
 quiesced; a concurrent execute after shutdown can open the tenant again.
@@ -59,10 +60,13 @@ quiesced; a concurrent execute after shutdown can open the tenant again.
 The tenant mutex and counter key serialize independent writes in one tenant
 through sync completion. This is a correctness-first baseline for API
 comparison, not a final high-performance RocksDB configuration. R1a does not
-implement process-crash fault injection or claim power-loss testing. Response
-budgets are checked against the encoded service response; reads currently
-materialize a value before that check, and mutations commit before validating
-the response frame budget.
+implement process-crash fault injection or claim power-loss testing. R1a
+checked response budgets against the encoded service response; reads
+materialized a value before that check, and mutations committed before validating
+the response frame budget. Native single-key Put/Delete also commit before the
+protocol layer encodes the response; its batch mutation fast path does not
+reserve a read response budget. R1b-1 changes only Query/Scan to reserve their
+document budgets while iterating. It does not change write budget behavior.
 
 The build uses a small C++ TransactionDB shim against RocksDB 11.8.1 commit
 `abeebd9630f11bd08c28b7bd43c7bdfc62050654`. The existing benchmark shim exposes

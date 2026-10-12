@@ -106,7 +106,7 @@ raw engine calls as diagnostics, with their boundary clearly named.
 | Stage | Status | Deliverable | Exit condition |
 | --- | --- | --- | --- |
 | R0: foundation | Complete for this inventory | This roadmap, backend contract, workload definitions, policy cross-reference | Existing behavior and proposed work are separated; required mixes and multi-tenancy are explicit. |
-| R1: equivalent backend | Partial; R1a slice implemented, remaining R1 work pending | Experimental `dodb-rocksdb` service, shared contract coverage, format/revision design note | KV, Query/Scan, conditional and multi-key writes, tenant isolation, reopen, and process-crash cases pass on both backends. |
+| R1: equivalent backend | Partial; R1a and R1b-1 slices implemented, remaining R1 work pending | Experimental `dodb-rocksdb` service, shared read contract coverage, format/revision design notes | KV, Query/Scan, conditional and multi-key writes, tenant isolation, reopen, and process-crash cases pass on both backends. |
 | R2: product driver | Pending | Stateful application-workload driver through `DodbService`; one process with multiple DBs | Logical input equivalence, actual operation accounting, correctness, resource bounds, and all mandatory profiles pass short smoke. |
 | R3: first product evidence | Pending | Small single-tenant and multi-tenant OCI results, followed by Debian | All mandatory mixes are present, per-tenant behavior is visible, source/binary/host provenance is valid. |
 | R4: focused improvement | Pending | One measured bottleneck, one implementation change, before/after evidence | Same contract and frozen workloads pass; gains and regressions are recorded. |
@@ -119,14 +119,23 @@ small profiles below and must not revive the previous 126-run plan by default.
 Update this table after each deliverable with source SHA, artifact path, actual
 checks performed, and remaining gates. Documentation alone does not complete R1.
 
-R1a is the first small vertical slice: existing service types,
+R1a was the first small vertical slice: existing service types,
 recoverable revision/tombstone representation, Get/Put/Delete, width-four
 conditional Transact, four independent tenant DBs, conflict/ABA checks, and
 close/reopen. Its implementation and correctness evidence are recorded in
-[the R1a backend note](rocksdb-backend-r1a.md). It does not complete R1. The
-next increment adds Query/Scan, the remaining contract cases, lifecycle limits,
-and process-crash evidence. Neither increment starts a performance campaign
-before the complete R1 exit condition is met.
+[the R1a backend note](rocksdb-backend-r1a.md).
+
+R1b-1 adds snapshot-based Query/Scan, shared native/RocksDB read contract tests,
+response-budget checks before result value copies, and local/OCI file-backed
+verification. The final implementation SHA tested locally and on OCI is
+`e59ae32117df13e23cf298d2f8ec6a8fc4c53a93`; the earlier implementation commit
+`2774bd1c3491134bbc944c91a8bf34d3bfa22a6e` was also tested before commit
+`e59ae32117df13e23cf298d2f8ec6a8fc4c53a93` added the exact-budget success
+assertion. Details are in the
+[R1b-1 report](../experiments/results/rocksdb-service-r1b1-2774bd1c/REPORT.md).
+R1 remains incomplete. Common transaction conformance, tenant lifecycle and
+capacity management, process-kill recovery, and the serialization bottleneck
+before performance comparison remain open. No performance campaign was run.
 
 R1a source SHA `f7325bc24a46afe0912e200ae8a08b9275157c6e` passed the disk-backed
 integration test locally on macOS ARM64 and in an OCI A1 native ARM64 Release
@@ -135,9 +144,8 @@ consecutive local repeats of the cold-open and concurrency suite. The OCI run us
 checkout and the pinned RocksDB 11.8.1 archive; the
 [run report](../experiments/results/rocksdb-service-r1a-70105e0f/REPORT.md)
 records commands, provenance, failed-attempt correction, and coverage.
-Query/Scan, common native-backend
-coverage, full lifecycle management, process-kill recovery, and all other R1
-exit conditions remain pending.
+Common transaction conformance, full lifecycle management, process-kill
+recovery, and all other R1 exit conditions remain pending after R1b-1.
 
 ### R1 implementation order
 
