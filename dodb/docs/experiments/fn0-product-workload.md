@@ -6,6 +6,14 @@ was established from experiment branch base
 `73171b64091b4f40a68fb986b49a9c115570b282` and `main` base
 `d5e41bb823b55d68bad6ab5ba73b0b5113223d8b`.
 
+Product research update, 2026-10-12: the
+[single-instance product roadmap](../research/single-instance-product-roadmap.md)
+now governs the staged comparison of native dodb and dodb backed by RocksDB.
+The required scope includes conditional multi-key writes, the 95/5, 80/20,
+50/50, and 20/80 mixes, and multiple tenant DBs in one process. This document's
+internal B-link regression policy remains applicable; its historical raw-engine
+reference comparisons do not substitute for the common product API contract.
+
 ## 1. Product design center
 
 dodb is fn0's general-purpose transactional operational database for web,
@@ -75,6 +83,9 @@ diagnostics.
 
 This protects the common point-read path from regressions introduced by write
 optimization.
+
+The product roadmap also requires an 80/20 read/write case. Both 95/5 and 80/20
+remain mandatory product coverage when execution time is reduced.
 
 ### W2: general OLTP
 
@@ -203,8 +214,12 @@ For each B-link change retain and report both:
 
 Report `candidate / main` and `candidate / previous-blink` where comparable.
 This distinguishes whether B-link is valuable against production from whether
-the latest change improves the existing B-link line. RocksDB may be an
-external reference, but is not dodb's direct correctness or adoption baseline.
+the latest change improves the existing B-link line. For the product decision,
+the primary external alternative is dodb backed by RocksDB under the same
+[service and transaction contract](../research/backend-contract.md). Raw
+RocksDB WriteBatch results remain engine diagnostics. The shared contract and
+reference model are correctness baselines; historical engine ratios alone do
+not establish product superiority or multi-tenant readiness.
 
 ## 8. Product adoption policy
 
