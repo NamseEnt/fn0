@@ -1187,6 +1187,7 @@ fn validate_mixed_read_history(args: &Args, reports: &[WriterReport]) -> Value {
         .sum::<u64>();
     let mut failed = 0u64;
     let mut indeterminate = 0u64;
+    let mut failure_samples = Vec::new();
     for report in reports {
         for read in &report.read_events {
             let seed_revision = read.seed_revision.unwrap_or_default();
@@ -1270,6 +1271,40 @@ fn validate_mixed_read_history(args: &Args, reports: &[WriterReport]) -> Value {
                     indeterminate += 1;
                 } else {
                     failed += 1;
+                    if failure_samples.len() < 16 {
+                        let candidates: Vec<_> = reports
+                            .iter()
+                            .flat_map(|entry| entry.write_events.iter())
+                            .filter(|candidate| candidate.key == read.key)
+                            .map(|candidate| {
+                                json!({
+                                    "writer": candidate.writer_id,
+                                    "operation": candidate.operation_id,
+                                    "offset": candidate.mutation_offset,
+                                    "revision": candidate.revision,
+                                    "started_before_read_finished": candidate.started_at < read.finished_at,
+                                    "finished_after_read_started": candidate.finished_at > read.started_at,
+                                    "completed_before_read": candidate.finished_at <= read.started_at,
+                                })
+                            })
+                            .collect();
+                        let latest_completed = latest_completed_event.map(|candidate| {
+                            json!({
+                                "writer": candidate.writer_id,
+                                "operation": candidate.operation_id,
+                                "offset": candidate.mutation_offset,
+                                "revision": candidate.revision,
+                            })
+                        });
+                        failure_samples.push(json!({
+                            "key": hex(&read.key),
+                            "value_identity": transaction_value_identity(&read.value),
+                            "read_revision": read.revision,
+                            "seed_revision": read.seed_revision,
+                            "latest_completed_write": latest_completed,
+                            "key_writes": candidates,
+                        }));
+                    }
                 }
             }
         }
@@ -1285,6 +1320,7 @@ fn validate_mixed_read_history(args: &Args, reports: &[WriterReport]) -> Value {
         "write_history_limit_per_client": MAX_WRITE_HISTORY_PER_CLIENT,
         "failed": failed,
         "indeterminate": indeterminate,
+        "failure_samples": failure_samples,
         "revision_policy": if reports.iter().flat_map(|report| report.read_events.iter()).any(|read| read.revision.is_some()) {
             "dodb_revision_history"
         } else {
