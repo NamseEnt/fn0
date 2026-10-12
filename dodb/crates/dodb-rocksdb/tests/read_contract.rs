@@ -352,6 +352,23 @@ async fn check_read_contract<S: DodbService>(service: &S) {
     )
     .unwrap()
     .len();
+    assert_eq!(
+        projections(&query_response(
+            execute(
+                service,
+                1,
+                Request::Query {
+                    pk: PrimaryKey::new(b"budget".to_vec()),
+                    exclusive_after_sk: None,
+                    limit: 1,
+                },
+                ExecutionBudget::new(exact_budget),
+            )
+            .await
+            .unwrap()
+        )),
+        vec![(key(b"budget", b"single"), vec![0x5a; 2_000])]
+    );
     assert!(matches!(
         execute(
             service,
