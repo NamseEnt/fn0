@@ -173,35 +173,38 @@ impl DodbEngine {
             .expect("dodb benchmark runtime should start");
         let page_count = DODB_CACHE_BYTES / dodb_storage::page::PAGE_SIZE;
         let config = DatabaseConfig::default().with_cache_capacity(page_count);
-        let adapter = match engine_name.as_str() {
-            "main-btree" => {
-                let store = dodb_storage::BTreeStore::open_with_wal(
-                    ProductionFile::open(&file_path).expect("dodb data file should open"),
-                    ProductionFile::open(&wal_path).expect("dodb WAL file should open"),
-                    config,
-                )
-                .expect("main B-tree should open");
-                let shard = Arc::new(AsyncShard::start_with_config(
-                    store,
-                    CoordinatorConfig {
-                        queue_capacity: 256,
-                        max_group_requests: 64,
-                        max_group_bytes: 4 * 1024 * 1024,
-                        max_collection_delay: std::time::Duration::ZERO,
-                    },
-                ));
-                StoreAdapter::Main(shard)
+        let adapter = {
+            let _runtime_guard = runtime.enter();
+            match engine_name.as_str() {
+                "main-btree" => {
+                    let store = dodb_storage::BTreeStore::open_with_wal(
+                        ProductionFile::open(&file_path).expect("dodb data file should open"),
+                        ProductionFile::open(&wal_path).expect("dodb WAL file should open"),
+                        config,
+                    )
+                    .expect("main B-tree should open");
+                    let shard = Arc::new(AsyncShard::start_with_config(
+                        store,
+                        CoordinatorConfig {
+                            queue_capacity: 256,
+                            max_group_requests: 64,
+                            max_group_bytes: 4 * 1024 * 1024,
+                            max_collection_delay: std::time::Duration::ZERO,
+                        },
+                    ));
+                    StoreAdapter::Main(shard)
+                }
+                "planned-blink" => {
+                    let store = BlinkStore::open_with_wal(
+                        ProductionFile::open(&file_path).expect("dodb data file should open"),
+                        ProductionFile::open(&wal_path).expect("dodb WAL file should open"),
+                        config,
+                    )
+                    .expect("planned B-link should open");
+                    StoreAdapter::Planned(PlannedAdapter::start(store))
+                }
+                other => panic!("unsupported dodb engine {other}"),
             }
-            "planned-blink" => {
-                let store = BlinkStore::open_with_wal(
-                    ProductionFile::open(&file_path).expect("dodb data file should open"),
-                    ProductionFile::open(&wal_path).expect("dodb WAL file should open"),
-                    config,
-                )
-                .expect("planned B-link should open");
-                StoreAdapter::Planned(PlannedAdapter::start(store))
-            }
-            other => panic!("unsupported dodb engine {other}"),
         };
         Self {
             runtime,
