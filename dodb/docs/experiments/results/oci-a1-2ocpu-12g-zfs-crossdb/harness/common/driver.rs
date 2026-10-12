@@ -478,9 +478,11 @@ fn writer_thread<E: Engine>(
                 _ => false,
             };
             if choose_read {
+                let engine_call_started;
                 let (rows, query_request, read_revision) = if args.operation == "query" {
                     let query_request = generator.next_query(args.read_limit);
                     trace.push_query(&query_request, args.read_limit);
+                    engine_call_started = Instant::now();
                     (
                         Some(engine.query(&mut writer, &query_request, args.read_limit)),
                         Some(query_request),
@@ -490,6 +492,7 @@ fn writer_thread<E: Engine>(
                     let generated = generator.next_transaction();
                     let key = &generated[0].key;
                     trace.push_get(key);
+                    engine_call_started = Instant::now();
                     let observation = engine.read_observation(&mut writer, key);
                     let read_revision = observation.as_ref().and_then(|value| value.revision);
                     let rows = observation.map(|value| {
@@ -537,7 +540,7 @@ fn writer_thread<E: Engine>(
                             value: row.value.clone(),
                             revision: read_revision,
                             seed_revision: engine.seed_revision(&row.key),
-                            started_at: started,
+                            started_at: engine_call_started,
                             finished_at: finished,
                         };
                         if report.read_events.len() < MAX_READ_HISTORY_PER_CLIENT {
@@ -594,6 +597,7 @@ fn writer_thread<E: Engine>(
                     .iter()
                     .map(|mutation| (mutation.key.as_slice(), mutation.value.as_slice())),
             );
+            let engine_call_started = Instant::now();
             let outcome = execute_with_retry(engine, &mut writer, &mutations, &mut stats);
             let finished = Instant::now();
             let elapsed = finished - started;
@@ -622,7 +626,7 @@ fn writer_thread<E: Engine>(
                                 operation_id,
                                 mutation_offset,
                                 revision,
-                                started_at: started,
+                                started_at: engine_call_started,
                                 finished_at: finished,
                             });
                         } else {
