@@ -9,8 +9,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde_json::{Map, Value, json};
 
 use super::workload::{
-    Distribution, LatencySamples, Mutation, TraceHash, WorkloadConfig, WorkloadGenerator,
-    component_bytes, key_for_index, seed_rows, splitmix64, writer_phase_seed,
+    Distribution, LatencySamples, Mutation, QueryRequest, TraceHash, WorkloadConfig,
+    WorkloadGenerator, key_for_index, seed_rows, splitmix64, transaction_value_bytes,
+    transaction_value_identity, writer_phase_seed,
 };
 
 pub const MAX_ATTEMPTS: u32 = 16;
@@ -18,23 +19,6 @@ pub const BACKOFF_BASE_MICROS: u64 = 100;
 pub const BACKOFF_CAP_MICROS: u64 = 10_000;
 pub const SEED_CHUNK_ROWS: usize = 1_000;
 pub const SEEDER_WRITER_ID: usize = usize::MAX;
-
-fn query_primary_key() -> Vec<u8> {
-    component_bytes(0x33, 0, 8)
-}
-
-fn query_rows(value_size: usize, limit: usize) -> Vec<Mutation> {
-    (0..limit.min(256))
-        .map(|index| {
-            let mut key = query_primary_key();
-            key.extend_from_slice(&component_bytes(0x43, index as u64, 8));
-            Mutation {
-                key,
-                value: vec![(index & 0xff) as u8; value_size],
-            }
-        })
-        .collect()
-}
 
 pub fn backoff_after(failed_attempts: u32) -> Duration {
     let shift = failed_attempts.saturating_sub(1).min(16);
@@ -183,7 +167,7 @@ pub enum RetryKind {
 
 #[derive(Debug)]
 pub enum Attempt {
-    Committed,
+    Committed(Option<u64>),
     Retryable(RetryKind, String),
     Failed(String),
 }
@@ -194,11 +178,30 @@ pub trait Engine: Sync {
     fn attempt(&self, writer: &mut Self::Writer, mutations: &[Mutation]) -> Attempt;
     fn seed(&self, writer: &mut Self::Writer, rows: &[Mutation]);
     fn read(&self, writer: &mut Self::Writer, key: &[u8]) -> Option<Vec<u8>>;
-    fn query(&self, writer: &mut Self::Writer, primary_key: &[u8], limit: usize) -> Vec<Mutation>;
+    fn read_observation(&self, writer: &mut Self::Writer, key: &[u8]) -> Option<ReadObservation> {
+        self.read(writer, key).map(|value| ReadObservation {
+            value,
+            revision: None,
+        })
+    }
+    fn checks_revisions(&self) -> bool {
+        false
+    }
+    fn query(
+        &self,
+        writer: &mut Self::Writer,
+        request: &QueryRequest,
+        limit: usize,
+    ) -> Vec<Mutation>;
     fn count_rows(&self, writer: &mut Self::Writer) -> u64;
     fn settings(&self, writer: &mut Self::Writer) -> Value;
     fn metrics(&self) -> Value;
     fn monitor_sample(&self) -> Value;
+}
+
+pub struct ReadObservation {
+    pub value: Vec<u8>,
+    pub revision: Option<u64>,
 }
 
 pub trait EngineFactory {
@@ -212,13 +215,21 @@ pub trait EngineFactory {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Outcome {
-    Committed,
+    Committed(Option<u64>),
     Abandoned,
     Failed,
 }
 
 #[derive(Clone, Debug)]
 struct PhaseStats {
+    attempted_reads: u64,
+    successful_reads: u64,
+    failed_reads: u64,
+    attempted_write_transactions: u64,
+    successful_write_transactions: u64,
+    failed_write_transactions: u64,
+    revision_checks: u64,
+    revision_failures: u64,
     attempted_transactions: u64,
     successful_transactions: u64,
     abandoned_transactions: u64,
@@ -238,12 +249,20 @@ struct PhaseStats {
     read_latency: LatencySamples,
     write_latency: LatencySamples,
     messages: BTreeMap<String, u64>,
-    timeline: Vec<(u64, u64, bool)>,
+    timeline: Vec<(u64, u64, bool, bool)>,
 }
 
 impl PhaseStats {
     fn new(seed: u64) -> Self {
         Self {
+            attempted_reads: 0,
+            successful_reads: 0,
+            failed_reads: 0,
+            attempted_write_transactions: 0,
+            successful_write_transactions: 0,
+            failed_write_transactions: 0,
+            revision_checks: 0,
+            revision_failures: 0,
             attempted_transactions: 0,
             successful_transactions: 0,
             abandoned_transactions: 0,
@@ -268,6 +287,14 @@ impl PhaseStats {
     }
 
     fn merge(&mut self, other: Self) {
+        self.attempted_reads += other.attempted_reads;
+        self.successful_reads += other.successful_reads;
+        self.failed_reads += other.failed_reads;
+        self.attempted_write_transactions += other.attempted_write_transactions;
+        self.successful_write_transactions += other.successful_write_transactions;
+        self.failed_write_transactions += other.failed_write_transactions;
+        self.revision_checks += other.revision_checks;
+        self.revision_failures += other.revision_failures;
         self.attempted_transactions += other.attempted_transactions;
         self.successful_transactions += other.successful_transactions;
         self.abandoned_transactions += other.abandoned_transactions;
@@ -294,6 +321,14 @@ impl PhaseStats {
 
     fn counters(&self) -> Value {
         json!({
+            "attempted_reads": self.attempted_reads,
+            "successful_reads": self.successful_reads,
+            "failed_reads": self.failed_reads,
+            "attempted_write_transactions": self.attempted_write_transactions,
+            "successful_write_transactions": self.successful_write_transactions,
+            "failed_write_transactions": self.failed_write_transactions,
+            "revision_checks": self.revision_checks,
+            "revision_failures": self.revision_failures,
             "attempted_transactions": self.attempted_transactions,
             "successful_transactions": self.successful_transactions,
             "abandoned_transactions": self.abandoned_transactions,
@@ -325,7 +360,7 @@ fn execute_with_retry<E: Engine>(
         stats.attempts += 1;
         stats.max_attempts_used = stats.max_attempts_used.max(attempt_number);
         match engine.attempt(writer, mutations) {
-            Attempt::Committed => return Outcome::Committed,
+            Attempt::Committed(revision) => return Outcome::Committed(revision),
             Attempt::Retryable(kind, message) => {
                 match kind {
                     RetryKind::Busy => stats.busy += 1,
@@ -353,15 +388,41 @@ struct PhaseReport {
     stats: PhaseStats,
     trace: TraceHash,
     finished_at: Instant,
+    finished_after_start: Duration,
 }
 
 struct WriterReport {
     writer_id: usize,
     phases: Vec<PhaseReport>,
-    last_writes: HashMap<Vec<u8>, u8>,
-    ambiguous_writes: HashMap<Vec<u8>, Vec<u8>>,
+    last_writes: HashMap<Vec<u8>, Vec<u8>>,
+    ambiguous_writes: HashMap<Vec<u8>, Vec<Vec<u8>>>,
     last_committed: Vec<Vec<u8>>,
+    read_events: Vec<ReadEvent>,
+    read_events_seen: u64,
+    write_events: Vec<WriteEvent>,
+    write_history_overflow: bool,
 }
+
+struct ReadEvent {
+    key: Vec<u8>,
+    value: Vec<u8>,
+    revision: Option<u64>,
+    started_at: Instant,
+    finished_at: Instant,
+}
+
+struct WriteEvent {
+    key: Vec<u8>,
+    writer_id: u64,
+    operation_id: u64,
+    mutation_offset: u64,
+    revision: Option<u64>,
+    started_at: Instant,
+    finished_at: Instant,
+}
+
+const MAX_READ_HISTORY_PER_CLIENT: usize = 1_024;
+const MAX_WRITE_HISTORY_PER_CLIENT: usize = 65_536;
 
 struct Schedule {
     phase_start: Instant,
@@ -382,6 +443,10 @@ fn writer_thread<E: Engine>(
         last_writes: HashMap::new(),
         ambiguous_writes: HashMap::new(),
         last_committed: Vec::new(),
+        read_events: Vec::new(),
+        read_events_seen: 0,
+        write_events: Vec::new(),
+        write_history_overflow: false,
     };
     let record_timeline = !args.window.is_zero();
     barrier.wait();
@@ -408,31 +473,93 @@ fn writer_thread<E: Engine>(
                 _ => false,
             };
             if choose_read {
-                let generated = generator.next_transaction();
-                let rows = if args.operation == "query" {
-                    Some(engine.query(&mut writer, &query_primary_key(), args.read_limit))
+                let (rows, query_request, read_revision) = if args.operation == "query" {
+                    let query_request = generator.next_query(args.read_limit);
+                    trace.push_query(&query_request, args.read_limit);
+                    (
+                        Some(engine.query(&mut writer, &query_request, args.read_limit)),
+                        Some(query_request),
+                        None,
+                    )
                 } else {
-                    engine.read(&mut writer, &generated[0].key).map(|value| {
+                    let generated = generator.next_transaction();
+                    let key = &generated[0].key;
+                    trace.push_get(key);
+                    let observation = engine.read_observation(&mut writer, key);
+                    let read_revision = observation.as_ref().and_then(|value| value.revision);
+                    let rows = observation.map(|value| {
                         vec![Mutation {
-                            key: generated[0].key.clone(),
-                            value,
+                            key: key.clone(),
+                            value: value.value,
                         }]
-                    })
+                    });
+                    (rows, None, read_revision)
                 };
                 let finished = Instant::now();
                 let elapsed = finished - started;
                 stats.attempted_transactions += 1;
+                stats.attempted_reads += 1;
                 stats.read_operations += 1;
                 let succeeded = rows.as_ref().is_some_and(|result| {
                     if args.operation == "query" {
-                        !result.is_empty()
+                        query_request
+                            .as_ref()
+                            .is_some_and(|request| result == &request.expected_rows)
                     } else {
                         result
                             .first()
                             .is_some_and(|row| row.value.len() == args.value_size)
+                            && (args.operation != "get"
+                                || rows.as_ref().is_some_and(|result| {
+                                    result.first().is_some_and(|row| {
+                                        row.value
+                                            == super::workload::value_bytes(
+                                                args.value_size,
+                                                key_index(&row.key),
+                                                0,
+                                            )
+                                            && (!engine.checks_revisions()
+                                                || read_revision
+                                                    == Some(
+                                                        (key_index(&row.key)
+                                                            / SEED_CHUNK_ROWS as u64)
+                                                            + 1,
+                                                    ))
+                                    })
+                                }))
                     }
                 });
+                if args.operation == "mixed" && !warmup {
+                    if let Some(row) = rows.as_ref().and_then(|result| result.first()) {
+                        report.read_events_seen += 1;
+                        let read_event = ReadEvent {
+                            key: row.key.clone(),
+                            value: row.value.clone(),
+                            revision: read_revision,
+                            started_at: started,
+                            finished_at: finished,
+                        };
+                        if report.read_events.len() < MAX_READ_HISTORY_PER_CLIENT {
+                            report.read_events.push(read_event);
+                        } else {
+                            let replacement =
+                                (splitmix64(phase_seed ^ report.read_events_seen.rotate_left(17))
+                                    % report.read_events_seen)
+                                    as usize;
+                            if replacement < MAX_READ_HISTORY_PER_CLIENT {
+                                report.read_events[replacement] = read_event;
+                            }
+                        }
+                    }
+                }
+                if args.operation == "get" && engine.checks_revisions() {
+                    stats.revision_checks += 1;
+                    if !succeeded {
+                        stats.revision_failures += 1;
+                    }
+                }
                 if succeeded {
+                    stats.successful_reads += 1;
                     stats.successful_transactions += 1;
                     stats.query_rows += if args.operation == "query" {
                         rows.as_ref().map_or(0, |result| result.len() as u64)
@@ -441,16 +568,20 @@ fn writer_thread<E: Engine>(
                     };
                     stats.committed_latency.push(elapsed);
                 } else {
+                    stats.failed_reads += 1;
                     stats.failed_transactions += 1;
                     stats.errors += 1;
                 }
                 stats.all_latency.push(elapsed);
-                stats.read_latency.push(elapsed);
+                if succeeded {
+                    stats.read_latency.push(elapsed);
+                }
                 if record_timeline && !warmup {
                     stats.timeline.push((
                         (finished - phase_start).as_nanos() as u64,
                         elapsed.as_nanos() as u64,
                         succeeded,
+                        true,
                     ));
                 }
                 operation_index = operation_index.wrapping_add(1);
@@ -466,9 +597,11 @@ fn writer_thread<E: Engine>(
             let finished = Instant::now();
             let elapsed = finished - started;
             stats.attempted_transactions += 1;
+            stats.attempted_write_transactions += 1;
             stats.all_latency.push(elapsed);
             match outcome {
-                Outcome::Committed => {
+                Outcome::Committed(revision) => {
+                    stats.successful_write_transactions += 1;
                     stats.successful_transactions += 1;
                     stats.mutation_ops += mutations.len() as u64;
                     stats.committed_latency.push(elapsed);
@@ -476,7 +609,24 @@ fn writer_thread<E: Engine>(
                     for mutation in &mutations {
                         report
                             .last_writes
-                            .insert(mutation.key.clone(), mutation.value[0]);
+                            .insert(mutation.key.clone(), mutation.value.clone());
+                        if report.write_events.len() < MAX_WRITE_HISTORY_PER_CLIENT {
+                            let (value_writer, operation_id, mutation_offset) =
+                                transaction_value_identity(&mutation.value).expect(
+                                    "write value should carry its generated input identity",
+                                );
+                            report.write_events.push(WriteEvent {
+                                key: mutation.key.clone(),
+                                writer_id: value_writer,
+                                operation_id,
+                                mutation_offset,
+                                revision,
+                                started_at: started,
+                                finished_at: finished,
+                            });
+                        } else {
+                            report.write_history_overflow = true;
+                        }
                     }
                     if !warmup {
                         report.last_committed = mutations
@@ -485,15 +635,19 @@ fn writer_thread<E: Engine>(
                             .collect();
                     }
                 }
-                Outcome::Abandoned => stats.abandoned_transactions += 1,
+                Outcome::Abandoned => {
+                    stats.abandoned_transactions += 1;
+                    stats.failed_write_transactions += 1;
+                }
                 Outcome::Failed => {
                     stats.failed_transactions += 1;
+                    stats.failed_write_transactions += 1;
                     for mutation in &mutations {
                         report
                             .ambiguous_writes
                             .entry(mutation.key.clone())
                             .or_default()
-                            .push(mutation.value[0]);
+                            .push(mutation.value.clone());
                     }
                 }
             }
@@ -501,7 +655,8 @@ fn writer_thread<E: Engine>(
                 stats.timeline.push((
                     (finished - phase_start).as_nanos() as u64,
                     elapsed.as_nanos() as u64,
-                    outcome == Outcome::Committed,
+                    matches!(outcome, Outcome::Committed(_)),
+                    false,
                 ));
             }
             operation_index = operation_index.wrapping_add(1);
@@ -511,6 +666,7 @@ fn writer_thread<E: Engine>(
             stats,
             trace,
             finished_at: Instant::now(),
+            finished_after_start: phase_start.elapsed(),
         });
         barrier.wait();
     }
@@ -606,15 +762,73 @@ fn machine_info() -> Value {
         })
         .unwrap_or_default();
     let kernel = std::fs::read_to_string("/proc/sys/kernel/osrelease").unwrap_or_default();
+    let cpu_model = cpuinfo
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("model name\t: ")
+                .or_else(|| line.strip_prefix("Hardware\t: "))
+        })
+        .unwrap_or("unknown");
     json!({
         "logical_cpus": std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get),
+        "cpu_model": cpu_model,
         "cpu_part": cpuinfo.lines().find_map(|line| line.strip_prefix("CPU part\t: ")).unwrap_or("unknown"),
         "os": os,
         "kernel": kernel.trim(),
+        "process_thread_count": status_value("Threads:"),
     })
 }
 
-fn window_summary(timeline: &mut [(u64, u64, bool)], window: Duration, wall: Duration) -> Value {
+fn status_value(prefix: &str) -> Option<u64> {
+    std::fs::read_to_string("/proc/self/status")
+        .ok()?
+        .lines()
+        .find_map(|line| line.strip_prefix(prefix)?.trim().parse().ok())
+}
+
+fn rss_summary(samples: &[Value], requested_interval: Duration, wall: Duration) -> Value {
+    let mut rss_values: Vec<u64> = samples
+        .iter()
+        .filter_map(|sample| sample.get("rss_kib").and_then(Value::as_u64))
+        .collect();
+    rss_values.sort_unstable();
+    let percentile = |fraction: f64| {
+        if rss_values.is_empty() {
+            Value::Null
+        } else {
+            let index = ((rss_values.len() - 1) as f64 * fraction).round() as usize;
+            json!(rss_values[index])
+        }
+    };
+    let expected_samples = if requested_interval.is_zero() {
+        0
+    } else {
+        (wall.as_nanos() / requested_interval.as_nanos()) as usize
+    };
+    let mut thread_counts: Vec<u64> = samples
+        .iter()
+        .filter_map(|sample| sample.get("thread_count").and_then(Value::as_u64))
+        .collect();
+    thread_counts.sort_unstable();
+    json!({
+        "p50_kib": percentile(0.50),
+        "p95_kib": percentile(0.95),
+        "observed_max_kib": rss_values.last().copied(),
+        "sample_count": rss_values.len(),
+        "expected_sample_count": expected_samples,
+        "collection_failures": samples.len().saturating_sub(rss_values.len()),
+        "complete": !rss_values.is_empty() && samples.len() == expected_samples && rss_values.len() == samples.len(),
+        "thread_count_min": thread_counts.first().copied(),
+        "thread_count_max": thread_counts.last().copied(),
+        "thread_count_sample_count": thread_counts.len(),
+    })
+}
+
+fn window_summary(
+    timeline: &mut [(u64, u64, bool, bool)],
+    window: Duration,
+    wall: Duration,
+) -> Value {
     if window.is_zero() {
         return Value::Null;
     }
@@ -626,34 +840,60 @@ fn window_summary(timeline: &mut [(u64, u64, bool)], window: Duration, wall: Dur
         let start = window_index * window_nanos;
         let end = start + window_nanos;
         let mut committed_latencies: Vec<u64> = Vec::new();
-        let mut attempted = 0u64;
-        for (finish, latency, committed) in timeline.iter() {
+        let mut read_latencies: Vec<u64> = Vec::new();
+        let mut write_latencies: Vec<u64> = Vec::new();
+        let mut attempted_reads = 0u64;
+        let mut attempted_writes = 0u64;
+        let mut successful_reads = 0u64;
+        let mut successful_writes = 0u64;
+        for (finish, latency, committed, is_read) in timeline.iter() {
             if *finish >= start && *finish < end {
-                attempted += 1;
+                if *is_read {
+                    attempted_reads += 1;
+                } else {
+                    attempted_writes += 1;
+                }
                 if *committed {
                     committed_latencies.push(*latency);
+                    if *is_read {
+                        successful_reads += 1;
+                        read_latencies.push(*latency);
+                    } else {
+                        successful_writes += 1;
+                        write_latencies.push(*latency);
+                    }
                 }
             }
         }
         committed_latencies.sort_unstable();
-        let percentile = |fraction: f64| -> f64 {
-            if committed_latencies.is_empty() {
+        read_latencies.sort_unstable();
+        write_latencies.sort_unstable();
+        let percentile = |values: &[u64], fraction: f64| -> f64 {
+            if values.is_empty() {
                 return 0.0;
             }
-            let index = ((committed_latencies.len() - 1) as f64 * fraction).round() as usize;
-            committed_latencies[index] as f64 / 1_000.0
+            let index = ((values.len() - 1) as f64 * fraction).round() as usize;
+            values[index] as f64 / 1_000.0
         };
         let span_seconds = (end.min(wall.as_nanos() as u64).saturating_sub(start)) as f64 / 1e9;
         windows.push(json!({
             "window_index": window_index,
             "start_s": start as f64 / 1e9,
             "span_s": span_seconds,
-            "attempted_transactions": attempted,
+            "attempted_reads": attempted_reads,
+            "attempted_write_transactions": attempted_writes,
+            "successful_reads": successful_reads,
+            "successful_write_transactions": successful_writes,
             "successful_transactions": committed_latencies.len(),
-            "logical_tx_per_second": if span_seconds > 0.0 { committed_latencies.len() as f64 / span_seconds } else { 0.0 },
-            "p50_us": percentile(0.50),
-            "p95_us": percentile(0.95),
-            "p99_us": percentile(0.99),
+            "aggregate_logical_ops_per_second": if span_seconds > 0.0 { committed_latencies.len() as f64 / span_seconds } else { 0.0 },
+            "read_operations_per_second": if span_seconds > 0.0 { successful_reads as f64 / span_seconds } else { 0.0 },
+            "write_transactions_per_second": if span_seconds > 0.0 { successful_writes as f64 / span_seconds } else { 0.0 },
+            "read_p50_us": percentile(&read_latencies, 0.50),
+            "read_p95_us": percentile(&read_latencies, 0.95),
+            "read_p99_us": percentile(&read_latencies, 0.99),
+            "write_p50_us": percentile(&write_latencies, 0.50),
+            "write_p95_us": percentile(&write_latencies, 0.95),
+            "write_p99_us": percentile(&write_latencies, 0.99),
         }));
     }
     Value::Array(windows)
@@ -668,6 +908,8 @@ struct RunOutcome {
     traces: Vec<Value>,
     writer_reports: Vec<WriterReport>,
     monitor: Vec<Value>,
+    client_completion: Vec<Value>,
+    completion_skew_ms: f64,
 }
 
 fn run_phases<E: Engine>(engine: &E, args: &Args) -> RunOutcome {
@@ -730,6 +972,7 @@ fn run_phases<E: Engine>(engine: &E, args: &Args) -> RunOutcome {
                     let sample = json!({
                         "t_s": started.elapsed().as_secs_f64(),
                         "rss_kib": status_kib("VmRSS:"),
+                        "thread_count": status_value("Threads:"),
                         "disk_apparent_bytes": apparent,
                         "disk_allocated_bytes": allocated,
                         "disk_files": files,
@@ -774,14 +1017,34 @@ fn run_phases<E: Engine>(engine: &E, args: &Args) -> RunOutcome {
     let mut measured = PhaseStats::new(args.seed ^ 0xabcd);
     let mut warmup = PhaseStats::new(args.seed ^ 0xabce);
     let mut traces = Vec::new();
+    let mut client_completion = Vec::new();
+    let mut completion_times = Vec::new();
     let mut writer_reports = writer_reports;
     for report in writer_reports.iter_mut() {
+        if let Some(phase) = report.phases.iter().find(|phase| !phase.warmup) {
+            completion_times.push(phase.finished_after_start);
+            client_completion.push(json!({
+                "client": report.writer_id,
+                "finished_ms": phase.finished_after_start.as_secs_f64() * 1_000.0,
+                "attempted": phase.stats.attempted_transactions,
+                "successful": phase.stats.successful_transactions,
+                "failed": phase.stats.failed_transactions + phase.stats.abandoned_transactions,
+            }));
+        }
         for phase in report.phases.drain(..) {
             traces.push(json!({
                 "writer": report.writer_id,
                 "phase": if phase.warmup { "warmup" } else { "measured" },
                 "transactions": phase.trace.transactions,
                 "hash": format!("{:016x}", phase.trace.state),
+                "checkpoints": phase
+                    .trace
+                    .checkpoints
+                    .iter()
+                    .map(|(transactions, hash)| {
+                        json!({"transactions": transactions, "hash": format!("{hash:016x}")})
+                    })
+                    .collect::<Vec<_>>(),
             }));
             if phase.warmup {
                 warmup.merge(phase.stats);
@@ -799,6 +1062,14 @@ fn run_phases<E: Engine>(engine: &E, args: &Args) -> RunOutcome {
         traces,
         writer_reports,
         monitor: monitor_samples.into_inner().unwrap(),
+        completion_skew_ms: completion_times
+            .iter()
+            .max()
+            .zip(completion_times.iter().min())
+            .map_or(0.0, |(latest, earliest)| {
+                latest.saturating_sub(*earliest).as_secs_f64() * 1_000.0
+            }),
+        client_completion,
     }
 }
 
@@ -809,17 +1080,20 @@ fn sampled_working_set_indices(args: &Args) -> Vec<usize> {
 }
 
 fn verify<E: Engine>(engine: &E, args: &Args, reports: &[WriterReport]) -> Value {
-    let mut candidates: HashMap<&[u8], HashSet<u8>> = HashMap::new();
-    let mut ambiguous: HashMap<&[u8], HashSet<u8>> = HashMap::new();
+    let mut candidates: HashMap<&[u8], HashSet<Vec<u8>>> = HashMap::new();
+    let mut ambiguous: HashMap<&[u8], HashSet<Vec<u8>>> = HashMap::new();
     for report in reports {
-        for (key, byte) in &report.last_writes {
-            candidates.entry(key.as_slice()).or_default().insert(*byte);
+        for (key, value) in &report.last_writes {
+            candidates
+                .entry(key.as_slice())
+                .or_default()
+                .insert(value.clone());
         }
-        for (key, bytes) in &report.ambiguous_writes {
+        for (key, values) in &report.ambiguous_writes {
             ambiguous
                 .entry(key.as_slice())
                 .or_default()
-                .extend(bytes.iter().copied());
+                .extend(values.iter().cloned());
         }
     }
     let working_set = args.working_set as u64;
@@ -831,16 +1105,7 @@ fn verify<E: Engine>(engine: &E, args: &Args, reports: &[WriterReport]) -> Value
         .keys()
         .filter(|key| key_index(key) >= working_set && !candidates.contains_key(*key))
         .count() as u64;
-    let query_seed_rows = if matches!(args.operation.as_str(), "query" | "mixed") {
-        args.working_set.min(256)
-    } else {
-        0usize
-    };
-    let query_seed_overlaps = (0..query_seed_rows.min(args.working_set))
-        .step_by(128)
-        .count() as u64;
-    let expected_rows_min =
-        working_set + query_seed_rows as u64 - query_seed_overlaps + committed_new_keys;
+    let expected_rows_min = working_set + committed_new_keys;
     let expected_rows_max = expected_rows_min + ambiguous_new_keys;
 
     let mut sampled: Vec<Vec<u8>> = sampled_working_set_indices(args)
@@ -861,31 +1126,31 @@ fn verify<E: Engine>(engine: &E, args: &Args, reports: &[WriterReport]) -> Value
     let mut keys_with_committed_writes = 0u64;
     for key in &sampled {
         let actual = engine.read(&mut reader, key);
-        let mut allowed: HashSet<u8> = HashSet::new();
+        let mut allowed: HashSet<Vec<u8>> = HashSet::new();
         let committed = candidates.get(key.as_slice());
         if let Some(bytes) = committed {
             keys_with_committed_writes += 1;
-            allowed.extend(bytes.iter().copied());
+            allowed.extend(bytes.iter().cloned());
         } else if key_index(key) < working_set {
-            allowed.insert((key_index(key) & 0xff) as u8);
+            allowed.insert(super::workload::value_bytes(
+                args.value_size,
+                key_index(key),
+                0,
+            ));
         }
         let may_be_absent = committed.is_none() && key_index(key) >= working_set;
         if let Some(bytes) = ambiguous.get(key.as_slice()) {
-            allowed.extend(bytes.iter().copied());
+            allowed.extend(bytes.iter().cloned());
         }
         let valid = match &actual {
             None => may_be_absent,
-            Some(value) => {
-                value.len() == args.value_size
-                    && value.iter().all(|byte| *byte == value[0])
-                    && allowed.contains(&value[0])
-            }
+            Some(value) => value.len() == args.value_size && allowed.contains(value),
         };
         if !valid && mismatches.len() < 20 {
             mismatches.push(json!({
                 "key": hex(key),
                 "actual": actual.as_ref().map(|value| hex(value)),
-                "allowed": allowed.iter().copied().collect::<Vec<u8>>(),
+                "allowed_value_count": allowed.len(),
             }));
         }
         if !valid && mismatches.len() >= 20 {
@@ -909,6 +1174,253 @@ fn verify<E: Engine>(engine: &E, args: &Args, reports: &[WriterReport]) -> Value
     })
 }
 
+fn validate_mixed_read_history(args: &Args, reports: &[WriterReport]) -> Value {
+    let write_history_overflow = reports.iter().any(|report| report.write_history_overflow);
+    let sampled_reads = reports
+        .iter()
+        .map(|report| report.read_events.len())
+        .sum::<usize>();
+    let observed_reads = reports
+        .iter()
+        .map(|report| report.read_events_seen)
+        .sum::<u64>();
+    let mut failed = 0u64;
+    let mut indeterminate = 0u64;
+    for report in reports {
+        for read in &report.read_events {
+            let seed_revision = (key_index(&read.key) / SEED_CHUNK_ROWS as u64) + 1;
+            let seed_value = super::workload::value_bytes(args.value_size, key_index(&read.key), 0);
+            let mut latest_completed_revision = seed_revision;
+            let mut latest_completed_event: Option<&WriteEvent> = None;
+            for candidate in reports.iter().flat_map(|entry| entry.write_events.iter()) {
+                if candidate.key != read.key || candidate.finished_at > read.started_at {
+                    continue;
+                }
+                match (latest_completed_event, candidate.revision) {
+                    (_, Some(revision)) if revision >= latest_completed_revision => {
+                        latest_completed_revision = revision;
+                        latest_completed_event = Some(candidate);
+                    }
+                    (None, None) => latest_completed_event = Some(candidate),
+                    (Some(previous), None) if candidate.finished_at > previous.finished_at => {
+                        latest_completed_event = Some(candidate)
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(actual_revision) = read.revision {
+                if actual_revision < latest_completed_revision {
+                    failed += 1;
+                    continue;
+                }
+            } else if latest_completed_event.is_some() && write_history_overflow {
+                indeterminate += 1;
+                continue;
+            }
+            let seed_matches = read.value == seed_value
+                && read
+                    .revision
+                    .map_or(latest_completed_event.is_none(), |revision| {
+                        revision == seed_revision
+                    });
+            if seed_matches {
+                continue;
+            }
+            let matching_write = reports
+                .iter()
+                .flat_map(|entry| entry.write_events.iter())
+                .any(|candidate| {
+                    let completed_before_read = candidate.finished_at <= read.started_at
+                        && latest_completed_event
+                            .is_some_and(|latest| std::ptr::eq(latest, candidate));
+                    let overlapped_read = candidate.started_at < read.finished_at
+                        && candidate.finished_at > read.started_at;
+                    candidate.key == read.key
+                        && transaction_value_identity(&read.value).is_some_and(
+                            |(writer_identity, operation_id, mutation_offset)| {
+                                candidate.writer_id == writer_identity
+                                    && candidate.operation_id == operation_id
+                                    && candidate.mutation_offset == mutation_offset
+                                    && read.value
+                                        == transaction_value_bytes(
+                                            args.value_size,
+                                            writer_identity as usize,
+                                            operation_id,
+                                            mutation_offset as usize,
+                                        )
+                            },
+                        )
+                        && (completed_before_read || overlapped_read)
+                        && match (read.revision, candidate.revision) {
+                            (Some(read_revision), Some(write_revision)) => {
+                                read_revision == write_revision
+                                    && write_revision >= latest_completed_revision
+                            }
+                            (None, None) => latest_completed_event
+                                .is_none_or(|latest| std::ptr::eq(latest, candidate)),
+                            _ => false,
+                        }
+                });
+            if !matching_write {
+                if write_history_overflow {
+                    indeterminate += 1;
+                } else {
+                    failed += 1;
+                }
+            }
+        }
+    }
+    let passed = sampled_reads > 0 && failed == 0 && indeterminate == 0 && !write_history_overflow;
+    json!({
+        "status": if passed { "passed" } else if failed > 0 { "failed" } else { "inconclusive" },
+        "sampled_reads": sampled_reads,
+        "observed_reads_with_value": observed_reads,
+        "sampled_writes": reports.iter().map(|report| report.write_events.len()).sum::<usize>(),
+        "write_history_overflow": write_history_overflow,
+        "read_history_limit_per_client": MAX_READ_HISTORY_PER_CLIENT,
+        "write_history_limit_per_client": MAX_WRITE_HISTORY_PER_CLIENT,
+        "failed": failed,
+        "indeterminate": indeterminate,
+        "revision_policy": if reports.iter().flat_map(|report| report.read_events.iter()).any(|read| read.revision.is_some()) {
+            "dodb_revision_history"
+        } else {
+            "value_history_without_engine_revision"
+        },
+        "passed": passed,
+    })
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use super::{
+        Args, Distribution, MAX_READ_HISTORY_PER_CLIENT, MAX_WRITE_HISTORY_PER_CLIENT, Mode,
+        ReadEvent, SEED_CHUNK_ROWS, WriteEvent, WriterReport, validate_mixed_read_history,
+    };
+    use crate::common::workload::{key_for_index, transaction_value_bytes, value_bytes};
+    use std::collections::{BTreeMap, HashMap};
+    use std::time::{Duration, Instant};
+
+    fn args() -> Args {
+        Args {
+            mode: Mode::Bench,
+            operation: "mixed".to_owned(),
+            read_percent: 50,
+            read_limit: 16,
+            writers: 1,
+            width: 1,
+            distribution: Distribution::Uniform,
+            working_set: 10_000,
+            key_size: 16,
+            value_size: 512,
+            warmup: Duration::ZERO,
+            duration: Duration::from_secs(1),
+            seed: 1,
+            scenario_index: 1,
+            repetition: 1,
+            data_dir: "/bench/zfs/db/test".into(),
+            output: "/bench/zfs/db/test.jsonl".into(),
+            window: Duration::ZERO,
+            monitor_interval: Duration::from_secs(1),
+            probe_transactions: 1,
+            engine_options: BTreeMap::new(),
+        }
+    }
+
+    fn report(read: ReadEvent, writes: Vec<WriteEvent>, overflow: bool) -> WriterReport {
+        WriterReport {
+            writer_id: 0,
+            phases: Vec::new(),
+            last_writes: HashMap::new(),
+            ambiguous_writes: HashMap::new(),
+            last_committed: Vec::new(),
+            read_events: vec![read],
+            read_events_seen: 1,
+            write_events: writes,
+            write_history_overflow: overflow,
+        }
+    }
+
+    #[test]
+    fn mixed_history_accepts_independent_seed_revision_and_full_value() {
+        let start = Instant::now();
+        let key = key_for_index(Distribution::Uniform, 16, 17);
+        let read = ReadEvent {
+            key: key.clone(),
+            value: value_bytes(512, 17, 0),
+            revision: Some(1),
+            started_at: start,
+            finished_at: start + Duration::from_micros(5),
+        };
+        let result = validate_mixed_read_history(&args(), &[report(read, Vec::new(), false)]);
+        assert_eq!(result["status"], "passed");
+        assert_eq!(result["sampled_reads"], 1);
+    }
+
+    #[test]
+    fn mixed_history_rejects_wrong_value_and_revision() {
+        let start = Instant::now();
+        let key = key_for_index(Distribution::Uniform, 16, 17);
+        let read = ReadEvent {
+            key,
+            value: vec![0; 512],
+            revision: Some(99),
+            started_at: start,
+            finished_at: start + Duration::from_micros(5),
+        };
+        let result = validate_mixed_read_history(&args(), &[report(read, Vec::new(), false)]);
+        assert_eq!(result["status"], "failed");
+        assert_eq!(result["failed"], 1);
+    }
+
+    #[test]
+    fn mixed_history_accepts_a_completed_write_with_its_commit_revision() {
+        let started = Instant::now();
+        let key = key_for_index(Distribution::Uniform, 16, 17);
+        let value = transaction_value_bytes(512, 0, 41, 0);
+        let write = WriteEvent {
+            key: key.clone(),
+            writer_id: 0,
+            operation_id: 41,
+            mutation_offset: 0,
+            revision: Some(42),
+            started_at: started,
+            finished_at: started + Duration::from_micros(4),
+        };
+        let read = ReadEvent {
+            key,
+            value,
+            revision: Some(42),
+            started_at: started + Duration::from_micros(5),
+            finished_at: started + Duration::from_micros(8),
+        };
+        let result = validate_mixed_read_history(&args(), &[report(read, vec![write], false)]);
+        assert_eq!(result["status"], "passed");
+    }
+
+    #[test]
+    fn mixed_history_does_not_pass_when_write_events_are_missing() {
+        let start = Instant::now();
+        let key = key_for_index(Distribution::Uniform, 16, 17);
+        let read = ReadEvent {
+            key,
+            value: value_bytes(512, 500, 0),
+            revision: Some(500),
+            started_at: start,
+            finished_at: start + Duration::from_micros(5),
+        };
+        let result = validate_mixed_read_history(&args(), &[report(read, Vec::new(), true)]);
+        assert_eq!(result["status"], "inconclusive");
+        assert_eq!(result["passed"], false);
+    }
+
+    #[test]
+    fn history_budgets_are_explicit_and_bounded() {
+        assert_eq!(MAX_READ_HISTORY_PER_CLIENT, 1_024);
+        assert_eq!(MAX_WRITE_HISTORY_PER_CLIENT, 65_536);
+        assert_eq!(SEED_CHUNK_ROWS, 1_000);
+    }
+}
+
 pub fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
@@ -926,12 +1438,14 @@ fn append_record(path: &Path, record: &Value) {
 }
 
 fn prepare_data_dir(args: &Args) {
+    let data_root = std::env::var_os("CROSSDB_DATA_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/bench/zfs/db"));
     assert!(
-        args.data_dir.starts_with("/bench/zfs/db"),
-        "database files must live under /bench/zfs/db"
+        args.data_dir.starts_with(&data_root),
+        "database files must live under the configured benchmark data root"
     );
-    let _ = std::fs::remove_dir_all(&args.data_dir);
-    std::fs::create_dir_all(&args.data_dir).expect("data dir should be creatable");
+    std::fs::create_dir(&args.data_dir).expect("run data directory must be new and unused");
 }
 
 fn stats_record(stats: &PhaseStats, wall: Duration) -> Value {
@@ -941,6 +1455,14 @@ fn stats_record(stats: &PhaseStats, wall: Duration) -> Value {
     object.insert(
         "attempted_tx_per_second".into(),
         json!(stats.attempted_transactions as f64 / seconds),
+    );
+    object.insert(
+        "write_transactions_per_second".into(),
+        json!(stats.successful_write_transactions as f64 / seconds),
+    );
+    object.insert(
+        "aggregate_logical_ops_per_second".into(),
+        json!((stats.successful_reads + stats.successful_write_transactions) as f64 / seconds),
     );
     object.insert(
         "attempts_per_second".into(),
@@ -1027,18 +1549,10 @@ fn run_bench<F: EngineFactory>(args: &Args) {
         let settings = engine.settings(&mut seeder);
         let workload = args.workload();
         let rows: Vec<Mutation> = seed_rows(&workload).collect();
-        let mut seeded_rows = rows.len();
+        let seeded_rows = rows.len();
         let seed_started = Instant::now();
         for chunk in rows.chunks(SEED_CHUNK_ROWS) {
             engine.seed(&mut seeder, chunk);
-        }
-        if matches!(args.operation.as_str(), "query" | "mixed") {
-            let rows = query_rows(args.value_size, args.working_set);
-            let overlaps = (0..rows.len().min(args.working_set)).step_by(128).count();
-            seeded_rows += rows.len() - overlaps;
-            for chunk in rows.chunks(SEED_CHUNK_ROWS) {
-                engine.seed(&mut seeder, chunk);
-            }
         }
         let seed_elapsed = seed_started.elapsed();
         json!({"effective": settings, "seed_rows": seeded_rows, "seed_elapsed_s": seed_elapsed.as_secs_f64()})
@@ -1052,10 +1566,38 @@ fn run_bench<F: EngineFactory>(args: &Args) {
     let files_before_close = directory_listing(&args.data_dir);
     let close_info = F::close(engine);
     let reopened = F::reopen(args);
-    let verification = verify(&reopened, args, &outcome.writer_reports);
+    let mut verification = verify(&reopened, args, &outcome.writer_reports);
+    if args.operation == "mixed" {
+        let history = validate_mixed_read_history(args, &outcome.writer_reports);
+        let passed = verification["passed"].as_bool().unwrap_or(false)
+            && history["passed"].as_bool().unwrap_or(false);
+        verification["passed"] = json!(passed);
+        verification["mixed_read_history"] = history;
+    }
     let reopen_close = F::close(reopened);
     let wall_seconds = outcome.wall.as_secs_f64();
     let windows = window_summary(&mut outcome.measured.timeline, args.window, outcome.wall);
+    let read_validation = match args.operation.as_str() {
+        "get"
+            if F::engine_name(args) == "main-btree" || F::engine_name(args) == "planned-blink" =>
+        {
+            "Every Get checks full bytes, length, and independently predicted seed revision"
+        }
+        "get" => "Every Get checks full bytes and length; engine revisions unavailable",
+        "query" => {
+            "Every Query checks row count, full keys, ordering, cursor boundary, and value bytes"
+        }
+        "mixed"
+            if F::engine_name(args) == "main-btree" || F::engine_name(args) == "planned-blink" =>
+        {
+            "Sampled concurrent reads check full value history and dodb revisions; bounded history overflow is inconclusive"
+        }
+        "mixed" => {
+            "Sampled concurrent reads check full value history; engine revisions unavailable"
+        }
+        _ => "No read validation required",
+    };
+    let measurement_rss = rss_summary(&outcome.monitor, args.monitor_interval, outcome.wall);
     let mut record = json!({
         "record_type": "crossdb-run",
         "timestamp_unix_ms": unix_ms() as u64,
@@ -1063,6 +1605,7 @@ fn run_bench<F: EngineFactory>(args: &Args) {
         "build": F::build_info(),
         "machine": machine_info(),
         "sync_contract": "durable-return",
+        "read_validation": read_validation,
         "writers": args.writers,
         "transaction_width": args.width,
         "operation": args.operation,
@@ -1096,6 +1639,7 @@ fn run_bench<F: EngineFactory>(args: &Args) {
             "after_seed": rss_after_seed,
             "end": rss_end,
             "hwm": rss_hwm,
+            "measurement_window": measurement_rss,
         },
         "settings": settings,
         "metrics_after_seed": metrics_after_seed,
@@ -1107,6 +1651,9 @@ fn run_bench<F: EngineFactory>(args: &Args) {
         "verification": verification,
         "windows": windows,
         "monitor": outcome.monitor,
+        "client_completion": outcome.client_completion,
+        "client_completion_skew_ms": outcome.completion_skew_ms,
+        "drain_inclusive_wall_seconds": wall_seconds,
         "traces": outcome.traces,
     });
     let logical_cpus = std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
@@ -1131,7 +1678,6 @@ fn run_bench<F: EngineFactory>(args: &Args) {
         measured["p99_us"].as_f64().unwrap_or(0.0),
         record["verification"]["passed"],
     );
-    let _ = std::fs::remove_dir_all(&args.data_dir);
 }
 
 pub fn strace_marker(args: &Args, label: &str) {
@@ -1175,7 +1721,7 @@ fn run_probe<F: EngineFactory>(args: &Args) {
         strace_marker(args, &format!("commit-begin-{transaction_index}"));
         let result = engine.attempt(&mut writer, &mutations);
         strace_marker(args, &format!("commit-returned-{transaction_index}"));
-        let committed = matches!(result, Attempt::Committed);
+        let committed = matches!(result, Attempt::Committed(_));
         transactions.push(json!({
             "transaction": transaction_index,
             "width": width,
@@ -1222,7 +1768,6 @@ fn run_probe<F: EngineFactory>(args: &Args) {
     });
     append_record(&args.output, &record);
     println!("{}", serde_json::to_string_pretty(&record).unwrap());
-    let _ = std::fs::remove_dir_all(&args.data_dir);
 }
 
 fn run_atomicity<F: EngineFactory>(args: &Args) {
@@ -1260,7 +1805,7 @@ fn run_atomicity<F: EngineFactory>(args: &Args) {
                             .collect();
                         stats.attempted_transactions += 1;
                         match execute_with_retry(engine, &mut writer, &mutations, &mut stats) {
-                            Outcome::Committed => {
+                            Outcome::Committed(_) => {
                                 stats.successful_transactions += 1;
                                 committed.push(tag);
                             }
@@ -1337,5 +1882,4 @@ fn run_atomicity<F: EngineFactory>(args: &Args) {
     });
     append_record(&args.output, &record);
     println!("{}", serde_json::to_string(&record).unwrap());
-    let _ = std::fs::remove_dir_all(&args.data_dir);
 }

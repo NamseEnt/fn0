@@ -258,6 +258,9 @@ int crossdb_rocksdb_query(void* raw_handle, const uint8_t* lower,
   size_t count = 0;
   for (iterator->Seek(lower_slice); iterator->Valid() && count < limit;
        iterator->Next()) {
+    if (iterator->key().compare(lower_slice) == 0) {
+      continue;
+    }
     if (iterator->key().compare(upper_slice) > 0) {
       break;
     }

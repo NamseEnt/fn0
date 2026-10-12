@@ -1,16 +1,23 @@
 use std::path::PathBuf;
 
 fn main() {
-    for name in ["CROSSDB_ROCKSDB_TAG", "CROSSDB_ROCKSDB_COMMIT", "CROSSDB_ROCKSDB_DIR"] {
+    for name in ["CROSSDB_ROCKSDB_TAG", "CROSSDB_ROCKSDB_COMMIT", "CROSSDB_ROCKSDB_DIR", "CROSSDB_SOURCE_CLEAN"] {
         println!("cargo:rerun-if-env-changed={name}");
     }
-    let tag = std::env::var("CROSSDB_ROCKSDB_TAG").expect("CROSSDB_ROCKSDB_TAG must be set");
-    let commit =
-        std::env::var("CROSSDB_ROCKSDB_COMMIT").expect("CROSSDB_ROCKSDB_COMMIT must be set");
+    let Ok(rocksdb_directory) = std::env::var("CROSSDB_ROCKSDB_DIR") else {
+        return;
+    };
+    let tag = std::env::var("CROSSDB_ROCKSDB_TAG").expect("CROSSDB_ROCKSDB_TAG must be set with CROSSDB_ROCKSDB_DIR");
+    let commit = std::env::var("CROSSDB_ROCKSDB_COMMIT").expect("CROSSDB_ROCKSDB_COMMIT must be set with CROSSDB_ROCKSDB_DIR");
     println!("cargo:rustc-env=CROSSDB_ROCKSDB_TAG={tag}");
     println!("cargo:rustc-env=CROSSDB_ROCKSDB_COMMIT={commit}");
-    let rocksdb_dir =
-        PathBuf::from(std::env::var("CROSSDB_ROCKSDB_DIR").expect("CROSSDB_ROCKSDB_DIR must be set"));
+    if let Ok(source_sha) = std::env::var("CROSSDB_SOURCE_SHA") {
+        println!("cargo:rustc-env=CROSSDB_SOURCE_SHA={source_sha}");
+    }
+    if let Ok(source_clean) = std::env::var("CROSSDB_SOURCE_CLEAN") {
+        println!("cargo:rustc-env=CROSSDB_SOURCE_CLEAN={source_clean}");
+    }
+    let rocksdb_dir = PathBuf::from(rocksdb_directory);
     println!("cargo:rerun-if-changed=shim/rocksdb_shim.cc");
     println!("cargo:rerun-if-changed={}", rocksdb_dir.join("librocksdb.a").display());
     cc::Build::new()
@@ -19,7 +26,7 @@ fn main() {
         .include(rocksdb_dir.join("include"))
         .flag("-std=c++20")
         .flag("-fno-rtti")
-        .flag("-march=armv8-a+crc+crypto")
+        .flag("-march=native")
         .flag("-O2")
         .define("NDEBUG", None)
         .warnings(true)

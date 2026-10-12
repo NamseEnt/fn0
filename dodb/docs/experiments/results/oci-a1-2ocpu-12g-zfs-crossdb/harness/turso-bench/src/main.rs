@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 #[path = "../../common/mod.rs"]
 mod common;
 
@@ -5,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use common::driver::{self, Args, Attempt, Engine, EngineFactory, RetryKind};
-use common::workload::Mutation;
+use common::workload::{Mutation, QueryRequest};
 use serde_json::{json, Value};
 use turso::params::Params;
 use turso::{Builder, Connection, Database, Statement};
@@ -196,7 +198,7 @@ impl Engine for TursoEngine {
                         connection.is_autocommit().unwrap_or(false),
                         "commit must end the transaction"
                     );
-                    Attempt::Committed
+                    Attempt::Committed(None)
                 }
                 Err(error) => {
                     rollback(connection).await;
@@ -254,20 +256,20 @@ impl Engine for TursoEngine {
         })
     }
 
-    fn query(&self, writer: &mut TursoWriter, primary_key: &[u8], limit: usize) -> Vec<Mutation> {
+    fn query(&self, writer: &mut TursoWriter, request: &QueryRequest, limit: usize) -> Vec<Mutation> {
         let TursoWriter {
             runtime,
             connection,
             ..
         } = writer;
-        let mut lower = primary_key.to_vec();
-        lower.extend_from_slice(&[0; 8]);
-        let mut upper = primary_key.to_vec();
+        let mut lower = request.primary_key.clone();
+        lower.extend_from_slice(&request.exclusive_after_sort_key);
+        let mut upper = request.primary_key.clone();
         upper.extend_from_slice(&[u8::MAX; 8]);
         runtime.block_on(async {
             let mut rows = match connection
                 .query(
-                    "SELECT k, v FROM kv WHERE k >= ?1 AND k <= ?2 ORDER BY k LIMIT ?3",
+                    "SELECT k, v FROM kv WHERE k > ?1 AND k <= ?2 ORDER BY k LIMIT ?3",
                     Params::Positional(vec![
                         turso::Value::Blob(lower),
                         turso::Value::Blob(upper),

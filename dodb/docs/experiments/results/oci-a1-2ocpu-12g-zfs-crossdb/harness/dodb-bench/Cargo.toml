@@ -1,0 +1,18 @@
+[package]
+name = "dodb-bench"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+dodb-core = { path = "../../../../../../crates/dodb-core" }
+dodb-storage = { path = "../../../../../../crates/dodb-storage" }
+libc = "0.2"
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
+
+[profile.release]
+opt-level = 3
+debug = "line-tables-only"

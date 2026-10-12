@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 #[path = "../../common/mod.rs"]
 mod common;
 
@@ -5,7 +7,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use common::driver::{self, Args, Attempt, Engine, EngineFactory, RetryKind};
-use common::workload::Mutation;
+use common::workload::{Mutation, QueryRequest};
 use rusqlite::{
     params, Connection, Error, ErrorCode, OpenFlags, OptionalExtension, TransactionBehavior,
 };
@@ -58,7 +60,7 @@ impl Engine for SqliteEngine {
             }
         }
         match transaction.commit() {
-            Ok(()) => Attempt::Committed,
+            Ok(()) => Attempt::Committed(None),
             Err(error) => classify(error),
         }
     }
@@ -87,13 +89,13 @@ impl Engine for SqliteEngine {
             .expect("SQLite point read should succeed")
     }
 
-    fn query(&self, writer: &mut Self::Writer, primary_key: &[u8], limit: usize) -> Vec<Mutation> {
-        let mut lower = primary_key.to_vec();
-        lower.extend_from_slice(&[0; 8]);
-        let mut upper = primary_key.to_vec();
+    fn query(&self, writer: &mut Self::Writer, request: &QueryRequest, limit: usize) -> Vec<Mutation> {
+        let mut lower = request.primary_key.clone();
+        lower.extend_from_slice(&request.exclusive_after_sort_key);
+        let mut upper = request.primary_key.clone();
         upper.extend_from_slice(&[u8::MAX; 8]);
         let mut statement = writer
-            .prepare("SELECT k, v FROM kv WHERE k >= ?1 AND k <= ?2 ORDER BY k LIMIT ?3")
+            .prepare("SELECT k, v FROM kv WHERE k > ?1 AND k <= ?2 ORDER BY k LIMIT ?3")
             .expect("SQLite query should prepare");
         statement
             .query_map(params![lower, upper, limit as i64], |row| {

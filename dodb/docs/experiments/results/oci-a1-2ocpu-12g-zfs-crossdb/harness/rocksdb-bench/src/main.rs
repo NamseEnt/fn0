@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 #[path = "../../common/mod.rs"]
 mod common;
 
@@ -5,12 +7,18 @@ use std::ffi::{CStr, CString, c_char, c_void};
 use std::path::PathBuf;
 
 use common::driver::{self, Args, Attempt, Engine, EngineFactory};
-use common::workload::Mutation;
+use common::workload::{Mutation, QueryRequest};
 use serde_json::{Value, json};
 
 const BLOCK_CACHE_BYTES: u64 = 64 * 1024 * 1024;
-const ROCKSDB_TAG: &str = env!("CROSSDB_ROCKSDB_TAG");
-const ROCKSDB_COMMIT: &str = env!("CROSSDB_ROCKSDB_COMMIT");
+const ROCKSDB_TAG: &str = match option_env!("CROSSDB_ROCKSDB_TAG") {
+    Some(value) => value,
+    None => "unavailable",
+};
+const ROCKSDB_COMMIT: &str = match option_env!("CROSSDB_ROCKSDB_COMMIT") {
+    Some(value) => value,
+    None => "unavailable",
+};
 
 unsafe extern "C" {
     fn crossdb_rocksdb_open(
@@ -160,7 +168,7 @@ impl Engine for RocksEngine {
             )
         };
         if status == 0 {
-            Attempt::Committed
+            Attempt::Committed(None)
         } else {
             Attempt::Failed(take_string(error).unwrap_or_default())
         }
@@ -168,7 +176,7 @@ impl Engine for RocksEngine {
 
     fn seed(&self, writer: &mut Self::Writer, rows: &[Mutation]) {
         match self.attempt(writer, rows) {
-            Attempt::Committed => {}
+            Attempt::Committed(_) => {}
             other => panic!("seed write failed: {other:?}"),
         }
     }
@@ -197,10 +205,10 @@ impl Engine for RocksEngine {
         }
     }
 
-    fn query(&self, _writer: &mut Self::Writer, primary_key: &[u8], limit: usize) -> Vec<Mutation> {
-        let mut lower = primary_key.to_vec();
-        lower.extend_from_slice(&[0; 8]);
-        let mut upper = primary_key.to_vec();
+    fn query(&self, _writer: &mut Self::Writer, request: &QueryRequest, limit: usize) -> Vec<Mutation> {
+        let mut lower = request.primary_key.clone();
+        lower.extend_from_slice(&request.exclusive_after_sort_key);
+        let mut upper = request.primary_key.clone();
         upper.extend_from_slice(&[u8::MAX; 8]);
         let mut keys = vec![0; limit * 16];
         let mut values = vec![0; limit * self.value_size];
@@ -300,6 +308,8 @@ impl EngineFactory for RocksFactory {
     fn build_info() -> Value {
         json!({
             "database": "rocksdb",
+        "source_sha": option_env!("CROSSDB_SOURCE_SHA").unwrap_or("unknown"),
+        "source_clean": option_env!("CROSSDB_SOURCE_CLEAN").unwrap_or("unknown"),
             "tag": ROCKSDB_TAG,
             "commit": ROCKSDB_COMMIT,
             "binding": "C++ API through a static in-process shim (DB::Write with one WriteBatch per logical transaction)",

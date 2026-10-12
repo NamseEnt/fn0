@@ -6,7 +6,8 @@ pub const SEED_STRIDE: u64 = 1_009;
 pub const WARMUP_SEED_MASK: u64 = 0xaaaa_0000;
 pub const MEASURED_SEED_MASK: u64 = 0xbbbb_0000;
 pub const WRITER_SEED_MASK: u64 = 0x1000_0000;
-pub const LATENCY_RESERVOIR_LIMIT: usize = 1_000_000;
+pub const LATENCY_RESERVOIR_LIMIT: usize = 16_384;
+pub const TRACE_CHECKPOINT_INTERVAL: u64 = 256;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Distribution {
@@ -61,6 +62,13 @@ pub struct Mutation {
     pub value: Vec<u8>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QueryRequest {
+    pub primary_key: Vec<u8>,
+    pub exclusive_after_sort_key: Vec<u8>,
+    pub expected_rows: Vec<Mutation>,
+}
+
 #[derive(Clone, Debug)]
 pub struct WorkloadGenerator {
     config: WorkloadConfig,
@@ -107,9 +115,43 @@ impl WorkloadGenerator {
             .enumerate()
             .map(|(offset, key)| Mutation {
                 key,
-                value: value_bytes(self.config.value_size, self.operation, offset),
+                value: transaction_value_bytes(
+                    self.config.value_size,
+                    self.worker_id,
+                    self.operation,
+                    offset,
+                ),
             })
             .collect()
+    }
+
+    pub fn next_query(&mut self, limit: usize) -> QueryRequest {
+        let partition_count = self.config.working_set.min(128);
+        let partition_index = self.random_bounded(partition_count);
+        let partition_rows = (self.config.working_set - 1 - partition_index) / 128 + 1;
+        let cursor_slots = partition_rows.saturating_sub(limit).max(1);
+        let cursor_slot = self.random_bounded(cursor_slots);
+        let cursor_index = partition_index + cursor_slot * 128;
+        let cursor_key =
+            key_for_index(self.config.distribution, self.config.key_size, cursor_index);
+        let key_component_length = self.config.key_size / 2;
+        let primary_key = cursor_key[..key_component_length].to_vec();
+        let exclusive_after_sort_key = cursor_key[key_component_length..].to_vec();
+        let expected_rows = (1..=limit)
+            .map(|row_offset| {
+                let row_index = cursor_index + row_offset * 128;
+                Mutation {
+                    key: key_for_index(self.config.distribution, self.config.key_size, row_index),
+                    value: value_bytes(self.config.value_size, row_index as u64, 0),
+                }
+            })
+            .collect();
+        self.operation = self.operation.wrapping_add(1);
+        QueryRequest {
+            primary_key,
+            exclusive_after_sort_key,
+            expected_rows,
+        }
     }
 
     fn next_index(&mut self, offset: usize) -> usize {
@@ -209,14 +251,60 @@ pub fn component_bytes(tag: u8, value: u64, length: usize) -> Vec<u8> {
 }
 
 pub fn value_bytes(length: usize, operation: u64, offset: usize) -> Vec<u8> {
-    let byte = (operation.wrapping_add(offset as u64) & 0xff) as u8;
-    vec![byte; length]
+    let mut value = Vec::with_capacity(length);
+    let mut block_index = 0u64;
+    while value.len() < length {
+        let block = splitmix64(
+            operation
+                .rotate_left(19)
+                .wrapping_add(offset as u64)
+                .wrapping_add(block_index.wrapping_mul(0x9e37_79b9_7f4a_7c15)),
+        )
+        .to_be_bytes();
+        let remaining = length - value.len();
+        value.extend_from_slice(&block[..remaining.min(block.len())]);
+        block_index = block_index.wrapping_add(1);
+    }
+    value
 }
 
-#[derive(Clone, Copy, Debug)]
+pub fn transaction_value_bytes(
+    length: usize,
+    worker_id: usize,
+    operation_id: u64,
+    mutation_offset: usize,
+) -> Vec<u8> {
+    assert!(length >= 28);
+    let worker_identity = worker_id as u64;
+    let mutation_identity = mutation_offset as u64;
+    let mut value = value_bytes(
+        length,
+        operation_id ^ worker_identity.rotate_left(13),
+        mutation_offset ^ worker_id,
+    );
+    value[..4].copy_from_slice(b"DDBW");
+    value[4..12].copy_from_slice(&worker_identity.to_be_bytes());
+    value[12..20].copy_from_slice(&operation_id.to_be_bytes());
+    value[20..28].copy_from_slice(&mutation_identity.to_be_bytes());
+    value
+}
+
+pub fn transaction_value_identity(bytes: &[u8]) -> Option<(u64, u64, u64)> {
+    if bytes.len() < 28 || &bytes[..4] != b"DDBW" {
+        return None;
+    }
+    Some((
+        u64::from_be_bytes(bytes[4..12].try_into().ok()?),
+        u64::from_be_bytes(bytes[12..20].try_into().ok()?),
+        u64::from_be_bytes(bytes[20..28].try_into().ok()?),
+    ))
+}
+
+#[derive(Clone, Debug)]
 pub struct TraceHash {
     pub transactions: u64,
     pub state: u64,
+    pub checkpoints: Vec<(u64, u64)>,
 }
 
 impl TraceHash {
@@ -224,6 +312,7 @@ impl TraceHash {
         Self {
             transactions: 0,
             state: 0xcbf2_9ce4_8422_2325,
+            checkpoints: Vec::new(),
         }
     }
 
@@ -248,6 +337,32 @@ impl TraceHash {
             self.absorb(value);
         }
         self.absorb(&width.to_be_bytes());
+        self.record_checkpoint();
+    }
+
+    pub fn push_get(&mut self, key: &[u8]) {
+        self.transactions += 1;
+        self.absorb(b"get");
+        self.absorb(&(key.len() as u32).to_be_bytes());
+        self.absorb(key);
+        self.record_checkpoint();
+    }
+
+    pub fn push_query(&mut self, request: &QueryRequest, limit: usize) {
+        self.transactions += 1;
+        self.absorb(b"query");
+        self.absorb(&(request.primary_key.len() as u32).to_be_bytes());
+        self.absorb(&request.primary_key);
+        self.absorb(&(request.exclusive_after_sort_key.len() as u32).to_be_bytes());
+        self.absorb(&request.exclusive_after_sort_key);
+        self.absorb(&(limit as u64).to_be_bytes());
+        self.record_checkpoint();
+    }
+
+    fn record_checkpoint(&mut self) {
+        if self.transactions.is_multiple_of(TRACE_CHECKPOINT_INTERVAL) {
+            self.checkpoints.push((self.transactions, self.state));
+        }
     }
 }
 
@@ -300,5 +415,68 @@ impl LatencySamples {
         values.sort_unstable();
         let index = ((values.len().saturating_sub(1)) as f64 * fraction).round() as usize;
         values[index].as_secs_f64() * 1_000_000.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        Distribution, LATENCY_RESERVOIR_LIMIT, LatencySamples, WorkloadConfig, WorkloadGenerator,
+        transaction_value_bytes, transaction_value_identity,
+    };
+    use std::collections::HashSet;
+    use std::time::Duration;
+
+    #[test]
+    fn query_requests_cover_partitions_cursors_and_exact_seed_rows() {
+        let config = WorkloadConfig {
+            distribution: Distribution::Uniform,
+            working_set: 10_000,
+            key_size: 16,
+            value_size: 512,
+            width: 1,
+        };
+        let mut generator = WorkloadGenerator::new(config, 0x1234_5678, 7);
+        let mut partitions = HashSet::new();
+        let mut cursors = HashSet::new();
+        for _ in 0..256 {
+            let request = generator.next_query(16);
+            partitions.insert(request.primary_key.clone());
+            cursors.insert(request.exclusive_after_sort_key.clone());
+            assert_eq!(request.expected_rows.len(), 16);
+            let mut previous_key = [
+                request.primary_key.as_slice(),
+                request.exclusive_after_sort_key.as_slice(),
+            ]
+            .concat();
+            for row in request.expected_rows {
+                assert_eq!(&row.key[..8], request.primary_key.as_slice());
+                assert!(row.key.as_slice() > previous_key.as_slice());
+                assert_eq!(row.value.len(), 512);
+                previous_key = row.key;
+            }
+        }
+        assert!(partitions.len() > 1);
+        assert!(cursors.len() > 1);
+    }
+
+    #[test]
+    fn latency_reservoir_stays_within_the_shared_sample_budget() {
+        let mut samples = LatencySamples::with_seed(0xfeed_beef);
+        for sample_index in 0..(LATENCY_RESERVOIR_LIMIT * 4) {
+            samples.push(Duration::from_nanos(sample_index as u64));
+        }
+        assert_eq!(samples.values.len(), LATENCY_RESERVOIR_LIMIT);
+        assert_eq!(samples.seen, (LATENCY_RESERVOIR_LIMIT * 4) as u64);
+    }
+
+    #[test]
+    fn transaction_values_change_across_the_full_payload() {
+        let first = transaction_value_bytes(512, 2, 1, 0);
+        let next = transaction_value_bytes(512, 2, 2, 0);
+        assert_eq!(first.len(), 512);
+        assert_eq!(next.len(), 512);
+        assert_ne!(first, next);
+        assert_eq!(transaction_value_identity(&first), Some((2, 1, 0)));
     }
 }
