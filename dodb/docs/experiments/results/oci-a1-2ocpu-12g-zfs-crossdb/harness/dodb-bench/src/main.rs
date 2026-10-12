@@ -4,7 +4,7 @@
 mod common;
 
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use common::driver::{self, Args, Attempt, Engine, EngineFactory, ReadObservation};
 use common::workload::{Mutation, QueryRequest};
@@ -147,6 +147,8 @@ struct DodbEngine {
     file_path: PathBuf,
     wal_path: PathBuf,
     engine_name: String,
+    pending_seed_revisions: Mutex<Vec<u64>>,
+    seed_revisions: OnceLock<Vec<u64>>,
 }
 
 impl DodbEngine {
@@ -214,6 +216,8 @@ impl DodbEngine {
             file_path,
             wal_path,
             engine_name,
+            pending_seed_revisions: Mutex::new(Vec::new()),
+            seed_revisions: OnceLock::new(),
         }
     }
 
@@ -370,9 +374,30 @@ impl Engine for DodbEngine {
 
     fn seed(&self, writer: &mut Self::Writer, rows: &[Mutation]) {
         match self.transact(writer, rows) {
-            Ok(_) => {}
+            Ok(result) => self
+                .pending_seed_revisions
+                .lock()
+                .expect("seed revision builder should not be poisoned")
+                .push(
+                    result
+                        .revision
+                        .expect("seed transaction should return a commit revision")
+                        .get(),
+                ),
             Err(error) => panic!("dodb seed transaction failed: {error:?}"),
         }
+    }
+
+    fn finish_seeding(&self) {
+        let revisions = std::mem::take(
+            &mut *self
+                .pending_seed_revisions
+                .lock()
+                .expect("seed revision builder should not be poisoned"),
+        );
+        self.seed_revisions
+            .set(revisions)
+            .expect("seed revisions should be finalized once");
     }
 
     fn read(&self, writer: &mut Self::Writer, key: &[u8]) -> Option<Vec<u8>> {
@@ -386,6 +411,16 @@ impl Engine for DodbEngine {
 
     fn checks_revisions(&self) -> bool {
         true
+    }
+
+    fn seed_revision(&self, key: &[u8]) -> Option<u64> {
+        let mut index_bytes = [0u8; 8];
+        index_bytes.copy_from_slice(&key[key.len() - 8..]);
+        let row_index = u64::from_be_bytes(index_bytes);
+        self.seed_revisions
+            .get()?
+            .get((row_index / driver::SEED_CHUNK_ROWS as u64) as usize)
+            .copied()
     }
 
     fn query(

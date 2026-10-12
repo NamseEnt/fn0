@@ -177,6 +177,7 @@ pub trait Engine: Sync {
     fn open_writer(&self, writer_id: usize) -> Self::Writer;
     fn attempt(&self, writer: &mut Self::Writer, mutations: &[Mutation]) -> Attempt;
     fn seed(&self, writer: &mut Self::Writer, rows: &[Mutation]);
+    fn finish_seeding(&self) {}
     fn read(&self, writer: &mut Self::Writer, key: &[u8]) -> Option<Vec<u8>>;
     fn read_observation(&self, writer: &mut Self::Writer, key: &[u8]) -> Option<ReadObservation> {
         self.read(writer, key).map(|value| ReadObservation {
@@ -186,6 +187,9 @@ pub trait Engine: Sync {
     }
     fn checks_revisions(&self) -> bool {
         false
+    }
+    fn seed_revision(&self, _key: &[u8]) -> Option<u64> {
+        None
     }
     fn query(
         &self,
@@ -407,6 +411,7 @@ struct ReadEvent {
     key: Vec<u8>,
     value: Vec<u8>,
     revision: Option<u64>,
+    seed_revision: Option<u64>,
     started_at: Instant,
     finished_at: Instant,
 }
@@ -519,12 +524,7 @@ fn writer_thread<E: Engine>(
                                                 0,
                                             )
                                             && (!engine.checks_revisions()
-                                                || read_revision
-                                                    == Some(
-                                                        (key_index(&row.key)
-                                                            / SEED_CHUNK_ROWS as u64)
-                                                            + 1,
-                                                    ))
+                                                || read_revision == engine.seed_revision(&row.key))
                                     })
                                 }))
                     }
@@ -536,6 +536,7 @@ fn writer_thread<E: Engine>(
                             key: row.key.clone(),
                             value: row.value.clone(),
                             revision: read_revision,
+                            seed_revision: engine.seed_revision(&row.key),
                             started_at: started,
                             finished_at: finished,
                         };
@@ -1188,7 +1189,7 @@ fn validate_mixed_read_history(args: &Args, reports: &[WriterReport]) -> Value {
     let mut indeterminate = 0u64;
     for report in reports {
         for read in &report.read_events {
-            let seed_revision = (key_index(&read.key) / SEED_CHUNK_ROWS as u64) + 1;
+            let seed_revision = read.seed_revision.unwrap_or_default();
             let seed_value = super::workload::value_bytes(args.value_size, key_index(&read.key), 0);
             let mut latest_completed_revision = seed_revision;
             let mut latest_completed_event: Option<&WriteEvent> = None;
@@ -1348,6 +1349,7 @@ mod validation_tests {
             key: key.clone(),
             value: value_bytes(512, 17, 0),
             revision: Some(1),
+            seed_revision: Some(1),
             started_at: start,
             finished_at: start + Duration::from_micros(5),
         };
@@ -1364,6 +1366,7 @@ mod validation_tests {
             key,
             value: vec![0; 512],
             revision: Some(99),
+            seed_revision: Some(1),
             started_at: start,
             finished_at: start + Duration::from_micros(5),
         };
@@ -1390,6 +1393,7 @@ mod validation_tests {
             key,
             value,
             revision: Some(42),
+            seed_revision: Some(1),
             started_at: started + Duration::from_micros(5),
             finished_at: started + Duration::from_micros(8),
         };
@@ -1405,6 +1409,7 @@ mod validation_tests {
             key,
             value: value_bytes(512, 500, 0),
             revision: Some(500),
+            seed_revision: Some(1),
             started_at: start,
             finished_at: start + Duration::from_micros(5),
         };
@@ -1554,6 +1559,7 @@ fn run_bench<F: EngineFactory>(args: &Args) {
         for chunk in rows.chunks(SEED_CHUNK_ROWS) {
             engine.seed(&mut seeder, chunk);
         }
+        engine.finish_seeding();
         let seed_elapsed = seed_started.elapsed();
         json!({"effective": settings, "seed_rows": seeded_rows, "seed_elapsed_s": seed_elapsed.as_secs_f64()})
     };
@@ -1581,7 +1587,7 @@ fn run_bench<F: EngineFactory>(args: &Args) {
         "get"
             if F::engine_name(args) == "main-btree" || F::engine_name(args) == "planned-blink" =>
         {
-            "Every Get checks full bytes, length, and independently predicted seed revision"
+            "Every Get checks full bytes, length, and seed commit revision recorded independently of read results"
         }
         "get" => "Every Get checks full bytes and length; engine revisions unavailable",
         "query" => {
