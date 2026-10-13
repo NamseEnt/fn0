@@ -132,6 +132,6 @@ Next investigation: attribute RocksDB write latency to wait on the tenant revisi
 - `oci-runs/<condition>/<backend>/report.json`: complete counters, p50/p95/p99, per-tenant records, resource/timing data, validation.
 - `oci-runs/<condition>/<backend>/command.txt`, `stdout.log`, `exit-status.txt`, and binary hashes: exact invocation and run evidence.
 - `oci-runs/smoke/<backend>/`: OCI smoke records.
-- `local-smoke-*.json` and `local-schedule-tests.log`: local checks.
+- `local-smoke-*.json`, `local-schedule-tests.log`, and `local-commands.txt`: local smoke commands and checks.
 - `build-run/`: helper environment, compiler output, archive/build provenance and cache snapshots.
 - `host-and-source.txt`, `binary.sha256`, and `rocksdb-archive.sha256`: environment and executable/archive identity.

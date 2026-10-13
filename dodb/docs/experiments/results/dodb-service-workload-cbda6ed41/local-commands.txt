@@ -1,0 +1,15 @@
+Source SHA: cbda6ed41099c569b060884a71bd2f1d98c1df7b
+Local environment: macOS arm64, debug binary; local smoke only, not performance evidence.
+
+Focused schedule tests:
+DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 cargo test --locked --offline -p dodb-rocksdb --bin service_workload
+
+Local driver build:
+DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 cargo build --locked --offline -p dodb-rocksdb --bin service_workload
+
+Local B-link smoke:
+DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 target/debug/service_workload --backend blink --scenario smoke --data-dir /tmp/dodb-service-workload-fingerprint-local/blink-db --seed 20261013 --warmup-ms 0 --measurement-ms 10000 --clients 4 --rows 10000 --value-size 512 --call-cap 1000 --report /tmp/dodb-service-workload-fingerprint-local/blink.json
+
+Local RocksDB smoke:
+DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 target/debug/service_workload --backend rocksdb --scenario smoke --data-dir /tmp/dodb-service-workload-fingerprint-local/rocksdb-db --seed 20261013 --warmup-ms 0 --measurement-ms 10000 --clients 4 --rows 10000 --value-size 512 --call-cap 1000 --report /tmp/dodb-service-workload-fingerprint-local/rocksdb.json
+8328a8effe91f7736d5363abeb049c48958d3970f436089a8c164962343e321c  target/debug/service_workload
