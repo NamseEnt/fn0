@@ -1,0 +1,583 @@
+{
+  "api_boundary": "DodbService::execute with shared Request/Response and ExecutionBudget",
+  "backend": "rocksdb",
+  "compaction_observation": "not exposed by the service comparison driver",
+  "configuration": {
+    "blink": {
+      "coordinator_collection_delay_ms": 0,
+      "coordinator_group_bytes": 4194304,
+      "coordinator_group_requests": 64,
+      "coordinator_queue_capacity": 256,
+      "database_cache_capacity_pages": 128
+    },
+    "call_cap": 1000000,
+    "canonical_encoded_key_initial_dataset_min_max_bytes": {
+      "maximum": 36,
+      "minimum": 33
+    },
+    "canonical_encoded_key_sample_bytes": 33,
+    "clients": 16,
+    "combined_raw_pk_sk_bytes": 16,
+    "initial_rows_per_tenant": 10000,
+    "measurement_requested_ms": 5000,
+    "pk_raw_bytes": 8,
+    "query_limit": 16,
+    "rocksdb": {
+      "blocking_operation_limit": 8,
+      "transaction_revision_counter": "tenant serialized"
+    },
+    "sk_raw_bytes": 8,
+    "tenant_count": 1,
+    "tokio_runtime_worker_threads": 16,
+    "value_size_bytes": 512,
+    "warmup_requested_ms": 1000
+  },
+  "counters": {
+    "api_calls": 81110,
+    "client_input_prefixes": [
+      {
+        "admitted_workflows": 4972,
+        "client_index": 4,
+        "fingerprint": "ef6bf147a37d5561",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 5107,
+        "client_index": 12,
+        "fingerprint": "3d8a44431d0e0bb4",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 4917,
+        "client_index": 0,
+        "fingerprint": "008c776f7ae6cc3b",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 4952,
+        "client_index": 7,
+        "fingerprint": "3a5045c36c98dd35",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 5060,
+        "client_index": 14,
+        "fingerprint": "2f2eec9b2ccfbad0",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 4941,
+        "client_index": 2,
+        "fingerprint": "6ef73d157992623d",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 5066,
+        "client_index": 11,
+        "fingerprint": "c8b9ea0145b3e65a",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 5015,
+        "client_index": 13,
+        "fingerprint": "58ded1d2195869d9",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 5160,
+        "client_index": 10,
+        "fingerprint": "1d2bf4e041aaaf95",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 5031,
+        "client_index": 8,
+        "fingerprint": "6635f9f9d3eedf30",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 5019,
+        "client_index": 1,
+        "fingerprint": "21fd129495e47b7c",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 5241,
+        "client_index": 6,
+        "fingerprint": "d79fd21255a43b73",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 4994,
+        "client_index": 5,
+        "fingerprint": "b755cb90342dc402",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 5005,
+        "client_index": 15,
+        "fingerprint": "3c7e3073b34774e8",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 4956,
+        "client_index": 3,
+        "fingerprint": "15c1d14029db37bd",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 4950,
+        "client_index": 9,
+        "fingerprint": "0bdecdbb80f1d88e",
+        "prefix_limit": 100,
+        "profile": "rw95",
+        "workflow_count": 100
+      }
+    ],
+    "condition_kinds": {
+      "Exists": 1442,
+      "NotExists": 653,
+      "RevisionEquals": 724
+    },
+    "conditional_attempts": 2819,
+    "intentional_condition_rejections": 320,
+    "latency": {
+      "condition_rejection": {
+        "count": 320,
+        "p50_ms": 0.397243,
+        "p95_ms": 1.371452,
+        "p99_ms": 2.476741,
+        "sample_count": 320,
+        "sample_limit": 20000
+      },
+      "get": {
+        "count": 60923,
+        "p50_ms": 0.524804,
+        "p95_ms": 1.663094,
+        "p99_ms": 2.722664,
+        "sample_count": 20000,
+        "sample_limit": 20000
+      },
+      "preparatory_get": {
+        "count": 724,
+        "p50_ms": 0.688686,
+        "p95_ms": 1.656975,
+        "p99_ms": 2.438101,
+        "sample_count": 724,
+        "sample_limit": 20000
+      },
+      "query16": {
+        "count": 15423,
+        "p50_ms": 0.699886,
+        "p95_ms": 1.727455,
+        "p99_ms": 2.559542,
+        "sample_count": 15423,
+        "sample_limit": 20000
+      },
+      "workflow": {
+        "count": 80386,
+        "p50_ms": 0.517045,
+        "p95_ms": 2.739304,
+        "p99_ms": 11.138375,
+        "sample_count": 20000,
+        "sample_limit": 20000
+      },
+      "write_transaction_success": {
+        "count": 3720,
+        "p50_ms": 3.45071,
+        "p95_ms": 13.941559,
+        "p99_ms": 29.996498,
+        "sample_count": 3720,
+        "sample_limit": 20000
+      }
+    },
+    "natural_conflicts": 0,
+    "ordinary_gets": 60923,
+    "other_errors": 0,
+    "overloads": 0,
+    "preparatory_gets": 724,
+    "query16_calls": 15423,
+    "query_rows_returned": 76174,
+    "read_calls": 77070,
+    "read_fraction": 0.9501910985081987,
+    "request_limit_reached": false,
+    "successful_mutations": 9656,
+    "successful_write_transactions": 3720,
+    "verification_errors": [],
+    "write_categories": {
+      "conditional_width_1": {
+        "attempts": 1215,
+        "successes": 1055
+      },
+      "conditional_width_4": {
+        "attempts": 1203,
+        "successes": 1043
+      },
+      "conditional_width_8": {
+        "attempts": 401,
+        "successes": 401
+      },
+      "delete": {
+        "attempts": 400,
+        "successes": 400
+      },
+      "put": {
+        "attempts": 821,
+        "successes": 821
+      }
+    },
+    "write_fraction": 0.049808901491801255,
+    "write_ledger_entries": 3720,
+    "write_ledger_limit": 1000000,
+    "write_requests": 4040
+  },
+  "disk_usage_bytes": {
+    "after_reopen_validation": 23829042,
+    "before_shutdown": 12109436
+  },
+  "disk_usage_scope": "all regular files under this run's isolated data directory after measurement and before shutdown",
+  "per_tenant": {
+    "tenant_1": {
+      "counters": {
+        "api_calls": 81110,
+        "client_input_prefixes": [
+          {
+            "admitted_workflows": 4972,
+            "client_index": 4,
+            "fingerprint": "ef6bf147a37d5561",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 5107,
+            "client_index": 12,
+            "fingerprint": "3d8a44431d0e0bb4",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 4917,
+            "client_index": 0,
+            "fingerprint": "008c776f7ae6cc3b",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 4952,
+            "client_index": 7,
+            "fingerprint": "3a5045c36c98dd35",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 5060,
+            "client_index": 14,
+            "fingerprint": "2f2eec9b2ccfbad0",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 4941,
+            "client_index": 2,
+            "fingerprint": "6ef73d157992623d",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 5066,
+            "client_index": 11,
+            "fingerprint": "c8b9ea0145b3e65a",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 5015,
+            "client_index": 13,
+            "fingerprint": "58ded1d2195869d9",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 5160,
+            "client_index": 10,
+            "fingerprint": "1d2bf4e041aaaf95",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 5031,
+            "client_index": 8,
+            "fingerprint": "6635f9f9d3eedf30",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 5019,
+            "client_index": 1,
+            "fingerprint": "21fd129495e47b7c",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 5241,
+            "client_index": 6,
+            "fingerprint": "d79fd21255a43b73",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 4994,
+            "client_index": 5,
+            "fingerprint": "b755cb90342dc402",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 5005,
+            "client_index": 15,
+            "fingerprint": "3c7e3073b34774e8",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 4956,
+            "client_index": 3,
+            "fingerprint": "15c1d14029db37bd",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 4950,
+            "client_index": 9,
+            "fingerprint": "0bdecdbb80f1d88e",
+            "prefix_limit": 100,
+            "profile": "rw95",
+            "workflow_count": 100
+          }
+        ],
+        "condition_kinds": {
+          "Exists": 1442,
+          "NotExists": 653,
+          "RevisionEquals": 724
+        },
+        "conditional_attempts": 2819,
+        "intentional_condition_rejections": 320,
+        "latency": {
+          "condition_rejection": {
+            "count": 320,
+            "p50_ms": 0.397243,
+            "p95_ms": 1.371452,
+            "p99_ms": 2.476741,
+            "sample_count": 320,
+            "sample_limit": 20000
+          },
+          "get": {
+            "count": 60923,
+            "p50_ms": 0.524804,
+            "p95_ms": 1.663094,
+            "p99_ms": 2.722664,
+            "sample_count": 20000,
+            "sample_limit": 20000
+          },
+          "preparatory_get": {
+            "count": 724,
+            "p50_ms": 0.688686,
+            "p95_ms": 1.656975,
+            "p99_ms": 2.438101,
+            "sample_count": 724,
+            "sample_limit": 20000
+          },
+          "query16": {
+            "count": 15423,
+            "p50_ms": 0.699886,
+            "p95_ms": 1.727455,
+            "p99_ms": 2.559542,
+            "sample_count": 15423,
+            "sample_limit": 20000
+          },
+          "workflow": {
+            "count": 80386,
+            "p50_ms": 0.517045,
+            "p95_ms": 2.739304,
+            "p99_ms": 11.138375,
+            "sample_count": 20000,
+            "sample_limit": 20000
+          },
+          "write_transaction_success": {
+            "count": 3720,
+            "p50_ms": 3.45071,
+            "p95_ms": 13.941559,
+            "p99_ms": 29.996498,
+            "sample_count": 3720,
+            "sample_limit": 20000
+          }
+        },
+        "natural_conflicts": 0,
+        "ordinary_gets": 60923,
+        "other_errors": 0,
+        "overloads": 0,
+        "preparatory_gets": 724,
+        "query16_calls": 15423,
+        "query_rows_returned": 76174,
+        "read_calls": 77070,
+        "read_fraction": 0.9501910985081987,
+        "request_limit_reached": false,
+        "successful_mutations": 9656,
+        "successful_write_transactions": 3720,
+        "verification_errors": [],
+        "write_categories": {
+          "conditional_width_1": {
+            "attempts": 1215,
+            "successes": 1055
+          },
+          "conditional_width_4": {
+            "attempts": 1203,
+            "successes": 1043
+          },
+          "conditional_width_8": {
+            "attempts": 401,
+            "successes": 401
+          },
+          "delete": {
+            "attempts": 400,
+            "successes": 400
+          },
+          "put": {
+            "attempts": 821,
+            "successes": 821
+          }
+        },
+        "write_fraction": 0.049808901491801255,
+        "write_ledger_entries": 3720,
+        "write_ledger_limit": 1000000,
+        "write_requests": 4040
+      },
+      "profile": "rw95",
+      "schedule_fingerprint": "09a189d4792bd0de",
+      "throughput_per_second": {
+        "api_calls": 16205.335978468796,
+        "read_calls": 15398.1659950757,
+        "successful_mutations": 1929.216178129635,
+        "successful_write_transactions": 743.2357272827509
+      }
+    }
+  },
+  "process_metrics": {
+    "after": {
+      "complete": true,
+      "cpu_ticks_total": 567,
+      "rss_kb": 32376,
+      "sample_source": "/proc/self/status and /proc/self/stat"
+    },
+    "before": {
+      "complete": true,
+      "cpu_ticks_total": 105,
+      "rss_kb": 22892,
+      "sample_source": "/proc/self/status and /proc/self/stat"
+    },
+    "cpu_percent_of_one_core": 92.30508225930937,
+    "cpu_percent_of_online_machine": 46.152541129654686,
+    "cpu_seconds": 4.62,
+    "cpu_ticks_delta": 462,
+    "online_processors": 2,
+    "peak_sampled_rss_kb": 31976,
+    "rss_sample_count": 24,
+    "sampling_completeness": "complete",
+    "sampling_interval_ms": 200
+  },
+  "reopen_validation": {
+    "tenant_1": {
+      "actual_rows": 21121,
+      "commit_identity_entries": 4545,
+      "commit_identity_unique": true,
+      "expected_rows": 21121,
+      "mismatch_samples": [],
+      "missing_rows": 0,
+      "passed": true,
+      "replay_order": "commit identity for write history; ordered expected stream for Scan comparison",
+      "scan_materialization_bound": "one response page plus bounded write ledger and mismatch sample",
+      "scan_page_limit": 64
+    }
+  },
+  "scenario": "rw95",
+  "schema": "dodb-service-workload-v1",
+  "seed": 20261013,
+  "sync_count_and_group_metrics": "unavailable from existing service interfaces",
+  "throughput_per_second": {
+    "api_calls": 16205.335978468796,
+    "read_calls": 15398.1659950757,
+    "successful_mutations": 1929.216178129635,
+    "successful_write_transactions": 743.2357272827509
+  },
+  "timing": {
+    "admission_ms": 5002.081337,
+    "completed_api_calls": 81110,
+    "drain_ms": 3.060186,
+    "measurement_deadline_to_last_completion_ms": 3.060186,
+    "seed_setup_ms_excluded": 401.526604,
+    "throughput_denominator_seconds": 5.005141523,
+    "total_elapsed_ms": 5005.141523,
+    "warmup_count_by_tenant": [
+      18553
+    ]
+  },
+  "validation": {
+    "tenant_1": {
+      "actual_rows": 21121,
+      "commit_identity_entries": 4545,
+      "commit_identity_unique": true,
+      "expected_rows": 21121,
+      "mismatch_samples": [],
+      "missing_rows": 0,
+      "passed": true,
+      "replay_order": "commit identity for write history; ordered expected stream for Scan comparison",
+      "scan_materialization_bound": "one response page plus bounded write ledger and mismatch sample",
+      "scan_page_limit": 64
+    }
+  }
+}

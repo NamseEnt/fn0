@@ -1,0 +1,5 @@
+api_calls=4000
+successful_write_transactions=1441
+intentional_condition_rejections=109
+all_validation_passed=true
+rss_sampling=complete

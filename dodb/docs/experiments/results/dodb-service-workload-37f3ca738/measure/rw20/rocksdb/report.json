@@ -1,0 +1,317 @@
+{
+  "api_boundary": "DodbService::execute with shared Request/Response and ExecutionBudget",
+  "backend": "rocksdb",
+  "compaction_observation": "not exposed by the service comparison driver",
+  "configuration": {
+    "blink": {
+      "coordinator_collection_delay_ms": 0,
+      "coordinator_group_bytes": 4194304,
+      "coordinator_group_requests": 64,
+      "coordinator_queue_capacity": 256,
+      "database_cache_capacity_pages": 128
+    },
+    "call_cap": 1000000,
+    "canonical_encoded_key_initial_dataset_min_max_bytes": {
+      "maximum": 36,
+      "minimum": 33
+    },
+    "canonical_encoded_key_sample_bytes": 33,
+    "clients": 16,
+    "combined_raw_pk_sk_bytes": 16,
+    "initial_rows_per_tenant": 10000,
+    "measurement_requested_ms": 5000,
+    "pk_raw_bytes": 8,
+    "query_limit": 16,
+    "rocksdb": {
+      "blocking_operation_limit": 8,
+      "transaction_revision_counter": "tenant serialized"
+    },
+    "sk_raw_bytes": 8,
+    "tenant_count": 1,
+    "tokio_runtime_worker_threads": 16,
+    "value_size_bytes": 512,
+    "warmup_requested_ms": 1000
+  },
+  "counters": {
+    "api_calls": 7006,
+    "condition_kinds": {
+      "Exists": 1842,
+      "NotExists": 1048,
+      "RevisionEquals": 1006
+    },
+    "conditional_attempts": 3896,
+    "intentional_condition_rejections": 501,
+    "latency": {
+      "condition_rejection": {
+        "count": 501,
+        "p50_ms": 4.860082,
+        "p95_ms": 7.083301,
+        "p99_ms": 7.968629,
+        "sample_count": 501,
+        "sample_limit": 20000
+      },
+      "get": {
+        "count": 97,
+        "p50_ms": 9.720643,
+        "p95_ms": 13.358115,
+        "p99_ms": 29.572534,
+        "sample_count": 97,
+        "sample_limit": 20000
+      },
+      "preparatory_get": {
+        "count": 1006,
+        "p50_ms": 9.467762,
+        "p95_ms": 13.250193,
+        "p99_ms": 15.17169,
+        "sample_count": 1006,
+        "sample_limit": 20000
+      },
+      "query16": {
+        "count": 251,
+        "p50_ms": 9.933525,
+        "p95_ms": 13.725118,
+        "p99_ms": 15.565613,
+        "sample_count": 251,
+        "sample_limit": 20000
+      },
+      "workflow": {
+        "count": 6000,
+        "p50_ms": 11.086495,
+        "p95_ms": 27.613157,
+        "p99_ms": 41.301994,
+        "sample_count": 6000,
+        "sample_limit": 20000
+      },
+      "write_transaction_success": {
+        "count": 5151,
+        "p50_ms": 10.330208,
+        "p95_ms": 26.643989,
+        "p99_ms": 41.807358,
+        "sample_count": 5151,
+        "sample_limit": 20000
+      }
+    },
+    "natural_conflicts": 0,
+    "ordinary_gets": 97,
+    "other_errors": 0,
+    "overloads": 0,
+    "preparatory_gets": 1006,
+    "query16_calls": 251,
+    "query_rows_returned": 1236,
+    "read_calls": 1354,
+    "read_fraction": 0.1932629174992863,
+    "request_limit_reached": false,
+    "successful_mutations": 14207,
+    "successful_write_transactions": 5151,
+    "verification_errors": [],
+    "write_categories": {
+      "conditional_width_1": {
+        "attempts": 1492,
+        "successes": 1271
+      },
+      "conditional_width_4": {
+        "attempts": 1652,
+        "successes": 1453
+      },
+      "conditional_width_8": {
+        "attempts": 752,
+        "successes": 671
+      },
+      "delete": {
+        "attempts": 553,
+        "successes": 553
+      },
+      "put": {
+        "attempts": 1203,
+        "successes": 1203
+      }
+    },
+    "write_fraction": 0.8067370825007136,
+    "write_ledger_entries": 5151,
+    "write_ledger_limit": 1000000,
+    "write_requests": 5652
+  },
+  "disk_usage_bytes": {
+    "after_reopen_validation": 29566075,
+    "before_shutdown": 15029418
+  },
+  "disk_usage_scope": "all regular files under this run's isolated data directory after measurement and before shutdown",
+  "per_tenant": {
+    "tenant_1": {
+      "counters": {
+        "api_calls": 7006,
+        "condition_kinds": {
+          "Exists": 1842,
+          "NotExists": 1048,
+          "RevisionEquals": 1006
+        },
+        "conditional_attempts": 3896,
+        "intentional_condition_rejections": 501,
+        "latency": {
+          "condition_rejection": {
+            "count": 501,
+            "p50_ms": 4.860082,
+            "p95_ms": 7.083301,
+            "p99_ms": 7.968629,
+            "sample_count": 501,
+            "sample_limit": 20000
+          },
+          "get": {
+            "count": 97,
+            "p50_ms": 9.720643,
+            "p95_ms": 13.358115,
+            "p99_ms": 29.572534,
+            "sample_count": 97,
+            "sample_limit": 20000
+          },
+          "preparatory_get": {
+            "count": 1006,
+            "p50_ms": 9.467762,
+            "p95_ms": 13.250193,
+            "p99_ms": 15.17169,
+            "sample_count": 1006,
+            "sample_limit": 20000
+          },
+          "query16": {
+            "count": 251,
+            "p50_ms": 9.933525,
+            "p95_ms": 13.725118,
+            "p99_ms": 15.565613,
+            "sample_count": 251,
+            "sample_limit": 20000
+          },
+          "workflow": {
+            "count": 6000,
+            "p50_ms": 11.086495,
+            "p95_ms": 27.613157,
+            "p99_ms": 41.301994,
+            "sample_count": 6000,
+            "sample_limit": 20000
+          },
+          "write_transaction_success": {
+            "count": 5151,
+            "p50_ms": 10.330208,
+            "p95_ms": 26.643989,
+            "p99_ms": 41.807358,
+            "sample_count": 5151,
+            "sample_limit": 20000
+          }
+        },
+        "natural_conflicts": 0,
+        "ordinary_gets": 97,
+        "other_errors": 0,
+        "overloads": 0,
+        "preparatory_gets": 1006,
+        "query16_calls": 251,
+        "query_rows_returned": 1236,
+        "read_calls": 1354,
+        "read_fraction": 0.1932629174992863,
+        "request_limit_reached": false,
+        "successful_mutations": 14207,
+        "successful_write_transactions": 5151,
+        "verification_errors": [],
+        "write_categories": {
+          "conditional_width_1": {
+            "attempts": 1492,
+            "successes": 1271
+          },
+          "conditional_width_4": {
+            "attempts": 1652,
+            "successes": 1453
+          },
+          "conditional_width_8": {
+            "attempts": 752,
+            "successes": 671
+          },
+          "delete": {
+            "attempts": 553,
+            "successes": 553
+          },
+          "put": {
+            "attempts": 1203,
+            "successes": 1203
+          }
+        },
+        "write_fraction": 0.8067370825007136,
+        "write_ledger_entries": 5151,
+        "write_ledger_limit": 1000000,
+        "write_requests": 5652
+      },
+      "profile": "rw20",
+      "schedule_fingerprint": "902895fc149e7bc6",
+      "throughput_per_second": {
+        "api_calls": 1397.1042018204005,
+        "read_calls": 270.00843409432235,
+        "successful_mutations": 2833.094404119673,
+        "successful_write_transactions": 1027.1886588034374
+      }
+    }
+  },
+  "process_metrics": {
+    "after": {
+      "complete": true,
+      "cpu_ticks_total": 182,
+      "rss_kb": 28360,
+      "sample_source": "/proc/self/status and /proc/self/stat"
+    },
+    "before": {
+      "complete": true,
+      "cpu_ticks_total": 40,
+      "rss_kb": 19336,
+      "sample_source": "/proc/self/status and /proc/self/stat"
+    },
+    "cpu_percent_of_one_core": 28.31698496410175,
+    "cpu_percent_of_online_machine": 14.158492482050875,
+    "cpu_seconds": 1.42,
+    "cpu_ticks_delta": 142,
+    "online_processors": 2,
+    "peak_sampled_rss_kb": 28084,
+    "rss_sample_count": 24,
+    "sampling_completeness": "complete",
+    "sampling_interval_ms": 200
+  },
+  "reopen_validation": {
+    "tenant_1": {
+      "actual_rows": 26240,
+      "commit_identities_monotonic_after_sort": true,
+      "commit_identity_entries": 6159,
+      "expected_rows": 26240,
+      "mismatch_samples": [],
+      "missing_rows": 0,
+      "passed": true
+    }
+  },
+  "scenario": "rw20",
+  "schema": "dodb-service-workload-v1",
+  "seed": 20261013,
+  "sync_count_and_group_metrics": "unavailable from existing service interfaces",
+  "throughput_per_second": {
+    "api_calls": 1397.1042018204005,
+    "read_calls": 270.00843409432235,
+    "successful_mutations": 2833.094404119673,
+    "successful_write_transactions": 1027.1886588034374
+  },
+  "timing": {
+    "admission_ms": 5002.939429999999,
+    "completed_api_calls": 7006,
+    "drain_ms": 11.71874,
+    "measurement_deadline_to_last_completion_ms": 11.71874,
+    "seed_setup_ms_excluded": 375.61206200000004,
+    "throughput_denominator_seconds": 5.01465817,
+    "total_elapsed_ms": 5014.65817,
+    "warmup_count_by_tenant": [
+      1347
+    ]
+  },
+  "validation": {
+    "tenant_1": {
+      "actual_rows": 26240,
+      "commit_identities_monotonic_after_sort": true,
+      "commit_identity_entries": 6159,
+      "expected_rows": 26240,
+      "mismatch_samples": [],
+      "missing_rows": 0,
+      "passed": true
+    }
+  }
+}

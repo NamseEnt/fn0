@@ -1,0 +1,12 @@
+   Compiling bitflags v2.13.1
+   Compiling dodb-core v0.1.0 (/bench/zfs/db/product-build/dodb-service-workload/dodb/crates/dodb-core)
+   Compiling tower-http v0.6.8
+   Compiling dodb-service v0.1.0 (/bench/zfs/db/product-build/dodb-service-workload/dodb/crates/dodb-service)
+   Compiling dodb-protocol v0.1.0 (/bench/zfs/db/product-build/dodb-service-workload/dodb/crates/dodb-protocol)
+   Compiling dodb-storage v0.1.0 (/bench/zfs/db/product-build/dodb-service-workload/dodb/crates/dodb-storage)
+   Compiling reqwest v0.12.28
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/product-build/dodb-service-workload/dodb/crates/dodb-rocksdb)
+   Compiling opentelemetry-http v0.31.0
+   Compiling opentelemetry-otlp v0.31.1
+   Compiling dodb-server v0.1.0 (/bench/zfs/db/product-build/dodb-service-workload/dodb/crates/dodb-server)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 40s
