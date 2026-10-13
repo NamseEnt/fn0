@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{CStr, c_char, c_void};
 use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
 use dodb_core::{
@@ -16,7 +17,7 @@ use dodb_service::{
     DodbService, ExecutionBudget, Request, Response, ServiceFuture, ShutdownFuture,
     TransactionOutcome,
 };
-use tokio::sync::{OnceCell, RwLock, Semaphore};
+use tokio::sync::{Notify, OnceCell, Semaphore};
 
 const USER_KEY_PREFIX: u8 = 1;
 const METADATA_COUNTER_KEY: &[u8] = &[0, 1];
@@ -90,7 +91,8 @@ pub struct RocksDbService {
     data_dir: PathBuf,
     databases: DashMap<TenantId, Arc<OnceCell<Arc<TenantDatabase>>>>,
     blocking_operations: Arc<Semaphore>,
-    lifecycle: RwLock<()>,
+    blocking_operation_limit: usize,
+    lifecycle: LifecycleCoordinator,
     #[cfg(test)]
     blocking_operation_hook: std::sync::Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
 }
@@ -115,6 +117,26 @@ struct TenantReadIterator {
     _database: Arc<RocksDbHandle>,
 }
 
+struct LifecycleCoordinator {
+    state: Mutex<LifecycleState>,
+    active_requests: AtomicUsize,
+    changed: Notify,
+    #[cfg(test)]
+    shutdown_hook: Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
+}
+
+struct LifecycleState {
+    shutting_down: bool,
+}
+
+struct RequestLease<'service> {
+    lifecycle: &'service LifecycleCoordinator,
+}
+
+struct ShutdownLease<'service> {
+    lifecycle: &'service LifecycleCoordinator,
+}
+
 impl RocksDbService {
     pub fn new(config: RocksDbServiceConfig) -> Result<Self, Error> {
         if config.max_blocking_operations == 0 {
@@ -127,28 +149,29 @@ impl RocksDbService {
             data_dir: config.data_dir,
             databases: DashMap::new(),
             blocking_operations: Arc::new(Semaphore::new(config.max_blocking_operations)),
-            lifecycle: RwLock::new(()),
+            blocking_operation_limit: config.max_blocking_operations,
+            lifecycle: LifecycleCoordinator::new(),
             #[cfg(test)]
             blocking_operation_hook: std::sync::Mutex::new(None),
         })
     }
 
     pub async fn shutdown(&self) {
-        let _lifecycle = self.lifecycle.write().await;
+        let _shutdown_lease = self.lifecycle.begin_shutdown().await;
+        let mut blocking_permits = Vec::with_capacity(self.blocking_operation_limit);
+        for _ in 0..self.blocking_operation_limit {
+            if let Ok(permit) = Arc::clone(&self.blocking_operations).acquire_owned().await {
+                blocking_permits.push(permit);
+            }
+        }
         let cells = self
             .databases
             .iter()
             .map(|entry| Arc::clone(entry.value()))
             .collect::<Vec<_>>();
         self.databases.clear();
-        for cell in cells {
-            let _ = self
-                .run_blocking(move || {
-                    drop(cell);
-                    Ok(())
-                })
-                .await;
-        }
+        let _ = tokio::task::spawn_blocking(move || drop(cells)).await;
+        drop(blocking_permits);
     }
 
     pub fn tenant_path(&self, tenant: TenantId) -> PathBuf {
@@ -220,7 +243,7 @@ impl RocksDbService {
         request: Request,
         budget: ExecutionBudget,
     ) -> Result<Response, Error> {
-        let _lifecycle = self.lifecycle.read().await;
+        let _request_lease = self.lifecycle.begin_request().await;
         match request {
             Request::Get { key } => {
                 let state = match self.database(tenant, false).await? {
@@ -326,6 +349,110 @@ impl RocksDbService {
                 Ok(Response::Scan(rows))
             }
         }
+    }
+}
+
+impl LifecycleCoordinator {
+    fn new() -> Self {
+        Self {
+            state: Mutex::new(LifecycleState {
+                shutting_down: false,
+            }),
+            active_requests: AtomicUsize::new(0),
+            changed: Notify::new(),
+            #[cfg(test)]
+            shutdown_hook: Mutex::new(None),
+        }
+    }
+
+    async fn begin_request(&self) -> RequestLease<'_> {
+        loop {
+            let notified = self.changed.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            let accepted = {
+                let state = self
+                    .state
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                if state.shutting_down {
+                    false
+                } else {
+                    self.active_requests.fetch_add(1, Ordering::AcqRel);
+                    true
+                }
+            };
+            if accepted {
+                return RequestLease { lifecycle: self };
+            }
+            notified.await;
+        }
+    }
+
+    async fn begin_shutdown(&self) -> ShutdownLease<'_> {
+        loop {
+            let notified = self.changed.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            let started = {
+                let mut state = self
+                    .state
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                if state.shutting_down {
+                    false
+                } else {
+                    state.shutting_down = true;
+                    true
+                }
+            };
+            if started {
+                break;
+            }
+            notified.await;
+        }
+
+        loop {
+            let notified = self.changed.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            if self.active_requests.load(Ordering::Acquire) == 0 {
+                break;
+            }
+            notified.await;
+        }
+        #[cfg(test)]
+        if let Some(shutdown_hook) = self
+            .shutdown_hook
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+        {
+            shutdown_hook();
+        }
+        ShutdownLease { lifecycle: self }
+    }
+}
+
+impl Drop for RequestLease<'_> {
+    fn drop(&mut self) {
+        self.lifecycle
+            .active_requests
+            .fetch_sub(1, Ordering::AcqRel);
+        self.lifecycle.changed.notify_waiters();
+    }
+}
+
+impl Drop for ShutdownLease<'_> {
+    fn drop(&mut self) {
+        let mut state = self
+            .lifecycle
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        state.shutting_down = false;
+        drop(state);
+        self.lifecycle.changed.notify_waiters();
     }
 }
 
@@ -1079,6 +1206,89 @@ mod tests {
                     },
                     ExecutionBudget::new(1024),
                 )
+                .await
+                .unwrap(),
+            Response::Get(RevisionState::present(b"alive".to_vec(), Revision::new(1)))
+        );
+        service.shutdown().await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn shutdown_drains_a_blocking_operation_after_its_request_is_cancelled() {
+        let directory = temporary_db_directory();
+        let service =
+            Arc::new(RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap());
+        let tenant = TenantId::new(42);
+        let key = DocumentKey::new(b"cancelled-request".to_vec(), b"key".to_vec());
+        service
+            .execute(
+                tenant,
+                Request::Put {
+                    key: key.clone(),
+                    value: b"alive".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap();
+
+        let (operation_started_sender, operation_started_receiver) = mpsc::channel();
+        let (continue_operation_sender, continue_operation_receiver) = mpsc::channel();
+        let continue_operation_receiver = std::sync::Mutex::new(continue_operation_receiver);
+        let operation_index = Arc::new(AtomicUsize::new(0));
+        *service.blocking_operation_hook.lock().unwrap() = Some(Arc::new(move || {
+            if operation_index.fetch_add(1, Ordering::SeqCst) == 1 {
+                operation_started_sender.send(()).unwrap();
+                continue_operation_receiver
+                    .lock()
+                    .unwrap()
+                    .recv_timeout(Duration::from_secs(10))
+                    .expect("request continuation timed out");
+            }
+        }));
+
+        let request_service = Arc::clone(&service);
+        let request_key = key.clone();
+        let request = tokio::spawn(async move {
+            request_service
+                .execute(
+                    tenant,
+                    Request::Get { key: request_key },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+        });
+        tokio::task::spawn_blocking(move || {
+            operation_started_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("RocksDB Get did not reach its blocking operation");
+        })
+        .await
+        .unwrap();
+        request.abort();
+        assert!(request.await.unwrap_err().is_cancelled());
+
+        let (shutdown_started_sender, shutdown_started_receiver) = mpsc::channel();
+        *service.lifecycle.shutdown_hook.lock().unwrap() = Some(Arc::new(move || {
+            shutdown_started_sender.send(()).unwrap();
+        }));
+        let shutdown_service = Arc::clone(&service);
+        let shutdown = tokio::spawn(async move { shutdown_service.shutdown().await });
+        tokio::task::spawn_blocking(move || {
+            shutdown_started_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("shutdown did not close request admission");
+        })
+        .await
+        .unwrap();
+        continue_operation_sender.send(()).unwrap();
+        shutdown.await.unwrap();
+        *service.blocking_operation_hook.lock().unwrap() = None;
+        *service.lifecycle.shutdown_hook.lock().unwrap() = None;
+
+        assert_eq!(
+            service
+                .execute(tenant, Request::Get { key }, ExecutionBudget::new(1024),)
                 .await
                 .unwrap(),
             Response::Get(RevisionState::present(b"alive".to_vec(), Revision::new(1)))
