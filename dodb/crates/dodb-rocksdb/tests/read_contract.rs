@@ -11,6 +11,13 @@ use tempfile::TempDir;
 
 const MAXIMUM_BUDGET: ExecutionBudget = ExecutionBudget::new(2 * 1024 * 1024);
 
+fn temporary_db_directory() -> TempDir {
+    match std::env::var_os("DODB_TEST_DATA_DIR") {
+        Some(path) => TempDir::new_in(path).unwrap(),
+        None => TempDir::new().unwrap(),
+    }
+}
+
 fn key(pk: &[u8], sk: &[u8]) -> DocumentKey {
     DocumentKey::new(pk.to_vec(), sk.to_vec())
 }
@@ -516,9 +523,9 @@ async fn check_read_contract<S: DodbService>(service: &S) {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn btree_blink_and_rocksdb_share_the_same_read_contract() {
-    let native_directory = TempDir::new().unwrap();
-    let blink_directory = TempDir::new().unwrap();
-    let rocks_directory = TempDir::new().unwrap();
+    let native_directory = temporary_db_directory();
+    let blink_directory = temporary_db_directory();
+    let rocks_directory = temporary_db_directory();
     let native = LocalTenantService::new(LocalTenantServiceConfig {
         data_dir: PathBuf::from(native_directory.path()),
         ..LocalTenantServiceConfig::default()
@@ -542,7 +549,7 @@ async fn btree_blink_and_rocksdb_share_the_same_read_contract() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn rocksdb_query_and_scan_survive_shutdown_and_reopen() {
-    let directory = TempDir::new().unwrap();
+    let directory = temporary_db_directory();
     let config = RocksDbServiceConfig::new(directory.path());
     let service = RocksDbService::new(config.clone()).unwrap();
     let expected_keys = [key(b"reopen", &[0]), key(b"reopen", &[255])];
