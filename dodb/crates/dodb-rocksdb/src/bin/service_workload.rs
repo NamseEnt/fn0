@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -9,7 +9,7 @@ use dodb_core::{
     TransactionMutation, TransactionRequest,
 };
 use dodb_server::{BlinkTenantService, LocalTenantServiceConfig};
-use dodb_service::{Document, DodbService, ExecutionBudget, Request, Response};
+use dodb_service::{DodbService, ExecutionBudget, Request, Response};
 use dodb_storage::{CoordinatorConfig, DatabaseConfig};
 use serde_json::{Value, json};
 use tokio::task::JoinSet;
@@ -1067,41 +1067,63 @@ async fn verify_tenant(
     options: &Options,
     counters: &Mutex<Counters>,
 ) -> Value {
-    let expected_rows = options.initial_rows as i64;
-    let ledger = counters.lock().unwrap().write_ledger.clone();
-    let mut sorted_ledger = ledger.clone();
+    let mut sorted_ledger = counters.lock().unwrap().write_ledger.clone();
     sorted_ledger.sort_by_key(|entry| entry.commit_identity);
-    let mut expected = BTreeMap::<DocumentKey, Vec<u8>>::new();
-    for ordinal in 0..options.initial_rows {
-        expected.insert(
-            key_from_ordinal(ordinal as u64),
-            initial_value(options.value_size, tenant_index, ordinal),
-        );
-    }
+    let commit_identity_unique = sorted_ledger
+        .windows(2)
+        .all(|pair| pair[0].commit_identity != pair[1].commit_identity);
+    let mut deleted_seed_ordinals = BTreeSet::new();
     for entry in &sorted_ledger {
+        if entry.kind == WriteKind::Delete && entry.workflow_id % 2 == 0 {
+            deleted_seed_ordinals.insert(entry.workflow_id % 500);
+        }
+    }
+    let put_mutation_count = sorted_ledger
+        .iter()
+        .filter(|entry| entry.kind != WriteKind::Delete)
+        .map(|entry| match entry.kind {
+            WriteKind::Put | WriteKind::Delete | WriteKind::ConditionalOne => 1,
+            WriteKind::TransactionFour => 4,
+            WriteKind::TransactionEight => 8,
+        })
+        .sum::<usize>();
+    let expected_row_count =
+        options.initial_rows - deleted_seed_ordinals.len() + put_mutation_count;
+    let seed_rows = (0..options.initial_rows)
+        .filter(|ordinal| !deleted_seed_ordinals.contains(&(*ordinal as u64)))
+        .map(|ordinal| {
+            (
+                key_from_ordinal(ordinal as u64),
+                initial_value(options.value_size, tenant_index, ordinal),
+            )
+        });
+    sorted_ledger.sort_by_key(|entry| entry.workflow_id);
+    let dynamic_rows = sorted_ledger.into_iter().flat_map(|entry| {
         let width = match entry.kind {
             WriteKind::Put | WriteKind::Delete | WriteKind::ConditionalOne => 1,
             WriteKind::TransactionFour => 4,
             WriteKind::TransactionEight => 8,
         };
-        for mutation_index in 0..width {
-            let key = mutation_key(tenant_index, entry.workflow_id, mutation_index, entry.kind);
+        (0..width).filter_map(move |mutation_index| {
             if entry.kind == WriteKind::Delete {
-                expected.remove(&key);
-            } else {
-                expected.insert(
-                    key,
-                    generated_value(
-                        options.value_size,
-                        options.seed,
-                        entry.workflow_id,
-                        mutation_index,
-                    ),
-                );
+                return None;
             }
-        }
-    }
-    let mut actual = Vec::<Document>::new();
+            let key = mutation_key(tenant_index, entry.workflow_id, mutation_index, entry.kind);
+            Some((
+                key,
+                generated_value(
+                    options.value_size,
+                    options.seed,
+                    entry.workflow_id,
+                    mutation_index,
+                ),
+            ))
+        })
+    });
+    let mut expected = seed_rows.chain(dynamic_rows).peekable();
+    let mut actual_rows = 0_usize;
+    let mut missing_rows = 0_usize;
+    let mut mismatch_samples = Vec::new();
     let mut cursor = None;
     loop {
         match service
@@ -1119,35 +1141,56 @@ async fn verify_tenant(
                     break;
                 }
                 cursor = page.last().map(|document| document.key.clone());
-                actual.extend(page);
+                for document in page {
+                    actual_rows += 1;
+                    match expected.next() {
+                        Some((expected_key, expected_value))
+                            if expected_key == document.key && expected_value == document.value => {
+                        }
+                        Some((expected_key, _)) => {
+                            missing_rows += 1;
+                            if mismatch_samples.len() < 16 {
+                                mismatch_samples.push(format!(
+                                    "expected {:?}, received {:?}",
+                                    expected_key.encode(),
+                                    document.key.encode()
+                                ));
+                            }
+                        }
+                        None => {
+                            if mismatch_samples.len() < 16 {
+                                mismatch_samples
+                                    .push(format!("unexpected key {:?}", document.key.encode()));
+                            }
+                        }
+                    }
+                }
             }
             Ok(_) => return json!({"passed": false, "error": "Scan response type mismatch"}),
             Err(error) => return json!({"passed": false, "error": error.to_string()}),
         }
     }
-    let mut mismatches = Vec::new();
-    for document in &actual {
-        if expected.get(&document.key) != Some(&document.value) {
-            mismatches.push(format!("unexpected key/value {:?}", document.key.encode()));
-            if mismatches.len() == 16 {
-                break;
-            }
+    while expected.next().is_some() {
+        missing_rows += 1;
+        if mismatch_samples.len() < 16 {
+            mismatch_samples.push("expected row missing after final Scan row".to_owned());
         }
     }
-    let missing_count = expected
-        .keys()
-        .filter(|key| !actual.iter().any(|document| &document.key == *key))
-        .count();
-    let passed = actual.len() == expected.len() && mismatches.is_empty() && missing_count == 0;
-    let _ = expected_rows;
+    let passed = actual_rows == expected_row_count
+        && mismatch_samples.is_empty()
+        && missing_rows == 0
+        && commit_identity_unique;
     json!({
         "passed": passed,
-        "expected_rows": expected.len(),
-        "actual_rows": actual.len(),
-        "missing_rows": missing_count,
-        "mismatch_samples": mismatches,
-        "commit_identities_monotonic_after_sort": sorted_ledger.windows(2).all(|pair| pair[0].commit_identity <= pair[1].commit_identity),
-        "commit_identity_entries": sorted_ledger.len(),
+        "expected_rows": expected_row_count,
+        "actual_rows": actual_rows,
+        "missing_rows": missing_rows,
+        "mismatch_samples": mismatch_samples,
+        "replay_order": "commit identity for write history; ordered expected stream for Scan comparison",
+        "commit_identity_unique": commit_identity_unique,
+        "commit_identity_entries": counters.lock().unwrap().write_ledger.len(),
+        "scan_page_limit": 64,
+        "scan_materialization_bound": "one response page plus bounded write ledger and mismatch sample",
     })
 }
 
