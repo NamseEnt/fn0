@@ -1,0 +1,14 @@
+   Compiling dodb-rocksdb v0.1.0 (/Users/namse/fn0-dodb-blink-experiment/dodb/crates/dodb-rocksdb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.18s
+     Running tests/process_crash_contract.rs (/Users/namse/fn0-dodb-blink-experiment/target/debug/deps/process_crash_contract-80f15a56ca73cdee)
+
+running 3 tests
+test service_child ... ok
+R1B3A_CASE backend=native handoff=success child_signal=9 child_reaped=true
+R1B3A_REOPEN backend=native result=passed expected_documents=4
+test native_acknowledged_transaction_survives_process_sigkill_and_reopen ... ok
+R1B3A_CASE backend=rocksdb handoff=success child_signal=9 child_reaped=true
+R1B3A_REOPEN backend=rocksdb result=passed expected_documents=4
+test rocksdb_acknowledged_transaction_survives_process_sigkill_and_reopen ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s

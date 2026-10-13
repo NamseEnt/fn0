@@ -76,10 +76,13 @@ than a timing delay.
 
 ## Remaining work
 
-At the R1b-1 implementation point, shared transaction conformance, tenant
-lifecycle and capacity management, and process-kill recovery remained open.
 R1b-2 covers the shared transaction contract and normal shutdown/reopen; its
 verification is recorded in the [R1b-2 report](../experiments/results/rocksdb-service-r1b2/REPORT.md).
-Tenant write serialization caused by the handle mutex and shared revision
-counter remains. This slice establishes no throughput or latency claim,
-power-loss behavior, process-kill recovery, or bounded tenant-memory guarantee.
+R1b-3a covers one shared acknowledged-transaction SIGKILL/reopen scenario on
+native and RocksDB, recorded in the
+[R1b-3a report](../experiments/results/rocksdb-service-r1b3a-20261013-local/REPORT.md).
+Commit-interruption recovery, other process-crash cases, tenant lifecycle and
+capacity management remain open. Tenant write serialization caused by the
+handle mutex and shared revision counter remains. This slice establishes no
+throughput or latency claim, power-loss behavior, complete process-kill
+recovery, or bounded tenant-memory guarantee.

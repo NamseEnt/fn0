@@ -1,12 +1,14 @@
 # Backend contract for the product comparison
 
-Status: R1b-2 transaction slice verified, 2026-10-13. This remains the
-common contract for both backends; it does not claim that all R1 gates pass.
-See [the roadmap](single-instance-product-roadmap.md) for execution order and
-the [R1b-2 verification report](../experiments/results/rocksdb-service-r1b2/REPORT.md)
-for the latest tested transaction implementation. The earlier
+Status: R1b-3a acknowledged-transaction process-kill slice verified,
+2026-10-13. This remains the common contract for both backends; it does not
+claim that all R1 gates pass. See [the roadmap](single-instance-product-roadmap.md)
+for execution order. The earlier
 [R1b-1 report](../experiments/results/rocksdb-service-r1b1-2774bd1c/REPORT.md)
-records the separate read implementation slice.
+records the separate read implementation slice. R1b-2 transaction conformance
+is in the [R1b-2 report](../experiments/results/rocksdb-service-r1b2/REPORT.md),
+and R1b-3a is in the
+[R1b-3a report](../experiments/results/rocksdb-service-r1b3a-20261013-local/REPORT.md).
 
 ## Existing API boundary
 
@@ -152,14 +154,17 @@ cases instead of inventing a second semantic model.
 | Limits and errors | Same request/response budget and conflict encoding behavior; large values not materialized just to report revision conflict. |
 | Tenant isolation | Same document key in different tenant DBs has independent state; one process serves them concurrently. |
 | Lifecycle | Cold open, duplicate concurrent open, close with in-flight work, reopen, configured capacity, shutdown. |
-| Process crash | Acknowledged writes survive kill/reopen; interrupted transactions are absent or complete; independent expected history. |
+| Process crash | Acknowledged transaction survives kill/reopen; interrupted transactions are absent or complete; independent expected history. |
 
 The deterministic reference can replay a backend's recorded serialized logical
 commits; cross-backend tests should normalize opaque identities rather than
 require matching physical LSN numbers. Concurrent checks must account for
 allowed histories, not assume the value is unchanged while another writer runs.
-Independent parent/oracle state is required for recovery checks. Process kill
-does not remove kernel page cache or establish power-loss safety.
+Independent parent/oracle state is required for recovery checks. R1b-3a
+verifies one acknowledged width-four transaction after SIGKILL and reopen on
+each backend; interrupted-transaction recovery and the rest of the
+process-crash inventory remain open. Process kill does not remove kernel page
+cache or establish power-loss safety.
 
 ## Independent dodb API scope
 

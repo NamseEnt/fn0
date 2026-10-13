@@ -109,7 +109,7 @@ raw engine calls as diagnostics, with their boundary clearly named.
 | Stage | Status | Deliverable | Exit condition |
 | --- | --- | --- | --- |
 | R0: foundation | Complete for this inventory | This roadmap, backend contract, workload definitions, policy cross-reference | Existing behavior and proposed work are separated; required mixes and multi-tenancy are explicit. |
-| R1: equivalent backend | Partial; R1a, R1b-1, and R1b-2 slices implemented, remaining R1 work pending | Experimental `dodb-rocksdb` service, shared read and transaction contract coverage, format/revision design notes | KV, Query/Scan, conditional and multi-key writes, tenant isolation, reopen, and process-crash cases pass on both backends. |
+| R1: equivalent backend | Partial; R1a, R1b-1, R1b-2, and R1b-3a slices implemented, remaining R1 work pending | Experimental `dodb-rocksdb` service, shared read, transaction, and acknowledged-transaction recovery coverage, format/revision design notes | KV, Query/Scan, conditional and multi-key writes, tenant isolation, reopen, and required process-crash cases pass on both backends. |
 | R2: product driver | Pending | Stateful application-workload driver through `DodbService`; one process with multiple DBs | Logical input equivalence, actual operation accounting, correctness, resource bounds, and all mandatory profiles pass short smoke. |
 | R3: first product evidence | Pending | Small single-tenant and multi-tenant OCI results, followed by Debian | All mandatory mixes are present, per-tenant behavior is visible, source/binary/host provenance is valid. |
 | R4: focused improvement | Pending | One measured bottleneck, one implementation change, before/after evidence | Same contract and frozen workloads pass; gains and regressions are recorded. |
@@ -139,10 +139,16 @@ assertion. Details are in the
 R1b-2 adds the shared native/RocksDB transaction contract and normal
 shutdown/reopen verification. Its tested SHA and result are recorded in the
 [R1b-2 report](../experiments/results/rocksdb-service-r1b2/REPORT.md).
-R1 remains incomplete: tenant lifecycle and capacity management and
-process-kill recovery remain open. Tenant write serialization is also a known
-limitation. This correctness work does not establish performance comparison
-readiness, and no performance campaign was run.
+R1b-3a adds one shared acknowledged-transaction SIGKILL/reopen scenario per
+backend. The local and OCI checks, exact exit signals, reopened logical state,
+and claim limits are recorded in the
+[R1b-3a report](../experiments/results/rocksdb-service-r1b3a-20261013-local/REPORT.md).
+This covers one process-kill recovery contract; it does not complete the
+process-crash inventory. R1 remains incomplete: tenant lifecycle and capacity
+management, commit-interruption recovery, and process-kill recovery beyond this
+acknowledged-transaction case remain open. Tenant write serialization is also
+a known limitation. This correctness work does not establish performance
+comparison readiness, and no performance campaign was run.
 
 R1a source SHA `f7325bc24a46afe0912e200ae8a08b9275157c6e` passed the disk-backed
 integration test locally on macOS ARM64 and in an OCI A1 native ARM64 Release
@@ -153,9 +159,11 @@ checkout and the pinned RocksDB 11.8.1 archive; the
 records commands, provenance, failed-attempt correction, and coverage.
 After R1b-1, common transaction conformance, full lifecycle management,
 process-kill recovery, and all other R1 exit conditions remained pending.
-R1b-2 now covers transaction conformance and normal shutdown/reopen. Full
-tenant lifecycle and capacity management and process-kill recovery remain
-pending; AWS HTTP API support is not a current or future product requirement.
+R1b-2 covers transaction conformance and normal shutdown/reopen. R1b-3a covers
+one acknowledged-transaction SIGKILL/reopen scenario per backend; commit
+interruption, full tenant lifecycle and capacity management, and the remaining
+process-crash cases are pending. AWS HTTP API support is not a current or
+future product requirement.
 
 ### R1 implementation order
 
