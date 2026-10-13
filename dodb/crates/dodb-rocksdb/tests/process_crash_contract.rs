@@ -3,26 +3,33 @@ use std::io::{BufRead, BufReader, Write};
 use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::mpsc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use dodb_core::{
-    DocumentKey, Revision, RevisionState, TenantId, TransactionCondition, TransactionMutation,
-    TransactionRequest,
+    DocumentKey, Error, Revision, RevisionState, TenantId, TransactionCondition,
+    TransactionMutation, TransactionRequest,
 };
 use dodb_rocksdb::{RocksDbService, RocksDbServiceConfig};
-use dodb_server::{LocalTenantService, LocalTenantServiceConfig};
+use dodb_server::{FaultInjectorFactory, LocalTenantService, LocalTenantServiceConfig};
 use dodb_service::{DodbService, ExecutionBudget, Request, Response};
+use dodb_storage::FaultInjector;
 use tempfile::TempDir;
 use tokio::runtime::Builder;
 
 const TENANT_ID: u64 = 913;
 const RESPONSE_BUDGET: ExecutionBudget = ExecutionBudget::new(1 << 20);
 const HANDOFF_TIMEOUT: Duration = Duration::from_secs(60);
-const CHILD_BACKEND_ENV: &str = "DODB_R1B3A_CHILD_BACKEND";
-const CHILD_DATA_DIR_ENV: &str = "DODB_R1B3A_CHILD_DATA_DIR";
-const HANDOFF_PREFIX: &str = "R1B3A_HANDOFF|success|";
+const CHILD_BACKEND_ENV: &str = "DODB_R1B3B_CHILD_BACKEND";
+const CHILD_DATA_DIR_ENV: &str = "DODB_R1B3B_CHILD_DATA_DIR";
+const ROCKSDB_HOOK_ENV: &str = "DODB_R1B3B_ENABLE_WAL_SYNC_HOOK";
+const HOOK_PREFIX: &str = "R1B3B_HOOK|";
+
+unsafe extern "C" {
+    fn dodb_rocksdb_arm_wal_sync_hook();
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Backend {
@@ -47,6 +54,7 @@ struct ExpectedDocument {
 struct Scenario {
     seed_request: TransactionRequest,
     target_request: TransactionRequest,
+    previous_documents: BTreeMap<DocumentKey, ExpectedDocument>,
     expected_documents: BTreeMap<DocumentKey, ExpectedDocument>,
     deleted_key: DocumentKey,
     untouched_key: DocumentKey,
@@ -68,7 +76,7 @@ impl Drop for ChildGuard {
 }
 
 #[test]
-fn native_acknowledged_transaction_survives_process_sigkill_and_reopen() {
+fn native_wal_sync_interruption_recovers_all_or_none() {
     if std::env::var_os(CHILD_BACKEND_ENV).is_some() {
         return;
     }
@@ -76,7 +84,7 @@ fn native_acknowledged_transaction_survives_process_sigkill_and_reopen() {
 }
 
 #[test]
-fn rocksdb_acknowledged_transaction_survives_process_sigkill_and_reopen() {
+fn rocksdb_wal_sync_interruption_recovers_all_or_none() {
     if std::env::var_os(CHILD_BACKEND_ENV).is_some() {
         return;
     }
@@ -89,6 +97,11 @@ fn service_child() {
         return;
     };
     let backend = parse_backend(&backend.to_string_lossy());
+    assert_eq!(
+        backend == Backend::RocksDb,
+        std::env::var_os(ROCKSDB_HOOK_ENV).is_some(),
+        "RocksDB test hook must be enabled only for the RocksDB child"
+    );
     let data_dir = PathBuf::from(
         std::env::var_os(CHILD_DATA_DIR_ENV).expect("child data directory is required"),
     );
@@ -100,21 +113,36 @@ fn service_child() {
     runtime.block_on(async move {
         match backend {
             Backend::Native => {
-                let service = LocalTenantService::new(LocalTenantServiceConfig {
-                    data_dir,
+                let mut service = LocalTenantService::new(LocalTenantServiceConfig {
+                    data_dir: data_dir.clone(),
                     ..LocalTenantServiceConfig::default()
                 })
                 .expect("native service should open");
-                execute_seed_and_target(&service, scenario).await;
-                write_success_handoff(backend);
+                let hook_armed = Arc::new(AtomicBool::new(false));
+                let hook_wal_path =
+                    data_dir.join(format!("tenant-{TENANT_ID}-shard-{TENANT_ID}.wal"));
+                let injector_armed = Arc::clone(&hook_armed);
+                let factory: FaultInjectorFactory = Arc::new(move |_tenant_id, _shard_id| {
+                    Box::new(NativeWalSyncHook {
+                        armed: Arc::clone(&injector_armed),
+                        wal_path: hook_wal_path.clone(),
+                    })
+                });
+                service.set_fault_injector_factory(factory);
+                execute_seed(&service, &scenario).await;
+                hook_armed.store(true, Ordering::Release);
+                execute_target(&service, scenario.target_request).await;
+                write_target_returned(backend);
                 std::future::pending::<()>().await;
                 service.shutdown().await;
             }
             Backend::RocksDb => {
                 let service = RocksDbService::new(RocksDbServiceConfig::new(data_dir))
                     .expect("RocksDB service should open");
-                execute_seed_and_target(&service, scenario).await;
-                write_success_handoff(backend);
+                execute_seed(&service, &scenario).await;
+                unsafe { dodb_rocksdb_arm_wal_sync_hook() };
+                execute_target(&service, scenario.target_request).await;
+                write_target_returned(backend);
                 std::future::pending::<()>().await;
                 service.shutdown().await;
             }
@@ -124,6 +152,7 @@ fn service_child() {
 
 fn run_backend_case(backend: Backend) {
     let scenario = build_scenario();
+    let previous_documents = scenario.previous_documents.clone();
     let expected_documents = scenario.expected_documents.clone();
     let deleted_key = scenario.deleted_key.clone();
     let untouched_key = scenario.untouched_key.clone();
@@ -131,8 +160,38 @@ fn run_backend_case(backend: Backend) {
     let data_dir = directory.path().join("service-data");
     assert!(!data_dir.exists());
     let mut child = spawn_service_child(backend, &data_dir);
-    let handoff = receive_handoff(&mut child, backend);
-    assert_eq!(handoff, format!("{HANDOFF_PREFIX}{}", backend.as_str()));
+    let wal_path = data_dir.join(format!("tenant-{TENANT_ID}-shard-{TENANT_ID}.wal"));
+    let hook = receive_hook(&mut child, backend);
+    if backend == Backend::Native {
+        assert!(hook.starts_with(&format!("{HOOK_PREFIX}native|before_wal_sync|")));
+        assert!(wal_path.exists(), "native WAL file must exist at the hook");
+        assert!(hook.contains(&wal_path.display().to_string()));
+    } else {
+        assert!(hook.starts_with(&format!("{HOOK_PREFIX}rocksdb|wal_sync_before|")));
+        let hooked_path = Path::new(hook.rsplit('|').next().expect("hook has path"));
+        assert!(
+            hooked_path
+                .extension()
+                .is_some_and(|extension| extension == "log"),
+            "RocksDB hook must name a WAL log file"
+        );
+        assert!(
+            hooked_path.exists(),
+            "RocksDB WAL file must exist at the hook"
+        );
+    }
+    println!(
+        "R1B3B_HOOK_REACHED child_pid={} message={hook}",
+        child.child.id()
+    );
+    assert!(
+        child
+            .child
+            .try_wait()
+            .expect("child status should be readable")
+            .is_none(),
+        "child must remain blocked at the actual WAL sync hook"
+    );
 
     child
         .child
@@ -146,8 +205,9 @@ fn run_backend_case(backend: Backend) {
         "child must terminate from SIGKILL"
     );
     println!(
-        "R1B3A_CASE backend={} handoff=success child_signal=9 child_reaped=true",
-        backend.as_str()
+        "R1B3B_CASE backend={} child_pid={} hook=wal_sync_before child_signal=9 child_reaped=true",
+        backend.as_str(),
+        child.child.id()
     );
 
     let runtime = Builder::new_current_thread()
@@ -162,21 +222,35 @@ fn run_backend_case(backend: Backend) {
                     ..LocalTenantServiceConfig::default()
                 })
                 .expect("native service should reopen after child exit");
-                verify_reopened_state(&service, &expected_documents, &deleted_key, &untouched_key)
-                    .await;
+                let recovered = verify_reopened_state(
+                    &service,
+                    &previous_documents,
+                    &expected_documents,
+                    &deleted_key,
+                    &untouched_key,
+                )
+                .await;
+                println!("R1B3B_RECOVERY backend=native state={recovered}");
                 service.shutdown().await;
             }
             Backend::RocksDb => {
                 let service = RocksDbService::new(RocksDbServiceConfig::new(&data_dir))
                     .expect("RocksDB service should reopen after child exit");
-                verify_reopened_state(&service, &expected_documents, &deleted_key, &untouched_key)
-                    .await;
+                let recovered = verify_reopened_state(
+                    &service,
+                    &previous_documents,
+                    &expected_documents,
+                    &deleted_key,
+                    &untouched_key,
+                )
+                .await;
+                println!("R1B3B_RECOVERY backend=rocksdb state={recovered}");
                 service.shutdown().await;
             }
         }
     });
     println!(
-        "R1B3A_REOPEN backend={} result=passed expected_documents={}",
+        "R1B3B_REOPEN backend={} result=passed expected_documents={}",
         backend.as_str(),
         expected_documents.len()
     );
@@ -184,7 +258,8 @@ fn run_backend_case(backend: Backend) {
 
 fn spawn_service_child(backend: Backend, data_dir: &Path) -> ChildGuard {
     let executable = std::env::current_exe().expect("test executable path should be available");
-    let mut child = Command::new(executable)
+    let mut command = Command::new(executable);
+    command
         .arg("--exact")
         .arg("service_child")
         .arg("--nocapture")
@@ -192,9 +267,11 @@ fn spawn_service_child(backend: Backend, data_dir: &Path) -> ChildGuard {
         .env(CHILD_DATA_DIR_ENV, data_dir)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .expect("service child should start");
+        .stderr(Stdio::inherit());
+    if backend == Backend::RocksDb {
+        command.env(ROCKSDB_HOOK_ENV, "1");
+    }
+    let mut child = command.spawn().expect("service child should start");
     let stdout = child.stdout.take().expect("child stdout should be piped");
     let (line_sender, line_receiver) = mpsc::channel();
     thread::spawn(move || {
@@ -211,25 +288,31 @@ fn spawn_service_child(backend: Backend, data_dir: &Path) -> ChildGuard {
     }
 }
 
-fn receive_handoff(child: &mut ChildGuard, backend: Backend) -> String {
+fn receive_hook(child: &mut ChildGuard, backend: Backend) -> String {
     let deadline = Instant::now() + HANDOFF_TIMEOUT;
     loop {
         let line = child.handoff_lines.recv_timeout(Duration::from_millis(25));
         match line {
-            Ok(Ok(line)) if line == format!("{HANDOFF_PREFIX}{}", backend.as_str()) => {
+            Ok(Ok(line)) if line.starts_with("R1B3B_WRONG_SYNC_TARGET|") => {
+                panic!("wrong_sync_target: {line}");
+            }
+            Ok(Ok(line)) if line.starts_with(&format!("{HOOK_PREFIX}{}|", backend.as_str())) => {
                 return line;
             }
+            Ok(Ok(line)) if line.starts_with("R1B3B_TARGET_RETURNED|") => {
+                panic!("target transaction returned before WAL sync hook: {line}");
+            }
             Ok(Ok(_)) => {}
-            Ok(Err(error)) => panic!("failed reading child handoff: {error}"),
+            Ok(Err(error)) => panic!("handoff_timeout: failed reading child output: {error}"),
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 let status = child
                     .child
                     .try_wait()
                     .expect("child status should be readable")
                     .unwrap_or_else(|| {
-                        panic!("child output closed before success handoff for {backend:?}")
+                        panic!("hook_not_reached: child output closed for {backend:?}")
                     });
-                panic!("child exited before success handoff: {status}");
+                panic!("hook_not_reached: child exited before hook: {status}");
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 if let Some(status) = child
@@ -238,34 +321,38 @@ fn receive_handoff(child: &mut ChildGuard, backend: Backend) -> String {
                     .expect("child status should be readable")
                 {
                     child.reaped = true;
-                    panic!("child exited before success handoff: {status}");
+                    panic!("hook_not_reached: child exited before hook: {status}");
                 }
             }
         }
         if Instant::now() >= deadline {
-            panic!("child success handoff timed out for {backend:?}");
+            panic!("handoff_timeout: WAL sync hook timed out for {backend:?}");
         }
     }
 }
 
-async fn execute_seed_and_target<S: DodbService>(service: &S, scenario: Scenario) {
+async fn execute_seed<S: DodbService>(service: &S, scenario: &Scenario) {
     let tenant = TenantId::new(TENANT_ID);
     let seed_response = service
         .execute(
             tenant,
             Request::Transact {
-                request: scenario.seed_request,
+                request: scenario.seed_request.clone(),
             },
             RESPONSE_BUDGET,
         )
         .await
         .expect("seed transaction should succeed");
     assert!(matches!(seed_response, Response::Transact(outcome) if outcome.commit_lsn.is_some()));
+}
+
+async fn execute_target<S: DodbService>(service: &S, target_request: TransactionRequest) {
+    let tenant = TenantId::new(TENANT_ID);
     let target_response = service
         .execute(
             tenant,
             Request::Transact {
-                request: scenario.target_request,
+                request: target_request,
             },
             RESPONSE_BUDGET,
         )
@@ -274,20 +361,50 @@ async fn execute_seed_and_target<S: DodbService>(service: &S, scenario: Scenario
     assert!(matches!(target_response, Response::Transact(outcome) if outcome.commit_lsn.is_some()));
 }
 
-fn write_success_handoff(backend: Backend) {
+fn write_target_returned(backend: Backend) {
     let stdout = std::io::stdout();
     let mut output = stdout.lock();
-    writeln!(output, "{HANDOFF_PREFIX}{}", backend.as_str())
-        .expect("success handoff should be written");
-    output.flush().expect("success handoff should be flushed");
+    writeln!(output, "R1B3B_TARGET_RETURNED|{}", backend.as_str())
+        .expect("target-returned marker should be written");
+    output
+        .flush()
+        .expect("target-returned marker should be flushed");
+}
+
+struct NativeWalSyncHook {
+    armed: Arc<AtomicBool>,
+    wal_path: PathBuf,
+}
+
+impl FaultInjector for NativeWalSyncHook {
+    fn hit(&mut self, point: &str) -> Result<(), Error> {
+        if point == "before_wal_sync" && self.armed.swap(false, Ordering::AcqRel) {
+            let stdout = std::io::stdout();
+            let mut output = stdout.lock();
+            writeln!(
+                output,
+                "{HOOK_PREFIX}native|before_wal_sync|{}",
+                self.wal_path.display()
+            )
+            .map_err(|error| Error::recovery(format!("native hook handoff failed: {error}")))?;
+            output
+                .flush()
+                .map_err(|error| Error::recovery(format!("native hook flush failed: {error}")))?;
+            loop {
+                thread::park();
+            }
+        }
+        Ok(())
+    }
 }
 
 async fn verify_reopened_state<S: DodbService>(
     service: &S,
+    previous_documents: &BTreeMap<DocumentKey, ExpectedDocument>,
     expected_documents: &BTreeMap<DocumentKey, ExpectedDocument>,
     deleted_key: &DocumentKey,
     untouched_key: &DocumentKey,
-) {
+) -> &'static str {
     let tenant = TenantId::new(TENANT_ID);
     let mut cursor = None;
     let mut actual_documents = BTreeMap::new();
@@ -326,15 +443,15 @@ async fn verify_reopened_state<S: DodbService>(
             revisions.insert(document.key, document.revision);
         }
     }
-    assert_eq!(actual_documents, *expected_documents);
+    let recovered_state = if actual_documents == *previous_documents {
+        "previous"
+    } else if actual_documents == *expected_documents {
+        "complete_target"
+    } else {
+        panic!("partial_or_unexpected_state: full scan differs from both complete oracle states")
+    };
 
     let deleted_state = get_state(service, tenant, deleted_key.clone()).await;
-    let RevisionState::Missing {
-        revision: deleted_revision,
-    } = deleted_state
-    else {
-        panic!("deleted key must be logically missing after reopen");
-    };
     let untouched_state = get_state(service, tenant, untouched_key.clone()).await;
     let RevisionState::Present {
         value: untouched_value,
@@ -344,17 +461,139 @@ async fn verify_reopened_state<S: DodbService>(
         panic!("untouched key must remain present after reopen");
     };
     assert_eq!(untouched_value, b"seed-untouched");
-    assert!(deleted_revision > Revision::ZERO);
-
-    let target_revision = *revisions
-        .get(&key(b"crash", b"updated-a"))
-        .expect("updated key should be present");
-    for changed_key in [key(b"crash", b"updated-b"), key(b"crash", b"created")] {
-        assert_eq!(revisions.get(&changed_key), Some(&target_revision));
+    if recovered_state == "previous" {
+        assert_eq!(
+            deleted_state,
+            RevisionState::Present {
+                value: b"seed-delete".to_vec(),
+                revision: *revisions
+                    .get(deleted_key)
+                    .expect("seed delete key is scanned"),
+            }
+        );
+        let seed_revision = *revisions
+            .values()
+            .next()
+            .expect("previous state has documents");
+        assert!(
+            revisions
+                .values()
+                .all(|revision| *revision == seed_revision)
+        );
+        let created_state = get_state(service, tenant, key(b"crash", b"created")).await;
+        assert_eq!(
+            created_state,
+            RevisionState::Missing {
+                revision: Revision::ZERO
+            }
+        );
+    } else {
+        let RevisionState::Missing {
+            revision: deleted_revision,
+        } = deleted_state
+        else {
+            panic!("complete_target state requires a deleted tombstone");
+        };
+        assert!(deleted_revision > Revision::ZERO);
+        let target_revision = *revisions
+            .get(&key(b"crash", b"updated-a"))
+            .expect("updated key should be present");
+        for changed_key in [key(b"crash", b"updated-b"), key(b"crash", b"created")] {
+            assert_eq!(revisions.get(&changed_key), Some(&target_revision));
+        }
+        assert_eq!(deleted_revision, target_revision);
+        assert!(deleted_revision > untouched_revision);
+        assert!(target_revision > untouched_revision);
     }
-    assert_eq!(deleted_revision, target_revision);
-    assert!(deleted_revision > untouched_revision);
-    assert!(target_revision > untouched_revision);
+
+    let reopen_key = key(b"crash", b"post-reopen");
+    let reopen_request = TransactionRequest::new(
+        vec![TransactionCondition::NotExists {
+            key: reopen_key.clone(),
+        }],
+        vec![TransactionMutation::Put {
+            key: reopen_key.clone(),
+            value: b"post-reopen".to_vec(),
+        }],
+    );
+    let response = service
+        .execute(
+            tenant,
+            Request::Transact {
+                request: reopen_request,
+            },
+            RESPONSE_BUDGET,
+        )
+        .await
+        .expect("post-reopen transaction should succeed");
+    assert!(matches!(response, Response::Transact(outcome) if outcome.commit_lsn.is_some()));
+    let mut post_reopen_documents = if recovered_state == "previous" {
+        previous_documents.clone()
+    } else {
+        expected_documents.clone()
+    };
+    post_reopen_documents.insert(
+        reopen_key,
+        ExpectedDocument {
+            value: b"post-reopen".to_vec(),
+        },
+    );
+    let post_reopen_scan = full_scan(service, tenant).await;
+    assert_eq!(post_reopen_scan.0, post_reopen_documents);
+    assert!(
+        post_reopen_scan
+            .1
+            .values()
+            .all(|revision| *revision > Revision::ZERO)
+    );
+    recovered_state
+}
+
+async fn full_scan<S: DodbService>(
+    service: &S,
+    tenant: TenantId,
+) -> (
+    BTreeMap<DocumentKey, ExpectedDocument>,
+    BTreeMap<DocumentKey, Revision>,
+) {
+    let mut cursor = None;
+    let mut actual_documents = BTreeMap::new();
+    let mut revisions = BTreeMap::new();
+    loop {
+        let response = service
+            .execute(
+                tenant,
+                Request::Scan {
+                    exclusive_after_key: cursor.clone(),
+                    limit: 16,
+                },
+                RESPONSE_BUDGET,
+            )
+            .await
+            .expect("reopened full scan should succeed");
+        let Response::Scan(documents) = response else {
+            panic!("reopened scan returned an unexpected response");
+        };
+        if documents.is_empty() {
+            break;
+        }
+        for document in documents {
+            cursor = Some(document.key.clone());
+            assert!(
+                actual_documents
+                    .insert(
+                        document.key.clone(),
+                        ExpectedDocument {
+                            value: document.value,
+                        },
+                    )
+                    .is_none(),
+                "full scan returned a duplicate logical document"
+            );
+            revisions.insert(document.key, document.revision);
+        }
+    }
+    (actual_documents, revisions)
 }
 
 async fn get_state<S: DodbService>(
@@ -424,7 +663,7 @@ fn build_scenario() -> Scenario {
             },
         ],
     );
-    let mut expected_documents = seed_request
+    let previous_documents = seed_request
         .mutations
         .iter()
         .filter_map(|mutation| match mutation {
@@ -437,6 +676,7 @@ fn build_scenario() -> Scenario {
             TransactionMutation::Delete { .. } => None,
         })
         .collect::<BTreeMap<_, _>>();
+    let mut expected_documents = previous_documents.clone();
     for mutation in &target_request.mutations {
         match mutation {
             TransactionMutation::Put { key, value } => {
@@ -455,6 +695,7 @@ fn build_scenario() -> Scenario {
     Scenario {
         seed_request,
         target_request,
+        previous_documents,
         expected_documents,
         deleted_key,
         untouched_key,

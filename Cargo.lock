@@ -1875,6 +1875,7 @@ dependencies = [
  "dodb-protocol",
  "dodb-server",
  "dodb-service",
+ "dodb-storage",
  "futures",
  "tempfile",
  "tokio",

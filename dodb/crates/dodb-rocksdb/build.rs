@@ -35,6 +35,7 @@ fn main() {
         .file("shim/transaction_shim.cc")
         .include(rocksdb_dir.join("include"))
         .flag_if_supported("-std=c++20")
+        .flag_if_supported("-fno-rtti")
         .warnings(true)
         .compile("dodb_rocksdb_transaction_shim");
     println!("cargo:rustc-link-search=native={}", rocksdb_dir.display());

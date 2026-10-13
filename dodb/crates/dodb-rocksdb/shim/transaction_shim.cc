@@ -1,9 +1,15 @@
+#include <atomic>
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <signal.h>
+#include <unistd.h>
 
 #include "rocksdb/db.h"
+#include "rocksdb/env.h"
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/iterator.h"
@@ -12,6 +18,95 @@
 #include "rocksdb/version.h"
 
 namespace {
+
+class WalSyncHookEnv;
+
+class WalSyncHookFile : public rocksdb::WritableFileWrapper {
+ public:
+  WalSyncHookFile(std::unique_ptr<rocksdb::WritableFile> target,
+                  WalSyncHookEnv* environment, std::string file_name,
+                  bool is_wal_file);
+  rocksdb::Status Sync() override;
+
+ private:
+  std::unique_ptr<rocksdb::WritableFile> owned_target_;
+  WalSyncHookEnv* environment_;
+  std::string file_name_;
+  bool is_wal_file_;
+};
+
+class WalSyncHookEnv : public rocksdb::EnvWrapper {
+ public:
+  WalSyncHookEnv() : rocksdb::EnvWrapper(rocksdb::Env::Default()) {}
+
+  rocksdb::Status NewWritableFile(
+      const std::string& file_name,
+      std::unique_ptr<rocksdb::WritableFile>* result,
+      const rocksdb::EnvOptions& options) override {
+    std::unique_ptr<rocksdb::WritableFile> opened_file;
+    const auto status = this->target()->NewWritableFile(file_name, &opened_file, options);
+    if (!status.ok()) {
+      return status;
+    }
+    result->reset(new WalSyncHookFile(
+        std::move(opened_file), this, file_name, is_wal_file(file_name)));
+    return status;
+  }
+
+  void arm() { armed_.store(true, std::memory_order_release); }
+
+  bool take_armed() { return armed_.exchange(false, std::memory_order_acq_rel); }
+
+  static bool is_wal_file(std::string_view file_name) {
+    const auto separator = file_name.find_last_of('/');
+    const auto base_name = file_name.substr(
+        separator == std::string_view::npos ? 0 : separator + 1);
+    if (base_name.size() < 5 || base_name.substr(base_name.size() - 4) != ".log") {
+      return false;
+    }
+    const auto digits = base_name.substr(0, base_name.size() - 4);
+    return std::all_of(digits.begin(), digits.end(),
+                       [](unsigned char character) {
+                         return character >= '0' && character <= '9';
+                       });
+  }
+
+ private:
+  std::atomic<bool> armed_{false};
+};
+
+WalSyncHookFile::WalSyncHookFile(
+    std::unique_ptr<rocksdb::WritableFile> target,
+    WalSyncHookEnv* environment, std::string file_name, bool is_wal_file)
+    : rocksdb::WritableFileWrapper(target.get()),
+      owned_target_(std::move(target)),
+      environment_(environment),
+      file_name_(std::move(file_name)),
+      is_wal_file_(is_wal_file) {}
+
+rocksdb::Status WalSyncHookFile::Sync() {
+  if (environment_->take_armed()) {
+    const std::string message = is_wal_file_
+        ? "R1B3B_HOOK|rocksdb|wal_sync_before|" + file_name_ + "\n"
+        : "R1B3B_WRONG_SYNC_TARGET|rocksdb|" + file_name_ + "\n";
+    const auto ignored = write(STDOUT_FILENO, message.data(), message.size());
+    static_cast<void>(ignored);
+    for (;;) {
+      pause();
+    }
+  }
+  return rocksdb::WritableFileWrapper::Sync();
+}
+
+WalSyncHookEnv& wal_sync_hook_env() {
+  static WalSyncHookEnv environment;
+  return environment;
+}
+
+bool wal_sync_hook_enabled() {
+  const auto* value = std::getenv("DODB_R1B3B_ENABLE_WAL_SYNC_HOOK");
+  return value != nullptr && std::string_view(value) == "1";
+}
 
 struct ReadIterator {
   rocksdb::TransactionDB* database;
@@ -54,6 +149,9 @@ void* dodb_rocksdb_open(const char* path, char** error) {
   rocksdb::Options options;
   options.create_if_missing = true;
   options.compression = rocksdb::kNoCompression;
+  if (wal_sync_hook_enabled()) {
+    options.env = &wal_sync_hook_env();
+  }
   rocksdb::TransactionDBOptions transaction_options;
   rocksdb::TransactionDB* database = nullptr;
   const auto status = rocksdb::TransactionDB::Open(
@@ -63,6 +161,10 @@ void* dodb_rocksdb_open(const char* path, char** error) {
     return nullptr;
   }
   return database;
+}
+
+void dodb_rocksdb_arm_wal_sync_hook() {
+  wal_sync_hook_env().arm();
 }
 
 void dodb_rocksdb_close(void* database) {

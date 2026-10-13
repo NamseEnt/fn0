@@ -20,5 +20,6 @@ cc.workspace = true
 
 [dev-dependencies]
 dodb-server.workspace = true
+dodb-storage.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
