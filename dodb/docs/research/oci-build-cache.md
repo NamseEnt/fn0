@@ -29,8 +29,10 @@ clean checkouts.
 The fixed sccache path is
 `/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/sccache`.
 The helper sets `RUSTC_WRAPPER`, `SCCACHE_DIR`, and a research-specific Unix
-socket at `/tmp/dodb-sccache-rust1971-arm64.sock`. The socket path is kept
-short because Unix socket paths have a small platform limit. sccache `0.18.0` is installed from Mozilla's official
+socket at `/tmp/dodb-sccache-rust1971-arm64.sock`. Its per-run `TMPDIR` is a
+short unique path under `/tmp` because sccache creates its startup notification
+socket under the temporary directory, which otherwise can exceed the Unix
+socket path limit. sccache `0.18.0` is installed from Mozilla's official
 `aarch64-unknown-linux-musl` release archive. The pinned archive SHA-256 is
 `2b3284d5da3b46a47dc4229e75bb7b88ac4aa99c8d754fb7d2f84997e5a4354a`; verify
 it with `sha256sum` before unpacking. The binary is kept at
@@ -41,10 +43,11 @@ zero sccache hits without indicating a cache failure.
 
 The Rust source checkout must be a clean checkout at the exact SHA under
 validation. Each invocation has a unique `DODB_BUILD_RUN_ID`; its log, timing,
-temporary files, command record, binary path/hash, and SHA256SUMS are stored
-under `/bench/zfs/db/dodb-rocksdb-build-runs/<run-id>/`. The database or crash
-artifacts are not part of this build helper. A build lock prevents concurrent
-use by invocations of this helper; it does not stop or alter unrelated jobs.
+command record, binary path/hash, and SHA256SUMS are stored under
+`/bench/zfs/db/dodb-rocksdb-build-runs/<run-id>/`; temporary files use a
+unique short path under `/tmp`. The database or crash artifacts are not part
+of this build helper. A build lock prevents concurrent use by invocations of
+this helper; it does not stop or alter unrelated jobs.
 
 ## RocksDB reuse and provenance
 
@@ -79,13 +82,14 @@ verification of the current SHA.
 ## Reuse check
 
 Two consecutive `--no-run` builds were requested for one clean SHA and this
-fixed Cargo target. The first helper attempt stopped before Cargo compilation:
-sccache could not create its default Unix socket from the long cache path, and
-its compile request count stayed at zero. That failed attempt is retained in
-its own run directory. The helper now sets the short research-specific socket
-above. Results from the two successful build-only checks, including times and
-whether Cargo rebuilt dependencies, are recorded below. No test was executed
-as part of this check.
+fixed Cargo target. The first two helper attempts stopped before Cargo
+compilation because sccache's startup notification socket used a long
+temporary path; its compile request count stayed at zero. Those failed
+attempts are retained in their own run directories. The helper now uses the
+short per-run `TMPDIR` and the research-specific socket above. Results from
+the two successful build-only checks, including times and whether Cargo
+rebuilt dependencies, are recorded below. No test was executed as part of
+this check.
 
 ## sccache references and limits
 

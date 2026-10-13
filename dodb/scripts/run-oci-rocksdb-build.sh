@@ -8,6 +8,8 @@ sccache_binary="/bench/zfs/db/tooling/sccache-0.18.0-aarch64-unknown-linux-musl/
 rocksdb_path="/bench/zfs/db/product-build/rocksdb-source"
 result_root="/bench/zfs/db/dodb-rocksdb-build-runs"
 run_id="${DODB_BUILD_RUN_ID:-}"
+run_suffix="$(printf '%s' "$run_id" | sha256sum | cut -c 1-16)"
+tmp_path="/tmp/db-${run_suffix}"
 repo_root="$(git rev-parse --show-toplevel)"
 source_sha="$(git -C "$repo_root" rev-parse HEAD)"
 
@@ -38,7 +40,10 @@ if ! mkdir "$run_path"; then
   printf 'run evidence path already exists: %s\n' "$run_path" >&2
   exit 2
 fi
-mkdir -p "$run_path/tmp"
+if ! mkdir "$tmp_path"; then
+  printf 'run temporary path already exists: %s\n' "$tmp_path" >&2
+  exit 2
+fi
 
 if [[ ! -x "$sccache_binary" ]]; then
   printf 'pinned sccache binary is missing: %s\n' "$sccache_binary" >&2
@@ -55,7 +60,7 @@ export CARGO_INCREMENTAL=0
 export SCCACHE_DIR="$sccache_path"
 export RUSTC_WRAPPER="$sccache_binary"
 export SCCACHE_SERVER_UDS="/tmp/dodb-sccache-rust1971-arm64.sock"
-export TMPDIR="$run_path/tmp"
+export TMPDIR="$tmp_path"
 
 {
   date -u '+utc=%Y-%m-%dT%H:%M:%SZ'
@@ -65,6 +70,7 @@ export TMPDIR="$run_path/tmp"
   rustup run "$toolchain" cargo -V
   printf 'host_architecture=%s\n' "$(uname -m)"
   printf 'cargo_target_dir=%s\nsccache_dir=%s\nrocksdb_dir=%s\n' "$CARGO_TARGET_DIR" "$SCCACHE_DIR" "$DODB_ROCKSDB_DIR"
+  printf 'run_tmpdir=%s\n' "$TMPDIR"
   printf 'sccache_version=%s\n' "$("$sccache_binary" --version)"
   printf 'sccache_sha256=%s\n' "$(sha256sum "$sccache_binary" | cut -d ' ' -f 1)"
   printf 'cargo_incremental=%s\nrustc_wrapper=%s\nsccache_server_uds=%s\n' "$CARGO_INCREMENTAL" "$RUSTC_WRAPPER" "$SCCACHE_SERVER_UDS"
