@@ -54,7 +54,7 @@ export DODB_ROCKSDB_DIR="$rocksdb_path"
 export CARGO_INCREMENTAL=0
 export SCCACHE_DIR="$sccache_path"
 export RUSTC_WRAPPER="$sccache_binary"
-export SCCACHE_SERVER_PORT=4227
+export SCCACHE_SERVER_UDS="/tmp/dodb-sccache-rust1971-arm64.sock"
 export TMPDIR="$run_path/tmp"
 
 {
@@ -67,7 +67,7 @@ export TMPDIR="$run_path/tmp"
   printf 'cargo_target_dir=%s\nsccache_dir=%s\nrocksdb_dir=%s\n' "$CARGO_TARGET_DIR" "$SCCACHE_DIR" "$DODB_ROCKSDB_DIR"
   printf 'sccache_version=%s\n' "$("$sccache_binary" --version)"
   printf 'sccache_sha256=%s\n' "$(sha256sum "$sccache_binary" | cut -d ' ' -f 1)"
-  printf 'cargo_incremental=%s\nrustc_wrapper=%s\nsccache_server_port=%s\n' "$CARGO_INCREMENTAL" "$RUSTC_WRAPPER" "$SCCACHE_SERVER_PORT"
+  printf 'cargo_incremental=%s\nrustc_wrapper=%s\nsccache_server_uds=%s\n' "$CARGO_INCREMENTAL" "$RUSTC_WRAPPER" "$SCCACHE_SERVER_UDS"
   printf 'rocksdb_source_sha=%s\n' "$(git -C "$rocksdb_path" rev-parse HEAD)"
   sha256sum "$rocksdb_path/librocksdb.a"
   sha256sum "$rocksdb_path/make_config.mk"

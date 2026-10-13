@@ -28,8 +28,9 @@ clean checkouts.
 
 The fixed sccache path is
 `/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/sccache`.
-The helper sets `RUSTC_WRAPPER`, `SCCACHE_DIR`, and a research-specific server
-port (`4227`). sccache `0.18.0` is installed from Mozilla's official
+The helper sets `RUSTC_WRAPPER`, `SCCACHE_DIR`, and a research-specific Unix
+socket at `/tmp/dodb-sccache-rust1971-arm64.sock`. The socket path is kept
+short because Unix socket paths have a small platform limit. sccache `0.18.0` is installed from Mozilla's official
 `aarch64-unknown-linux-musl` release archive. The pinned archive SHA-256 is
 `2b3284d5da3b46a47dc4229e75bb7b88ac4aa99c8d754fb7d2f84997e5a4354a`; verify
 it with `sha256sum` before unpacking. The binary is kept at
@@ -78,10 +79,13 @@ verification of the current SHA.
 ## Reuse check
 
 Two consecutive `--no-run` builds were requested for one clean SHA and this
-fixed Cargo target. Results, including times and whether Cargo rebuilt any
-dependencies, are recorded below after the OCI check. The first build measures
-the cost of populating the shared target; the second measures reuse. No test
-was executed as part of this check.
+fixed Cargo target. The first helper attempt stopped before Cargo compilation:
+sccache could not create its default Unix socket from the long cache path, and
+its compile request count stayed at zero. That failed attempt is retained in
+its own run directory. The helper now sets the short research-specific socket
+above. Results from the two successful build-only checks, including times and
+whether Cargo rebuilt dependencies, are recorded below. No test was executed
+as part of this check.
 
 ## sccache references and limits
 
