@@ -940,9 +940,16 @@ mod tests {
     use std::time::Duration;
     use tempfile::TempDir;
 
+    fn temporary_db_directory() -> TempDir {
+        match std::env::var_os("DODB_TEST_DATA_DIR") {
+            Some(path) => TempDir::new_in(path).unwrap(),
+            None => TempDir::new().unwrap(),
+        }
+    }
+
     #[test]
     fn get_completes_while_same_tenant_transaction_is_open() {
-        let directory = TempDir::new().unwrap();
+        let directory = temporary_db_directory();
         let database = Arc::new(TenantDatabase::open(directory.path()).unwrap());
         let key = DocumentKey::new(b"concurrent-read".to_vec(), b"key".to_vec());
         database
@@ -1001,7 +1008,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn shutdown_waits_for_an_in_flight_request_and_service_reopens() {
-        let directory = TempDir::new().unwrap();
+        let directory = temporary_db_directory();
         let service =
             Arc::new(RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap());
         let tenant = TenantId::new(41);
@@ -1081,7 +1088,7 @@ mod tests {
 
     #[test]
     fn read_iterator_keeps_database_alive_after_tenant_owner_drops() {
-        let directory = TempDir::new().unwrap();
+        let directory = temporary_db_directory();
         let database = TenantDatabase::open(directory.path()).unwrap();
         let key = DocumentKey::new(b"iterator-lifetime".to_vec(), b"key".to_vec());
         database
@@ -1105,7 +1112,7 @@ mod tests {
 
     #[test]
     fn read_iterator_keeps_one_snapshot_across_atomic_transaction_commit() {
-        let directory = TempDir::new().unwrap();
+        let directory = temporary_db_directory();
         let database = TenantDatabase::open(directory.path()).unwrap();
         let first_key = DocumentKey::new(b"snapshot".to_vec(), b"a".to_vec());
         let second_key = DocumentKey::new(b"snapshot".to_vec(), b"b".to_vec());
