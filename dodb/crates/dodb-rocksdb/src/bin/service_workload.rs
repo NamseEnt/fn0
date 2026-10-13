@@ -19,6 +19,7 @@ const INITIAL_ROWS: usize = 10_000;
 const VALUE_SIZE: usize = 512;
 const MAX_LATENCY_SAMPLES: usize = 20_000;
 const MAX_WRITE_LEDGER: usize = 1_000_000;
+const INPUT_FINGERPRINT_PREFIX_WORKFLOWS: u64 = 100;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum BackendKind {
@@ -184,6 +185,7 @@ struct Counters {
     condition_kinds: BTreeMap<String, u64>,
     latencies: BTreeMap<String, Latencies>,
     write_ledger: Vec<LedgerEntry>,
+    client_input_prefixes: Vec<ClientInputPrefix>,
     verification_errors: Vec<String>,
     request_limit_reached: bool,
 }
@@ -193,6 +195,15 @@ struct LedgerEntry {
     commit_identity: u64,
     workflow_id: u64,
     kind: WriteKind,
+}
+
+#[derive(Clone)]
+struct ClientInputPrefix {
+    client_index: usize,
+    profile: Profile,
+    workflow_count: u64,
+    admitted_workflows: u64,
+    fingerprint: String,
 }
 
 impl Counters {
@@ -243,6 +254,14 @@ impl Counters {
             "latency": self.latencies.iter().map(|(name, data)| (name.clone(), data.report())).collect::<BTreeMap<_, _>>(),
             "write_ledger_entries": self.write_ledger.len(),
             "write_ledger_limit": MAX_WRITE_LEDGER,
+            "client_input_prefixes": self.client_input_prefixes.iter().map(|entry| json!({
+                "client_index": entry.client_index,
+                "profile": profile_name(entry.profile),
+                "workflow_count": entry.workflow_count,
+                "admitted_workflows": entry.admitted_workflows,
+                "prefix_limit": INPUT_FINGERPRINT_PREFIX_WORKFLOWS,
+                "fingerprint": entry.fingerprint,
+            })).collect::<Vec<_>>(),
             "verification_errors": self.verification_errors,
             "request_limit_reached": self.request_limit_reached,
         })
@@ -283,6 +302,8 @@ impl Counters {
             }
         }
         self.write_ledger.extend(other.write_ledger);
+        self.client_input_prefixes
+            .extend(other.client_input_prefixes);
         self.verification_errors.extend(other.verification_errors);
     }
 }
@@ -505,6 +526,57 @@ fn schedule_fingerprint(profile: Profile, seed: u64) -> String {
         }
     }
     format!("{fingerprint:016x}")
+}
+
+fn input_workflow_fingerprint(
+    profile: Profile,
+    seed: u64,
+    client_index: usize,
+    tenant_index: usize,
+    workflow_id: u64,
+    value_size: usize,
+    plan: &WorkflowPlan,
+) -> u64 {
+    let (tag, flags) = match &plan.kind {
+        WorkflowKind::Read(ReadKind::Get) => (1_u64, 0_u64),
+        WorkflowKind::Read(ReadKind::Query16) => (2, 0),
+        WorkflowKind::Write {
+            kind,
+            revision_get,
+            intended_rejection,
+            condition_kind,
+        } => {
+            let tag = match *kind {
+                WriteKind::Put => 3,
+                WriteKind::Delete => 4,
+                WriteKind::ConditionalOne => 5,
+                WriteKind::TransactionFour => 6,
+                WriteKind::TransactionEight => 7,
+            };
+            let flags = (*revision_get as u64)
+                | ((*intended_rejection as u64) << 1)
+                | ((*condition_kind as u64) << 2);
+            (tag, flags)
+        }
+    };
+    let mut fingerprint = 0xcbf2_9ce4_8422_2325_u64;
+    for value in [
+        profile_read_percentage(profile) as u64,
+        seed,
+        client_index as u64,
+        tenant_index as u64,
+        workflow_id,
+        value_size as u64,
+        tag,
+        flags,
+        plan.key_ordinal,
+    ] {
+        for byte in value.to_le_bytes() {
+            fingerprint ^= byte as u64;
+            fingerprint = fingerprint.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    fingerprint
 }
 
 fn key_from_ordinal(ordinal: u64) -> DocumentKey {
@@ -934,6 +1006,9 @@ async fn run_clients(
             let plan = make_plan(profile, options.seed ^ tenant_index as u64);
             let mut plan_index = client_index % plan.len();
             let mut client_sequence = 0_u64;
+            let mut prefix_workflow_count = 0_u64;
+            let mut admitted_workflows = 0_u64;
+            let mut input_fingerprint = 0xcbf2_9ce4_8422_2325_u64;
             while accepting.load(Ordering::Relaxed) && Instant::now() < deadline {
                 let next = plan[plan_index].clone();
                 let required_calls = match next.kind {
@@ -968,6 +1043,23 @@ async fn run_clients(
                     .wrapping_add((client_index as u64) << 40)
                     .wrapping_add(client_sequence);
                 client_sequence += 1;
+                if prefix_workflow_count < INPUT_FINGERPRINT_PREFIX_WORKFLOWS {
+                    let workflow_fingerprint = input_workflow_fingerprint(
+                        profile,
+                        options.seed ^ tenant_index as u64,
+                        client_index,
+                        tenant_index,
+                        next_id,
+                        options.value_size,
+                        &next,
+                    );
+                    for byte in workflow_fingerprint.to_le_bytes() {
+                        input_fingerprint ^= byte as u64;
+                        input_fingerprint = input_fingerprint.wrapping_mul(0x0000_0100_0000_01b3);
+                    }
+                    prefix_workflow_count += 1;
+                }
+                admitted_workflows += 1;
                 execute_workflow(
                     &service,
                     tenant,
@@ -979,6 +1071,17 @@ async fn run_clients(
                 )
                 .await;
             }
+            counters[tenant_index]
+                .lock()
+                .unwrap()
+                .client_input_prefixes
+                .push(ClientInputPrefix {
+                    client_index,
+                    profile,
+                    workflow_count: prefix_workflow_count,
+                    admitted_workflows,
+                    fingerprint: format!("{input_fingerprint:016x}"),
+                });
         });
     }
     while Instant::now() < deadline
@@ -1415,6 +1518,7 @@ async fn run(options: Options) -> Result<Value, String> {
                 })
                 .collect(),
             write_ledger: measured.write_ledger.clone(),
+            client_input_prefixes: measured.client_input_prefixes.clone(),
             verification_errors: measured.verification_errors.clone(),
             request_limit_reached: measured.request_limit_reached,
         });
