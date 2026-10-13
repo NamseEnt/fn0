@@ -1,8 +1,9 @@
 # Backend contract for the product comparison
 
-Status: the common read/transaction service contract passed for B-tree, B-link,
-and RocksDB at implementation verification SHA
-`8dc4f3b7565f5bb0b963f782721378a55616f516`, 2026-10-13. The existing
+Status: the common read/transaction service contract and RocksDB wrapper
+concurrency/lifetime checks passed for B-tree, B-link, and RocksDB at
+implementation verification SHA `139d9ae40120e35aad226bb13830c9347e297595`,
+2026-10-13. This does not establish a performance baseline. The existing
 R1b-3b WAL-sync-boundary all-or-none process-kill result is preserved; neither
 statement claims that every lifecycle or crash case is complete. See
 [the roadmap](single-instance-product-roadmap.md) for execution order and the
@@ -47,6 +48,45 @@ that snapshot across calls or pages. Read response budgets reject oversized
 results without truncating them and are reserved per live document before its
 value bytes are copied into the response. The RocksDB cursor seeks use the
 canonical escaped `DocumentKey` encoding and RocksDB's bytewise comparator.
+
+## RocksDB handle ownership and concurrency
+
+The tenant-wide mutex around the raw RocksDB DB pointer has been removed.
+`RocksDbHandle` is shared through `Arc`; the pinned RocksDB 11.8.1 `DB` API
+documents concurrent access from multiple threads without external
+synchronization, and `TransactionDB` derives from that DB hierarchy. A separate
+RocksDB `Transaction` is created for each request and is not shared. Its guard
+retains the DB owner through commit or rollback and transaction destruction.
+Query/Scan iterators retain the DB owner until the iterator and its snapshot
+have both been released. This means clearing the tenant registry cannot close a
+DB while a request, transaction, or iterator still owns it.
+
+The short lifecycle state lock admits requests and tracks active execute
+futures; it is not held during database work. Shutdown closes admission, waits
+for active request leases, then drains the unchanged eight-slot blocking
+semaphore before clearing the registry on Tokio's blocking pool. This also
+waits for already-started blocking work whose request future was cancelled. The
+prior reusable-service behavior is retained: a later execute can reopen the
+tenant. A spawn-blocking closure also owns the DB `Arc`, so cancellation of its
+awaiting future does not free the handle before the blocking call finishes.
+
+The focused concurrency check pauses a transaction immediately after the
+actual `BeginTransaction` call and confirms a same-tenant Get returns a
+committed value before that transaction is released. Another check overlaps a
+service Get with shutdown, confirms the request completes, and reopens the same
+tenant afterward. A third cancels the request future after its RocksDB Get has
+started and confirms shutdown waits for that blocking operation before the
+tenant can be reopened. The existing shared read and transaction contracts
+still pass, including Query/Scan snapshot consistency. These are correctness
+checks; they do not measure performance.
+
+TransactionDB key locks acquired by `GetForUpdate` remain responsible for
+condition and mutation key protection. Every mutating transaction also locks
+and updates the persisted tenant revision counter in the same transaction, so
+successful write commits can remain serialized per tenant by that counter.
+This change does not redesign revision allocation or establish parallel
+independent write commits. It also does not change the blocking-operation
+limit.
 
 ## Transaction validation and state identity
 

@@ -1,8 +1,10 @@
 # B-link service comparison readiness
 
-Status: B-link service connection and common service-contract checks complete.
-The workload driver and performance records are pending. No speed comparison
-was run for this report.
+Status: B-link service connection, common service-contract checks, and the
+RocksDB wrapper concurrency/lifetime change are complete at implementation
+verification SHA `139d9ae40120e35aad226bb13830c9347e297595`. The workload driver
+and performance records are pending. No speed comparison was run for this
+report.
 
 ## Backend paths
 
@@ -132,43 +134,108 @@ and is not counted as the OCI ZFS verification. Commit `6bd01f0c` adds the
 explicit test-data-root setting; `8dc4f3b7` preserves queued requests at the
 coordinator group byte limit.
 
-## RocksDB wrapper and scheduling difference
+## RocksDB wrapper ownership and scheduling
 
-`TenantDatabase.handle` is a `std::sync::Mutex<NonNull<c_void>>`. Point Get
-holds it during the RocksDB call. Transaction execution acquires it before
-`dodb_rocksdb_begin` and holds it through sorted `GetForUpdate` calls,
-condition evaluation, writes, and commit or rollback. Query/Scan hold it while
-creating the iterator and snapshot, then release it while iterating. This is a
-wrapper-level per-tenant serialization in addition to RocksDB's own
-TransactionDB key locks.
+At implementation verification SHA `139d9ae40120e35aad226bb13830c9347e297595`,
+the tenant-wide `handle` mutex is removed. A tenant database owns an
+`Arc<RocksDbHandle>` around the opened `TransactionDB`. Point Get, iterator and
+snapshot creation, and transaction begin/commit call the pinned RocksDB API
+without a wrapper mutex. Pinned RocksDB 11.8.1 documents `DB` as safe for
+concurrent access without external synchronization in
+`include/rocksdb/db.h`; `TransactionDB` derives from that DB hierarchy. Each
+request creates and exclusively uses its own RocksDB `Transaction` object, so
+the transaction object itself is never shared between requests.
 
-Every mutating transaction also calls `GetForUpdate` on metadata key
-`0x00 0x01`, increments the persisted tenant revision counter, and commits that
-counter with the requested mutations. The counter serializes revision
-allocation for successful mutations in a tenant inside TransactionDB. The
-wrapper mutex is broader: it serializes otherwise independent writes and
-overlaps reads with a tenant's transaction from the wrapper's point of view.
-The service has a global semaphore of eight blocking operations and runs those
-operations on Tokio's blocking pool. Separate tenants have separate database
-handles and can use those slots concurrently.
+`TransactionGuard` retains a DB `Arc` through commit, rollback, and transaction
+destruction. `TenantReadIterator` retains a DB `Arc` until its C++ iterator is
+destroyed; the C++ read-iterator owner releases its iterator before releasing
+the associated snapshot. These owners keep the raw DB pointer valid if the
+tenant registry is cleared while a blocking operation, transaction, snapshot,
+or iterator still holds it. The `unsafe Send`/`Sync` implementation is limited
+to the shared DB handle and relies on the pinned DB concurrency contract and
+Arc-controlled close lifetime.
+
+The registry is accessed briefly to find or initialize a per-tenant cell. A
+short lifecycle state lock admits requests and tracks active execute futures;
+the lock is not held during database work. Shutdown closes admission, waits for
+active request leases, then drains all permits from the unchanged eight-slot
+blocking semaphore before clearing tenant cells on Tokio's blocking pool. This
+also waits for already-started blocking work whose request future was
+cancelled. The existing service behavior after shutdown is preserved: a later
+execute can reopen the tenant. Blocking closures and FFI transaction/iterator
+owners also retain the DB `Arc` through their own completion.
+
+This removes wrapper serialization between same-tenant Gets and lets Get run
+while a transaction remains open. Query/Scan iterator creation and traversal
+also have no exclusive tenant-handle lock; the existing per-request snapshot
+and read-contract check still verify atomic snapshot visibility. TransactionDB
+`GetForUpdate` protection for condition and mutation keys remains in place.
+Every mutating transaction still calls `GetForUpdate` on metadata key
+`0x00 0x01` and commits the incremented revision counter with its mutations.
+That tenant-wide revision allocation can continue to serialize successful
+write commits. The blocking-operation limit is unchanged. None of these
+correctness checks measures performance impact, establishes a competitive
+RocksDB baseline, or shows that independent writes now commit in parallel.
+
+The local checks used Rust/Cargo 1.97.1 on macOS ARM64 and the pinned RocksDB
+checkout at `abeebd9630f11bd08c28b7bd43c7bdfc62050654`:
+
+```sh
+cargo +1.97.1 fmt -p dodb-rocksdb
+DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 \
+  cargo +1.97.1 test --locked -p dodb-rocksdb \
+  --lib --test read_contract --test transaction_contract
+```
+
+The five library tests passed, including an explicit transaction-begin gate
+that kept a transaction open until a concurrent Get completed, iterator-owned
+DB lifetime after tenant-owner drop, snapshot consistency, and an execute
+overlapping shutdown followed by same-service reopen, and cancellation of an
+execute while shutdown drained its blocking operation. The common read target
+passed 2 tests; the common transaction target passed 1 test. The existing
+common checks include Query/Scan snapshot consistency and normal shutdown and
+reopen.
+
+OCI verification ran the same targets on clean detached source SHA
+`139d9ae40120e35aad226bb13830c9347e297595` on
+`instance-20260923-1013`, native AArch64 Linux, Rust/Cargo 1.97.1, and the
+Release profile with `+crc`:
+
+```sh
+DODB_TEST_DATA_DIR=/bench/zfs/db/dodb-rocksdb-wrapper-139d9ae4/test-databases \
+DODB_BUILD_RUN_ID=rocksdb-wrapper-139d9ae4 \
+  bash dodb/scripts/run-oci-rocksdb-build.sh \
+  test --locked --release -p dodb-rocksdb \
+  --lib --test read_contract --test transaction_contract
+```
+
+All 5 library, 2 common read, and 1 common transaction tests passed. Cargo
+reported 98.53 seconds. Test DBs were rooted at
+`/bench/zfs/db/dodb-rocksdb-wrapper-139d9ae4/test-databases` on ZFS. The clean
+detached checkout was
+`/bench/zfs/db/dodb-rocksdb-wrapper-139d9ae4/checkout`.
+The shared Cargo target, sccache directory, and running sccache server were
+reused; this invocation added 7 cache misses and no hits while compiling
+changed workspace crates. RocksDB 11.8.1 was not rebuilt; the reused archive at
+`/bench/zfs/db/product-build/rocksdb-source/librocksdb.a` has SHA-256
+`9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5`.
+The test executable SHA-256 values were:
+
+| Test executable | SHA-256 |
+| --- | --- |
+| `dodb_rocksdb-8dc0217159dad61d` | `36e9f95ebbf92a86104f516a67c063a1a991aba7cde8cc07843c720c050286ad` |
+| `read_contract-c907033e9384b264` | `7a5b309539850ebca3c76ab69234103228384cfe43c08d07ebb81ec5527b63f9` |
+| `transaction_contract-832acd252ecc23fe` | `1619684a28f5d79bd48c54ec8ebe85859cfb62a7c1e49d622858cb3f02942294` |
+
+Complete helper logs and checksums remain at
+`/bench/zfs/db/dodb-rocksdb-build-runs/rocksdb-wrapper-139d9ae4/`.
 
 B-link reads pin immutable published generations without taking the writer
 queue. Its per-tenant coordinator serializes logical writes in request order,
-but can place several logical transactions under one physical WAL sync. The
-current RocksDB wrapper holds one tenant mutex through each synchronous
-TransactionDB commit; it does not collect several service transactions into a
-shared sync group. Both successful write responses wait for the backend's
-durability path, while batching and concurrency differ inside the backends.
-
-Do not use the current RocksDB wrapper as evidence that B-link is generally
-faster. Before treating it as a competitive RocksDB baseline, the first narrow
-wrapper change should remove the `handle` mutex from ordinary concurrent
-operations while retaining safe handle lifetime and the existing
-TransactionDB `GetForUpdate` locks. Keep the revision counter transaction and
-measure its effect before proposing a revision redesign. The service's eight
-blocking-operation limit remains an explicit resource setting. This isolates
-the wrapper's broad serialization without changing public semantics or
-rebuilding the backend architecture.
+but can place several logical transactions under one physical WAL sync. RocksDB
+now permits concurrent wrapper reads and keeps each request transaction
+separate, but it still commits synchronously and has the shared revision-counter
+lock described above. No cross-backend performance effect has been measured.
 
 ## Existing workload harness and remaining gap
 
@@ -227,9 +294,10 @@ each run has separate logs, database paths, and temporary paths. It must reuse
 the existing Cargo cache and RocksDB archive rather than create a per-SHA
 target or rebuild RocksDB.
 
-The next smallest implementation task is the service-level stateful workload
-driver described above. It should expose B-link and RocksDB service factories,
-implement only the frozen ten-record workload, and emit the accounting and
-manifest fields needed to validate paired OCI runs. This report establishes
-service readiness; it does not establish throughput, latency, or a backend
-winner.
+The next implementation task is the service-level stateful workload driver
+described above. It should expose B-link and RocksDB service factories, cover
+the four single-tenant read/write ratios and the mixed multi-tenant scenario,
+include conditional writes and width-four/eight transactions, count preparatory
+Gets as API calls, and separate successful write transactions from expected
+condition rejections. This report establishes correctness readiness; it does
+not establish throughput, latency, or a backend winner.
