@@ -187,14 +187,13 @@ DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 \
   --lib --test read_contract --test transaction_contract
 ```
 
-The five library tests passed, including an explicit transaction-begin gate
+The five library tests passed. They cover an explicit transaction-begin gate
 that kept a transaction open until a concurrent Get completed, iterator-owned
-DB lifetime after tenant-owner drop, snapshot consistency, and an execute
-overlapping shutdown followed by same-service reopen, and cancellation of an
-execute while shutdown drained its blocking operation. The common read target
-passed 2 tests; the common transaction target passed 1 test. The existing
-common checks include Query/Scan snapshot consistency and normal shutdown and
-reopen.
+DB lifetime after tenant-owner drop, snapshot consistency, request/shutdown
+overlap followed by same-service reopen, and cancellation followed by shutdown
+draining the blocking operation. The common read target passed 2 tests; the
+common transaction target passed 1 test. The existing common checks include
+Query/Scan snapshot consistency and normal shutdown and reopen.
 
 OCI verification ran the same targets on clean detached source SHA
 `139d9ae40120e35aad226bb13830c9347e297595` on
