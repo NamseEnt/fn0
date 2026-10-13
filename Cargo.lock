@@ -1877,6 +1877,9 @@ dependencies = [
  "dodb-service",
  "dodb-storage",
  "futures",
+ "libc",
+ "serde",
+ "serde_json",
  "tempfile",
  "tokio",
 ]

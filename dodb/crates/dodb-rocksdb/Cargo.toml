@@ -11,6 +11,11 @@ build = "build.rs"
 dodb-core.workspace = true
 dodb-protocol.workspace = true
 dodb-service.workspace = true
+dodb-server.workspace = true
+dodb-storage.workspace = true
+libc.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 dashmap.workspace = true
 futures.workspace = true
 tokio = { workspace = true, features = ["rt", "sync"] }
