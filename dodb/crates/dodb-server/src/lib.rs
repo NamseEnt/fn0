@@ -1205,7 +1205,10 @@ impl AsyncBlinkShard {
                     request_bytes = request_bytes.saturating_add(next_bytes);
                     queued.push(next);
                 }
-                if queued.len() > 1 && config.max_collection_delay > std::time::Duration::ZERO {
+                if queued.len() > 1
+                    && pending.is_none()
+                    && config.max_collection_delay > std::time::Duration::ZERO
+                {
                     let deadline = tokio::time::sleep(config.max_collection_delay);
                     tokio::pin!(deadline);
                     while queued.len() < config.max_group_requests.max(1) {
