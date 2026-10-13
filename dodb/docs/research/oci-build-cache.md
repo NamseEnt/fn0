@@ -82,12 +82,13 @@ verification of the current SHA.
 ## Reuse check
 
 Two consecutive `--no-run` builds were requested for one clean SHA and this
-fixed Cargo target. The first two helper attempts stopped before Cargo
-compilation because sccache's startup notification socket used a long
-temporary path; its compile request count stayed at zero. Those failed
-attempts are retained in their own run directories. The helper now uses the
-short per-run `TMPDIR` and the research-specific socket above. Results from
-the two successful build-only checks, including times and whether Cargo
+fixed Cargo target. The first three helper attempts stopped before Cargo
+compilation with a Unix socket path error; their sccache compile request
+counts stayed at zero. Those failed attempts are retained in their own run
+directories. A standalone check showed that the pinned compiler responds
+when the sccache server is started with the short temp path and dedicated
+socket. The helper now starts that server explicitly before Cargo. Results
+from the two successful build-only checks, including times and whether Cargo
 rebuilt dependencies, are recorded below. No test was executed as part of
 this check.
 

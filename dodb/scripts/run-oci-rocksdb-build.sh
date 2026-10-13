@@ -84,6 +84,8 @@ export TMPDIR="$tmp_path"
   printf '\n'
 } > "$run_path/environment.txt" 2>&1
 
+printf '%s\n' 'sccache --start-server' > "$run_path/sccache-server-start.txt"
+"$sccache_binary" --start-server > "$run_path/sccache-server-start.txt" 2>&1
 printf '%s\n' 'sccache --show-stats' > "$run_path/sccache-before-command.txt"
 "$sccache_binary" --show-stats >> "$run_path/sccache-before-command.txt" 2>&1
 set +e
