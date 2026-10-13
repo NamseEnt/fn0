@@ -33,11 +33,15 @@ socket at `/tmp/dodb-sccache-rust1971-arm64.sock`. Its per-run `TMPDIR` is a
 short unique path under `/tmp` because sccache creates its startup notification
 socket under the temporary directory, which otherwise can exceed the Unix
 socket path limit. The helper reuses an active listener on this dedicated
-socket and starts one only when none is listening. sccache `0.18.0` is installed from Mozilla's official
-`aarch64-unknown-linux-musl` release archive. The pinned archive SHA-256 is
+socket and starts one only when none is listening. sccache `0.18.0` is
+installed from Mozilla's
+[official release](https://github.com/mozilla/sccache/releases/tag/v0.18.0)
+`aarch64-unknown-linux-musl` archive. The pinned archive SHA-256 is
 `2b3284d5da3b46a47dc4229e75bb7b88ac4aa99c8d754fb7d2f84997e5a4354a`; verify
 it with `sha256sum` before unpacking. The binary is kept at
 `/bench/zfs/db/tooling/sccache-0.18.0-aarch64-unknown-linux-musl/sccache`.
+Its SHA-256 is
+`0fd82ece4469b791e30fffdd43d58d2e6cae303950c0d6c8faad932d93e35cf4`.
 No ccache is configured. Cargo can skip a rustc invocation using target
 fingerprints before sccache is called, so an unchanged second build can have
 zero sccache hits without indicating a cache failure.
@@ -82,16 +86,48 @@ verification of the current SHA.
 
 ## Reuse check
 
-Two consecutive `--no-run` builds were requested for one clean SHA and this
-fixed Cargo target. The first three helper attempts stopped before Cargo
-compilation with a Unix socket path error; their sccache compile request
-counts stayed at zero. Those failed attempts are retained in their own run
-directories. A standalone check showed that the pinned compiler responds
-when the sccache server is started with the short temp path and dedicated
-socket. The helper now starts that server explicitly before Cargo. Results
-from the two successful build-only checks, including times and whether Cargo
-rebuilt dependencies, are recorded below. No test was executed as part of
-this check.
+The first four helper attempts stopped before Cargo compilation with a Unix
+socket path error; their sccache compile request counts stayed at zero. Those
+failed attempts are retained in their own run directories. A standalone check
+showed that the pinned compiler responds when the sccache server is started
+with the short temp path and dedicated socket. The helper now starts one
+server only when its listener is absent and reuses the listener otherwise.
+No unrelated process was stopped. No test was executed as part of this check.
+
+The final helper was exercised twice consecutively from a clean detached OCI
+checkout at source SHA `913c9728c21cb5b60f0fe2803d7e94b8957ea8ac`, using the
+fixed shared target. The first invocation reused the prior target contents
+but compiled six workspace crates for the new checkout root. This was not an
+empty-target cold build. The second invocation reused the first invocation's
+artifacts without any `Compiling` lines.
+
+| Run evidence directory | Elapsed | Cargo output | sccache change |
+| --- | ---: | --- | --- |
+| `/bench/zfs/db/dodb-rocksdb-build-runs/process-crash-contract-913c9728c21cb5b60f0fe2803d7e94b8957ea8ac-build-1/` | 60.29 s | Compiled `dodb-core`, `dodb-rocksdb`, `dodb-service`, `dodb-protocol`, `dodb-storage`, and `dodb-server`; Release `--no-run` succeeded. | 9 requests; 7 executed, with 7 misses (6 Rust, 1 C/C++), 0 hits, and 2 non-cacheable calls. |
+| `/bench/zfs/db/dodb-rocksdb-build-runs/process-crash-contract-913c9728c21cb5b60f0fe2803d7e94b8957ea8ac-build-2/` | 0.37 s | `Finished release` in 0.33 s; no crates recompiled; Release `--no-run` succeeded. | Before/after remained 9 requests, 7 executed, 7 misses, and 0 hits. Cargo did not call the compiler, so no new sccache hit was expected. |
+
+Both runs used `rustup run 1.97.1 cargo test --locked --release -p dodb-rocksdb --test process_crash_contract --no-run` and returned status 0. The Cargo-reported executable was under the shared target at `release/deps/process_crash_contract-8a59a0b53a7c7951`; its SHA-256 was `23ccd28c43120d4ab582b0e13bff6e7e45896c38af250c6100e19df2bf30c5b5`. The helper records the resolved executable path and hash in each run directory. The executable was not run.
+
+The Cargo target existed before this check and was reused from the R1b-3a
+target path after its `.rustc_info.json` confirmed Rust `1.97.1` and `+crc`.
+The R1b-3a report lists OCI Rust `1.98.1`, while the repository's explicit
+`rust-toolchain.toml` pins `1.97.1`; this run follows the repository pin. The
+new clean checkout root differed from the earlier checkout root, so Cargo
+rebuilt workspace crates on the first invocation. The helper leaves
+`SCCACHE_BASEDIRS` unset to retain absolute path distinctions in cache keys.
+For later sequential SHAs, keep the clean checkout at the same path when
+possible. Compiler version, source, and flags remain part of normal cache
+decisions.
+
+The existing RocksDB source SHA was
+`abeebd9630f11bd08c28b7bd43c7bdfc62050654`; the archive SHA-256 was
+`9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5` and
+`make_config.mk` SHA-256 was
+`bcd375a99550a9314a92ec3673cb7540ed4eea06909477bf3675d772baefaf71`.
+`make_config.mk` defines Linux with `CC=cc`, `CXX=g++`, and `AR=gcc-ar`, and
+the source `include/rocksdb/version.h` defines version 11.8.1. The archive was
+not rebuilt. The single C/C++ sccache miss was from this build's C++ shim
+compilation; no RocksDB archive cache effect was measured.
 
 ## sccache references and limits
 
@@ -102,7 +138,5 @@ invoke the system linker. The [configuration documentation](https://github.com/m
 describes the local `SCCACHE_DIR` and `SCCACHE_BASEDIRS` path normalization.
 This helper does not normalize source paths: Cargo target reuse is the primary
 mechanism, and sccache keys retain their normal source, compiler, argument,
-and path distinctions. The small C++ transaction shim is compiled by
-`cc-rs`; this helper does not change its compiler configuration. The existing
-RocksDB archive is reused without a rebuild, so this task makes no claim about
-C++ cache benefit.
+and path distinctions. The C++ transaction shim produced one sccache miss;
+the existing RocksDB archive was reused without a rebuild.
