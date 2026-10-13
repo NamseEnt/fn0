@@ -87,12 +87,17 @@ with `--exact service_child`, so parent scenarios cannot recurse.
 
 | Environment | Source SHA | Build and command | RocksDB | Result |
 | --- | --- | --- | --- | --- |
-| Local macOS 26.4, ARM64, Rust 1.97.1 | `551471d5ea48d9e0d1a185b6bdf274ae09cf3ae5` | `cargo fmt -p dodb-rocksdb -- --check`; `env DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 cargo check --locked --offline -p dodb-rocksdb --all-targets`; `env DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 cargo test --locked --offline -p dodb-rocksdb --test process_crash_contract -- --nocapture` | 11.8.1, source `abeebd9630f11bd08c28b7bd43c7bdfc62050654` | Formatting, all-target check, and both final scenarios passed. Log: `local-process-crash-final.log`. |
-| OCI A1, Linux aarch64, Rust 1.98.1, ZFS | `551471d5ea48d9e0d1a185b6bdf274ae09cf3ae5` | Clean detached checkout; `env DODB_ROCKSDB_DIR=/bench/zfs/db/product-build/rocksdb-source CARGO_TARGET_DIR=/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target TMPDIR=/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/tmp cargo test --locked --release -p dodb-rocksdb --test process_crash_contract -- --nocapture` | 11.8.1, source `abeebd9630f11bd08c28b7bd43c7bdfc62050654` | Native ARM64 Release build and both scenarios passed. ZFS mount: `/bench/zfs/db` (`dodbbench/db`). ELF test binary SHA-256: `ef6887d4b19ddd8f70d2902e1bb672fb8220a4d5c998e1570538f6fba96db62f`. Checkout status was clean at the exact source SHA. Log: `oci-process-crash.log`. |
+| Local macOS 26.4, ARM64, Rust version unverified | `551471d5ea48d9e0d1a185b6bdf274ae09cf3ae5` | `cargo fmt -p dodb-rocksdb -- --check`; `env DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 cargo check --locked --offline -p dodb-rocksdb --all-targets`; `env DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 cargo test --locked --offline -p dodb-rocksdb --test process_crash_contract -- --nocapture` | 11.8.1, source `abeebd9630f11bd08c28b7bd43c7bdfc62050654` | Formatting, all-target check, and both final scenarios passed. Log: `local-process-crash-final.log`. |
+| OCI A1, Linux aarch64, Rust version unverified, ZFS | `551471d5ea48d9e0d1a185b6bdf274ae09cf3ae5` | Clean detached checkout; `env DODB_ROCKSDB_DIR=/bench/zfs/db/product-build/rocksdb-source CARGO_TARGET_DIR=/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target TMPDIR=/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/tmp cargo test --locked --release -p dodb-rocksdb --test process_crash_contract -- --nocapture` | 11.8.1, source `abeebd9630f11bd08c28b7bd43c7bdfc62050654` | Native ARM64 Release build and both scenarios passed. ZFS mount: `/bench/zfs/db` (`dodbbench/db`). ELF test binary SHA-256: `ef6887d4b19ddd8f70d2902e1bb672fb8220a4d5c998e1570538f6fba96db62f`. Checkout status was clean at the exact source SHA. Log: `oci-process-crash.log`. |
 
 The OCI checkout and target/temp directories were new and dedicated to this
 run. No source was changed on OCI. No existing OCI experiment was stopped,
 deleted, or overwritten. No Debian task or performance measurement was run.
+The earlier table entries `Rust 1.98.1` for OCI and `Rust 1.97.1` for local
+were not supported by the retained direct run logs: neither log contains
+`rustc -vV` or `cargo -V` output. The repository pin and Cargo fingerprints do
+not establish the compiler used by those past runs, so their actual Rust and
+Cargo versions are unverified.
 
 ## Failures and corrections
 

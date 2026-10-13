@@ -72,7 +72,7 @@ helper. For example, the build-only `process_crash_contract` command is:
 
 ```sh
 DODB_BUILD_RUN_ID=process-crash-contract-no-run-01 \
-  dodb/scripts/run-oci-rocksdb-build.sh \
+  bash dodb/scripts/run-oci-rocksdb-build.sh \
   test --locked --release -p dodb-rocksdb --test process_crash_contract --no-run
 ```
 
@@ -106,13 +106,16 @@ artifacts without any `Compiling` lines.
 | `/bench/zfs/db/dodb-rocksdb-build-runs/process-crash-contract-913c9728c21cb5b60f0fe2803d7e94b8957ea8ac-build-1/` | 60.29 s | Compiled `dodb-core`, `dodb-rocksdb`, `dodb-service`, `dodb-protocol`, `dodb-storage`, and `dodb-server`; Release `--no-run` succeeded. | 9 requests; 7 executed, with 7 misses (6 Rust, 1 C/C++), 0 hits, and 2 non-cacheable calls. |
 | `/bench/zfs/db/dodb-rocksdb-build-runs/process-crash-contract-913c9728c21cb5b60f0fe2803d7e94b8957ea8ac-build-2/` | 0.37 s | `Finished release` in 0.33 s; no crates recompiled; Release `--no-run` succeeded. | Before/after remained 9 requests, 7 executed, 7 misses, and 0 hits. Cargo did not call the compiler, so no new sccache hit was expected. |
 
-Both runs used `rustup run 1.97.1 cargo test --locked --release -p dodb-rocksdb --test process_crash_contract --no-run` and returned status 0. The Cargo-reported executable was under the shared target at `release/deps/process_crash_contract-8a59a0b53a7c7951`; its SHA-256 was `23ccd28c43120d4ab582b0e13bff6e7e45896c38af250c6100e19df2bf30c5b5`. The helper records the resolved executable path and hash in each run directory. The executable was not run.
+Both runs used `bash dodb/scripts/run-oci-rocksdb-build.sh test --locked --release -p dodb-rocksdb --test process_crash_contract --no-run` and returned status 0. The Cargo-reported executable was under the shared target at `release/deps/process_crash_contract-8a59a0b53a7c7951`; its SHA-256 was `23ccd28c43120d4ab582b0e13bff6e7e45896c38af250c6100e19df2bf30c5b5`. The helper records the resolved executable path and hash in each run directory. The executable was not run.
 
 The Cargo target existed before this check and was reused from the R1b-3a
 target path after its `.rustc_info.json` confirmed Rust `1.97.1` and `+crc`.
-The R1b-3a report lists OCI Rust `1.98.1`, while the repository's explicit
-`rust-toolchain.toml` pins `1.97.1`; this run follows the repository pin. The
-new clean checkout root differed from the earlier checkout root, so Cargo
+The R1b-3a report previously listed OCI Rust `1.98.1`, while the repository's
+explicit `rust-toolchain.toml` pins `1.97.1`. The retained R1b-3a direct run log
+does not record `rustc -vV` or `cargo -V`, so the historical actual versions
+are unverified; the pin and reused target fingerprint do not establish them.
+This run follows the repository pin. The new clean checkout root differed from
+the earlier checkout root, so Cargo
 rebuilt workspace crates on the first invocation. The helper leaves
 `SCCACHE_BASEDIRS` unset to retain absolute path distinctions in cache keys.
 For later sequential SHAs, keep the clean checkout at the same path when

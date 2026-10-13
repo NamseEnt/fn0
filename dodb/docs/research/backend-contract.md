@@ -1,6 +1,6 @@
 # Backend contract for the product comparison
 
-Status: R1b-3a acknowledged-transaction process-kill slice verified,
+Status: R1b-3b WAL-sync-boundary all-or-none process-kill slice verified,
 2026-10-13. This remains the common contract for both backends; it does not
 claim that all R1 gates pass. See [the roadmap](single-instance-product-roadmap.md)
 for execution order. The earlier
@@ -9,6 +9,8 @@ records the separate read implementation slice. R1b-2 transaction conformance
 is in the [R1b-2 report](../experiments/results/rocksdb-service-r1b2/REPORT.md),
 and R1b-3a is in the
 [R1b-3a report](../experiments/results/rocksdb-service-r1b3a-20261013-local/REPORT.md).
+R1b-3b's native and RocksDB WAL-sync-boundary checks are recorded in the
+[R1b-3b report](../experiments/results/rocksdb-service-r1b3b-20261013-local/REPORT.md).
 
 ## Existing API boundary
 
