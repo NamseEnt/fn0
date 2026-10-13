@@ -32,7 +32,8 @@ The helper sets `RUSTC_WRAPPER`, `SCCACHE_DIR`, and a research-specific Unix
 socket at `/tmp/dodb-sccache-rust1971-arm64.sock`. Its per-run `TMPDIR` is a
 short unique path under `/tmp` because sccache creates its startup notification
 socket under the temporary directory, which otherwise can exceed the Unix
-socket path limit. sccache `0.18.0` is installed from Mozilla's official
+socket path limit. The helper reuses an active listener on this dedicated
+socket and starts one only when none is listening. sccache `0.18.0` is installed from Mozilla's official
 `aarch64-unknown-linux-musl` release archive. The pinned archive SHA-256 is
 `2b3284d5da3b46a47dc4229e75bb7b88ac4aa99c8d754fb7d2f84997e5a4354a`; verify
 it with `sha256sum` before unpacking. The binary is kept at
