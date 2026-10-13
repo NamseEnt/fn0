@@ -1,9 +1,13 @@
 # Backend contract for the product comparison
 
-Status: R1b-3b WAL-sync-boundary all-or-none process-kill slice verified,
-2026-10-13. This remains the common contract for both backends; it does not
-claim that all R1 gates pass. See [the roadmap](single-instance-product-roadmap.md)
-for execution order. The earlier
+Status: the common read/transaction service contract passed for B-tree, B-link,
+and RocksDB at implementation verification SHA
+`8dc4f3b7565f5bb0b963f782721378a55616f516`, 2026-10-13. The existing
+R1b-3b WAL-sync-boundary all-or-none process-kill result is preserved; neither
+statement claims that every lifecycle or crash case is complete. See
+[the roadmap](single-instance-product-roadmap.md) for execution order and the
+[B-link comparison readiness report](blink-service-comparison-readiness.md)
+for service wiring and OCI provenance. The earlier
 [R1b-1 report](../experiments/results/rocksdb-service-r1b1-2774bd1c/REPORT.md)
 records the separate read implementation slice. R1b-2 transaction conformance
 is in the [R1b-2 report](../experiments/results/rocksdb-service-r1b2/REPORT.md),
@@ -14,7 +18,9 @@ R1b-3b's native and RocksDB WAL-sync-boundary checks are recorded in the
 
 ## Existing API boundary
 
-Implement `dodb_service::DodbService` for `dodb-rocksdb`. Reuse `TenantId`,
+Implement `dodb_service::DodbService` for each compared backend. The existing
+services are `LocalTenantService` backed by B-tree,
+`BlinkTenantService` backed by B-link, and `RocksDbService`. Reuse `TenantId`,
 `DocumentKey`, `Request`, `Response`, `TransactionRequest`, `ExecutionBudget`,
 and application errors. The same transport must be able to call either service.
 An engine-only adapter returning a bool for writes is insufficient.

@@ -117,6 +117,30 @@ repetitions to every cell without a question that requires them.
 
 ## First multi-tenant comparison
 
+The initial comparison uses one MT-MIX run per backend. Each run is one service
+process managing four independent tenant DBs simultaneously, with one tenant
+running each RW profile (RW95, RW80, RW50, RW20). Use 16 external clients total,
+four clients assigned to each tenant, 10,000 live rows per tenant, 16-byte
+combined raw keys, and 512-byte changing values. Use seed `20261013` for each
+paired backend input and deterministic tenant substreams. Cap each run at
+1,000,000 public API calls, including prerequisite Gets; the five-second
+measurement deadline normally stops admission first. Use the same closed-loop
+request generator and fixed client allocation for both backends. This is four
+active/open tenants; it does not claim larger tenant capacity or lifecycle
+readiness. Seed the same logical tenant data before timing.
+
+The initial single-tenant and MT-MIX comparison therefore has ten records:
+four profiles times two backends, plus one four-profile MT-MIX record per
+backend. Every run uses one-second warmup, five-second measurement, and one
+repetition, seed `20261013`, and a 1,000,000 public API-call ceiling per run.
+It is preliminary evidence only. Record API-call attempts and
+successes, successful write transactions, mutations, expected condition
+rejections, conflicts, preparatory Gets, and per-tenant outputs separately.
+Condition-generating Gets are public service requests and are included in the
+same 16-client workload accounting. Both backends receive the same fixed seed
+and logical input stream within each paired record.
+
+The profiles below remain follow-up multi-tenant cases after the initial round.
 Each run is one service process managing independent tenant DBs simultaneously.
 Measure per tenant and per workload, not just total ops/s. Seed only active
 tenant datasets to avoid turning a mostly idle scenario into a bulk load.
@@ -140,10 +164,10 @@ Do not give each of 16 databases an independent full-machine CPU/cache budget.
 Total memory accounting includes resources shared and retained by all DBs.
 For hot keys specify the key-set size and access probability in the manifest.
 
-Three scenarios times two backends = six records per host. Combined with the
-single-tenant comparison, first-round evidence is 14 records per host, at most
-28 across OCI and Debian. Correctness checks and failed attempts are listed
-separately and are not successful benchmark records.
+The three scenarios above are follow-up coverage, not part of the initial ten
+records. When run, retain all scenarios on both backends and report them
+separately from the preliminary round. Correctness checks and failed attempts
+are listed separately and are not successful benchmark records.
 
 Later lifecycle work expands to 1,000 persistent tenants with a small active
 set, exercises configured handle capacity and eviction, and measures cold-open

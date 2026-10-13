@@ -1,8 +1,10 @@
 # Single-instance transactional database research
 
-Status: active research plan, established 2026-10-12. The foundation inventory
-is complete; backend implementation and new product measurements are pending.
-Inspected source: `7785241d11cf909111c1226afd3bed666f010cd4`.
+Status: active research plan. The common service contract now has B-tree,
+B-link, and RocksDB implementations; a service-level product workload driver
+and product measurements remain pending. The latest historical inventory is
+`7785241d11cf909111c1226afd3bed666f010cd4`; the B-link service connection is
+recorded in [the readiness report](blink-service-comparison-readiness.md).
 
 ## Product objective
 
@@ -44,8 +46,8 @@ operation semantics do not imply AWS HTTP API compatibility.
 | Transaction input | `TransactionRequest` with conditions and Put/Delete mutations | KV-only WriteBatch measurements do not cover the product. |
 | Conditions | RevisionEquals, Exists, NotExists | Both backends need atomic validation and application. |
 | Missing documents | Missing carries a revision; untouched missing is revision zero | Persist deletion identity and detect missing/insert/delete ABA. |
-| Native tenant service | `LocalTenantService`, lazy opening, one tenant/one shard by default | Multi-database routing exists, but high-performance tenant management is unproven. |
-| Native service storage | Hardwired `BTreeStore` and `AsyncShard` | Planned Blink is not already a selectable backend of this service. |
+| Existing native service | `LocalTenantService`, lazy opening, one tenant/one shard by default, backed by `BTreeStore` and `AsyncShard` | Keep as the regression and diagnosis path. It is not the B-link measurement backend. |
+| B-link service | `BlinkTenantService` implements `DodbService`, opens one file/WAL pair per tenant, and batches that tenant's mutations through `BlinkStore::apply_transaction_group` | It is now eligible for the common service comparison after the same contract checks. |
 | Open database limit | Default 1,024; full map returns Overloaded | Existing code does not establish idle eviction or bounded memory per instance. |
 | Tenant registry | Mutex held while opening a new shard | Cold-open interference is a concrete investigation target, not yet a measured bottleneck. |
 | Reference semantics | `ReferenceDb` and transaction/server tests | Reuse the semantic oracle and move reusable cases to a backend contract suite. |
@@ -93,12 +95,11 @@ same application requests / same dodb client and transport when enabled
              common backend conformance requirements
 ```
 
-Use two primary backends per measurement round. Initially `dodb-native` is the
-existing B-tree service. Promote a declared Planned Blink configuration into the
-same service boundary only after it passes the same contract. Keep exact engine
-selection in every manifest; do not relabel B-tree as Blink. Previous native
-versions are controls for specific changes, not an automatic third engine in
-every product matrix. Turso is an optional later comparator with the same gate.
+Use two primary backends per initial measurement round: the B-link service and
+the RocksDB service. Keep the existing B-tree service for regression and
+diagnosis; do not add it as an automatic third product measurement. Record the
+exact service and engine configuration in every manifest. Turso is an optional
+later comparator with the same service-contract gate.
 
 Service execution is the first product comparison boundary. Run through the same
 QUIC server/client afterward to expose transport and request-budget costs. Keep
@@ -109,18 +110,17 @@ raw engine calls as diagnostics, with their boundary clearly named.
 | Stage | Status | Deliverable | Exit condition |
 | --- | --- | --- | --- |
 | R0: foundation | Complete for this inventory | This roadmap, backend contract, workload definitions, policy cross-reference | Existing behavior and proposed work are separated; required mixes and multi-tenancy are explicit. |
-| R1: equivalent backend | Partial; R1a, R1b-1, R1b-2, R1b-3a, and R1b-3b slices implemented, remaining R1 work pending | Experimental `dodb-rocksdb` service, shared read and transaction coverage, acknowledged-transaction and WAL-sync-boundary recovery coverage, format/revision design notes | KV, Query/Scan, conditional and multi-key writes, tenant isolation, reopen, and required process-crash cases pass on both backends. |
-| R2: product driver | Pending | Stateful application-workload driver through `DodbService`; one process with multiple DBs | Logical input equivalence, actual operation accounting, correctness, resource bounds, and all mandatory profiles pass short smoke. |
-| R3: first product evidence | Pending | Small single-tenant and multi-tenant OCI results, followed by Debian | All mandatory mixes are present, per-tenant behavior is visible, source/binary/host provenance is valid. |
+| R1: equivalent service contract | Complete at implementation verification SHA `8dc4f3b7565f5bb0b963f782721378a55616f516`; [report](blink-service-comparison-readiness.md) | B-tree, B-link, and RocksDB use the same API request and expected contract body | Reads, writes, conditions, transaction atomicity, budgets, tenant isolation, snapshot reads, and normal reopen pass locally and on OCI ZFS. Additional crash campaigns are not a prerequisite for the first performance comparison. |
+| R2: product driver | Pending | Stateful synthetic workload driver through `DodbService`, with B-link and RocksDB factories | Same seeded logical inputs, call/write/rejection accounting, conditional preparation costs, and single-/multi-tenant execution pass a short correctness smoke. |
+| R3: first product evidence | Pending; OCI only for the first round | Eight single-tenant records and two mixed-tenant records, one run per condition | Mandatory ratios and transaction actions are present; service, file, WAL, input, binary, host, and timing provenance is valid. |
 | R4: focused improvement | Pending | One measured bottleneck, one implementation change, before/after evidence | Same contract and frozen workloads pass; gains and regressions are recorded. |
 | R5: confirmation | Pending | Targeted repetitions, sustained storage behavior, bursts, cold-tenant and capacity checks, common transport | Claims survive observed noise, DB lifecycle transitions, and meaningful storage activity. |
 
-R1 remains incomplete until its remaining implementation and correctness gates
-pass. Complete its code and correctness evidence before launching a broad
-performance matrix. R2 must start with the
-small profiles below and must not revive the previous 126-run plan by default.
-Update this table after each deliverable with source SHA, artifact path, actual
-checks performed, and remaining gates. Documentation alone does not complete R1.
+Use this stage table to keep service correctness, workload preparation, and
+measurement evidence distinct. The first comparison is deliberately small and
+does not claim complete tenant lifecycle management or coverage of every crash
+mode. Update this table after each deliverable with source SHA, artifact path,
+actual checks performed, and remaining gates.
 
 R1a was the first small vertical slice: existing service types,
 recoverable revision/tombstone representation, Get/Put/Delete, width-four
@@ -139,21 +139,13 @@ assertion. Details are in the
 R1b-2 adds the shared native/RocksDB transaction contract and normal
 shutdown/reopen verification. Its tested SHA and result are recorded in the
 [R1b-2 report](../experiments/results/rocksdb-service-r1b2/REPORT.md).
-R1b-3a adds one shared acknowledged-transaction SIGKILL/reopen scenario per
-backend. The local and OCI checks, exact exit signals, reopened logical state,
-and claim limits are recorded in the
-[R1b-3a report](../experiments/results/rocksdb-service-r1b3a-20261013-local/REPORT.md).
-R1b-3a covers one acknowledged-transaction process-kill recovery case; it does
-not complete the process-crash inventory. R1 remains incomplete: tenant
-lifecycle and capacity management, sync-syscall interruption, power-loss
-recovery, and process-kill recovery beyond the acknowledged-transaction and
-WAL-sync-boundary cases remain open. R1b-3b tests one point per backend after
-target WAL append and before its commit durability sync call; its complete-state
-oracle and evidence are in the
-[R1b-3b report](../experiments/results/rocksdb-service-r1b3b-20261013-local/REPORT.md).
-Tenant write serialization is also a known limitation. This correctness work
-does not establish performance comparison readiness, and no performance
-campaign was run.
+R1b-3a and R1b-3b preserve the acknowledged-transaction and WAL-sync-boundary
+SIGKILL/reopen results in their existing reports. Do not schedule another crash
+campaign as the next required stage. Full lifecycle/capacity policy, additional
+crash cases, power-loss evidence, and tenant eviction remain separate future
+work; they are not prerequisites for the initial bounded service comparison.
+Tenant write scheduling differences are documented in the
+[readiness report](blink-service-comparison-readiness.md).
 
 R1a source SHA `f7325bc24a46afe0912e200ae8a08b9275157c6e` passed the disk-backed
 integration test locally on macOS ARM64 and in an OCI A1 native ARM64 Release
@@ -162,31 +154,11 @@ consecutive local repeats of the cold-open and concurrency suite. The OCI run us
 checkout and the pinned RocksDB 11.8.1 archive; the
 [run report](../experiments/results/rocksdb-service-r1a-70105e0f/REPORT.md)
 records commands, provenance, failed-attempt correction, and coverage.
-After R1b-1, common transaction conformance, full lifecycle management,
-process-kill recovery, and all other R1 exit conditions remained pending.
-R1b-2 covers transaction conformance and normal shutdown/reopen. R1b-3a covers
-one acknowledged-transaction SIGKILL/reopen scenario per backend; commit
-interruption, full tenant lifecycle and capacity management, and the remaining
-process-crash cases are pending. AWS HTTP API support is not a current or
-future product requirement.
-
-### R1 implementation order
-
-1. Add an experimental backend module/crate implementing existing `DodbService`.
-   Keep transport and protocol storage-independent. Pin RocksDB 11.8.1 initially
-   to retain build provenance; use native builds on each measurement host.
-2. Specify value/tombstone encoding, revision allocation and restart behavior,
-   transaction locking, conflict mapping, and request/response limits.
-3. Implement Get/Put/Delete/Query/Scan and single-shot Transact with conditions.
-   Start from a supported RocksDB transaction implementation; document any
-   performance-oriented alternative and prove the same semantics first.
-4. Reuse/extract backend-neutral correctness cases. Include a condition on an
-   unmodified key, absent-key ABA, races with unconditional writes, and atomic
-   failure. Do not add a global cross-tenant write mutex for convenience.
-5. Expose tenant DB open/close/shutdown through a small reusable factory/registry
-   boundary. Keep the native and RocksDB handles internal to their backends.
-6. Establish process-kill/reopen recovery evidence for acknowledged requests
-   and all-or-none unacknowledged transactions, with independent expectations.
+The earlier R1 notes described the state at each RocksDB implementation slice;
+they are historical and do not make additional crash work a prerequisite.
+Common transaction conformance and normal reopen are now covered by R1b-2, and
+the existing R1b-3a/R1b-3b process-kill results remain preserved. AWS HTTP API
+support is not a current or future product requirement.
 
 ## Multi-tenant product requirements
 
@@ -213,20 +185,21 @@ the comparison. Shared resources can cause interference; measure it.
 
 ## Fast execution without losing coverage
 
-The first single-tenant evidence has four mixes (95/5, 80/20, 50/50, 20/80) and
-two backends: eight selected records per host. The transaction/conditional mix
-is defined in [workloads-v1.md](workloads-v1.md). Five-second, one-repetition
-runs are preliminary only. Keep query correctness and width-eight transactions
-in conformance coverage and include them in the tenant scenarios; do not expand
-every dimension into a Cartesian product.
+The initial comparison is limited to B-link and RocksDB on OCI. Its single-
+tenant matrix is RW95, RW80, RW50, and RW20 on both backends. One MT-MIX record
+per backend runs four active tenants together, one per profile. This makes ten
+records total. Each run uses 16 external clients, 10,000 live rows per active
+tenant, 16-byte combined raw keys, and 512-byte changing values; the stateful
+write recipe and counters are defined in [workloads-v1.md](workloads-v1.md).
+Use one-second warmup, five-second measurement, and one repetition. This is a
+short preliminary comparison, not an LSM steady-state or long-term stability
+claim. The first round is OCI only; Debian is not part of this task.
 
-The first multi-tenant evidence has three scenarios and two backends: six
-selected records per host. Run OCI first, then Debian. Together the first
-product round is 14 records per host, at most 28 across both hosts, excluding
-correctness/smoke checks and narrowly justified retries. Setup may dominate
-wall time; report setup and measured time separately. Reuse only genuinely
-equivalent results. Existing quick KV results cannot fill new conditional or
-multi-tenant cells.
+The existing workload definitions retain MT-IDLE and MT-NOISY as follow-up
+profiles. Do not expand the initial ten records into a Cartesian product, but do
+not remove conditional writes, widths four/eight, preparatory Get costs, or the
+four required read/write ratios. Report setup separately from the five-second
+measurement. Existing raw-engine studies cannot fill service-level records.
 
 After the first round, repeat only inconclusive or decision-critical cases.
 Sustained LSM evidence must observe flush/compaction and actual data growth;

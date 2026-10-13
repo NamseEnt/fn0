@@ -119,9 +119,10 @@ follow-up establishes a winner. The measurement-only changes are committed at
 `022ad1c5c382d3e40703e6c2df72c64c72947255`, and
 `a7c9d396d8b7a74a5959beee09b739696e391ad2` on the experiment branch.
 
-The next acceptance gate is to add distributed Query16, record trace identity
-and per-client completions, and run both engines through a shared reader
-execution model. Then run the 24-case matrix and retain paired raw values,
-resource samples, and provenance. Get profiling, mixed-path changes, their
-regression checks, and the long durable mixed run follow only after that
-baseline is accepted.
+This raw-engine follow-up is superseded as the product-comparison path by the
+shared `DodbService` boundary. The first product comparison uses B-link and
+RocksDB services after the common read and transaction contract passes; it does
+not reuse these raw-engine rates. The service-level stateful workload driver,
+full input accounting, and ten-record OCI matrix are still pending. See the
+[single-instance roadmap](../research/single-instance-product-roadmap.md) and
+[B-link service readiness report](../research/blink-service-comparison-readiness.md).
