@@ -6,11 +6,16 @@ Inspected source: `7785241d11cf909111c1226afd3bed666f010cd4`.
 
 ## Product objective
 
-Build a high-performance single-instance database with a documented subset of
-DynamoDB-style operations: KV access, ordered short queries, atomic multi-key
-writes, and conditional writes. One native process must manage many independent
-tenant databases and their files. Evaluate successful application work, latency,
-resource use, and interference between tenants.
+Build a high-performance single-instance database that provides selected
+DynamoDB-style capabilities through dodb's own endpoint and API: KV access,
+ordered short queries, atomic multi-key writes, and conditional writes. One
+native process must manage many independent tenant databases and their files.
+Evaluate successful application work, latency, resource use, and interference
+between tenants.
+
+A DynamoDB-compatible endpoint is not currently planned. Selected capabilities
+follow dodb's documented contract; AWS HTTP protocol compatibility is not a
+product goal or a requirement for this research.
 
 The primary alternative is **the same dodb API backed by RocksDB**. A successful
 research outcome can select the native engine, the RocksDB backend, or different
@@ -28,9 +33,9 @@ explicit recorded user decision. Faster turnaround reduces repetitions and
 duration before it reduces product coverage.
 
 The initial transaction boundary is one tenant database. Cross-tenant or
-cross-file atomic transactions require a separate design. DynamoDB compatibility
-means the explicitly documented subset, not the complete AWS HTTP API,
-expression language, transaction limits, or idempotency behavior.
+cross-file atomic transactions require a separate design. DynamoDB-style
+capabilities do not imply compatibility with DynamoDB endpoints, expression
+language, transaction limits, or idempotency behavior.
 
 ## Verified foundation
 
@@ -254,6 +259,3 @@ that no optimization exists or that native storage will eventually win.
 - [RocksDB memory usage](https://github.com/facebook/rocksdb/wiki/Memory-usage-in-RocksDB)
   and [WriteBufferManager](https://github.com/facebook/rocksdb/wiki/Write-Buffer-Manager):
   shared memory resources for multiple engine instances and accounting limits.
-- [DynamoDB TransactWriteItems](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TransactWriteItems.html):
-  reference behavior for the compatibility inventory, not a claim that dodb
-  currently implements the full operation.

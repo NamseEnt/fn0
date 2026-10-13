@@ -14,6 +14,11 @@ The required scope includes conditional multi-key writes, the 95/5, 80/20,
 internal B-link regression policy remains applicable; its historical raw-engine
 reference comparisons do not substitute for the common product API contract.
 
+Product API scope, clarified 2026-10-13: dodb provides selected DynamoDB-style
+capabilities through its own endpoint and API. A DynamoDB-compatible endpoint
+is not currently planned. AWS HTTP protocol compatibility is not a product
+goal or a benchmark acceptance requirement.
+
 ## 1. Product design center
 
 dodb is fn0's general-purpose transactional operational database for web,

@@ -105,8 +105,8 @@ Required design decisions before claiming conformance:
 
 RocksDB's transaction primitives are documented in its
 [official transaction guide](https://github.com/facebook/rocksdb/wiki/Transactions).
-Their presence does not supply dodb key encoding, revisions, API errors, tenant
-lifecycle, or DynamoDB request translation automatically.
+Their presence does not supply dodb key encoding, revisions, API errors, or
+tenant lifecycle automatically.
 
 ## Tenant databases and shared resources
 
@@ -159,20 +159,21 @@ allowed histories, not assume the value is unchanged while another writer runs.
 Independent parent/oracle state is required for recovery checks. Process kill
 does not remove kernel page cache or establish power-loss safety.
 
-## DynamoDB compatibility inventory
+## Independent dodb API scope
 
-Before exposing a DynamoDB-compatible endpoint, record exactly which actions,
-conditions, errors, limits, key/value types, and retry semantics are supported.
-Existing dodb Transact is a semantic primitive; it is not an implemented AWS
-TransactWriteItems endpoint. Existing conditions are revision/presence checks,
-not an attribute-expression parser. Existing opaque values are not an AWS
-AttributeValue implementation.
+The product goal is to provide selected DynamoDB-style capabilities through
+dodb's own endpoint and API. A DynamoDB-compatible endpoint is not currently
+planned. AWS HTTP protocol compatibility is not a backend requirement or a
+planned research milestone.
 
-Translate only the declared subset into the shared service contract, identically
-for both backends. Full Update expressions, ClientRequestToken idempotency,
-cross-table transactions, and other AWS behavior require explicit future scope.
-Unsupported operations must be reported as unsupported rather than partially
-executed. Consult the
-[AWS operation reference](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TransactWriteItems.html)
-when writing that mapping. The first backend comparison exercises the current
-dodb contract and does not require building a complete DynamoDB emulator.
+Both backends must implement the existing shared dodb service contract with the
+same actions, conditions, errors, limits, key/value types, and retry semantics.
+Existing Transact provides atomic mutations with revision/presence conditions;
+values remain opaque bytes. These capabilities do not imply support for AWS
+request formats, attribute expressions, AttributeValue encoding, transaction
+limits, or ClientRequestToken behavior.
+
+Unsupported dodb operations must be reported as unsupported rather than
+partially executed. Product comparisons exercise dodb's contract, including
+conditional and multi-key writes, without requiring DynamoDB protocol adapters
+or AWS-specific features.
