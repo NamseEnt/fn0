@@ -119,10 +119,10 @@ The comparison includes current service mechanisms: B-link durable work can shar
 
 ## Attempts and next investigation
 
-- Focused schedule checks: 3/3 passed. They cover all four ratios, preparatory Get quota/calls, Get/Query split, category coverage, condition targeting, and width-4/8 single Transact workflows.
-- Local smoke: B-link and RocksDB each completed 4,000 API calls across four tenants; final and reopen scans passed.
-- OCI smoke: 2/2 passed (4,000 calls/backend across four tenants), excluded from measurements.
-- OCI measurement: 10/10 passed, exactly one run per declared condition. No run failed or needed retry. Order was RW95 B-link/RocksDB, RW80 RocksDB/B-link, RW50 B-link/RocksDB, RW20 RocksDB/B-link, MT-MIX RocksDB/B-link.
+- Focused schedule checks: planned 3, executed 3, passed 3, failed 0, not reached 0. They cover all four ratios, preparatory Get quota/calls, Get/Query split, category coverage, condition targeting, and width-4/8 single Transact workflows.
+- Local backend smoke: planned 2, executed 2, passed 2, failed 0, not reached 0. B-link and RocksDB each completed 4,000 API calls across four tenants; final and reopen scans passed.
+- OCI backend smoke: planned 2, executed 2, passed 2, failed 0, not reached 0 (4,000 calls/backend across four tenants), excluded from measurements.
+- OCI measurements: planned 10, executed 10, passed 10, failed 0, not reached 0; exactly one run per declared condition, no retries. Order was RW95 B-link/RocksDB, RW80 RocksDB/B-link, RW50 B-link/RocksDB, RW20 RocksDB/B-link, MT-MIX RocksDB/B-link.
 - Earlier complete measurement set at SHA `37f3ca73861fb6db3d1d5ec5becac5bb60c290ed` is retained under `../dodb-service-workload-37f3ca738/`; its Scan verifier retained all rows in memory, so it was superseded by bounded streaming validation. The `20b39c5d6` set passed with bounded scans but was superseded to add and verify per-client paired input-prefix fingerprints. Both earlier sets are preserved.
 
 Next investigation: attribute RocksDB write latency to wait on the tenant revision-counter lock, using the existing implementation and service workload while collecting narrowly scoped lock-wait evidence. Do not optimize the allocator in that attribution step.
