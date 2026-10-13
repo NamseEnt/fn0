@@ -1,10 +1,12 @@
 # Backend contract for the product comparison
 
-Status: R1b-1 implementation slice verified, 2026-10-12. This remains the
+Status: R1b-2 transaction slice verified, 2026-10-13. This remains the
 common contract for both backends; it does not claim that all R1 gates pass.
 See [the roadmap](single-instance-product-roadmap.md) for execution order and
-the [R1b-1 verification report](../experiments/results/rocksdb-service-r1b1-2774bd1c/REPORT.md)
-for the tested implementation.
+the [R1b-2 verification report](../experiments/results/rocksdb-service-r1b2/REPORT.md)
+for the latest tested transaction implementation. The earlier
+[R1b-1 report](../experiments/results/rocksdb-service-r1b1-2774bd1c/REPORT.md)
+records the separate read implementation slice.
 
 ## Existing API boundary
 
@@ -161,10 +163,9 @@ does not remove kernel page cache or establish power-loss safety.
 
 ## Independent dodb API scope
 
-The product goal is to provide selected DynamoDB-style capabilities through
-dodb's own endpoint and API. A DynamoDB-compatible endpoint is not currently
-planned. AWS HTTP protocol compatibility is not a backend requirement or a
-planned research milestone.
+The product goal is to provide selected DynamoDB-style data-operation
+semantics through dodb's own API. AWS HTTP API compatibility is outside current
+scope and is not a future product milestone.
 
 Both backends must implement the existing shared dodb service contract with the
 same actions, conditions, errors, limits, key/value types, and retry semantics.

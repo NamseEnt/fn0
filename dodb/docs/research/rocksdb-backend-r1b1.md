@@ -76,9 +76,10 @@ than a timing delay.
 
 ## Remaining work
 
-The R1 exit condition remains open. Shared transaction conformance coverage,
-tenant lifecycle and capacity management, process-kill recovery, and the
-per-tenant write serialization caused by the handle mutex and shared revision
-counter remain pending. The serialization issue must be addressed before a
-performance comparison. This slice establishes no throughput or latency claim,
+At the R1b-1 implementation point, shared transaction conformance, tenant
+lifecycle and capacity management, and process-kill recovery remained open.
+R1b-2 covers the shared transaction contract and normal shutdown/reopen; its
+verification is recorded in the [R1b-2 report](../experiments/results/rocksdb-service-r1b2/REPORT.md).
+Tenant write serialization caused by the handle mutex and shared revision
+counter remains. This slice establishes no throughput or latency claim,
 power-loss behavior, process-kill recovery, or bounded tenant-memory guarantee.

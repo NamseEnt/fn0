@@ -1,8 +1,8 @@
 # RocksDB service backend R1a
 
-Status: R1a scope passed locally and on OCI. Query/Scan and remaining R1 gates
-are tracked in the [R1b-1 backend note](rocksdb-backend-r1b1.md). This is not a
-claim of complete backend conformance.
+Status: R1a scope passed locally and on OCI. Later implementation slices and
+remaining R1 gates are tracked in the [roadmap](single-instance-product-roadmap.md)
+and the R1b backend notes. This is not a claim of complete backend conformance.
 
 ## Storage format
 

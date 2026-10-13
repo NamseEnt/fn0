@@ -13,9 +13,8 @@ native process must manage many independent tenant databases and their files.
 Evaluate successful application work, latency, resource use, and interference
 between tenants.
 
-A DynamoDB-compatible endpoint is not currently planned. Selected capabilities
-follow dodb's documented contract; AWS HTTP protocol compatibility is not a
-product goal or a requirement for this research.
+Selected capabilities follow dodb's documented contract. AWS HTTP API
+compatibility is outside product scope and is not a future milestone.
 
 The primary alternative is **the same dodb API backed by RocksDB**. A successful
 research outcome can select the native engine, the RocksDB backend, or different
@@ -33,9 +32,8 @@ explicit recorded user decision. Faster turnaround reduces repetitions and
 duration before it reduces product coverage.
 
 The initial transaction boundary is one tenant database. Cross-tenant or
-cross-file atomic transactions require a separate design. DynamoDB-style
-capabilities do not imply compatibility with DynamoDB endpoints, expression
-language, transaction limits, or idempotency behavior.
+cross-file atomic transactions require a separate design. DynamoDB-style data
+operation semantics do not imply AWS HTTP API compatibility.
 
 ## Verified foundation
 
@@ -111,7 +109,7 @@ raw engine calls as diagnostics, with their boundary clearly named.
 | Stage | Status | Deliverable | Exit condition |
 | --- | --- | --- | --- |
 | R0: foundation | Complete for this inventory | This roadmap, backend contract, workload definitions, policy cross-reference | Existing behavior and proposed work are separated; required mixes and multi-tenancy are explicit. |
-| R1: equivalent backend | Partial; R1a and R1b-1 slices implemented, remaining R1 work pending | Experimental `dodb-rocksdb` service, shared read contract coverage, format/revision design notes | KV, Query/Scan, conditional and multi-key writes, tenant isolation, reopen, and process-crash cases pass on both backends. |
+| R1: equivalent backend | Partial; R1a, R1b-1, and R1b-2 slices implemented, remaining R1 work pending | Experimental `dodb-rocksdb` service, shared read and transaction contract coverage, format/revision design notes | KV, Query/Scan, conditional and multi-key writes, tenant isolation, reopen, and process-crash cases pass on both backends. |
 | R2: product driver | Pending | Stateful application-workload driver through `DodbService`; one process with multiple DBs | Logical input equivalence, actual operation accounting, correctness, resource bounds, and all mandatory profiles pass short smoke. |
 | R3: first product evidence | Pending | Small single-tenant and multi-tenant OCI results, followed by Debian | All mandatory mixes are present, per-tenant behavior is visible, source/binary/host provenance is valid. |
 | R4: focused improvement | Pending | One measured bottleneck, one implementation change, before/after evidence | Same contract and frozen workloads pass; gains and regressions are recorded. |
@@ -138,9 +136,13 @@ verification. The final implementation SHA tested locally and on OCI is
 `e59ae32117df13e23cf298d2f8ec6a8fc4c53a93` added the exact-budget success
 assertion. Details are in the
 [R1b-1 report](../experiments/results/rocksdb-service-r1b1-2774bd1c/REPORT.md).
-R1 remains incomplete. Common transaction conformance, tenant lifecycle and
-capacity management, process-kill recovery, and the serialization bottleneck
-before performance comparison remain open. No performance campaign was run.
+R1b-2 adds the shared native/RocksDB transaction contract and normal
+shutdown/reopen verification. Its tested SHA and result are recorded in the
+[R1b-2 report](../experiments/results/rocksdb-service-r1b2/REPORT.md).
+R1 remains incomplete: tenant lifecycle and capacity management and
+process-kill recovery remain open. Tenant write serialization is also a known
+limitation. This correctness work does not establish performance comparison
+readiness, and no performance campaign was run.
 
 R1a source SHA `f7325bc24a46afe0912e200ae8a08b9275157c6e` passed the disk-backed
 integration test locally on macOS ARM64 and in an OCI A1 native ARM64 Release
@@ -149,8 +151,11 @@ consecutive local repeats of the cold-open and concurrency suite. The OCI run us
 checkout and the pinned RocksDB 11.8.1 archive; the
 [run report](../experiments/results/rocksdb-service-r1a-70105e0f/REPORT.md)
 records commands, provenance, failed-attempt correction, and coverage.
-Common transaction conformance, full lifecycle management, process-kill
-recovery, and all other R1 exit conditions remain pending after R1b-1.
+After R1b-1, common transaction conformance, full lifecycle management,
+process-kill recovery, and all other R1 exit conditions remained pending.
+R1b-2 now covers transaction conformance and normal shutdown/reopen. Full
+tenant lifecycle and capacity management and process-kill recovery remain
+pending; AWS HTTP API support is not a current or future product requirement.
 
 ### R1 implementation order
 
