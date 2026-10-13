@@ -29,7 +29,7 @@ const TRANSPORT_EVENT_COUNT: usize =
 
 use dodb_core::{
     Error, ObservedState, RevisionState, ShardId, TenantId, TransactionCondition,
-    TransactionConflict, TransactionRequest,
+    TransactionConflict, TransactionMutation, TransactionRequest, TransactionResult,
 };
 use dodb_protocol::{
     ApplicationError, ProtocolError, ProtocolLimits, ResponseEnvelope, decode_header,
@@ -965,6 +965,377 @@ pub struct LocalTenantService {
     resolver: Arc<dyn TenantShardResolver>,
     shards: Mutex<BTreeMap<TenantId, Arc<AsyncShard<ProductionFile, ProductionFile>>>>,
     fault_injector_factory: Mutex<Option<FaultInjectorFactory>>,
+}
+
+pub struct BlinkTenantService {
+    data_dir: PathBuf,
+    max_open_shards: usize,
+    database_config: DatabaseConfig,
+    coordinator_config: CoordinatorConfig,
+    shards: Mutex<BTreeMap<TenantId, Arc<AsyncBlinkShard>>>,
+}
+
+struct AsyncBlinkShard {
+    read_handle: dodb_storage::BlinkReadHandle,
+    request_tx: Mutex<Option<tokio::sync::mpsc::Sender<QueuedBlinkTransaction>>>,
+    coordinator_task: Mutex<Option<tokio::task::JoinHandle<()>>>,
+}
+
+struct QueuedBlinkTransaction {
+    request: TransactionRequest,
+    response_tx: tokio::sync::oneshot::Sender<Result<TransactionResult, Error>>,
+}
+
+impl BlinkTenantService {
+    pub fn new(config: LocalTenantServiceConfig) -> Result<Self, Error> {
+        if config.max_open_shards == 0 {
+            return Err(Error::invalid_request("max_open_shards must be nonzero"));
+        }
+        std::fs::create_dir_all(config.data_dir.join("blink"))?;
+        Ok(Self {
+            data_dir: config.data_dir,
+            max_open_shards: config.max_open_shards,
+            database_config: config.database_config,
+            coordinator_config: config.coordinator_config,
+            shards: Mutex::new(BTreeMap::new()),
+        })
+    }
+
+    pub async fn shutdown(&self) {
+        let shards = {
+            let mut shards = self.shards.lock().await;
+            let open_shards = shards.values().cloned().collect::<Vec<_>>();
+            shards.clear();
+            open_shards
+        };
+        for shard in shards {
+            let _ = shard.shutdown().await;
+        }
+    }
+
+    async fn execute_request(
+        &self,
+        tenant: TenantId,
+        request: Request,
+        budget: ExecutionBudget,
+    ) -> Result<Response, Error> {
+        match request {
+            Request::Get { key } => {
+                let state = match self.read_shard(tenant).await? {
+                    Some(shard) => shard
+                        .read_handle
+                        .get_with_response_budget(&key, budget.max_response_bytes)?,
+                    None => RevisionState::missing(dodb_core::Revision::ZERO),
+                };
+                let response = Response::Get(state);
+                ensure_synthesized_response_budget(&response, budget.max_response_bytes)?;
+                Ok(response)
+            }
+            Request::Put { key, value } => {
+                let shard = self.open_shard(tenant).await?;
+                let result = shard
+                    .transact(TransactionRequest::new(
+                        Vec::new(),
+                        vec![TransactionMutation::Put { key, value }],
+                    ))
+                    .await?;
+                let response =
+                    Response::Put(result.revision.ok_or_else(|| {
+                        Error::invariant("Blink put transaction has no revision")
+                    })?);
+                ensure_synthesized_response_budget(&response, budget.max_response_bytes)?;
+                Ok(response)
+            }
+            Request::Delete { key } => {
+                let shard = self.open_shard(tenant).await?;
+                let result = shard
+                    .transact(TransactionRequest::new(
+                        Vec::new(),
+                        vec![TransactionMutation::Delete { key }],
+                    ))
+                    .await?;
+                let response =
+                    Response::Delete(result.revision.ok_or_else(|| {
+                        Error::invariant("Blink delete transaction has no revision")
+                    })?);
+                ensure_synthesized_response_budget(&response, budget.max_response_bytes)?;
+                Ok(response)
+            }
+            Request::Query {
+                pk,
+                exclusive_after_sk,
+                limit,
+            } => {
+                let rows = match self.read_shard(tenant).await? {
+                    Some(shard) => shard.read_handle.query_with_response_budget(
+                        &pk,
+                        exclusive_after_sk.as_ref(),
+                        limit,
+                        budget.max_response_bytes,
+                    )?,
+                    None => Vec::new(),
+                };
+                let response = Response::Query(rows.into_iter().map(storage_document).collect());
+                ensure_synthesized_response_budget(&response, budget.max_response_bytes)?;
+                Ok(response)
+            }
+            Request::Scan {
+                exclusive_after_key,
+                limit,
+            } => {
+                let rows = match self.read_shard(tenant).await? {
+                    Some(shard) => shard.read_handle.scan_with_response_budget(
+                        exclusive_after_key.as_ref(),
+                        limit,
+                        budget.max_response_bytes,
+                    )?,
+                    None => Vec::new(),
+                };
+                let response = Response::Scan(rows.into_iter().map(storage_document).collect());
+                ensure_synthesized_response_budget(&response, budget.max_response_bytes)?;
+                Ok(response)
+            }
+            Request::Transact { request } => {
+                request.validate()?;
+                if request.mutations.is_empty() {
+                    let Some(shard) = self.read_shard(tenant).await? else {
+                        let actual = ObservedState::missing(dodb_core::Revision::ZERO);
+                        for condition in &request.conditions {
+                            if !condition_matches(condition, &actual) {
+                                return Err(Error::conflict(TransactionConflict {
+                                    key: condition.key().clone(),
+                                    expected: condition.expectation(),
+                                    actual,
+                                }));
+                            }
+                        }
+                        let response =
+                            Response::Transact(TransactionOutcome::conditions_satisfied());
+                        ensure_synthesized_response_budget(&response, budget.max_response_bytes)?;
+                        return Ok(response);
+                    };
+                    let result = shard.transact(request).await?;
+                    let response = Response::Transact(match result.commit_lsn {
+                        Some(commit_lsn) => TransactionOutcome::committed(commit_lsn),
+                        None => TransactionOutcome::conditions_satisfied(),
+                    });
+                    ensure_synthesized_response_budget(&response, budget.max_response_bytes)?;
+                    return Ok(response);
+                }
+                let result = self.open_shard(tenant).await?.transact(request).await?;
+                let response = Response::Transact(match result.commit_lsn {
+                    Some(commit_lsn) => TransactionOutcome::committed(commit_lsn),
+                    None => TransactionOutcome::conditions_satisfied(),
+                });
+                ensure_synthesized_response_budget(&response, budget.max_response_bytes)?;
+                Ok(response)
+            }
+        }
+    }
+
+    async fn read_shard(&self, tenant: TenantId) -> Result<Option<Arc<AsyncBlinkShard>>, Error> {
+        let path = self.database_path(tenant);
+        if !path.exists() && !path.with_extension("wal").exists() {
+            return Ok(None);
+        }
+        Ok(Some(self.open_shard(tenant).await?))
+    }
+
+    async fn open_shard(&self, tenant: TenantId) -> Result<Arc<AsyncBlinkShard>, Error> {
+        let mut shards = self.shards.lock().await;
+        if let Some(shard) = shards.get(&tenant) {
+            return Ok(Arc::clone(shard));
+        }
+        if shards.len() >= self.max_open_shards {
+            return Err(Error::overloaded("open shard cache is full"));
+        }
+        let shard_id = ShardId::new(tenant.get());
+        let database_path = self.database_path(tenant);
+        let mut database_config = self.database_config.clone();
+        database_config.tenant_id = tenant;
+        database_config.shard_id = shard_id;
+        database_config.database_uuid = database_uuid(tenant, shard_id);
+        let mut store = dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_path(
+            &database_path,
+            database_config,
+        )?;
+        store.enable_planned_execution();
+        let shard = Arc::new(AsyncBlinkShard::start(store, self.coordinator_config));
+        shards.insert(tenant, Arc::clone(&shard));
+        Ok(shard)
+    }
+
+    fn database_path(&self, tenant: TenantId) -> PathBuf {
+        self.data_dir.join("blink").join(format!(
+            "tenant-{}-shard-{}.db",
+            tenant.get(),
+            tenant.get()
+        ))
+    }
+}
+
+impl AsyncBlinkShard {
+    fn start(
+        mut store: dodb_storage::BlinkStore<ProductionFile, ProductionFile>,
+        config: CoordinatorConfig,
+    ) -> Self {
+        let read_handle = store.versioned_read_handle();
+        let (request_tx, mut request_rx) =
+            tokio::sync::mpsc::channel::<QueuedBlinkTransaction>(config.queue_capacity.max(1));
+        let coordinator_task = tokio::spawn(async move {
+            let mut pending = None;
+            loop {
+                let first = match pending.take() {
+                    Some(request) => Some(request),
+                    None => request_rx.recv().await,
+                };
+                let Some(first) = first else { break };
+                let mut queued = vec![first];
+                let mut request_bytes = transaction_size(&queued[0].request);
+                tokio::task::yield_now().await;
+                while queued.len() < config.max_group_requests.max(1) {
+                    let Ok(next) = request_rx.try_recv() else {
+                        break;
+                    };
+                    let next_bytes = transaction_size(&next.request);
+                    if request_bytes.saturating_add(next_bytes) > config.max_group_bytes.max(1) {
+                        pending = Some(next);
+                        break;
+                    }
+                    request_bytes = request_bytes.saturating_add(next_bytes);
+                    queued.push(next);
+                }
+                if queued.len() > 1 && config.max_collection_delay > std::time::Duration::ZERO {
+                    let deadline = tokio::time::sleep(config.max_collection_delay);
+                    tokio::pin!(deadline);
+                    while queued.len() < config.max_group_requests.max(1) {
+                        tokio::select! {
+                            next = request_rx.recv() => {
+                                let Some(next) = next else { break };
+                                let next_bytes = transaction_size(&next.request);
+                                if request_bytes.saturating_add(next_bytes) > config.max_group_bytes.max(1) {
+                                    pending = Some(next);
+                                    break;
+                                }
+                                request_bytes = request_bytes.saturating_add(next_bytes);
+                                queued.push(next);
+                            }
+                            _ = &mut deadline => break,
+                        }
+                    }
+                }
+                let requests = queued
+                    .iter()
+                    .map(|entry| entry.request.clone())
+                    .collect::<Vec<_>>();
+                let (updated_store, results) = match tokio::task::spawn_blocking(move || {
+                    let results = store.apply_transaction_group(&requests);
+                    (store, results)
+                })
+                .await
+                {
+                    Ok(result) => result,
+                    Err(error) => {
+                        let message = format!("Blink coordinator worker failed: {error}");
+                        for entry in queued {
+                            let _ = entry
+                                .response_tx
+                                .send(Err(Error::durability(message.clone())));
+                        }
+                        break;
+                    }
+                };
+                store = updated_store;
+                match results {
+                    Ok(results) => {
+                        for (entry, result) in queued.into_iter().zip(results) {
+                            let _ = entry.response_tx.send(result);
+                        }
+                    }
+                    Err(error) => {
+                        let message = error.to_string();
+                        for entry in queued {
+                            let _ = entry
+                                .response_tx
+                                .send(Err(Error::durability(message.clone())));
+                        }
+                    }
+                }
+            }
+        });
+        Self {
+            read_handle,
+            request_tx: Mutex::new(Some(request_tx)),
+            coordinator_task: Mutex::new(Some(coordinator_task)),
+        }
+    }
+
+    async fn transact(&self, request: TransactionRequest) -> Result<TransactionResult, Error> {
+        let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+        self.request_tx
+            .lock()
+            .await
+            .as_ref()
+            .ok_or_else(|| Error::invariant("Blink coordinator is closed"))?
+            .try_send(QueuedBlinkTransaction {
+                request,
+                response_tx,
+            })
+            .map_err(|error| match error {
+                tokio::sync::mpsc::error::TrySendError::Full(_) => {
+                    Error::overloaded("Blink coordinator queue is full")
+                }
+                tokio::sync::mpsc::error::TrySendError::Closed(_) => {
+                    Error::invariant("Blink coordinator is closed")
+                }
+            })?;
+        response_rx
+            .await
+            .map_err(|_| Error::invariant("Blink coordinator dropped a response"))?
+    }
+
+    async fn shutdown(&self) -> Result<(), Error> {
+        self.request_tx.lock().await.take();
+        if let Some(task) = self.coordinator_task.lock().await.take() {
+            task.await.map_err(|error| {
+                Error::invariant(format!("Blink coordinator task failed: {error}"))
+            })?;
+        }
+        Ok(())
+    }
+}
+
+fn transaction_size(request: &TransactionRequest) -> usize {
+    request
+        .conditions
+        .iter()
+        .map(|condition| {
+            condition.key().pk.as_bytes().len() + condition.key().sk.as_bytes().len() + 32
+        })
+        .chain(request.mutations.iter().map(|mutation| match mutation {
+            TransactionMutation::Put { key, value } => {
+                key.pk.as_bytes().len() + key.sk.as_bytes().len() + value.len() + 32
+            }
+            TransactionMutation::Delete { key } => {
+                key.pk.as_bytes().len() + key.sk.as_bytes().len() + 32
+            }
+        }))
+        .fold(0usize, usize::saturating_add)
+}
+
+impl DodbService for BlinkTenantService {
+    fn execute<'service>(
+        &'service self,
+        tenant: TenantId,
+        request: Request,
+        budget: ExecutionBudget,
+    ) -> ServiceFuture<'service> {
+        Box::pin(async move { self.execute_request(tenant, request, budget).await })
+    }
+
+    fn shutdown<'service>(&'service self) -> ShutdownFuture<'service> {
+        Box::pin(async move { self.shutdown().await })
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

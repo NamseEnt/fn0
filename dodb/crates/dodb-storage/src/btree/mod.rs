@@ -242,7 +242,7 @@ pub struct StorageMetrics {
 const RESPONSE_WIRE_OVERHEAD: usize = 17;
 const RESPONSE_MEMORY_OVERHEAD: usize = 64 * 1024;
 
-struct ResponseBudget {
+pub(crate) struct ResponseBudget {
     maximum_wire: usize,
     maximum_memory: usize,
     used_wire: usize,
@@ -250,7 +250,7 @@ struct ResponseBudget {
 }
 
 impl ResponseBudget {
-    fn new(maximum: usize) -> Result<Self> {
+    pub(crate) fn new(maximum: usize) -> Result<Self> {
         if maximum < RESPONSE_WIRE_OVERHEAD {
             return Err(Error::response_too_large(format!(
                 "response envelope exceeds {maximum} bytes"
@@ -289,7 +289,7 @@ impl ResponseBudget {
         self.reserve(wire, value_len.saturating_add(32))
     }
 
-    fn reserve_document(&mut self, key: &DocumentKey, value_len: usize) -> Result<()> {
+    pub(crate) fn reserve_document(&mut self, key: &DocumentKey, value_len: usize) -> Result<()> {
         let materialized = key
             .pk
             .as_bytes()

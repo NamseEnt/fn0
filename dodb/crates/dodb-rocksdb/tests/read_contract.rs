@@ -1,9 +1,10 @@
 use dodb_core::{
-    DocumentKey, Error, PrimaryKey, SortKey, TenantId, TransactionMutation, TransactionRequest,
+    DocumentKey, Error, PrimaryKey, RevisionState, SortKey, TenantId, TransactionMutation,
+    TransactionRequest,
 };
 use dodb_protocol::{ProtocolLimits, ResponseEnvelope, encode_response};
 use dodb_rocksdb::{RocksDbService, RocksDbServiceConfig};
-use dodb_server::{LocalTenantService, LocalTenantServiceConfig};
+use dodb_server::{BlinkTenantService, LocalTenantService, LocalTenantServiceConfig};
 use dodb_service::{Document, DodbService, ExecutionBudget, Request, Response};
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -341,8 +342,30 @@ async fn check_read_contract<S: DodbService>(service: &S) {
     )
     .await
     .unwrap();
+    assert!(matches!(
+        execute(
+            service,
+            1,
+            Request::Get {
+                key: large_key.clone(),
+            },
+            ExecutionBudget::new(100),
+        )
+        .await,
+        Err(Error::ResponseTooLarge(_))
+    ));
+    assert!(matches!(
+        execute(
+            service,
+            1,
+            Request::Get { key: large_key },
+            MAXIMUM_BUDGET,
+        )
+        .await,
+        Ok(Response::Get(RevisionState::Present { value, .. })) if value == large_document
+    ));
     let exact_response = Response::Query(vec![Document {
-        key: large_key,
+        key: key(b"budget", b"single"),
         value: large_document,
         revision: dodb_core::Revision::new(1),
     }]);
@@ -492,20 +515,28 @@ async fn check_read_contract<S: DodbService>(service: &S) {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn native_and_rocksdb_share_the_same_read_contract() {
+async fn btree_blink_and_rocksdb_share_the_same_read_contract() {
     let native_directory = TempDir::new().unwrap();
+    let blink_directory = TempDir::new().unwrap();
     let rocks_directory = TempDir::new().unwrap();
     let native = LocalTenantService::new(LocalTenantServiceConfig {
         data_dir: PathBuf::from(native_directory.path()),
         ..LocalTenantServiceConfig::default()
     })
     .unwrap();
+    let blink = BlinkTenantService::new(LocalTenantServiceConfig {
+        data_dir: PathBuf::from(blink_directory.path()),
+        ..LocalTenantServiceConfig::default()
+    })
+    .unwrap();
     let rocksdb = RocksDbService::new(RocksDbServiceConfig::new(rocks_directory.path())).unwrap();
 
     check_read_contract(&native).await;
+    check_read_contract(&blink).await;
     check_read_contract(&rocksdb).await;
 
     native.shutdown().await;
+    blink.shutdown().await;
     rocksdb.shutdown().await;
 }
 

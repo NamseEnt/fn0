@@ -22,8 +22,8 @@ use dodb_core::{
 };
 
 use crate::btree::{
-    BatchRequest, BatchResponse, DatabaseConfig, Document, InvariantReport, StorageLimits,
-    StorageMetrics,
+    BatchRequest, BatchResponse, DatabaseConfig, Document, InvariantReport, ResponseBudget,
+    StorageLimits, StorageMetrics,
 };
 mod leaf;
 
@@ -1574,14 +1574,24 @@ pub struct BlinkReadHandle {
 
 impl BlinkReadHandle {
     pub fn get(&self, key: &DocumentKey) -> Result<RevisionState> {
+        self.get_with_response_budget(key, usize::MAX)
+    }
+
+    pub fn get_with_response_budget(
+        &self,
+        key: &DocumentKey,
+        max_response_bytes: usize,
+    ) -> Result<RevisionState> {
         let pin = self.publisher.pin();
+        let mut budget = ResponseBudget::new(max_response_bytes)?;
+        let mut budget = Some(&mut budget);
         #[cfg(not(feature = "blink-read-metrics-disabled"))]
         self.publisher
             .metrics
             .read_operations
             .fetch_add(1, Ordering::Relaxed);
         let mut corrections = 0;
-        let result = read_published_state(&pin, key, &mut corrections);
+        let result = read_published_state_with_budget(&pin, key, &mut corrections, &mut budget);
         #[cfg(not(feature = "blink-read-metrics-disabled"))]
         self.publisher
             .metrics
@@ -1596,14 +1606,26 @@ impl BlinkReadHandle {
         exclusive_after_sk: Option<&SortKey>,
         limit: usize,
     ) -> Result<Vec<Document>> {
+        self.query_with_response_budget(pk, exclusive_after_sk, limit, usize::MAX)
+    }
+
+    pub fn query_with_response_budget(
+        &self,
+        pk: &PrimaryKey,
+        exclusive_after_sk: Option<&SortKey>,
+        limit: usize,
+        max_response_bytes: usize,
+    ) -> Result<Vec<Document>> {
         let pin = self.publisher.pin();
+        let mut budget = ResponseBudget::new(max_response_bytes)?;
+        let mut budget = Some(&mut budget);
         #[cfg(not(feature = "blink-read-metrics-disabled"))]
         self.publisher
             .metrics
             .read_operations
             .fetch_add(1, Ordering::Relaxed);
         let mut corrections = 0;
-        let result = published_range_state(
+        let result = published_range_state_with_budget(
             &pin,
             Some(pk),
             exclusive_after_sk.map(|sort_key| {
@@ -1611,6 +1633,7 @@ impl BlinkReadHandle {
             }),
             limit,
             &mut corrections,
+            &mut budget,
         );
         #[cfg(not(feature = "blink-read-metrics-disabled"))]
         self.publisher
@@ -1621,14 +1644,32 @@ impl BlinkReadHandle {
     }
 
     pub fn scan(&self, cursor: Option<&DocumentKey>, limit: usize) -> Result<Vec<Document>> {
+        self.scan_with_response_budget(cursor, limit, usize::MAX)
+    }
+
+    pub fn scan_with_response_budget(
+        &self,
+        cursor: Option<&DocumentKey>,
+        limit: usize,
+        max_response_bytes: usize,
+    ) -> Result<Vec<Document>> {
         let pin = self.publisher.pin();
+        let mut budget = ResponseBudget::new(max_response_bytes)?;
+        let mut budget = Some(&mut budget);
         #[cfg(not(feature = "blink-read-metrics-disabled"))]
         self.publisher
             .metrics
             .read_operations
             .fetch_add(1, Ordering::Relaxed);
         let mut corrections = 0;
-        let result = published_range_state(&pin, None, cursor.cloned(), limit, &mut corrections);
+        let result = published_range_state_with_budget(
+            &pin,
+            None,
+            cursor.cloned(),
+            limit,
+            &mut corrections,
+            &mut budget,
+        );
         #[cfg(not(feature = "blink-read-metrics-disabled"))]
         self.publisher
             .metrics
@@ -6023,6 +6064,15 @@ fn read_state_encoded<S: ReadPageSource>(
     encoded: &[u8],
     right_link_corrections: &mut u64,
 ) -> Result<RevisionState> {
+    read_state_encoded_with_budget(state, encoded, right_link_corrections, None)
+}
+
+fn read_state_encoded_with_budget<S: ReadPageSource>(
+    state: &S,
+    encoded: &[u8],
+    right_link_corrections: &mut u64,
+    mut budget: Option<&mut ResponseBudget>,
+) -> Result<RevisionState> {
     let (page, index) = find_entry_with_metrics(state, encoded, right_link_corrections)?;
     let BlinkPage::Leaf { entries, .. } = page.as_ref() else {
         return Err(Error::corruption("Blink route ended at non-leaf"));
@@ -6031,10 +6081,20 @@ fn read_state_encoded<S: ReadPageSource>(
         return Ok(RevisionState::missing(Revision::ZERO));
     };
     match entry.value {
-        Some(value) => Ok(RevisionState::present(
-            materialize_value(state, value)?,
-            entry.revision,
-        )),
+        Some(value) => {
+            if let Some(budget) = budget.as_deref_mut() {
+                budget.reserve_document(
+                    &DocumentKey::decode(encoded).map_err(|error| {
+                        Error::corruption(format!("Blink key decode failed: {error}"))
+                    })?,
+                    blink_value_length(value),
+                )?;
+            }
+            Ok(RevisionState::present(
+                materialize_value(state, value)?,
+                entry.revision,
+            ))
+        }
         None => Ok(RevisionState::missing(entry.revision)),
     }
 }
@@ -6044,8 +6104,22 @@ fn read_published_state(
     key: &DocumentKey,
     right_link_corrections: &mut u64,
 ) -> Result<RevisionState> {
+    read_published_state_with_budget(state, key, right_link_corrections, &mut None)
+}
+
+fn read_published_state_with_budget(
+    state: &GenerationPin,
+    key: &DocumentKey,
+    right_link_corrections: &mut u64,
+    budget: &mut Option<&mut ResponseBudget>,
+) -> Result<RevisionState> {
     if state.generation.overlays.is_empty() {
-        return read_state(state, key, right_link_corrections);
+        return read_state_encoded_with_budget(
+            state,
+            &key.encode(),
+            right_link_corrections,
+            budget.as_deref_mut(),
+        );
     }
     let encoded = key.encode();
     validate_encoded_key(&encoded)?;
@@ -6054,14 +6128,20 @@ fn read_published_state(
             return if slot.tombstone {
                 Ok(RevisionState::missing(slot.revision))
             } else {
-                Ok(RevisionState::present(
-                    segment.value(slot).to_vec(),
-                    slot.revision,
-                ))
+                let value = segment.value(slot);
+                if let Some(budget) = budget.as_deref_mut() {
+                    budget.reserve_document(key, value.len())?;
+                }
+                Ok(RevisionState::present(value.to_vec(), slot.revision))
             };
         }
     }
-    read_state_encoded(state, &encoded, right_link_corrections)
+    read_state_encoded_with_budget(
+        state,
+        &encoded,
+        right_link_corrections,
+        budget.as_deref_mut(),
+    )
 }
 
 fn query_state<S: ReadPageSource>(
@@ -6070,6 +6150,24 @@ fn query_state<S: ReadPageSource>(
     exclusive_after_sk: Option<&SortKey>,
     limit: usize,
     right_link_corrections: &mut u64,
+) -> Result<Vec<Document>> {
+    query_state_with_budget(
+        state,
+        pk,
+        exclusive_after_sk,
+        limit,
+        right_link_corrections,
+        None,
+    )
+}
+
+fn query_state_with_budget<S: ReadPageSource>(
+    state: &S,
+    pk: &PrimaryKey,
+    exclusive_after_sk: Option<&SortKey>,
+    limit: usize,
+    right_link_corrections: &mut u64,
+    mut budget: Option<&mut ResponseBudget>,
 ) -> Result<Vec<Document>> {
     if limit == 0 {
         return Ok(Vec::new());
@@ -6119,6 +6217,9 @@ fn query_state<S: ReadPageSource>(
                 continue;
             }
             if let Some(value) = entry.value {
+                if let Some(budget) = budget.as_deref_mut() {
+                    budget.reserve_document(&key, blink_value_length(value))?;
+                }
                 output.push(Document {
                     key,
                     value: materialize_value(state, value)?,
@@ -6141,6 +6242,16 @@ fn scan_state<S: ReadPageSource>(
     cursor: Option<&DocumentKey>,
     limit: usize,
     right_link_corrections: &mut u64,
+) -> Result<Vec<Document>> {
+    scan_state_with_budget(state, cursor, limit, right_link_corrections, None)
+}
+
+fn scan_state_with_budget<S: ReadPageSource>(
+    state: &S,
+    cursor: Option<&DocumentKey>,
+    limit: usize,
+    right_link_corrections: &mut u64,
+    mut budget: Option<&mut ResponseBudget>,
 ) -> Result<Vec<Document>> {
     if limit == 0 {
         return Ok(Vec::new());
@@ -6175,6 +6286,9 @@ fn scan_state<S: ReadPageSource>(
             let key = DocumentKey::decode(entry.key)
                 .map_err(|error| Error::corruption(format!("Blink key decode failed: {error}")))?;
             if let Some(value) = entry.value {
+                if let Some(budget) = budget.as_deref_mut() {
+                    budget.reserve_document(&key, blink_value_length(value))?;
+                }
                 output.push(Document {
                     key,
                     value: materialize_value(state, value)?,
@@ -6304,19 +6418,44 @@ fn published_range_state(
     limit: usize,
     right_link_corrections: &mut u64,
 ) -> Result<Vec<Document>> {
+    published_range_state_with_budget(
+        state,
+        primary_key,
+        exclusive_after,
+        limit,
+        right_link_corrections,
+        &mut None,
+    )
+}
+
+fn published_range_state_with_budget(
+    state: &GenerationPin,
+    primary_key: Option<&PrimaryKey>,
+    exclusive_after: Option<DocumentKey>,
+    limit: usize,
+    right_link_corrections: &mut u64,
+    budget: &mut Option<&mut ResponseBudget>,
+) -> Result<Vec<Document>> {
     if limit == 0 {
         return Ok(Vec::new());
     }
     if state.generation.overlays.is_empty() {
         return match (primary_key, exclusive_after.as_ref()) {
-            (Some(primary_key), cursor) => query_state(
+            (Some(primary_key), cursor) => query_state_with_budget(
                 state,
                 primary_key,
                 cursor.map(|cursor| &cursor.sk),
                 limit,
                 right_link_corrections,
+                budget.as_deref_mut(),
             ),
-            (None, cursor) => scan_state(state, cursor, limit, right_link_corrections),
+            (None, cursor) => scan_state_with_budget(
+                state,
+                cursor,
+                limit,
+                right_link_corrections,
+                budget.as_deref_mut(),
+            ),
         };
     }
     let lower_bound = match (&exclusive_after, primary_key) {
@@ -6392,11 +6531,13 @@ fn published_range_state(
         );
         if let Some((segment_index, slot)) = winning_overlay {
             if !slot.tombstone {
+                let value = state.generation.overlays[segment_index].value(slot);
+                if let Some(budget) = budget.as_deref_mut() {
+                    budget.reserve_document(&decoded_key, value.len())?;
+                }
                 output.push(Document {
                     key: decoded_key,
-                    value: state.generation.overlays[segment_index]
-                        .value(slot)
-                        .to_vec(),
+                    value: value.to_vec(),
                     revision: slot.revision,
                 });
             }
@@ -6406,6 +6547,9 @@ fn published_range_state(
         {
             let entry = base.current_entry()?;
             if let Some(value) = entry.value {
+                if let Some(budget) = budget.as_deref_mut() {
+                    budget.reserve_document(&decoded_key, blink_value_length(value))?;
+                }
                 output.push(Document {
                     key: decoded_key,
                     value: materialize_value(state, value)?,
@@ -6598,6 +6742,13 @@ fn materialize_value<S: ReadPageSource>(state: &S, value: BlinkValueRef<'_>) -> 
             }
             Ok(output)
         }
+    }
+}
+
+fn blink_value_length(value: BlinkValueRef<'_>) -> usize {
+    match value {
+        BlinkValueRef::Inline(value) => value.len(),
+        BlinkValueRef::Overflow { length, .. } => length as usize,
     }
 }
 
