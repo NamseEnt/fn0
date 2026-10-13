@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{CStr, c_char, c_void};
 use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use dashmap::DashMap;
 use dodb_core::{
@@ -16,7 +16,7 @@ use dodb_service::{
     DodbService, ExecutionBudget, Request, Response, ServiceFuture, ShutdownFuture,
     TransactionOutcome,
 };
-use tokio::sync::{OnceCell, Semaphore};
+use tokio::sync::{OnceCell, RwLock, Semaphore};
 
 const USER_KEY_PREFIX: u8 = 1;
 const METADATA_COUNTER_KEY: &[u8] = &[0, 1];
@@ -90,22 +90,29 @@ pub struct RocksDbService {
     data_dir: PathBuf,
     databases: DashMap<TenantId, Arc<OnceCell<Arc<TenantDatabase>>>>,
     blocking_operations: Arc<Semaphore>,
+    lifecycle: RwLock<()>,
+    #[cfg(test)]
+    blocking_operation_hook: std::sync::Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
 }
 
 struct TenantDatabase {
-    handle: Mutex<NonNull<c_void>>,
+    handle: Arc<RocksDbHandle>,
 }
 
-unsafe impl Send for TenantDatabase {}
-unsafe impl Sync for TenantDatabase {}
+struct RocksDbHandle(NonNull<c_void>);
+
+unsafe impl Send for RocksDbHandle {}
+unsafe impl Sync for RocksDbHandle {}
 
 struct TransactionGuard {
     handle: NonNull<c_void>,
+    _database: Arc<RocksDbHandle>,
     active: bool,
 }
 
 struct TenantReadIterator {
     handle: NonNull<c_void>,
+    _database: Arc<RocksDbHandle>,
 }
 
 impl RocksDbService {
@@ -120,10 +127,14 @@ impl RocksDbService {
             data_dir: config.data_dir,
             databases: DashMap::new(),
             blocking_operations: Arc::new(Semaphore::new(config.max_blocking_operations)),
+            lifecycle: RwLock::new(()),
+            #[cfg(test)]
+            blocking_operation_hook: std::sync::Mutex::new(None),
         })
     }
 
     pub async fn shutdown(&self) {
+        let _lifecycle = self.lifecycle.write().await;
         let cells = self
             .databases
             .iter()
@@ -189,8 +200,14 @@ impl RocksDbService {
             .acquire_owned()
             .await
             .map_err(|_| Error::overloaded("blocking RocksDB executor is closed"))?;
+        #[cfg(test)]
+        let operation_hook = self.blocking_operation_hook.lock().unwrap().clone();
         tokio::task::spawn_blocking(move || {
             let _permit = permit;
+            #[cfg(test)]
+            if let Some(operation_hook) = operation_hook {
+                operation_hook();
+            }
             operation()
         })
         .await
@@ -203,6 +220,7 @@ impl RocksDbService {
         request: Request,
         budget: ExecutionBudget,
     ) -> Result<Response, Error> {
+        let _lifecycle = self.lifecycle.read().await;
         match request {
             Request::Get { key } => {
                 let state = match self.database(tenant, false).await? {
@@ -322,22 +340,18 @@ impl TenantDatabase {
         let handle = unsafe { dodb_rocksdb_open(path.as_ptr(), &mut error) };
         let handle = NonNull::new(handle).ok_or_else(|| ffi_error(error, "RocksDB open failed"))?;
         Ok(Self {
-            handle: Mutex::new(handle),
+            handle: Arc::new(RocksDbHandle(handle)),
         })
     }
 
     fn get(&self, key: &DocumentKey) -> Result<RevisionState, Error> {
-        let _guard = self
-            .handle
-            .lock()
-            .map_err(|_| Error::invariant("tenant RocksDB lock was poisoned"))?;
         let encoded_key = user_key(key);
         let mut value = std::ptr::null_mut();
         let mut value_length = 0;
         let mut error = std::ptr::null_mut();
         let result = unsafe {
             dodb_rocksdb_get(
-                _guard.as_ptr(),
+                self.handle.0.as_ptr(),
                 encoded_key.as_ptr(),
                 encoded_key.len(),
                 &mut value,
@@ -356,21 +370,20 @@ impl TenantDatabase {
     }
 
     fn read_iterator(&self, start_key: &[u8]) -> Result<TenantReadIterator, Error> {
-        let guard = self
-            .handle
-            .lock()
-            .map_err(|_| Error::invariant("tenant RocksDB lock was poisoned"))?;
         let mut error = std::ptr::null_mut();
         let iterator = unsafe {
             dodb_rocksdb_iterator_new(
-                guard.as_ptr(),
+                self.handle.0.as_ptr(),
                 start_key.as_ptr(),
                 start_key.len(),
                 &mut error,
             )
         };
         NonNull::new(iterator)
-            .map(|handle| TenantReadIterator { handle })
+            .map(|handle| TenantReadIterator {
+                handle,
+                _database: Arc::clone(&self.handle),
+            })
             .ok_or_else(|| ffi_error(error, "RocksDB snapshot iterator creation failed"))
     }
 
@@ -486,19 +499,28 @@ impl TenantDatabase {
     }
 
     fn transact(&self, request: TransactionRequest) -> Result<LogicalTransactionResult, Error> {
+        self.transact_with_begin_hook(request, || {})
+    }
+
+    fn transact_with_begin_hook<F>(
+        &self,
+        request: TransactionRequest,
+        on_begin: F,
+    ) -> Result<LogicalTransactionResult, Error>
+    where
+        F: FnOnce(),
+    {
         request.validate()?;
-        let guard = self
-            .handle
-            .lock()
-            .map_err(|_| Error::invariant("tenant RocksDB lock was poisoned"))?;
         let mut error = std::ptr::null_mut();
-        let transaction = unsafe { dodb_rocksdb_begin(guard.as_ptr(), &mut error) };
+        let transaction = unsafe { dodb_rocksdb_begin(self.handle.0.as_ptr(), &mut error) };
         let transaction = NonNull::new(transaction)
             .ok_or_else(|| ffi_error(error, "RocksDB transaction begin failed"))?;
         let mut transaction_guard = TransactionGuard {
             handle: transaction,
+            _database: Arc::clone(&self.handle),
             active: true,
         };
+        on_begin();
         let mut encoded_keys = BTreeSet::new();
         for condition in &request.conditions {
             encoded_keys.insert(user_key(condition.key()));
@@ -578,13 +600,9 @@ impl TenantDatabase {
     }
 }
 
-impl Drop for TenantDatabase {
+impl Drop for RocksDbHandle {
     fn drop(&mut self) {
-        let handle = self
-            .handle
-            .get_mut()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        unsafe { dodb_rocksdb_close(handle.as_ptr()) };
+        unsafe { dodb_rocksdb_close(self.0.as_ptr()) };
     }
 }
 
@@ -917,7 +935,173 @@ unsafe fn take_error(error: *mut c_char, fallback: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::mpsc;
+    use std::time::Duration;
     use tempfile::TempDir;
+
+    #[test]
+    fn get_completes_while_same_tenant_transaction_is_open() {
+        let directory = TempDir::new().unwrap();
+        let database = Arc::new(TenantDatabase::open(directory.path()).unwrap());
+        let key = DocumentKey::new(b"concurrent-read".to_vec(), b"key".to_vec());
+        database
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: key.clone(),
+                    value: b"committed".to_vec(),
+                }],
+            ))
+            .unwrap();
+
+        let (transaction_started_sender, transaction_started_receiver) = mpsc::channel();
+        let (continue_transaction_sender, continue_transaction_receiver) = mpsc::channel();
+        let transaction_database = Arc::clone(&database);
+        let transaction_key = key.clone();
+        let transaction = std::thread::spawn(move || {
+            transaction_database.transact_with_begin_hook(
+                TransactionRequest::new(
+                    Vec::new(),
+                    vec![TransactionMutation::Put {
+                        key: transaction_key,
+                        value: b"uncommitted".to_vec(),
+                    }],
+                ),
+                || {
+                    transaction_started_sender.send(()).unwrap();
+                    continue_transaction_receiver
+                        .recv_timeout(Duration::from_secs(10))
+                        .expect("transaction continuation timed out");
+                },
+            )
+        });
+
+        transaction_started_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("transaction did not reach its open-transaction hook");
+        let (get_result_sender, get_result_receiver) = mpsc::channel();
+        let get_database = Arc::clone(&database);
+        let get_key = key.clone();
+        let get = std::thread::spawn(move || {
+            get_result_sender.send(get_database.get(&get_key)).unwrap();
+        });
+        let state = get_result_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("Get waited for the open transaction");
+        assert_eq!(
+            state.unwrap(),
+            RevisionState::present(b"committed".to_vec(), Revision::new(1))
+        );
+
+        continue_transaction_sender.send(()).unwrap();
+        transaction.join().unwrap().unwrap();
+        get.join().unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn shutdown_waits_for_an_in_flight_request_and_service_reopens() {
+        let directory = TempDir::new().unwrap();
+        let service =
+            Arc::new(RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap());
+        let tenant = TenantId::new(41);
+        let key = DocumentKey::new(b"lifecycle".to_vec(), b"key".to_vec());
+        service
+            .execute(
+                tenant,
+                Request::Put {
+                    key: key.clone(),
+                    value: b"alive".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap();
+
+        let (operation_started_sender, operation_started_receiver) = mpsc::channel();
+        let (continue_operation_sender, continue_operation_receiver) = mpsc::channel();
+        let continue_operation_receiver = std::sync::Mutex::new(continue_operation_receiver);
+        let should_pause = Arc::new(AtomicBool::new(true));
+        *service.blocking_operation_hook.lock().unwrap() = Some(Arc::new(move || {
+            if should_pause.swap(false, Ordering::SeqCst) {
+                operation_started_sender.send(()).unwrap();
+                continue_operation_receiver
+                    .lock()
+                    .unwrap()
+                    .recv_timeout(Duration::from_secs(10))
+                    .expect("request continuation timed out");
+            }
+        }));
+
+        let request_service = Arc::clone(&service);
+        let request = tokio::spawn(async move {
+            request_service
+                .execute(tenant, Request::Get { key }, ExecutionBudget::new(1024))
+                .await
+        });
+        tokio::task::spawn_blocking(move || {
+            operation_started_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("request did not reach its blocking operation");
+        })
+        .await
+        .unwrap();
+
+        let shutdown_service = Arc::clone(&service);
+        let (shutdown_started_sender, shutdown_started_receiver) = tokio::sync::oneshot::channel();
+        let shutdown = tokio::spawn(async move {
+            let _ = shutdown_started_sender.send(());
+            shutdown_service.shutdown().await;
+        });
+        shutdown_started_receiver.await.unwrap();
+        continue_operation_sender.send(()).unwrap();
+
+        assert_eq!(
+            request.await.unwrap().unwrap(),
+            Response::Get(RevisionState::present(b"alive".to_vec(), Revision::new(1)))
+        );
+        shutdown.await.unwrap();
+        *service.blocking_operation_hook.lock().unwrap() = None;
+
+        assert_eq!(
+            service
+                .execute(
+                    tenant,
+                    Request::Get {
+                        key: DocumentKey::new(b"lifecycle".to_vec(), b"key".to_vec())
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .unwrap(),
+            Response::Get(RevisionState::present(b"alive".to_vec(), Revision::new(1)))
+        );
+        service.shutdown().await;
+    }
+
+    #[test]
+    fn read_iterator_keeps_database_alive_after_tenant_owner_drops() {
+        let directory = TempDir::new().unwrap();
+        let database = TenantDatabase::open(directory.path()).unwrap();
+        let key = DocumentKey::new(b"iterator-lifetime".to_vec(), b"key".to_vec());
+        database
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: key.clone(),
+                    value: b"retained".to_vec(),
+                }],
+            ))
+            .unwrap();
+        let iterator = database
+            .read_iterator(&user_partition_prefix(&PrimaryKey::new(
+                b"iterator-lifetime".to_vec(),
+            )))
+            .unwrap();
+        drop(database);
+        assert_eq!(iterator_value(&iterator), (key, b"retained".to_vec()));
+        drop(iterator);
+    }
 
     #[test]
     fn read_iterator_keeps_one_snapshot_across_atomic_transaction_commit() {
