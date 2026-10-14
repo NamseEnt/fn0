@@ -476,6 +476,10 @@ pub struct RocksDbService {
     lifecycle: LifecycleCoordinator,
     #[cfg(test)]
     blocking_operation_hook: std::sync::Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
+    #[cfg(test)]
+    tenant_path_checks: AtomicUsize,
+    #[cfg(test)]
+    tenant_database_opens: AtomicUsize,
 }
 
 struct TenantDatabase {
@@ -548,6 +552,10 @@ impl RocksDbService {
             lifecycle: LifecycleCoordinator::new(),
             #[cfg(test)]
             blocking_operation_hook: std::sync::Mutex::new(None),
+            #[cfg(test)]
+            tenant_path_checks: AtomicUsize::new(0),
+            #[cfg(test)]
+            tenant_database_opens: AtomicUsize::new(0),
         })
     }
 
@@ -602,6 +610,8 @@ impl RocksDbService {
     ) -> Result<Option<Arc<TenantDatabase>>, Error> {
         let path = self.tenant_path(tenant);
         if !create {
+            #[cfg(test)]
+            self.tenant_path_checks.fetch_add(1, Ordering::Relaxed);
             let path_exists = self
                 .run_blocking(tenant, false, move || Ok(path.exists()))
                 .await?;
@@ -620,6 +630,8 @@ impl RocksDbService {
         let revision_allocator = self.revision_allocator;
         let database = cell
             .get_or_try_init(|| async move {
+                #[cfg(test)]
+                self.tenant_database_opens.fetch_add(1, Ordering::Relaxed);
                 let semaphore_started = Instant::now();
                 let permit = semaphore
                     .acquire_owned()
@@ -654,6 +666,17 @@ impl RocksDbService {
             })
             .await?;
         Ok(Some(Arc::clone(database)))
+    }
+
+    async fn read_database(&self, tenant: TenantId) -> Result<Option<Arc<TenantDatabase>>, Error> {
+        if let Some(database) = self
+            .databases
+            .get(&tenant)
+            .and_then(|cell| cell.get().cloned())
+        {
+            return Ok(Some(database));
+        }
+        self.database(tenant, false).await
     }
 
     async fn run_blocking<T, F>(
@@ -863,7 +886,7 @@ impl RocksDbService {
         match request {
             Request::Get { key } => {
                 let database_started = Instant::now();
-                let database = self.database(tenant, false).await?;
+                let database = self.read_database(tenant).await?;
                 if let Some(metrics) = &self.research_metrics {
                     if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
                     {
@@ -996,7 +1019,7 @@ impl RocksDbService {
                 limit,
             } => {
                 let database_started = Instant::now();
-                let database = self.database(tenant, false).await?;
+                let database = self.read_database(tenant).await?;
                 if let Some(metrics) = &self.research_metrics {
                     if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
                     {
@@ -1050,7 +1073,7 @@ impl RocksDbService {
                 exclusive_after_key,
                 limit,
             } => {
-                let rows = match self.database(tenant, false).await? {
+                let rows = match self.read_database(tenant).await? {
                     Some(database) => {
                         self.run_blocking(tenant, false, move || {
                             database.scan(exclusive_after_key.as_ref(), limit, budget)
@@ -2333,6 +2356,287 @@ mod tests {
         service.shutdown().await;
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn initialized_tenant_reads_skip_repeated_path_checks() {
+        let directory = temporary_db_directory();
+        let service = RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap();
+        let tenant = TenantId::new(43);
+        let key = DocumentKey::new(b"warm-tenant".to_vec(), b"key".to_vec());
+        service
+            .execute(
+                tenant,
+                Request::Put {
+                    key: key.clone(),
+                    value: b"value".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap();
+
+        for _ in 0..4 {
+            assert!(matches!(
+                service
+                    .execute(
+                        tenant,
+                        Request::Get { key: key.clone() },
+                        ExecutionBudget::new(1024),
+                    )
+                    .await
+                    .unwrap(),
+                Response::Get(RevisionState::Present { .. })
+            ));
+            assert!(matches!(
+                service
+                    .execute(
+                        tenant,
+                        Request::Query {
+                            pk: PrimaryKey::new(b"warm-tenant".to_vec()),
+                            exclusive_after_sk: None,
+                            limit: 10,
+                        },
+                        ExecutionBudget::new(1024),
+                    )
+                    .await
+                    .unwrap(),
+                Response::Query(rows) if rows.len() == 1
+            ));
+            assert!(matches!(
+                service
+                    .execute(
+                        tenant,
+                        Request::Scan {
+                            exclusive_after_key: None,
+                            limit: 10,
+                        },
+                        ExecutionBudget::new(1024),
+                    )
+                    .await
+                    .unwrap(),
+                Response::Scan(rows) if rows.len() == 1
+            ));
+        }
+
+        assert_eq!(service.tenant_path_checks.load(Ordering::Relaxed), 0);
+        service.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn missing_tenant_reads_do_not_create_database_directory() {
+        let directory = temporary_db_directory();
+        let service = RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap();
+        let tenant = TenantId::new(46);
+        let key = DocumentKey::new(b"absent-tenant".to_vec(), b"key".to_vec());
+
+        assert_eq!(
+            service
+                .execute(tenant, Request::Get { key }, ExecutionBudget::new(1024),)
+                .await
+                .unwrap(),
+            Response::Get(RevisionState::missing(Revision::ZERO))
+        );
+        assert_eq!(
+            service
+                .execute(
+                    tenant,
+                    Request::Query {
+                        pk: PrimaryKey::new(b"absent-tenant".to_vec()),
+                        exclusive_after_sk: None,
+                        limit: 10,
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .unwrap(),
+            Response::Query(Vec::new())
+        );
+        assert_eq!(
+            service
+                .execute(
+                    tenant,
+                    Request::Scan {
+                        exclusive_after_key: None,
+                        limit: 10,
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .unwrap(),
+            Response::Scan(Vec::new())
+        );
+
+        assert!(!service.tenant_path(tenant).exists());
+        assert_eq!(service.tenant_path_checks.load(Ordering::Relaxed), 3);
+        assert_eq!(service.tenant_database_opens.load(Ordering::Relaxed), 0);
+        service.shutdown().await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn disk_tenant_cold_open_is_shared_and_then_uses_read_fast_path() {
+        let directory = temporary_db_directory();
+        let tenant = TenantId::new(44);
+        let key = DocumentKey::new(b"disk-tenant".to_vec(), b"key".to_vec());
+        let seed_service =
+            RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap();
+        seed_service
+            .execute(
+                tenant,
+                Request::Put {
+                    key: key.clone(),
+                    value: b"persisted".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap();
+        seed_service.shutdown().await;
+
+        let service =
+            Arc::new(RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap());
+        let mut reads = Vec::new();
+        for _ in 0..8 {
+            let service = Arc::clone(&service);
+            let key = key.clone();
+            reads.push(tokio::spawn(async move {
+                service
+                    .execute(tenant, Request::Get { key }, ExecutionBudget::new(1024))
+                    .await
+            }));
+        }
+        for read in reads {
+            assert_eq!(
+                read.await.unwrap().unwrap(),
+                Response::Get(RevisionState::present(
+                    b"persisted".to_vec(),
+                    Revision::new(1)
+                ))
+            );
+        }
+        assert_eq!(service.tenant_database_opens.load(Ordering::Relaxed), 1);
+        let path_checks_after_open = service.tenant_path_checks.load(Ordering::Relaxed);
+        assert!(path_checks_after_open > 0);
+
+        service
+            .execute(tenant, Request::Get { key }, ExecutionBudget::new(1024))
+            .await
+            .unwrap();
+        assert_eq!(
+            service.tenant_path_checks.load(Ordering::Relaxed),
+            path_checks_after_open
+        );
+        service.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn failed_tenant_open_can_be_retried() {
+        let directory = temporary_db_directory();
+        let service = RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap();
+        let tenant = TenantId::new(47);
+        let tenant_path = service.tenant_path(tenant);
+        std::fs::write(&tenant_path, b"not a database directory").unwrap();
+
+        assert!(
+            service
+                .execute(
+                    tenant,
+                    Request::Get {
+                        key: DocumentKey::new(b"retry".to_vec(), b"key".to_vec()),
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .is_err()
+        );
+
+        std::fs::remove_file(&tenant_path).unwrap();
+        let database = TenantDatabase::open(&tenant_path).unwrap();
+        let key = DocumentKey::new(b"retry".to_vec(), b"key".to_vec());
+        database
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: key.clone(),
+                    value: b"recovered".to_vec(),
+                }],
+            ))
+            .unwrap();
+        drop(database);
+
+        assert_eq!(
+            service
+                .execute(tenant, Request::Get { key }, ExecutionBudget::new(1024))
+                .await
+                .unwrap(),
+            Response::Get(RevisionState::present(
+                b"recovered".to_vec(),
+                Revision::new(1)
+            ))
+        );
+        assert_eq!(service.tenant_database_opens.load(Ordering::Relaxed), 2);
+        service.shutdown().await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn read_waits_for_an_initializing_registry_cell() {
+        let directory = temporary_db_directory();
+        let tenant = TenantId::new(45);
+        let key = DocumentKey::new(b"initializing".to_vec(), b"key".to_vec());
+        let seed_service =
+            RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap();
+        seed_service
+            .execute(
+                tenant,
+                Request::Put {
+                    key: key.clone(),
+                    value: b"ready".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap();
+        seed_service.shutdown().await;
+
+        let service =
+            Arc::new(RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap());
+        let cell = Arc::new(OnceCell::new());
+        service.databases.insert(tenant, Arc::clone(&cell));
+        let (opened_sender, opened_receiver) = tokio::sync::oneshot::channel();
+        let (release_sender, release_receiver) = tokio::sync::oneshot::channel();
+        let initializer = tokio::spawn(async move {
+            cell.get_or_try_init(|| async move {
+                let database = TenantDatabase::open(
+                    &directory.path().join(format!("tenant-{}", tenant.get())),
+                )?;
+                let _ = opened_sender.send(());
+                release_receiver.await.unwrap();
+                Ok::<_, Error>(Arc::new(database))
+            })
+            .await?;
+            Ok::<_, Error>(())
+        });
+        opened_receiver.await.unwrap();
+
+        let request_service = Arc::clone(&service);
+        let mut request = tokio::spawn(async move {
+            request_service
+                .execute(tenant, Request::Get { key }, ExecutionBudget::new(1024))
+                .await
+        });
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), &mut request)
+                .await
+                .is_err()
+        );
+        release_sender.send(()).unwrap();
+        initializer.await.unwrap().unwrap();
+        assert_eq!(
+            request.await.unwrap().unwrap(),
+            Response::Get(RevisionState::present(b"ready".to_vec(), Revision::new(1)))
+        );
+        assert_eq!(service.tenant_path_checks.load(Ordering::Relaxed), 1);
+        service.shutdown().await;
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn shutdown_drains_a_blocking_operation_after_its_request_is_cancelled() {
         let directory = temporary_db_directory();
@@ -2357,7 +2661,7 @@ mod tests {
         let continue_operation_receiver = std::sync::Mutex::new(continue_operation_receiver);
         let operation_index = Arc::new(AtomicUsize::new(0));
         *service.blocking_operation_hook.lock().unwrap() = Some(Arc::new(move || {
-            if operation_index.fetch_add(1, Ordering::SeqCst) == 1 {
+            if operation_index.fetch_add(1, Ordering::SeqCst) == 0 {
                 operation_started_sender.send(()).unwrap();
                 continue_operation_receiver
                     .lock()
