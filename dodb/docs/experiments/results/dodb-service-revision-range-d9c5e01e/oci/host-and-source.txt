@@ -1,0 +1,41 @@
+Implementation verification SHA: d9c5e01e239abf5e203cbdc7379a0beb8c5345b8
+Implementation branch: experiment/b-link-batched-engine-monorepo
+Implementation checkout: /bench/zfs/db/dodb-revision-range-d9c5e01e
+Checkout state: clean detached checkout at the implementation verification SHA
+Host: instance-20260923-1013
+Architecture: aarch64, 2 online CPUs, Linux 6.12.0-206.104.4.4.el9uek.aarch64
+Filesystem: ZFS /bench/zfs/db, mounted from dodbbench/db, rw,noatime
+Rust: 1.97.1 (8bab26f4f 2026-07-14)
+Cargo: 1.97.1 (c980f4866 2026-06-30)
+Cargo target: /bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target
+Rust target flags: aarch64-unknown-linux-gnu with +crc from repository configuration
+RocksDB source: abeebd9630f11bd08c28b7bd43c7bdfc62050654, version 11.8.1
+RocksDB archive: /bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+RocksDB archive SHA-256: 9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5
+Workload executable: /bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/service_workload
+Workload executable SHA-256 before, after, and for all ten runs: 1b362e58777b205be30008a163b850fbd96dd56db5f17ed1f43773fc82c5db81
+Research build helper: dodb/scripts/run-oci-rocksdb-build.sh
+Focused-check helper run: revision-range-d9c5e01e-focused-tests
+Workload-build helper run: revision-range-d9c5e01e-workload-build
+OCI measurement root: /bench/zfs/db/dodb-revision-range-runs/d9c5e01e/measure/
+Independent smoke root: /bench/zfs/db/dodb-revision-range-runs/d9c5e01e/smoke/
+Per-run database directories remain on OCI under the corresponding smoke and measure run paths.
+
+Focused test command:
+DODB_BUILD_RUN_ID=revision-range-d9c5e01e-focused-tests bash dodb/scripts/run-oci-rocksdb-build.sh test --locked --release -p dodb-rocksdb --lib --test transaction_contract --test read_contract --test research_metrics
+
+Workload build command:
+DODB_BUILD_RUN_ID=revision-range-d9c5e01e-workload-build bash dodb/scripts/run-oci-rocksdb-build.sh build --locked --release -p dodb-rocksdb --bin service_workload
+
+Run configuration for each measured scenario:
+--backend rocksdb --scenario <rw95|rw80|rw50|rw20|mt-mix> --warmup-ms 1000 --measurement-ms 5000 --clients 16 --call-cap 1000000 --rows 10000 --value-size 512 --seed 20261013 --research-metrics 1
+
+Allocator selection:
+--revision-allocator serialized
+--revision-allocator reserved-ranges
+
+The exact per-run command, stdout, JSON report, exit status, and binary hashes are preserved under measure/<scenario>/<mode>/. The two smoke runs use 0 ms warmup, 10,000 ms measurement, four clients, and a 1,000-call cap; they are not included in performance comparisons.
+
+Instrumentation was enabled identically for both allocator modes. This matches the revision-counter diagnostic's measured ON setting. The existing driver seed setup remains outside measured admission and research metric phases; its total elapsed time is retained per run, and range-mode seed reservations are three per seeded tenant.
+
+No RocksDB archive rebuild, new Cargo target, OCI source edit, B-link run, or extra WAL crash campaign was performed.

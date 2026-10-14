@@ -1,0 +1,10 @@
+rw95:serialized
+rw95:reserved-ranges
+rw80:reserved-ranges
+rw80:serialized
+rw50:serialized
+rw50:reserved-ranges
+rw20:reserved-ranges
+rw20:serialized
+mt-mix:serialized
+mt-mix:reserved-ranges

@@ -39,7 +39,11 @@ transactions may commit in a different physical completion order; their
 revision/commit identities define a valid logical serialization order because
 their mutations commute. `commit_lsn` remains the unique logical write identity
 used by the existing driver replay, not a RocksDB physical sequence number or
-response completion timestamp. Condition-only requests still allocate nothing.
+response completion timestamp. `Revision` and `Lsn` are distinct newtypes over
+`u64`; the RocksDB service continues to return the same allocated integer in
+both fields. The existing service contract documents per-key identity, not
+contiguous values or response completion order. Condition-only requests still
+allocate nothing.
 
 Reservation transactions touch only counter metadata and never acquire user
 keys, so a transaction holding user locks while requesting a range cannot form
