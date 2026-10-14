@@ -1,0 +1,10 @@
+host=instance-20260923-1013
+kernel=Linux 6.12.0-206.104.4.4.el9uek.aarch64 aarch64 GNU/Linux
+filesystem=dodbbench/db   zfs  155438276 119778252  35660024  78% /bench/zfs/db
+source_sha=6b101c1b44ec21704b060a99b61c7cac792a9e19
+source_status_entries=0
+rust=rustc 1.97.1 (8bab26f4f 2026-07-14)
+cargo=cargo 1.97.1 (c980f4866 2026-06-30)
+rocksdb_source_sha=abeebd9630f11bd08c28b7bd43c7bdfc62050654
+9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5  /bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+4e6a143207e9d66343cc7f38a095a4a65ceac8b202dea2694f9b1c22384a931f  /bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/service_workload

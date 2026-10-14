@@ -1,0 +1,34 @@
+   Compiling dodb-core v0.1.0 (/bench/zfs/db/dodb-read-stage-diagnostic-6b101c1b/checkout/dodb/crates/dodb-core)
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/dodb-read-stage-diagnostic-6b101c1b/checkout/dodb/crates/dodb-rocksdb)
+   Compiling dodb-service v0.1.0 (/bench/zfs/db/dodb-read-stage-diagnostic-6b101c1b/checkout/dodb/crates/dodb-service)
+   Compiling dodb-protocol v0.1.0 (/bench/zfs/db/dodb-read-stage-diagnostic-6b101c1b/checkout/dodb/crates/dodb-protocol)
+   Compiling dodb-storage v0.1.0 (/bench/zfs/db/dodb-read-stage-diagnostic-6b101c1b/checkout/dodb/crates/dodb-storage)
+   Compiling dodb-server v0.1.0 (/bench/zfs/db/dodb-read-stage-diagnostic-6b101c1b/checkout/dodb/crates/dodb-server)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 41s
+     Running unittests src/lib.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/dodb_rocksdb-ab9831430d697c48)
+
+running 11 tests
+test tests::assigned_revision_is_burned_when_user_transaction_rolls_back ... ok
+test tests::allocator_modes_switch_above_existing_counter_high_water ... ok
+test tests::get_completes_while_same_tenant_transaction_is_open ... ok
+test tests::partial_range_is_abandoned_after_reopen_and_failed_tokens_are_burned ... ok
+test tests::range_reservation_rejects_overflow_and_corrupt_counter ... ok
+test tests::read_iterator_keeps_database_alive_after_tenant_owner_drops ... ok
+test tests::read_iterator_keeps_one_snapshot_across_atomic_transaction_commit ... ok
+test tests::reserved_revision_ranges_are_unique_under_concurrent_assignment ... ok
+test tests::shutdown_drains_a_blocking_operation_after_its_request_is_cancelled ... ok
+test tests::shutdown_waits_for_an_in_flight_request_and_service_reopens ... ok
+test tests::uncertain_reservation_commit_does_not_publish_its_range ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/research_metrics.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/research_metrics-83cde58b82deaa3d)
+
+running 4 tests
+test disabled_research_metrics_are_explicitly_absent ... ok
+test range_reservations_are_separate_from_user_commit_metrics ... ok
+test metric_toggle_preserves_logical_results ... ok
+test research_metrics_are_bounded_phase_separated_and_counted_once ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
