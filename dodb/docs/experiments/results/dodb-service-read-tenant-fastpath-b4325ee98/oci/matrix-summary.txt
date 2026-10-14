@@ -1,0 +1,11 @@
+Measurement plan: 10 total, each baseline/fast scenario pair once.
+Execution order: baseline RW95, fast RW95, fast RW80, baseline RW80, baseline RW50, fast RW50, fast RW20, baseline RW20, baseline MT-MIX, fast MT-MIX.
+Executed: 10.
+Passed: 10.
+Failed: 0.
+Not reached: 0.
+Reruns: none.
+All workload exit statuses were zero; all independent validation and shutdown/reopen validation entries passed. Baseline and fast client input fingerprints matched within each scenario.
+
+Accepted smoke: one fast-path run, all four tenants passed both validations.
+Rejected smoke attempt: one run with only 128 initial rows; driver replay validation failed due its first-500-seed-delete assumption. The run and assessment are preserved separately and excluded from the matrix.

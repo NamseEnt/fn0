@@ -1,0 +1,8 @@
+Local command:
+DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 cargo test --locked --offline --release -p dodb-rocksdb --lib --test read_contract --test transaction_contract
+
+Final outcome: pass. 16 library tests, 2 read contract tests, and 1 transaction contract test passed. The first attempt failed only because an existing cancellation test waited for the second blocking submission; after path-check removal, the actual Get became the first submission. The hook was adjusted, and the full command above was rerun successfully.
+
+Formatting and whitespace checks: rustfmt --edition 2024 dodb/crates/dodb-rocksdb/src/lib.rs; git diff --check. Both passed.
+
+Not run: crash tests and Debian checks.

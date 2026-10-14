@@ -1,0 +1,5 @@
+The first smoke used 128 initial rows and returned workload process status 0, but validation and reopen_validation were false because the existing replay logic accounts for seed deletions in the first 500 seed ordinals. With fewer than 500 seeded rows, deletes targeting absent seed rows reduce the expected count incorrectly. The report is preserved and excluded.
+
+The first post-processing check also queried a nonexistent top-level verification field and exited with KeyError. The workload itself had returned status 0. The corrected check reads validation and reopen_validation.
+
+The smoke rerun used 10,000 initial rows per tenant. All four tenants passed both replay and reopen validation. It is retained as the accepted smoke and excluded from the ten measured conditions.

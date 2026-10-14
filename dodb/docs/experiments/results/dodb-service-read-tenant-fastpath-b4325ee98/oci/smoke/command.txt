@@ -1,0 +1,3 @@
+source_sha=b4325ee98be07ed7efe10119bf4e7b7c997a2b25
+binary=/bench/zfs/db/dodb-read-fastpath-b4325ee98/binaries/service_workload-b4325ee98be07ed7efe10119bf4e7b7c997a2b25
+command=/bench/zfs/db/dodb-read-fastpath-b4325ee98/binaries/service_workload-b4325ee98be07ed7efe10119bf4e7b7c997a2b25 --backend rocksdb --scenario smoke --seed 20261013 --warmup-ms 100 --measurement-ms 500 --clients 16 --rows 128 --value-size 512 --call-cap 1000000 --revision-allocator reserved-ranges --research-metrics 0 --read-stage-metrics 0 --data-dir /bench/zfs/db/dodb-read-fastpath-b4325ee98/oci/smoke/db --report /bench/zfs/db/dodb-read-fastpath-b4325ee98/oci/smoke/report.json 

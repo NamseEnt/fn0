@@ -1,0 +1,3 @@
+source_sha=de790c685dee9551170d6094c945ff03ca762ac4
+binary=/bench/zfs/db/dodb-read-fastpath-b4325ee98/binaries/service_workload-de790c685dee9551170d6094c945ff03ca762ac4
+command=/bench/zfs/db/dodb-read-fastpath-b4325ee98/binaries/service_workload-de790c685dee9551170d6094c945ff03ca762ac4 --backend rocksdb --scenario rw20 --seed 20261013 --warmup-ms 1000 --measurement-ms 5000 --clients 16 --rows 10000 --value-size 512 --call-cap 1000000 --revision-allocator reserved-ranges --research-metrics 0 --read-stage-metrics 0 --data-dir /bench/zfs/db/dodb-read-fastpath-b4325ee98/oci/runs/baseline-rw20/db --report /bench/zfs/db/dodb-read-fastpath-b4325ee98/oci/runs/baseline-rw20/report.json 
