@@ -1,0 +1,22 @@
+   Compiling dodb-core v0.1.0 (/bench/zfs/db/dodb-rocksdb-revision-counter-diagnostic-a05fa627/checkout/dodb/crates/dodb-core)
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/dodb-rocksdb-revision-counter-diagnostic-a05fa627/checkout/dodb/crates/dodb-rocksdb)
+   Compiling dodb-service v0.1.0 (/bench/zfs/db/dodb-rocksdb-revision-counter-diagnostic-a05fa627/checkout/dodb/crates/dodb-service)
+   Compiling dodb-storage v0.1.0 (/bench/zfs/db/dodb-rocksdb-revision-counter-diagnostic-a05fa627/checkout/dodb/crates/dodb-storage)
+   Compiling dodb-protocol v0.1.0 (/bench/zfs/db/dodb-rocksdb-revision-counter-diagnostic-a05fa627/checkout/dodb/crates/dodb-protocol)
+   Compiling dodb-server v0.1.0 (/bench/zfs/db/dodb-rocksdb-revision-counter-diagnostic-a05fa627/checkout/dodb/crates/dodb-server)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 41s
+     Running tests/research_metrics.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/research_metrics-83cde58b82deaa3d)
+
+running 3 tests
+test disabled_research_metrics_are_explicitly_absent ... ok
+test metric_toggle_preserves_logical_results ... ok
+test research_metrics_are_bounded_phase_separated_and_counted_once ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/transaction_contract.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/transaction_contract-c9689276e58ee241)
+
+running 1 test
+test btree_blink_and_rocksdb_share_transaction_contract ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s

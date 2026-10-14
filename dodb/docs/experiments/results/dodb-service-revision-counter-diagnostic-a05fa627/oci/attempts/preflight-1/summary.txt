@@ -1,0 +1,5 @@
+Attempt type: workload orchestration preflight
+Result: no workload process ran
+Failure: per-run mkdir failed because the runs/ parent directory had not been created
+Planned matrix: 10 RocksDB OFF/ON runs
+Rerun: same matrix after creating runs/

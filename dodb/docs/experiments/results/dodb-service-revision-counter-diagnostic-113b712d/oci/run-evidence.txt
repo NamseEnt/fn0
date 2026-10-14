@@ -1,0 +1,4 @@
+OCI per-run database root: /bench/zfs/db/dodb-rocksdb-revision-counter-diagnostic-113b712d/runs/<scenario>-<mode>/db
+OCI implementation checkout: /bench/zfs/db/dodb-rocksdb-revision-counter-diagnostic-113b712d/checkout
+OCI build helper records: /bench/zfs/db/dodb-rocksdb-build-runs/revision-counter-113b712d-focused-tests-1 and /bench/zfs/db/dodb-rocksdb-build-runs/revision-counter-113b712d-workload-build-1
+The evidence archive contains run commands, stdout, JSON reports, exit codes, executable before/after hashes, helper logs, compiler-cache snapshots, and build environment records. It excludes the retained RocksDB DB directories. No OCI run directory was reused or overwritten.

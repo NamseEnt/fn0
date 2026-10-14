@@ -1,0 +1,33 @@
+Implementation verification SHA: 113b712de62e013bd299ba1769ed7ac953dc75bc
+Branch: experiment/b-link-batched-engine-monorepo
+OCI checkout: /bench/zfs/db/dodb-rocksdb-revision-counter-diagnostic-113b712d/checkout
+OCI checkout state: detached and clean
+OCI host: instance-20260923-1013
+Kernel: Linux 6.12.0-206.104.4.4.el9uek.aarch64
+Architecture: aarch64, 2 online CPUs, Neoverse-N1
+Filesystem: ZFS at /bench/zfs/db
+Rust/Cargo: 1.97.1
+Cargo target: aarch64-unknown-linux-gnu, +crc, Release, debug symbols enabled
+Shared Cargo target: /bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target
+sccache: 0.18.0 at /bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/sccache
+RocksDB source commit: abeebd9630f11bd08c28b7bd43c7bdfc62050654, version 11.8.1
+RocksDB archive SHA-256: 9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5
+Workload binary SHA-256: ad49619b1b7d859d51c54193388fbc896e27239e27c6f9a72a793c45fcfb91e8
+Seed: 20261013
+Warmup: 1 second
+Measurement admission: 5 seconds
+Clients: 16 total; MT-MIX has 4 per tenant
+Initial rows: 10,000 per tenant
+Value size: 512 bytes
+Per-condition repetitions: 1
+Each metrics OFF/ON run used an independent database path.
+
+Build helper run IDs:
+- revision-counter-113b712d-focused-tests-1
+- revision-counter-113b712d-workload-build-1
+
+Focused tests:
+DODB_TEST_DATA_DIR=/bench/zfs/db/dodb-rocksdb-revision-counter-diagnostic-113b712d/test-databases DODB_BUILD_RUN_ID=revision-counter-113b712d-focused-tests-1 bash dodb/scripts/run-oci-rocksdb-build.sh test --locked --release -p dodb-rocksdb --test research_metrics --test transaction_contract
+
+Workload binary build:
+DODB_BUILD_RUN_ID=revision-counter-113b712d-workload-build-1 bash dodb/scripts/run-oci-rocksdb-build.sh build --locked --release -p dodb-rocksdb --bin service_workload
