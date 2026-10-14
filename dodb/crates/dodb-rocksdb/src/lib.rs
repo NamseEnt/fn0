@@ -1068,11 +1068,24 @@ impl TenantDatabase {
         Ok(documents)
     }
 
+    #[cfg(test)]
     fn next_reserved_revision(
         &self,
         metrics: Option<Arc<TenantResearchMetrics>>,
         stage: usize,
     ) -> Result<u64, Error> {
+        self.next_reserved_revision_with_hook(metrics, stage, || Ok(()))
+    }
+
+    fn next_reserved_revision_with_hook<F>(
+        &self,
+        metrics: Option<Arc<TenantResearchMetrics>>,
+        stage: usize,
+        after_reservation_commit: F,
+    ) -> Result<u64, Error>
+    where
+        F: FnOnce() -> Result<(), Error>,
+    {
         let wait_started = Instant::now();
         let mut range = self
             .reserved_revisions
@@ -1145,6 +1158,7 @@ impl TenantDatabase {
                 }));
             }
             transaction_guard.finish();
+            after_reservation_commit()?;
             range.next = first_revision;
             range.end = reserved_high_water;
             if let Some(metrics) = &metrics {
@@ -1184,7 +1198,7 @@ impl TenantDatabase {
         metrics: Option<Arc<TenantResearchMetrics>>,
         stage: usize,
     ) -> Result<LogicalTransactionResult, Error> {
-        self.transact_with_begin_hook_and_metrics(request, || {}, metrics, stage)
+        self.transact_with_hooks(request, || {}, || Ok(()), || Ok(()), metrics, stage)
     }
 
     #[cfg(test)]
@@ -1196,18 +1210,22 @@ impl TenantDatabase {
     where
         F: FnOnce(),
     {
-        self.transact_with_begin_hook_and_metrics(request, on_begin, None, 0)
+        self.transact_with_hooks(request, on_begin, || Ok(()), || Ok(()), None, 0)
     }
 
-    fn transact_with_begin_hook_and_metrics<F>(
+    fn transact_with_hooks<B, R, T>(
         &self,
         request: TransactionRequest,
-        on_begin: F,
+        on_begin: B,
+        after_reservation_commit: R,
+        after_revision_assignment: T,
         metrics: Option<Arc<TenantResearchMetrics>>,
         stage: usize,
     ) -> Result<LogicalTransactionResult, Error>
     where
-        F: FnOnce(),
+        B: FnOnce(),
+        R: FnOnce() -> Result<(), Error>,
+        T: FnOnce() -> Result<(), Error>,
     {
         request.validate()?;
         let mut error = std::ptr::null_mut();
@@ -1376,8 +1394,13 @@ impl TenantDatabase {
             Some((current_revision, _)) => current_revision
                 .checked_add(1)
                 .ok_or_else(|| Error::invariant("tenant revision counter exhausted"))?,
-            None => self.next_reserved_revision(metrics.clone(), stage)?,
+            None => self.next_reserved_revision_with_hook(
+                metrics.clone(),
+                stage,
+                after_reservation_commit,
+            )?,
         };
+        after_revision_assignment()?;
         let mutation_started = Instant::now();
         for mutation in &request.mutations {
             let (key, state) = match mutation {
@@ -2161,6 +2184,122 @@ mod tests {
         let abandoned = reopened.next_reserved_revision(None, 0).unwrap();
         let next = reopened.next_reserved_revision(None, 0).unwrap();
         assert_eq!(next, abandoned + 1);
+    }
+
+    #[test]
+    fn assigned_revision_is_burned_when_user_transaction_rolls_back() {
+        let directory = temporary_db_directory();
+        let database = TenantDatabase::open_with_allocator(
+            directory.path(),
+            RevisionAllocatorMode::ReservedRanges,
+            4,
+        )
+        .unwrap();
+        let key = DocumentKey::new(b"rollback".to_vec(), b"row".to_vec());
+        let request = || {
+            TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: key.clone(),
+                    value: b"committed".to_vec(),
+                }],
+            )
+        };
+        let failed = database.transact_with_hooks(
+            request(),
+            || {},
+            || Ok(()),
+            || {
+                Err(Error::durability(
+                    "injected rollback after token assignment",
+                ))
+            },
+            None,
+            0,
+        );
+        assert!(failed.is_err());
+        assert_eq!(
+            database.get(&key).unwrap(),
+            RevisionState::missing(Revision::ZERO)
+        );
+        let committed = database.transact(request()).unwrap();
+        assert_eq!(committed.revision.unwrap().get(), 2);
+        assert_eq!(
+            database.get(&key).unwrap(),
+            RevisionState::present(b"committed".to_vec(), Revision::new(2))
+        );
+        drop(database);
+
+        let reopened = TenantDatabase::open_with_allocator(
+            directory.path(),
+            RevisionAllocatorMode::ReservedRanges,
+            4,
+        )
+        .unwrap();
+        let after_reopen = reopened
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key,
+                    value: b"after reopen".to_vec(),
+                }],
+            ))
+            .unwrap();
+        assert_eq!(after_reopen.revision.unwrap().get(), 5);
+    }
+
+    #[test]
+    fn uncertain_reservation_commit_does_not_publish_its_range() {
+        let directory = temporary_db_directory();
+        let database = TenantDatabase::open_with_allocator(
+            directory.path(),
+            RevisionAllocatorMode::ReservedRanges,
+            4,
+        )
+        .unwrap();
+        let key = DocumentKey::new(b"reservation".to_vec(), b"row".to_vec());
+        let request = || {
+            TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: key.clone(),
+                    value: b"committed".to_vec(),
+                }],
+            )
+        };
+        let uncertain = database.transact_with_hooks(
+            request(),
+            || {},
+            || Err(Error::durability("injected uncertain reservation result")),
+            || Ok(()),
+            None,
+            0,
+        );
+        assert!(uncertain.is_err());
+        assert_eq!(
+            database.get(&key).unwrap(),
+            RevisionState::missing(Revision::ZERO)
+        );
+        let committed = database.transact(request()).unwrap();
+        assert_eq!(committed.revision.unwrap().get(), 5);
+        drop(database);
+
+        let reopened = TenantDatabase::open_with_allocator(
+            directory.path(),
+            RevisionAllocatorMode::ReservedRanges,
+            4,
+        )
+        .unwrap();
+        let after_reopen = reopened
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key,
+                    value: b"after reopen".to_vec(),
+                }],
+            ))
+            .unwrap();
+        assert_eq!(after_reopen.revision.unwrap().get(), 9);
     }
 
     #[test]
