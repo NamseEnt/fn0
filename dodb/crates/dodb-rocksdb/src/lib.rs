@@ -1207,6 +1207,7 @@ impl TenantDatabase {
         })
     }
 
+    #[cfg(test)]
     fn get(&self, key: &DocumentKey) -> Result<RevisionState, Error> {
         self.get_with_metrics(TenantId::new(0), key, None, None)
     }
@@ -1279,6 +1280,7 @@ impl TenantDatabase {
             .ok_or_else(|| ffi_error(error, "RocksDB snapshot iterator creation failed"))
     }
 
+    #[cfg(test)]
     fn query(
         &self,
         pk: &PrimaryKey,

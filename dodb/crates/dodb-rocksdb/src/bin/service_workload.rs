@@ -1595,6 +1595,7 @@ async fn run(options: Options) -> Result<Value, String> {
         options.backend,
         options.data_dir.clone(),
         false,
+        false,
         options.revision_allocator,
     )
     .map_err(|error| error.to_string())?;
