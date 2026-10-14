@@ -520,9 +520,9 @@ impl RocksDbService {
             .is_some_and(|metrics| metrics.stage.load(Ordering::Acquire) > 0);
         #[cfg(test)]
         let operation_hook = self.blocking_operation_hook.lock().unwrap().clone();
+        let dispatch_started = Instant::now();
         tokio::task::spawn_blocking(move || {
             let _permit = permit;
-            let dispatch_started = Instant::now();
             if let Some(metrics) = &metrics {
                 metrics.record(
                     tenant,
