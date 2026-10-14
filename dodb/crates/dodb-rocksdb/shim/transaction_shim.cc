@@ -11,6 +11,8 @@
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
 #include "rocksdb/options.h"
+#include "rocksdb/perf_context.h"
+#include "rocksdb/perf_level.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/iterator.h"
 #include "rocksdb/utilities/transaction.h"
@@ -267,10 +269,19 @@ int dodb_rocksdb_get(void* database, const unsigned char* key, size_t key_length
 
 int dodb_rocksdb_transaction_get_for_update(
     void* transaction, const unsigned char* key, size_t key_length,
-    unsigned char** value, size_t* value_length, char** error) {
+    unsigned char** value, size_t* value_length, int collect_lock_wait,
+    uint64_t* lock_wait_nanos, uint64_t* lock_wait_count, char** error) {
+  auto* perf_context = rocksdb::get_perf_context();
+  if (collect_lock_wait != 0) {
+    perf_context->Reset();
+  }
   std::string stored;
   const auto status = static_cast<rocksdb::Transaction*>(transaction)->GetForUpdate(
       rocksdb::ReadOptions(), rocksdb::Slice(reinterpret_cast<const char*>(key), key_length), &stored);
+  if (collect_lock_wait != 0) {
+    *lock_wait_nanos = perf_context->key_lock_wait_time;
+    *lock_wait_count = perf_context->key_lock_wait_count;
+  }
   if (status.IsNotFound()) {
     return 1;
   }
@@ -287,6 +298,12 @@ int dodb_rocksdb_transaction_get_for_update(
     return 2;
   }
   return 0;
+}
+
+void dodb_rocksdb_set_research_metrics(bool enabled) {
+  rocksdb::SetPerfLevel(enabled ? rocksdb::PerfLevel::kEnableTimeExceptForMutex
+                                : rocksdb::PerfLevel::kDisable);
+  rocksdb::get_perf_context()->Reset();
 }
 
 int dodb_rocksdb_transaction_put(void* transaction, const unsigned char* key,

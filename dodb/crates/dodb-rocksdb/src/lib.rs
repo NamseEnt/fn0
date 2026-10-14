@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use dashmap::DashMap;
 use dodb_core::{
@@ -24,6 +25,228 @@ const METADATA_COUNTER_KEY: &[u8] = &[0, 1];
 const VALUE_FORMAT: u8 = 1;
 const PRESENT_TAG: u8 = 1;
 const MISSING_TAG: u8 = 2;
+const METRIC_COUNT: usize = 13;
+const HISTOGRAM_BUCKETS: usize = 64;
+const MAX_METRIC_TENANTS: usize = 64;
+
+#[derive(Clone, Copy)]
+#[repr(usize)]
+enum Metric {
+    RequestDuration,
+    ReadSemaphoreWait,
+    WriteSemaphoreWait,
+    BlockingDispatchWait,
+    UserGetForUpdateDuration,
+    UserKeyLockWait,
+    RevisionCounterGetForUpdateDuration,
+    RevisionCounterLockWait,
+    ConditionCheck,
+    CommitDuration,
+    RollbackDuration,
+    CounterHeldDuration,
+    MutationConstruction,
+}
+
+const METRIC_NAMES: [&str; METRIC_COUNT] = [
+    "service_request_duration",
+    "read_semaphore_wait",
+    "write_semaphore_wait",
+    "blocking_dispatch_wait",
+    "user_key_get_for_update_duration",
+    "user_key_lock_wait",
+    "revision_counter_get_for_update_duration",
+    "revision_counter_lock_wait",
+    "condition_check_duration",
+    "commit_duration",
+    "rollback_duration",
+    "counter_held_duration_approx",
+    "mutation_construction_duration",
+];
+
+#[derive(Default)]
+pub struct ResearchMetrics {
+    tenants: DashMap<u64, Arc<TenantResearchMetrics>>,
+    stage: std::sync::atomic::AtomicUsize,
+    tenant_slots: std::sync::atomic::AtomicUsize,
+    omitted_tenant_metric_events: std::sync::atomic::AtomicU64,
+}
+
+#[derive(Default)]
+struct TenantResearchMetrics {
+    warmup: [Histogram; METRIC_COUNT],
+    measurement: [Histogram; METRIC_COUNT],
+    warmup_outcomes: OutcomeCounts,
+    measurement_outcomes: OutcomeCounts,
+}
+
+#[derive(Default)]
+struct OutcomeCounts {
+    successful_writes: std::sync::atomic::AtomicU64,
+    condition_rejections: std::sync::atomic::AtomicU64,
+    other_errors: std::sync::atomic::AtomicU64,
+    user_key_lock_wait_count: std::sync::atomic::AtomicU64,
+    revision_counter_lock_wait_count: std::sync::atomic::AtomicU64,
+}
+
+struct Histogram {
+    count: std::sync::atomic::AtomicU64,
+    total_nanos: std::sync::atomic::AtomicU64,
+    buckets: [std::sync::atomic::AtomicU64; HISTOGRAM_BUCKETS],
+}
+
+impl Default for Histogram {
+    fn default() -> Self {
+        Self {
+            count: std::sync::atomic::AtomicU64::new(0),
+            total_nanos: std::sync::atomic::AtomicU64::new(0),
+            buckets: std::array::from_fn(|_| std::sync::atomic::AtomicU64::new(0)),
+        }
+    }
+}
+
+impl ResearchMetrics {
+    pub fn set_measurement_phase(&self) {
+        self.stage.store(2, Ordering::Release);
+    }
+
+    pub fn set_warmup_phase(&self) {
+        self.stage.store(1, Ordering::Release);
+    }
+
+    pub fn snapshot(&self) -> serde_json::Value {
+        self.snapshot_inner()
+    }
+
+    fn tenant(&self, tenant: TenantId) -> Option<Arc<TenantResearchMetrics>> {
+        match self.tenants.entry(tenant.get()) {
+            dashmap::mapref::entry::Entry::Occupied(entry) => Some(Arc::clone(entry.get())),
+            dashmap::mapref::entry::Entry::Vacant(entry) => {
+                let reserved =
+                    self.tenant_slots
+                        .fetch_update(Ordering::AcqRel, Ordering::Relaxed, |slots| {
+                            (slots < MAX_METRIC_TENANTS).then_some(slots + 1)
+                        });
+                if reserved.is_err() {
+                    self.omitted_tenant_metric_events
+                        .fetch_add(1, Ordering::Relaxed);
+                    return None;
+                }
+                let metrics = Arc::new(TenantResearchMetrics::default());
+                entry.insert(Arc::clone(&metrics));
+                Some(metrics)
+            }
+        }
+    }
+
+    fn record(&self, tenant: TenantId, metric: Metric, elapsed: std::time::Duration) {
+        let Some(tenant_metrics) = self.tenant(tenant) else {
+            return;
+        };
+        let stage = self.stage.load(Ordering::Acquire);
+        if stage > 0 {
+            let phase = if stage == 2 {
+                &tenant_metrics.measurement
+            } else {
+                &tenant_metrics.warmup
+            };
+            phase[metric as usize].record(elapsed.as_nanos().min(u64::MAX as u128) as u64);
+        }
+    }
+
+    fn snapshot_inner(&self) -> serde_json::Value {
+        let tenants = self.tenants.iter().map(|entry| {
+            let metrics = entry.value();
+            let render_phase = |histograms: &[Histogram; METRIC_COUNT]| {
+                let mut values = serde_json::Map::new();
+                for (index, name) in METRIC_NAMES.iter().enumerate() {
+                    values.insert((*name).to_owned(), histograms[index].snapshot());
+                }
+                serde_json::Value::Object(values)
+            };
+            let outcomes = |counts: &OutcomeCounts| serde_json::json!({
+                "successful_writes": counts.successful_writes.load(Ordering::Relaxed),
+                "condition_rejections": counts.condition_rejections.load(Ordering::Relaxed),
+                "other_errors": counts.other_errors.load(Ordering::Relaxed),
+                "user_key_lock_wait_count": counts.user_key_lock_wait_count.load(Ordering::Relaxed),
+                "revision_counter_lock_wait_count": counts.revision_counter_lock_wait_count.load(Ordering::Relaxed),
+            });
+            (format!("tenant_{}", entry.key()), serde_json::json!({
+                "warmup": render_phase(&metrics.warmup),
+                "measurement": render_phase(&metrics.measurement),
+                "outcomes": {
+                    "warmup": outcomes(&metrics.warmup_outcomes),
+                    "measurement": outcomes(&metrics.measurement_outcomes),
+                }
+            }))
+        }).collect::<serde_json::Map<_, _>>();
+        serde_json::json!({
+            "enabled": true,
+            "histogram_percentiles": "approximate upper bounds of base-2 nanosecond buckets",
+            "lock_wait_source": "RocksDB 11.8.1 PerfContext key_lock_wait_time and key_lock_wait_count deltas around each GetForUpdate call",
+            "tenant_limit": MAX_METRIC_TENANTS,
+            "omitted_tenant_metric_events": self.omitted_tenant_metric_events.load(Ordering::Relaxed),
+            "tenants": tenants,
+        })
+    }
+}
+
+impl TenantResearchMetrics {
+    fn record(&self, metric: Metric, elapsed: std::time::Duration, stage: usize) {
+        if stage > 0 {
+            let phase = if stage == 2 {
+                &self.measurement
+            } else {
+                &self.warmup
+            };
+            phase[metric as usize].record(elapsed.as_nanos().min(u64::MAX as u128) as u64);
+        }
+    }
+}
+
+impl Histogram {
+    fn record(&self, nanos: u64) {
+        self.count.fetch_add(1, Ordering::Relaxed);
+        self.total_nanos.fetch_add(nanos, Ordering::Relaxed);
+        let bucket = if nanos == 0 {
+            0
+        } else {
+            (u64::BITS - nanos.leading_zeros()) as usize
+        };
+        self.buckets[bucket.min(HISTOGRAM_BUCKETS - 1)].fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn snapshot(&self) -> serde_json::Value {
+        let count = self.count.load(Ordering::Relaxed);
+        let total_nanos = self.total_nanos.load(Ordering::Relaxed);
+        let percentile = |numerator: u64| -> Option<f64> {
+            if count == 0 {
+                return None;
+            }
+            let target = (count - 1).saturating_mul(numerator).div_ceil(100);
+            let mut seen = 0u64;
+            for (bucket_index, bucket) in self.buckets.iter().enumerate() {
+                seen = seen.saturating_add(bucket.load(Ordering::Relaxed));
+                if seen > target {
+                    let upper_bound = if bucket_index == 0 {
+                        1
+                    } else {
+                        1u64.checked_shl(bucket_index as u32).unwrap_or(u64::MAX)
+                    };
+                    return Some(upper_bound as f64 / 1_000_000.0);
+                }
+            }
+            Some(u64::MAX as f64 / 1_000_000.0)
+        };
+        serde_json::json!({
+            "count": count,
+            "total_ms_across_requests": total_nanos as f64 / 1_000_000.0,
+            "mean_ms": if count == 0 { None } else { Some(total_nanos as f64 / count as f64 / 1_000_000.0) },
+            "p50_ms_approx": percentile(50),
+            "p95_ms_approx": percentile(95),
+            "p99_ms_approx": percentile(99),
+        })
+    }
+}
 
 unsafe extern "C" {
     fn dodb_rocksdb_open(path: *const c_char, error: *mut *mut c_char) -> *mut c_void;
@@ -55,6 +278,9 @@ unsafe extern "C" {
         key_length: usize,
         value: *mut *mut u8,
         value_length: *mut usize,
+        collect_lock_wait: i32,
+        lock_wait_nanos: *mut u64,
+        lock_wait_count: *mut u64,
         error: *mut *mut c_char,
     ) -> i32;
     fn dodb_rocksdb_transaction_put(
@@ -68,6 +294,7 @@ unsafe extern "C" {
     fn dodb_rocksdb_transaction_commit(transaction: *mut c_void, error: *mut *mut c_char) -> i32;
     fn dodb_rocksdb_transaction_rollback(transaction: *mut c_void);
     fn dodb_rocksdb_transaction_destroy(transaction: *mut c_void);
+    fn dodb_rocksdb_set_research_metrics(enabled: bool);
     fn dodb_rocksdb_value_free(value: *mut u8);
     fn dodb_rocksdb_error_free(error: *mut c_char);
 }
@@ -76,6 +303,7 @@ unsafe extern "C" {
 pub struct RocksDbServiceConfig {
     pub data_dir: PathBuf,
     pub max_blocking_operations: usize,
+    pub research_metrics: bool,
 }
 
 impl RocksDbServiceConfig {
@@ -83,6 +311,7 @@ impl RocksDbServiceConfig {
         Self {
             data_dir: data_dir.into(),
             max_blocking_operations: 8,
+            research_metrics: false,
         }
     }
 }
@@ -92,6 +321,7 @@ pub struct RocksDbService {
     databases: DashMap<TenantId, Arc<OnceCell<Arc<TenantDatabase>>>>,
     blocking_operations: Arc<Semaphore>,
     blocking_operation_limit: usize,
+    research_metrics: Option<Arc<ResearchMetrics>>,
     lifecycle: LifecycleCoordinator,
     #[cfg(test)]
     blocking_operation_hook: std::sync::Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
@@ -150,6 +380,9 @@ impl RocksDbService {
             databases: DashMap::new(),
             blocking_operations: Arc::new(Semaphore::new(config.max_blocking_operations)),
             blocking_operation_limit: config.max_blocking_operations,
+            research_metrics: config
+                .research_metrics
+                .then(|| Arc::new(ResearchMetrics::default())),
             lifecycle: LifecycleCoordinator::new(),
             #[cfg(test)]
             blocking_operation_hook: std::sync::Mutex::new(None),
@@ -178,6 +411,28 @@ impl RocksDbService {
         self.data_dir.join(format!("tenant-{}", tenant.get()))
     }
 
+    pub fn research_metrics_snapshot(&self) -> Option<serde_json::Value> {
+        self.research_metrics
+            .as_ref()
+            .map(|metrics| metrics.snapshot())
+    }
+
+    pub fn research_metrics_handle(&self) -> Option<Arc<ResearchMetrics>> {
+        self.research_metrics.clone()
+    }
+
+    pub fn set_research_measurement_phase(&self) {
+        if let Some(metrics) = &self.research_metrics {
+            metrics.set_measurement_phase();
+        }
+    }
+
+    pub fn set_research_warmup_phase(&self) {
+        if let Some(metrics) = &self.research_metrics {
+            metrics.set_warmup_phase();
+        }
+    }
+
     async fn database(
         &self,
         tenant: TenantId,
@@ -185,7 +440,9 @@ impl RocksDbService {
     ) -> Result<Option<Arc<TenantDatabase>>, Error> {
         let path = self.tenant_path(tenant);
         if !create {
-            let path_exists = self.run_blocking(move || Ok(path.exists())).await?;
+            let path_exists = self
+                .run_blocking(tenant, false, move || Ok(path.exists()))
+                .await?;
             if !path_exists {
                 return Ok(None);
             }
@@ -197,14 +454,31 @@ impl RocksDbService {
             .or_insert_with(|| Arc::new(OnceCell::new()))
             .clone();
         let semaphore = Arc::clone(&self.blocking_operations);
+        let research_metrics = self.research_metrics.clone();
         let database = cell
             .get_or_try_init(|| async move {
+                let semaphore_started = Instant::now();
                 let permit = semaphore
                     .acquire_owned()
                     .await
                     .map_err(|_| Error::overloaded("blocking RocksDB executor is closed"))?;
+                if let Some(metrics) = &research_metrics {
+                    metrics.record(
+                        tenant,
+                        Metric::WriteSemaphoreWait,
+                        semaphore_started.elapsed(),
+                    );
+                }
+                let dispatch_started = Instant::now();
                 tokio::task::spawn_blocking(move || {
                     let _permit = permit;
+                    if let Some(metrics) = &research_metrics {
+                        metrics.record(
+                            tenant,
+                            Metric::BlockingDispatchWait,
+                            dispatch_started.elapsed(),
+                        );
+                    }
                     TenantDatabase::open(&path).map(Arc::new)
                 })
                 .await
@@ -214,24 +488,60 @@ impl RocksDbService {
         Ok(Some(Arc::clone(database)))
     }
 
-    async fn run_blocking<T, F>(&self, operation: F) -> Result<T, Error>
+    async fn run_blocking<T, F>(
+        &self,
+        tenant: TenantId,
+        is_write: bool,
+        operation: F,
+    ) -> Result<T, Error>
     where
         T: Send + 'static,
         F: FnOnce() -> Result<T, Error> + Send + 'static,
     {
+        let semaphore_started = Instant::now();
         let permit = Arc::clone(&self.blocking_operations)
             .acquire_owned()
             .await
             .map_err(|_| Error::overloaded("blocking RocksDB executor is closed"))?;
+        if let Some(metrics) = &self.research_metrics {
+            metrics.record(
+                tenant,
+                if is_write {
+                    Metric::WriteSemaphoreWait
+                } else {
+                    Metric::ReadSemaphoreWait
+                },
+                semaphore_started.elapsed(),
+            );
+        }
+        let metrics = self.research_metrics.clone();
+        let collect_metrics = metrics
+            .as_ref()
+            .is_some_and(|metrics| metrics.stage.load(Ordering::Acquire) > 0);
         #[cfg(test)]
         let operation_hook = self.blocking_operation_hook.lock().unwrap().clone();
         tokio::task::spawn_blocking(move || {
             let _permit = permit;
+            let dispatch_started = Instant::now();
+            if let Some(metrics) = &metrics {
+                metrics.record(
+                    tenant,
+                    Metric::BlockingDispatchWait,
+                    dispatch_started.elapsed(),
+                );
+            }
+            if collect_metrics {
+                unsafe { dodb_rocksdb_set_research_metrics(true) };
+            }
             #[cfg(test)]
             if let Some(operation_hook) = operation_hook {
                 operation_hook();
             }
-            operation()
+            let result = operation();
+            if collect_metrics {
+                unsafe { dodb_rocksdb_set_research_metrics(false) };
+            }
+            result
         })
         .await
         .map_err(|error| Error::recovery(format!("RocksDB operation task failed: {error}")))?
@@ -243,11 +553,49 @@ impl RocksDbService {
         request: Request,
         budget: ExecutionBudget,
     ) -> Result<Response, Error> {
+        let started = Instant::now();
+        let is_mutation = request.is_mutation();
+        let result = self.execute_request_inner(tenant, request, budget).await;
+        if let Some(metrics) = &self.research_metrics {
+            if let Some(tenant_metrics) = metrics.tenant(tenant) {
+                let stage = metrics.stage.load(Ordering::Acquire);
+                metrics.record(tenant, Metric::RequestDuration, started.elapsed());
+                let outcomes = if stage == 2 {
+                    &tenant_metrics.measurement_outcomes
+                } else {
+                    &tenant_metrics.warmup_outcomes
+                };
+                if stage > 0 {
+                    match &result {
+                        Ok(_) if is_mutation => {
+                            outcomes.successful_writes.fetch_add(1, Ordering::Relaxed)
+                        }
+                        Err(Error::Conflict(_)) => outcomes
+                            .condition_rejections
+                            .fetch_add(1, Ordering::Relaxed),
+                        Err(_) => outcomes.other_errors.fetch_add(1, Ordering::Relaxed),
+                        Ok(_) => 0,
+                    };
+                }
+            }
+        }
+        result
+    }
+
+    async fn execute_request_inner(
+        &self,
+        tenant: TenantId,
+        request: Request,
+        budget: ExecutionBudget,
+    ) -> Result<Response, Error> {
         let _request_lease = self.lifecycle.begin_request().await;
         match request {
             Request::Get { key } => {
                 let state = match self.database(tenant, false).await? {
-                    Some(database) => self.run_blocking(move || database.get(&key)).await?,
+                    Some(database) => {
+                        self.run_blocking(tenant, false, move || database.get(&key))
+                            .await?
+                    }
                     None => RevisionState::missing(Revision::ZERO),
                 };
                 let response = Response::Get(state);
@@ -263,8 +611,18 @@ impl RocksDbService {
                     Vec::new(),
                     vec![TransactionMutation::Put { key, value }],
                 );
+                let stage = self
+                    .research_metrics
+                    .as_ref()
+                    .map_or(0, |metrics| metrics.stage.load(Ordering::Acquire));
+                let transaction_metrics = self
+                    .research_metrics
+                    .as_ref()
+                    .and_then(|metrics| metrics.tenant(tenant));
                 let result = self
-                    .run_blocking(move || database.transact(request))
+                    .run_blocking(tenant, true, move || {
+                        database.transact_with_metrics(request, transaction_metrics, stage)
+                    })
                     .await?;
                 let revision = result
                     .revision
@@ -280,8 +638,18 @@ impl RocksDbService {
                     .ok_or_else(|| Error::invariant("created tenant database was absent"))?;
                 let request =
                     TransactionRequest::new(Vec::new(), vec![TransactionMutation::Delete { key }]);
+                let stage = self
+                    .research_metrics
+                    .as_ref()
+                    .map_or(0, |metrics| metrics.stage.load(Ordering::Acquire));
+                let transaction_metrics = self
+                    .research_metrics
+                    .as_ref()
+                    .and_then(|metrics| metrics.tenant(tenant));
                 let result = self
-                    .run_blocking(move || database.transact(request))
+                    .run_blocking(tenant, true, move || {
+                        database.transact_with_metrics(request, transaction_metrics, stage)
+                    })
                     .await?;
                 let revision = result
                     .revision
@@ -296,8 +664,18 @@ impl RocksDbService {
                 let database = self.database(tenant, has_mutations).await?;
                 let result = match database {
                     Some(database) => {
-                        self.run_blocking(move || database.transact(request))
-                            .await?
+                        let stage = self
+                            .research_metrics
+                            .as_ref()
+                            .map_or(0, |metrics| metrics.stage.load(Ordering::Acquire));
+                        let transaction_metrics = self
+                            .research_metrics
+                            .as_ref()
+                            .and_then(|metrics| metrics.tenant(tenant));
+                        self.run_blocking(tenant, has_mutations, move || {
+                            database.transact_with_metrics(request, transaction_metrics, stage)
+                        })
+                        .await?
                     }
                     None => evaluate_uncreated(&request)?,
                 };
@@ -316,7 +694,7 @@ impl RocksDbService {
             } => {
                 let rows = match self.database(tenant, false).await? {
                     Some(database) => {
-                        self.run_blocking(move || {
+                        self.run_blocking(tenant, false, move || {
                             database.query(&pk, exclusive_after_sk.as_ref(), limit, budget)
                         })
                         .await?
@@ -335,7 +713,7 @@ impl RocksDbService {
             } => {
                 let rows = match self.database(tenant, false).await? {
                     Some(database) => {
-                        self.run_blocking(move || {
+                        self.run_blocking(tenant, false, move || {
                             database.scan(exclusive_after_key.as_ref(), limit, budget)
                         })
                         .await?
@@ -625,14 +1003,38 @@ impl TenantDatabase {
         Ok(documents)
     }
 
+    #[cfg(test)]
     fn transact(&self, request: TransactionRequest) -> Result<LogicalTransactionResult, Error> {
-        self.transact_with_begin_hook(request, || {})
+        self.transact_with_metrics(request, None, 0)
     }
 
+    fn transact_with_metrics(
+        &self,
+        request: TransactionRequest,
+        metrics: Option<Arc<TenantResearchMetrics>>,
+        stage: usize,
+    ) -> Result<LogicalTransactionResult, Error> {
+        self.transact_with_begin_hook_and_metrics(request, || {}, metrics, stage)
+    }
+
+    #[cfg(test)]
     fn transact_with_begin_hook<F>(
         &self,
         request: TransactionRequest,
         on_begin: F,
+    ) -> Result<LogicalTransactionResult, Error>
+    where
+        F: FnOnce(),
+    {
+        self.transact_with_begin_hook_and_metrics(request, on_begin, None, 0)
+    }
+
+    fn transact_with_begin_hook_and_metrics<F>(
+        &self,
+        request: TransactionRequest,
+        on_begin: F,
+        metrics: Option<Arc<TenantResearchMetrics>>,
+        stage: usize,
     ) -> Result<LogicalTransactionResult, Error>
     where
         F: FnOnce(),
@@ -657,17 +1059,74 @@ impl TenantDatabase {
         }
         let mut states = BTreeMap::new();
         for encoded_key in encoded_keys {
-            let state = match transaction_get_for_update(&transaction_guard, &encoded_key)? {
+            let get_started = Instant::now();
+            let is_user_key = encoded_key.first() == Some(&USER_KEY_PREFIX);
+            let mut lock_wait_nanos = 0;
+            let mut lock_wait_count = 0;
+            let state = match transaction_get_for_update(
+                &transaction_guard,
+                &encoded_key,
+                metrics.is_some() && stage > 0,
+                &mut lock_wait_nanos,
+                &mut lock_wait_count,
+            )? {
                 Some(encoded_state) => decode_state(&encoded_state)?,
                 None => RevisionState::missing(Revision::ZERO),
             };
+            if let Some(metrics) = &metrics {
+                metrics.record(
+                    if is_user_key {
+                        Metric::UserGetForUpdateDuration
+                    } else {
+                        Metric::RevisionCounterGetForUpdateDuration
+                    },
+                    get_started.elapsed(),
+                    stage,
+                );
+                let lock_metric = if is_user_key {
+                    Metric::UserKeyLockWait
+                } else {
+                    Metric::RevisionCounterLockWait
+                };
+                metrics.record(
+                    lock_metric,
+                    std::time::Duration::from_nanos(lock_wait_nanos),
+                    stage,
+                );
+                if stage > 0 && is_user_key {
+                    let outcomes = if stage == 2 {
+                        &metrics.measurement_outcomes
+                    } else {
+                        &metrics.warmup_outcomes
+                    };
+                    outcomes
+                        .user_key_lock_wait_count
+                        .fetch_add(lock_wait_count, Ordering::Relaxed);
+                } else if stage > 0 {
+                    let outcomes = if stage == 2 {
+                        &metrics.measurement_outcomes
+                    } else {
+                        &metrics.warmup_outcomes
+                    };
+                    outcomes
+                        .revision_counter_lock_wait_count
+                        .fetch_add(lock_wait_count, Ordering::Relaxed);
+                }
+            }
             states.insert(encoded_key, state);
         }
+        let condition_started = Instant::now();
         for condition in &request.conditions {
             let actual = states
                 .get(&user_key(condition.key()))
                 .ok_or_else(|| Error::invariant("transaction condition state was not locked"))?;
             if !condition_matches(condition, actual) {
+                if let Some(metrics) = &metrics {
+                    metrics.record(Metric::ConditionCheck, condition_started.elapsed(), stage);
+                    let rollback_started = Instant::now();
+                    transaction_guard.rollback();
+                    metrics.record(Metric::RollbackDuration, rollback_started.elapsed(), stage);
+                }
                 return Err(Error::conflict(TransactionConflict {
                     key: condition.key().clone(),
                     expected: condition.expectation(),
@@ -675,14 +1134,53 @@ impl TenantDatabase {
                 }));
             }
         }
+        if let Some(metrics) = &metrics {
+            metrics.record(Metric::ConditionCheck, condition_started.elapsed(), stage);
+        }
         if request.mutations.is_empty() {
+            let rollback_started = Instant::now();
             transaction_guard.rollback();
+            if let Some(metrics) = &metrics {
+                metrics.record(Metric::RollbackDuration, rollback_started.elapsed(), stage);
+            }
             return Ok(LogicalTransactionResult {
                 commit_lsn: None,
                 revision: None,
             });
         }
-        let counter = transaction_get_for_update(&transaction_guard, METADATA_COUNTER_KEY)?;
+        let counter_started = Instant::now();
+        let mut counter_lock_wait_nanos = 0;
+        let mut counter_lock_wait_count = 0;
+        let counter = transaction_get_for_update(
+            &transaction_guard,
+            METADATA_COUNTER_KEY,
+            metrics.is_some() && stage > 0,
+            &mut counter_lock_wait_nanos,
+            &mut counter_lock_wait_count,
+        )?;
+        let counter_held_started = Instant::now();
+        if let Some(metrics) = &metrics {
+            metrics.record(
+                Metric::RevisionCounterGetForUpdateDuration,
+                counter_started.elapsed(),
+                stage,
+            );
+            metrics.record(
+                Metric::RevisionCounterLockWait,
+                std::time::Duration::from_nanos(counter_lock_wait_nanos),
+                stage,
+            );
+            if stage > 0 {
+                let outcomes = if stage == 2 {
+                    &metrics.measurement_outcomes
+                } else {
+                    &metrics.warmup_outcomes
+                };
+                outcomes
+                    .revision_counter_lock_wait_count
+                    .fetch_add(counter_lock_wait_count, Ordering::Relaxed);
+            }
+        }
         let current_revision = counter
             .as_deref()
             .map(counter_bytes_to_u64)
@@ -691,6 +1189,7 @@ impl TenantDatabase {
         let next_revision = current_revision
             .checked_add(1)
             .ok_or_else(|| Error::invariant("tenant revision counter exhausted"))?;
+        let mutation_started = Instant::now();
         for mutation in &request.mutations {
             let (key, state) = match mutation {
                 TransactionMutation::Put { key, value } => (
@@ -710,6 +1209,14 @@ impl TenantDatabase {
             METADATA_COUNTER_KEY,
             &next_revision.to_be_bytes(),
         )?;
+        if let Some(metrics) = &metrics {
+            metrics.record(
+                Metric::MutationConstruction,
+                mutation_started.elapsed(),
+                stage,
+            );
+        }
+        let commit_started = Instant::now();
         let mut commit_error = std::ptr::null_mut();
         let commit_result = unsafe {
             dodb_rocksdb_transaction_commit(transaction_guard.handle.as_ptr(), &mut commit_error)
@@ -718,6 +1225,14 @@ impl TenantDatabase {
             return Err(Error::durability(unsafe {
                 take_error(commit_error, "RocksDB transaction commit failed")
             }));
+        }
+        if let Some(metrics) = &metrics {
+            metrics.record(Metric::CommitDuration, commit_started.elapsed(), stage);
+            metrics.record(
+                Metric::CounterHeldDuration,
+                counter_held_started.elapsed(),
+                stage,
+            );
         }
         transaction_guard.finish();
         Ok(LogicalTransactionResult {
@@ -1006,6 +1521,9 @@ fn transaction_put(transaction: &TransactionGuard, key: &[u8], value: &[u8]) -> 
 fn transaction_get_for_update(
     transaction: &TransactionGuard,
     key: &[u8],
+    collect_lock_wait: bool,
+    lock_wait_nanos: &mut u64,
+    lock_wait_count: &mut u64,
 ) -> Result<Option<Vec<u8>>, Error> {
     let mut value = std::ptr::null_mut();
     let mut value_length = 0;
@@ -1017,6 +1535,9 @@ fn transaction_get_for_update(
             key.len(),
             &mut value,
             &mut value_length,
+            i32::from(collect_lock_wait),
+            lock_wait_nanos,
+            lock_wait_count,
             &mut error,
         )
     };

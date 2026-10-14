@@ -76,26 +76,40 @@ struct WorkflowPlan {
 
 struct DriverService {
     service: Box<dyn DodbService>,
+    research_metrics: Option<Arc<dodb_rocksdb::ResearchMetrics>>,
 }
 
 impl DriverService {
-    fn new(backend: BackendKind, data_dir: PathBuf) -> Result<Self, Error> {
-        let service: Box<dyn DodbService> = match backend {
+    fn new(
+        backend: BackendKind,
+        data_dir: PathBuf,
+        research_metrics_enabled: bool,
+    ) -> Result<Self, Error> {
+        let (service, research_metrics): (
+            Box<dyn DodbService>,
+            Option<Arc<dodb_rocksdb::ResearchMetrics>>,
+        ) = match backend {
             BackendKind::Blink => {
                 let mut config = LocalTenantServiceConfig::default();
                 config.data_dir = data_dir;
                 config.max_open_shards = 16;
                 config.database_config = DatabaseConfig::default().with_cache_capacity(128);
                 config.coordinator_config = CoordinatorConfig::default();
-                Box::new(BlinkTenantService::new(config)?)
+                (Box::new(BlinkTenantService::new(config)?), None)
             }
             BackendKind::RocksDb => {
                 let mut config = dodb_rocksdb::RocksDbServiceConfig::new(data_dir);
                 config.max_blocking_operations = 8;
-                Box::new(dodb_rocksdb::RocksDbService::new(config)?)
+                config.research_metrics = research_metrics_enabled;
+                let rocksdb_service = dodb_rocksdb::RocksDbService::new(config)?;
+                let metrics = rocksdb_service.research_metrics_handle();
+                (Box::new(rocksdb_service), metrics)
             }
         };
-        Ok(Self { service })
+        Ok(Self {
+            service,
+            research_metrics,
+        })
     }
 
     async fn execute(&self, tenant: TenantId, request: Request) -> Result<Response, Error> {
@@ -106,6 +120,25 @@ impl DriverService {
 
     async fn shutdown(&self) {
         self.service.shutdown().await;
+    }
+
+    fn set_research_measurement_phase(&self) {
+        if let Some(metrics) = &self.research_metrics {
+            metrics.set_measurement_phase();
+        }
+    }
+
+    fn set_research_warmup_phase(&self) {
+        if let Some(metrics) = &self.research_metrics {
+            metrics.set_warmup_phase();
+        }
+    }
+
+    fn research_metrics_snapshot(&self) -> serde_json::Value {
+        self.research_metrics.as_ref().map_or_else(
+            || json!({"enabled": false, "reason": "disabled"}),
+            |metrics| metrics.snapshot(),
+        )
     }
 }
 
@@ -122,6 +155,7 @@ struct Options {
     value_size: usize,
     call_cap: u64,
     report_path: Option<PathBuf>,
+    research_metrics: bool,
 }
 
 #[derive(Default)]
@@ -352,6 +386,7 @@ fn parse_options() -> Result<Options, String> {
         value_size: parse("--value-size", VALUE_SIZE as u64)? as usize,
         call_cap: parse("--call-cap", 1_000_000)?,
         report_path: values.get("--report").map(PathBuf::from),
+        research_metrics: parse("--research-metrics", 0)? == 1,
     })
 }
 
@@ -1363,8 +1398,12 @@ async fn run(options: Options) -> Result<Value, String> {
     }
     std::fs::create_dir_all(&options.data_dir).map_err(|error| error.to_string())?;
     let service = Arc::new(
-        DriverService::new(options.backend, options.data_dir.clone())
-            .map_err(|error| error.to_string())?,
+        DriverService::new(
+            options.backend,
+            options.data_dir.clone(),
+            options.research_metrics,
+        )
+        .map_err(|error| error.to_string())?,
     );
     let seed_started = Instant::now();
     seed_all(
@@ -1376,6 +1415,7 @@ async fn run(options: Options) -> Result<Value, String> {
     .await
     .map_err(|error| error.to_string())?;
     let seed_elapsed = seed_started.elapsed();
+    service.set_research_warmup_phase();
     let assignments = assignments(options.scenario, options.clients);
     let tenant_count = if matches!(options.scenario, Scenario::Multi | Scenario::Smoke) {
         4
@@ -1399,6 +1439,7 @@ async fn run(options: Options) -> Result<Value, String> {
         )
         .await;
     }
+    service.set_research_measurement_phase();
     let counters = Arc::new(
         (0..tenant_count)
             .map(|_| Mutex::new(Counters::default()))
@@ -1428,6 +1469,7 @@ async fn run(options: Options) -> Result<Value, String> {
         1 << 56,
     )
     .await;
+    let research_metrics = service.research_metrics_snapshot();
     stop_metric_sampling.store(true, Ordering::Relaxed);
     let _ = sampler.await;
     let total_elapsed = admission + drain;
@@ -1525,7 +1567,7 @@ async fn run(options: Options) -> Result<Value, String> {
     }
     let disk_bytes_before_shutdown = directory_bytes(&options.data_dir);
     service.shutdown().await;
-    let reopened = DriverService::new(options.backend, options.data_dir.clone())
+    let reopened = DriverService::new(options.backend, options.data_dir.clone(), false)
         .map_err(|error| error.to_string())?;
     let mut reopen_validation = BTreeMap::new();
     for tenant_index in 0..tenant_count {
@@ -1577,6 +1619,7 @@ async fn run(options: Options) -> Result<Value, String> {
             "query_limit": 16,
             "blink": {"database_cache_capacity_pages": 128, "coordinator_queue_capacity": 256, "coordinator_group_requests": 64, "coordinator_group_bytes": 4194304, "coordinator_collection_delay_ms": 0},
             "rocksdb": {"blocking_operation_limit": 8, "transaction_revision_counter": "tenant serialized"},
+            "research_metrics_enabled": options.research_metrics,
         },
         "timing": {
             "seed_setup_ms_excluded": seed_elapsed.as_secs_f64() * 1000.0,
@@ -1595,6 +1638,7 @@ async fn run(options: Options) -> Result<Value, String> {
             "successful_mutations": total_counters.successful_mutations as f64 / total_elapsed.as_secs_f64(),
         },
         "counters": total_counters.report(),
+        "rocksdb_research_metrics": research_metrics,
         "per_tenant": per_tenant,
         "validation": validation,
         "reopen_validation": reopen_validation,
