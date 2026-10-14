@@ -1,0 +1,18 @@
+Implementation SHA: 3dd51326565fad6638bbcd2420208faa0b55a9f7
+Host: macOS 25.4, arm64
+Rust: 1.97.1 (8bab26f4f 2026-07-14)
+Cargo: 1.97.1 (c980f4866 2026-06-30)
+Local RocksDB archive SHA-256: c425d7aee1ffb38f3093e43014d56504e398cd68bfd2262f4b6a0881601efc0f
+Release workload binary SHA-256: d9706ea0a75b2ef893d83ae1e56be3266b4f64d17aeb3b54a7848ac97fcbf20a
+Build command: DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 cargo build --locked --offline --release -p dodb-rocksdb --bin service_workload
+Focused checks: DODB_ROCKSDB_DIR=/tmp/dodb-r1a-rocksdb-abeebd9 cargo test --locked --offline -p dodb-rocksdb --lib --test transaction_contract --test read_contract --test research_metrics
+Formatting check: cargo fmt --package dodb-rocksdb -- --check
+
+Passing B-link smoke:
+target/release/service_workload --backend blink --scenario smoke --data-dir /tmp/dodb-blink-reserved-local-smoke-3dd513265/blink --rows 10000 --clients 4 --warmup-ms 50 --measurement-ms 100 --call-cap 400
+
+Passing RocksDB smoke:
+target/release/service_workload --backend rocksdb --revision-allocator reserved-ranges --scenario smoke --data-dir /tmp/dodb-blink-reserved-local-smoke-3dd513265/rocksdb --rows 10000 --clients 4 --warmup-ms 50 --measurement-ms 100 --call-cap 400
+
+The macOS process-resource fields are unavailable and these smoke runs are not
+used in the performance comparison.

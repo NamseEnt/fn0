@@ -1,0 +1,12 @@
+hostname=instance-20260923-1013
+architecture=aarch64
+kernel=6.12.0-206.104.4.4.el9uek.aarch64
+online_cpus=2
+TARGET        SOURCE       FSTYPE OPTIONS
+/bench/zfs/db dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive
+filesystem_capacity=Filesystem      Size  Used Avail Use% Mounted on
+dodbbench/db    149G  110G   40G  74% /bench/zfs/db
+checkout_head=82160803f0c92575f03fe1160c27711228f8262e
+checkout_status=## HEAD (no branch)
+rocksdb_archive=9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5  /bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+workload_binary=3f81ab98a5b433bb5b8c86571f7b4f774d7e92c286aad8f84404aade45a24d18  /bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/service_workload

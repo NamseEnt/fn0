@@ -1,0 +1,244 @@
+{
+  "rw95": {
+    "tenant_1": {
+      "schedule_fingerprint": "09a189d4792bd0de",
+      "client_prefixes_equal": true,
+      "client_prefix_count": 16,
+      "blink_client_prefixes": {
+        "12": "3d8a44431d0e0bb4",
+        "2": "6ef73d157992623d",
+        "13": "58ded1d2195869d9",
+        "5": "b755cb90342dc402",
+        "0": "008c776f7ae6cc3b",
+        "4": "ef6bf147a37d5561",
+        "11": "c8b9ea0145b3e65a",
+        "1": "21fd129495e47b7c",
+        "6": "d79fd21255a43b73",
+        "8": "6635f9f9d3eedf30",
+        "14": "2f2eec9b2ccfbad0",
+        "9": "0bdecdbb80f1d88e",
+        "7": "3a5045c36c98dd35",
+        "3": "15c1d14029db37bd",
+        "15": "3c7e3073b34774e8",
+        "10": "1d2bf4e041aaaf95"
+      },
+      "rocksdb_client_prefixes": {
+        "13": "58ded1d2195869d9",
+        "1": "21fd129495e47b7c",
+        "0": "008c776f7ae6cc3b",
+        "14": "2f2eec9b2ccfbad0",
+        "5": "b755cb90342dc402",
+        "10": "1d2bf4e041aaaf95",
+        "15": "3c7e3073b34774e8",
+        "8": "6635f9f9d3eedf30",
+        "4": "ef6bf147a37d5561",
+        "9": "0bdecdbb80f1d88e",
+        "3": "15c1d14029db37bd",
+        "7": "3a5045c36c98dd35",
+        "11": "c8b9ea0145b3e65a",
+        "12": "3d8a44431d0e0bb4",
+        "2": "6ef73d157992623d",
+        "6": "d79fd21255a43b73"
+      }
+    }
+  },
+  "rw80": {
+    "tenant_1": {
+      "schedule_fingerprint": "173deb83edfabe14",
+      "client_prefixes_equal": true,
+      "client_prefix_count": 16,
+      "blink_client_prefixes": {
+        "14": "b1397f034ddcdfca",
+        "2": "e6c86d4e7f370a91",
+        "12": "09296d54824e9df9",
+        "7": "c256ad2ce786f29f",
+        "0": "a4f1e93562eb851f",
+        "10": "fedfa875ceb3a0fc",
+        "5": "b0a32405a3c1f039",
+        "4": "5ad0793453dc1335",
+        "11": "c9080848b2643800",
+        "3": "a6bd15dcab4e9b56",
+        "9": "67addafcc833007d",
+        "1": "97eb105bfafa222e",
+        "8": "311db7d2c5d6dcb3",
+        "15": "50a377f13c27742f",
+        "6": "a3f1cb3440d31ff2",
+        "13": "a481fcad41f12639"
+      },
+      "rocksdb_client_prefixes": {
+        "13": "a481fcad41f12639",
+        "2": "e6c86d4e7f370a91",
+        "9": "67addafcc833007d",
+        "15": "50a377f13c27742f",
+        "7": "c256ad2ce786f29f",
+        "5": "b0a32405a3c1f039",
+        "10": "fedfa875ceb3a0fc",
+        "8": "311db7d2c5d6dcb3",
+        "6": "a3f1cb3440d31ff2",
+        "3": "a6bd15dcab4e9b56",
+        "4": "5ad0793453dc1335",
+        "11": "c9080848b2643800",
+        "0": "a4f1e93562eb851f",
+        "14": "b1397f034ddcdfca",
+        "12": "09296d54824e9df9",
+        "1": "97eb105bfafa222e"
+      }
+    }
+  },
+  "rw50": {
+    "tenant_1": {
+      "schedule_fingerprint": "2a283f587ebe4f3e",
+      "client_prefixes_equal": true,
+      "client_prefix_count": 16,
+      "blink_client_prefixes": {
+        "14": "e5a2ef94c94d3f1d",
+        "4": "345cd3ee9b19f93e",
+        "11": "cf0c39c7189f7ff0",
+        "13": "da4fc9268e42fa9d",
+        "7": "7a6fd3e37645a48c",
+        "3": "0d502ea63a347848",
+        "6": "ff741f233084bc6c",
+        "10": "2b636d0c5377219d",
+        "0": "d05d64bc1eee8938",
+        "9": "d1c76fc5acf41e3a",
+        "15": "79fb13fca7740da2",
+        "12": "3cf64935e7fd3257",
+        "1": "00afe83ef95ccbcb",
+        "5": "e203e8cff110234d",
+        "8": "96f536da823ea2f2",
+        "2": "4626b4849e0871a4"
+      },
+      "rocksdb_client_prefixes": {
+        "11": "cf0c39c7189f7ff0",
+        "8": "96f536da823ea2f2",
+        "13": "da4fc9268e42fa9d",
+        "4": "345cd3ee9b19f93e",
+        "5": "e203e8cff110234d",
+        "1": "00afe83ef95ccbcb",
+        "2": "4626b4849e0871a4",
+        "14": "e5a2ef94c94d3f1d",
+        "3": "0d502ea63a347848",
+        "0": "d05d64bc1eee8938",
+        "9": "d1c76fc5acf41e3a",
+        "12": "3cf64935e7fd3257",
+        "10": "2b636d0c5377219d",
+        "15": "79fb13fca7740da2",
+        "7": "7a6fd3e37645a48c",
+        "6": "ff741f233084bc6c"
+      }
+    }
+  },
+  "rw20": {
+    "tenant_1": {
+      "schedule_fingerprint": "902895fc149e7bc6",
+      "client_prefixes_equal": true,
+      "client_prefix_count": 16,
+      "blink_client_prefixes": {
+        "7": "60fa5877782bb914",
+        "15": "27eb518d53c85aff",
+        "4": "618341eb9389ca78",
+        "11": "c8c5b972f4a45a9c",
+        "8": "288765ce467341de",
+        "13": "97e4a83da5668e26",
+        "12": "ac0b35976354993e",
+        "3": "2b1b99653423af6b",
+        "0": "a08b638f28f4ed51",
+        "9": "e25a23f7393e757a",
+        "14": "2c54430cbb707ec5",
+        "6": "e324966a5ae82bae",
+        "5": "f55ffd845dd55fb1",
+        "10": "b270ccd7bd14c4b2",
+        "1": "15f3273e98c2c399",
+        "2": "3e72225bf8ce0aa4"
+      },
+      "rocksdb_client_prefixes": {
+        "4": "618341eb9389ca78",
+        "12": "ac0b35976354993e",
+        "8": "288765ce467341de",
+        "13": "97e4a83da5668e26",
+        "3": "2b1b99653423af6b",
+        "14": "2c54430cbb707ec5",
+        "0": "a08b638f28f4ed51",
+        "7": "60fa5877782bb914",
+        "9": "e25a23f7393e757a",
+        "5": "f55ffd845dd55fb1",
+        "11": "c8c5b972f4a45a9c",
+        "6": "e324966a5ae82bae",
+        "15": "27eb518d53c85aff",
+        "10": "b270ccd7bd14c4b2",
+        "1": "15f3273e98c2c399",
+        "2": "3e72225bf8ce0aa4"
+      }
+    }
+  },
+  "mt-mix": {
+    "tenant_1": {
+      "schedule_fingerprint": "09a189d4792bd0de",
+      "client_prefixes_equal": true,
+      "client_prefix_count": 4,
+      "blink_client_prefixes": {
+        "0": "008c776f7ae6cc3b",
+        "1": "21fd129495e47b7c",
+        "2": "6ef73d157992623d",
+        "3": "15c1d14029db37bd"
+      },
+      "rocksdb_client_prefixes": {
+        "1": "21fd129495e47b7c",
+        "2": "6ef73d157992623d",
+        "3": "15c1d14029db37bd",
+        "0": "008c776f7ae6cc3b"
+      }
+    },
+    "tenant_2": {
+      "schedule_fingerprint": "42d01511e1d3d4b4",
+      "client_prefixes_equal": true,
+      "client_prefix_count": 4,
+      "blink_client_prefixes": {
+        "4": "481252c312f3b3b2",
+        "5": "647be86b2e980937",
+        "6": "7e524b0b0df7be52",
+        "7": "7ef4ec080c042749"
+      },
+      "rocksdb_client_prefixes": {
+        "6": "7e524b0b0df7be52",
+        "7": "7ef4ec080c042749",
+        "4": "481252c312f3b3b2",
+        "5": "647be86b2e980937"
+      }
+    },
+    "tenant_3": {
+      "schedule_fingerprint": "2ce20a3e4b206aba",
+      "client_prefixes_equal": true,
+      "client_prefix_count": 4,
+      "blink_client_prefixes": {
+        "10": "868a7e51cedace24",
+        "8": "4f7578a7f90f92d2",
+        "11": "3cf9a109640ca0c0",
+        "9": "9daef0fc9f08e5a6"
+      },
+      "rocksdb_client_prefixes": {
+        "10": "868a7e51cedace24",
+        "11": "3cf9a109640ca0c0",
+        "8": "4f7578a7f90f92d2",
+        "9": "9daef0fc9f08e5a6"
+      }
+    },
+    "tenant_4": {
+      "schedule_fingerprint": "bd5535d7fdaec7fa",
+      "client_prefixes_equal": true,
+      "client_prefix_count": 4,
+      "blink_client_prefixes": {
+        "12": "c61425b50864c767",
+        "14": "bc3f47b60a0809a6",
+        "15": "4d1baa020cbb6285",
+        "13": "0ef93abc80101091"
+      },
+      "rocksdb_client_prefixes": {
+        "15": "4d1baa020cbb6285",
+        "14": "bc3f47b60a0809a6",
+        "13": "0ef93abc80101091",
+        "12": "c61425b50864c767"
+      }
+    }
+  }
+}
