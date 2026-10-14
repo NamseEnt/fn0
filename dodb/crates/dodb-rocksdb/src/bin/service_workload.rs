@@ -84,6 +84,7 @@ impl DriverService {
         backend: BackendKind,
         data_dir: PathBuf,
         research_metrics_enabled: bool,
+        read_stage_metrics_enabled: bool,
         revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
     ) -> Result<Self, Error> {
         let (service, research_metrics): (
@@ -102,6 +103,7 @@ impl DriverService {
                 let mut config = dodb_rocksdb::RocksDbServiceConfig::new(data_dir);
                 config.max_blocking_operations = 8;
                 config.research_metrics = research_metrics_enabled;
+                config.detailed_write_metrics = !read_stage_metrics_enabled;
                 config.revision_allocator = revision_allocator;
                 let rocksdb_service = dodb_rocksdb::RocksDbService::new(config)?;
                 let metrics = rocksdb_service.research_metrics_handle();
@@ -158,6 +160,7 @@ struct Options {
     call_cap: u64,
     report_path: Option<PathBuf>,
     research_metrics: bool,
+    read_stage_metrics: bool,
     revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
 }
 
@@ -399,6 +402,7 @@ fn parse_options() -> Result<Options, String> {
         call_cap: parse("--call-cap", 1_000_000)?,
         report_path: values.get("--report").map(PathBuf::from),
         research_metrics: parse("--research-metrics", 0)? == 1,
+        read_stage_metrics: parse("--read-stage-metrics", 0)? == 1,
         revision_allocator,
     })
 }
@@ -797,14 +801,16 @@ async fn execute_workflow(
                 key_from_ordinal(plan.key_ordinal % options.initial_rows.max(1) as u64);
             if revision_get {
                 let started = Instant::now();
-                let result = service
-                    .execute(
+                let result = dodb_rocksdb::with_research_read_kind(
+                    dodb_rocksdb::ResearchReadKind::PreparatoryGet,
+                    service.execute(
                         tenant,
                         Request::Get {
                             key: condition_key.clone(),
                         },
-                    )
-                    .await;
+                    ),
+                )
+                .await;
                 let elapsed = started.elapsed();
                 let mut state = counters.lock().unwrap();
                 state.api_calls += 1;
@@ -1401,6 +1407,9 @@ async fn run(options: Options) -> Result<Value, String> {
     if options.clients == 0 || options.initial_rows == 0 || options.call_cap == 0 {
         return Err("client, row, and call cap values must be nonzero".to_owned());
     }
+    if options.read_stage_metrics && !options.research_metrics {
+        return Err("read-stage metrics require research metrics".to_owned());
+    }
     if options.data_dir.exists()
         && std::fs::read_dir(&options.data_dir)
             .map_err(|error| error.to_string())?
@@ -1415,6 +1424,7 @@ async fn run(options: Options) -> Result<Value, String> {
             options.backend,
             options.data_dir.clone(),
             options.research_metrics,
+            options.read_stage_metrics,
             options.revision_allocator,
         )
         .map_err(|error| error.to_string())?,
@@ -1639,6 +1649,8 @@ async fn run(options: Options) -> Result<Value, String> {
             "blink": {"database_cache_capacity_pages": 128, "coordinator_queue_capacity": 256, "coordinator_group_requests": 64, "coordinator_group_bytes": 4194304, "coordinator_collection_delay_ms": 0},
             "rocksdb": {"blocking_operation_limit": 8, "revision_allocator": match options.revision_allocator { dodb_rocksdb::RevisionAllocatorMode::Serialized => "serialized", dodb_rocksdb::RevisionAllocatorMode::ReservedRanges => "reserved-ranges" }, "revision_range_size": if options.revision_allocator == dodb_rocksdb::RevisionAllocatorMode::ReservedRanges { Some(4_096) } else { None }},
             "research_metrics_enabled": options.research_metrics,
+            "read_stage_metrics_enabled": options.read_stage_metrics,
+            "detailed_write_metrics_enabled": options.research_metrics && !options.read_stage_metrics,
         },
         "timing": {
             "seed_setup_ms_excluded": seed_elapsed.as_secs_f64() * 1000.0,

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use dodb_core::{
@@ -29,6 +29,82 @@ const MISSING_TAG: u8 = 2;
 const METRIC_COUNT: usize = 16;
 const HISTOGRAM_BUCKETS: usize = 64;
 const MAX_METRIC_TENANTS: usize = 64;
+const READ_METRIC_COUNT: usize = 13;
+
+tokio::task_local! {
+    static RESEARCH_READ_KIND: ResearchReadKind;
+    static RESEARCH_READ_CONTEXT: Arc<ReadRequestContext>;
+}
+
+struct ReadRequestContext {
+    kind: ResearchReadKind,
+    started: Instant,
+    first_permit: std::sync::atomic::AtomicBool,
+    semaphore_wait_nanos: std::sync::atomic::AtomicU64,
+    blocking_dispatch_nanos: std::sync::atomic::AtomicU64,
+    blocking_closure_nanos: std::sync::atomic::AtomicU64,
+    completion_handoff_nanos: std::sync::atomic::AtomicU64,
+}
+
+impl ReadRequestContext {
+    fn add_duration(counter: &std::sync::atomic::AtomicU64, duration: Duration) {
+        counter.fetch_add(
+            duration.as_nanos().min(u64::MAX as u128) as u64,
+            Ordering::Relaxed,
+        );
+    }
+}
+
+pub async fn with_research_read_kind<F>(kind: ResearchReadKind, future: F) -> F::Output
+where
+    F: std::future::Future,
+{
+    RESEARCH_READ_KIND.scope(kind, future).await
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(usize)]
+pub enum ResearchReadKind {
+    Get,
+    PreparatoryGet,
+    Query16,
+}
+
+#[derive(Clone, Copy)]
+#[repr(usize)]
+enum ReadMetric {
+    PrePermit,
+    SemaphoreWait,
+    BlockingDispatch,
+    BlockingClosure,
+    CompletionHandoff,
+    TenantDatabaseLookup,
+    RocksDbGet,
+    GetCopyDecode,
+    QueryIteratorSetup,
+    QueryIteratorCalls,
+    QueryCopyDecodeBudget,
+    ResponseProcessing,
+    ServiceRequestTotal,
+}
+
+const READ_METRIC_NAMES: [&str; READ_METRIC_COUNT] = [
+    "request_to_permit_acquire_start",
+    "semaphore_wait",
+    "blocking_dispatch_wait",
+    "blocking_closure_duration",
+    "blocking_completion_handoff",
+    "tenant_database_lookup",
+    "rocksdb_get_call",
+    "get_copy_decode",
+    "query_snapshot_iterator_setup",
+    "query_iterator_calls_sum",
+    "query_copy_decode_budget",
+    "response_processing",
+    "service_request_total",
+];
+
+const READ_KIND_NAMES: [&str; 3] = ["get", "preparatory_get", "query16"];
 
 #[derive(Clone, Copy)]
 #[repr(usize)]
@@ -82,6 +158,8 @@ pub struct ResearchMetrics {
 struct TenantResearchMetrics {
     warmup: [Histogram; METRIC_COUNT],
     measurement: [Histogram; METRIC_COUNT],
+    warmup_reads: [[Histogram; READ_METRIC_COUNT]; 3],
+    measurement_reads: [[Histogram; READ_METRIC_COUNT]; 3],
     warmup_outcomes: OutcomeCounts,
     measurement_outcomes: OutcomeCounts,
 }
@@ -164,6 +242,28 @@ impl ResearchMetrics {
         }
     }
 
+    fn record_read(
+        &self,
+        tenant: TenantId,
+        kind: ResearchReadKind,
+        metric: ReadMetric,
+        elapsed: std::time::Duration,
+    ) {
+        let Some(tenant_metrics) = self.tenant(tenant) else {
+            return;
+        };
+        let stage = self.stage.load(Ordering::Acquire);
+        if stage > 0 {
+            let phase = if stage == 2 {
+                &tenant_metrics.measurement_reads
+            } else {
+                &tenant_metrics.warmup_reads
+            };
+            phase[kind as usize][metric as usize]
+                .record(elapsed.as_nanos().min(u64::MAX as u128) as u64);
+        }
+    }
+
     fn snapshot_inner(&self) -> serde_json::Value {
         let tenants = self.tenants.iter().map(|entry| {
             let metrics = entry.value();
@@ -173,6 +273,20 @@ impl ResearchMetrics {
                     values.insert((*name).to_owned(), histograms[index].snapshot());
                 }
                 serde_json::Value::Object(values)
+            };
+            let render_reads = |histograms: &[[Histogram; READ_METRIC_COUNT]; 3]| {
+                let mut kinds = serde_json::Map::new();
+                for (kind_index, kind_name) in READ_KIND_NAMES.iter().enumerate() {
+                    let mut values = serde_json::Map::new();
+                    for (metric_index, metric_name) in READ_METRIC_NAMES.iter().enumerate() {
+                        values.insert(
+                            (*metric_name).to_owned(),
+                            histograms[kind_index][metric_index].snapshot(),
+                        );
+                    }
+                    kinds.insert((*kind_name).to_owned(), serde_json::Value::Object(values));
+                }
+                serde_json::Value::Object(kinds)
             };
             let outcomes = |counts: &OutcomeCounts| serde_json::json!({
                 "successful_writes": counts.successful_writes.load(Ordering::Relaxed),
@@ -193,6 +307,10 @@ impl ResearchMetrics {
             (format!("tenant_{}", entry.key()), serde_json::json!({
                 "warmup": render_phase(&metrics.warmup),
                 "measurement": render_phase(&metrics.measurement),
+                "read_stages": {
+                    "warmup": render_reads(&metrics.warmup_reads),
+                    "measurement": render_reads(&metrics.measurement_reads),
+                },
                 "outcomes": {
                     "warmup": outcomes(&metrics.warmup_outcomes),
                     "measurement": outcomes(&metrics.measurement_outcomes),
@@ -324,6 +442,7 @@ pub struct RocksDbServiceConfig {
     pub data_dir: PathBuf,
     pub max_blocking_operations: usize,
     pub research_metrics: bool,
+    pub detailed_write_metrics: bool,
     pub revision_allocator: RevisionAllocatorMode,
 }
 
@@ -340,6 +459,7 @@ impl RocksDbServiceConfig {
             data_dir: data_dir.into(),
             max_blocking_operations: 8,
             research_metrics: false,
+            detailed_write_metrics: true,
             revision_allocator: RevisionAllocatorMode::Serialized,
         }
     }
@@ -351,6 +471,7 @@ pub struct RocksDbService {
     blocking_operations: Arc<Semaphore>,
     blocking_operation_limit: usize,
     research_metrics: Option<Arc<ResearchMetrics>>,
+    detailed_write_metrics: bool,
     revision_allocator: RevisionAllocatorMode,
     lifecycle: LifecycleCoordinator,
     #[cfg(test)]
@@ -422,6 +543,7 @@ impl RocksDbService {
             research_metrics: config
                 .research_metrics
                 .then(|| Arc::new(ResearchMetrics::default())),
+            detailed_write_metrics: config.detailed_write_metrics,
             revision_allocator: config.revision_allocator,
             lifecycle: LifecycleCoordinator::new(),
             #[cfg(test)]
@@ -545,6 +667,17 @@ impl RocksDbService {
         F: FnOnce() -> Result<T, Error> + Send + 'static,
     {
         let semaphore_started = Instant::now();
+        let read_context = RESEARCH_READ_CONTEXT.try_with(Arc::clone).ok();
+        if let (Some(context), Some(metrics)) = (&read_context, &self.research_metrics) {
+            if context.first_permit.swap(false, Ordering::AcqRel) {
+                metrics.record_read(
+                    tenant,
+                    context.kind,
+                    ReadMetric::PrePermit,
+                    semaphore_started.saturating_duration_since(context.started),
+                );
+            }
+        }
         let permit = Arc::clone(&self.blocking_operations)
             .acquire_owned()
             .await
@@ -559,22 +692,38 @@ impl RocksDbService {
                 },
                 semaphore_started.elapsed(),
             );
+            if let Some(context) = &read_context {
+                ReadRequestContext::add_duration(
+                    &context.semaphore_wait_nanos,
+                    semaphore_started.elapsed(),
+                );
+            }
         }
         let metrics = self.research_metrics.clone();
+        let read_context_for_task = read_context.clone();
         let collect_metrics = metrics
             .as_ref()
-            .is_some_and(|metrics| metrics.stage.load(Ordering::Acquire) > 0);
+            .is_some_and(|metrics| metrics.stage.load(Ordering::Acquire) > 0)
+            && is_write
+            && self.detailed_write_metrics;
         #[cfg(test)]
         let operation_hook = self.blocking_operation_hook.lock().unwrap().clone();
         let dispatch_started = Instant::now();
-        tokio::task::spawn_blocking(move || {
+        let (result, closure_finished) = tokio::task::spawn_blocking(move || {
             let _permit = permit;
+            let started = Instant::now();
             if let Some(metrics) = &metrics {
                 metrics.record(
                     tenant,
                     Metric::BlockingDispatchWait,
                     dispatch_started.elapsed(),
                 );
+                if let Some(context) = &read_context_for_task {
+                    ReadRequestContext::add_duration(
+                        &context.blocking_dispatch_nanos,
+                        dispatch_started.elapsed(),
+                    );
+                }
             }
             if collect_metrics {
                 unsafe { dodb_rocksdb_set_research_metrics(true) };
@@ -584,13 +733,26 @@ impl RocksDbService {
                 operation_hook();
             }
             let result = operation();
+            if let Some(context) = &read_context_for_task {
+                ReadRequestContext::add_duration(
+                    &context.blocking_closure_nanos,
+                    started.elapsed(),
+                );
+            }
             if collect_metrics {
                 unsafe { dodb_rocksdb_set_research_metrics(false) };
             }
-            result
+            (result, Instant::now())
         })
         .await
-        .map_err(|error| Error::recovery(format!("RocksDB operation task failed: {error}")))?
+        .map_err(|error| Error::recovery(format!("RocksDB operation task failed: {error}")))?;
+        if let Some(context) = &read_context {
+            ReadRequestContext::add_duration(
+                &context.completion_handoff_nanos,
+                closure_finished.elapsed(),
+            );
+        }
+        result
     }
 
     async fn execute_request(
@@ -600,12 +762,75 @@ impl RocksDbService {
         budget: ExecutionBudget,
     ) -> Result<Response, Error> {
         let started = Instant::now();
+        let default_read_kind = match &request {
+            Request::Get { .. } => Some(ResearchReadKind::Get),
+            Request::Query { .. } => Some(ResearchReadKind::Query16),
+            _ => None,
+        };
+        let read_kind = RESEARCH_READ_KIND
+            .try_with(|kind| *kind)
+            .ok()
+            .or(default_read_kind);
         let is_mutation = request.is_mutation();
-        let result = self.execute_request_inner(tenant, request, budget).await;
+        let read_context = read_kind.map(|kind| {
+            Arc::new(ReadRequestContext {
+                kind,
+                started,
+                first_permit: std::sync::atomic::AtomicBool::new(true),
+                semaphore_wait_nanos: std::sync::atomic::AtomicU64::new(0),
+                blocking_dispatch_nanos: std::sync::atomic::AtomicU64::new(0),
+                blocking_closure_nanos: std::sync::atomic::AtomicU64::new(0),
+                completion_handoff_nanos: std::sync::atomic::AtomicU64::new(0),
+            })
+        });
+        let result = if let (Some(kind), Some(context)) = (read_kind, read_context.clone()) {
+            RESEARCH_READ_KIND
+                .scope(
+                    kind,
+                    RESEARCH_READ_CONTEXT
+                        .scope(context, self.execute_request_inner(tenant, request, budget)),
+                )
+                .await
+        } else {
+            self.execute_request_inner(tenant, request, budget).await
+        };
         if let Some(metrics) = &self.research_metrics {
             if let Some(tenant_metrics) = metrics.tenant(tenant) {
                 let stage = metrics.stage.load(Ordering::Acquire);
                 metrics.record(tenant, Metric::RequestDuration, started.elapsed());
+                if let Some(context) = &read_context {
+                    for (metric, nanos) in [
+                        (
+                            ReadMetric::SemaphoreWait,
+                            context.semaphore_wait_nanos.load(Ordering::Relaxed),
+                        ),
+                        (
+                            ReadMetric::BlockingDispatch,
+                            context.blocking_dispatch_nanos.load(Ordering::Relaxed),
+                        ),
+                        (
+                            ReadMetric::BlockingClosure,
+                            context.blocking_closure_nanos.load(Ordering::Relaxed),
+                        ),
+                        (
+                            ReadMetric::CompletionHandoff,
+                            context.completion_handoff_nanos.load(Ordering::Relaxed),
+                        ),
+                    ] {
+                        metrics.record_read(
+                            tenant,
+                            context.kind,
+                            metric,
+                            Duration::from_nanos(nanos),
+                        );
+                    }
+                    metrics.record_read(
+                        tenant,
+                        context.kind,
+                        ReadMetric::ServiceRequestTotal,
+                        started.elapsed(),
+                    );
+                }
                 let outcomes = if stage == 2 {
                     &tenant_metrics.measurement_outcomes
                 } else {
@@ -637,15 +862,44 @@ impl RocksDbService {
         let _request_lease = self.lifecycle.begin_request().await;
         match request {
             Request::Get { key } => {
-                let state = match self.database(tenant, false).await? {
+                let database_started = Instant::now();
+                let database = self.database(tenant, false).await?;
+                if let Some(metrics) = &self.research_metrics {
+                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
+                    {
+                        metrics.record_read(
+                            tenant,
+                            kind,
+                            ReadMetric::TenantDatabaseLookup,
+                            database_started.elapsed(),
+                        );
+                    }
+                }
+                let state = match database {
                     Some(database) => {
-                        self.run_blocking(tenant, false, move || database.get(&key))
-                            .await?
+                        let metrics = self.research_metrics.clone();
+                        let kind = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok();
+                        self.run_blocking(tenant, false, move || {
+                            database.get_with_metrics(tenant, &key, metrics, kind)
+                        })
+                        .await?
                     }
                     None => RevisionState::missing(Revision::ZERO),
                 };
+                let response_started = Instant::now();
                 let response = Response::Get(state);
                 enforce_response_budget(&response, budget)?;
+                if let (Some(metrics), Ok(kind)) = (
+                    &self.research_metrics,
+                    RESEARCH_READ_CONTEXT.try_with(|context| context.kind),
+                ) {
+                    metrics.record_read(
+                        tenant,
+                        kind,
+                        ReadMetric::ResponseProcessing,
+                        response_started.elapsed(),
+                    );
+                }
                 Ok(response)
             }
             Request::Put { key, value } => {
@@ -664,6 +918,7 @@ impl RocksDbService {
                 let transaction_metrics = self
                     .research_metrics
                     .as_ref()
+                    .filter(|_| self.detailed_write_metrics)
                     .and_then(|metrics| metrics.tenant(tenant));
                 let result = self
                     .run_blocking(tenant, true, move || {
@@ -691,6 +946,7 @@ impl RocksDbService {
                 let transaction_metrics = self
                     .research_metrics
                     .as_ref()
+                    .filter(|_| self.detailed_write_metrics)
                     .and_then(|metrics| metrics.tenant(tenant));
                 let result = self
                     .run_blocking(tenant, true, move || {
@@ -717,6 +973,7 @@ impl RocksDbService {
                         let transaction_metrics = self
                             .research_metrics
                             .as_ref()
+                            .filter(|_| self.detailed_write_metrics)
                             .and_then(|metrics| metrics.tenant(tenant));
                         self.run_blocking(tenant, has_mutations, move || {
                             database.transact_with_metrics(request, transaction_metrics, stage)
@@ -738,10 +995,33 @@ impl RocksDbService {
                 exclusive_after_sk,
                 limit,
             } => {
-                let rows = match self.database(tenant, false).await? {
+                let database_started = Instant::now();
+                let database = self.database(tenant, false).await?;
+                if let Some(metrics) = &self.research_metrics {
+                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
+                    {
+                        metrics.record_read(
+                            tenant,
+                            kind,
+                            ReadMetric::TenantDatabaseLookup,
+                            database_started.elapsed(),
+                        );
+                    }
+                }
+                let rows = match database {
                     Some(database) => {
+                        let metrics = self.research_metrics.clone();
+                        let kind = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok();
                         self.run_blocking(tenant, false, move || {
-                            database.query(&pk, exclusive_after_sk.as_ref(), limit, budget)
+                            database.query_with_metrics(
+                                tenant,
+                                &pk,
+                                exclusive_after_sk.as_ref(),
+                                limit,
+                                budget,
+                                metrics,
+                                kind,
+                            )
                         })
                         .await?
                     }
@@ -751,7 +1031,20 @@ impl RocksDbService {
                         return Ok(response);
                     }
                 };
-                Ok(Response::Query(rows))
+                let response_started = Instant::now();
+                let response = Response::Query(rows);
+                if let (Some(metrics), Ok(kind)) = (
+                    &self.research_metrics,
+                    RESEARCH_READ_CONTEXT.try_with(|context| context.kind),
+                ) {
+                    metrics.record_read(
+                        tenant,
+                        kind,
+                        ReadMetric::ResponseProcessing,
+                        response_started.elapsed(),
+                    );
+                }
+                Ok(response)
             }
             Request::Scan {
                 exclusive_after_key,
@@ -915,10 +1208,21 @@ impl TenantDatabase {
     }
 
     fn get(&self, key: &DocumentKey) -> Result<RevisionState, Error> {
+        self.get_with_metrics(TenantId::new(0), key, None, None)
+    }
+
+    fn get_with_metrics(
+        &self,
+        tenant: TenantId,
+        key: &DocumentKey,
+        metrics: Option<Arc<ResearchMetrics>>,
+        kind: Option<ResearchReadKind>,
+    ) -> Result<RevisionState, Error> {
         let encoded_key = user_key(key);
         let mut value = std::ptr::null_mut();
         let mut value_length = 0;
         let mut error = std::ptr::null_mut();
+        let native_started = Instant::now();
         let result = unsafe {
             dodb_rocksdb_get(
                 self.handle.0.as_ptr(),
@@ -929,14 +1233,32 @@ impl TenantDatabase {
                 &mut error,
             )
         };
-        match result {
+        if let (Some(metrics), Some(kind)) = (&metrics, kind) {
+            metrics.record_read(
+                tenant,
+                kind,
+                ReadMetric::RocksDbGet,
+                native_started.elapsed(),
+            );
+        }
+        let decode_started = Instant::now();
+        let decoded = match result {
             1 => Ok(RevisionState::missing(Revision::ZERO)),
             2 => Err(ffi_error(error, "RocksDB get failed")),
             _ => {
                 let bytes = unsafe { copy_and_free_value(value, value_length) };
                 decode_state(&bytes)
             }
+        };
+        if let (Some(metrics), Some(kind)) = (&metrics, kind) {
+            metrics.record_read(
+                tenant,
+                kind,
+                ReadMetric::GetCopyDecode,
+                decode_started.elapsed(),
+            );
         }
+        decoded
     }
 
     fn read_iterator(&self, start_key: &[u8]) -> Result<TenantReadIterator, Error> {
@@ -964,59 +1286,109 @@ impl TenantDatabase {
         limit: usize,
         maximum_response_bytes: ExecutionBudget,
     ) -> Result<Vec<dodb_service::Document>, Error> {
-        let mut budget = ReadResponseBudget::new(maximum_response_bytes.max_response_bytes)?;
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-        validate_encoded_key(&DocumentKey::new(pk.as_bytes().to_vec(), Vec::new()))?;
-        if let Some(cursor) = exclusive_after_sk {
-            validate_encoded_key(&DocumentKey::new(
-                pk.as_bytes().to_vec(),
-                cursor.as_bytes().to_vec(),
-            ))?;
-        }
-        let start_key = exclusive_after_sk
-            .map(|sort_key| {
-                user_key(&DocumentKey::new(
+        self.query_with_metrics(
+            TenantId::new(0),
+            pk,
+            exclusive_after_sk,
+            limit,
+            maximum_response_bytes,
+            None,
+            None,
+        )
+    }
+
+    fn query_with_metrics(
+        &self,
+        tenant: TenantId,
+        pk: &PrimaryKey,
+        exclusive_after_sk: Option<&SortKey>,
+        limit: usize,
+        maximum_response_bytes: ExecutionBudget,
+        metrics: Option<Arc<ResearchMetrics>>,
+        kind: Option<ResearchReadKind>,
+    ) -> Result<Vec<dodb_service::Document>, Error> {
+        let query_started = Instant::now();
+        let mut iterator_setup = Duration::ZERO;
+        let mut iterator_calls = Duration::ZERO;
+        let result = (|| {
+            let mut budget = ReadResponseBudget::new(maximum_response_bytes.max_response_bytes)?;
+            if limit == 0 {
+                return Ok(Vec::new());
+            }
+            validate_encoded_key(&DocumentKey::new(pk.as_bytes().to_vec(), Vec::new()))?;
+            if let Some(cursor) = exclusive_after_sk {
+                validate_encoded_key(&DocumentKey::new(
                     pk.as_bytes().to_vec(),
-                    sort_key.as_bytes().to_vec(),
-                ))
-            })
-            .unwrap_or_else(|| user_partition_prefix(pk));
-        let iterator = self.read_iterator(&start_key)?;
-        let mut documents = Vec::new();
-        while let Some((encoded_key, value_pointer, value_length)) = iterator.current()? {
-            if encoded_key.first() != Some(&USER_KEY_PREFIX) {
-                break;
+                    cursor.as_bytes().to_vec(),
+                ))?;
             }
-            let document_key = DocumentKey::decode(&encoded_key[1..]).map_err(|error| {
-                Error::corruption(format!("RocksDB document key decode failed: {error}"))
-            })?;
-            if document_key.pk != *pk {
-                break;
-            }
-            if exclusive_after_sk.is_some_and(|cursor| document_key.sk <= *cursor) {
-                iterator.next();
-                continue;
-            }
-            if let Some((revision, value_length)) =
-                decode_present_record(value_pointer, value_length)?
-            {
-                budget.reserve_document(&document_key, value_length)?;
-                documents.push(dodb_service::Document {
-                    key: document_key,
-                    value: unsafe {
-                        std::slice::from_raw_parts(value_pointer.add(10), value_length).to_vec()
-                    },
-                    revision,
-                });
-                if documents.len() == limit {
-                    return Ok(documents);
+            let start_key = exclusive_after_sk
+                .map(|sort_key| {
+                    user_key(&DocumentKey::new(
+                        pk.as_bytes().to_vec(),
+                        sort_key.as_bytes().to_vec(),
+                    ))
+                })
+                .unwrap_or_else(|| user_partition_prefix(pk));
+            let setup_started = Instant::now();
+            let iterator = self.read_iterator(&start_key)?;
+            iterator_setup = setup_started.elapsed();
+            let mut documents = Vec::new();
+            loop {
+                let current_started = Instant::now();
+                let current = iterator.current();
+                iterator_calls += current_started.elapsed();
+                let Some((encoded_key, value_pointer, value_length)) = current? else {
+                    break;
+                };
+                if encoded_key.first() != Some(&USER_KEY_PREFIX) {
+                    break;
                 }
+                let document_key = DocumentKey::decode(&encoded_key[1..]).map_err(|error| {
+                    Error::corruption(format!("RocksDB document key decode failed: {error}"))
+                })?;
+                if document_key.pk != *pk {
+                    break;
+                }
+                if exclusive_after_sk.is_some_and(|cursor| document_key.sk <= *cursor) {
+                    let next_started = Instant::now();
+                    iterator.next();
+                    iterator_calls += next_started.elapsed();
+                    continue;
+                }
+                if let Some((revision, value_length)) =
+                    decode_present_record(value_pointer, value_length)?
+                {
+                    budget.reserve_document(&document_key, value_length)?;
+                    documents.push(dodb_service::Document {
+                        key: document_key,
+                        value: unsafe {
+                            std::slice::from_raw_parts(value_pointer.add(10), value_length).to_vec()
+                        },
+                        revision,
+                    });
+                    if documents.len() == limit {
+                        return Ok(documents);
+                    }
+                }
+                let next_started = Instant::now();
+                iterator.next();
+                iterator_calls += next_started.elapsed();
             }
-            iterator.next();
+            Ok(documents)
+        })();
+        if let (Some(metrics), Some(kind)) = (&metrics, kind) {
+            let total = query_started.elapsed();
+            metrics.record_read(tenant, kind, ReadMetric::QueryIteratorSetup, iterator_setup);
+            metrics.record_read(tenant, kind, ReadMetric::QueryIteratorCalls, iterator_calls);
+            metrics.record_read(
+                tenant,
+                kind,
+                ReadMetric::QueryCopyDecodeBudget,
+                total.saturating_sub(iterator_setup + iterator_calls),
+            );
         }
-        Ok(documents)
+        result
     }
 
     fn scan(

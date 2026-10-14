@@ -50,6 +50,20 @@ async fn research_metrics_are_bounded_phase_separated_and_counted_once() {
     service.set_research_measurement_phase();
     let target_key = key(b"measured", b"target");
     assert!(matches!(
+        dodb_rocksdb::with_research_read_kind(
+            dodb_rocksdb::ResearchReadKind::PreparatoryGet,
+            execute(
+                &service,
+                1,
+                Request::Get {
+                    key: target_key.clone(),
+                },
+            ),
+        )
+        .await,
+        Ok(Response::Get(RevisionState::Missing { .. }))
+    ));
+    assert!(matches!(
         execute(
             &service,
             1,
@@ -79,6 +93,19 @@ async fn research_metrics_are_bounded_phase_separated_and_counted_once() {
         execute(&service, 1, Request::Get { key: target_key.clone() }).await,
         Ok(Response::Get(RevisionState::Present { value, revision })) if value == b"value" && revision == Revision::new(2)
     ));
+    assert!(matches!(
+        execute(
+            &service,
+            1,
+            Request::Query {
+                pk: dodb_core::PrimaryKey::new(b"measured".to_vec()),
+                exclusive_after_sk: None,
+                limit: 16,
+            },
+        )
+        .await,
+        Ok(Response::Query(rows)) if rows.len() == 1 && rows[0].value == b"value"
+    ));
 
     let concurrent_writes = 32;
     let mut tasks = tokio::task::JoinSet::new();
@@ -106,14 +133,68 @@ async fn research_metrics_are_bounded_phase_separated_and_counted_once() {
     let tenant_two = &snapshot["tenants"]["tenant_2"];
     assert_eq!(tenant_one["warmup"]["service_request_duration"]["count"], 1);
     assert_eq!(
+        tenant_one["read_stages"]["warmup"]["get"]["service_request_total"]["count"],
+        1
+    );
+    assert_eq!(
         tenant_one["measurement"]["service_request_duration"]["count"],
-        19
+        21
     );
     assert_eq!(
         tenant_one["measurement"]["write_semaphore_wait"]["count"],
         18
     );
-    assert_eq!(tenant_one["measurement"]["read_semaphore_wait"]["count"], 2);
+    assert_eq!(tenant_one["measurement"]["read_semaphore_wait"]["count"], 6);
+    assert_eq!(
+        tenant_one["read_stages"]["measurement"]["get"]["service_request_total"]["count"],
+        1
+    );
+    assert_eq!(
+        tenant_one["read_stages"]["measurement"]["get"]["rocksdb_get_call"]["count"],
+        1
+    );
+    assert_eq!(
+        tenant_one["read_stages"]["measurement"]["get"]["get_copy_decode"]["count"],
+        1
+    );
+    assert_eq!(
+        tenant_one["read_stages"]["measurement"]["preparatory_get"]["service_request_total"]["count"],
+        1
+    );
+    assert_eq!(
+        tenant_one["read_stages"]["measurement"]["query16"]["service_request_total"]["count"],
+        1
+    );
+    assert_eq!(
+        tenant_one["read_stages"]["measurement"]["get"]["blocking_closure_duration"]["count"],
+        1
+    );
+    for metric in [
+        "semaphore_wait",
+        "blocking_dispatch_wait",
+        "blocking_completion_handoff",
+    ] {
+        assert_eq!(
+            tenant_one["read_stages"]["measurement"]["get"][metric]["count"],
+            1
+        );
+        assert_eq!(
+            tenant_one["read_stages"]["measurement"]["query16"][metric]["count"],
+            1
+        );
+    }
+    assert_eq!(
+        tenant_one["read_stages"]["measurement"]["query16"]["query_iterator_calls_sum"]["count"],
+        1
+    );
+    assert_eq!(
+        tenant_one["read_stages"]["measurement"]["query16"]["query_snapshot_iterator_setup"]["count"],
+        1
+    );
+    assert_eq!(
+        tenant_one["read_stages"]["measurement"]["query16"]["query_copy_decode_budget"]["count"],
+        1
+    );
     assert_eq!(
         tenant_one["measurement"]["user_key_get_for_update_duration"]["count"],
         18
@@ -148,7 +229,7 @@ async fn research_metrics_are_bounded_phase_separated_and_counted_once() {
             + tenant_two["measurement"]["service_request_duration"]["count"]
                 .as_u64()
                 .unwrap(),
-        (concurrent_writes + 3) as u64
+        (concurrent_writes + 5) as u64
     );
 }
 
