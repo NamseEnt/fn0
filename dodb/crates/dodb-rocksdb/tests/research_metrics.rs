@@ -4,7 +4,7 @@ use dodb_core::{
     DocumentKey, Error, Revision, RevisionState, TenantId, TransactionCondition,
     TransactionMutation, TransactionRequest,
 };
-use dodb_rocksdb::{RocksDbService, RocksDbServiceConfig};
+use dodb_rocksdb::{RevisionAllocatorMode, RocksDbService, RocksDbServiceConfig};
 use dodb_service::{DodbService, ExecutionBudget, Request, Response};
 use tempfile::TempDir;
 
@@ -199,4 +199,40 @@ async fn metric_toggle_preserves_logical_results() {
     }
 
     assert_eq!(run(false).await, run(true).await);
+}
+
+#[tokio::test]
+async fn range_reservations_are_separate_from_user_commit_metrics() {
+    let directory = TempDir::new().unwrap();
+    let mut config = RocksDbServiceConfig::new(directory.path());
+    config.research_metrics = true;
+    config.revision_allocator = RevisionAllocatorMode::ReservedRanges;
+    let service = RocksDbService::new(config).unwrap();
+    service.set_research_measurement_phase();
+    for ordinal in 0..3 {
+        execute(
+            &service,
+            1,
+            Request::Put {
+                key: key(b"range-metrics", &[ordinal]),
+                value: vec![ordinal],
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let tenant = service.research_metrics_snapshot().unwrap()["tenants"]["tenant_1"].clone();
+    let outcomes = &tenant["outcomes"]["measurement"];
+    assert_eq!(outcomes["user_commits"], 3);
+    assert_eq!(outcomes["range_reservations"], 1);
+    assert_eq!(outcomes["reservation_commits"], 1);
+    assert_eq!(outcomes["user_transaction_counter_accesses"], 0);
+    assert_eq!(outcomes["reservation_counter_accesses"], 1);
+    assert_eq!(tenant["measurement"]["user_commit_duration"]["count"], 3);
+    assert_eq!(
+        tenant["measurement"]["revision_range_reservation_duration"]["count"],
+        1
+    );
+    assert_eq!(tenant["measurement"]["revision_allocator_wait"]["count"], 3);
+    service.shutdown().await;
 }

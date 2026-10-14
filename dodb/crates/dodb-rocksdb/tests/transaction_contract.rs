@@ -1,7 +1,7 @@
 mod common;
 
 use common::check_transaction_contract;
-use dodb_rocksdb::{RocksDbService, RocksDbServiceConfig};
+use dodb_rocksdb::{RevisionAllocatorMode, RocksDbService, RocksDbServiceConfig};
 use dodb_server::{BlinkTenantService, LocalTenantService, LocalTenantServiceConfig};
 use tempfile::TempDir;
 
@@ -36,8 +36,17 @@ async fn btree_blink_and_rocksdb_share_transaction_contract() {
     };
     check_transaction_contract(blink_service(), blink_service).await;
 
-    let rocksdb_directory = temporary_db_directory();
-    let rocksdb_path = rocksdb_directory.path().to_path_buf();
-    let rocksdb_service = || RocksDbService::new(RocksDbServiceConfig::new(&rocksdb_path)).unwrap();
-    check_transaction_contract(rocksdb_service(), rocksdb_service).await;
+    for revision_allocator in [
+        RevisionAllocatorMode::Serialized,
+        RevisionAllocatorMode::ReservedRanges,
+    ] {
+        let rocksdb_directory = temporary_db_directory();
+        let rocksdb_path = rocksdb_directory.path().to_path_buf();
+        let rocksdb_service = || {
+            let mut config = RocksDbServiceConfig::new(&rocksdb_path);
+            config.revision_allocator = revision_allocator;
+            RocksDbService::new(config).unwrap()
+        };
+        check_transaction_contract(rocksdb_service(), rocksdb_service).await;
+    }
 }

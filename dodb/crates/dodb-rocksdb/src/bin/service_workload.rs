@@ -84,6 +84,7 @@ impl DriverService {
         backend: BackendKind,
         data_dir: PathBuf,
         research_metrics_enabled: bool,
+        revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
     ) -> Result<Self, Error> {
         let (service, research_metrics): (
             Box<dyn DodbService>,
@@ -101,6 +102,7 @@ impl DriverService {
                 let mut config = dodb_rocksdb::RocksDbServiceConfig::new(data_dir);
                 config.max_blocking_operations = 8;
                 config.research_metrics = research_metrics_enabled;
+                config.revision_allocator = revision_allocator;
                 let rocksdb_service = dodb_rocksdb::RocksDbService::new(config)?;
                 let metrics = rocksdb_service.research_metrics_handle();
                 (Box::new(rocksdb_service), metrics)
@@ -156,6 +158,7 @@ struct Options {
     call_cap: u64,
     report_path: Option<PathBuf>,
     research_metrics: bool,
+    revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
 }
 
 #[derive(Default)]
@@ -359,6 +362,15 @@ fn parse_options() -> Result<Options, String> {
         "rocksdb" => BackendKind::RocksDb,
         other => return Err(format!("unsupported backend {other}")),
     };
+    let revision_allocator = match values
+        .get("--revision-allocator")
+        .map(String::as_str)
+        .unwrap_or("serialized")
+    {
+        "serialized" => dodb_rocksdb::RevisionAllocatorMode::Serialized,
+        "reserved-ranges" => dodb_rocksdb::RevisionAllocatorMode::ReservedRanges,
+        other => return Err(format!("unsupported revision allocator {other}")),
+    };
     let scenario = match values.get("--scenario").map(String::as_str).unwrap_or("") {
         "rw95" => Scenario::Single(Profile::Rw95),
         "rw80" => Scenario::Single(Profile::Rw80),
@@ -387,6 +399,7 @@ fn parse_options() -> Result<Options, String> {
         call_cap: parse("--call-cap", 1_000_000)?,
         report_path: values.get("--report").map(PathBuf::from),
         research_metrics: parse("--research-metrics", 0)? == 1,
+        revision_allocator,
     })
 }
 
@@ -1402,6 +1415,7 @@ async fn run(options: Options) -> Result<Value, String> {
             options.backend,
             options.data_dir.clone(),
             options.research_metrics,
+            options.revision_allocator,
         )
         .map_err(|error| error.to_string())?,
     );
@@ -1567,8 +1581,13 @@ async fn run(options: Options) -> Result<Value, String> {
     }
     let disk_bytes_before_shutdown = directory_bytes(&options.data_dir);
     service.shutdown().await;
-    let reopened = DriverService::new(options.backend, options.data_dir.clone(), false)
-        .map_err(|error| error.to_string())?;
+    let reopened = DriverService::new(
+        options.backend,
+        options.data_dir.clone(),
+        false,
+        options.revision_allocator,
+    )
+    .map_err(|error| error.to_string())?;
     let mut reopen_validation = BTreeMap::new();
     for tenant_index in 0..tenant_count {
         let mut replay_counters = Counters::default();
@@ -1618,7 +1637,7 @@ async fn run(options: Options) -> Result<Value, String> {
             "call_cap": options.call_cap,
             "query_limit": 16,
             "blink": {"database_cache_capacity_pages": 128, "coordinator_queue_capacity": 256, "coordinator_group_requests": 64, "coordinator_group_bytes": 4194304, "coordinator_collection_delay_ms": 0},
-            "rocksdb": {"blocking_operation_limit": 8, "transaction_revision_counter": "tenant serialized"},
+            "rocksdb": {"blocking_operation_limit": 8, "revision_allocator": match options.revision_allocator { dodb_rocksdb::RevisionAllocatorMode::Serialized => "serialized", dodb_rocksdb::RevisionAllocatorMode::ReservedRanges => "reserved-ranges" }, "revision_range_size": if options.revision_allocator == dodb_rocksdb::RevisionAllocatorMode::ReservedRanges { Some(4_096) } else { None }},
             "research_metrics_enabled": options.research_metrics,
         },
         "timing": {

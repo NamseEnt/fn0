@@ -22,10 +22,11 @@ use tokio::sync::{Notify, OnceCell, Semaphore};
 
 const USER_KEY_PREFIX: u8 = 1;
 const METADATA_COUNTER_KEY: &[u8] = &[0, 1];
+const DEFAULT_REVISION_RANGE_SIZE: u64 = 4_096;
 const VALUE_FORMAT: u8 = 1;
 const PRESENT_TAG: u8 = 1;
 const MISSING_TAG: u8 = 2;
-const METRIC_COUNT: usize = 13;
+const METRIC_COUNT: usize = 16;
 const HISTOGRAM_BUCKETS: usize = 64;
 const MAX_METRIC_TENANTS: usize = 64;
 
@@ -45,6 +46,9 @@ enum Metric {
     RollbackDuration,
     CounterHeldDuration,
     MutationConstruction,
+    AllocatorWait,
+    RangeReservationDuration,
+    UserCommitDuration,
 }
 
 const METRIC_NAMES: [&str; METRIC_COUNT] = [
@@ -61,6 +65,9 @@ const METRIC_NAMES: [&str; METRIC_COUNT] = [
     "rollback_duration",
     "counter_held_duration_approx",
     "mutation_construction_duration",
+    "revision_allocator_wait",
+    "revision_range_reservation_duration",
+    "user_commit_duration",
 ];
 
 #[derive(Default)]
@@ -86,6 +93,10 @@ struct OutcomeCounts {
     other_errors: std::sync::atomic::AtomicU64,
     user_key_lock_wait_count: std::sync::atomic::AtomicU64,
     revision_counter_lock_wait_count: std::sync::atomic::AtomicU64,
+    range_reservations: std::sync::atomic::AtomicU64,
+    reservation_commits: std::sync::atomic::AtomicU64,
+    user_commits: std::sync::atomic::AtomicU64,
+    user_transaction_counter_accesses: std::sync::atomic::AtomicU64,
 }
 
 struct Histogram {
@@ -169,6 +180,15 @@ impl ResearchMetrics {
                 "other_errors": counts.other_errors.load(Ordering::Relaxed),
                 "user_key_lock_wait_count": counts.user_key_lock_wait_count.load(Ordering::Relaxed),
                 "revision_counter_lock_wait_count": counts.revision_counter_lock_wait_count.load(Ordering::Relaxed),
+                "range_reservations": counts.range_reservations.load(Ordering::Relaxed),
+                "reservation_commits": counts.reservation_commits.load(Ordering::Relaxed),
+                "user_commits": counts.user_commits.load(Ordering::Relaxed),
+                "user_transaction_counter_accesses": counts
+                    .user_transaction_counter_accesses
+                    .load(Ordering::Relaxed),
+                "reservation_counter_accesses": counts
+                    .range_reservations
+                    .load(Ordering::Relaxed),
             });
             (format!("tenant_{}", entry.key()), serde_json::json!({
                 "warmup": render_phase(&metrics.warmup),
@@ -304,6 +324,14 @@ pub struct RocksDbServiceConfig {
     pub data_dir: PathBuf,
     pub max_blocking_operations: usize,
     pub research_metrics: bool,
+    pub revision_allocator: RevisionAllocatorMode,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum RevisionAllocatorMode {
+    #[default]
+    Serialized,
+    ReservedRanges,
 }
 
 impl RocksDbServiceConfig {
@@ -312,6 +340,7 @@ impl RocksDbServiceConfig {
             data_dir: data_dir.into(),
             max_blocking_operations: 8,
             research_metrics: false,
+            revision_allocator: RevisionAllocatorMode::Serialized,
         }
     }
 }
@@ -322,6 +351,7 @@ pub struct RocksDbService {
     blocking_operations: Arc<Semaphore>,
     blocking_operation_limit: usize,
     research_metrics: Option<Arc<ResearchMetrics>>,
+    revision_allocator: RevisionAllocatorMode,
     lifecycle: LifecycleCoordinator,
     #[cfg(test)]
     blocking_operation_hook: std::sync::Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
@@ -329,6 +359,15 @@ pub struct RocksDbService {
 
 struct TenantDatabase {
     handle: Arc<RocksDbHandle>,
+    revision_allocator: RevisionAllocatorMode,
+    reserved_revisions: Mutex<ReservedRevisionRange>,
+    revision_range_size: u64,
+}
+
+#[derive(Default)]
+struct ReservedRevisionRange {
+    next: u64,
+    end: u64,
 }
 
 struct RocksDbHandle(NonNull<c_void>);
@@ -383,6 +422,7 @@ impl RocksDbService {
             research_metrics: config
                 .research_metrics
                 .then(|| Arc::new(ResearchMetrics::default())),
+            revision_allocator: config.revision_allocator,
             lifecycle: LifecycleCoordinator::new(),
             #[cfg(test)]
             blocking_operation_hook: std::sync::Mutex::new(None),
@@ -455,6 +495,7 @@ impl RocksDbService {
             .clone();
         let semaphore = Arc::clone(&self.blocking_operations);
         let research_metrics = self.research_metrics.clone();
+        let revision_allocator = self.revision_allocator;
         let database = cell
             .get_or_try_init(|| async move {
                 let semaphore_started = Instant::now();
@@ -479,7 +520,12 @@ impl RocksDbService {
                             dispatch_started.elapsed(),
                         );
                     }
-                    TenantDatabase::open(&path).map(Arc::new)
+                    TenantDatabase::open_with_allocator(
+                        &path,
+                        revision_allocator,
+                        DEFAULT_REVISION_RANGE_SIZE,
+                    )
+                    .map(Arc::new)
                 })
                 .await
                 .map_err(|error| Error::recovery(format!("RocksDB open task failed: {error}")))?
@@ -835,7 +881,23 @@ impl Drop for ShutdownLease<'_> {
 }
 
 impl TenantDatabase {
+    #[cfg(test)]
     fn open(path: &Path) -> Result<Self, Error> {
+        Self::open_with_allocator(
+            path,
+            RevisionAllocatorMode::Serialized,
+            DEFAULT_REVISION_RANGE_SIZE,
+        )
+    }
+
+    fn open_with_allocator(
+        path: &Path,
+        revision_allocator: RevisionAllocatorMode,
+        revision_range_size: u64,
+    ) -> Result<Self, Error> {
+        if revision_range_size == 0 {
+            return Err(Error::invalid_input("revision range size must be nonzero"));
+        }
         let path = path
             .to_str()
             .ok_or_else(|| Error::invalid_input("tenant path is not valid UTF-8"))?;
@@ -846,6 +908,9 @@ impl TenantDatabase {
         let handle = NonNull::new(handle).ok_or_else(|| ffi_error(error, "RocksDB open failed"))?;
         Ok(Self {
             handle: Arc::new(RocksDbHandle(handle)),
+            revision_allocator,
+            reserved_revisions: Mutex::new(ReservedRevisionRange::default()),
+            revision_range_size,
         })
     }
 
@@ -1003,6 +1068,111 @@ impl TenantDatabase {
         Ok(documents)
     }
 
+    fn next_reserved_revision(
+        &self,
+        metrics: Option<Arc<TenantResearchMetrics>>,
+        stage: usize,
+    ) -> Result<u64, Error> {
+        let wait_started = Instant::now();
+        let mut range = self
+            .reserved_revisions
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(metrics) = &metrics {
+            metrics.record(Metric::AllocatorWait, wait_started.elapsed(), stage);
+        }
+        if range.next == 0 || range.next > range.end {
+            let reserve_started = Instant::now();
+            let mut error = std::ptr::null_mut();
+            let transaction = unsafe { dodb_rocksdb_begin(self.handle.0.as_ptr(), &mut error) };
+            let transaction = NonNull::new(transaction)
+                .ok_or_else(|| ffi_error(error, "revision range transaction begin failed"))?;
+            let mut transaction_guard = TransactionGuard {
+                handle: transaction,
+                _database: Arc::clone(&self.handle),
+                active: true,
+            };
+            let mut lock_wait_nanos = 0;
+            let mut lock_wait_count = 0;
+            let counter = transaction_get_for_update(
+                &transaction_guard,
+                METADATA_COUNTER_KEY,
+                metrics.is_some() && stage > 0,
+                &mut lock_wait_nanos,
+                &mut lock_wait_count,
+            )?;
+            if let Some(metrics) = &metrics {
+                metrics.record(
+                    Metric::RevisionCounterGetForUpdateDuration,
+                    reserve_started.elapsed(),
+                    stage,
+                );
+                metrics.record(
+                    Metric::RevisionCounterLockWait,
+                    std::time::Duration::from_nanos(lock_wait_nanos),
+                    stage,
+                );
+            }
+            let current_high_water = counter
+                .as_deref()
+                .map(counter_bytes_to_u64)
+                .transpose()?
+                .unwrap_or(0);
+            let first_revision = current_high_water
+                .checked_add(1)
+                .filter(|revision| *revision != 0)
+                .ok_or_else(|| Error::invariant("tenant revision counter exhausted"))?;
+            let reserved_high_water = current_high_water
+                .checked_add(self.revision_range_size)
+                .filter(|revision| *revision >= first_revision)
+                .ok_or_else(|| Error::invariant("tenant revision range exhausted"))?;
+            transaction_put(
+                &transaction_guard,
+                METADATA_COUNTER_KEY,
+                &reserved_high_water.to_be_bytes(),
+            )?;
+            let commit_started = Instant::now();
+            let mut commit_error = std::ptr::null_mut();
+            let commit_result = unsafe {
+                dodb_rocksdb_transaction_commit(
+                    transaction_guard.handle.as_ptr(),
+                    &mut commit_error,
+                )
+            };
+            if commit_result != 0 {
+                return Err(Error::durability(unsafe {
+                    take_error(commit_error, "revision range reservation commit failed")
+                }));
+            }
+            transaction_guard.finish();
+            range.next = first_revision;
+            range.end = reserved_high_water;
+            if let Some(metrics) = &metrics {
+                metrics.record(Metric::CommitDuration, commit_started.elapsed(), stage);
+                metrics.record(
+                    Metric::RangeReservationDuration,
+                    reserve_started.elapsed(),
+                    stage,
+                );
+                let outcomes = if stage == 2 {
+                    &metrics.measurement_outcomes
+                } else {
+                    &metrics.warmup_outcomes
+                };
+                if stage > 0 {
+                    outcomes.range_reservations.fetch_add(1, Ordering::Relaxed);
+                    outcomes.reservation_commits.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        }
+        let revision = range.next;
+        range.next = range
+            .next
+            .checked_add(1)
+            .ok_or_else(|| Error::invariant("tenant revision counter exhausted"))?;
+        Ok(revision)
+    }
+
     #[cfg(test)]
     fn transact(&self, request: TransactionRequest) -> Result<LogicalTransactionResult, Error> {
         self.transact_with_metrics(request, None, 0)
@@ -1148,47 +1318,66 @@ impl TenantDatabase {
                 revision: None,
             });
         }
-        let counter_started = Instant::now();
-        let mut counter_lock_wait_nanos = 0;
-        let mut counter_lock_wait_count = 0;
-        let counter = transaction_get_for_update(
-            &transaction_guard,
-            METADATA_COUNTER_KEY,
-            metrics.is_some() && stage > 0,
-            &mut counter_lock_wait_nanos,
-            &mut counter_lock_wait_count,
-        )?;
-        let counter_held_started = Instant::now();
-        if let Some(metrics) = &metrics {
-            metrics.record(
-                Metric::RevisionCounterGetForUpdateDuration,
-                counter_started.elapsed(),
-                stage,
-            );
-            metrics.record(
-                Metric::RevisionCounterLockWait,
-                std::time::Duration::from_nanos(counter_lock_wait_nanos),
-                stage,
-            );
-            if stage > 0 {
-                let outcomes = if stage == 2 {
-                    &metrics.measurement_outcomes
-                } else {
-                    &metrics.warmup_outcomes
-                };
-                outcomes
-                    .revision_counter_lock_wait_count
-                    .fetch_add(counter_lock_wait_count, Ordering::Relaxed);
+        let counter_held_started = if self.revision_allocator == RevisionAllocatorMode::Serialized {
+            let counter_started = Instant::now();
+            let mut counter_lock_wait_nanos = 0;
+            let mut counter_lock_wait_count = 0;
+            let counter = transaction_get_for_update(
+                &transaction_guard,
+                METADATA_COUNTER_KEY,
+                metrics.is_some() && stage > 0,
+                &mut counter_lock_wait_nanos,
+                &mut counter_lock_wait_count,
+            )?;
+            if let Some(metrics) = &metrics {
+                if stage > 0 {
+                    let outcomes = if stage == 2 {
+                        &metrics.measurement_outcomes
+                    } else {
+                        &metrics.warmup_outcomes
+                    };
+                    outcomes
+                        .user_transaction_counter_accesses
+                        .fetch_add(1, Ordering::Relaxed);
+                }
             }
-        }
-        let current_revision = counter
-            .as_deref()
-            .map(counter_bytes_to_u64)
-            .transpose()?
-            .unwrap_or(0);
-        let next_revision = current_revision
-            .checked_add(1)
-            .ok_or_else(|| Error::invariant("tenant revision counter exhausted"))?;
+            if let Some(metrics) = &metrics {
+                metrics.record(
+                    Metric::RevisionCounterGetForUpdateDuration,
+                    counter_started.elapsed(),
+                    stage,
+                );
+                metrics.record(
+                    Metric::RevisionCounterLockWait,
+                    std::time::Duration::from_nanos(counter_lock_wait_nanos),
+                    stage,
+                );
+                if stage > 0 {
+                    let outcomes = if stage == 2 {
+                        &metrics.measurement_outcomes
+                    } else {
+                        &metrics.warmup_outcomes
+                    };
+                    outcomes
+                        .revision_counter_lock_wait_count
+                        .fetch_add(counter_lock_wait_count, Ordering::Relaxed);
+                }
+            }
+            let current_revision = counter
+                .as_deref()
+                .map(counter_bytes_to_u64)
+                .transpose()?
+                .unwrap_or(0);
+            Some((current_revision, Instant::now()))
+        } else {
+            None
+        };
+        let next_revision = match &counter_held_started {
+            Some((current_revision, _)) => current_revision
+                .checked_add(1)
+                .ok_or_else(|| Error::invariant("tenant revision counter exhausted"))?,
+            None => self.next_reserved_revision(metrics.clone(), stage)?,
+        };
         let mutation_started = Instant::now();
         for mutation in &request.mutations {
             let (key, state) = match mutation {
@@ -1204,11 +1393,13 @@ impl TenantDatabase {
             let encoded_state = encode_state(&state);
             transaction_put(&transaction_guard, &key, &encoded_state)?;
         }
-        transaction_put(
-            &transaction_guard,
-            METADATA_COUNTER_KEY,
-            &next_revision.to_be_bytes(),
-        )?;
+        if self.revision_allocator == RevisionAllocatorMode::Serialized {
+            transaction_put(
+                &transaction_guard,
+                METADATA_COUNTER_KEY,
+                &next_revision.to_be_bytes(),
+            )?;
+        }
         if let Some(metrics) = &metrics {
             metrics.record(
                 Metric::MutationConstruction,
@@ -1228,11 +1419,22 @@ impl TenantDatabase {
         }
         if let Some(metrics) = &metrics {
             metrics.record(Metric::CommitDuration, commit_started.elapsed(), stage);
-            metrics.record(
-                Metric::CounterHeldDuration,
-                counter_held_started.elapsed(),
-                stage,
-            );
+            metrics.record(Metric::UserCommitDuration, commit_started.elapsed(), stage);
+            if let Some((_, counter_held_started)) = counter_held_started {
+                metrics.record(
+                    Metric::CounterHeldDuration,
+                    counter_held_started.elapsed(),
+                    stage,
+                );
+            }
+            if stage > 0 {
+                let outcomes = if stage == 2 {
+                    &metrics.measurement_outcomes
+                } else {
+                    &metrics.warmup_outcomes
+                };
+                outcomes.user_commits.fetch_add(1, Ordering::Relaxed);
+            }
         }
         transaction_guard.finish();
         Ok(LogicalTransactionResult {
@@ -1904,6 +2106,141 @@ mod tests {
             .unwrap();
         assert_eq!(current[0].value, b"new-a");
         assert_eq!(current[1].value, b"new-b");
+    }
+
+    #[test]
+    fn reserved_revision_ranges_are_unique_under_concurrent_assignment() {
+        let directory = temporary_db_directory();
+        let database = Arc::new(
+            TenantDatabase::open_with_allocator(
+                directory.path(),
+                RevisionAllocatorMode::ReservedRanges,
+                3,
+            )
+            .unwrap(),
+        );
+        let barrier = Arc::new(std::sync::Barrier::new(16));
+        let workers = (0..16)
+            .map(|_| {
+                let database = Arc::clone(&database);
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    database.next_reserved_revision(None, 0).unwrap()
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut revisions = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect::<Vec<_>>();
+        revisions.sort_unstable();
+        assert_eq!(revisions, (1..=16).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn partial_range_is_abandoned_after_reopen_and_failed_tokens_are_burned() {
+        let directory = temporary_db_directory();
+        let first_database = TenantDatabase::open_with_allocator(
+            directory.path(),
+            RevisionAllocatorMode::ReservedRanges,
+            4,
+        )
+        .unwrap();
+        assert_eq!(first_database.next_reserved_revision(None, 0).unwrap(), 1);
+        assert_eq!(first_database.next_reserved_revision(None, 0).unwrap(), 2);
+        drop(first_database);
+
+        let reopened = TenantDatabase::open_with_allocator(
+            directory.path(),
+            RevisionAllocatorMode::ReservedRanges,
+            4,
+        )
+        .unwrap();
+        assert_eq!(reopened.next_reserved_revision(None, 0).unwrap(), 5);
+        let abandoned = reopened.next_reserved_revision(None, 0).unwrap();
+        let next = reopened.next_reserved_revision(None, 0).unwrap();
+        assert_eq!(next, abandoned + 1);
+    }
+
+    #[test]
+    fn allocator_modes_switch_above_existing_counter_high_water() {
+        let directory = temporary_db_directory();
+        let serialized = TenantDatabase::open(directory.path()).unwrap();
+        let prior = serialized
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: DocumentKey::new(b"legacy".to_vec(), b"row".to_vec()),
+                    value: b"value".to_vec(),
+                }],
+            ))
+            .unwrap()
+            .revision
+            .unwrap()
+            .get();
+        drop(serialized);
+
+        let ranged = TenantDatabase::open_with_allocator(
+            directory.path(),
+            RevisionAllocatorMode::ReservedRanges,
+            4,
+        )
+        .unwrap();
+        assert_eq!(ranged.next_reserved_revision(None, 0).unwrap(), prior + 1);
+        drop(ranged);
+
+        let serialized_again = TenantDatabase::open(directory.path()).unwrap();
+        let next = serialized_again
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: DocumentKey::new(b"legacy".to_vec(), b"next".to_vec()),
+                    value: b"value".to_vec(),
+                }],
+            ))
+            .unwrap()
+            .revision
+            .unwrap()
+            .get();
+        assert_eq!(next, prior + 5);
+    }
+
+    #[test]
+    fn range_reservation_rejects_overflow_and_corrupt_counter() {
+        for (counter_value, range_size) in [(u64::MAX - 1, 4), (0, 4)] {
+            let directory = temporary_db_directory();
+            let database = TenantDatabase::open_with_allocator(
+                directory.path(),
+                RevisionAllocatorMode::ReservedRanges,
+                range_size,
+            )
+            .unwrap();
+            let transaction = unsafe {
+                dodb_rocksdb_begin(database.handle.0.as_ptr(), &mut std::ptr::null_mut())
+            };
+            let transaction = NonNull::new(transaction).unwrap();
+            let mut guard = TransactionGuard {
+                handle: transaction,
+                _database: Arc::clone(&database.handle),
+                active: true,
+            };
+            let encoded_counter = if counter_value == 0 {
+                vec![1, 2, 3]
+            } else {
+                counter_value.to_be_bytes().to_vec()
+            };
+            transaction_put(&guard, METADATA_COUNTER_KEY, &encoded_counter).unwrap();
+            let mut commit_error = std::ptr::null_mut();
+            assert_eq!(
+                unsafe {
+                    dodb_rocksdb_transaction_commit(guard.handle.as_ptr(), &mut commit_error)
+                },
+                0
+            );
+            guard.finish();
+            assert!(database.next_reserved_revision(None, 0).is_err());
+        }
     }
 
     fn iterator_value(iterator: &TenantReadIterator) -> (DocumentKey, Vec<u8>) {
