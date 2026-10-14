@@ -2196,9 +2196,22 @@ mod tests {
         )
         .unwrap();
         let key = DocumentKey::new(b"rollback".to_vec(), b"row".to_vec());
+        let initial = database
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: key.clone(),
+                    value: b"initial".to_vec(),
+                }],
+            ))
+            .unwrap();
+        let initial_revision = initial.revision.unwrap();
         let request = || {
             TransactionRequest::new(
-                Vec::new(),
+                vec![TransactionCondition::RevisionEquals {
+                    key: key.clone(),
+                    expected_revision: initial_revision,
+                }],
                 vec![TransactionMutation::Put {
                     key: key.clone(),
                     value: b"committed".to_vec(),
@@ -2220,13 +2233,13 @@ mod tests {
         assert!(failed.is_err());
         assert_eq!(
             database.get(&key).unwrap(),
-            RevisionState::missing(Revision::ZERO)
+            RevisionState::present(b"initial".to_vec(), initial_revision)
         );
         let committed = database.transact(request()).unwrap();
-        assert_eq!(committed.revision.unwrap().get(), 2);
+        assert_eq!(committed.revision.unwrap().get(), 3);
         assert_eq!(
             database.get(&key).unwrap(),
-            RevisionState::present(b"committed".to_vec(), Revision::new(2))
+            RevisionState::present(b"committed".to_vec(), Revision::new(3))
         );
         drop(database);
 
