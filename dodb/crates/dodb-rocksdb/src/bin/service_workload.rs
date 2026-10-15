@@ -84,7 +84,7 @@ impl DriverService {
         backend: BackendKind,
         data_dir: PathBuf,
         research_metrics_enabled: bool,
-        read_stage_metrics_enabled: bool,
+        detailed_write_metrics_enabled: bool,
         revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
         blocking_admission: dodb_rocksdb::BlockingAdmissionMode,
         shared_blocking_slots: usize,
@@ -106,7 +106,7 @@ impl DriverService {
                 config.max_blocking_operations = shared_blocking_slots;
                 config.blocking_admission = blocking_admission;
                 config.research_metrics = research_metrics_enabled;
-                config.detailed_write_metrics = !read_stage_metrics_enabled;
+                config.detailed_write_metrics = detailed_write_metrics_enabled;
                 config.revision_allocator = revision_allocator;
                 let rocksdb_service = dodb_rocksdb::RocksDbService::new(config)?;
                 let metrics = rocksdb_service.research_metrics_handle();
@@ -164,6 +164,7 @@ struct Options {
     report_path: Option<PathBuf>,
     research_metrics: bool,
     read_stage_metrics: bool,
+    detailed_write_metrics: bool,
     revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
     blocking_admission: dodb_rocksdb::BlockingAdmissionMode,
     shared_blocking_slots: usize,
@@ -425,6 +426,9 @@ fn parse_options() -> Result<Options, String> {
             .map(|value| value.parse().map_err(|_| format!("invalid {name}")))
             .unwrap_or(Ok(default))
     };
+    let read_stage_metrics = parse("--read-stage-metrics", 0)? == 1;
+    let detailed_write_metrics =
+        parse("--detailed-write-metrics", u64::from(!read_stage_metrics))? == 1;
     Ok(Options {
         backend,
         scenario,
@@ -438,7 +442,8 @@ fn parse_options() -> Result<Options, String> {
         call_cap: parse("--call-cap", 1_000_000)?,
         report_path: values.get("--report").map(PathBuf::from),
         research_metrics: parse("--research-metrics", 0)? == 1,
-        read_stage_metrics: parse("--read-stage-metrics", 0)? == 1,
+        read_stage_metrics,
+        detailed_write_metrics,
         revision_allocator,
         blocking_admission,
         shared_blocking_slots,
@@ -1462,7 +1467,7 @@ async fn run(options: Options) -> Result<Value, String> {
             options.backend,
             options.data_dir.clone(),
             options.research_metrics,
-            options.read_stage_metrics,
+            options.detailed_write_metrics,
             options.revision_allocator,
             options.blocking_admission,
             options.shared_blocking_slots,
@@ -1709,7 +1714,7 @@ async fn run(options: Options) -> Result<Value, String> {
             },
             "research_metrics_enabled": options.research_metrics,
             "read_stage_metrics_enabled": options.read_stage_metrics,
-            "detailed_write_metrics_enabled": options.research_metrics && !options.read_stage_metrics,
+            "detailed_write_metrics_enabled": options.research_metrics && options.detailed_write_metrics,
         },
         "timing": {
             "seed_setup_ms_excluded": seed_elapsed.as_secs_f64() * 1000.0,

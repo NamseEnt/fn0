@@ -30,6 +30,40 @@ const METRIC_COUNT: usize = 16;
 const HISTOGRAM_BUCKETS: usize = 64;
 const MAX_METRIC_TENANTS: usize = 64;
 const READ_METRIC_COUNT: usize = 13;
+const WRITE_READ_METRIC_COUNT: usize = 5;
+
+const WRITE_READ_METRIC_NAMES: [&str; WRITE_READ_METRIC_COUNT] = [
+    "native_get_for_update",
+    "native_lock_wait",
+    "shim_value_copy",
+    "rust_value_copy",
+    "state_decode",
+];
+
+const WRITE_READ_ROLE_NAMES: [&str; 2] = ["condition_key", "mutation_only_key"];
+
+#[repr(C)]
+#[derive(Default)]
+struct NativeReadTimings {
+    native_call_nanos: u64,
+    value_copy_nanos: u64,
+}
+
+#[derive(Default)]
+struct WriteReadObservation {
+    native: NativeReadTimings,
+    rust_copy: Duration,
+    encoded_bytes: usize,
+}
+
+#[derive(Default)]
+struct WriteReadMetrics {
+    timings: [Histogram; WRITE_READ_METRIC_COUNT],
+    keys: std::sync::atomic::AtomicU64,
+    found_keys: std::sync::atomic::AtomicU64,
+    encoded_bytes: std::sync::atomic::AtomicU64,
+    payload_bytes: std::sync::atomic::AtomicU64,
+}
 
 tokio::task_local! {
     static RESEARCH_READ_KIND: ResearchReadKind;
@@ -160,6 +194,8 @@ struct TenantResearchMetrics {
     measurement: [Histogram; METRIC_COUNT],
     warmup_reads: [[Histogram; READ_METRIC_COUNT]; 3],
     measurement_reads: [[Histogram; READ_METRIC_COUNT]; 3],
+    warmup_write_reads: [WriteReadMetrics; 2],
+    measurement_write_reads: [WriteReadMetrics; 2],
     warmup_outcomes: OutcomeCounts,
     measurement_outcomes: OutcomeCounts,
 }
@@ -304,12 +340,33 @@ impl ResearchMetrics {
                     .range_reservations
                     .load(Ordering::Relaxed),
             });
+            let render_write_reads = |roles: &[WriteReadMetrics; 2]| {
+                let mut values = serde_json::Map::new();
+                for (role_index, role_name) in WRITE_READ_ROLE_NAMES.iter().enumerate() {
+                    let role = &roles[role_index];
+                    let timings = WRITE_READ_METRIC_NAMES.iter().enumerate().map(|(metric_index, name)| {
+                        ((*name).to_owned(), role.timings[metric_index].snapshot())
+                    }).collect::<serde_json::Map<_, _>>();
+                    values.insert((*role_name).to_owned(), serde_json::json!({
+                        "keys": role.keys.load(Ordering::Relaxed),
+                        "found_keys": role.found_keys.load(Ordering::Relaxed),
+                        "encoded_bytes_fetched": role.encoded_bytes.load(Ordering::Relaxed),
+                        "payload_bytes_fetched": role.payload_bytes.load(Ordering::Relaxed),
+                        "timings": timings,
+                    }));
+                }
+                serde_json::Value::Object(values)
+            };
             (format!("tenant_{}", entry.key()), serde_json::json!({
                 "warmup": render_phase(&metrics.warmup),
                 "measurement": render_phase(&metrics.measurement),
                 "read_stages": {
                     "warmup": render_reads(&metrics.warmup_reads),
                     "measurement": render_reads(&metrics.measurement_reads),
+                },
+                "write_reads": {
+                    "warmup": render_write_reads(&metrics.warmup_write_reads),
+                    "measurement": render_write_reads(&metrics.measurement_write_reads),
                 },
                 "outcomes": {
                     "warmup": outcomes(&metrics.warmup_outcomes),
@@ -419,6 +476,7 @@ unsafe extern "C" {
         collect_lock_wait: i32,
         lock_wait_nanos: *mut u64,
         lock_wait_count: *mut u64,
+        timings: *mut NativeReadTimings,
         error: *mut *mut c_char,
     ) -> i32;
     fn dodb_rocksdb_transaction_put(
@@ -1581,6 +1639,7 @@ impl TenantDatabase {
                 metrics.is_some() && stage > 0,
                 &mut lock_wait_nanos,
                 &mut lock_wait_count,
+                None,
             )?;
             if let Some(metrics) = &metrics {
                 metrics.record(
@@ -1714,21 +1773,34 @@ impl TenantDatabase {
             encoded_keys.insert(user_key(mutation.key()));
         }
         let mut states = BTreeMap::new();
+        let condition_keys = metrics.as_ref().filter(|_| stage > 0).map(|_| {
+            request
+                .conditions
+                .iter()
+                .map(|condition| user_key(condition.key()))
+                .collect::<BTreeSet<_>>()
+        });
         for encoded_key in encoded_keys {
             let get_started = Instant::now();
             let is_user_key = encoded_key.first() == Some(&USER_KEY_PREFIX);
             let mut lock_wait_nanos = 0;
             let mut lock_wait_count = 0;
-            let state = match transaction_get_for_update(
+            let mut observation = WriteReadObservation::default();
+            let encoded_state = transaction_get_for_update(
                 &transaction_guard,
                 &encoded_key,
                 metrics.is_some() && stage > 0,
                 &mut lock_wait_nanos,
                 &mut lock_wait_count,
-            )? {
+                condition_keys.as_ref().map(|_| &mut observation),
+            )?;
+            let found = encoded_state.is_some();
+            let decode_started = condition_keys.as_ref().map(|_| Instant::now());
+            let state = match encoded_state {
                 Some(encoded_state) => decode_state(&encoded_state)?,
                 None => RevisionState::missing(Revision::ZERO),
             };
+            let decode_elapsed = decode_started.map_or(Duration::ZERO, |started| started.elapsed());
             if let Some(metrics) = &metrics {
                 metrics.record(
                     if is_user_key {
@@ -1767,6 +1839,39 @@ impl TenantDatabase {
                     outcomes
                         .revision_counter_lock_wait_count
                         .fetch_add(lock_wait_count, Ordering::Relaxed);
+                }
+            }
+            if let (Some(metrics), Some(condition_keys)) = (&metrics, &condition_keys) {
+                let roles = if stage == 2 {
+                    &metrics.measurement_write_reads
+                } else {
+                    &metrics.warmup_write_reads
+                };
+                let role_index = usize::from(!condition_keys.contains(&encoded_key));
+                let role = &roles[role_index];
+                role.keys.fetch_add(1, Ordering::Relaxed);
+                role.found_keys
+                    .fetch_add(u64::from(found), Ordering::Relaxed);
+                role.encoded_bytes
+                    .fetch_add(observation.encoded_bytes as u64, Ordering::Relaxed);
+                let payload_bytes = match &state {
+                    RevisionState::Present { value, .. } => value.len(),
+                    RevisionState::Missing { .. } => 0,
+                };
+                role.payload_bytes
+                    .fetch_add(payload_bytes as u64, Ordering::Relaxed);
+                for (metric_index, duration) in [
+                    Duration::from_nanos(observation.native.native_call_nanos),
+                    Duration::from_nanos(lock_wait_nanos),
+                    Duration::from_nanos(observation.native.value_copy_nanos),
+                    observation.rust_copy,
+                    decode_elapsed,
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    role.timings[metric_index]
+                        .record(duration.as_nanos().min(u64::MAX as u128) as u64);
                 }
             }
             states.insert(encoded_key, state);
@@ -1814,6 +1919,7 @@ impl TenantDatabase {
                 metrics.is_some() && stage > 0,
                 &mut counter_lock_wait_nanos,
                 &mut counter_lock_wait_count,
+                None,
             )?;
             if let Some(metrics) = &metrics {
                 if stage > 0 {
@@ -2217,10 +2323,12 @@ fn transaction_get_for_update(
     collect_lock_wait: bool,
     lock_wait_nanos: &mut u64,
     lock_wait_count: &mut u64,
+    observation: Option<&mut WriteReadObservation>,
 ) -> Result<Option<Vec<u8>>, Error> {
     let mut value = std::ptr::null_mut();
     let mut value_length = 0;
     let mut error = std::ptr::null_mut();
+    let mut native_timings = NativeReadTimings::default();
     let result = unsafe {
         dodb_rocksdb_transaction_get_for_update(
             transaction.handle.as_ptr(),
@@ -2231,14 +2339,22 @@ fn transaction_get_for_update(
             i32::from(collect_lock_wait),
             lock_wait_nanos,
             lock_wait_count,
+            &mut native_timings,
             &mut error,
         )
     };
-    match result {
+    let copy_started = observation.as_ref().map(|_| Instant::now());
+    let decoded = match result {
         1 => Ok(None),
         2 => Err(ffi_error(error, "RocksDB transaction read failed")),
         _ => Ok(Some(unsafe { copy_and_free_value(value, value_length) })),
+    };
+    if let Some(observation) = observation {
+        observation.native = native_timings;
+        observation.rust_copy = copy_started.unwrap().elapsed();
+        observation.encoded_bytes = value_length;
     }
+    decoded
 }
 
 fn enforce_response_budget(response: &Response, budget: ExecutionBudget) -> Result<(), Error> {

@@ -1,5 +1,6 @@
 #include <atomic>
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -141,6 +142,11 @@ void set_error(char** error, const rocksdb::Status& status) {
 
 extern "C" {
 
+struct DodbRocksDbReadTimings {
+  uint64_t native_call_nanos;
+  uint64_t value_copy_nanos;
+};
+
 void* dodb_rocksdb_open(const char* path, char** error) {
   if (ROCKSDB_MAJOR != 11 || ROCKSDB_MINOR != 8 || ROCKSDB_PATCH != 1) {
     if (error != nullptr) {
@@ -270,15 +276,20 @@ int dodb_rocksdb_get(void* database, const unsigned char* key, size_t key_length
 int dodb_rocksdb_transaction_get_for_update(
     void* transaction, const unsigned char* key, size_t key_length,
     unsigned char** value, size_t* value_length, int collect_lock_wait,
-    uint64_t* lock_wait_nanos, uint64_t* lock_wait_count, char** error) {
+    uint64_t* lock_wait_nanos, uint64_t* lock_wait_count,
+    DodbRocksDbReadTimings* timings, char** error) {
   auto* perf_context = rocksdb::get_perf_context();
   if (collect_lock_wait != 0) {
     perf_context->Reset();
   }
   std::string stored;
+  const auto native_started = collect_lock_wait != 0
+      ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   const auto status = static_cast<rocksdb::Transaction*>(transaction)->GetForUpdate(
       rocksdb::ReadOptions(), rocksdb::Slice(reinterpret_cast<const char*>(key), key_length), &stored);
   if (collect_lock_wait != 0) {
+    timings->native_call_nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now() - native_started).count();
     *lock_wait_nanos = perf_context->key_lock_wait_time;
     *lock_wait_count = perf_context->key_lock_wait_count;
   }
@@ -289,8 +300,14 @@ int dodb_rocksdb_transaction_get_for_update(
     set_error(error, status);
     return 2;
   }
+  const auto copy_started = collect_lock_wait != 0
+      ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   *value = reinterpret_cast<unsigned char*>(copy_string(stored));
   *value_length = stored.size();
+  if (collect_lock_wait != 0) {
+    timings->value_copy_nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now() - copy_started).count();
+  }
   if (*value == nullptr) {
     if (error != nullptr) {
       *error = copy_string("allocation failed while copying RocksDB value");

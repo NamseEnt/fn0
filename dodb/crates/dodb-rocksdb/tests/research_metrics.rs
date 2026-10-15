@@ -317,3 +317,122 @@ async fn range_reservations_are_separate_from_user_commit_metrics() {
     assert_eq!(tenant["measurement"]["revision_allocator_wait"]["count"], 3);
     service.shutdown().await;
 }
+
+#[tokio::test]
+async fn write_reads_account_for_roles_payloads_rejections_and_phases() {
+    let directory = TempDir::new().unwrap();
+    let mut config = RocksDbServiceConfig::new(directory.path());
+    config.research_metrics = true;
+    config.revision_allocator = RevisionAllocatorMode::ReservedRanges;
+    let service = RocksDbService::new(config).unwrap();
+    let mutation_key = key(b"write-reads", b"mutation");
+    let condition_key = key(b"write-reads", b"condition");
+    let tombstone_key = key(b"write-reads", b"tombstone");
+    for (target, payload_size) in [(&mutation_key, 512), (&condition_key, 1024)] {
+        execute(
+            &service,
+            1,
+            Request::Put {
+                key: target.clone(),
+                value: vec![7; payload_size],
+            },
+        )
+        .await
+        .unwrap();
+    }
+    execute(
+        &service,
+        1,
+        Request::Delete {
+            key: tombstone_key.clone(),
+        },
+    )
+    .await
+    .unwrap();
+    service.set_research_warmup_phase();
+    execute(
+        &service,
+        1,
+        Request::Put {
+            key: mutation_key.clone(),
+            value: vec![8; 512],
+        },
+    )
+    .await
+    .unwrap();
+    service.set_research_measurement_phase();
+    execute(
+        &service,
+        1,
+        Request::Put {
+            key: mutation_key.clone(),
+            value: vec![9; 512],
+        },
+    )
+    .await
+    .unwrap();
+    execute(
+        &service,
+        1,
+        Request::Transact {
+            request: TransactionRequest::new(
+                vec![TransactionCondition::Exists {
+                    key: condition_key.clone(),
+                }],
+                vec![
+                    TransactionMutation::Put {
+                        key: mutation_key.clone(),
+                        value: vec![10; 512],
+                    },
+                    TransactionMutation::Delete { key: tombstone_key },
+                ],
+            ),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(matches!(
+        execute(
+            &service,
+            1,
+            Request::Transact {
+                request: TransactionRequest::new(
+                    vec![TransactionCondition::NotExists { key: condition_key }],
+                    vec![TransactionMutation::Put {
+                        key: mutation_key,
+                        value: vec![11; 512]
+                    }],
+                )
+            }
+        )
+        .await,
+        Err(Error::Conflict(_))
+    ));
+    service.shutdown().await;
+    let snapshot = service.research_metrics_snapshot().unwrap();
+    let reads = &snapshot["tenants"]["tenant_1"]["write_reads"];
+    let warmup = &reads["warmup"]["mutation_only_key"];
+    assert_eq!(warmup["keys"], 1);
+    assert_eq!(warmup["payload_bytes_fetched"], 512);
+    let condition = &reads["measurement"]["condition_key"];
+    let mutation = &reads["measurement"]["mutation_only_key"];
+    assert_eq!(condition["keys"], 2);
+    assert_eq!(condition["found_keys"], 2);
+    assert_eq!(condition["encoded_bytes_fetched"], 2068);
+    assert_eq!(condition["payload_bytes_fetched"], 2048);
+    assert_eq!(mutation["keys"], 4);
+    assert_eq!(mutation["found_keys"], 4);
+    assert_eq!(mutation["encoded_bytes_fetched"], 1576);
+    assert_eq!(mutation["payload_bytes_fetched"], 1536);
+    for role in [condition, mutation] {
+        for timing in [
+            "native_get_for_update",
+            "native_lock_wait",
+            "shim_value_copy",
+            "rust_value_copy",
+            "state_decode",
+        ] {
+            assert_eq!(role["timings"][timing]["count"], role["keys"]);
+        }
+    }
+}
