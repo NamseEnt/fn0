@@ -1,0 +1,1 @@
+First smoke process exited 0 and report state/reopen checks passed; local post-run assertion script stopped on a shell-quoting NameError while rendering configuration fields. Workload is retained and is not rerun.

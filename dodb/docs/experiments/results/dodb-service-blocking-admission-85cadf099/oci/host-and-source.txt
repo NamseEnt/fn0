@@ -1,0 +1,18 @@
+OCI host: instance-20260923-1013
+OS: Oracle Linux 9.8, Linux 6.12.0-206.104.4.4.el9uek.aarch64
+Architecture: ARM64, 2 online CPUs
+Filesystem: ZFS mounted at /bench/zfs/db
+Implementation checkout: /bench/zfs/db/dodb-blocking-admission-85cadf099
+Implementation SHA: 85cadf0991de2b2052f5b6f7647dc46647b4ede6
+Checkout status after tests and measurements: clean
+Rust/Cargo: 1.97.1
+Target: aarch64-unknown-linux-gnu with repository +crc flags
+Profile: Release, debug information enabled
+Shared Cargo target: /bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target
+RocksDB source SHA: abeebd9630f11bd08c28b7bd43c7bdfc62050654
+RocksDB archive SHA-256: 9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5
+RocksDB make_config.mk SHA-256: bcd375a99550a9314a92ec3673cb7540ed4eea06909477bf3675d772baefaf71
+Workload binary SHA-256: e54ebd3c6f842697fea1b8ce614bbb4ea87dd02c757dc96e8a8273b9a9bed8f1
+OCI results root: /bench/zfs/db/dodb-service-blocking-admission-85cadf099
+
+Build invocations used dodb/scripts/run-oci-rocksdb-build.sh with unique DODB_BUILD_RUN_ID values blocking-admission-focused-85cadf099 and blocking-admission-driver-build-85cadf099. The existing RocksDB archive, shared Cargo target, pinned sccache, and Release profile were reused. No new Cargo target or RocksDB archive build was created.

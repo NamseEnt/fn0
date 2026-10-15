@@ -1,0 +1,5 @@
+mode=shared-8
+read_slots=8
+write_slots=8
+validation_tenants=4
+reopen_validation_tenants=4

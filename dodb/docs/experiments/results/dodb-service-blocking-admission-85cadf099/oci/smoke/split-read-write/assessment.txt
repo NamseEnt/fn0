@@ -1,0 +1,5 @@
+mode=split-read-2-write-6
+read_slots=2
+write_slots=6
+validation_tenants=4
+reopen_validation_tenants=4

@@ -1,0 +1,17 @@
+Planned performance runs: 10
+Completed performance runs: 10
+Passed workload exit status: 10
+Passed report state validation: 10
+Passed shutdown/reopen validation: 10
+Failed performance runs: 0
+Rerun performance runs: 0
+Not reached: 0
+
+Scenario pairs used alternating mode order and serial execution:
+shared RW95, split RW95, split RW80, shared RW80, shared RW50, split RW50, split RW20, shared RW20, shared MT-MIX, split MT-MIX.
+
+Every paired scenario had equal per-client first-100 workflow fingerprints. All runs used an independent initial database. The workload binary SHA-256 was unchanged before and after each run. RSS sampling was complete with 24 samples per run.
+
+Smoke checks, excluded from the 10 performance runs: shared mode and split mode each used 10,000 rows per tenant and passed state plus reopen validation for all four tenants. Shared emitted shared-8 with read/write settings 8/8. Split emitted split-read-2-write-6 with settings 2/6.
+
+Smoke checker issue: the first shared smoke process exited 0 and its report passed both state and reopen validation. A post-run assertion script had a shell-quoting NameError while formatting mode details. This checker-only issue is preserved in smoke/shared/checker-failure.txt. The existing shared report was rechecked successfully without rerunning the workload; the split smoke then completed and passed.
