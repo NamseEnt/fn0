@@ -441,9 +441,17 @@ unsafe extern "C" {
 pub struct RocksDbServiceConfig {
     pub data_dir: PathBuf,
     pub max_blocking_operations: usize,
+    pub blocking_admission: BlockingAdmissionMode,
     pub research_metrics: bool,
     pub detailed_write_metrics: bool,
     pub revision_allocator: RevisionAllocatorMode,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BlockingAdmissionMode {
+    #[default]
+    Shared,
+    SplitReadWrite,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -458,6 +466,7 @@ impl RocksDbServiceConfig {
         Self {
             data_dir: data_dir.into(),
             max_blocking_operations: 8,
+            blocking_admission: BlockingAdmissionMode::Shared,
             research_metrics: false,
             detailed_write_metrics: true,
             revision_allocator: RevisionAllocatorMode::Serialized,
@@ -469,6 +478,9 @@ pub struct RocksDbService {
     data_dir: PathBuf,
     databases: DashMap<TenantId, Arc<OnceCell<Arc<TenantDatabase>>>>,
     blocking_operations: Arc<Semaphore>,
+    read_blocking_operations: Arc<Semaphore>,
+    write_blocking_operations: Arc<Semaphore>,
+    blocking_admission: BlockingAdmissionMode,
     blocking_operation_limit: usize,
     research_metrics: Option<Arc<ResearchMetrics>>,
     detailed_write_metrics: bool,
@@ -493,6 +505,21 @@ struct TenantDatabase {
 struct ReservedRevisionRange {
     next: u64,
     end: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ExecutionLane {
+    Read,
+    Write,
+}
+
+fn execution_lane(request: &Request) -> ExecutionLane {
+    match request {
+        Request::Get { .. } | Request::Query { .. } | Request::Scan { .. } => ExecutionLane::Read,
+        Request::Put { .. } | Request::Delete { .. } | Request::Transact { .. } => {
+            ExecutionLane::Write
+        }
+    }
 }
 
 struct RocksDbHandle(NonNull<c_void>);
@@ -538,11 +565,21 @@ impl RocksDbService {
                 "max_blocking_operations must be nonzero",
             ));
         }
+        if config.blocking_admission == BlockingAdmissionMode::SplitReadWrite
+            && config.max_blocking_operations != 8
+        {
+            return Err(Error::invalid_request(
+                "split blocking admission requires exactly eight total operations",
+            ));
+        }
         std::fs::create_dir_all(&config.data_dir)?;
         Ok(Self {
             data_dir: config.data_dir,
             databases: DashMap::new(),
             blocking_operations: Arc::new(Semaphore::new(config.max_blocking_operations)),
+            read_blocking_operations: Arc::new(Semaphore::new(2)),
+            write_blocking_operations: Arc::new(Semaphore::new(6)),
+            blocking_admission: config.blocking_admission,
             blocking_operation_limit: config.max_blocking_operations,
             research_metrics: config
                 .research_metrics
@@ -562,9 +599,26 @@ impl RocksDbService {
     pub async fn shutdown(&self) {
         let _shutdown_lease = self.lifecycle.begin_shutdown().await;
         let mut blocking_permits = Vec::with_capacity(self.blocking_operation_limit);
-        for _ in 0..self.blocking_operation_limit {
-            if let Ok(permit) = Arc::clone(&self.blocking_operations).acquire_owned().await {
-                blocking_permits.push(permit);
+        match self.blocking_admission {
+            BlockingAdmissionMode::Shared => {
+                for _ in 0..self.blocking_operation_limit {
+                    if let Ok(permit) = Arc::clone(&self.blocking_operations).acquire_owned().await
+                    {
+                        blocking_permits.push(permit);
+                    }
+                }
+            }
+            BlockingAdmissionMode::SplitReadWrite => {
+                for (semaphore, limit) in [
+                    (&self.read_blocking_operations, 2),
+                    (&self.write_blocking_operations, 6),
+                ] {
+                    for _ in 0..limit {
+                        if let Ok(permit) = Arc::clone(semaphore).acquire_owned().await {
+                            blocking_permits.push(permit);
+                        }
+                    }
+                }
             }
         }
         let cells = self
@@ -579,6 +633,16 @@ impl RocksDbService {
 
     pub fn tenant_path(&self, tenant: TenantId) -> PathBuf {
         self.data_dir.join(format!("tenant-{}", tenant.get()))
+    }
+
+    fn semaphore_for(&self, lane: ExecutionLane) -> Arc<Semaphore> {
+        match self.blocking_admission {
+            BlockingAdmissionMode::Shared => Arc::clone(&self.blocking_operations),
+            BlockingAdmissionMode::SplitReadWrite => match lane {
+                ExecutionLane::Read => Arc::clone(&self.read_blocking_operations),
+                ExecutionLane::Write => Arc::clone(&self.write_blocking_operations),
+            },
+        }
     }
 
     pub fn research_metrics_snapshot(&self) -> Option<serde_json::Value> {
@@ -607,13 +671,14 @@ impl RocksDbService {
         &self,
         tenant: TenantId,
         create: bool,
+        lane: ExecutionLane,
     ) -> Result<Option<Arc<TenantDatabase>>, Error> {
         let path = self.tenant_path(tenant);
         if !create {
             #[cfg(test)]
             self.tenant_path_checks.fetch_add(1, Ordering::Relaxed);
             let path_exists = self
-                .run_blocking(tenant, false, move || Ok(path.exists()))
+                .run_blocking(tenant, lane, move || Ok(path.exists()))
                 .await?;
             if !path_exists {
                 return Ok(None);
@@ -625,7 +690,7 @@ impl RocksDbService {
             .entry(tenant)
             .or_insert_with(|| Arc::new(OnceCell::new()))
             .clone();
-        let semaphore = Arc::clone(&self.blocking_operations);
+        let semaphore = self.semaphore_for(lane);
         let research_metrics = self.research_metrics.clone();
         let revision_allocator = self.revision_allocator;
         let database = cell
@@ -640,7 +705,11 @@ impl RocksDbService {
                 if let Some(metrics) = &research_metrics {
                     metrics.record(
                         tenant,
-                        Metric::WriteSemaphoreWait,
+                        if lane == ExecutionLane::Write {
+                            Metric::WriteSemaphoreWait
+                        } else {
+                            Metric::ReadSemaphoreWait
+                        },
                         semaphore_started.elapsed(),
                     );
                 }
@@ -676,13 +745,13 @@ impl RocksDbService {
         {
             return Ok(Some(database));
         }
-        self.database(tenant, false).await
+        self.database(tenant, false, ExecutionLane::Read).await
     }
 
     async fn run_blocking<T, F>(
         &self,
         tenant: TenantId,
-        is_write: bool,
+        lane: ExecutionLane,
         operation: F,
     ) -> Result<T, Error>
     where
@@ -701,14 +770,15 @@ impl RocksDbService {
                 );
             }
         }
-        let permit = Arc::clone(&self.blocking_operations)
+        let permit = self
+            .semaphore_for(lane)
             .acquire_owned()
             .await
             .map_err(|_| Error::overloaded("blocking RocksDB executor is closed"))?;
         if let Some(metrics) = &self.research_metrics {
             metrics.record(
                 tenant,
-                if is_write {
+                if lane == ExecutionLane::Write {
                     Metric::WriteSemaphoreWait
                 } else {
                     Metric::ReadSemaphoreWait
@@ -727,7 +797,7 @@ impl RocksDbService {
         let collect_metrics = metrics
             .as_ref()
             .is_some_and(|metrics| metrics.stage.load(Ordering::Acquire) > 0)
-            && is_write
+            && lane == ExecutionLane::Write
             && self.detailed_write_metrics;
         #[cfg(test)]
         let operation_hook = self.blocking_operation_hook.lock().unwrap().clone();
@@ -883,6 +953,7 @@ impl RocksDbService {
         budget: ExecutionBudget,
     ) -> Result<Response, Error> {
         let _request_lease = self.lifecycle.begin_request().await;
+        let lane = execution_lane(&request);
         match request {
             Request::Get { key } => {
                 let database_started = Instant::now();
@@ -902,7 +973,7 @@ impl RocksDbService {
                     Some(database) => {
                         let metrics = self.research_metrics.clone();
                         let kind = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok();
-                        self.run_blocking(tenant, false, move || {
+                        self.run_blocking(tenant, lane, move || {
                             database.get_with_metrics(tenant, &key, metrics, kind)
                         })
                         .await?
@@ -927,7 +998,7 @@ impl RocksDbService {
             }
             Request::Put { key, value } => {
                 let database = self
-                    .database(tenant, true)
+                    .database(tenant, true, lane)
                     .await?
                     .ok_or_else(|| Error::invariant("created tenant database was absent"))?;
                 let request = TransactionRequest::new(
@@ -944,7 +1015,7 @@ impl RocksDbService {
                     .filter(|_| self.detailed_write_metrics)
                     .and_then(|metrics| metrics.tenant(tenant));
                 let result = self
-                    .run_blocking(tenant, true, move || {
+                    .run_blocking(tenant, lane, move || {
                         database.transact_with_metrics(request, transaction_metrics, stage)
                     })
                     .await?;
@@ -957,7 +1028,7 @@ impl RocksDbService {
             }
             Request::Delete { key } => {
                 let database = self
-                    .database(tenant, true)
+                    .database(tenant, true, lane)
                     .await?
                     .ok_or_else(|| Error::invariant("created tenant database was absent"))?;
                 let request =
@@ -972,7 +1043,7 @@ impl RocksDbService {
                     .filter(|_| self.detailed_write_metrics)
                     .and_then(|metrics| metrics.tenant(tenant));
                 let result = self
-                    .run_blocking(tenant, true, move || {
+                    .run_blocking(tenant, lane, move || {
                         database.transact_with_metrics(request, transaction_metrics, stage)
                     })
                     .await?;
@@ -986,7 +1057,7 @@ impl RocksDbService {
             Request::Transact { request } => {
                 request.validate()?;
                 let has_mutations = !request.mutations.is_empty();
-                let database = self.database(tenant, has_mutations).await?;
+                let database = self.database(tenant, has_mutations, lane).await?;
                 let result = match database {
                     Some(database) => {
                         let stage = self
@@ -998,7 +1069,7 @@ impl RocksDbService {
                             .as_ref()
                             .filter(|_| self.detailed_write_metrics)
                             .and_then(|metrics| metrics.tenant(tenant));
-                        self.run_blocking(tenant, has_mutations, move || {
+                        self.run_blocking(tenant, lane, move || {
                             database.transact_with_metrics(request, transaction_metrics, stage)
                         })
                         .await?
@@ -1035,7 +1106,7 @@ impl RocksDbService {
                     Some(database) => {
                         let metrics = self.research_metrics.clone();
                         let kind = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok();
-                        self.run_blocking(tenant, false, move || {
+                        self.run_blocking(tenant, lane, move || {
                             database.query_with_metrics(
                                 tenant,
                                 &pk,
@@ -1075,7 +1146,7 @@ impl RocksDbService {
             } => {
                 let rows = match self.read_database(tenant).await? {
                     Some(database) => {
-                        self.run_blocking(tenant, false, move || {
+                        self.run_blocking(tenant, lane, move || {
                             database.scan(exclusive_after_key.as_ref(), limit, budget)
                         })
                         .await?
@@ -2218,6 +2289,191 @@ mod tests {
     }
 
     #[test]
+    fn request_kinds_use_the_expected_admission_lane() {
+        let key = DocumentKey::new(b"lane".to_vec(), b"key".to_vec());
+        let read_requests = [
+            Request::Get { key: key.clone() },
+            Request::Query {
+                pk: PrimaryKey::new(b"lane".to_vec()),
+                exclusive_after_sk: None,
+                limit: 16,
+            },
+            Request::Scan {
+                exclusive_after_key: None,
+                limit: 16,
+            },
+        ];
+        let write_requests = [
+            Request::Put {
+                key: key.clone(),
+                value: Vec::new(),
+            },
+            Request::Delete { key },
+            Request::Transact {
+                request: TransactionRequest::new(Vec::new(), Vec::new()),
+            },
+        ];
+        assert!(
+            read_requests
+                .iter()
+                .all(|request| execution_lane(request) == ExecutionLane::Read)
+        );
+        assert!(
+            write_requests
+                .iter()
+                .all(|request| execution_lane(request) == ExecutionLane::Write)
+        );
+    }
+
+    #[test]
+    fn shared_admission_remains_the_default_eight_slot_mode() {
+        let directory = temporary_db_directory();
+        let config = RocksDbServiceConfig::new(directory.path());
+        assert_eq!(config.blocking_admission, BlockingAdmissionMode::Shared);
+        let service = RocksDbService::new(config).unwrap();
+        assert_eq!(service.blocking_operations.available_permits(), 8);
+        assert_eq!(service.read_blocking_operations.available_permits(), 2);
+        assert_eq!(service.write_blocking_operations.available_permits(), 6);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn split_admission_reserves_two_read_and_six_write_slots() {
+        let directory = temporary_db_directory();
+        let mut config = RocksDbServiceConfig::new(directory.path());
+        config.blocking_admission = BlockingAdmissionMode::SplitReadWrite;
+        let service = Arc::new(RocksDbService::new(config).unwrap());
+        let (started_sender, started_receiver) = mpsc::channel();
+        let started_receiver = Arc::new(std::sync::Mutex::new(started_receiver));
+        let read_active = Arc::new(AtomicUsize::new(0));
+        let write_active = Arc::new(AtomicUsize::new(0));
+        let total_active = Arc::new(AtomicUsize::new(0));
+        let max_read_active = Arc::new(AtomicUsize::new(0));
+        let max_write_active = Arc::new(AtomicUsize::new(0));
+        let max_total_active = Arc::new(AtomicUsize::new(0));
+        let mut release_senders = Vec::new();
+        let mut jobs = Vec::new();
+
+        let launch = |lane: ExecutionLane,
+                      service: &Arc<RocksDbService>,
+                      started_sender: &mpsc::Sender<ExecutionLane>,
+                      read_active: &Arc<AtomicUsize>,
+                      write_active: &Arc<AtomicUsize>,
+                      total_active: &Arc<AtomicUsize>,
+                      max_read_active: &Arc<AtomicUsize>,
+                      max_write_active: &Arc<AtomicUsize>,
+                      max_total_active: &Arc<AtomicUsize>| {
+            let (release_sender, release_receiver) = mpsc::channel();
+            let started_sender = started_sender.clone();
+            let read_active = Arc::clone(read_active);
+            let write_active = Arc::clone(write_active);
+            let total_active = Arc::clone(total_active);
+            let max_read_active = Arc::clone(max_read_active);
+            let max_write_active = Arc::clone(max_write_active);
+            let max_total_active = Arc::clone(max_total_active);
+            let service = Arc::clone(service);
+            let job = tokio::spawn(async move {
+                service
+                    .run_blocking(TenantId::new(1), lane, move || {
+                        let active_total = total_active.fetch_add(1, Ordering::SeqCst) + 1;
+                        max_total_active.fetch_max(active_total, Ordering::SeqCst);
+                        match lane {
+                            ExecutionLane::Read => {
+                                let active = read_active.fetch_add(1, Ordering::SeqCst) + 1;
+                                max_read_active.fetch_max(active, Ordering::SeqCst);
+                            }
+                            ExecutionLane::Write => {
+                                let active = write_active.fetch_add(1, Ordering::SeqCst) + 1;
+                                max_write_active.fetch_max(active, Ordering::SeqCst);
+                            }
+                        }
+                        started_sender.send(lane).unwrap();
+                        release_receiver.recv().unwrap();
+                        match lane {
+                            ExecutionLane::Read => read_active.fetch_sub(1, Ordering::SeqCst),
+                            ExecutionLane::Write => write_active.fetch_sub(1, Ordering::SeqCst),
+                        };
+                        total_active.fetch_sub(1, Ordering::SeqCst);
+                        Ok(())
+                    })
+                    .await
+                    .unwrap();
+            });
+            (release_sender, job)
+        };
+
+        for _ in 0..6 {
+            let (release_sender, job) = launch(
+                ExecutionLane::Write,
+                &service,
+                &started_sender,
+                &read_active,
+                &write_active,
+                &total_active,
+                &max_read_active,
+                &max_write_active,
+                &max_total_active,
+            );
+            release_senders.push(release_sender);
+            jobs.push(job);
+        }
+        let write_receiver = Arc::clone(&started_receiver);
+        let write_starts = tokio::task::spawn_blocking(move || {
+            (0..6)
+                .map(|_| write_receiver.lock().unwrap().recv().unwrap())
+                .collect::<Vec<_>>()
+        })
+        .await
+        .unwrap();
+        assert!(
+            write_starts
+                .iter()
+                .all(|lane| *lane == ExecutionLane::Write)
+        );
+
+        let mut read_release_senders = Vec::new();
+        for _ in 0..2 {
+            let (release_sender, job) = launch(
+                ExecutionLane::Read,
+                &service,
+                &started_sender,
+                &read_active,
+                &write_active,
+                &total_active,
+                &max_read_active,
+                &max_write_active,
+                &max_total_active,
+            );
+            read_release_senders.push(release_sender);
+            jobs.push(job);
+        }
+        let read_receiver = Arc::clone(&started_receiver);
+        let read_starts = tokio::task::spawn_blocking(move || {
+            (0..2)
+                .map(|_| read_receiver.lock().unwrap().recv().unwrap())
+                .collect::<Vec<_>>()
+        });
+        let read_starts = read_starts.await.unwrap();
+        assert!(read_starts.iter().all(|lane| *lane == ExecutionLane::Read));
+        assert_eq!(read_active.load(Ordering::SeqCst), 2);
+        assert_eq!(write_active.load(Ordering::SeqCst), 6);
+        assert_eq!(total_active.load(Ordering::SeqCst), 8);
+        assert_eq!(max_read_active.load(Ordering::SeqCst), 2);
+        assert_eq!(max_write_active.load(Ordering::SeqCst), 6);
+        assert_eq!(max_total_active.load(Ordering::SeqCst), 8);
+
+        for release_sender in read_release_senders {
+            release_sender.send(()).unwrap();
+        }
+        for release_sender in release_senders {
+            release_sender.send(()).unwrap();
+        }
+        for job in jobs {
+            job.await.unwrap();
+        }
+        service.shutdown().await;
+    }
+
+    #[test]
     fn get_completes_while_same_tenant_transaction_is_open() {
         let directory = temporary_db_directory();
         let database = Arc::new(TenantDatabase::open(directory.path()).unwrap());
@@ -2640,8 +2896,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn shutdown_drains_a_blocking_operation_after_its_request_is_cancelled() {
         let directory = temporary_db_directory();
-        let service =
-            Arc::new(RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap());
+        let mut config = RocksDbServiceConfig::new(directory.path());
+        config.blocking_admission = BlockingAdmissionMode::SplitReadWrite;
+        let service = Arc::new(RocksDbService::new(config).unwrap());
         let tenant = TenantId::new(42);
         let key = DocumentKey::new(b"cancelled-request".to_vec(), b"key".to_vec());
         service
