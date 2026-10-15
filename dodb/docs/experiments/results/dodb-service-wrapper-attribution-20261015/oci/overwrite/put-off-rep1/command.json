@@ -1,0 +1,15 @@
+[
+  "/usr/bin/time",
+  "-v",
+  "-o",
+  "/bench/zfs/db/dodb-wrapper-attribution-20261015/overwrite/put-off-rep1/process-time.txt",
+  "/bench/zfs/db/dodb-wrapper-attribution-20261015/binaries/wrapper_overwrite_probe-4418f506b",
+  "--data-dir",
+  "/bench/zfs/db/dodb-wrapper-attribution-20261015/overwrite/put-off-rep1/db",
+  "--report",
+  "/bench/zfs/db/dodb-wrapper-attribution-20261015/overwrite/put-off-rep1/report.json",
+  "--mode",
+  "put",
+  "--metrics",
+  "0"
+]

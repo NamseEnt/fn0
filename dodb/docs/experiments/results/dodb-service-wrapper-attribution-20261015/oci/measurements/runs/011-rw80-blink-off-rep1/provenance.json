@@ -1,0 +1,9 @@
+{
+  "profile": "blink-off",
+  "scenario": "rw80",
+  "repetition": 1,
+  "sequence": 11,
+  "elapsed_seconds": 8.339070410002023,
+  "binary_sha256_before": "5b16734e865a525a42fd339f8f89f4f10f71977aa046a6d905492ee6fa905c00",
+  "binary_sha256_after": "5b16734e865a525a42fd339f8f89f4f10f71977aa046a6d905492ee6fa905c00"
+}

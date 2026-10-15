@@ -1,0 +1,8 @@
+{
+  "dodb_rocksdb": {
+    "binary": "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/dodb_rocksdb-ab9831430d697c48",
+    "sha256_before": "6dfd383fa06161135fe71f0a21c4ebe879b4618e5a9827cea172bef24e4f9576",
+    "sha256_after": "6dfd383fa06161135fe71f0a21c4ebe879b4618e5a9827cea172bef24e4f9576",
+    "exit_status": 101
+  }
+}

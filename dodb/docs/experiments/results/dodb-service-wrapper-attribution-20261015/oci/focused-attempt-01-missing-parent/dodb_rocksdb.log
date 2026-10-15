@@ -1,0 +1,111 @@
+
+running 21 tests
+test tests::allocator_modes_switch_above_existing_counter_high_water ... 
+thread 'tests::allocator_modes_switch_above_existing_counter_high_water' (1176368) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpUK7uHW", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test tests::assigned_revision_is_burned_when_user_transaction_rolls_back ... 
+thread 'tests::assigned_revision_is_burned_when_user_transaction_rolls_back' (1176369) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpyCkRJQ", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::disk_tenant_cold_open_is_shared_and_then_uses_read_fast_path ... 
+thread 'tests::disk_tenant_cold_open_is_shared_and_then_uses_read_fast_path' (1176370) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpADkjMF", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::failed_tenant_open_can_be_retried ... 
+thread 'tests::failed_tenant_open_can_be_retried' (1176375) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpVBXReW", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::get_completes_while_same_tenant_transaction_is_open ... 
+thread 'tests::get_completes_while_same_tenant_transaction_is_open' (1176376) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpnQV5HT", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::initialized_tenant_reads_skip_repeated_path_checks ... 
+thread 'tests::initialized_tenant_reads_skip_repeated_path_checks' (1176377) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpeVH5bH", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::missing_tenant_reads_do_not_create_database_directory ... 
+thread 'tests::missing_tenant_reads_do_not_create_database_directory' (1176382) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpeTOQaV", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::partial_range_is_abandoned_after_reopen_and_failed_tokens_are_burned ... 
+thread 'tests::partial_range_is_abandoned_after_reopen_and_failed_tokens_are_burned' (1176383) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpJDhij8", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::range_reservation_rejects_overflow_and_corrupt_counter ... 
+thread 'tests::range_reservation_rejects_overflow_and_corrupt_counter' (1176384) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpr0gB2z", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::read_iterator_keeps_database_alive_after_tenant_owner_drops ... 
+thread 'tests::read_iterator_keeps_database_alive_after_tenant_owner_drops' (1176385) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpDWRg3k", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::read_iterator_keeps_one_snapshot_across_atomic_transaction_commit ... 
+thread 'tests::read_iterator_keeps_one_snapshot_across_atomic_transaction_commit' (1176386) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpDyLjIx", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::read_waits_for_an_initializing_registry_cell ... 
+thread 'tests::read_waits_for_an_initializing_registry_cell' (1176387) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpvs69w7", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::request_kinds_use_the_expected_admission_lane ... ok
+test tests::reserved_revision_ranges_are_unique_under_concurrent_assignment ... 
+thread 'tests::reserved_revision_ranges_are_unique_under_concurrent_assignment' (1176393) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpqXpwPE", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::shared_admission_accepts_sixteen_slots_and_rejects_zero ... 
+thread 'tests::shared_admission_accepts_sixteen_slots_and_rejects_zero' (1176394) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpUDspUc", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::shared_admission_remains_the_default_eight_slot_mode ... 
+thread 'tests::shared_admission_remains_the_default_eight_slot_mode' (1176395) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpfbNSDm", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::shared_sixteen_slot_admission_stays_bounded_until_blocking_work_finishes ... 
+thread 'tests::shared_sixteen_slot_admission_stays_bounded_until_blocking_work_finishes' (1176396) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpxsNa9i", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::shutdown_drains_a_blocking_operation_after_its_request_is_cancelled ... 
+thread 'tests::shutdown_drains_a_blocking_operation_after_its_request_is_cancelled' (1176401) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmp7ZyqrC", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::shutdown_waits_for_an_in_flight_request_and_service_reopens ... 
+thread 'tests::shutdown_waits_for_an_in_flight_request_and_service_reopens' (1176404) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmp6pllEj", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::split_admission_reserves_two_read_and_six_write_slots ... 
+thread 'tests::split_admission_reserves_two_read_and_six_write_slots' (1176407) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpR8fYEe", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+test tests::uncertain_reservation_commit_does_not_publish_its_range ... 
+thread 'tests::uncertain_reservation_commit_does_not_publish_its_range' (1176412) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:2402:49:
+called `Result::unwrap()` on an `Err` value: Custom { kind: NotFound, error: PathError { path: "/bench/zfs/db/dodb-wrapper-attribution-20261015/focused/db/.tmpGG85R5", err: Os { code: 2, kind: NotFound, message: "No such file or directory" } } }
+FAILED
+
+failures:
+
+failures:
+    tests::allocator_modes_switch_above_existing_counter_high_water
+    tests::assigned_revision_is_burned_when_user_transaction_rolls_back
+    tests::disk_tenant_cold_open_is_shared_and_then_uses_read_fast_path
+    tests::failed_tenant_open_can_be_retried
+    tests::get_completes_while_same_tenant_transaction_is_open
+    tests::initialized_tenant_reads_skip_repeated_path_checks
+    tests::missing_tenant_reads_do_not_create_database_directory
+    tests::partial_range_is_abandoned_after_reopen_and_failed_tokens_are_burned
+    tests::range_reservation_rejects_overflow_and_corrupt_counter
+    tests::read_iterator_keeps_database_alive_after_tenant_owner_drops
+    tests::read_iterator_keeps_one_snapshot_across_atomic_transaction_commit
+    tests::read_waits_for_an_initializing_registry_cell
+    tests::reserved_revision_ranges_are_unique_under_concurrent_assignment
+    tests::shared_admission_accepts_sixteen_slots_and_rejects_zero
+    tests::shared_admission_remains_the_default_eight_slot_mode
+    tests::shared_sixteen_slot_admission_stays_bounded_until_blocking_work_finishes
+    tests::shutdown_drains_a_blocking_operation_after_its_request_is_cancelled
+    tests::shutdown_waits_for_an_in_flight_request_and_service_reopens
+    tests::split_admission_reserves_two_read_and_six_write_slots
+    tests::uncertain_reservation_commit_does_not_publish_its_range
+
+test result: FAILED. 1 passed; 20 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

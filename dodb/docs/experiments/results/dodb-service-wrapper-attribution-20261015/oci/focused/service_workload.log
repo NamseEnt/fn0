@@ -1,0 +1,8 @@
+
+running 3 tests
+test tests::binary_keys_have_sixteen_raw_bytes_and_canonical_encoded_size_range ... ok
+test tests::schedules_keep_all_categories_and_api_ratio_including_preparatory_gets ... ok
+test tests::width_four_and_eight_are_single_transaction_workflows ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,20 @@
+{
+  "dodb_rocksdb": {
+    "binary": "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/dodb_rocksdb-ab9831430d697c48",
+    "sha256_before": "6dfd383fa06161135fe71f0a21c4ebe879b4618e5a9827cea172bef24e4f9576",
+    "sha256_after": "6dfd383fa06161135fe71f0a21c4ebe879b4618e5a9827cea172bef24e4f9576",
+    "exit_status": 0
+  },
+  "read_contract": {
+    "binary": "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/read_contract-981873c309dec091",
+    "sha256_before": "5f0e3306b857be49a048e4fd55f341496726ec1d0d69631097d72ed7c297ae9a",
+    "sha256_after": "5f0e3306b857be49a048e4fd55f341496726ec1d0d69631097d72ed7c297ae9a",
+    "exit_status": 0
+  },
+  "research_metrics": {
+    "binary": "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/research_metrics-83cde58b82deaa3d",
+    "sha256_before": "4bb64b18a6836d38cb90b57ed8fb0c5f971e2712708ef0fec7132fd1477b2fd3",
+    "sha256_after": "4bb64b18a6836d38cb90b57ed8fb0c5f971e2712708ef0fec7132fd1477b2fd3",
+    "exit_status": 101
+  }
+}

@@ -1,0 +1,3 @@
+   Compiling dodb-server v0.1.0 (/bench/zfs/db/dodb-wrapper-attribution-20261015/checkout/dodb/crates/dodb-server)
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/dodb-wrapper-attribution-20261015/checkout/dodb/crates/dodb-rocksdb)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 06s

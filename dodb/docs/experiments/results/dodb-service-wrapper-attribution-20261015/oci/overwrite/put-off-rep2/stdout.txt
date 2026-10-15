@@ -1,0 +1,107 @@
+{
+  "calls": 20077,
+  "calls_per_second": 4012.3268665693768,
+  "client_prefixes": [
+    {
+      "client": 0,
+      "fingerprint": "756e018988179365",
+      "workflows": 100
+    },
+    {
+      "client": 1,
+      "fingerprint": "6d7d8330fddcd765",
+      "workflows": 100
+    },
+    {
+      "client": 2,
+      "fingerprint": "facc0ebaa7016e65",
+      "workflows": 100
+    },
+    {
+      "client": 3,
+      "fingerprint": "aecaa5dbf42cff65",
+      "workflows": 100
+    },
+    {
+      "client": 4,
+      "fingerprint": "b6413e8c8104b765",
+      "workflows": 100
+    },
+    {
+      "client": 5,
+      "fingerprint": "ae50c033f6c9fb65",
+      "workflows": 100
+    },
+    {
+      "client": 6,
+      "fingerprint": "3b9f4bbd9fee9265",
+      "workflows": 100
+    },
+    {
+      "client": 7,
+      "fingerprint": "ef9de2deed1a2365",
+      "workflows": 100
+    },
+    {
+      "client": 8,
+      "fingerprint": "f42864ec46cd4b65",
+      "workflows": 100
+    },
+    {
+      "client": 9,
+      "fingerprint": "ec37e693bc928f65",
+      "workflows": 100
+    },
+    {
+      "client": 10,
+      "fingerprint": "7986721d65b72665",
+      "workflows": 100
+    },
+    {
+      "client": 11,
+      "fingerprint": "2d85093eb2e2b765",
+      "workflows": 100
+    },
+    {
+      "client": 12,
+      "fingerprint": "34fba1ef3fba6f65",
+      "workflows": 100
+    },
+    {
+      "client": 13,
+      "fingerprint": "2d0b2396b57fb365",
+      "workflows": 100
+    },
+    {
+      "client": 14,
+      "fingerprint": "ba59af205ea44a65",
+      "workflows": 100
+    },
+    {
+      "client": 15,
+      "fingerprint": "6e584641abcfdb65",
+      "workflows": 100
+    }
+  ],
+  "clients": 16,
+  "elapsed_seconds_including_drain": 5.003829615,
+  "initial_keys": 16,
+  "latency": {
+    "p50_ms": 3.926954,
+    "p95_ms": 4.70676,
+    "p99_ms": 6.771578,
+    "samples": 20077
+  },
+  "measurement_seconds": 5,
+  "mode": "put",
+  "reopen_validation": true,
+  "research_metrics": {
+    "enabled": false
+  },
+  "revision_allocator": "reserved-ranges",
+  "schema": "dodb-wrapper-overwrite-probe-v1",
+  "shared_slots": 8,
+  "validation": true,
+  "value_bytes": 512,
+  "warmup_seconds": 1
+}

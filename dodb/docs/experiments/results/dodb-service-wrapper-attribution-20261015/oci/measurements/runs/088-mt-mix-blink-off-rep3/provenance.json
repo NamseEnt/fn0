@@ -1,0 +1,9 @@
+{
+  "profile": "blink-off",
+  "scenario": "mt-mix",
+  "repetition": 3,
+  "sequence": 88,
+  "elapsed_seconds": 11.046545184915885,
+  "binary_sha256_before": "5b16734e865a525a42fd339f8f89f4f10f71977aa046a6d905492ee6fa905c00",
+  "binary_sha256_after": "5b16734e865a525a42fd339f8f89f4f10f71977aa046a6d905492ee6fa905c00"
+}

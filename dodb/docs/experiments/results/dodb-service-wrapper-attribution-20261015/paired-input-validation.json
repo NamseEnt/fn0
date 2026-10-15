@@ -1,0 +1,126 @@
+{
+  "passed": true,
+  "performance_runs": 90,
+  "groups": {
+    "rw95:tenant_1": {
+      "schedule": "09a189d4792bd0de",
+      "clients": {
+        "11": "c8b9ea0145b3e65a",
+        "4": "ef6bf147a37d5561",
+        "12": "3d8a44431d0e0bb4",
+        "9": "0bdecdbb80f1d88e",
+        "15": "3c7e3073b34774e8",
+        "13": "58ded1d2195869d9",
+        "10": "1d2bf4e041aaaf95",
+        "3": "15c1d14029db37bd",
+        "6": "d79fd21255a43b73",
+        "7": "3a5045c36c98dd35",
+        "2": "6ef73d157992623d",
+        "14": "2f2eec9b2ccfbad0",
+        "8": "6635f9f9d3eedf30",
+        "1": "21fd129495e47b7c",
+        "5": "b755cb90342dc402",
+        "0": "008c776f7ae6cc3b"
+      }
+    },
+    "rw80:tenant_1": {
+      "schedule": "173deb83edfabe14",
+      "clients": {
+        "15": "50a377f13c27742f",
+        "7": "c256ad2ce786f29f",
+        "9": "67addafcc833007d",
+        "8": "311db7d2c5d6dcb3",
+        "2": "e6c86d4e7f370a91",
+        "5": "b0a32405a3c1f039",
+        "13": "a481fcad41f12639",
+        "14": "b1397f034ddcdfca",
+        "10": "fedfa875ceb3a0fc",
+        "3": "a6bd15dcab4e9b56",
+        "1": "97eb105bfafa222e",
+        "11": "c9080848b2643800",
+        "4": "5ad0793453dc1335",
+        "12": "09296d54824e9df9",
+        "6": "a3f1cb3440d31ff2",
+        "0": "a4f1e93562eb851f"
+      }
+    },
+    "rw50:tenant_1": {
+      "schedule": "2a283f587ebe4f3e",
+      "clients": {
+        "9": "d1c76fc5acf41e3a",
+        "6": "ff741f233084bc6c",
+        "13": "da4fc9268e42fa9d",
+        "2": "4626b4849e0871a4",
+        "0": "d05d64bc1eee8938",
+        "15": "79fb13fca7740da2",
+        "12": "3cf64935e7fd3257",
+        "8": "96f536da823ea2f2",
+        "4": "345cd3ee9b19f93e",
+        "5": "e203e8cff110234d",
+        "10": "2b636d0c5377219d",
+        "11": "cf0c39c7189f7ff0",
+        "1": "00afe83ef95ccbcb",
+        "3": "0d502ea63a347848",
+        "7": "7a6fd3e37645a48c",
+        "14": "e5a2ef94c94d3f1d"
+      }
+    },
+    "rw20:tenant_1": {
+      "schedule": "902895fc149e7bc6",
+      "clients": {
+        "12": "ac0b35976354993e",
+        "11": "c8c5b972f4a45a9c",
+        "6": "e324966a5ae82bae",
+        "3": "2b1b99653423af6b",
+        "0": "a08b638f28f4ed51",
+        "2": "3e72225bf8ce0aa4",
+        "4": "618341eb9389ca78",
+        "15": "27eb518d53c85aff",
+        "5": "f55ffd845dd55fb1",
+        "13": "97e4a83da5668e26",
+        "14": "2c54430cbb707ec5",
+        "10": "b270ccd7bd14c4b2",
+        "8": "288765ce467341de",
+        "1": "15f3273e98c2c399",
+        "7": "60fa5877782bb914",
+        "9": "e25a23f7393e757a"
+      }
+    },
+    "mt-mix:tenant_1": {
+      "schedule": "09a189d4792bd0de",
+      "clients": {
+        "3": "15c1d14029db37bd",
+        "2": "6ef73d157992623d",
+        "0": "008c776f7ae6cc3b",
+        "1": "21fd129495e47b7c"
+      }
+    },
+    "mt-mix:tenant_2": {
+      "schedule": "42d01511e1d3d4b4",
+      "clients": {
+        "7": "7ef4ec080c042749",
+        "6": "7e524b0b0df7be52",
+        "4": "481252c312f3b3b2",
+        "5": "647be86b2e980937"
+      }
+    },
+    "mt-mix:tenant_3": {
+      "schedule": "2ce20a3e4b206aba",
+      "clients": {
+        "11": "3cf9a109640ca0c0",
+        "8": "4f7578a7f90f92d2",
+        "10": "868a7e51cedace24",
+        "9": "9daef0fc9f08e5a6"
+      }
+    },
+    "mt-mix:tenant_4": {
+      "schedule": "bd5535d7fdaec7fa",
+      "clients": {
+        "14": "bc3f47b60a0809a6",
+        "15": "4d1baa020cbb6285",
+        "13": "0ef93abc80101091",
+        "12": "c61425b50864c767"
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "profile": "serialized-8-on",
+  "scenario": "rw20",
+  "repetition": 2,
+  "sequence": 53,
+  "elapsed_seconds": 6.7911381660960615,
+  "binary_sha256_before": "5b16734e865a525a42fd339f8f89f4f10f71977aa046a6d905492ee6fa905c00",
+  "binary_sha256_after": "5b16734e865a525a42fd339f8f89f4f10f71977aa046a6d905492ee6fa905c00"
+}

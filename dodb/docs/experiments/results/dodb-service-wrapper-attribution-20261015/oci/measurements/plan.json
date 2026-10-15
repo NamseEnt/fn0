@@ -1,0 +1,64 @@
+{
+  "source_sha": "d56382ef236542846b3bb836570566f835b2a0e3",
+  "profiles": [
+    [
+      "serialized-8-on",
+      "rocksdb",
+      "serialized",
+      "shared",
+      8,
+      true
+    ],
+    [
+      "ranges-8-on",
+      "rocksdb",
+      "reserved-ranges",
+      "shared",
+      8,
+      true
+    ],
+    [
+      "ranges-16-on",
+      "rocksdb",
+      "reserved-ranges",
+      "shared",
+      16,
+      true
+    ],
+    [
+      "ranges-split-on",
+      "rocksdb",
+      "reserved-ranges",
+      "split-read-write",
+      8,
+      true
+    ],
+    [
+      "ranges-8-off",
+      "rocksdb",
+      "reserved-ranges",
+      "shared",
+      8,
+      false
+    ],
+    [
+      "blink-off",
+      "blink",
+      "serialized",
+      "shared",
+      8,
+      false
+    ]
+  ],
+  "scenarios": [
+    "rw95",
+    "rw80",
+    "rw50",
+    "rw20",
+    "mt-mix"
+  ],
+  "repetitions": 3,
+  "performance_runs": 90,
+  "smoke_runs": 6,
+  "binary_sha256": "5b16734e865a525a42fd339f8f89f4f10f71977aa046a6d905492ee6fa905c00"
+}

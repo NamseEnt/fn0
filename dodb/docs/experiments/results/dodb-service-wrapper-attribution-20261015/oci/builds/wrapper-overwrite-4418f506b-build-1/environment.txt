@@ -1,0 +1,31 @@
+utc=2026-10-15T05:30:44Z
+source_path=/bench/zfs/db/dodb-wrapper-attribution-20261015/checkout
+source_sha=4418f506b0e93ed5d4dde5590b291d38031b8bda
+toolchain=1.97.1
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+binary: rustc
+commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452
+commit-date: 2026-07-14
+host: aarch64-unknown-linux-gnu
+release: 1.97.1
+LLVM version: 22.1.6
+cargo 1.97.1 (c980f4866 2026-06-30)
+host_architecture=aarch64
+cargo_target_dir=/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target
+sccache_dir=/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/sccache
+rocksdb_dir=/bench/zfs/db/product-build/rocksdb-source
+run_tmpdir=/tmp/db-3ff661fbce03bbea
+sccache_version=sccache 0.18.0
+sccache_sha256=0fd82ece4469b791e30fffdd43d58d2e6cae303950c0d6c8faad932d93e35cf4
+cargo_incremental=0
+rustc_wrapper=/bench/zfs/db/tooling/sccache-0.18.0-aarch64-unknown-linux-musl/sccache
+sccache_server_uds=/tmp/dodb-sccache-rust1971-arm64.sock
+rocksdb_source_sha=abeebd9630f11bd08c28b7bd43c7bdfc62050654
+9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5  /bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+bcd375a99550a9314a92ec3673cb7540ed4eea06909477bf3675d772baefaf71  /bench/zfs/db/product-build/rocksdb-source/make_config.mk
+5d959dfcc98b53886ee772ba216c4f9a1b31f093b46b5b263c0d084af54e821d  /bench/zfs/db/dodb-wrapper-attribution-20261015/checkout/rust-toolchain.toml
+d7f22f835a631b08459a9662e207df20f4abfbf8110e198cbac04582f5c42c9f  /bench/zfs/db/dodb-wrapper-attribution-20261015/checkout/.cargo/config.toml
+e44665703dba57120463a98bbbd5091db251799c5e26b64fb17efacd36f84747  /bench/zfs/db/dodb-wrapper-attribution-20261015/checkout/Cargo.lock
+d0d1061b53e248d85dfc37478ecb228f6f4cbfb088ea9151eee52f4ae25ff9fb  /bench/zfs/db/dodb-wrapper-attribution-20261015/checkout/Cargo.toml
+## HEAD (no branch)
+command=rustup run 1.97.1 cargo build --locked --release -p dodb-rocksdb --bin wrapper_overwrite_probe 

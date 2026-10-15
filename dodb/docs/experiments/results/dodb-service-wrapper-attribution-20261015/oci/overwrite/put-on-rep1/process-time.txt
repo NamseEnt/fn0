@@ -1,0 +1,23 @@
+	Command being timed: "/bench/zfs/db/dodb-wrapper-attribution-20261015/binaries/wrapper_overwrite_probe-4418f506b --data-dir /bench/zfs/db/dodb-wrapper-attribution-20261015/overwrite/put-on-rep1/db --report /bench/zfs/db/dodb-wrapper-attribution-20261015/overwrite/put-on-rep1/report.json --mode put --metrics 1"
+	User time (seconds): 1.07
+	System time (seconds): 0.96
+	Percent of CPU this job got: 33%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:06.13
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 22952
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1234
+	Minor (reclaiming a frame) page faults: 6873
+	Voluntary context switches: 84766
+	Involuntary context switches: 56888
+	Swaps: 0
+	File system inputs: 21678
+	File system outputs: 22004
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

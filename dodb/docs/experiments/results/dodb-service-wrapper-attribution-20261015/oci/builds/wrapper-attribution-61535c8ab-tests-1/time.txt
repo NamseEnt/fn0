@@ -1,0 +1,3 @@
+elapsed_seconds=138.42
+user_seconds=111.85
+system_seconds=22.40

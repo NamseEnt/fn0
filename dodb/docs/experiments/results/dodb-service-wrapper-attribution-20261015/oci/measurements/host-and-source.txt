@@ -1,0 +1,64 @@
+date -u
+Thu Oct 15 05:12:15 AM UTC 2026
+hostname
+instance-20260923-1013
+uname -a
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+lscpu
+Architecture:                            aarch64
+CPU op-mode(s):                          32-bit, 64-bit
+Byte Order:                              Little Endian
+CPU(s):                                  2
+On-line CPU(s) list:                     0,1
+Vendor ID:                               ARM
+Model name:                              Neoverse-N1
+Model:                                   1
+Thread(s) per core:                      1
+Core(s) per socket:                      2
+Socket(s):                               1
+Stepping:                                r3p1
+BogoMIPS:                                50.00
+Flags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0,1
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; CSV2, BHB
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+free -h
+               total        used        free      shared  buff/cache   available
+Mem:            10Gi       5.9Gi       2.3Gi        14Mi       2.9Gi       4.8Gi
+Swap:          4.0Gi       371Mi       3.6Gi
+df -h /bench/zfs/db
+Filesystem      Size  Used Avail Use% Mounted on
+dodbbench/db    149G  124G   26G  84% /bench/zfs/db
+findmnt -T /bench/zfs/db
+TARGET        SOURCE       FSTYPE OPTIONS
+/bench/zfs/db dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive
+rustup run 1.97.1 rustc -vV
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+binary: rustc
+commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452
+commit-date: 2026-07-14
+host: aarch64-unknown-linux-gnu
+release: 1.97.1
+LLVM version: 22.1.6
+git status --short --branch
+## HEAD (no branch)
+git -C /bench/zfs/db/product-build/rocksdb-source rev-parse HEAD
+abeebd9630f11bd08c28b7bd43c7bdfc62050654
+sha256sum /bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5  /bench/zfs/db/product-build/rocksdb-source/librocksdb.a
