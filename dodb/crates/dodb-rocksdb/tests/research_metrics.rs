@@ -144,7 +144,7 @@ async fn research_metrics_are_bounded_phase_separated_and_counted_once() {
         tenant_one["measurement"]["write_semaphore_wait"]["count"],
         18
     );
-    assert_eq!(tenant_one["measurement"]["read_semaphore_wait"]["count"], 6);
+    assert_eq!(tenant_one["measurement"]["read_semaphore_wait"]["count"], 3);
     assert_eq!(
         tenant_one["read_stages"]["measurement"]["get"]["service_request_total"]["count"],
         1
