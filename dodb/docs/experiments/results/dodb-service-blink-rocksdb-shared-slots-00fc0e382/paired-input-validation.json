@@ -1,0 +1,55 @@
+{
+  "run_count": 15,
+  "scenarios": {
+    "rw95": {
+      "run_count": 3,
+      "configuration_profiles": [
+        "blink:0",
+        "rocksdb:16",
+        "rocksdb:8"
+      ],
+      "schedule_fingerprints_match": true,
+      "first_100_client_input_prefixes_match": true
+    },
+    "rw80": {
+      "run_count": 3,
+      "configuration_profiles": [
+        "blink:0",
+        "rocksdb:16",
+        "rocksdb:8"
+      ],
+      "schedule_fingerprints_match": true,
+      "first_100_client_input_prefixes_match": true
+    },
+    "rw50": {
+      "run_count": 3,
+      "configuration_profiles": [
+        "blink:0",
+        "rocksdb:16",
+        "rocksdb:8"
+      ],
+      "schedule_fingerprints_match": true,
+      "first_100_client_input_prefixes_match": true
+    },
+    "rw20": {
+      "run_count": 3,
+      "configuration_profiles": [
+        "blink:0",
+        "rocksdb:16",
+        "rocksdb:8"
+      ],
+      "schedule_fingerprints_match": true,
+      "first_100_client_input_prefixes_match": true
+    },
+    "mt-mix": {
+      "run_count": 3,
+      "configuration_profiles": [
+        "blink:0",
+        "rocksdb:16",
+        "rocksdb:8"
+      ],
+      "schedule_fingerprints_match": true,
+      "first_100_client_input_prefixes_match": true
+    }
+  }
+}

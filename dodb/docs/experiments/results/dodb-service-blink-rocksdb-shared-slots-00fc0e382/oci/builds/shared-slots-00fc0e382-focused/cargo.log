@@ -1,0 +1,49 @@
+   Compiling dodb-core v0.1.0 (/bench/zfs/db/dodb-shared-slot-comparison-00fc0e382/dodb/crates/dodb-core)
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/dodb-shared-slot-comparison-00fc0e382/dodb/crates/dodb-rocksdb)
+   Compiling dodb-service v0.1.0 (/bench/zfs/db/dodb-shared-slot-comparison-00fc0e382/dodb/crates/dodb-service)
+   Compiling dodb-protocol v0.1.0 (/bench/zfs/db/dodb-shared-slot-comparison-00fc0e382/dodb/crates/dodb-protocol)
+   Compiling dodb-storage v0.1.0 (/bench/zfs/db/dodb-shared-slot-comparison-00fc0e382/dodb/crates/dodb-storage)
+   Compiling dodb-server v0.1.0 (/bench/zfs/db/dodb-shared-slot-comparison-00fc0e382/dodb/crates/dodb-server)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2m 10s
+     Running unittests src/lib.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/dodb_rocksdb-ab9831430d697c48)
+
+running 21 tests
+test tests::assigned_revision_is_burned_when_user_transaction_rolls_back ... ok
+test tests::allocator_modes_switch_above_existing_counter_high_water ... ok
+test tests::disk_tenant_cold_open_is_shared_and_then_uses_read_fast_path ... ok
+test tests::failed_tenant_open_can_be_retried ... ok
+test tests::get_completes_while_same_tenant_transaction_is_open ... ok
+test tests::missing_tenant_reads_do_not_create_database_directory ... ok
+test tests::initialized_tenant_reads_skip_repeated_path_checks ... ok
+test tests::partial_range_is_abandoned_after_reopen_and_failed_tokens_are_burned ... ok
+test tests::range_reservation_rejects_overflow_and_corrupt_counter ... ok
+test tests::read_iterator_keeps_database_alive_after_tenant_owner_drops ... ok
+test tests::read_iterator_keeps_one_snapshot_across_atomic_transaction_commit ... ok
+test tests::request_kinds_use_the_expected_admission_lane ... ok
+test tests::reserved_revision_ranges_are_unique_under_concurrent_assignment ... ok
+test tests::shared_admission_accepts_sixteen_slots_and_rejects_zero ... ok
+test tests::shared_admission_remains_the_default_eight_slot_mode ... ok
+test tests::read_waits_for_an_initializing_registry_cell ... ok
+test tests::shared_sixteen_slot_admission_stays_bounded_until_blocking_work_finishes ... ok
+test tests::shutdown_drains_a_blocking_operation_after_its_request_is_cancelled ... ok
+test tests::shutdown_waits_for_an_in_flight_request_and_service_reopens ... ok
+test tests::split_admission_reserves_two_read_and_six_write_slots ... ok
+test tests::uncertain_reservation_commit_does_not_publish_its_range ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+     Running tests/read_contract.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/read_contract-981873c309dec091)
+
+running 2 tests
+test rocksdb_query_and_scan_survive_shutdown_and_reopen ... ok
+test btree_blink_and_rocksdb_share_the_same_read_contract ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/transaction_contract.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/transaction_contract-c9689276e58ee241)
+
+running 1 test
+test btree_blink_and_rocksdb_share_transaction_contract ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s
+

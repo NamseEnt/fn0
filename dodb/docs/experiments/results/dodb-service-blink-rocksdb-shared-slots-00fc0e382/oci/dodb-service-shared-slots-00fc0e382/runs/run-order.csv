@@ -1,0 +1,16 @@
+sequence,scenario,profile
+01,rw95,blink
+02,rw95,rocksdb
+03,rw95,rocksdb
+04,rw80,rocksdb
+05,rw80,rocksdb
+06,rw80,blink
+07,rw50,rocksdb
+08,rw50,blink
+09,rw50,rocksdb
+10,rw20,blink
+11,rw20,rocksdb
+12,rw20,rocksdb
+13,mt-mix,rocksdb
+14,mt-mix,rocksdb
+15,mt-mix,blink

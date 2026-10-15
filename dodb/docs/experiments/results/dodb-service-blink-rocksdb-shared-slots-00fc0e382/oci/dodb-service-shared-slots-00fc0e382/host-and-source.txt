@@ -1,0 +1,97 @@
+utc=2026-10-15T03:07:11Z
+instance-20260923-1013
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+Architecture:                            aarch64
+CPU op-mode(s):                          32-bit, 64-bit
+Byte Order:                              Little Endian
+CPU(s):                                  2
+On-line CPU(s) list:                     0,1
+Vendor ID:                               ARM
+Model name:                              Neoverse-N1
+Model:                                   1
+Thread(s) per core:                      1
+Core(s) per socket:                      2
+Socket(s):                               1
+Stepping:                                r3p1
+BogoMIPS:                                50.00
+Flags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0,1
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; CSV2, BHB
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+MemTotal:       11159744 kB
+MemFree:         2394892 kB
+MemAvailable:    4913536 kB
+Buffers:              24 kB
+Cached:          2029740 kB
+SwapCached:        15748 kB
+Active:          1245140 kB
+Inactive:         908260 kB
+Active(anon):      96384 kB
+Inactive(anon):    55336 kB
+Active(file):    1148756 kB
+Inactive(file):   852924 kB
+Unevictable:       16084 kB
+Mlocked:           12084 kB
+SwapTotal:       4194300 kB
+SwapFree:        3817840 kB
+Zswap:                 0 kB
+Zswapped:              0 kB
+Dirty:                44 kB
+Writeback:             0 kB
+AnonPages:        133528 kB
+Mapped:           122388 kB
+Shmem:             17876 kB
+KReclaimable:     935420 kB
+Slab:            1778216 kB
+SReclaimable:     935420 kB
+SUnreclaim:       842796 kB
+KernelStack:        6100 kB
+PageTables:         8340 kB
+SecPageTables:         0 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:     9774172 kB
+Committed_AS:    3051144 kB
+VmallocTotal:   135288315904 kB
+VmallocUsed:      151492 kB
+VmallocChunk:          0 kB
+Percpu:              960 kB
+HardwareCorrupted:     0 kB
+AnonHugePages:     57344 kB
+ShmemHugePages:        0 kB
+ShmemPmdMapped:        0 kB
+FileHugePages:     36864 kB
+FilePmdMapped:     36864 kB
+CmaTotal:              0 kB
+CmaFree:               0 kB
+HugePages_Total:       0
+HugePages_Free:        0
+HugePages_Rsvd:        0
+HugePages_Surp:        0
+Hugepagesize:       2048 kB
+Hugetlb:               0 kB
+TARGET        SOURCE       FSTYPE OPTIONS
+/bench/zfs/db dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive
+Filesystem      Size  Used Avail Use% Mounted on
+dodbbench/db    149G  120G   29G  81% /bench/zfs/db
+00fc0e38246069869f08db8cac7e430d31fb7212
+## HEAD (no branch)
+9c91b54718d19f9fd6a78274db5fda05beafe9da2c39e9f70cb2992203323228  /bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/service_workload
+9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5  /bench/zfs/db/product-build/rocksdb-source/librocksdb.a

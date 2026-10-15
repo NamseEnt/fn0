@@ -1,0 +1,3 @@
+zero_slots_exit=2
+split_combination_exit=2
+blink_option_exit=2
