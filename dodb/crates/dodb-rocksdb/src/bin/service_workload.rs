@@ -87,6 +87,7 @@ impl DriverService {
         read_stage_metrics_enabled: bool,
         revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
         blocking_admission: dodb_rocksdb::BlockingAdmissionMode,
+        shared_blocking_slots: usize,
     ) -> Result<Self, Error> {
         let (service, research_metrics): (
             Box<dyn DodbService>,
@@ -102,7 +103,7 @@ impl DriverService {
             }
             BackendKind::RocksDb => {
                 let mut config = dodb_rocksdb::RocksDbServiceConfig::new(data_dir);
-                config.max_blocking_operations = 8;
+                config.max_blocking_operations = shared_blocking_slots;
                 config.blocking_admission = blocking_admission;
                 config.research_metrics = research_metrics_enabled;
                 config.detailed_write_metrics = !read_stage_metrics_enabled;
@@ -165,6 +166,7 @@ struct Options {
     read_stage_metrics: bool,
     revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
     blocking_admission: dodb_rocksdb::BlockingAdmissionMode,
+    shared_blocking_slots: usize,
 }
 
 #[derive(Default)]
@@ -386,6 +388,25 @@ fn parse_options() -> Result<Options, String> {
         "split-read-write" => dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite,
         other => return Err(format!("unsupported blocking admission {other}")),
     };
+    let shared_blocking_slots = values
+        .get("--shared-blocking-slots")
+        .map(|value| {
+            value
+                .parse::<usize>()
+                .map_err(|_| "invalid --shared-blocking-slots".to_owned())
+        })
+        .transpose()?
+        .unwrap_or(8);
+    if shared_blocking_slots == 0 {
+        return Err("--shared-blocking-slots must be positive".to_owned());
+    }
+    if blocking_admission == dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite
+        && values.contains_key("--shared-blocking-slots")
+    {
+        return Err(
+            "--shared-blocking-slots cannot be combined with split-read-write admission".to_owned(),
+        );
+    }
     let scenario = match values.get("--scenario").map(String::as_str).unwrap_or("") {
         "rw95" => Scenario::Single(Profile::Rw95),
         "rw80" => Scenario::Single(Profile::Rw80),
@@ -395,6 +416,9 @@ fn parse_options() -> Result<Options, String> {
         "smoke" => Scenario::Smoke,
         other => return Err(format!("unsupported scenario {other}")),
     };
+    if backend == BackendKind::Blink && shared_blocking_slots != 8 {
+        return Err("--shared-blocking-slots applies only to RocksDB".to_owned());
+    }
     let parse = |name: &str, default: u64| -> Result<u64, String> {
         values
             .get(name)
@@ -417,6 +441,7 @@ fn parse_options() -> Result<Options, String> {
         read_stage_metrics: parse("--read-stage-metrics", 0)? == 1,
         revision_allocator,
         blocking_admission,
+        shared_blocking_slots,
     })
 }
 
@@ -1440,6 +1465,7 @@ async fn run(options: Options) -> Result<Value, String> {
             options.read_stage_metrics,
             options.revision_allocator,
             options.blocking_admission,
+            options.shared_blocking_slots,
         )
         .map_err(|error| error.to_string())?,
     );
@@ -1612,6 +1638,7 @@ async fn run(options: Options) -> Result<Value, String> {
         false,
         options.revision_allocator,
         options.blocking_admission,
+        options.shared_blocking_slots,
     )
     .map_err(|error| error.to_string())?;
     let mut reopen_validation = BTreeMap::new();
@@ -1663,7 +1690,23 @@ async fn run(options: Options) -> Result<Value, String> {
             "call_cap": options.call_cap,
             "query_limit": 16,
             "blink": {"database_cache_capacity_pages": 128, "coordinator_queue_capacity": 256, "coordinator_group_requests": 64, "coordinator_group_bytes": 4194304, "coordinator_collection_delay_ms": 0},
-            "rocksdb": {"blocking_operation_limit": 8, "blocking_admission": match options.blocking_admission { dodb_rocksdb::BlockingAdmissionMode::Shared => "shared-8", dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite => "split-read-2-write-6" }, "read_blocking_slots": if options.blocking_admission == dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite { 2 } else { 8 }, "write_blocking_slots": if options.blocking_admission == dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite { 6 } else { 8 }, "revision_allocator": match options.revision_allocator { dodb_rocksdb::RevisionAllocatorMode::Serialized => "serialized", dodb_rocksdb::RevisionAllocatorMode::ReservedRanges => "reserved-ranges" }, "revision_range_size": if options.revision_allocator == dodb_rocksdb::RevisionAllocatorMode::ReservedRanges { Some(4_096) } else { None }},
+            "rocksdb": {
+                "blocking_operation_limit": if options.backend == BackendKind::RocksDb {
+                    if options.blocking_admission == dodb_rocksdb::BlockingAdmissionMode::Shared { options.shared_blocking_slots } else { 8 }
+                } else { 0 },
+                "blocking_admission": if options.backend == BackendKind::Blink {
+                    "not-applicable".to_owned()
+                } else {
+                    match options.blocking_admission {
+                        dodb_rocksdb::BlockingAdmissionMode::Shared => format!("shared-{}", options.shared_blocking_slots),
+                        dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite => "split-read-2-write-6".to_owned()
+                    }
+                },
+                "read_blocking_slots": if options.backend == BackendKind::Blink { 0 } else if options.blocking_admission == dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite { 2 } else { options.shared_blocking_slots },
+                "write_blocking_slots": if options.backend == BackendKind::Blink { 0 } else if options.blocking_admission == dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite { 6 } else { options.shared_blocking_slots },
+                "revision_allocator": match options.revision_allocator { dodb_rocksdb::RevisionAllocatorMode::Serialized => "serialized", dodb_rocksdb::RevisionAllocatorMode::ReservedRanges => "reserved-ranges" },
+                "revision_range_size": if options.revision_allocator == dodb_rocksdb::RevisionAllocatorMode::ReservedRanges { Some(4_096) } else { None }
+            },
             "research_metrics_enabled": options.research_metrics,
             "read_stage_metrics_enabled": options.read_stage_metrics,
             "detailed_write_metrics_enabled": options.research_metrics && !options.read_stage_metrics,

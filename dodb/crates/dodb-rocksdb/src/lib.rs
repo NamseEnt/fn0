@@ -2336,6 +2336,90 @@ mod tests {
         assert_eq!(service.write_blocking_operations.available_permits(), 6);
     }
 
+    #[test]
+    fn shared_admission_accepts_sixteen_slots_and_rejects_zero() {
+        let directory = temporary_db_directory();
+        let mut config = RocksDbServiceConfig::new(directory.path());
+        config.max_blocking_operations = 16;
+        let service = RocksDbService::new(config).unwrap();
+        assert_eq!(service.blocking_operations.available_permits(), 16);
+
+        let mut invalid_config = RocksDbServiceConfig::new(directory.path().join("zero"));
+        invalid_config.max_blocking_operations = 0;
+        assert!(RocksDbService::new(invalid_config).is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn shared_sixteen_slot_admission_stays_bounded_until_blocking_work_finishes() {
+        let directory = temporary_db_directory();
+        let mut config = RocksDbServiceConfig::new(directory.path());
+        config.max_blocking_operations = 16;
+        let service = Arc::new(RocksDbService::new(config).unwrap());
+        let (started_sender, started_receiver) = mpsc::channel();
+        let started_receiver = Arc::new(std::sync::Mutex::new(started_receiver));
+        let active = Arc::new(AtomicUsize::new(0));
+        let started_count = Arc::new(AtomicUsize::new(0));
+        let maximum_active = Arc::new(AtomicUsize::new(0));
+        let mut release_senders = Vec::new();
+        let mut jobs = Vec::new();
+
+        for _ in 0..18 {
+            let (release_sender, release_receiver) = mpsc::channel();
+            let service = Arc::clone(&service);
+            let started_sender = started_sender.clone();
+            let active = Arc::clone(&active);
+            let started_count = Arc::clone(&started_count);
+            let maximum_active = Arc::clone(&maximum_active);
+            jobs.push(tokio::spawn(async move {
+                service
+                    .run_blocking(TenantId::new(1), ExecutionLane::Read, move || {
+                        let active_count = active.fetch_add(1, Ordering::SeqCst) + 1;
+                        maximum_active.fetch_max(active_count, Ordering::SeqCst);
+                        started_count.fetch_add(1, Ordering::SeqCst);
+                        started_sender.send(()).unwrap();
+                        release_receiver.recv().unwrap();
+                        active.fetch_sub(1, Ordering::SeqCst);
+                        Ok(())
+                    })
+                    .await
+                    .unwrap();
+            }));
+            release_senders.push(release_sender);
+        }
+
+        let first_sixteen_receiver = Arc::clone(&started_receiver);
+        tokio::task::spawn_blocking(move || {
+            for _ in 0..16 {
+                first_sixteen_receiver.lock().unwrap().recv().unwrap();
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(active.load(Ordering::SeqCst), 16);
+        assert_eq!(maximum_active.load(Ordering::SeqCst), 16);
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(started_count.load(Ordering::SeqCst), 16);
+
+        for release_sender in release_senders.iter().take(16) {
+            release_sender.send(()).unwrap();
+        }
+        let final_two_receiver = Arc::clone(&started_receiver);
+        tokio::task::spawn_blocking(move || {
+            for _ in 0..2 {
+                final_two_receiver.lock().unwrap().recv().unwrap();
+            }
+        })
+        .await
+        .unwrap();
+        for release_sender in release_senders.iter().skip(16) {
+            release_sender.send(()).unwrap();
+        }
+        for job in jobs {
+            job.await.unwrap();
+        }
+        service.shutdown().await;
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn split_admission_reserves_two_read_and_six_write_slots() {
         let directory = temporary_db_directory();
