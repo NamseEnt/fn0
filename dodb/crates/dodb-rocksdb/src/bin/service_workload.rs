@@ -617,6 +617,14 @@ impl Counters {
             .iter()
             .map(|entry| entry.fingerprint.capacity())
             .sum::<usize>();
+        let latency_percentile_sort_copy_bytes = self
+            .latencies
+            .values()
+            .map(|latency| match &latency.storage {
+                LatencyData::ExactAll(samples) => samples.len() * std::mem::size_of::<u64>(),
+                LatencyData::Log1024(_) => 0,
+            })
+            .sum::<usize>();
         json!({
             "scope": "actual collector vector capacities and populated sizes; excludes allocator metadata, map node overhead, runtime, service and document state",
             "latency_exact_capacity_bytes": exact_latency_capacity_bytes,
@@ -631,7 +639,37 @@ impl Counters {
             "client_input_prefix_vector_bytes": client_prefix_capacity_bytes,
             "client_input_fingerprint_capacity_bytes": client_fingerprint_capacity_bytes,
             "workflow_plan_capacity_bytes": self.client_input_prefixes.iter().map(|entry| entry.workflow_plan_capacity_bytes).sum::<usize>(),
+            "latency_percentile_sort_copy_bytes": latency_percentile_sort_copy_bytes,
         })
+    }
+
+    fn collector_memory_capacity_bytes(&self) -> usize {
+        let mut latency_capacity_bytes = 0_usize;
+        let mut histogram_capacity_bytes = 0_usize;
+        for latency in self.latencies.values() {
+            let (exact_capacity, _, histogram_capacity) = latency.memory_accounting();
+            latency_capacity_bytes += exact_capacity;
+            histogram_capacity_bytes += histogram_capacity;
+        }
+        latency_capacity_bytes
+            + histogram_capacity_bytes
+            + self.write_ledger.capacity() * std::mem::size_of::<LedgerEntry>()
+            + self.client_input_prefixes.capacity() * std::mem::size_of::<ClientInputPrefix>()
+            + self
+                .client_input_prefixes
+                .iter()
+                .map(|entry| entry.fingerprint.capacity() + entry.workflow_plan_capacity_bytes)
+                .sum::<usize>()
+    }
+
+    fn latency_sort_copy_capacity_bytes(&self) -> usize {
+        self.latencies
+            .values()
+            .map(|latency| match &latency.storage {
+                LatencyData::ExactAll(samples) => samples.len() * std::mem::size_of::<u64>(),
+                LatencyData::Log1024(_) => 0,
+            })
+            .sum()
     }
 }
 
@@ -2092,6 +2130,7 @@ async fn run(options: Options) -> Result<Value, String> {
     let mut validation = BTreeMap::new();
     let mut per_tenant = BTreeMap::new();
     let mut total_counters = Counters::new(options.latency_storage, options.max_write_ledger);
+    let mut largest_replay_ledger_clone_bytes = 0_usize;
     for tenant_index in 0..tenant_count {
         let warmup = warmup_counts[tenant_index].lock().unwrap();
         let mut replay_counters = Counters::default();
@@ -2102,6 +2141,8 @@ async fn run(options: Options) -> Result<Value, String> {
         replay_counters
             .write_ledger
             .extend(counters[tenant_index].lock().unwrap().write_ledger.clone());
+        largest_replay_ledger_clone_bytes = largest_replay_ledger_clone_bytes
+            .max(replay_counters.write_ledger.capacity() * std::mem::size_of::<LedgerEntry>());
         validation.insert(
             format!("tenant_{}", tenant_index + 1),
             verify_tenant(
@@ -2152,6 +2193,8 @@ async fn run(options: Options) -> Result<Value, String> {
         replay_counters
             .write_ledger
             .extend(counters[tenant_index].lock().unwrap().write_ledger.clone());
+        largest_replay_ledger_clone_bytes = largest_replay_ledger_clone_bytes
+            .max(replay_counters.write_ledger.capacity() * std::mem::size_of::<LedgerEntry>());
         reopen_validation.insert(
             format!("tenant_{}", tenant_index + 1),
             verify_tenant(
@@ -2168,6 +2211,21 @@ async fn run(options: Options) -> Result<Value, String> {
     reopened.shutdown().await;
     drop(reopened);
     let disk_bytes_after_reopen = directory_bytes(&options.data_dir);
+    let warmup_collector_capacity_bytes = warmup_counts
+        .iter()
+        .map(|counter| counter.lock().unwrap().collector_memory_capacity_bytes())
+        .sum::<usize>();
+    let measurement_collector_capacity_bytes = counters
+        .iter()
+        .map(|counter| counter.lock().unwrap().collector_memory_capacity_bytes())
+        .sum::<usize>();
+    let merged_collector_capacity_bytes = total_counters.collector_memory_capacity_bytes();
+    let latency_report_sort_copy_bytes = total_counters.latency_sort_copy_capacity_bytes();
+    let estimated_collector_peak_bytes = warmup_collector_capacity_bytes
+        + measurement_collector_capacity_bytes
+        + merged_collector_capacity_bytes
+        + largest_replay_ledger_clone_bytes
+        + latency_report_sort_copy_bytes;
     let report = json!({
         "schema": "dodb-service-workload-v1",
         "backend": match options.backend { BackendKind::Blink => "blink", BackendKind::RocksDb => "rocksdb", BackendKind::RocksDbDirect => "rocksdb-direct" },
@@ -2242,6 +2300,15 @@ async fn run(options: Options) -> Result<Value, String> {
             "successful_mutations": total_counters.successful_mutations as f64 / total_elapsed.as_secs_f64(),
         },
         "counters": total_counters.report(),
+        "collector_memory_phases": {
+            "accounting_scope": "actual latency, write ledger, client prefix and input plan vector capacities; excludes allocator metadata, map nodes, runtime, service state, document state and replay oracle maps",
+            "warmup_capacity_bytes": warmup_collector_capacity_bytes,
+            "measurement_capacity_bytes": measurement_collector_capacity_bytes,
+            "merged_measurement_capacity_bytes": merged_collector_capacity_bytes,
+            "largest_replay_ledger_clone_capacity_bytes": largest_replay_ledger_clone_bytes,
+            "latency_report_sort_copy_bytes": latency_report_sort_copy_bytes,
+            "estimated_simultaneous_collector_peak_bytes": estimated_collector_peak_bytes,
+        },
         "rocksdb_research_metrics": research_metrics,
         "per_tenant": per_tenant,
         "validation": validation,
