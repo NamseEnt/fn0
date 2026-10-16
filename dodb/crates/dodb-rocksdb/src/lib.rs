@@ -20,6 +20,8 @@ use dodb_service::{
 };
 use tokio::sync::{Notify, OnceCell, Semaphore};
 
+pub mod research;
+
 const USER_KEY_PREFIX: u8 = 1;
 const METADATA_COUNTER_KEY: &[u8] = &[0, 1];
 const DEFAULT_REVISION_RANGE_SIZE: u64 = 4_096;

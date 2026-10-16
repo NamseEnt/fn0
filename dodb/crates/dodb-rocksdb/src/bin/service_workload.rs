@@ -24,6 +24,13 @@ const INPUT_FINGERPRINT_PREFIX_WORKFLOWS: u64 = 100;
 enum BackendKind {
     Blink,
     RocksDb,
+    RocksDbDirect,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ClientExecutor {
+    Async,
+    Dedicated,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -73,63 +80,102 @@ struct WorkflowPlan {
     key_ordinal: u64,
 }
 
+enum DriverBackend {
+    Service(Box<dyn DodbService>),
+    Direct {
+        tenants: BTreeMap<TenantId, dodb_rocksdb::research::SynchronousRocksDbTenant>,
+        admission: tokio::sync::Semaphore,
+    },
+}
+
 struct DriverService {
-    service: Box<dyn DodbService>,
+    backend: DriverBackend,
     research_metrics: Option<Arc<dodb_rocksdb::ResearchMetrics>>,
 }
 
 impl DriverService {
-    fn new(
-        backend: BackendKind,
-        data_dir: PathBuf,
-        research_metrics_enabled: bool,
-        detailed_write_metrics_enabled: bool,
-        revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
-        blocking_admission: dodb_rocksdb::BlockingAdmissionMode,
-        shared_blocking_slots: usize,
-    ) -> Result<Self, Error> {
-        let (service, research_metrics): (
-            Box<dyn DodbService>,
-            Option<Arc<dodb_rocksdb::ResearchMetrics>>,
-        ) = match backend {
+    fn new(options: &Options, data_dir: PathBuf) -> Result<Self, Error> {
+        let (backend, research_metrics) = match options.backend {
             BackendKind::Blink => {
                 let mut config = LocalTenantServiceConfig::default();
                 config.data_dir = data_dir;
                 config.max_open_shards = 16;
                 config.database_config = DatabaseConfig::default().with_cache_capacity(128);
                 config.coordinator_config = CoordinatorConfig::default();
-                (Box::new(BlinkTenantService::new(config)?), None)
+                (
+                    DriverBackend::Service(Box::new(BlinkTenantService::new(config)?)),
+                    None,
+                )
             }
             BackendKind::RocksDb => {
                 let mut config = dodb_rocksdb::RocksDbServiceConfig::new(data_dir);
-                config.max_blocking_operations = blocking_admission
-                    .split_slot_limits()
-                    .map_or(shared_blocking_slots, |(read_slots, write_slots)| {
-                        read_slots + write_slots
-                    });
-                config.blocking_admission = blocking_admission;
-                config.research_metrics = research_metrics_enabled;
-                config.detailed_write_metrics = detailed_write_metrics_enabled;
-                config.revision_allocator = revision_allocator;
-                let rocksdb_service = dodb_rocksdb::RocksDbService::new(config)?;
-                let metrics = rocksdb_service.research_metrics_handle();
-                (Box::new(rocksdb_service), metrics)
+                config.max_blocking_operations =
+                    options.blocking_admission.split_slot_limits().map_or(
+                        options.shared_blocking_slots,
+                        |(read_slots, write_slots)| read_slots + write_slots,
+                    );
+                config.blocking_admission = options.blocking_admission;
+                config.research_metrics = options.research_metrics;
+                config.detailed_write_metrics = options.detailed_write_metrics;
+                config.revision_allocator = options.revision_allocator;
+                let service = dodb_rocksdb::RocksDbService::new(config)?;
+                let metrics = service.research_metrics_handle();
+                (DriverBackend::Service(Box::new(service)), metrics)
+            }
+            BackendKind::RocksDbDirect => {
+                std::fs::create_dir_all(&data_dir)?;
+                let tenant_count = if matches!(options.scenario, Scenario::Multi | Scenario::Smoke)
+                {
+                    4
+                } else {
+                    1
+                };
+                let tenants = (1..=tenant_count)
+                    .map(|tenant_number| {
+                        let tenant = TenantId::new(tenant_number);
+                        let database = dodb_rocksdb::research::SynchronousRocksDbTenant::open(
+                            &data_dir.join(format!("tenant-{tenant_number}")),
+                            options.revision_allocator,
+                        )?;
+                        Ok((tenant, database))
+                    })
+                    .collect::<Result<BTreeMap<_, _>, Error>>()?;
+                (
+                    DriverBackend::Direct {
+                        tenants,
+                        admission: tokio::sync::Semaphore::new(options.shared_blocking_slots),
+                    },
+                    None,
+                )
             }
         };
         Ok(Self {
-            service,
+            backend,
             research_metrics,
         })
     }
 
     async fn execute(&self, tenant: TenantId, request: Request) -> Result<Response, Error> {
-        self.service
-            .execute(tenant, request, ExecutionBudget::new(RESPONSE_BUDGET))
-            .await
+        let budget = ExecutionBudget::new(RESPONSE_BUDGET);
+        match &self.backend {
+            DriverBackend::Service(service) => service.execute(tenant, request, budget).await,
+            DriverBackend::Direct { tenants, admission } => {
+                let _permit = admission
+                    .acquire()
+                    .await
+                    .map_err(|_| Error::overloaded("direct admission closed"))?;
+                tenants
+                    .get(&tenant)
+                    .ok_or_else(|| Error::invalid_request("tenant was not preopened"))?
+                    .execute(request, budget)
+            }
+        }
     }
 
     async fn shutdown(&self) {
-        self.service.shutdown().await;
+        if let DriverBackend::Service(service) = &self.backend {
+            service.shutdown().await;
+        }
     }
 
     fn set_research_measurement_phase(&self) {
@@ -155,6 +201,7 @@ impl DriverService {
 #[derive(Clone, Debug)]
 struct Options {
     backend: BackendKind,
+    client_executor: ClientExecutor,
     scenario: Scenario,
     data_dir: PathBuf,
     seed: u64,
@@ -362,8 +409,21 @@ fn parse_options() -> Result<Options, String> {
     let backend = match values.get("--backend").map(String::as_str).unwrap_or("") {
         "blink" => BackendKind::Blink,
         "rocksdb" => BackendKind::RocksDb,
+        "rocksdb-direct" => BackendKind::RocksDbDirect,
         other => return Err(format!("unsupported backend {other}")),
     };
+    let client_executor = match values
+        .get("--client-executor")
+        .map(String::as_str)
+        .unwrap_or("async")
+    {
+        "async" => ClientExecutor::Async,
+        "dedicated" => ClientExecutor::Dedicated,
+        other => return Err(format!("unsupported client executor {other}")),
+    };
+    if backend == BackendKind::RocksDbDirect && client_executor != ClientExecutor::Dedicated {
+        return Err("rocksdb-direct requires dedicated client threads".to_owned());
+    }
     let revision_allocator = match values
         .get("--revision-allocator")
         .map(String::as_str)
@@ -423,11 +483,18 @@ fn parse_options() -> Result<Options, String> {
             .map(|value| value.parse().map_err(|_| format!("invalid {name}")))
             .unwrap_or(Ok(default))
     };
+    let research_metrics = parse("--research-metrics", 0)? == 1;
+    if backend == BackendKind::RocksDbDirect
+        && (research_metrics || blocking_admission != dodb_rocksdb::BlockingAdmissionMode::Shared)
+    {
+        return Err("rocksdb-direct requires metrics OFF and shared admission".to_owned());
+    }
     let read_stage_metrics = parse("--read-stage-metrics", 0)? == 1;
     let detailed_write_metrics =
         parse("--detailed-write-metrics", u64::from(!read_stage_metrics))? == 1;
     Ok(Options {
         backend,
+        client_executor,
         scenario,
         data_dir: PathBuf::from(values.get("--data-dir").ok_or("--data-dir is required")?),
         seed: parse("--seed", 2_026_101_3)?,
@@ -438,7 +505,7 @@ fn parse_options() -> Result<Options, String> {
         value_size: parse("--value-size", VALUE_SIZE as u64)? as usize,
         call_cap: parse("--call-cap", 1_000_000)?,
         report_path: values.get("--report").map(PathBuf::from),
-        research_metrics: parse("--research-metrics", 0)? == 1,
+        research_metrics,
         read_stage_metrics,
         detailed_write_metrics,
         revision_allocator,
@@ -1096,7 +1163,8 @@ async fn run_clients(
         } else {
             (call_cap / tenant_count as u64).max(1)
         };
-        tasks.spawn(async move {
+        let client_executor = options.client_executor;
+        let client_operation = async move {
             let plan = make_plan(profile, options.seed ^ tenant_index as u64);
             let mut plan_index = client_index % plan.len();
             let mut client_sequence = 0_u64;
@@ -1176,7 +1244,16 @@ async fn run_clients(
                     admitted_workflows,
                     fingerprint: format!("{input_fingerprint:016x}"),
                 });
-        });
+        };
+        match client_executor {
+            ClientExecutor::Async => {
+                tasks.spawn(client_operation);
+            }
+            ClientExecutor::Dedicated => {
+                let runtime = tokio::runtime::Handle::current();
+                tasks.spawn_blocking(move || runtime.block_on(client_operation));
+            }
+        }
     }
     while Instant::now() < deadline
         && accepting.load(Ordering::Relaxed)
@@ -1460,16 +1537,8 @@ async fn run(options: Options) -> Result<Value, String> {
     }
     std::fs::create_dir_all(&options.data_dir).map_err(|error| error.to_string())?;
     let service = Arc::new(
-        DriverService::new(
-            options.backend,
-            options.data_dir.clone(),
-            options.research_metrics,
-            options.detailed_write_metrics,
-            options.revision_allocator,
-            options.blocking_admission,
-            options.shared_blocking_slots,
-        )
-        .map_err(|error| error.to_string())?,
+        DriverService::new(&options, options.data_dir.clone())
+            .map_err(|error| error.to_string())?,
     );
     let seed_started = Instant::now();
     seed_all(
@@ -1633,16 +1702,11 @@ async fn run(options: Options) -> Result<Value, String> {
     }
     let disk_bytes_before_shutdown = directory_bytes(&options.data_dir);
     service.shutdown().await;
-    let reopened = DriverService::new(
-        options.backend,
-        options.data_dir.clone(),
-        false,
-        false,
-        options.revision_allocator,
-        options.blocking_admission,
-        options.shared_blocking_slots,
-    )
-    .map_err(|error| error.to_string())?;
+    drop(service);
+    let mut reopen_options = options.clone();
+    reopen_options.research_metrics = false;
+    let reopened = DriverService::new(&reopen_options, options.data_dir.clone())
+        .map_err(|error| error.to_string())?;
     let mut reopen_validation = BTreeMap::new();
     for tenant_index in 0..tenant_count {
         let mut replay_counters = Counters::default();
@@ -1669,15 +1733,17 @@ async fn run(options: Options) -> Result<Value, String> {
         );
     }
     reopened.shutdown().await;
+    drop(reopened);
     let disk_bytes_after_reopen = directory_bytes(&options.data_dir);
     let report = json!({
         "schema": "dodb-service-workload-v1",
-        "backend": match options.backend { BackendKind::Blink => "blink", BackendKind::RocksDb => "rocksdb" },
+        "backend": match options.backend { BackendKind::Blink => "blink", BackendKind::RocksDb => "rocksdb", BackendKind::RocksDbDirect => "rocksdb-direct" },
         "scenario": match options.scenario { Scenario::Single(profile) => profile_name(profile), Scenario::Multi => "mt-mix", Scenario::Smoke => "smoke" },
         "seed": options.seed,
-        "api_boundary": "DodbService::execute with shared Request/Response and ExecutionBudget",
+        "api_boundary": if options.backend == BackendKind::RocksDbDirect { "synchronous TenantDatabase core with shared Request/Response and ExecutionBudget; preopened tenant handles; same transaction and revision implementation" } else { "DodbService::execute with shared Request/Response and ExecutionBudget" },
         "configuration": {
             "clients": options.clients,
+            "client_executor": match options.client_executor { ClientExecutor::Async => "async", ClientExecutor::Dedicated => "dedicated" },
             "tokio_runtime_worker_threads": 16,
             "tenant_count": tenant_count,
             "initial_rows_per_tenant": options.initial_rows,
@@ -1693,7 +1759,7 @@ async fn run(options: Options) -> Result<Value, String> {
             "query_limit": 16,
             "blink": {"database_cache_capacity_pages": 128, "coordinator_queue_capacity": 256, "coordinator_group_requests": 64, "coordinator_group_bytes": 4194304, "coordinator_collection_delay_ms": 0},
             "rocksdb": {
-                "blocking_operation_limit": if options.backend == BackendKind::RocksDb {
+                "blocking_operation_limit": if options.backend != BackendKind::Blink {
                     options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(read_slots, write_slots)| read_slots + write_slots)
                 } else { 0 },
                 "blocking_admission": if options.backend == BackendKind::Blink {
