@@ -1,8 +1,10 @@
 # RocksDB Contract Baseline and Optimization Plan
 
-> Execution stopped after read-only preflight: insufficient OCI ZFS capacity. Plan persisted; no implementation or benchmarks started. User decision required before resumption. Date: 2026-10-16 UTC.
+> Historical checkpoint (2026-10-16 UTC): Execution stopped after read-only preflight because OCI ZFS capacity was insufficient. At that checkpoint, no implementation or benchmarks had started.
 
-> API read-only audit evidence is preliminary only; contract resolution is incomplete. All six phases remain Pending.
+> Current status (2026-10-16 UTC): Resumed for user-authorized OCI cleanup; no new benchmarks may start until the capacity gate passes. Phase 1 is in progress for contract documentation review; tests have not run. Phases 2–6 remain Pending. The capacity gate remains Not passed.
+
+> The earlier read-only API audit remains preliminary evidence; contract resolution is still in progress.
 
 ## Goal and claim boundary
 
@@ -12,16 +14,18 @@ The comparison must separate raw subset throughput, successful transactions, suc
 
 ## Execution rules
 
-- Preserve source provenance, exact commands, binaries, input seeds, raw output, validation output, host and filesystem details, and rejected candidates.
-- Reuse existing verified evidence when its source, workload, correctness, and provenance match this plan. Record the artifact paths and the reason it qualifies; do not silently treat older evidence as current.
-- Change one measured cause at a time. Keep rejected candidates and their evidence.
+- Preserve source hashes, raw logs, reports, reproduction instructions, input seeds, validation output, host and filesystem details, and rejected-candidate evidence. Reuse existing verified evidence only when its source, workload, correctness, and provenance match this plan; record its artifact path and why it qualifies.
+- The user authorized deletion of completed experiment databases, old builds and binaries, and unnecessary archives. Preserve the current environment, source, and current required data. Record every removed historical database or binary in a cleanup manifest. Retain raw logs, reports, reproduction instructions, source hashes, and validation evidence; retaining every validated database or archive is not required.
+- Change one measured cause at a time. Keep rejected candidates' raw evidence and manifests.
 - Keep the default `Serialized` revision allocator mode and shared concurrency setting of 8 unless a separately justified change is explicitly approved. Benchmark optimized settings explicitly without changing defaults by implication.
 - Root owns design and candidate-selection decisions. Execution follows the selected scope and reports blockers immediately.
 - Do not deploy to production.
 
 ## Phase 1: Contract and architecture audit
 
-**Status: Pending**
+**Status: In progress**
+
+Current work: contract documentation review and reconciliation. Tests have not run. The API read-only audit remains preliminary and does not complete this phase.
 
 Map the DODB API, consumers, tests, RocksDB wrapper, service path, B-link path, and relevant concurrency and durability boundaries. Resolve the contract of revision values versus physical commit LSNs before changing identity or revision behavior. Audit every `commit_lsn` consumer before considering an opaque logical write identity. If current consumers rely on physical ordering or meaning, document that promise and obtain an explicit contract decision before weakening it. Independent concurrent response order is not a linearization order.
 
@@ -97,23 +101,23 @@ Each candidate must preserve transaction semantics, tenant isolation, response-b
 
 **Status: Pending**
 
-**OCI capacity/preflight gate: Not passed. Execution is stopped pending a user decision on storage expansion or an approved policy for preserving and moving existing artifacts.**
+**OCI capacity/preflight gate: Not passed. Work may continue within the user-authorized cleanup scope; no new benchmarks may start until cleanup is complete and a fresh capacity preflight passes.**
 
 The read-only preflight transcript is preserved at [PREFLIGHT.txt](results/rocksdb-contract-baseline-20261016/PREFLIGHT.txt). It identifies the authorized instance `instance-20260923-1013` as ARM64 Neoverse-N1 with 2 CPUs and approximately 12 GiB nominal RAM. `/proc/meminfo` reports `MemTotal` 11,159,744 kB (about 10.64 GiB) and `MemAvailable` 4,786,040 kB (about 4.6 GiB); swap use is 360 MiB. The stored SSH identity and existing `known_hosts` were verified. The default `rustc` and `cargo` are 1.98.1; Rust 1.97.1 is installed. No matching active build or benchmark process was found. The exact RocksDB 11.8.1 archive was not confirmed: the follow-up lookup was incomplete and no conclusion about its availability is drawn. `/bench/zfs/db` reports 149 GB total, 148 GB used, 1.3 GB available (displayed as 100% used); ZFS available space is 1.21 GB, and the `dodbbench` pool is ONLINE at 96%. This transcript records read-only preflight evidence only, not a measurement result. Do not make final measurement claims from it.
 
-The available space does not establish capacity for over-cache datasets, three 30-second confirmations, three five-minute repetitions, builds, retained databases, WAL, and evidence. Do not start implementation or measurement until the storage decision is resolved and a fresh capacity preflight passes. Use only the authorized OCI A1 ARM64 host and ZFS path `/bench/zfs/db`, with the approved stored SSH identity and normal host-key verification. Use pinned RocksDB 11.8.1 and Rust 1.97.1 with `+crc`. Do not substitute local or Debian measurements for authoritative results.
+The available space does not establish capacity for over-cache datasets, three 30-second confirmations, three five-minute repetitions, builds, temporary databases, WAL, and evidence. Do not start new benchmarks until the authorized cleanup is complete and a fresh capacity preflight passes. Use only the authorized OCI A1 ARM64 host and ZFS path `/bench/zfs/db`, with the approved stored SSH identity and normal host-key verification. Use pinned RocksDB 11.8.1 and Rust 1.97.1 with `+crc`. Do not substitute local or Debian measurements for authoritative results.
 
-Before testing, inspect live processes, host resources, and available storage. Do not run concurrent builds or benchmarks and do not perform destructive cleanup. Build from the exact source SHA and retain immutable binaries. Record commands and hashes, host and filesystem, seeds, workload, and validators.
+Before testing, inspect live processes, host resources, and available storage. Do not run concurrent builds or benchmarks. The user authorized cleanup of identified completed experiment databases, old builds and binaries, and unnecessary archives; apply that authorization only to listed targets and record removed databases and binaries in a cleanup manifest. Preserve unknown or unrelated data, the current environment and source, current required data, raw logs, reports, reproduction instructions, source hashes, and validation evidence. Build from the exact source SHA and retain binaries only as long as required for active validation; record their hashes and any later removal in the manifest. Record commands, host and filesystem, seeds, workload, and validators.
 
 Use existing five-second runs only for screening, together with missing candidate screening. Confirm candidates with a 10-second warmup and 30-second measurement for at least three repetitions in rotated serial order. Final representative measurements must run for at least five minutes with at least three repetitions. Before long runs, inspect every call-count and sample limit in the harness: the current one-million-call cap must not end a duration-governed run early. Remove the cap, or use a validated bounded-memory statistics method that continues measurement for the full requested duration and retains valid latency distributions. Require recorded elapsed time and completed operation counts to prove that the run did not stop at the old cap.
 
 Before testing, budget the memory of input traces, write ledgers, latency samples or bounded statistics, validation state, and collectors. Prefer streaming or disk-backed traces and ledgers; place explicit bounds on resident buffers and account for their RSS in the host resource budget. Verify that harness metadata does not consume the RocksDB cache budget or materially change the measured process RSS; report harness RSS separately and apply the same collection method to every comparison path. Validate any bounded-memory statistics method against full-sample results on a representative run.
 
-Estimate the full five-minute, three-repetition matrix before starting, including dataset growth, WAL growth, builds and immutable binaries, retained databases, raw results, and evidence artifacts. Record per-run and total storage estimates, available capacity, and retention needs. Stage concurrency and avoid an exhaustive Cartesian product. Do not start a long run or matrix expansion without adequate capacity for the run and preservation of its evidence. Record resident versus dataset size against an explicitly measured effective-cache budget, plus sustained flush, compaction, backlog, and disk behavior.
+Estimate the full five-minute, three-repetition matrix before starting, including dataset growth, WAL growth, builds, active binaries, temporary databases, raw logs, reports, reproduction instructions, and evidence artifacts. Record per-run and total storage estimates, available capacity, and retention needs. Stage concurrency and avoid an exhaustive Cartesian product. Do not start a long run or matrix expansion without adequate capacity for the run and preservation of required evidence. Completed experiment databases and unnecessary archives need not be retained after validation; record their removal in the cleanup manifest. Record resident versus dataset size against an explicitly measured effective-cache budget, plus sustained flush, compaction, backlog, and disk behavior.
 
-Stop and report before further work if live work conflicts, storage is insufficient, resource limits make the planned measurement invalid, or safe artifact retention cannot be maintained. Do not clean up unknown or unrelated data to make room.
+Stop and report before further work if live work conflicts, storage remains insufficient after user-authorized cleanup of identified targets, resource limits make the planned measurement invalid, or required raw evidence cannot be retained. The user-authorized cleanup may remove only identified completed experiment databases, old builds and binaries, and unnecessary archives with a cleanup manifest. Do not remove unknown or unrelated data, the current environment or source, or current required data.
 
-**Required evidence:** preflight snapshot; source and binary hashes; complete build and run commands; toolchain and RocksDB versions; host and ZFS details; input and seed; validator output; RSS and completion evidence; proof that duration-governed runs passed the one-million-call boundary and reached their requested duration; latency-sample or validated bounded-statistics method and validation; memory and RSS budgets for traces, write ledgers, collectors, and validation state; raw data; repetition order; five-minute matrix storage estimate covering dataset, WAL, binaries, retained databases, and evidence; capacity estimate; dataset and cache-budget measurements; engine health over sustained runs; workload-specific throughput, latency, and resource tradeoffs; preserved rejected attempts.
+**Required evidence:** preflight snapshot; source hashes; hashes for active binaries; complete build and run commands; toolchain and RocksDB versions; host and ZFS details; input and seed; validator output; RSS and completion evidence; proof that duration-governed runs passed the one-million-call boundary and reached their requested duration; latency-sample or validated bounded-statistics method and validation; memory and RSS budgets for traces, write ledgers, collectors, and validation state; raw logs, reports, reproduction instructions, and validation data; repetition order; five-minute matrix storage estimate covering dataset, WAL, active builds and binaries, temporary databases, and evidence; capacity estimate; cleanup manifest for removed databases and binaries; dataset and cache-budget measurements; engine health over sustained runs; workload-specific throughput, latency, and resource tradeoffs; preserved rejected-candidate evidence. Retaining every validated database or archive is not required.
 
 ## Phase 6: Independent validation and final comparison
 
@@ -133,7 +137,7 @@ Do not claim an absolute maximum or a universal winner. Preserve all artifacts a
 
 ## Cross-phase requirements and evidence checklist
 
-All items begin **Pending**. Update them only with a link to the evidence that supports completion.
+Items begin **Pending** unless a different status is shown. Update them only with a link to the evidence that supports the status.
 
 | Requirement or evidence | Status | Evidence |
 | --- | --- | --- |
@@ -149,8 +153,9 @@ All items begin **Pending**. Update them only with a link to the evidence that s
 | Reused evidence independently checked for contract and provenance fit | Pending | |
 | Normal performance and diagnostic instrumentation runs kept separate | Pending | |
 | Candidate changes isolated, attributed, and rejected attempts retained | Pending | |
-| OCI preflight capacity gate | Not passed | [PREFLIGHT.txt](results/rocksdb-contract-baseline-20261016/PREFLIGHT.txt) records 1.21 GB ZFS available and insufficient capacity for the planned retained runs. User decision required on storage expansion or artifact retention/migration policy. |
-| OCI source/binary provenance and final host verification for measurements | Pending | No implementation or benchmarks started. |
+| OCI preflight capacity gate | Not passed | [PREFLIGHT.txt](results/rocksdb-contract-baseline-20261016/PREFLIGHT.txt) records 1.21 GB ZFS available, insufficient for the planned runs and required evidence. User-authorized cleanup is in progress; repeat preflight after cleanup before benchmarking. |
+| User-authorized cleanup targets and removed database/binary manifest recorded | Pending | Cleanup is in progress; preserve current environment, source, and current required data. |
+| OCI source/binary provenance and final host verification for measurements | Pending | No new benchmark may start before the capacity gate passes. |
 | Screening, confirmation, and final repetition requirements met, including duration beyond the prior one-million-call cap | Pending | |
 | Full latency samples or validated bounded-memory statistics continue for the requested duration | Pending | |
 | Input traces, write ledgers, and harness memory budgeted and verified against cache and RSS limits | Pending | |
@@ -168,7 +173,7 @@ Stop experiment execution and report the evidence and decision needed before pro
 - The audit identifies an unresolved contract question. Resolve known document inconsistencies against the existing API, consumers, and tests; stop only if evidence shows that optimization would weaken a real API or consumer promise, including commit-LSN meaning, atomicity, snapshot behavior, revision behavior, or durability.
 - An implementation or benchmark reveals a correctness failure, unexplained error, inconsistent history, or failure of independent replay.
 - A candidate requires changing public contract, default behavior, durability, or a previously agreed design choice.
-- OCI work has conflicting live processes, insufficient disk or host capacity for datasets, WAL, binaries, databases, and evidence retention, uncertain authorization or host identity, unbudgeted harness memory, or would require destructive cleanup.
+- OCI work has conflicting live processes, insufficient disk or host capacity after the user-authorized cleanup scope, uncertain authorization or host identity, unbudgeted harness memory, or would require deleting unknown or unrelated data, the current environment or source, or current required data.
 - Required provenance or raw evidence cannot be retained, or a result cannot be validated against the same workload and contract.
 - The available evidence does not support a conclusion and expanding the workload or measurement scope would exceed the approved constraints.
 
@@ -176,13 +181,14 @@ On stop, preserve the current state and artifacts, record the exact blocker and 
 
 ## Execution log
 
-Append one entry for each phase attempt, including blocked and rejected work. Do not overwrite earlier entries. The plan-preparation entry records documentation only; Phases 1–6 remain Pending until executed.
+Append one entry for each phase attempt, including blocked and rejected work. Do not overwrite earlier entries. The plan-preparation entry records documentation only. Current phase statuses are Phase 1 In progress and Phases 2–6 Pending.
 
 | Date (UTC) | Phase | Status | Source SHA / candidate | Commands and artifact paths | Findings and decision | Blocker or next action |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-16 | Plan | Complete | Base SHA `404026706a9180078c65ce1d29ff499df6ecb5b6`; initial document commit `3b6d13f002693d6fa5254b94cfc1f5d6219b1f25` | Plan document only: `dodb/docs/experiments/rocksdb-contract-baseline-plan.md` | Six-phase scope recorded; no implementation or measurements performed | Phases 1–6 pending |
 | 2026-10-16 | Preflight | Stopped | Plan branch HEAD `1fd4fe6ae39b7172142654c5ce3ed043d462029b` | [PREFLIGHT.txt](results/rocksdb-contract-baseline-20261016/PREFLIGHT.txt), read-only transcript for `instance-20260923-1013` | Transcript records 1.21 GB ZFS available and insufficient capacity for over-cache data, required repetitions, builds, databases, WAL, and evidence retention. `MemTotal` is 11,159,744 kB; default Rust tools are 1.98.1; 1.97.1 is installed; exact RocksDB 11.8.1 archive availability remains unconfirmed because the lookup was incomplete. API audit remains preliminary; contract resolution incomplete. This is preflight evidence, not measurement evidence. No cleanup, expansion, implementation, or benchmark was performed. | User decision required: storage expansion or approved artifact preservation/migration policy. |
-| | 1 | Pending | | | | |
+| 2026-10-16 | Resume | In progress | User-authorized cleanup; plan baseline SHA `5275689f15b37710fc3c6960daef75d01082c851` | Plan update only; OCI capacity gate still Not passed | User authorized deletion of identified completed experiment databases, old builds/binaries, and unnecessary archives with a cleanup manifest. Historical stop remains recorded. Phase 1 contract documentation review is in progress; tests have not run. No new benchmarks may start before the capacity gate passes. | Complete authorized cleanup, record manifest/evidence, repeat capacity preflight; then continue Phase 1. |
+| | 1 | In progress | Contract documentation review; tests not run | | API read-only audit remains preliminary | Finish contract reconciliation and tests after Phase 1 documentation review. |
 | | 2 | Pending | | | | |
 | | 3 | Pending | | | | |
 | | 4 | Pending | | | | |
