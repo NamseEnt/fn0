@@ -2,9 +2,9 @@
 
 > Historical checkpoint (2026-10-16 UTC): Execution stopped after read-only preflight because OCI ZFS capacity was insufficient. At that checkpoint, no implementation or benchmarks had started.
 
-> Current status (2026-10-16 UTC): Resumed for user-authorized OCI cleanup; no new benchmarks may start until the capacity gate passes. Phase 1 is in progress for contract documentation review; tests have not run. Phases 2–6 remain Pending. The capacity gate remains Not passed.
+> Current status (2026-10-16 UTC): User-authorized OCI cleanup is continuing independently. Phase 1 contract-audit documentation is complete; correctness tests have not been rerun, so Phase 1 remains In progress. Phases 2–6 remain Pending. The disk-capacity gate remains Not passed pending cleanup and a fresh preflight. Development and measurements are on hold pending the user's decision on the resident-memory comparison plan.
 
-> The earlier read-only API audit remains preliminary evidence; contract resolution is still in progress.
+> The earlier read-only API audit was preliminary. The completed documentation audit is recorded in [CONTRACT-AUDIT.md](results/rocksdb-contract-baseline-20261016/CONTRACT-AUDIT.md); it does not establish that correctness validation has passed.
 
 ## Goal and claim boundary
 
@@ -25,7 +25,7 @@ The comparison must separate raw subset throughput, successful transactions, suc
 
 **Status: In progress**
 
-Current work: contract documentation review and reconciliation. Tests have not run. The API read-only audit remains preliminary and does not complete this phase.
+Contract-audit documentation is complete in [CONTRACT-AUDIT.md](results/rocksdb-contract-baseline-20261016/CONTRACT-AUDIT.md), based on architecture, backend-contract, and revision-range documentation at commit `543b55c9`. Phase 1 remains In progress because correctness tests have not been rerun; audit documentation completion is not correctness validation.
 
 Map the DODB API, consumers, tests, RocksDB wrapper, service path, B-link path, and relevant concurrency and durability boundaries. Resolve the contract of revision values versus physical commit LSNs before changing identity or revision behavior. Audit every `commit_lsn` consumer before considering an opaque logical write identity. If current consumers rely on physical ordering or meaning, document that promise and obtain an explicit contract decision before weakening it. Independent concurrent response order is not a linearization order.
 
@@ -48,7 +48,7 @@ The audit must determine whether the implementation preserves all of the followi
 
 A per-document revision conversion is not mandatory. Any alternative must be judged against the audited contract, not assumed to be required or free.
 
-**Required evidence:** API and consumer map; contract table with implementation and test references; all `commit_lsn` call sites and their assumptions; open questions and explicit decisions; baseline correctness gaps; existing evidence accepted for reuse.
+**Required evidence:** API and consumer map; contract table with implementation and test references; all `commit_lsn` call sites and their assumptions; open questions and explicit decisions; baseline correctness gaps; existing evidence accepted for reuse. The documentation audit is recorded in [CONTRACT-AUDIT.md](results/rocksdb-contract-baseline-20261016/CONTRACT-AUDIT.md); correctness tests and validation remain pending.
 
 ## Phase 2: Freeze the four comparison paths
 
@@ -101,11 +101,17 @@ Each candidate must preserve transaction semantics, tenant isolation, response-b
 
 **Status: Pending**
 
-**OCI capacity/preflight gate: Not passed. Work may continue within the user-authorized cleanup scope; no new benchmarks may start until cleanup is complete and a fresh capacity preflight passes.**
+**OCI capacity/preflight gate: Not passed. User-authorized cleanup continues independently; no benchmark may start until cleanup is complete and a fresh capacity preflight passes. Development and measurements remain on hold pending the user's resident-memory comparison decision.**
 
 The read-only preflight transcript is preserved at [PREFLIGHT.txt](results/rocksdb-contract-baseline-20261016/PREFLIGHT.txt). It identifies the authorized instance `instance-20260923-1013` as ARM64 Neoverse-N1 with 2 CPUs and approximately 12 GiB nominal RAM. `/proc/meminfo` reports `MemTotal` 11,159,744 kB (about 10.64 GiB) and `MemAvailable` 4,786,040 kB (about 4.6 GiB); swap use is 360 MiB. The stored SSH identity and existing `known_hosts` were verified. The default `rustc` and `cargo` are 1.98.1; Rust 1.97.1 is installed. No matching active build or benchmark process was found. The exact RocksDB 11.8.1 archive was not confirmed: the follow-up lookup was incomplete and no conclusion about its availability is drawn. `/bench/zfs/db` reports 149 GB total, 148 GB used, 1.3 GB available (displayed as 100% used); ZFS available space is 1.21 GB, and the `dodbbench` pool is ONLINE at 96%. This transcript records read-only preflight evidence only, not a measurement result. Do not make final measurement claims from it.
 
-The available space does not establish capacity for over-cache datasets, three 30-second confirmations, three five-minute repetitions, builds, temporary databases, WAL, and evidence. Do not start new benchmarks until the authorized cleanup is complete and a fresh capacity preflight passes. Use only the authorized OCI A1 ARM64 host and ZFS path `/bench/zfs/db`, with the approved stored SSH identity and normal host-key verification. Use pinned RocksDB 11.8.1 and Rust 1.97.1 with `+crc`. Do not substitute local or Debian measurements for authoritative results.
+The initial preflight's 1.21 GB available is from before the authorized cleanup; current free space is unverified until cleanup completes and the capacity preflight is repeated. That initial reading does not establish capacity for over-cache datasets, three 30-second confirmations, three five-minute repetitions, builds, temporary databases, WAL, and evidence. Do not start new benchmarks until cleanup is complete and a fresh capacity preflight passes. Use only the authorized OCI A1 ARM64 host and ZFS path `/bench/zfs/db`, with the approved stored SSH identity and normal host-key verification. Use pinned RocksDB 11.8.1 and Rust 1.97.1 with `+crc`. Do not substitute local or Debian measurements for authoritative results.
+
+### Resident-memory feasibility gate
+
+The current B-link implementation keeps all pages in RAM. Its `cache_capacity` bounds only the B-tree cache and does not evict pages. The [RESIDENCY-AUDIT.md](results/rocksdb-contract-baseline-20261016/RESIDENCY-AUDIT.md), recorded at commit `0358eb4e`, finds that same-budget paired throughput with an over-memory dataset is unsupported under this behavior. No paging or eviction implementation is included in this plan.
+
+A user decision is pending between (1) measuring both engines within the resident dataset budget, then measuring RocksDB alone with an over-memory dataset while documenting the B-link limitation, and (2) deferring over-memory runs until after the resident-budget comparison. Do not implement or measure either branch until the user answers. User-authorized storage cleanup continues separately. The disk-capacity gate also remains unresolved until the final cleanup and fresh preflight.
 
 Before testing, inspect live processes, host resources, and available storage. Do not run concurrent builds or benchmarks. The user authorized cleanup of identified completed experiment databases, old builds and binaries, and unnecessary archives; apply that authorization only to listed targets and record removed databases and binaries in a cleanup manifest. Preserve unknown or unrelated data, the current environment and source, current required data, raw logs, reports, reproduction instructions, source hashes, and validation evidence. Build from the exact source SHA and retain binaries only as long as required for active validation; record their hashes and any later removal in the manifest. Record commands, host and filesystem, seeds, workload, and validators.
 
@@ -153,7 +159,10 @@ Items begin **Pending** unless a different status is shown. Update them only wit
 | Reused evidence independently checked for contract and provenance fit | Pending | |
 | Normal performance and diagnostic instrumentation runs kept separate | Pending | |
 | Candidate changes isolated, attributed, and rejected attempts retained | Pending | |
-| OCI preflight capacity gate | Not passed | [PREFLIGHT.txt](results/rocksdb-contract-baseline-20261016/PREFLIGHT.txt) records 1.21 GB ZFS available, insufficient for the planned runs and required evidence. User-authorized cleanup is in progress; repeat preflight after cleanup before benchmarking. |
+| OCI preflight capacity gate | Not passed | [PREFLIGHT.txt](results/rocksdb-contract-baseline-20261016/PREFLIGHT.txt) records the pre-cleanup 1.21 GB ZFS availability; current free space is unverified. Repeat preflight after cleanup before benchmarking. |
+| Contract-audit documentation | Complete | [CONTRACT-AUDIT.md](results/rocksdb-contract-baseline-20261016/CONTRACT-AUDIT.md), based on architecture, backend-contract, and revision-range docs at commit `543b55c9`. |
+| Contract correctness validation and tests | Pending | Tests have not been rerun; documentation completion is not a passing correctness result. |
+| Resident-memory comparison strategy | Pending user decision | [RESIDENCY-AUDIT.md](results/rocksdb-contract-baseline-20261016/RESIDENCY-AUDIT.md), commit `0358eb4e`; current B-link behavior prevents same-budget over-memory paired throughput. |
 | User-authorized cleanup targets and removed database/binary manifest recorded | Pending | Cleanup is in progress; preserve current environment, source, and current required data. |
 | OCI source/binary provenance and final host verification for measurements | Pending | No new benchmark may start before the capacity gate passes. |
 | Screening, confirmation, and final repetition requirements met, including duration beyond the prior one-million-call cap | Pending | |
@@ -181,14 +190,15 @@ On stop, preserve the current state and artifacts, record the exact blocker and 
 
 ## Execution log
 
-Append one entry for each phase attempt, including blocked and rejected work. Do not overwrite earlier entries. The plan-preparation entry records documentation only. Current phase statuses are Phase 1 In progress and Phases 2–6 Pending.
+Append one entry for each phase attempt, including blocked and rejected work. Do not overwrite earlier entries. The plan-preparation entry records documentation only. Current phase statuses are Phase 1 In progress and Phases 2–6 Pending. User-authorized cleanup continues separately; development and measurements await the resident-memory comparison decision, and benchmarks also await a passing post-cleanup capacity gate.
 
 | Date (UTC) | Phase | Status | Source SHA / candidate | Commands and artifact paths | Findings and decision | Blocker or next action |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-16 | Plan | Complete | Base SHA `404026706a9180078c65ce1d29ff499df6ecb5b6`; initial document commit `3b6d13f002693d6fa5254b94cfc1f5d6219b1f25` | Plan document only: `dodb/docs/experiments/rocksdb-contract-baseline-plan.md` | Six-phase scope recorded; no implementation or measurements performed | Phases 1–6 pending |
 | 2026-10-16 | Preflight | Stopped | Plan branch HEAD `1fd4fe6ae39b7172142654c5ce3ed043d462029b` | [PREFLIGHT.txt](results/rocksdb-contract-baseline-20261016/PREFLIGHT.txt), read-only transcript for `instance-20260923-1013` | Transcript records 1.21 GB ZFS available and insufficient capacity for over-cache data, required repetitions, builds, databases, WAL, and evidence retention. `MemTotal` is 11,159,744 kB; default Rust tools are 1.98.1; 1.97.1 is installed; exact RocksDB 11.8.1 archive availability remains unconfirmed because the lookup was incomplete. API audit remains preliminary; contract resolution incomplete. This is preflight evidence, not measurement evidence. No cleanup, expansion, implementation, or benchmark was performed. | User decision required: storage expansion or approved artifact preservation/migration policy. |
-| 2026-10-16 | Resume | In progress | User-authorized cleanup; plan baseline SHA `5275689f15b37710fc3c6960daef75d01082c851` | Plan update only; OCI capacity gate still Not passed | User authorized deletion of identified completed experiment databases, old builds/binaries, and unnecessary archives with a cleanup manifest. Historical stop remains recorded. Phase 1 contract documentation review is in progress; tests have not run. No new benchmarks may start before the capacity gate passes. | Complete authorized cleanup, record manifest/evidence, repeat capacity preflight; then continue Phase 1. |
-| | 1 | In progress | Contract documentation review; tests not run | | API read-only audit remains preliminary | Finish contract reconciliation and tests after Phase 1 documentation review. |
+| 2026-10-16 | Resume | In progress | User-authorized cleanup; plan baseline SHA `5275689f15b37710fc3c6960daef75d01082c851` | Plan update only; OCI capacity gate still Not passed | User authorized deletion of identified completed experiment databases, old builds/binaries, and unnecessary archives with a cleanup manifest. Historical stop remains recorded. Cleanup continues separately. Development and measurements are on hold pending the user's resident-memory comparison decision; benchmarking also awaits a fresh passing capacity preflight. | Complete authorized cleanup and record its manifest; repeat capacity preflight after cleanup. Await the user's measurement-strategy decision before development or measurement. |
+| 2026-10-16 | 1 | In progress | Architecture, backend-contract, and revision-range docs at commit `543b55c9` | [CONTRACT-AUDIT.md](results/rocksdb-contract-baseline-20261016/CONTRACT-AUDIT.md) | Contract-audit documentation complete. Correctness tests have not been rerun; audit completion is separate from correctness validation. | Rerun required correctness validation after the user resolves the measurement-strategy hold. |
+| 2026-10-16 | Residency gate | Awaiting user decision | Resource audit at commit `0358eb4e` | [RESIDENCY-AUDIT.md](results/rocksdb-contract-baseline-20261016/RESIDENCY-AUDIT.md) | B-link keeps all pages in RAM; `cache_capacity` bounds B-tree cache only and does not evict. Same-budget over-memory paired throughput is unsupported. | User to choose resident-budget comparison first, or resident both plus over-memory RocksDB-only with B-link limitation documented. |
 | | 2 | Pending | | | | |
 | | 3 | Pending | | | | |
 | | 4 | Pending | | | | |
