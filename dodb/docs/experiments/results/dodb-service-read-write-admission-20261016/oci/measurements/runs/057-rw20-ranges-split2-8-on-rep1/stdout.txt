@@ -1,0 +1,1739 @@
+{
+  "api_boundary": "DodbService::execute with shared Request/Response and ExecutionBudget",
+  "backend": "rocksdb",
+  "compaction_observation": "not exposed by the service comparison driver",
+  "configuration": {
+    "blink": {
+      "coordinator_collection_delay_ms": 0,
+      "coordinator_group_bytes": 4194304,
+      "coordinator_group_requests": 64,
+      "coordinator_queue_capacity": 256,
+      "database_cache_capacity_pages": 128
+    },
+    "call_cap": 1000000,
+    "canonical_encoded_key_initial_dataset_min_max_bytes": {
+      "maximum": 36,
+      "minimum": 33
+    },
+    "canonical_encoded_key_sample_bytes": 33,
+    "clients": 16,
+    "combined_raw_pk_sk_bytes": 16,
+    "detailed_write_metrics_enabled": true,
+    "initial_rows_per_tenant": 10000,
+    "measurement_requested_ms": 5000,
+    "pk_raw_bytes": 8,
+    "query_limit": 16,
+    "read_stage_metrics_enabled": true,
+    "research_metrics_enabled": true,
+    "rocksdb": {
+      "blocking_admission": "split-read-2-write-8",
+      "blocking_operation_limit": 10,
+      "read_blocking_slots": 2,
+      "revision_allocator": "reserved-ranges",
+      "revision_range_size": 4096,
+      "write_blocking_slots": 8
+    },
+    "sk_raw_bytes": 8,
+    "tenant_count": 1,
+    "tokio_runtime_worker_threads": 16,
+    "value_size_bytes": 512,
+    "warmup_requested_ms": 1000
+  },
+  "counters": {
+    "api_calls": 17692,
+    "client_input_prefixes": [
+      {
+        "admitted_workflows": 947,
+        "client_index": 1,
+        "fingerprint": "15f3273e98c2c399",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 958,
+        "client_index": 0,
+        "fingerprint": "a08b638f28f4ed51",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 960,
+        "client_index": 10,
+        "fingerprint": "b270ccd7bd14c4b2",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 956,
+        "client_index": 15,
+        "fingerprint": "27eb518d53c85aff",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 945,
+        "client_index": 9,
+        "fingerprint": "e25a23f7393e757a",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 936,
+        "client_index": 13,
+        "fingerprint": "97e4a83da5668e26",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 966,
+        "client_index": 14,
+        "fingerprint": "2c54430cbb707ec5",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 941,
+        "client_index": 7,
+        "fingerprint": "60fa5877782bb914",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 945,
+        "client_index": 8,
+        "fingerprint": "288765ce467341de",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 955,
+        "client_index": 6,
+        "fingerprint": "e324966a5ae82bae",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 932,
+        "client_index": 4,
+        "fingerprint": "618341eb9389ca78",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 972,
+        "client_index": 11,
+        "fingerprint": "c8c5b972f4a45a9c",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 958,
+        "client_index": 12,
+        "fingerprint": "ac0b35976354993e",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 931,
+        "client_index": 2,
+        "fingerprint": "3e72225bf8ce0aa4",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 947,
+        "client_index": 5,
+        "fingerprint": "f55ffd845dd55fb1",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      },
+      {
+        "admitted_workflows": 949,
+        "client_index": 3,
+        "fingerprint": "2b1b99653423af6b",
+        "prefix_limit": 100,
+        "profile": "rw20",
+        "workflow_count": 100
+      }
+    ],
+    "condition_kinds": {
+      "Exists": 4923,
+      "NotExists": 2475,
+      "RevisionEquals": 2494
+    },
+    "conditional_attempts": 9892,
+    "intentional_condition_rejections": 988,
+    "latency": {
+      "condition_rejection": {
+        "count": 988,
+        "p50_ms": 2.645743,
+        "p95_ms": 5.174125,
+        "p99_ms": 6.578097,
+        "sample_count": 988,
+        "sample_limit": null,
+        "sampling": "all recorded completions"
+      },
+      "get": {
+        "count": 337,
+        "p50_ms": 0.06416,
+        "p95_ms": 0.252882,
+        "p99_ms": 0.471044,
+        "sample_count": 337,
+        "sample_limit": null,
+        "sampling": "all recorded completions"
+      },
+      "preparatory_get": {
+        "count": 2494,
+        "p50_ms": 0.07444,
+        "p95_ms": 0.280243,
+        "p99_ms": 0.453124,
+        "sample_count": 2494,
+        "sample_limit": null,
+        "sampling": "all recorded completions"
+      },
+      "query16": {
+        "count": 727,
+        "p50_ms": 0.092561,
+        "p95_ms": 0.325603,
+        "p99_ms": 0.479564,
+        "sample_count": 727,
+        "sample_limit": null,
+        "sampling": "all recorded completions"
+      },
+      "workflow": {
+        "count": 15198,
+        "p50_ms": 4.7032,
+        "p95_ms": 10.941654,
+        "p99_ms": 19.859531,
+        "sample_count": 15198,
+        "sample_limit": null,
+        "sampling": "all recorded completions"
+      },
+      "write_transaction_success": {
+        "count": 13146,
+        "p50_ms": 4.920243,
+        "p95_ms": 11.795181,
+        "p99_ms": 21.122462,
+        "sample_count": 13146,
+        "sample_limit": null,
+        "sampling": "all recorded completions"
+      }
+    },
+    "natural_conflicts": 0,
+    "ordinary_gets": 337,
+    "other_errors": 0,
+    "overloads": 0,
+    "preparatory_gets": 2494,
+    "query16_calls": 727,
+    "query_rows_returned": 3576,
+    "read_calls": 3558,
+    "read_fraction": 0.20110784535383225,
+    "request_limit_reached": false,
+    "successful_mutations": 33585,
+    "successful_write_transactions": 13146,
+    "verification_errors": [],
+    "write_categories": {
+      "conditional_width_1": {
+        "attempts": 4226,
+        "successes": 3855
+      },
+      "conditional_width_4": {
+        "attempts": 4185,
+        "successes": 3726
+      },
+      "conditional_width_8": {
+        "attempts": 1481,
+        "successes": 1323
+      },
+      "delete": {
+        "attempts": 1382,
+        "successes": 1382
+      },
+      "put": {
+        "attempts": 2860,
+        "successes": 2860
+      }
+    },
+    "write_fraction": 0.7988921546461678,
+    "write_ledger_entries": 13146,
+    "write_ledger_limit": 1000000,
+    "write_requests": 14134
+  },
+  "disk_usage_bytes": {
+    "after_reopen_validation": 55825736,
+    "before_shutdown": 28189356
+  },
+  "disk_usage_scope": "all regular files under this run's isolated data directory after measurement and before shutdown",
+  "per_tenant": {
+    "tenant_1": {
+      "counters": {
+        "api_calls": 17692,
+        "client_input_prefixes": [
+          {
+            "admitted_workflows": 947,
+            "client_index": 1,
+            "fingerprint": "15f3273e98c2c399",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 958,
+            "client_index": 0,
+            "fingerprint": "a08b638f28f4ed51",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 960,
+            "client_index": 10,
+            "fingerprint": "b270ccd7bd14c4b2",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 956,
+            "client_index": 15,
+            "fingerprint": "27eb518d53c85aff",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 945,
+            "client_index": 9,
+            "fingerprint": "e25a23f7393e757a",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 936,
+            "client_index": 13,
+            "fingerprint": "97e4a83da5668e26",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 966,
+            "client_index": 14,
+            "fingerprint": "2c54430cbb707ec5",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 941,
+            "client_index": 7,
+            "fingerprint": "60fa5877782bb914",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 945,
+            "client_index": 8,
+            "fingerprint": "288765ce467341de",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 955,
+            "client_index": 6,
+            "fingerprint": "e324966a5ae82bae",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 932,
+            "client_index": 4,
+            "fingerprint": "618341eb9389ca78",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 972,
+            "client_index": 11,
+            "fingerprint": "c8c5b972f4a45a9c",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 958,
+            "client_index": 12,
+            "fingerprint": "ac0b35976354993e",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 931,
+            "client_index": 2,
+            "fingerprint": "3e72225bf8ce0aa4",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 947,
+            "client_index": 5,
+            "fingerprint": "f55ffd845dd55fb1",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          },
+          {
+            "admitted_workflows": 949,
+            "client_index": 3,
+            "fingerprint": "2b1b99653423af6b",
+            "prefix_limit": 100,
+            "profile": "rw20",
+            "workflow_count": 100
+          }
+        ],
+        "condition_kinds": {
+          "Exists": 4923,
+          "NotExists": 2475,
+          "RevisionEquals": 2494
+        },
+        "conditional_attempts": 9892,
+        "intentional_condition_rejections": 988,
+        "latency": {
+          "condition_rejection": {
+            "count": 988,
+            "p50_ms": 2.645743,
+            "p95_ms": 5.174125,
+            "p99_ms": 6.578097,
+            "sample_count": 988,
+            "sample_limit": null,
+            "sampling": "all recorded completions"
+          },
+          "get": {
+            "count": 337,
+            "p50_ms": 0.06416,
+            "p95_ms": 0.252882,
+            "p99_ms": 0.471044,
+            "sample_count": 337,
+            "sample_limit": null,
+            "sampling": "all recorded completions"
+          },
+          "preparatory_get": {
+            "count": 2494,
+            "p50_ms": 0.07444,
+            "p95_ms": 0.280243,
+            "p99_ms": 0.453124,
+            "sample_count": 2494,
+            "sample_limit": null,
+            "sampling": "all recorded completions"
+          },
+          "query16": {
+            "count": 727,
+            "p50_ms": 0.092561,
+            "p95_ms": 0.325603,
+            "p99_ms": 0.479564,
+            "sample_count": 727,
+            "sample_limit": null,
+            "sampling": "all recorded completions"
+          },
+          "workflow": {
+            "count": 15198,
+            "p50_ms": 4.7032,
+            "p95_ms": 10.941654,
+            "p99_ms": 19.859531,
+            "sample_count": 15198,
+            "sample_limit": null,
+            "sampling": "all recorded completions"
+          },
+          "write_transaction_success": {
+            "count": 13146,
+            "p50_ms": 4.920243,
+            "p95_ms": 11.795181,
+            "p99_ms": 21.122462,
+            "sample_count": 13146,
+            "sample_limit": null,
+            "sampling": "all recorded completions"
+          }
+        },
+        "natural_conflicts": 0,
+        "ordinary_gets": 337,
+        "other_errors": 0,
+        "overloads": 0,
+        "preparatory_gets": 2494,
+        "query16_calls": 727,
+        "query_rows_returned": 3576,
+        "read_calls": 3558,
+        "read_fraction": 0.20110784535383225,
+        "request_limit_reached": false,
+        "successful_mutations": 33585,
+        "successful_write_transactions": 13146,
+        "verification_errors": [],
+        "write_categories": {
+          "conditional_width_1": {
+            "attempts": 4226,
+            "successes": 3855
+          },
+          "conditional_width_4": {
+            "attempts": 4185,
+            "successes": 3726
+          },
+          "conditional_width_8": {
+            "attempts": 1481,
+            "successes": 1323
+          },
+          "delete": {
+            "attempts": 1382,
+            "successes": 1382
+          },
+          "put": {
+            "attempts": 2860,
+            "successes": 2860
+          }
+        },
+        "write_fraction": 0.7988921546461678,
+        "write_ledger_entries": 13146,
+        "write_ledger_limit": 1000000,
+        "write_requests": 14134
+      },
+      "profile": "rw20",
+      "schedule_fingerprint": "902895fc149e7bc6",
+      "throughput_per_second": {
+        "api_calls": 3533.5182022043064,
+        "read_calls": 710.6182321638549,
+        "successful_mutations": 6707.732806976692,
+        "successful_write_transactions": 2625.5725913507695
+      }
+    }
+  },
+  "process_metrics": {
+    "after": {
+      "complete": true,
+      "cpu_ticks_total": 276,
+      "rss_kb": 42860,
+      "sample_source": "/proc/self/status and /proc/self/stat"
+    },
+    "before": {
+      "complete": true,
+      "cpu_ticks_total": 58,
+      "rss_kb": 23036,
+      "sample_source": "/proc/self/status and /proc/self/stat"
+    },
+    "cpu_percent_of_one_core": 43.539846714929844,
+    "cpu_percent_of_online_machine": 21.769923357464922,
+    "cpu_seconds": 2.18,
+    "cpu_ticks_delta": 218,
+    "online_processors": 2,
+    "peak_sampled_rss_kb": 42132,
+    "rss_sample_count": 24,
+    "sampling_completeness": "complete",
+    "sampling_interval_ms": 200
+  },
+  "reopen_validation": {
+    "tenant_1": {
+      "actual_rows": 49926,
+      "commit_identity_entries": 16166,
+      "commit_identity_unique": true,
+      "expected_rows": 49926,
+      "mismatch_samples": [],
+      "missing_rows": 0,
+      "passed": true,
+      "replay_order": "commit identity for write history; ordered expected stream for Scan comparison",
+      "scan_materialization_bound": "one response page plus bounded write ledger and mismatch sample",
+      "scan_page_limit": 64
+    }
+  },
+  "rocksdb_research_metrics": {
+    "enabled": true,
+    "histogram_percentiles": "approximate upper bounds of base-2 nanosecond buckets",
+    "lock_wait_source": "RocksDB 11.8.1 PerfContext key_lock_wait_time and key_lock_wait_count deltas around each GetForUpdate call",
+    "omitted_tenant_metric_events": 0,
+    "tenant_limit": 64,
+    "tenants": {
+      "tenant_1": {
+        "measurement": {
+          "blocking_dispatch_wait": {
+            "count": 17692,
+            "mean_ms": 0.04418428210490617,
+            "p50_ms_approx": 0.032768,
+            "p95_ms_approx": 0.262144,
+            "p99_ms_approx": 0.524288,
+            "total_ms_across_requests": 781.708319
+          },
+          "commit_duration": {
+            "count": 13149,
+            "mean_ms": 1.9795633194919766,
+            "p50_ms_approx": 2.097152,
+            "p95_ms_approx": 4.194304,
+            "p99_ms_approx": 4.194304,
+            "total_ms_across_requests": 26029.278088
+          },
+          "condition_check_duration": {
+            "count": 14134,
+            "mean_ms": 0.00047815848309042027,
+            "p50_ms_approx": 0.000512,
+            "p95_ms_approx": 0.002048,
+            "p99_ms_approx": 0.002048,
+            "total_ms_across_requests": 6.758292
+          },
+          "counter_held_duration_approx": {
+            "count": 0,
+            "mean_ms": null,
+            "p50_ms_approx": null,
+            "p95_ms_approx": null,
+            "p99_ms_approx": null,
+            "total_ms_across_requests": 0.0
+          },
+          "mutation_construction_duration": {
+            "count": 13146,
+            "mean_ms": 0.0059806868248897,
+            "p50_ms_approx": 0.004096,
+            "p95_ms_approx": 0.016384,
+            "p99_ms_approx": 0.032768,
+            "total_ms_across_requests": 78.622109
+          },
+          "read_semaphore_wait": {
+            "count": 3558,
+            "mean_ms": 0.0014574283305227656,
+            "p50_ms_approx": 0.000512,
+            "p95_ms_approx": 0.001024,
+            "p99_ms_approx": 0.002048,
+            "total_ms_across_requests": 5.18553
+          },
+          "revision_allocator_wait": {
+            "count": 13146,
+            "mean_ms": 0.0007885384147269132,
+            "p50_ms_approx": 0.000064,
+            "p95_ms_approx": 0.000128,
+            "p99_ms_approx": 0.000256,
+            "total_ms_across_requests": 10.366126
+          },
+          "revision_counter_get_for_update_duration": {
+            "count": 3,
+            "mean_ms": 0.00504,
+            "p50_ms_approx": 0.008192,
+            "p95_ms_approx": 0.008192,
+            "p99_ms_approx": 0.008192,
+            "total_ms_across_requests": 0.01512
+          },
+          "revision_counter_lock_wait": {
+            "count": 3,
+            "mean_ms": 0.0,
+            "p50_ms_approx": 1e-6,
+            "p95_ms_approx": 1e-6,
+            "p99_ms_approx": 1e-6,
+            "total_ms_across_requests": 0.0
+          },
+          "revision_range_reservation_duration": {
+            "count": 3,
+            "mean_ms": 1.613134,
+            "p50_ms_approx": 2.097152,
+            "p95_ms_approx": 4.194304,
+            "p99_ms_approx": 4.194304,
+            "total_ms_across_requests": 4.839402
+          },
+          "rollback_duration": {
+            "count": 988,
+            "mean_ms": 0.006308074898785425,
+            "p50_ms_approx": 0.004096,
+            "p95_ms_approx": 0.016384,
+            "p99_ms_approx": 0.065536,
+            "total_ms_across_requests": 6.232378
+          },
+          "service_request_duration": {
+            "count": 17692,
+            "mean_ms": 4.516679011134976,
+            "p50_ms_approx": 8.388608,
+            "p95_ms_approx": 16.777216,
+            "p99_ms_approx": 33.554432,
+            "total_ms_across_requests": 79909.085065
+          },
+          "user_commit_duration": {
+            "count": 13146,
+            "mean_ms": 1.9799395773619353,
+            "p50_ms_approx": 2.097152,
+            "p95_ms_approx": 4.194304,
+            "p99_ms_approx": 4.194304,
+            "total_ms_across_requests": 26028.285684
+          },
+          "user_key_get_for_update_duration": {
+            "count": 48731,
+            "mean_ms": 0.25280560624653714,
+            "p50_ms_approx": 0.004096,
+            "p95_ms_approx": 1.048576,
+            "p99_ms_approx": 8.388608,
+            "total_ms_across_requests": 12319.469998
+          },
+          "user_key_lock_wait": {
+            "count": 48731,
+            "mean_ms": 0.24711532601424144,
+            "p50_ms_approx": 1e-6,
+            "p95_ms_approx": 1.048576,
+            "p99_ms_approx": 8.388608,
+            "total_ms_across_requests": 12042.176952
+          },
+          "write_semaphore_wait": {
+            "count": 14134,
+            "mean_ms": 2.7703731291212677,
+            "p50_ms_approx": 4.194304,
+            "p95_ms_approx": 8.388608,
+            "p99_ms_approx": 8.388608,
+            "total_ms_across_requests": 39156.453807
+          }
+        },
+        "outcomes": {
+          "measurement": {
+            "condition_rejections": 988,
+            "other_errors": 0,
+            "range_reservations": 3,
+            "reservation_commits": 3,
+            "reservation_counter_accesses": 3,
+            "revision_counter_lock_wait_count": 0,
+            "successful_writes": 13146,
+            "user_commits": 13146,
+            "user_key_lock_wait_count": 2778,
+            "user_transaction_counter_accesses": 0
+          },
+          "warmup": {
+            "condition_rejections": 250,
+            "other_errors": 0,
+            "range_reservations": 0,
+            "reservation_commits": 0,
+            "reservation_counter_accesses": 0,
+            "revision_counter_lock_wait_count": 0,
+            "successful_writes": 3020,
+            "user_commits": 3020,
+            "user_key_lock_wait_count": 621,
+            "user_transaction_counter_accesses": 0
+          }
+        },
+        "read_stages": {
+          "measurement": {
+            "get": {
+              "blocking_closure_duration": {
+                "count": 337,
+                "mean_ms": 0.0068520296735905045,
+                "p50_ms_approx": 0.008192,
+                "p95_ms_approx": 0.016384,
+                "p99_ms_approx": 0.032768,
+                "total_ms_across_requests": 2.309134
+              },
+              "blocking_completion_handoff": {
+                "count": 337,
+                "mean_ms": 0.028735712166172107,
+                "p50_ms_approx": 0.016384,
+                "p95_ms_approx": 0.131072,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 9.683935
+              },
+              "blocking_dispatch_wait": {
+                "count": 337,
+                "mean_ms": 0.04914414836795252,
+                "p50_ms_approx": 0.032768,
+                "p95_ms_approx": 0.262144,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 16.561578
+              },
+              "get_copy_decode": {
+                "count": 337,
+                "mean_ms": 0.00032118694362017803,
+                "p50_ms_approx": 0.000512,
+                "p95_ms_approx": 0.000512,
+                "p99_ms_approx": 0.001024,
+                "total_ms_across_requests": 0.10824
+              },
+              "query_copy_decode_budget": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "query_iterator_calls_sum": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "query_snapshot_iterator_setup": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "request_to_permit_acquire_start": {
+                "count": 337,
+                "mean_ms": 0.0014692106824925816,
+                "p50_ms_approx": 0.002048,
+                "p95_ms_approx": 0.004096,
+                "p99_ms_approx": 0.004096,
+                "total_ms_across_requests": 0.495124
+              },
+              "response_processing": {
+                "count": 337,
+                "mean_ms": 0.002285474777448071,
+                "p50_ms_approx": 0.002048,
+                "p95_ms_approx": 0.008192,
+                "p99_ms_approx": 0.008192,
+                "total_ms_across_requests": 0.770205
+              },
+              "rocksdb_get_call": {
+                "count": 337,
+                "mean_ms": 0.004397893175074184,
+                "p50_ms_approx": 0.004096,
+                "p95_ms_approx": 0.008192,
+                "p99_ms_approx": 0.016384,
+                "total_ms_across_requests": 1.48209
+              },
+              "semaphore_wait": {
+                "count": 337,
+                "mean_ms": 0.001325,
+                "p50_ms_approx": 0.001024,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.002048,
+                "total_ms_across_requests": 0.446525
+              },
+              "service_request_total": {
+                "count": 337,
+                "mean_ms": 0.09155557566765578,
+                "p50_ms_approx": 0.065536,
+                "p95_ms_approx": 0.262144,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 30.854229
+              },
+              "tenant_database_lookup": {
+                "count": 337,
+                "mean_ms": 0.00039525519287833826,
+                "p50_ms_approx": 0.000512,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.001024,
+                "total_ms_across_requests": 0.133201
+              }
+            },
+            "preparatory_get": {
+              "blocking_closure_duration": {
+                "count": 2494,
+                "mean_ms": 0.006929773456295108,
+                "p50_ms_approx": 0.008192,
+                "p95_ms_approx": 0.016384,
+                "p99_ms_approx": 0.032768,
+                "total_ms_across_requests": 17.282855
+              },
+              "blocking_completion_handoff": {
+                "count": 2494,
+                "mean_ms": 0.03073862469927827,
+                "p50_ms_approx": 0.016384,
+                "p95_ms_approx": 0.131072,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 76.66213
+              },
+              "blocking_dispatch_wait": {
+                "count": 2494,
+                "mean_ms": 0.054015291499599036,
+                "p50_ms_approx": 0.065536,
+                "p95_ms_approx": 0.262144,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 134.714137
+              },
+              "get_copy_decode": {
+                "count": 2494,
+                "mean_ms": 0.00034191339214113874,
+                "p50_ms_approx": 0.000512,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.001024,
+                "total_ms_across_requests": 0.852732
+              },
+              "query_copy_decode_budget": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "query_iterator_calls_sum": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "query_snapshot_iterator_setup": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "request_to_permit_acquire_start": {
+                "count": 2494,
+                "mean_ms": 0.001651962309542903,
+                "p50_ms_approx": 0.002048,
+                "p95_ms_approx": 0.004096,
+                "p99_ms_approx": 0.004096,
+                "total_ms_across_requests": 4.119994
+              },
+              "response_processing": {
+                "count": 2494,
+                "mean_ms": 0.002579203287890938,
+                "p50_ms_approx": 0.002048,
+                "p95_ms_approx": 0.008192,
+                "p99_ms_approx": 0.016384,
+                "total_ms_across_requests": 6.432533
+              },
+              "rocksdb_get_call": {
+                "count": 2494,
+                "mean_ms": 0.004538601042502005,
+                "p50_ms_approx": 0.004096,
+                "p95_ms_approx": 0.016384,
+                "p99_ms_approx": 0.032768,
+                "total_ms_across_requests": 11.319271
+              },
+              "semaphore_wait": {
+                "count": 2494,
+                "mean_ms": 0.0018549811547714514,
+                "p50_ms_approx": 0.001024,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.008192,
+                "total_ms_across_requests": 4.626323
+              },
+              "service_request_total": {
+                "count": 2494,
+                "mean_ms": 0.09932099518845229,
+                "p50_ms_approx": 0.131072,
+                "p95_ms_approx": 0.524288,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 247.706562
+              },
+              "tenant_database_lookup": {
+                "count": 2494,
+                "mean_ms": 0.00039626583801122695,
+                "p50_ms_approx": 0.000512,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.001024,
+                "total_ms_across_requests": 0.988287
+              }
+            },
+            "query16": {
+              "blocking_closure_duration": {
+                "count": 727,
+                "mean_ms": 0.027326188445667126,
+                "p50_ms_approx": 0.032768,
+                "p95_ms_approx": 0.065536,
+                "p99_ms_approx": 0.065536,
+                "total_ms_across_requests": 19.866139
+              },
+              "blocking_completion_handoff": {
+                "count": 727,
+                "mean_ms": 0.02878642778541953,
+                "p50_ms_approx": 0.016384,
+                "p95_ms_approx": 0.131072,
+                "p99_ms_approx": 0.262144,
+                "total_ms_across_requests": 20.927733
+              },
+              "blocking_dispatch_wait": {
+                "count": 727,
+                "mean_ms": 0.05778684731774415,
+                "p50_ms_approx": 0.032768,
+                "p95_ms_approx": 0.262144,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 42.011038
+              },
+              "get_copy_decode": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "query_copy_decode_budget": {
+                "count": 727,
+                "mean_ms": 0.008193023383768913,
+                "p50_ms_approx": 0.008192,
+                "p95_ms_approx": 0.016384,
+                "p99_ms_approx": 0.032768,
+                "total_ms_across_requests": 5.956328
+              },
+              "query_iterator_calls_sum": {
+                "count": 727,
+                "mean_ms": 0.0028168101788170565,
+                "p50_ms_approx": 0.004096,
+                "p95_ms_approx": 0.004096,
+                "p99_ms_approx": 0.008192,
+                "total_ms_across_requests": 2.047821
+              },
+              "query_snapshot_iterator_setup": {
+                "count": 727,
+                "mean_ms": 0.014965530949105915,
+                "p50_ms_approx": 0.016384,
+                "p95_ms_approx": 0.032768,
+                "p99_ms_approx": 0.065536,
+                "total_ms_across_requests": 10.879941
+              },
+              "request_to_permit_acquire_start": {
+                "count": 727,
+                "mean_ms": 0.0025432957359009627,
+                "p50_ms_approx": 0.002048,
+                "p95_ms_approx": 0.004096,
+                "p99_ms_approx": 0.004096,
+                "total_ms_across_requests": 1.848976
+              },
+              "response_processing": {
+                "count": 727,
+                "mean_ms": 0.00009105914718019256,
+                "p50_ms_approx": 0.000128,
+                "p95_ms_approx": 0.000256,
+                "p99_ms_approx": 0.000256,
+                "total_ms_across_requests": 0.0662
+              },
+              "rocksdb_get_call": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "semaphore_wait": {
+                "count": 727,
+                "mean_ms": 0.0010329160935350756,
+                "p50_ms_approx": 0.001024,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.002048,
+                "total_ms_across_requests": 0.75093
+              },
+              "service_request_total": {
+                "count": 727,
+                "mean_ms": 0.11931293672627236,
+                "p50_ms_approx": 0.131072,
+                "p95_ms_approx": 0.524288,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 86.740505
+              },
+              "tenant_database_lookup": {
+                "count": 727,
+                "mean_ms": 0.0008129931224209079,
+                "p50_ms_approx": 0.000512,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.001024,
+                "total_ms_across_requests": 0.591046
+              }
+            }
+          },
+          "warmup": {
+            "get": {
+              "blocking_closure_duration": {
+                "count": 80,
+                "mean_ms": 0.006075037500000001,
+                "p50_ms_approx": 0.008192,
+                "p95_ms_approx": 0.016384,
+                "p99_ms_approx": 0.032768,
+                "total_ms_across_requests": 0.486003
+              },
+              "blocking_completion_handoff": {
+                "count": 80,
+                "mean_ms": 0.0257242,
+                "p50_ms_approx": 0.016384,
+                "p95_ms_approx": 0.131072,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 2.057936
+              },
+              "blocking_dispatch_wait": {
+                "count": 80,
+                "mean_ms": 0.0467784375,
+                "p50_ms_approx": 0.032768,
+                "p95_ms_approx": 0.262144,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 3.742275
+              },
+              "get_copy_decode": {
+                "count": 80,
+                "mean_ms": 0.0003055,
+                "p50_ms_approx": 0.000512,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.001024,
+                "total_ms_across_requests": 0.02444
+              },
+              "query_copy_decode_budget": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "query_iterator_calls_sum": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "query_snapshot_iterator_setup": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "request_to_permit_acquire_start": {
+                "count": 80,
+                "mean_ms": 0.0012650125,
+                "p50_ms_approx": 0.002048,
+                "p95_ms_approx": 0.004096,
+                "p99_ms_approx": 0.004096,
+                "total_ms_across_requests": 0.101201
+              },
+              "response_processing": {
+                "count": 80,
+                "mean_ms": 0.001867,
+                "p50_ms_approx": 0.002048,
+                "p95_ms_approx": 0.004096,
+                "p99_ms_approx": 0.008192,
+                "total_ms_across_requests": 0.14936
+              },
+              "rocksdb_get_call": {
+                "count": 80,
+                "mean_ms": 0.0036595374999999998,
+                "p50_ms_approx": 0.004096,
+                "p95_ms_approx": 0.008192,
+                "p99_ms_approx": 0.016384,
+                "total_ms_across_requests": 0.292763
+              },
+              "semaphore_wait": {
+                "count": 80,
+                "mean_ms": 0.0013355,
+                "p50_ms_approx": 0.001024,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.065536,
+                "total_ms_across_requests": 0.10684
+              },
+              "service_request_total": {
+                "count": 80,
+                "mean_ms": 0.0847947,
+                "p50_ms_approx": 0.065536,
+                "p95_ms_approx": 0.524288,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 6.783576
+              },
+              "tenant_database_lookup": {
+                "count": 80,
+                "mean_ms": 0.0003370125,
+                "p50_ms_approx": 0.000512,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.001024,
+                "total_ms_across_requests": 0.026961
+              }
+            },
+            "preparatory_get": {
+              "blocking_closure_duration": {
+                "count": 631,
+                "mean_ms": 0.006331908082408875,
+                "p50_ms_approx": 0.008192,
+                "p95_ms_approx": 0.016384,
+                "p99_ms_approx": 0.032768,
+                "total_ms_across_requests": 3.995434
+              },
+              "blocking_completion_handoff": {
+                "count": 631,
+                "mean_ms": 0.027429462757527733,
+                "p50_ms_approx": 0.016384,
+                "p95_ms_approx": 0.131072,
+                "p99_ms_approx": 0.262144,
+                "total_ms_across_requests": 17.307991
+              },
+              "blocking_dispatch_wait": {
+                "count": 631,
+                "mean_ms": 0.05879511093502377,
+                "p50_ms_approx": 0.065536,
+                "p95_ms_approx": 0.262144,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 37.099715
+              },
+              "get_copy_decode": {
+                "count": 631,
+                "mean_ms": 0.00029743740095087163,
+                "p50_ms_approx": 0.000512,
+                "p95_ms_approx": 0.000512,
+                "p99_ms_approx": 0.001024,
+                "total_ms_across_requests": 0.187683
+              },
+              "query_copy_decode_budget": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "query_iterator_calls_sum": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "query_snapshot_iterator_setup": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "request_to_permit_acquire_start": {
+                "count": 631,
+                "mean_ms": 0.0013856196513470681,
+                "p50_ms_approx": 0.002048,
+                "p95_ms_approx": 0.004096,
+                "p99_ms_approx": 0.004096,
+                "total_ms_across_requests": 0.874326
+              },
+              "response_processing": {
+                "count": 631,
+                "mean_ms": 0.002061949286846276,
+                "p50_ms_approx": 0.002048,
+                "p95_ms_approx": 0.004096,
+                "p99_ms_approx": 0.008192,
+                "total_ms_across_requests": 1.30109
+              },
+              "rocksdb_get_call": {
+                "count": 631,
+                "mean_ms": 0.003714580031695721,
+                "p50_ms_approx": 0.004096,
+                "p95_ms_approx": 0.008192,
+                "p99_ms_approx": 0.016384,
+                "total_ms_across_requests": 2.3439
+              },
+              "semaphore_wait": {
+                "count": 631,
+                "mean_ms": 0.0019630618066561016,
+                "p50_ms_approx": 0.001024,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.002048,
+                "total_ms_across_requests": 1.238692
+              },
+              "service_request_total": {
+                "count": 631,
+                "mean_ms": 0.0993384738510301,
+                "p50_ms_approx": 0.131072,
+                "p95_ms_approx": 0.524288,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 62.682577
+              },
+              "tenant_database_lookup": {
+                "count": 631,
+                "mean_ms": 0.0003588589540412044,
+                "p50_ms_approx": 0.000512,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.001024,
+                "total_ms_across_requests": 0.22644
+              }
+            },
+            "query16": {
+              "blocking_closure_duration": {
+                "count": 155,
+                "mean_ms": 0.029194077419354838,
+                "p50_ms_approx": 0.032768,
+                "p95_ms_approx": 0.065536,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 4.525082
+              },
+              "blocking_completion_handoff": {
+                "count": 155,
+                "mean_ms": 0.0320774,
+                "p50_ms_approx": 0.016384,
+                "p95_ms_approx": 0.262144,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 4.971997
+              },
+              "blocking_dispatch_wait": {
+                "count": 155,
+                "mean_ms": 0.062145283870967745,
+                "p50_ms_approx": 0.065536,
+                "p95_ms_approx": 0.262144,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 9.632519
+              },
+              "get_copy_decode": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "query_copy_decode_budget": {
+                "count": 155,
+                "mean_ms": 0.009417619354838709,
+                "p50_ms_approx": 0.008192,
+                "p95_ms_approx": 0.016384,
+                "p99_ms_approx": 0.032768,
+                "total_ms_across_requests": 1.459731
+              },
+              "query_iterator_calls_sum": {
+                "count": 155,
+                "mean_ms": 0.0023664774193548387,
+                "p50_ms_approx": 0.004096,
+                "p95_ms_approx": 0.004096,
+                "p99_ms_approx": 0.004096,
+                "total_ms_across_requests": 0.366804
+              },
+              "query_snapshot_iterator_setup": {
+                "count": 155,
+                "mean_ms": 0.016060554838709676,
+                "p50_ms_approx": 0.016384,
+                "p95_ms_approx": 0.032768,
+                "p99_ms_approx": 0.065536,
+                "total_ms_across_requests": 2.489386
+              },
+              "request_to_permit_acquire_start": {
+                "count": 155,
+                "mean_ms": 0.0015940709677419354,
+                "p50_ms_approx": 0.002048,
+                "p95_ms_approx": 0.004096,
+                "p99_ms_approx": 0.004096,
+                "total_ms_across_requests": 0.247081
+              },
+              "response_processing": {
+                "count": 155,
+                "mean_ms": 0.00007509677419354838,
+                "p50_ms_approx": 0.000128,
+                "p95_ms_approx": 0.000256,
+                "p99_ms_approx": 0.000256,
+                "total_ms_across_requests": 0.01164
+              },
+              "rocksdb_get_call": {
+                "count": 0,
+                "mean_ms": null,
+                "p50_ms_approx": null,
+                "p95_ms_approx": null,
+                "p99_ms_approx": null,
+                "total_ms_across_requests": 0.0
+              },
+              "semaphore_wait": {
+                "count": 155,
+                "mean_ms": 0.0063440709677419355,
+                "p50_ms_approx": 0.001024,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.262144,
+                "total_ms_across_requests": 0.983331
+              },
+              "service_request_total": {
+                "count": 155,
+                "mean_ms": 0.13302769677419354,
+                "p50_ms_approx": 0.131072,
+                "p95_ms_approx": 0.524288,
+                "p99_ms_approx": 0.524288,
+                "total_ms_across_requests": 20.619293
+              },
+              "tenant_database_lookup": {
+                "count": 155,
+                "mean_ms": 0.00037187096774193547,
+                "p50_ms_approx": 0.000512,
+                "p95_ms_approx": 0.001024,
+                "p99_ms_approx": 0.001024,
+                "total_ms_across_requests": 0.05764
+              }
+            }
+          }
+        },
+        "warmup": {
+          "blocking_dispatch_wait": {
+            "count": 4136,
+            "mean_ms": 0.04653903167311412,
+            "p50_ms_approx": 0.032768,
+            "p95_ms_approx": 0.262144,
+            "p99_ms_approx": 0.524288,
+            "total_ms_across_requests": 192.485435
+          },
+          "commit_duration": {
+            "count": 3020,
+            "mean_ms": 1.9266474582781457,
+            "p50_ms_approx": 2.097152,
+            "p95_ms_approx": 4.194304,
+            "p99_ms_approx": 4.194304,
+            "total_ms_across_requests": 5818.475324
+          },
+          "condition_check_duration": {
+            "count": 3270,
+            "mean_ms": 0.0005473920489296636,
+            "p50_ms_approx": 0.000512,
+            "p95_ms_approx": 0.002048,
+            "p99_ms_approx": 0.002048,
+            "total_ms_across_requests": 1.789972
+          },
+          "counter_held_duration_approx": {
+            "count": 0,
+            "mean_ms": null,
+            "p50_ms_approx": null,
+            "p95_ms_approx": null,
+            "p99_ms_approx": null,
+            "total_ms_across_requests": 0.0
+          },
+          "mutation_construction_duration": {
+            "count": 3020,
+            "mean_ms": 0.006557424172185431,
+            "p50_ms_approx": 0.004096,
+            "p95_ms_approx": 0.016384,
+            "p99_ms_approx": 0.032768,
+            "total_ms_across_requests": 19.803421
+          },
+          "read_semaphore_wait": {
+            "count": 866,
+            "mean_ms": 0.0025068579676674366,
+            "p50_ms_approx": 0.000512,
+            "p95_ms_approx": 0.001024,
+            "p99_ms_approx": 0.001024,
+            "total_ms_across_requests": 2.170939
+          },
+          "revision_allocator_wait": {
+            "count": 3020,
+            "mean_ms": 0.00007177615894039735,
+            "p50_ms_approx": 0.000064,
+            "p95_ms_approx": 0.000128,
+            "p99_ms_approx": 0.000256,
+            "total_ms_across_requests": 0.216764
+          },
+          "revision_counter_get_for_update_duration": {
+            "count": 0,
+            "mean_ms": null,
+            "p50_ms_approx": null,
+            "p95_ms_approx": null,
+            "p99_ms_approx": null,
+            "total_ms_across_requests": 0.0
+          },
+          "revision_counter_lock_wait": {
+            "count": 0,
+            "mean_ms": null,
+            "p50_ms_approx": null,
+            "p95_ms_approx": null,
+            "p99_ms_approx": null,
+            "total_ms_across_requests": 0.0
+          },
+          "revision_range_reservation_duration": {
+            "count": 0,
+            "mean_ms": null,
+            "p50_ms_approx": null,
+            "p95_ms_approx": null,
+            "p99_ms_approx": null,
+            "total_ms_across_requests": 0.0
+          },
+          "rollback_duration": {
+            "count": 250,
+            "mean_ms": 0.006462468,
+            "p50_ms_approx": 0.004096,
+            "p95_ms_approx": 0.016384,
+            "p99_ms_approx": 0.065536,
+            "total_ms_across_requests": 1.615617
+          },
+          "service_request_duration": {
+            "count": 4136,
+            "mean_ms": 3.881345618230174,
+            "p50_ms_approx": 4.194304,
+            "p95_ms_approx": 8.388608,
+            "p99_ms_approx": 16.777216,
+            "total_ms_across_requests": 16053.245477
+          },
+          "user_commit_duration": {
+            "count": 3020,
+            "mean_ms": 1.9268683327814569,
+            "p50_ms_approx": 2.097152,
+            "p95_ms_approx": 4.194304,
+            "p99_ms_approx": 4.194304,
+            "total_ms_across_requests": 5819.142365
+          },
+          "user_key_get_for_update_duration": {
+            "count": 11911,
+            "mean_ms": 0.1565466703047603,
+            "p50_ms_approx": 0.004096,
+            "p95_ms_approx": 0.065536,
+            "p99_ms_approx": 8.388608,
+            "total_ms_across_requests": 1864.62739
+          },
+          "user_key_lock_wait": {
+            "count": 11911,
+            "mean_ms": 0.15174105028964824,
+            "p50_ms_approx": 1e-6,
+            "p95_ms_approx": 0.016384,
+            "p99_ms_approx": 8.388608,
+            "total_ms_across_requests": 1807.38765
+          },
+          "write_semaphore_wait": {
+            "count": 3270,
+            "mean_ms": 2.3906999134556575,
+            "p50_ms_approx": 4.194304,
+            "p95_ms_approx": 4.194304,
+            "p99_ms_approx": 8.388608,
+            "total_ms_across_requests": 7817.588717
+          }
+        },
+        "write_reads": {
+          "measurement": {
+            "condition_key": {
+              "encoded_bytes_fetched": 4540878,
+              "found_keys": 8699,
+              "keys": 11675,
+              "payload_bytes_fetched": 4453888,
+              "timings": {
+                "native_get_for_update": {
+                  "count": 11675,
+                  "mean_ms": 1.039881992633833,
+                  "p50_ms_approx": 0.008192,
+                  "p95_ms_approx": 8.388608,
+                  "p99_ms_approx": 16.777216,
+                  "total_ms_across_requests": 12140.622264
+                },
+                "native_lock_wait": {
+                  "count": 11675,
+                  "mean_ms": 1.0314498459957173,
+                  "p50_ms_approx": 1e-6,
+                  "p95_ms_approx": 8.388608,
+                  "p99_ms_approx": 16.777216,
+                  "total_ms_across_requests": 12042.176952
+                },
+                "rust_value_copy": {
+                  "count": 11675,
+                  "mean_ms": 0.0001253049250535332,
+                  "p50_ms_approx": 0.000128,
+                  "p95_ms_approx": 0.000256,
+                  "p99_ms_approx": 0.000512,
+                  "total_ms_across_requests": 1.462935
+                },
+                "shim_value_copy": {
+                  "count": 11675,
+                  "mean_ms": 0.00016266029978586724,
+                  "p50_ms_approx": 0.000128,
+                  "p95_ms_approx": 0.000256,
+                  "p99_ms_approx": 0.000512,
+                  "total_ms_across_requests": 1.899059
+                },
+                "state_decode": {
+                  "count": 11675,
+                  "mean_ms": 0.00020262586723768738,
+                  "p50_ms_approx": 0.000256,
+                  "p95_ms_approx": 0.000512,
+                  "p99_ms_approx": 0.001024,
+                  "total_ms_across_requests": 2.365657
+                }
+              }
+            },
+            "mutation_only_key": {
+              "encoded_bytes_fetched": 55550,
+              "found_keys": 691,
+              "keys": 37056,
+              "payload_bytes_fetched": 48640,
+              "timings": {
+                "native_get_for_update": {
+                  "count": 37056,
+                  "mean_ms": 0.004202558667962004,
+                  "p50_ms_approx": 0.004096,
+                  "p95_ms_approx": 0.016384,
+                  "p99_ms_approx": 0.016384,
+                  "total_ms_across_requests": 155.730014
+                },
+                "native_lock_wait": {
+                  "count": 37056,
+                  "mean_ms": 0.0,
+                  "p50_ms_approx": 1e-6,
+                  "p95_ms_approx": 1e-6,
+                  "p99_ms_approx": 1e-6,
+                  "total_ms_across_requests": 0.0
+                },
+                "rust_value_copy": {
+                  "count": 37056,
+                  "mean_ms": 0.000039258662564766834,
+                  "p50_ms_approx": 0.000064,
+                  "p95_ms_approx": 0.000064,
+                  "p99_ms_approx": 0.000128,
+                  "total_ms_across_requests": 1.454769
+                },
+                "shim_value_copy": {
+                  "count": 37056,
+                  "mean_ms": 1.3212435233160623e-6,
+                  "p50_ms_approx": 1e-6,
+                  "p95_ms_approx": 1e-6,
+                  "p99_ms_approx": 0.000064,
+                  "total_ms_across_requests": 0.04896
+                },
+                "state_decode": {
+                  "count": 37056,
+                  "mean_ms": 0.000033661728195164075,
+                  "p50_ms_approx": 0.000064,
+                  "p95_ms_approx": 0.000064,
+                  "p99_ms_approx": 0.000128,
+                  "total_ms_across_requests": 1.247369
+                }
+              }
+            }
+          },
+          "warmup": {
+            "condition_key": {
+              "encoded_bytes_fetched": 1098810,
+              "found_keys": 2105,
+              "keys": 2704,
+              "payload_bytes_fetched": 1077760,
+              "timings": {
+                "native_get_for_update": {
+                  "count": 2704,
+                  "mean_ms": 0.675925613535503,
+                  "p50_ms_approx": 0.008192,
+                  "p95_ms_approx": 8.388608,
+                  "p99_ms_approx": 16.777216,
+                  "total_ms_across_requests": 1827.702859
+                },
+                "native_lock_wait": {
+                  "count": 2704,
+                  "mean_ms": 0.6684125924556213,
+                  "p50_ms_approx": 1e-6,
+                  "p95_ms_approx": 8.388608,
+                  "p99_ms_approx": 16.777216,
+                  "total_ms_across_requests": 1807.38765
+                },
+                "rust_value_copy": {
+                  "count": 2704,
+                  "mean_ms": 0.00009359652366863905,
+                  "p50_ms_approx": 0.000128,
+                  "p95_ms_approx": 0.000256,
+                  "p99_ms_approx": 0.000512,
+                  "total_ms_across_requests": 0.253085
+                },
+                "shim_value_copy": {
+                  "count": 2704,
+                  "mean_ms": 0.00009710170118343196,
+                  "p50_ms_approx": 0.000128,
+                  "p95_ms_approx": 0.000256,
+                  "p99_ms_approx": 0.000512,
+                  "total_ms_across_requests": 0.262563
+                },
+                "state_decode": {
+                  "count": 2704,
+                  "mean_ms": 0.0002346619822485207,
+                  "p50_ms_approx": 0.000256,
+                  "p95_ms_approx": 0.000512,
+                  "p99_ms_approx": 0.001024,
+                  "total_ms_across_requests": 0.634526
+                }
+              }
+            },
+            "mutation_only_key": {
+              "encoded_bytes_fetched": 78198,
+              "found_keys": 191,
+              "keys": 9207,
+              "payload_bytes_fetched": 76288,
+              "timings": {
+                "native_get_for_update": {
+                  "count": 9207,
+                  "mean_ms": 0.003439309221244705,
+                  "p50_ms_approx": 0.004096,
+                  "p95_ms_approx": 0.008192,
+                  "p99_ms_approx": 0.016384,
+                  "total_ms_across_requests": 31.66572
+                },
+                "native_lock_wait": {
+                  "count": 9207,
+                  "mean_ms": 0.0,
+                  "p50_ms_approx": 1e-6,
+                  "p95_ms_approx": 1e-6,
+                  "p99_ms_approx": 1e-6,
+                  "total_ms_across_requests": 0.0
+                },
+                "rust_value_copy": {
+                  "count": 9207,
+                  "mean_ms": 0.00003470011947431302,
+                  "p50_ms_approx": 0.000064,
+                  "p95_ms_approx": 0.000064,
+                  "p99_ms_approx": 0.000128,
+                  "total_ms_across_requests": 0.319484
+                },
+                "shim_value_copy": {
+                  "count": 9207,
+                  "mean_ms": 2.4980992722928207e-6,
+                  "p50_ms_approx": 1e-6,
+                  "p95_ms_approx": 1e-6,
+                  "p99_ms_approx": 0.000128,
+                  "total_ms_across_requests": 0.023
+                },
+                "state_decode": {
+                  "count": 9207,
+                  "mean_ms": 0.00003480851526012816,
+                  "p50_ms_approx": 0.000064,
+                  "p95_ms_approx": 0.000064,
+                  "p99_ms_approx": 0.000256,
+                  "total_ms_across_requests": 0.320482
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "scenario": "rw20",
+  "schema": "dodb-service-workload-v1",
+  "seed": 20261013,
+  "sync_count_and_group_metrics": "unavailable from existing service interfaces",
+  "throughput_per_second": {
+    "api_calls": 3533.5182022043064,
+    "read_calls": 710.6182321638549,
+    "successful_mutations": 6707.732806976692,
+    "successful_write_transactions": 2625.5725913507695
+  },
+  "timing": {
+    "admission_ms": 5000.839751,
+    "completed_api_calls": 17692,
+    "drain_ms": 6.068092,
+    "measurement_deadline_to_last_completion_ms": 6.068092,
+    "seed_setup_ms_excluded": 380.568909,
+    "throughput_denominator_seconds": 5.006907843,
+    "total_elapsed_ms": 5006.907843,
+    "warmup_count_by_tenant": [
+      4136
+    ]
+  },
+  "validation": {
+    "tenant_1": {
+      "actual_rows": 49926,
+      "commit_identity_entries": 16166,
+      "commit_identity_unique": true,
+      "expected_rows": 49926,
+      "mismatch_samples": [],
+      "missing_rows": 0,
+      "passed": true,
+      "replay_order": "commit identity for write history; ordered expected stream for Scan comparison",
+      "scan_materialization_bound": "one response page plus bounded write ledger and mismatch sample",
+      "scan_page_limit": 64
+    }
+  }
+}

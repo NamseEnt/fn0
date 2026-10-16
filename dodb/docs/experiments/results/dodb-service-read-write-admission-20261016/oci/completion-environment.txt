@@ -1,0 +1,6 @@
+Fri Oct 16 12:49:43 AM UTC 2026
+instance-20260923-1013
+Filesystem      Size  Used Avail Use% Mounted on
+dodbbench/db    149G  140G  8.7G  95% /bench/zfs/db
+d0f93e1e8b6ce54221d413897724a36ddd6725da
+135db6b423a98b4a542318fbb7be26a9e3f6745488649edf2cc4d52648fe3fd7  /bench/zfs/db/dodb-read-write-admission-20261016/binaries/service_workload-d0f93e1e8

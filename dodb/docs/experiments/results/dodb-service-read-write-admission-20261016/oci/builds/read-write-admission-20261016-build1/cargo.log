@@ -1,0 +1,7 @@
+   Compiling dodb-core v0.1.0 (/bench/zfs/db/dodb-read-write-admission-20261016/checkout/dodb/crates/dodb-core)
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/dodb-read-write-admission-20261016/checkout/dodb/crates/dodb-rocksdb)
+   Compiling dodb-service v0.1.0 (/bench/zfs/db/dodb-read-write-admission-20261016/checkout/dodb/crates/dodb-service)
+   Compiling dodb-protocol v0.1.0 (/bench/zfs/db/dodb-read-write-admission-20261016/checkout/dodb/crates/dodb-protocol)
+   Compiling dodb-storage v0.1.0 (/bench/zfs/db/dodb-read-write-admission-20261016/checkout/dodb/crates/dodb-storage)
+   Compiling dodb-server v0.1.0 (/bench/zfs/db/dodb-read-write-admission-20261016/checkout/dodb/crates/dodb-server)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 27s

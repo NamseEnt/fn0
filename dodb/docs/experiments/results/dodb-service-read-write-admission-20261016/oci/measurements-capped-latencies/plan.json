@@ -1,0 +1,76 @@
+{
+  "source_sha": "6331aae3113e9c4e97ddd3159aa4b9a9d0a92ac3",
+  "profiles": [
+    [
+      "ranges-shared8-off",
+      "rocksdb",
+      "reserved-ranges",
+      "shared",
+      8,
+      false
+    ],
+    [
+      "ranges-shared10-off",
+      "rocksdb",
+      "reserved-ranges",
+      "shared",
+      10,
+      false
+    ],
+    [
+      "ranges-split2-8-off",
+      "rocksdb",
+      "reserved-ranges",
+      "split-read-2-write-8",
+      10,
+      false
+    ]
+  ],
+  "diagnostic_profiles": [
+    [
+      "ranges-shared8-on",
+      "rocksdb",
+      "reserved-ranges",
+      "shared",
+      8,
+      true
+    ],
+    [
+      "ranges-shared10-on",
+      "rocksdb",
+      "reserved-ranges",
+      "shared",
+      10,
+      true
+    ],
+    [
+      "ranges-split2-8-on",
+      "rocksdb",
+      "reserved-ranges",
+      "split-read-2-write-8",
+      10,
+      true
+    ]
+  ],
+  "scenarios": [
+    "rw95",
+    "rw80",
+    "rw50",
+    "rw20",
+    "mt-mix"
+  ],
+  "repetitions": 3,
+  "diagnostic_repetitions": 1,
+  "performance_runs": 45,
+  "diagnostic_runs": 15,
+  "smoke_runs": 6,
+  "binary_sha256": "e60d5222f0767759b388633a69d1cdf1ba017acc4b6128ca44c466e5f3f6e91d",
+  "decision_screen": {
+    "reference": "ranges-shared8-off",
+    "minimum_write_throughput_ratio": 0.95,
+    "maximum_write_p99_ratio": 1.1,
+    "read_p95_and_p99_must_improve": true,
+    "scope": "each tenant/profile group; descriptive medians of three runs, not statistical noninferiority",
+    "default_promotion": false
+  }
+}

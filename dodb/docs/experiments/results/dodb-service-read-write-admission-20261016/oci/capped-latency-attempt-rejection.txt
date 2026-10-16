@@ -1,0 +1,1 @@
+Stopped before acceptance: the existing capped latency sampler keeps the first 19999 samples and repeatedly replaces slot zero after the cap; full-window p95/p99 require corrected recording. Preserve this partial attempt and exclude it from accepted comparisons.

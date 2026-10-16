@@ -1,0 +1,298 @@
+{
+  "accepted": false,
+  "source_sha": "6331aae3113e9c4e97ddd3159aa4b9a9d0a92ac3",
+  "complete_marker_present": false,
+  "reports_preserved": 26,
+  "checked_runs_preserved": 25,
+  "smoke_reports_preserved": 6,
+  "affected_tenant_categories": [
+    {
+      "run": "001-rw95-ranges-shared8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 142177,
+      "sample_count": 20000
+    },
+    {
+      "run": "001-rw95-ranges-shared8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "query16",
+      "count": 35998,
+      "sample_count": 20000
+    },
+    {
+      "run": "001-rw95-ranges-shared8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 187644,
+      "sample_count": 20000
+    },
+    {
+      "run": "002-rw95-ranges-shared10-off-rep1",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 160204,
+      "sample_count": 20000
+    },
+    {
+      "run": "002-rw95-ranges-shared10-off-rep1",
+      "tenant": "tenant_1",
+      "category": "query16",
+      "count": 40529,
+      "sample_count": 20000
+    },
+    {
+      "run": "002-rw95-ranges-shared10-off-rep1",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 211388,
+      "sample_count": 20000
+    },
+    {
+      "run": "003-rw95-ranges-split2-8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 148270,
+      "sample_count": 20000
+    },
+    {
+      "run": "003-rw95-ranges-split2-8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "query16",
+      "count": 37506,
+      "sample_count": 20000
+    },
+    {
+      "run": "003-rw95-ranges-split2-8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 195628,
+      "sample_count": 20000
+    },
+    {
+      "run": "004-rw80-ranges-shared10-off-rep1",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 39556,
+      "sample_count": 20000
+    },
+    {
+      "run": "004-rw80-ranges-shared10-off-rep1",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 63036,
+      "sample_count": 20000
+    },
+    {
+      "run": "005-rw80-ranges-split2-8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 40267,
+      "sample_count": 20000
+    },
+    {
+      "run": "005-rw80-ranges-split2-8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 64153,
+      "sample_count": 20000
+    },
+    {
+      "run": "006-rw80-ranges-shared8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 39276,
+      "sample_count": 20000
+    },
+    {
+      "run": "006-rw80-ranges-shared8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 62591,
+      "sample_count": 20000
+    },
+    {
+      "run": "007-rw50-ranges-split2-8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 24830,
+      "sample_count": 20000
+    },
+    {
+      "run": "008-rw50-ranges-shared8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 25585,
+      "sample_count": 20000
+    },
+    {
+      "run": "009-rw50-ranges-shared10-off-rep1",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 27285,
+      "sample_count": 20000
+    },
+    {
+      "run": "013-mt-mix-ranges-shared10-off-rep1",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 23853,
+      "sample_count": 20000
+    },
+    {
+      "run": "013-mt-mix-ranges-shared10-off-rep1",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 31477,
+      "sample_count": 20000
+    },
+    {
+      "run": "014-mt-mix-ranges-split2-8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 37866,
+      "sample_count": 20000
+    },
+    {
+      "run": "014-mt-mix-ranges-split2-8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 49989,
+      "sample_count": 20000
+    },
+    {
+      "run": "015-mt-mix-ranges-shared8-off-rep1",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 22107,
+      "sample_count": 20000
+    },
+    {
+      "run": "016-rw95-ranges-shared8-off-rep2",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 140287,
+      "sample_count": 20000
+    },
+    {
+      "run": "016-rw95-ranges-shared8-off-rep2",
+      "tenant": "tenant_1",
+      "category": "query16",
+      "count": 35538,
+      "sample_count": 20000
+    },
+    {
+      "run": "016-rw95-ranges-shared8-off-rep2",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 185187,
+      "sample_count": 20000
+    },
+    {
+      "run": "017-rw95-ranges-split2-8-off-rep2",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 146869,
+      "sample_count": 20000
+    },
+    {
+      "run": "017-rw95-ranges-split2-8-off-rep2",
+      "tenant": "tenant_1",
+      "category": "query16",
+      "count": 37176,
+      "sample_count": 20000
+    },
+    {
+      "run": "017-rw95-ranges-split2-8-off-rep2",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 193799,
+      "sample_count": 20000
+    },
+    {
+      "run": "018-rw95-ranges-shared10-off-rep2",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 155809,
+      "sample_count": 20000
+    },
+    {
+      "run": "018-rw95-ranges-shared10-off-rep2",
+      "tenant": "tenant_1",
+      "category": "query16",
+      "count": 39442,
+      "sample_count": 20000
+    },
+    {
+      "run": "018-rw95-ranges-shared10-off-rep2",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 205607,
+      "sample_count": 20000
+    },
+    {
+      "run": "019-rw80-ranges-shared10-off-rep2",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 41634,
+      "sample_count": 20000
+    },
+    {
+      "run": "019-rw80-ranges-shared10-off-rep2",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 66243,
+      "sample_count": 20000
+    },
+    {
+      "run": "020-rw80-ranges-shared8-off-rep2",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 39741,
+      "sample_count": 20000
+    },
+    {
+      "run": "020-rw80-ranges-shared8-off-rep2",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 63315,
+      "sample_count": 20000
+    },
+    {
+      "run": "021-rw80-ranges-split2-8-off-rep2",
+      "tenant": "tenant_1",
+      "category": "get",
+      "count": 40168,
+      "sample_count": 20000
+    },
+    {
+      "run": "021-rw80-ranges-split2-8-off-rep2",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 63988,
+      "sample_count": 20000
+    },
+    {
+      "run": "022-rw50-ranges-split2-8-off-rep2",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 25244,
+      "sample_count": 20000
+    },
+    {
+      "run": "023-rw50-ranges-shared10-off-rep2",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 26928,
+      "sample_count": 20000
+    },
+    {
+      "run": "024-rw50-ranges-shared8-off-rep2",
+      "tenant": "tenant_1",
+      "category": "workflow",
+      "count": 24921,
+      "sample_count": 20000
+    }
+  ],
+  "reason": "biased capped latency replacement and truncated aggregate merging; stopped before acceptance"
+}
