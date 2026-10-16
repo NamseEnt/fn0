@@ -3412,7 +3412,7 @@ mod tests {
                 ],
             ))
             .unwrap();
-        let initial_revision = Revision::new(initial.revision.unwrap());
+        let initial_revision = initial.revision.unwrap();
         let first_conditions = vec![
             TransactionCondition::RevisionEquals {
                 key: first_key.clone(),
@@ -3472,7 +3472,7 @@ mod tests {
                 }],
             ))
             .unwrap();
-        let higher_revision = Revision::new(second_result.revision.unwrap());
+        let higher_revision = second_result.revision.unwrap();
         assert!(higher_revision > initial_revision);
         assert_eq!(
             database
