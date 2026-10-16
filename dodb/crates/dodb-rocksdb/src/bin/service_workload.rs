@@ -17,7 +17,6 @@ use tokio::task::JoinSet;
 const RESPONSE_BUDGET: usize = 64 * 1024;
 const INITIAL_ROWS: usize = 10_000;
 const VALUE_SIZE: usize = 512;
-const MAX_LATENCY_SAMPLES: usize = 20_000;
 const MAX_WRITE_LEDGER: usize = 1_000_000;
 const INPUT_FINGERPRINT_PREFIX_WORKFLOWS: u64 = 100;
 
@@ -183,14 +182,7 @@ struct Latencies {
 impl Latencies {
     fn record(&mut self, nanos: u64) {
         self.count += 1;
-        if self.samples.len() < MAX_LATENCY_SAMPLES {
-            self.samples.push(nanos);
-        } else {
-            let replacement = self.count.wrapping_mul(2_654_435_761) % self.count;
-            if replacement < MAX_LATENCY_SAMPLES as u64 {
-                self.samples[replacement as usize] = nanos;
-            }
-        }
+        self.samples.push(nanos);
     }
 
     fn report(&self) -> Value {
@@ -206,7 +198,8 @@ impl Latencies {
         json!({
             "count": self.count,
             "sample_count": sorted.len(),
-            "sample_limit": MAX_LATENCY_SAMPLES,
+            "sample_limit": null,
+            "sampling": "all recorded completions",
             "p50_ms": percentile(50),
             "p95_ms": percentile(95),
             "p99_ms": percentile(99),
@@ -345,11 +338,7 @@ impl Counters {
         for (name, latency) in other.latencies {
             let target = self.latencies.entry(name).or_default();
             target.count += latency.count;
-            for sample in latency.samples {
-                if target.samples.len() < MAX_LATENCY_SAMPLES {
-                    target.samples.push(sample);
-                }
-            }
+            target.samples.extend(latency.samples);
         }
         self.write_ledger.extend(other.write_ledger);
         self.client_input_prefixes

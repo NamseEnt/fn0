@@ -21,6 +21,24 @@ DIAGNOSTIC_PROFILES = [(profile[0].replace("-off", "-on"), *profile[1:]) for pro
 SCENARIOS = attribution.SCENARIOS
 
 
+def verify_report(report, metrics_enabled):
+    attribution.verify_report(report, metrics_enabled)
+    for counters in [report["counters"], *[tenant["counters"] for tenant in report["per_tenant"].values()]]:
+        for latency in counters["latency"].values():
+            assert latency["count"] == latency["sample_count"]
+            assert latency["sample_limit"] is None
+            assert latency["sampling"] == "all recorded completions"
+
+
+def run_case(*arguments):
+    attribution.run_case(*arguments)
+    binary, result_root, profile, scenario, repetition, sequence, *smoke_arguments = arguments
+    smoke = bool(smoke_arguments and smoke_arguments[0])
+    run_name = f"{sequence:03d}-{scenario}-{profile[0]}-rep{repetition}"
+    report_path = result_root / ("smoke" if smoke else "runs") / run_name / "report.json"
+    verify_report(json.loads(report_path.read_text()), profile[5])
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", required=True, type=Path)
@@ -40,6 +58,7 @@ def main():
         "repetitions": 3, "diagnostic_repetitions": 1,
         "performance_runs": 45, "diagnostic_runs": 15, "smoke_runs": 6,
         "binary_sha256": attribution.digest(args.binary),
+        "latency_recording": "all recorded completions; count equals sample_count for all categories and tenants",
         "decision_screen": {
             "reference": "ranges-shared8-off",
             "minimum_write_throughput_ratio": 0.95,
@@ -64,7 +83,7 @@ def main():
             output.flush()
             subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, check=True)
     for profile_index, profile in enumerate(PROFILES + DIAGNOSTIC_PROFILES):
-        attribution.run_case(args.binary, args.result_root, profile, "smoke", 0, profile_index + 1, True)
+        run_case(args.binary, args.result_root, profile, "smoke", 0, profile_index + 1, True)
     sequence = 0
     for repetition in range(1, 4):
         for scenario_index, scenario in enumerate(SCENARIOS):
@@ -74,13 +93,13 @@ def main():
                 order = list(reversed(order))
             for profile in order:
                 sequence += 1
-                attribution.run_case(args.binary, args.result_root, profile, scenario, repetition, sequence)
+                run_case(args.binary, args.result_root, profile, scenario, repetition, sequence)
     assert sequence == plan["performance_runs"]
     for scenario_index, scenario in enumerate(SCENARIOS):
         offset = scenario_index % len(DIAGNOSTIC_PROFILES)
         for profile in DIAGNOSTIC_PROFILES[offset:] + DIAGNOSTIC_PROFILES[:offset]:
             sequence += 1
-            attribution.run_case(args.binary, args.result_root, profile, scenario, 1, sequence)
+            run_case(args.binary, args.result_root, profile, scenario, 1, sequence)
     assert sequence == plan["performance_runs"] + plan["diagnostic_runs"]
     assert not checked_output(["git", "status", "--porcelain"])
     (args.result_root / "complete.json").write_text(json.dumps({"passed": True, "runs": sequence}) + "\n")

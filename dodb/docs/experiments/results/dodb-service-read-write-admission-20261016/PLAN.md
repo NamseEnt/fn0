@@ -47,3 +47,18 @@ noninferiority claim. MT-MIX tenant groups must be reported separately.
 Keep the serialized allocator and shared-eight service defaults. No default
 promotion is authorized by this experiment. Five-second runs cannot establish
 sustained, large-dataset, crash-recovery, or production performance.
+
+## Measurement correction before the accepted matrix
+
+The initial attempt was stopped and excluded from acceptance when source
+review identified biased driver latency sampling after 20,000 observations:
+`count * 2654435761 % count` is zero before integer overflow, repeatedly
+replacing only sample zero. MT aggregate merging also truncated samples.
+The corrected driver records every latency and merges every tenant sample.
+All accepted reports must have `count == sample_count` for every latency
+category, tenant, and aggregate. Memory now scales with completed calls;
+the experiment retains its one-million call cap and records RSS. Request
+construction, service implementation, workload schedules, durability, and
+the predeclared screen are unchanged. Preserve the initial partial attempt
+and both prior builds; use one newly committed source/binary for all accepted
+runs. Do not mix old capped percentiles with corrected full-window percentiles.
