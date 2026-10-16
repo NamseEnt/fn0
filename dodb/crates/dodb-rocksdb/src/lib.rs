@@ -634,10 +634,10 @@ impl RocksDbService {
                 "max_blocking_operations must be nonzero",
             ));
         }
-        let (read_slots, write_slots) = config.blocking_admission.split_slot_limits().unwrap_or((
-            config.max_blocking_operations,
-            config.max_blocking_operations,
-        ));
+        let (read_slots, write_slots) = config
+            .blocking_admission
+            .split_slot_limits()
+            .unwrap_or((2, 6));
         if config.blocking_admission.split_slot_limits().is_some()
             && config.max_blocking_operations != read_slots + write_slots
         {
