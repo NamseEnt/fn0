@@ -293,16 +293,25 @@ fn receive_hook(child: &mut ChildGuard, backend: Backend) -> String {
     loop {
         let line = child.handoff_lines.recv_timeout(Duration::from_millis(25));
         match line {
-            Ok(Ok(line)) if line.starts_with("R1B3B_WRONG_SYNC_TARGET|") => {
-                panic!("wrong_sync_target: {line}");
+            Ok(Ok(line)) => {
+                let Some(event_line) = extract_handoff_event(&line) else {
+                    continue;
+                };
+                if event_line.starts_with("R1B3B_WRONG_SYNC_TARGET|") {
+                    panic!("wrong_sync_target: {event_line}");
+                }
+                if event_line.starts_with(HOOK_PREFIX) {
+                    let expected_backend_prefix = format!("{HOOK_PREFIX}{}|", backend.as_str());
+                    assert!(
+                        event_line.starts_with(&expected_backend_prefix),
+                        "unexpected WAL sync hook backend: {event_line}"
+                    );
+                    return event_line.to_owned();
+                }
+                if event_line.starts_with("R1B3B_TARGET_RETURNED|") {
+                    panic!("target transaction returned before WAL sync hook: {event_line}");
+                }
             }
-            Ok(Ok(line)) if line.starts_with(&format!("{HOOK_PREFIX}{}|", backend.as_str())) => {
-                return line;
-            }
-            Ok(Ok(line)) if line.starts_with("R1B3B_TARGET_RETURNED|") => {
-                panic!("target transaction returned before WAL sync hook: {line}");
-            }
-            Ok(Ok(_)) => {}
             Ok(Err(error)) => panic!("handoff_timeout: failed reading child output: {error}"),
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 let status = child
@@ -329,6 +338,35 @@ fn receive_hook(child: &mut ChildGuard, backend: Backend) -> String {
             panic!("handoff_timeout: WAL sync hook timed out for {backend:?}");
         }
     }
+}
+
+fn extract_handoff_event(output_line: &str) -> Option<&str> {
+    let marker_offset = [
+        "R1B3B_HOOK|",
+        "R1B3B_WRONG_SYNC_TARGET|",
+        "R1B3B_TARGET_RETURNED|",
+    ]
+    .iter()
+    .filter_map(|marker| output_line.find(marker))
+    .min()?;
+    Some(&output_line[marker_offset..])
+}
+
+#[test]
+fn handoff_event_framing_accepts_raw_and_prefixed_lines() {
+    let raw_event = "R1B3B_HOOK|native|before_wal_sync|/tmp/tenant.wal";
+    let prefixed_event = format!("test service_child ... {raw_event}");
+
+    assert_eq!(extract_handoff_event(raw_event), Some(raw_event));
+    assert_eq!(extract_handoff_event(&prefixed_event), Some(raw_event));
+    assert_eq!(
+        extract_handoff_event("error: child failed before emitting a handoff event"),
+        None
+    );
+    assert_eq!(
+        extract_handoff_event("test service_child ... R1B3B_TARGET_RETURNED|native"),
+        Some("R1B3B_TARGET_RETURNED|native")
+    );
 }
 
 async fn execute_seed<S: DodbService>(service: &S, scenario: &Scenario) {
