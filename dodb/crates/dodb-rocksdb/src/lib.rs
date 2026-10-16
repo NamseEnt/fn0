@@ -1441,10 +1441,7 @@ impl TenantDatabase {
         let decoded = match result {
             1 => Ok(RevisionState::missing(Revision::ZERO)),
             2 => Err(ffi_error(error, "RocksDB get failed")),
-            _ => {
-                let bytes = unsafe { copy_and_free_value(value, value_length) };
-                decode_state(&bytes)
-            }
+            _ => unsafe { decode_and_free_get_value(value, value_length) },
         };
         if let (Some(metrics), Some(kind)) = (&metrics, kind) {
             metrics.record_read(
@@ -2417,6 +2414,26 @@ unsafe fn copy_and_free_value(value: *mut u8, value_length: usize) -> Vec<u8> {
     let bytes = unsafe { std::slice::from_raw_parts(value, value_length) }.to_vec();
     unsafe { dodb_rocksdb_value_free(value) };
     bytes
+}
+
+struct NativeGetValue(NonNull<u8>);
+
+impl Drop for NativeGetValue {
+    fn drop(&mut self) {
+        unsafe { dodb_rocksdb_value_free(self.0.as_ptr()) };
+    }
+}
+
+unsafe fn decode_and_free_get_value(
+    value: *mut u8,
+    value_length: usize,
+) -> Result<RevisionState, Error> {
+    let allocation = NativeGetValue(
+        NonNull::new(value)
+            .ok_or_else(|| Error::invariant("successful RocksDB Get returned null"))?,
+    );
+    let encoded = unsafe { std::slice::from_raw_parts(allocation.0.as_ptr(), value_length) };
+    decode_state(encoded)
 }
 
 fn ffi_error(error: *mut c_char, fallback: &str) -> Error {
