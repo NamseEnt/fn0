@@ -97,12 +97,16 @@ async fn check_conditional_history<S: DodbService>(service: Arc<S>) {
     let second_future = execute(service.as_ref(), second_request);
     let (first_result, second_result) = tokio::join!(first_future, second_future);
     let first_commit = match first_result {
-        Ok(Response::Transact(outcome)) => outcome.commit_lsn.map(Revision::new),
+        Ok(Response::Transact(outcome)) => outcome
+            .commit_lsn
+            .map(|commit_lsn| Revision::new(commit_lsn.get())),
         Err(Error::Conflict(_)) => None,
         other => panic!("unexpected first transaction result: {other:?}"),
     };
     let second_commit = match second_result {
-        Ok(Response::Transact(outcome)) => outcome.commit_lsn.map(Revision::new),
+        Ok(Response::Transact(outcome)) => outcome
+            .commit_lsn
+            .map(|commit_lsn| Revision::new(commit_lsn.get())),
         Err(Error::Conflict(_)) => None,
         other => panic!("unexpected second transaction result: {other:?}"),
     };
