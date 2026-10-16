@@ -122,7 +122,7 @@ struct ReadIterator {
   }
 };
 
-char* copy_string(std::string_view value) {
+char* copy_string(const std::string& value) {
   auto* output = static_cast<char*>(std::malloc(value.size() + 1));
   if (output == nullptr) {
     return nullptr;
@@ -145,7 +145,6 @@ extern "C" {
 struct DodbRocksDbReadTimings {
   uint64_t native_call_nanos;
   uint64_t value_copy_nanos;
-  uint64_t stored_value_length;
 };
 
 void* dodb_rocksdb_open(const char* path, char** error) {
@@ -303,12 +302,8 @@ int dodb_rocksdb_transaction_get_for_update(
   }
   const auto copy_started = collect_lock_wait != 0
       ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
-  timings->stored_value_length = stored.size();
-  const auto copied_length = key_length > 0 && key[0] == 1
-      ? std::min(stored.size(), size_t{10}) : stored.size();
-  *value = reinterpret_cast<unsigned char*>(copy_string(
-      std::string_view(stored.data(), copied_length)));
-  *value_length = copied_length;
+  *value = reinterpret_cast<unsigned char*>(copy_string(stored));
+  *value_length = stored.size();
   if (collect_lock_wait != 0) {
     timings->value_copy_nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now() - copy_started).count();

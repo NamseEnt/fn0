@@ -104,5 +104,24 @@ pub fn materialized_transaction_observation(
 }
 
 pub fn header_transaction_observation(encoded: &[u8]) -> Result<dodb_core::ObservedState, Error> {
-    super::decode_transaction_observation(&encoded[..encoded.len().min(10)], encoded.len())
+    let stored_length = encoded.len();
+    let prefix = &encoded[..encoded.len().min(10)];
+    if prefix.len() < 10 || prefix[0] != super::VALUE_FORMAT {
+        return Err(Error::corruption(
+            "unsupported RocksDB logical value format",
+        ));
+    }
+    let revision = dodb_core::Revision::new(u64::from_be_bytes(
+        prefix[2..10]
+            .try_into()
+            .map_err(|_| Error::corruption("invalid RocksDB revision bytes"))?,
+    ));
+    match prefix[1] {
+        super::PRESENT_TAG => Ok(dodb_core::ObservedState::present(revision)),
+        super::MISSING_TAG if stored_length == 10 => {
+            Ok(dodb_core::ObservedState::missing(revision))
+        }
+        super::MISSING_TAG => Err(Error::corruption("tombstone contains value bytes")),
+        _ => Err(Error::corruption("unknown RocksDB logical value state")),
+    }
 }

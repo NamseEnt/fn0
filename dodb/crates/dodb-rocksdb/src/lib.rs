@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use dodb_core::{
-    DocumentKey, Error, ObservedState, PrimaryKey, Revision, RevisionState, SortKey, TenantId,
+    DocumentKey, Error, PrimaryKey, Revision, RevisionState, SortKey, TenantId,
     TransactionCondition, TransactionConflict, TransactionMutation, TransactionRequest,
 };
 use dodb_protocol::{MAX_STORAGE_ENCODED_KEY_SIZE, ProtocolLimits, encoded_success_response_size};
@@ -47,7 +47,6 @@ const WRITE_READ_ROLE_NAMES: [&str; 2] = ["condition_key", "mutation_only_key"];
 struct NativeReadTimings {
     native_call_nanos: u64,
     value_copy_nanos: u64,
-    stored_value_length: u64,
 }
 
 #[derive(Default)]
@@ -55,7 +54,6 @@ struct WriteReadObservation {
     native: NativeReadTimings,
     rust_copy: Duration,
     encoded_bytes: usize,
-    returned_bytes: usize,
 }
 
 #[derive(Default)]
@@ -65,7 +63,6 @@ struct WriteReadMetrics {
     found_keys: std::sync::atomic::AtomicU64,
     encoded_bytes: std::sync::atomic::AtomicU64,
     payload_bytes: std::sync::atomic::AtomicU64,
-    returned_bytes: std::sync::atomic::AtomicU64,
 }
 
 tokio::task_local! {
@@ -355,7 +352,6 @@ impl ResearchMetrics {
                         "found_keys": role.found_keys.load(Ordering::Relaxed),
                         "encoded_bytes_fetched": role.encoded_bytes.load(Ordering::Relaxed),
                         "payload_bytes_fetched": role.payload_bytes.load(Ordering::Relaxed),
-                        "encoded_bytes_returned_by_shim": role.returned_bytes.load(Ordering::Relaxed),
                         "timings": timings,
                     }));
                 }
@@ -1704,8 +1700,8 @@ impl TenantDatabase {
                 );
             }
             let current_high_water = counter
-                .as_ref()
-                .map(|value| counter_bytes_to_u64(&value.bytes))
+                .as_deref()
+                .map(counter_bytes_to_u64)
                 .transpose()?
                 .unwrap_or(0);
             let first_revision = current_high_water
@@ -1847,11 +1843,8 @@ impl TenantDatabase {
             let found = encoded_state.is_some();
             let decode_started = condition_keys.as_ref().map(|_| Instant::now());
             let state = match encoded_state {
-                Some(encoded_state) => decode_transaction_observation(
-                    &encoded_state.bytes,
-                    encoded_state.stored_length,
-                )?,
-                None => ObservedState::missing(Revision::ZERO),
+                Some(encoded_state) => decode_state(&encoded_state)?,
+                None => RevisionState::missing(Revision::ZERO),
             };
             let decode_elapsed = decode_started.map_or(Duration::ZERO, |started| started.elapsed());
             if let Some(metrics) = &metrics {
@@ -1907,12 +1900,9 @@ impl TenantDatabase {
                     .fetch_add(u64::from(found), Ordering::Relaxed);
                 role.encoded_bytes
                     .fetch_add(observation.encoded_bytes as u64, Ordering::Relaxed);
-                role.returned_bytes
-                    .fetch_add(observation.returned_bytes as u64, Ordering::Relaxed);
-                let payload_bytes = if state.is_missing() {
-                    0
-                } else {
-                    observation.encoded_bytes.saturating_sub(10)
+                let payload_bytes = match &state {
+                    RevisionState::Present { value, .. } => value.len(),
+                    RevisionState::Missing { .. } => 0,
                 };
                 role.payload_bytes
                     .fetch_add(payload_bytes as u64, Ordering::Relaxed);
@@ -1947,7 +1937,7 @@ impl TenantDatabase {
                 return Err(Error::conflict(TransactionConflict {
                     key: condition.key().clone(),
                     expected: condition.expectation(),
-                    actual: *actual,
+                    actual: actual.observed(),
                 }));
             }
         }
@@ -2012,8 +2002,8 @@ impl TenantDatabase {
                 }
             }
             let current_revision = counter
-                .as_ref()
-                .map(|value| counter_bytes_to_u64(&value.bytes))
+                .as_deref()
+                .map(counter_bytes_to_u64)
                 .transpose()?
                 .unwrap_or(0);
             Some((current_revision, Instant::now()))
@@ -2321,35 +2311,13 @@ fn decode_state(encoded: &[u8]) -> Result<RevisionState, Error> {
     }
 }
 
-fn decode_transaction_observation(
-    encoded: &[u8],
-    stored_length: usize,
-) -> Result<ObservedState, Error> {
-    if encoded.len() < 10 || encoded[0] != VALUE_FORMAT {
-        return Err(Error::corruption(
-            "unsupported RocksDB logical value format",
-        ));
-    }
-    let revision = Revision::new(u64::from_be_bytes(
-        encoded[2..10]
-            .try_into()
-            .map_err(|_| Error::corruption("invalid RocksDB revision bytes"))?,
-    ));
-    match encoded[1] {
-        PRESENT_TAG => Ok(ObservedState::present(revision)),
-        MISSING_TAG if stored_length == 10 => Ok(ObservedState::missing(revision)),
-        MISSING_TAG => Err(Error::corruption("tombstone contains value bytes")),
-        _ => Err(Error::corruption("unknown RocksDB logical value state")),
-    }
-}
-
 fn counter_bytes_to_u64(encoded: &[u8]) -> Result<u64, Error> {
     Ok(u64::from_be_bytes(encoded.try_into().map_err(|_| {
         Error::corruption("RocksDB revision counter has invalid length")
     })?))
 }
 
-fn condition_matches(condition: &TransactionCondition, actual: &ObservedState) -> bool {
+fn condition_matches(condition: &TransactionCondition, actual: &RevisionState) -> bool {
     match condition {
         TransactionCondition::RevisionEquals {
             expected_revision, ..
@@ -2360,13 +2328,13 @@ fn condition_matches(condition: &TransactionCondition, actual: &ObservedState) -
 }
 
 fn evaluate_uncreated(request: &TransactionRequest) -> Result<LogicalTransactionResult, Error> {
-    let actual = ObservedState::missing(Revision::ZERO);
+    let actual = RevisionState::missing(Revision::ZERO);
     for condition in &request.conditions {
         if !condition_matches(condition, &actual) {
             return Err(Error::conflict(TransactionConflict {
                 key: condition.key().clone(),
                 expected: condition.expectation(),
-                actual,
+                actual: actual.observed(),
             }));
         }
     }
@@ -2395,11 +2363,6 @@ fn transaction_put(transaction: &TransactionGuard, key: &[u8], value: &[u8]) -> 
     }
 }
 
-struct TransactionReadValue {
-    bytes: Vec<u8>,
-    stored_length: usize,
-}
-
 fn transaction_get_for_update(
     transaction: &TransactionGuard,
     key: &[u8],
@@ -2407,7 +2370,7 @@ fn transaction_get_for_update(
     lock_wait_nanos: &mut u64,
     lock_wait_count: &mut u64,
     observation: Option<&mut WriteReadObservation>,
-) -> Result<Option<TransactionReadValue>, Error> {
+) -> Result<Option<Vec<u8>>, Error> {
     let mut value = std::ptr::null_mut();
     let mut value_length = 0;
     let mut error = std::ptr::null_mut();
@@ -2430,16 +2393,12 @@ fn transaction_get_for_update(
     let decoded = match result {
         1 => Ok(None),
         2 => Err(ffi_error(error, "RocksDB transaction read failed")),
-        _ => Ok(Some(TransactionReadValue {
-            bytes: unsafe { copy_and_free_value(value, value_length) },
-            stored_length: native_timings.stored_value_length as usize,
-        })),
+        _ => Ok(Some(unsafe { copy_and_free_value(value, value_length) })),
     };
     if let Some(observation) = observation {
-        observation.rust_copy = copy_started.unwrap().elapsed();
-        observation.encoded_bytes = native_timings.stored_value_length as usize;
-        observation.returned_bytes = value_length;
         observation.native = native_timings;
+        observation.rust_copy = copy_started.unwrap().elapsed();
+        observation.encoded_bytes = value_length;
     }
     decoded
 }
