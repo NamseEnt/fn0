@@ -5840,11 +5840,15 @@ fn apply_cached_leaf_mutation(
             Ok(entry_index) => {
                 old_value = Some(entries.replace(entry_index, encoded, revision, value_ref));
                 if !leaf_fits(entries.all(), high_key.as_deref(), *right_sibling) {
-                    return Err(Error::invalid_input(
-                        "document key and value cannot fit in a Blink leaf",
-                    ));
+                    if entries.len() == 1 {
+                        return Err(Error::invalid_input(
+                            "document key and value cannot fit in a Blink leaf",
+                        ));
+                    }
+                    split_required = true;
+                } else {
+                    *lsn = Lsn::new(revision.get());
                 }
-                *lsn = Lsn::new(revision.get());
             }
             Err(entry_index) => {
                 entries.insert(
@@ -6788,21 +6792,36 @@ fn apply_mutation<S: BlinkMutationState>(
         Ok(index) => {
             let old = entries.replace(index, &encoded, revision, value_ref);
             if !leaf_fits(entries.all(), high_key.as_deref(), right_sibling) {
-                return Err(Error::invalid_input(
-                    "document key and value cannot fit in a Blink leaf",
-                ));
-            }
-            free_value(state, dirty, old)?;
-            state.insert_page(
-                leaf_id,
-                BlinkPage::Leaf {
-                    lsn: Lsn::new(revision.get()),
+                if entries.len() == 1 {
+                    return Err(Error::invalid_input(
+                        "document key and value cannot fit in a Blink leaf",
+                    ));
+                }
+                free_value(state, dirty, old)?;
+                split_leaf(
+                    state,
+                    dirty,
+                    metrics,
+                    leaf_id,
+                    path,
                     high_key,
                     right_sibling,
                     entries,
-                },
-            );
-            dirty.insert(leaf_id);
+                    revision,
+                )?;
+            } else {
+                free_value(state, dirty, old)?;
+                state.insert_page(
+                    leaf_id,
+                    BlinkPage::Leaf {
+                        lsn: Lsn::new(revision.get()),
+                        high_key,
+                        right_sibling,
+                        entries,
+                    },
+                );
+                dirty.insert(leaf_id);
+            }
         }
         Err(index) => {
             entries.insert(
@@ -13496,43 +13515,49 @@ mod tests {
                 store.put(key.clone(), vec![position as u8; 8]).unwrap();
             }
             let split_count_before_growth = store.split_metrics().leaf_splits;
-            for (position, key) in keys.iter().enumerate() {
-                store
-                    .put(key.clone(), vec![position as u8; INLINE_VALUE_LIMIT])
-                    .unwrap();
-            }
-            assert!(store.split_metrics().leaf_splits > split_count_before_growth);
             if planned_execution {
-                let transaction_keys = &keys[..4];
                 let result = store
                     .transact(TransactionRequest::new(
                         Vec::new(),
-                        transaction_keys
+                        keys[..4]
                             .iter()
                             .enumerate()
                             .map(|(position, key)| TransactionMutation::Put {
                                 key: key.clone(),
-                                value: vec![0xe0 + position as u8; 16],
+                                value: vec![position as u8; INLINE_VALUE_LIMIT],
                             })
                             .collect(),
                     ))
                     .unwrap();
                 let transaction_revision = result.revision.unwrap();
-                for key in transaction_keys {
+                for key in &keys[..4] {
                     assert_eq!(store.get(key).unwrap().revision(), transaction_revision);
                 }
+                let transaction_scan = store.scan(None, usize::MAX).unwrap();
+                for position in 0..4 {
+                    assert_eq!(transaction_scan[position].key, keys[position]);
+                    assert_eq!(
+                        transaction_scan[position].value,
+                        vec![position as u8; INLINE_VALUE_LIMIT]
+                    );
+                }
+                for (position, key) in keys.iter().enumerate().skip(4) {
+                    store
+                        .put(key.clone(), vec![position as u8; INLINE_VALUE_LIMIT])
+                        .unwrap();
+                }
+            } else {
+                for (position, key) in keys.iter().enumerate() {
+                    store
+                        .put(key.clone(), vec![position as u8; INLINE_VALUE_LIMIT])
+                        .unwrap();
+                }
             }
+            assert!(store.split_metrics().leaf_splits > split_count_before_growth);
             let expected = keys
                 .iter()
                 .enumerate()
-                .map(|(position, key)| {
-                    let value = if planned_execution && position < 4 {
-                        vec![0xe0 + position as u8; 16]
-                    } else {
-                        vec![position as u8; INLINE_VALUE_LIMIT]
-                    };
-                    (key.clone(), value)
-                })
+                .map(|(position, key)| (key.clone(), vec![position as u8; INLINE_VALUE_LIMIT]))
                 .collect::<Vec<_>>();
             let scanned = store.scan(None, usize::MAX).unwrap();
             assert_eq!(
