@@ -510,6 +510,17 @@ pub enum BlockingAdmissionMode {
     #[default]
     Shared,
     SplitReadWrite,
+    SplitRead2Write8,
+}
+
+impl BlockingAdmissionMode {
+    pub fn split_slot_limits(self) -> Option<(usize, usize)> {
+        match self {
+            Self::Shared => None,
+            Self::SplitReadWrite => Some((2, 6)),
+            Self::SplitRead2Write8 => Some((2, 8)),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -623,11 +634,15 @@ impl RocksDbService {
                 "max_blocking_operations must be nonzero",
             ));
         }
-        if config.blocking_admission == BlockingAdmissionMode::SplitReadWrite
-            && config.max_blocking_operations != 8
+        let (read_slots, write_slots) = config.blocking_admission.split_slot_limits().unwrap_or((
+            config.max_blocking_operations,
+            config.max_blocking_operations,
+        ));
+        if config.blocking_admission.split_slot_limits().is_some()
+            && config.max_blocking_operations != read_slots + write_slots
         {
             return Err(Error::invalid_request(
-                "split blocking admission requires exactly eight total operations",
+                "split blocking admission requires max_blocking_operations to equal its read and write slot total",
             ));
         }
         std::fs::create_dir_all(&config.data_dir)?;
@@ -635,8 +650,8 @@ impl RocksDbService {
             data_dir: config.data_dir,
             databases: DashMap::new(),
             blocking_operations: Arc::new(Semaphore::new(config.max_blocking_operations)),
-            read_blocking_operations: Arc::new(Semaphore::new(2)),
-            write_blocking_operations: Arc::new(Semaphore::new(6)),
+            read_blocking_operations: Arc::new(Semaphore::new(read_slots)),
+            write_blocking_operations: Arc::new(Semaphore::new(write_slots)),
             blocking_admission: config.blocking_admission,
             blocking_operation_limit: config.max_blocking_operations,
             research_metrics: config
@@ -666,10 +681,14 @@ impl RocksDbService {
                     }
                 }
             }
-            BlockingAdmissionMode::SplitReadWrite => {
+            BlockingAdmissionMode::SplitReadWrite | BlockingAdmissionMode::SplitRead2Write8 => {
+                let (read_slots, write_slots) = self
+                    .blocking_admission
+                    .split_slot_limits()
+                    .expect("split admission has read and write slot limits");
                 for (semaphore, limit) in [
-                    (&self.read_blocking_operations, 2),
-                    (&self.write_blocking_operations, 6),
+                    (&self.read_blocking_operations, read_slots),
+                    (&self.write_blocking_operations, write_slots),
                 ] {
                     for _ in 0..limit {
                         if let Ok(permit) = Arc::clone(semaphore).acquire_owned().await {
@@ -696,10 +715,12 @@ impl RocksDbService {
     fn semaphore_for(&self, lane: ExecutionLane) -> Arc<Semaphore> {
         match self.blocking_admission {
             BlockingAdmissionMode::Shared => Arc::clone(&self.blocking_operations),
-            BlockingAdmissionMode::SplitReadWrite => match lane {
-                ExecutionLane::Read => Arc::clone(&self.read_blocking_operations),
-                ExecutionLane::Write => Arc::clone(&self.write_blocking_operations),
-            },
+            BlockingAdmissionMode::SplitReadWrite | BlockingAdmissionMode::SplitRead2Write8 => {
+                match lane {
+                    ExecutionLane::Read => Arc::clone(&self.read_blocking_operations),
+                    ExecutionLane::Write => Arc::clone(&self.write_blocking_operations),
+                }
+            }
         }
     }
 

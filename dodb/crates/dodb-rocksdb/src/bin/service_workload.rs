@@ -103,7 +103,11 @@ impl DriverService {
             }
             BackendKind::RocksDb => {
                 let mut config = dodb_rocksdb::RocksDbServiceConfig::new(data_dir);
-                config.max_blocking_operations = shared_blocking_slots;
+                config.max_blocking_operations = blocking_admission
+                    .split_slot_limits()
+                    .map_or(shared_blocking_slots, |(read_slots, write_slots)| {
+                        read_slots + write_slots
+                    });
                 config.blocking_admission = blocking_admission;
                 config.research_metrics = research_metrics_enabled;
                 config.detailed_write_metrics = detailed_write_metrics_enabled;
@@ -387,6 +391,7 @@ fn parse_options() -> Result<Options, String> {
     {
         "shared" => dodb_rocksdb::BlockingAdmissionMode::Shared,
         "split-read-write" => dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite,
+        "split-read-2-write-8" => dodb_rocksdb::BlockingAdmissionMode::SplitRead2Write8,
         other => return Err(format!("unsupported blocking admission {other}")),
     };
     let shared_blocking_slots = values
@@ -401,12 +406,10 @@ fn parse_options() -> Result<Options, String> {
     if shared_blocking_slots == 0 {
         return Err("--shared-blocking-slots must be positive".to_owned());
     }
-    if blocking_admission == dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite
+    if blocking_admission.split_slot_limits().is_some()
         && values.contains_key("--shared-blocking-slots")
     {
-        return Err(
-            "--shared-blocking-slots cannot be combined with split-read-write admission".to_owned(),
-        );
+        return Err("--shared-blocking-slots cannot be combined with split admission".to_owned());
     }
     let scenario = match values.get("--scenario").map(String::as_str).unwrap_or("") {
         "rw95" => Scenario::Single(Profile::Rw95),
@@ -419,6 +422,11 @@ fn parse_options() -> Result<Options, String> {
     };
     if backend == BackendKind::Blink && shared_blocking_slots != 8 {
         return Err("--shared-blocking-slots applies only to RocksDB".to_owned());
+    }
+    if backend == BackendKind::Blink
+        && blocking_admission == dodb_rocksdb::BlockingAdmissionMode::SplitRead2Write8
+    {
+        return Err("split-read-2-write-8 admission applies only to RocksDB".to_owned());
     }
     let parse = |name: &str, default: u64| -> Result<u64, String> {
         values
@@ -1697,18 +1705,19 @@ async fn run(options: Options) -> Result<Value, String> {
             "blink": {"database_cache_capacity_pages": 128, "coordinator_queue_capacity": 256, "coordinator_group_requests": 64, "coordinator_group_bytes": 4194304, "coordinator_collection_delay_ms": 0},
             "rocksdb": {
                 "blocking_operation_limit": if options.backend == BackendKind::RocksDb {
-                    if options.blocking_admission == dodb_rocksdb::BlockingAdmissionMode::Shared { options.shared_blocking_slots } else { 8 }
+                    options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(read_slots, write_slots)| read_slots + write_slots)
                 } else { 0 },
                 "blocking_admission": if options.backend == BackendKind::Blink {
                     "not-applicable".to_owned()
                 } else {
                     match options.blocking_admission {
                         dodb_rocksdb::BlockingAdmissionMode::Shared => format!("shared-{}", options.shared_blocking_slots),
-                        dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite => "split-read-2-write-6".to_owned()
+                        dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite => "split-read-2-write-6".to_owned(),
+                        dodb_rocksdb::BlockingAdmissionMode::SplitRead2Write8 => "split-read-2-write-8".to_owned()
                     }
                 },
-                "read_blocking_slots": if options.backend == BackendKind::Blink { 0 } else if options.blocking_admission == dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite { 2 } else { options.shared_blocking_slots },
-                "write_blocking_slots": if options.backend == BackendKind::Blink { 0 } else if options.blocking_admission == dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite { 6 } else { options.shared_blocking_slots },
+                "read_blocking_slots": if options.backend == BackendKind::Blink { 0 } else { options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(read_slots, _)| read_slots) },
+                "write_blocking_slots": if options.backend == BackendKind::Blink { 0 } else { options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(_, write_slots)| write_slots) },
                 "revision_allocator": match options.revision_allocator { dodb_rocksdb::RevisionAllocatorMode::Serialized => "serialized", dodb_rocksdb::RevisionAllocatorMode::ReservedRanges => "reserved-ranges" },
                 "revision_range_size": if options.revision_allocator == dodb_rocksdb::RevisionAllocatorMode::ReservedRanges { Some(4_096) } else { None }
             },
