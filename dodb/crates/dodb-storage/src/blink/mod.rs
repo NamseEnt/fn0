@@ -13502,21 +13502,36 @@ mod tests {
                     .unwrap();
             }
             assert!(store.split_metrics().leaf_splits > split_count_before_growth);
-            for key in &keys {
-                store.delete(key.clone()).unwrap();
-            }
-            let split_count_before_recreation = store.split_metrics().leaf_splits;
-            for (position, key) in keys.iter().enumerate() {
-                store
-                    .put(key.clone(), vec![position as u8; INLINE_VALUE_LIMIT])
+            if planned_execution {
+                let transaction_keys = &keys[..4];
+                let result = store
+                    .transact(TransactionRequest::new(
+                        Vec::new(),
+                        transaction_keys
+                            .iter()
+                            .enumerate()
+                            .map(|(position, key)| TransactionMutation::Put {
+                                key: key.clone(),
+                                value: vec![0xe0 + position as u8; 16],
+                            })
+                            .collect(),
+                    ))
                     .unwrap();
+                let transaction_revision = result.revision.unwrap();
+                for key in transaction_keys {
+                    assert_eq!(store.get(key).unwrap().revision(), transaction_revision);
+                }
             }
-            assert!(store.split_metrics().leaf_splits > split_count_before_recreation);
             let expected = keys
                 .iter()
                 .enumerate()
                 .map(|(position, key)| {
-                    (key.clone(), vec![position as u8; INLINE_VALUE_LIMIT])
+                    let value = if planned_execution && position < 4 {
+                        vec![0xe0 + position as u8; 16]
+                    } else {
+                        vec![position as u8; INLINE_VALUE_LIMIT]
+                    };
+                    (key.clone(), value)
                 })
                 .collect::<Vec<_>>();
             let scanned = store.scan(None, usize::MAX).unwrap();
@@ -13539,7 +13554,75 @@ mod tests {
             );
             store.check_invariants().unwrap();
             let (data, wal) = store.into_files();
-            let reopened = reopen_memory_store(data, wal.unwrap());
+            let mut reopened = reopen_memory_store(data, wal.unwrap());
+            let reopened_scan = reopened.scan(None, usize::MAX).unwrap();
+            assert_eq!(
+                reopened_scan
+                    .iter()
+                    .map(|document| (document.key.clone(), document.value.clone()))
+                    .collect::<Vec<_>>(),
+                expected
+            );
+            reopened.check_invariants().unwrap();
+        }
+
+        for planned_execution in [false, true] {
+            let mut store = BlinkStore::<MemoryFile, MemoryFile>::open_with_wal(
+                MemoryFile::default(),
+                MemoryFile::default(),
+                config.clone(),
+            )
+            .unwrap();
+            if planned_execution {
+                store.enable_planned_execution();
+            }
+            let keys = (0..96u64)
+                .map(|position| {
+                    DocumentKey::new(
+                        b"tombstone-leaf-recreation".to_vec(),
+                        position.to_be_bytes().to_vec(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            for (position, key) in keys.iter().enumerate() {
+                store.put(key.clone(), vec![position as u8; 8]).unwrap();
+            }
+            for key in &keys {
+                store.delete(key.clone()).unwrap();
+            }
+            let split_count_before_recreation = store.split_metrics().leaf_splits;
+            for (position, key) in keys.iter().enumerate() {
+                store
+                    .put(key.clone(), vec![position as u8; INLINE_VALUE_LIMIT])
+                    .unwrap();
+            }
+            assert!(store.split_metrics().leaf_splits > split_count_before_recreation);
+            let expected = keys
+                .iter()
+                .enumerate()
+                .map(|(position, key)| (key.clone(), vec![position as u8; INLINE_VALUE_LIMIT]))
+                .collect::<Vec<_>>();
+            let scanned = store.scan(None, usize::MAX).unwrap();
+            assert_eq!(
+                scanned
+                    .iter()
+                    .map(|document| (document.key.clone(), document.value.clone()))
+                    .collect::<Vec<_>>(),
+                expected
+            );
+            assert_eq!(
+                store
+                    .query(
+                        &PrimaryKey::new(b"tombstone-leaf-recreation".to_vec()),
+                        None,
+                        usize::MAX
+                    )
+                    .unwrap(),
+                scanned
+            );
+            store.check_invariants().unwrap();
+            let (data, wal) = store.into_files();
+            let mut reopened = reopen_memory_store(data, wal.unwrap());
             let reopened_scan = reopened.scan(None, usize::MAX).unwrap();
             assert_eq!(
                 reopened_scan
