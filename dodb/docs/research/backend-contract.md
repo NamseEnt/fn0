@@ -1,9 +1,10 @@
 # Backend contract for the product comparison
 
 Status: the common read/transaction service contract and RocksDB wrapper
-concurrency/lifetime checks passed for B-tree, B-link, and RocksDB at
-implementation verification SHA `139d9ae40120e35aad226bb13830c9347e297595`,
-2026-10-13. This does not establish a performance baseline. The existing
+concurrency/lifetime checks were recorded as passing for B-tree, B-link, and
+RocksDB at implementation verification SHA `139d9ae40120e35aad226bb13830c9347e297595`,
+2026-10-13. This historical result does not establish a performance baseline
+or report checks rerun for this contract audit. The existing
 R1b-3b WAL-sync-boundary all-or-none process-kill result is preserved; neither
 statement claims that every lifecycle or crash case is complete. See
 [the roadmap](single-instance-product-roadmap.md) for execution order and the
@@ -34,6 +35,29 @@ An engine-only adapter returning a bool for writes is insufficient.
 | Scan | Canonical document order, exclusive document cursor, limit, consistent view within this operation. |
 | Transact | Single-shot evaluation of all point conditions and atomic application of all mutations in one tenant DB. |
 | Shutdown | Stop new work and complete service-owned work/handle cleanup under documented drain semantics. |
+
+The operation boundary is the existing `dodb_service::Request` and `Response`
+API; this comparison adds no response field or wire conversion. `Get` returns
+the present value with its revision, or the missing state with its revision.
+`Put` and `Delete` return the revision assigned by their successful write.
+`Query` selects one partition key and returns canonical sort-key order after
+the exclusive sort-key cursor. `Scan` returns canonical document-key order
+after the exclusive document-key cursor. Both honor `limit`, omit logical
+tombstones, and give each individual call one consistent snapshot. Different
+calls or pages do not share a snapshot. Execution budgets must be checked before
+copying large result values into a response.
+
+`Transact` supports `RevisionEquals`, `Exists`, and `NotExists`, with `Put` and
+`Delete` mutations. It rejects empty requests, duplicate conditions, and
+duplicate mutations; a condition and mutation may name the same key. It
+protects the canonical union of condition and mutation keys through decision
+and commit, evaluates every condition before applying any mutation, and
+applies all mutations atomically. A successful write assigns one revision to
+every changed key and returns a nonzero logical `commit_lsn`. A successful
+condition-only request returns `commit_lsn: None` and allocates no revision.
+Initial missing state has revision zero; deleted keys retain a nonzero missing
+revision. For a given key, issued revisions identify committed states and are
+not reused after delete/recreate or restart. Gaps are allowed.
 
 Ordinary separate reads do not promise a common snapshot across calls. Query
 and Scan must not expose a mixture of one transaction's partial publications.
@@ -107,13 +131,24 @@ commit identity. All changed keys of a successful transaction share its logical
 revision. Independently committed writes remain independent transactions even
 when the storage engine shares a sync.
 
-Revisions are database-scoped identities used for equality. They are not
-portable RocksDB sequence numbers or required to equal native physical WAL
-LSNs. Match observable behavior, not the numeric spacing of native LSNs.
+Per-key revisions are identity tokens used for equality. `commit_lsn` is the
+existing API and wire field for a successful write transaction's logical
+identity within its tenant/backend identity domain. Neither value is a
+portable RocksDB WAL sequence, timestamp, or snapshot handle. Do not claim
+global uniqueness across tenants, numeric ordering across independent keys, or
+that response completion order for overlapping requests matches token order.
+The native B-tree/B-link coordinator happens to use increasing physical LSNs;
+that implementation detail does not require a RocksDB wrapper to reconstruct
+native physical order. Keep same-key revision progression and committed
+read-after-success visibility intact. Separate Get calls or pages remain
+independent reads, while each Query and Scan call retains its own consistent
+snapshot. These clarifications retain the existing consumer-visible API and
+atomicity; they do not permit weaker visibility.
+
 Persist enough information that acknowledged identities survive restart and
 old tokens never become valid for a different logical state after deletion,
-recreation, checkpointing, or compaction. Record commit-token allocation and
-ordering guarantees separately from per-key revision equality.
+recreation, checkpointing, or compaction. Record token allocation guarantees
+separately from per-key revision equality.
 
 ## Proposed RocksDB implementation
 

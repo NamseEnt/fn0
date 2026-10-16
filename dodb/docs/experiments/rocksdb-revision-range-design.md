@@ -35,15 +35,23 @@ User key TransactionDB locks, including condition-only keys, are unchanged and
 remain held through the user commit. Allocation happens only after condition
 validation. Transactions that share any protected key therefore allocate in
 the same order in which their key lock dependency is serialized. Independent
-transactions may commit in a different physical completion order; their
-revision/commit identities define a valid logical serialization order because
-their mutations commute. `commit_lsn` remains the unique logical write identity
-used by the existing driver replay, not a RocksDB physical sequence number or
-response completion timestamp. `Revision` and `Lsn` are distinct newtypes over
-`u64`; the RocksDB service continues to return the same allocated integer in
-both fields. The existing service contract documents per-key identity, not
-contiguous values or response completion order. Condition-only requests still
-allocate nothing.
+transactions may commit in a different physical or response-completion order.
+Their mutations may commute for final-state replay, but sorting every returned
+identity does not establish a valid serialization for a history that includes
+reads. Read-inclusive history validation must preserve invocation/response
+real-time order and the states observed by reads; during overlap, a lower
+identity may become visible after a higher identity on an independent key.
+This does not relax atomicity, committed read-after-success visibility, or
+same-key revision ordering.
+
+`commit_lsn` remains the existing API and wire field for a nonzero logical
+successful-write identity within a tenant/backend identity domain. It is not a
+RocksDB physical sequence number, timestamp, or snapshot handle. Do not infer
+global uniqueness across tenants, numeric order across independent keys, or
+response completion order from its numeric value. `Revision` and `Lsn` are
+distinct newtypes over `u64`; the RocksDB service continues to return the same
+allocated integer in both fields. The public API and wire responses do not
+change. Condition-only requests still allocate nothing.
 
 Reservation transactions touch only counter metadata and never acquire user
 keys, so a transaction holding user locks while requesting a range cannot form
@@ -71,10 +79,15 @@ evidence.
 
 ## Validation and measurement
 
-Run the common transaction contract and focused allocator checks for uniqueness,
-re-reservation, rollback gaps, partial-range reopen, existing-format databases,
-condition ABA, tenant isolation, overflow, and reservation failure. Compare the
-default and experimental allocator with the existing service workload driver,
-its independent state replay, and the same measured instrumentation settings.
-Each allocator uses separate fresh database paths. The OCI matrix is one run
-per allocator and each of RW95, RW80, RW50, RW20, and MT-MIX.
+Run the common transaction contract and focused allocator checks for
+uniqueness within the supported identity domain, re-reservation, rollback gaps,
+partial-range reopen, existing-format databases, condition ABA, tenant
+isolation, overflow, and reservation failure. Compare the default and
+experimental allocator with the existing service workload driver, its
+independent final-state oracle, and the same measured instrumentation settings.
+Final-state replay may use identities to verify that successful write entries
+are distinct, but must not sort concurrent independent writes by token and
+claim that order as a read-inclusive serial history. Any history gate must
+include invocation/response intervals and read observations. Each allocator
+uses separate fresh database paths. The OCI matrix is one run per allocator
+and each of RW95, RW80, RW50, RW20, and MT-MIX.
