@@ -1,5 +1,9 @@
 # RocksDB Contract Baseline and Optimization Plan
 
+> Execution stopped after read-only preflight: insufficient OCI ZFS capacity. Plan persisted; no implementation or benchmarks started. User decision required before resumption. Date: 2026-10-16 UTC.
+
+> API read-only audit evidence is preliminary only; contract resolution is incomplete. All six phases remain Pending.
+
 ## Goal and claim boundary
 
 Establish a fast RocksDB implementation that satisfies the DODB API and correctness contract, then compare it fairly with the B-link service. The raw unconditional subset is a reference point for measuring required API and wrapper costs. The winner is unknown in advance. Results must not claim an absolute RocksDB maximum: the full-semantics synchronous core may still contain DODB-required work, and the service paths retain their own integration costs.
@@ -93,7 +97,11 @@ Each candidate must preserve transaction semantics, tenant isolation, response-b
 
 **Status: Pending**
 
-Use only the authorized OCI A1 ARM64 host and ZFS path `/bench/zfs/db`, with the approved stored SSH identity and normal host-key verification. Use pinned RocksDB 11.8.1 and Rust 1.97.1 with `+crc`. Do not substitute local or Debian measurements for authoritative results.
+**OCI capacity/preflight gate: Not passed. Execution is stopped pending a user decision on storage expansion or an approved policy for preserving and moving existing artifacts.**
+
+The current read-only preflight report identifies the authorized instance `instance-20260923-1013` as ARM64 Neoverse-N1 with 2 CPUs and approximately 12 GiB RAM. The stored SSH identity and existing `known_hosts` were verified. Rust 1.97.1 is installed. No cargo, rustc, or benchmark-related live process was found. `/bench/zfs/db` reports 149 GB total, 148 GB used, 1.3 GB available (displayed as 100% used); ZFS available space is 1.21 GB, and the `dodbbench` pool is ONLINE at 96%. `MemAvailable` is 4.6 GiB and swap use is 360 MiB. These values are from the current report only: raw preflight evidence files are still pending from the preflight agent under `/tmp`. This document has no link to raw evidence or an original remote source, so these readings are not final measurement claims.
+
+The available space does not establish capacity for over-cache datasets, three 30-second confirmations, three five-minute repetitions, builds, retained databases, WAL, and evidence. Do not start implementation or measurement until the storage decision is resolved and a fresh capacity preflight passes. Use only the authorized OCI A1 ARM64 host and ZFS path `/bench/zfs/db`, with the approved stored SSH identity and normal host-key verification. Use pinned RocksDB 11.8.1 and Rust 1.97.1 with `+crc`. Do not substitute local or Debian measurements for authoritative results.
 
 Before testing, inspect live processes, host resources, and available storage. Do not run concurrent builds or benchmarks and do not perform destructive cleanup. Build from the exact source SHA and retain immutable binaries. Record commands and hashes, host and filesystem, seeds, workload, and validators.
 
@@ -141,7 +149,8 @@ All items begin **Pending**. Update them only with a link to the evidence that s
 | Reused evidence independently checked for contract and provenance fit | Pending | |
 | Normal performance and diagnostic instrumentation runs kept separate | Pending | |
 | Candidate changes isolated, attributed, and rejected attempts retained | Pending | |
-| OCI preflight, capacity, source/binary provenance, and host verification recorded | Pending | |
+| OCI preflight capacity gate | Not passed | Current read-only report records 1.21 GB ZFS available and insufficient capacity for the planned retained runs; raw `/tmp` evidence is pending. User decision required on storage expansion or artifact retention/migration policy. |
+| OCI source/binary provenance and final host verification for measurements | Pending | No implementation or benchmarks started. |
 | Screening, confirmation, and final repetition requirements met, including duration beyond the prior one-million-call cap | Pending | |
 | Full latency samples or validated bounded-memory statistics continue for the requested duration | Pending | |
 | Input traces, write ledgers, and harness memory budgeted and verified against cache and RSS limits | Pending | |
@@ -172,6 +181,7 @@ Append one entry for each phase attempt, including blocked and rejected work. Do
 | Date (UTC) | Phase | Status | Source SHA / candidate | Commands and artifact paths | Findings and decision | Blocker or next action |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-16 | Plan | Complete | Base SHA `404026706a9180078c65ce1d29ff499df6ecb5b6`; initial document commit `3b6d13f002693d6fa5254b94cfc1f5d6219b1f25` | Plan document only: `dodb/docs/experiments/rocksdb-contract-baseline-plan.md` | Six-phase scope recorded; no implementation or measurements performed | Phases 1–6 pending |
+| 2026-10-16 | Preflight | Stopped | Plan branch HEAD `1fd4fe6ae39b7172142654c5ce3ed043d462029b` | Read-only report for `instance-20260923-1013`; raw files pending under `/tmp` and not linked | Current report shows 1.21 GB ZFS available, insufficient to guarantee over-cache data, required repetitions, build, database, WAL, and evidence retention. API audit remains preliminary; contract resolution incomplete. No cleanup, expansion, implementation, or benchmark was performed. | User decision required: storage expansion or approved artifact preservation/migration policy; then collect raw report evidence and repeat capacity preflight. |
 | | 1 | Pending | | | | |
 | | 2 | Pending | | | | |
 | | 3 | Pending | | | | |
