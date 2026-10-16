@@ -61,3 +61,15 @@ preliminary; default promotion and maximum-native-engine claims are excluded.
 The completion audit must also locate actual consumers for conditional,
 missing-revision, atomic-transaction and budget requirements, and distinguish
 required behavior from incidental implementation choices.
+
+## Verification probes
+
+Before the primary matrix, run eight metrics-OFF smoke cases and four
+metrics-ON after-service smoke cases (both allocators and client executors).
+The latter check retained instrumentation counts. Run a separate response
+size probe comparing the canonical serializer's lengths/errors with the
+counting writer across every response kind, exact/undersized frame budgets,
+field limits, 64 MiB value boundaries, binary keys, and document lists. Its
+CPU timing compares clone-and-encode against counting for 512 B, 64 KiB and
+1 MiB values; it does not measure service or I/O latency. No unit/integration
+suite is added by these research executables.

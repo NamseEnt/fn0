@@ -377,6 +377,27 @@ pub fn encode_response(
     )
 }
 
+pub fn encoded_success_response_size(
+    response: &Response,
+    limits: ProtocolLimits,
+) -> Result<usize, ProtocolError> {
+    limits.validate()?;
+    let mut payload = SizeWriter { length: Some(2) };
+    encode_response_payload(&mut payload, response, limits)?;
+    let payload_length = payload.length.ok_or(ProtocolError::LengthOverflow)?;
+    let frame_length = HEADER_SIZE
+        .checked_add(payload_length)
+        .ok_or(ProtocolError::LengthOverflow)?;
+    if frame_length > limits.max_response_frame_size {
+        return Err(ProtocolError::PayloadTooLarge {
+            length: frame_length,
+            maximum: limits.max_response_frame_size,
+        });
+    }
+    u32::try_from(payload_length).map_err(|_| ProtocolError::LengthOverflow)?;
+    Ok(frame_length)
+}
+
 pub fn decode_response_frame(
     frame: &[u8],
     expected_response_type: Option<u8>,
@@ -528,7 +549,7 @@ fn validate_payload_length(
 }
 
 fn encode_request_payload(
-    writer: &mut Writer,
+    writer: &mut impl WireWriter,
     request: &Request,
     limits: ProtocolLimits,
 ) -> Result<(), ProtocolError> {
@@ -625,7 +646,7 @@ fn decode_request_payload(
 }
 
 fn encode_response_payload(
-    writer: &mut Writer,
+    writer: &mut impl WireWriter,
     response: &Response,
     limits: ProtocolLimits,
 ) -> Result<(), ProtocolError> {
@@ -656,7 +677,7 @@ fn decode_response_payload(
     }
 }
 
-fn encode_transaction_outcome(writer: &mut Writer, outcome: TransactionOutcome) {
+fn encode_transaction_outcome(writer: &mut impl WireWriter, outcome: TransactionOutcome) {
     match outcome.commit_lsn {
         Some(commit_lsn) => {
             writer.u8(1);
@@ -679,7 +700,7 @@ fn decode_transaction_outcome(
 }
 
 fn encode_documents(
-    writer: &mut Writer,
+    writer: &mut impl WireWriter,
     documents: &[Document],
     limits: ProtocolLimits,
 ) -> Result<(), ProtocolError> {
@@ -709,7 +730,7 @@ fn decode_documents(
 }
 
 fn encode_revision_state(
-    writer: &mut Writer,
+    writer: &mut impl WireWriter,
     state: &RevisionState,
     limits: ProtocolLimits,
 ) -> Result<(), ProtocolError> {
@@ -741,7 +762,7 @@ fn decode_revision_state(
     }
 }
 
-fn encode_observed_state(writer: &mut Writer, state: ObservedState) {
+fn encode_observed_state(writer: &mut impl WireWriter, state: ObservedState) {
     match state {
         ObservedState::Present { revision } => {
             writer.u8(0);
@@ -763,7 +784,7 @@ fn decode_observed_state(reader: &mut Reader<'_>) -> Result<ObservedState, Proto
 }
 
 fn encode_conditions(
-    writer: &mut Writer,
+    writer: &mut impl WireWriter,
     conditions: &[TransactionCondition],
     limits: ProtocolLimits,
 ) -> Result<(), ProtocolError> {
@@ -814,7 +835,7 @@ fn decode_conditions(
 }
 
 fn encode_mutations(
-    writer: &mut Writer,
+    writer: &mut impl WireWriter,
     mutations: &[TransactionMutation],
     limits: ProtocolLimits,
 ) -> Result<(), ProtocolError> {
@@ -857,7 +878,7 @@ fn decode_mutations(
 }
 
 fn encode_key(
-    writer: &mut Writer,
+    writer: &mut impl WireWriter,
     key: &DocumentKey,
     limits: ProtocolLimits,
 ) -> Result<(), ProtocolError> {
@@ -895,7 +916,7 @@ fn validate_key_parts(pk: &[u8], sk: &[u8], limits: ProtocolLimits) -> Result<()
 }
 
 fn encode_optional_key(
-    writer: &mut Writer,
+    writer: &mut impl WireWriter,
     key: Option<&DocumentKey>,
     limits: ProtocolLimits,
 ) -> Result<(), ProtocolError> {
@@ -920,7 +941,7 @@ fn decode_optional_key(
 }
 
 fn encode_optional_bytes(
-    writer: &mut Writer,
+    writer: &mut impl WireWriter,
     bytes: Option<&[u8]>,
     maximum: usize,
 ) -> Result<(), ProtocolError> {
@@ -934,7 +955,11 @@ fn encode_optional_bytes(
     Ok(())
 }
 
-fn encode_limit(writer: &mut Writer, limit: usize, maximum: usize) -> Result<(), ProtocolError> {
+fn encode_limit(
+    writer: &mut impl WireWriter,
+    limit: usize,
+    maximum: usize,
+) -> Result<(), ProtocolError> {
     if limit > maximum {
         return Err(ProtocolError::PayloadTooLarge {
             length: limit,
@@ -946,7 +971,11 @@ fn encode_limit(writer: &mut Writer, limit: usize, maximum: usize) -> Result<(),
     Ok(())
 }
 
-fn encode_count(writer: &mut Writer, count: usize, maximum: usize) -> Result<(), ProtocolError> {
+fn encode_count(
+    writer: &mut impl WireWriter,
+    count: usize,
+    maximum: usize,
+) -> Result<(), ProtocolError> {
     if count > maximum {
         return Err(ProtocolError::PayloadTooLarge {
             length: count,
@@ -957,7 +986,11 @@ fn encode_count(writer: &mut Writer, count: usize, maximum: usize) -> Result<(),
     Ok(())
 }
 
-fn encode_bytes(writer: &mut Writer, bytes: &[u8], maximum: usize) -> Result<(), ProtocolError> {
+fn encode_bytes(
+    writer: &mut impl WireWriter,
+    bytes: &[u8],
+    maximum: usize,
+) -> Result<(), ProtocolError> {
     if bytes.len() > maximum {
         return Err(ProtocolError::PayloadTooLarge {
             length: bytes.len(),
@@ -968,7 +1001,7 @@ fn encode_bytes(writer: &mut Writer, bytes: &[u8], maximum: usize) -> Result<(),
 }
 
 fn encode_application_error(
-    writer: &mut Writer,
+    writer: &mut impl WireWriter,
     error: &ApplicationError,
     limits: ProtocolLimits,
 ) -> Result<(), ProtocolError> {
@@ -1011,7 +1044,7 @@ fn decode_application_error(
 }
 
 fn encode_conflict(
-    writer: &mut Writer,
+    writer: &mut impl WireWriter,
     conflict: &ConflictDetails,
     limits: ProtocolLimits,
 ) -> Result<(), ProtocolError> {
@@ -1092,6 +1125,17 @@ fn mutation_outcome(code: u8) -> Result<MutationOutcome, ProtocolError> {
     }
 }
 
+trait WireWriter: Sized {
+    fn u8(&mut self, value: u8);
+    fn u32(&mut self, value: u32);
+    fn u64(&mut self, value: u64);
+    fn bytes_raw(&mut self, value: &[u8]) -> Result<(), ProtocolError>;
+
+    fn bytes(&mut self, value: &[u8], maximum: usize) -> Result<(), ProtocolError> {
+        encode_bytes(self, value, maximum)
+    }
+}
+
 struct Writer {
     bytes: Vec<u8>,
 }
@@ -1101,6 +1145,12 @@ impl Writer {
         Self { bytes: Vec::new() }
     }
 
+    fn finish(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl WireWriter for Writer {
     fn u8(&mut self, value: u8) {
         self.bytes.push(value);
     }
@@ -1118,13 +1168,38 @@ impl Writer {
         self.bytes.extend_from_slice(value);
         Ok(())
     }
+}
 
-    fn bytes(&mut self, value: &[u8], maximum: usize) -> Result<(), ProtocolError> {
-        encode_bytes(self, value, maximum)
+struct SizeWriter {
+    length: Option<usize>,
+}
+
+impl SizeWriter {
+    fn add_length(&mut self, additional: usize) {
+        self.length = self
+            .length
+            .and_then(|length| length.checked_add(additional));
+    }
+}
+
+impl WireWriter for SizeWriter {
+    fn u8(&mut self, _value: u8) {
+        self.add_length(1);
     }
 
-    fn finish(self) -> Vec<u8> {
-        self.bytes
+    fn u32(&mut self, _value: u32) {
+        self.add_length(4);
+    }
+
+    fn u64(&mut self, _value: u64) {
+        self.add_length(8);
+    }
+
+    fn bytes_raw(&mut self, value: &[u8]) -> Result<(), ProtocolError> {
+        u32::try_from(value.len()).map_err(|_| ProtocolError::LengthOverflow)?;
+        self.add_length(4);
+        self.add_length(value.len());
+        Ok(())
     }
 }
 

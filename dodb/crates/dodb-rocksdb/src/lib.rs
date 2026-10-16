@@ -11,9 +11,7 @@ use dodb_core::{
     DocumentKey, Error, PrimaryKey, Revision, RevisionState, SortKey, TenantId,
     TransactionCondition, TransactionConflict, TransactionMutation, TransactionRequest,
 };
-use dodb_protocol::{
-    MAX_STORAGE_ENCODED_KEY_SIZE, ProtocolLimits, ResponseEnvelope, encode_response,
-};
+use dodb_protocol::{MAX_STORAGE_ENCODED_KEY_SIZE, ProtocolLimits, encoded_success_response_size};
 use dodb_service::{
     DodbService, ExecutionBudget, Request, Response, ServiceFuture, ShutdownFuture,
     TransactionOutcome,
@@ -839,6 +837,25 @@ impl RocksDbService {
         T: Send + 'static,
         F: FnOnce() -> Result<T, Error> + Send + 'static,
     {
+        if self.research_metrics.is_none() {
+            let permit = self
+                .semaphore_for(lane)
+                .acquire_owned()
+                .await
+                .map_err(|_| Error::overloaded("blocking RocksDB executor is closed"))?;
+            #[cfg(test)]
+            let operation_hook = self.blocking_operation_hook.lock().unwrap().clone();
+            return tokio::task::spawn_blocking(move || {
+                let _permit = permit;
+                #[cfg(test)]
+                if let Some(operation_hook) = operation_hook {
+                    operation_hook();
+                }
+                operation()
+            })
+            .await
+            .map_err(|error| Error::recovery(format!("RocksDB operation task failed: {error}")))?;
+        }
         let semaphore_started = Instant::now();
         let read_context = RESEARCH_READ_CONTEXT.try_with(Arc::clone).ok();
         if let (Some(context), Some(metrics)) = (&read_context, &self.research_metrics) {
@@ -935,6 +952,9 @@ impl RocksDbService {
         request: Request,
         budget: ExecutionBudget,
     ) -> Result<Response, Error> {
+        if self.research_metrics.is_none() {
+            return self.execute_request_inner(tenant, request, budget).await;
+        }
         let started = Instant::now();
         let default_read_kind = match &request {
             Request::Get { .. } => Some(ResearchReadKind::Get),
@@ -1037,7 +1057,7 @@ impl RocksDbService {
         let lane = execution_lane(&request);
         match request {
             Request::Get { key } => {
-                let database_started = Instant::now();
+                let database_started = self.research_metrics.as_ref().map(|_| Instant::now());
                 let database = self.read_database(tenant).await?;
                 if let Some(metrics) = &self.research_metrics {
                     if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
@@ -1046,7 +1066,7 @@ impl RocksDbService {
                             tenant,
                             kind,
                             ReadMetric::TenantDatabaseLookup,
-                            database_started.elapsed(),
+                            database_started.map_or(Duration::ZERO, |started| started.elapsed()),
                         );
                     }
                 }
@@ -1061,7 +1081,7 @@ impl RocksDbService {
                     }
                     None => RevisionState::missing(Revision::ZERO),
                 };
-                let response_started = Instant::now();
+                let response_started = self.research_metrics.as_ref().map(|_| Instant::now());
                 let response = Response::Get(state);
                 enforce_response_budget(&response, budget)?;
                 if let (Some(metrics), Ok(kind)) = (
@@ -1072,7 +1092,7 @@ impl RocksDbService {
                         tenant,
                         kind,
                         ReadMetric::ResponseProcessing,
-                        response_started.elapsed(),
+                        response_started.map_or(Duration::ZERO, |started| started.elapsed()),
                     );
                 }
                 Ok(response)
@@ -1170,7 +1190,7 @@ impl RocksDbService {
                 exclusive_after_sk,
                 limit,
             } => {
-                let database_started = Instant::now();
+                let database_started = self.research_metrics.as_ref().map(|_| Instant::now());
                 let database = self.read_database(tenant).await?;
                 if let Some(metrics) = &self.research_metrics {
                     if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
@@ -1179,7 +1199,7 @@ impl RocksDbService {
                             tenant,
                             kind,
                             ReadMetric::TenantDatabaseLookup,
-                            database_started.elapsed(),
+                            database_started.map_or(Duration::ZERO, |started| started.elapsed()),
                         );
                     }
                 }
@@ -1206,7 +1226,7 @@ impl RocksDbService {
                         return Ok(response);
                     }
                 };
-                let response_started = Instant::now();
+                let response_started = self.research_metrics.as_ref().map(|_| Instant::now());
                 let response = Response::Query(rows);
                 if let (Some(metrics), Ok(kind)) = (
                     &self.research_metrics,
@@ -1216,7 +1236,7 @@ impl RocksDbService {
                         tenant,
                         kind,
                         ReadMetric::ResponseProcessing,
-                        response_started.elapsed(),
+                        response_started.map_or(Duration::ZERO, |started| started.elapsed()),
                     );
                 }
                 Ok(response)
@@ -1398,7 +1418,7 @@ impl TenantDatabase {
         let mut value = std::ptr::null_mut();
         let mut value_length = 0;
         let mut error = std::ptr::null_mut();
-        let native_started = Instant::now();
+        let native_started = (metrics.is_some() && kind.is_some()).then(Instant::now);
         let result = unsafe {
             dodb_rocksdb_get(
                 self.handle.0.as_ptr(),
@@ -1414,10 +1434,10 @@ impl TenantDatabase {
                 tenant,
                 kind,
                 ReadMetric::RocksDbGet,
-                native_started.elapsed(),
+                native_started.map_or(Duration::ZERO, |started| started.elapsed()),
             );
         }
-        let decode_started = Instant::now();
+        let decode_started = (metrics.is_some() && kind.is_some()).then(Instant::now);
         let decoded = match result {
             1 => Ok(RevisionState::missing(Revision::ZERO)),
             2 => Err(ffi_error(error, "RocksDB get failed")),
@@ -1431,7 +1451,7 @@ impl TenantDatabase {
                 tenant,
                 kind,
                 ReadMetric::GetCopyDecode,
-                decode_started.elapsed(),
+                decode_started.map_or(Duration::ZERO, |started| started.elapsed()),
             );
         }
         decoded
@@ -1484,7 +1504,8 @@ impl TenantDatabase {
         metrics: Option<Arc<ResearchMetrics>>,
         kind: Option<ResearchReadKind>,
     ) -> Result<Vec<dodb_service::Document>, Error> {
-        let query_started = Instant::now();
+        let collect_metrics = metrics.is_some() && kind.is_some();
+        let query_started = collect_metrics.then(Instant::now);
         let mut iterator_setup = Duration::ZERO;
         let mut iterator_calls = Duration::ZERO;
         let result = (|| {
@@ -1507,14 +1528,15 @@ impl TenantDatabase {
                     ))
                 })
                 .unwrap_or_else(|| user_partition_prefix(pk));
-            let setup_started = Instant::now();
+            let setup_started = collect_metrics.then(Instant::now);
             let iterator = self.read_iterator(&start_key)?;
-            iterator_setup = setup_started.elapsed();
+            iterator_setup = setup_started.map_or(Duration::ZERO, |started| started.elapsed());
             let mut documents = Vec::new();
             loop {
-                let current_started = Instant::now();
+                let current_started = collect_metrics.then(Instant::now);
                 let current = iterator.current();
-                iterator_calls += current_started.elapsed();
+                iterator_calls +=
+                    current_started.map_or(Duration::ZERO, |started| started.elapsed());
                 let Some((encoded_key, value_pointer, value_length)) = current? else {
                     break;
                 };
@@ -1528,9 +1550,10 @@ impl TenantDatabase {
                     break;
                 }
                 if exclusive_after_sk.is_some_and(|cursor| document_key.sk <= *cursor) {
-                    let next_started = Instant::now();
+                    let next_started = collect_metrics.then(Instant::now);
                     iterator.next();
-                    iterator_calls += next_started.elapsed();
+                    iterator_calls +=
+                        next_started.map_or(Duration::ZERO, |started| started.elapsed());
                     continue;
                 }
                 if let Some((revision, value_length)) =
@@ -1548,14 +1571,14 @@ impl TenantDatabase {
                         return Ok(documents);
                     }
                 }
-                let next_started = Instant::now();
+                let next_started = collect_metrics.then(Instant::now);
                 iterator.next();
-                iterator_calls += next_started.elapsed();
+                iterator_calls += next_started.map_or(Duration::ZERO, |started| started.elapsed());
             }
             Ok(documents)
         })();
         if let (Some(metrics), Some(kind)) = (&metrics, kind) {
-            let total = query_started.elapsed();
+            let total = query_started.map_or(Duration::ZERO, |started| started.elapsed());
             metrics.record_read(tenant, kind, ReadMetric::QueryIteratorSetup, iterator_setup);
             metrics.record_read(tenant, kind, ReadMetric::QueryIteratorCalls, iterator_calls);
             metrics.record_read(
@@ -2385,7 +2408,7 @@ fn enforce_response_budget(response: &Response, budget: ExecutionBudget) -> Resu
         max_response_frame_size: budget.max_response_bytes,
         ..ProtocolLimits::default()
     };
-    encode_response(&ResponseEnvelope::Success(response.clone()), limits)
+    encoded_success_response_size(response, limits)
         .map(|_| ())
         .map_err(|error| Error::response_too_large(format!("response exceeds budget: {error}")))
 }
