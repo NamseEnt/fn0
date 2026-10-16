@@ -1,0 +1,8 @@
+local_bundle_sha256=b0ae81e3c92ede323be0a80616fae176ac94913333aa68d574c8e4ce730a1dcf
+remote_bundle_sha256=b0ae81e3c92ede323be0a80616fae176ac94913333aa68d574c8e4ce730a1dcf
+source_sha=c4630fd6cf45dfd74236a6ac0d9320715d260df4
+bundle_prerequisite_anchor_sha=f893a0052963bc103533e276ece687b0ecaa6d1c
+stable_source_path=/bench/zfs/db/rocksdb-contract-baseline-20261016/source
+stable_source_git_dir=/bench/zfs/db/product-build/dodb-product-source/.git/worktrees/source
+stable_source_git_common_dir=/bench/zfs/db/product-build/dodb-product-source/.git
+transport=local git bundle fetched into existing source repository object database, then detached worktree added

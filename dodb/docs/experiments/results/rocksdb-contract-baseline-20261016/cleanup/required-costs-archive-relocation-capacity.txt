@@ -1,0 +1,4 @@
+Fri Oct 16 02:07:34 AM UTC 2026
+Filesystem                  Size  Used Avail Use% Mounted on
+/dev/mapper/ocivolume-root   30G   27G  3.1G  90% /
+dodbbench/db                149G  144G  4.3G  98% /bench/zfs/db

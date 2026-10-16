@@ -1,0 +1,5 @@
+source_sha=c4630fd6cf45dfd74236a6ac0d9320715d260df4
+command=DODB_BUILD_RUN_ID=rocksdb-contract-baseline-20261016-core-c4630fd6-0718z RUST_TEST_THREADS=1 ./dodb/scripts/run-oci-rocksdb-build.sh test --locked --release -p dodb-rocksdb --lib --test read_contract --test transaction_contract --test research_metrics
+exit_status=126
+stderr=bash: line 1: ./dodb/scripts/run-oci-rocksdb-build.sh: Permission denied
+cargo_started=false

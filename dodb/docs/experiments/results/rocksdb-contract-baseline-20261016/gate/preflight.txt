@@ -1,0 +1,45 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+utc=2026-10-16T07:18:05Z
+hostname=instance-20260923-1013.subnet09231046.vcn09231046.oraclevcn.com
+uname=Linux 6.12.0-206.104.4.4.el9uek.aarch64 aarch64
+Architecture:                            aarch64
+CPU(s):                                  2
+Model name:                              Neoverse-N1
+Thread(s) per core:                      1
+Core(s) per socket:                      2
+Socket(s):                               1
+Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp
+               total        used        free      shared  buff/cache   available
+Mem:     11427577856  4518699008  4508323840    22355968  2832187392  6908878848
+Swap:     4294963200   382066688  3912896512
+MemTotal:       11159744 kB
+Filesystem                    1B-blocks        Used    Available Use% Mounted on
+/dev/mapper/ocivolume-root  31608274944 25813368832   5794906112  82% /
+dodbbench/db               159153594368 52669751296 106483843072  34% /bench/zfs/db
+dodbbench/db	used	52669751296	-
+dodbbench/db	available	106483843072	-
+active_build_bench_processes=none
+source_sha=c4630fd6cf45dfd74236a6ac0d9320715d260df4
+source_status=clean
+source_git_dir=/bench/zfs/db/product-build/dodb-product-source/.git/worktrees/source
+source_git_common_dir=/bench/zfs/db/product-build/dodb-product-source/.git
+anchor_head=f893a0052963bc103533e276ece687b0ecaa6d1c
+anchor_git_common_dir=/bench/zfs/db/product-build/dodb-product-source/.git
+rocksdb_head=abeebd9630f11bd08c28b7bd43c7bdfc62050654
+rocksdb_archive_sha256=9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5
+rustup_default=stable-aarch64-unknown-linux-gnu (default)
+stable-aarch64-unknown-linux-gnu (default)
+1.97.1-aarch64-unknown-linux-gnu (active)
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+cargo 1.97.1 (c980f4866 2026-06-30)
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+binary: rustc
+commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452
+commit-date: 2026-07-14
+host: aarch64-unknown-linux-gnu
+release: 1.97.1
+LLVM version: 22.1.6
+target_feature="crc"
+preflight_result=PASS

@@ -1,0 +1,13 @@
+OCI cleanup inventory baseline
+Date: 2026-10-16
+Host: opc@217.142.246.204
+Mount: /bench/zfs/db on dodbbench/db (ZFS)
+Source: 5275689f15b37710fc3c6960daef75d01082c851
+Active matching build/benchmark processes: none found
+Filesystem before cleanup: 149G total, 148G used, 1.3G available
+ZFS before cleanup: 147G used, 1.21G available
+Pinned toolchain installed: Rust/Cargo 1.97.1; default toolchain is 1.98.1
+Pinned RocksDB keeper: /bench/zfs/db/product-build/rocksdb-source at abeebd9630f11bd08c28b7bd43c7bdfc62050654
+Pinned archive SHA-256: 9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5
+Shared Cargo target/cache and /bench/zfs/db/tooling are retained.
+Current data path /bench/zfs/db/dodb-final-path-20261016 is retained.

@@ -1,0 +1,75 @@
+/bench/zfs/db/crossdb-10e3494e-oci/build/target-dodb
+/bench/zfs/db/crossdb-10e3494e-oci/build/target-rocksdb
+/bench/zfs/db/crossdb-1ac11e56-oci/build/target-dodb
+/bench/zfs/db/crossdb-1ac11e56-oci/build/target-rocksdb
+/bench/zfs/db/crossdb-33722487-oci/build/target-dodb
+/bench/zfs/db/crossdb-33722487-oci/build/target-rocksdb
+/bench/zfs/db/crossdb-3da68648-oci/build/target-dodb
+/bench/zfs/db/crossdb-3da68648-oci/build/target-rocksdb
+/bench/zfs/db/crossdb-4e35e99d-oci/build/target-dodb
+/bench/zfs/db/crossdb-4e35e99d-oci/build/target-rocksdb
+/bench/zfs/db/crossdb-82c2b6e1-oci/build/target-dodb
+/bench/zfs/db/crossdb-82c2b6e1-oci/build/target-rocksdb
+/bench/zfs/db/crossdb-aa83fab0-oci/build/target-dodb
+/bench/zfs/db/crossdb-aa83fab0-oci/build/target-rocksdb
+/bench/zfs/db/crossdb-be1c1786-oci/build/target-dodb
+/bench/zfs/db/crossdb-be1c1786-oci/build/target-rocksdb
+/bench/zfs/db/crossdb-c1ee7cbf-oci/build/target-dodb
+/bench/zfs/db/crossdb-c1ee7cbf-oci/build/target-rocksdb
+/bench/zfs/db/crossdb-d3f4958-oci/build/target-dodb
+/bench/zfs/db/crossdb-d3f4958-oci/build/target-rocksdb
+/bench/zfs/db/dodb-rocksdb-r1a-70105e0f871a25a9/target
+/bench/zfs/db/dodb-rocksdb-r1b1-2774bd1c3491134b/target
+/bench/zfs/db/dodb-rocksdb-r1b1-e59ae32117df13e2/target
+/bench/zfs/db/dodb-rocksdb-r1b2-558a9283c1a9/target
+/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target
+/bench/zfs/db/experiment-build/borrowed-page-b7c67715-target
+/bench/zfs/db/oci-a1-borrowed-query16-4bc4d42e4d816f4a11428f5423d89a4c35494f9b/build-target-feature-on
+/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-base
+/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-candidate
+/bench/zfs/db/oci-phase0-followup-087406003b1edbe7e0a2991d54ae8e088e98baed/target
+/bench/zfs/db/oci-phase0-followup-4bc4d42e4d816f4a11428f5423d89a4c35494f9b/target
+/bench/zfs/db/oci-phase0-followup-ff864bf92461c9216e840d9eecf7bb04e52c41ce/target
+/bench/zfs/db/oci-phase0-measurement-5cee905cce6aa93d474112efdcaf561d31eadcf9/cargo-home/registry/src/index.crates.io-1949cf8c6b5b557f/cc-1.2.51/src/target
+/bench/zfs/db/oci-phase0-measurement-5cee905cce6aa93d474112efdcaf561d31eadcf9/target
+/bench/zfs/db/oci-phase0-measurement-a277c01b5217a8cb8210b94c2be06131b6c4dc4e/target
+/bench/zfs/db/oci-phase0-measurement-aece5d4356f127d63181fd82613ead46bfb52aff/target
+/bench/zfs/db/product-build/dodb-product-target
+/bench/zfs/db/product-build/rocksdb-product-target
+/bench/zfs/db/product-build/sqlite-product-target
+/bench/zfs/db/product-build/turso-0.8.2-pre.2-target
+/bench/zfs/db/product-build/turso-product-target
+CUSTOM CARGO TARGET ROOTS
+711782	/bench/zfs/db/experiment-build/b5aad16
+523710	/bench/zfs/db/experiment-build/borrowed-page-b7c67715-target
+555905	/bench/zfs/db/experiment-build/dodb-81f6ce268
+555865	/bench/zfs/db/experiment-build/dodb-8a6f3dc
+684129	/bench/zfs/db/oci-a1-borrowed-query16-4bc4d42e4d816f4a11428f5423d89a4c35494f9b/build-target-feature-on
+241301	/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-base
+241261	/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-candidate
+578491	/bench/zfs/db/process-crash-target-3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93
+578439	/bench/zfs/db/process-crash-target-5d34c23bd3d594c93419eda66c5177161e56ff24
+578439	/bench/zfs/db/process-crash-target-6b5b93fa921225b5acb80d23c32509eb56165dc4
+578451	/bench/zfs/db/process-crash-target-a3b554191e6c003fd723d4f2b9ade886cbd1d5ee
+B5AAD16 LAYOUT
+d 5 /bench/zfs/db/experiment-build/b5aad16/rocksdb-test
+d 10 /bench/zfs/db/experiment-build/b5aad16/rocksdb-test/debug
+f 177 /bench/zfs/db/experiment-build/b5aad16/rocksdb-test/CACHEDIR.TAG
+f 1687 /bench/zfs/db/experiment-build/b5aad16/rocksdb-test/.rustc_info.json
+f 1294 /bench/zfs/db/experiment-build/b5aad16/.rustc_info.json
+d 12 /bench/zfs/db/experiment-build/b5aad16/release
+f 1609 /bench/zfs/db/experiment-build/b5aad16/release/phase0-bench.d
+d 72 /bench/zfs/db/experiment-build/b5aad16/release/deps
+f 0 /bench/zfs/db/experiment-build/b5aad16/release/.cargo-artifact-lock
+f 0 /bench/zfs/db/experiment-build/b5aad16/release/.cargo-build-lock
+d 2 /bench/zfs/db/experiment-build/b5aad16/release/examples
+d 36 /bench/zfs/db/experiment-build/b5aad16/release/.fingerprint
+f 46033216 /bench/zfs/db/experiment-build/b5aad16/release/phase0-bench
+f 0 /bench/zfs/db/experiment-build/b5aad16/release/.cargo-lock
+d 12 /bench/zfs/db/experiment-build/b5aad16/release/build
+d 2 /bench/zfs/db/experiment-build/b5aad16/release/incremental
+f 177 /bench/zfs/db/experiment-build/b5aad16/CACHEDIR.TAG
+d 5 /bench/zfs/db/experiment-build/b5aad16/rocksdb
+f 177 /bench/zfs/db/experiment-build/b5aad16/rocksdb/CACHEDIR.TAG
+d 12 /bench/zfs/db/experiment-build/b5aad16/rocksdb/release
+f 2625 /bench/zfs/db/experiment-build/b5aad16/rocksdb/.rustc_info.json

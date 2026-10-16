@@ -1,0 +1,8 @@
+source_sha=c4630fd6cf45dfd74236a6ac0d9320715d260df4
+core_source_unchanged_from_404026706a9180078c65ce1d29ff499df6ecb5b6: git diff --quiet 404026706a9180078c65ce1d29ff499df6ecb5b6 c4630fd6cf45dfd74236a6ac0d9320715d260df4 -- dodb/src
+core_contract_run: DODB_BUILD_RUN_ID=rocksdb-contract-baseline-20261016-core-c4630fd6-0718z RUST_TEST_THREADS=1 dodb/scripts/run-oci-rocksdb-build.sh test --locked --release -p dodb-rocksdb --lib --test read_contract --test transaction_contract --test research_metrics
+process_crash_run: DODB_BUILD_RUN_ID=rocksdb-contract-baseline-20261016-process-crash-c4630fd6-0718z RUST_TEST_THREADS=1 dodb/scripts/run-oci-rocksdb-build.sh test --locked --release -p dodb-rocksdb --test process_crash_contract
+process_crash_scope=existing process-crash contract test only; this does not establish power-loss durability
+
+resume_invocation_not_run: DODB_BUILD_RUN_ID=rocksdb-contract-baseline-20261016-core-c4630fd6-0718z RUST_TEST_THREADS=1 bash dodb/scripts/run-oci-rocksdb-build.sh test --locked --release -p dodb-rocksdb --lib --test read_contract --test transaction_contract --test research_metrics
+resume_process_crash_invocation_not_run: DODB_BUILD_RUN_ID=rocksdb-contract-baseline-20261016-process-crash-c4630fd6-0718z RUST_TEST_THREADS=1 bash dodb/scripts/run-oci-rocksdb-build.sh test --locked --release -p dodb-rocksdb --test process_crash_contract

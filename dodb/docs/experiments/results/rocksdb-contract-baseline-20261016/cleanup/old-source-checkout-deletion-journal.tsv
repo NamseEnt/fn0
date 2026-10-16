@@ -1,0 +1,7 @@
+path	head	allocated_kib	classification	result
+/bench/zfs/db/crossdb-be1c1786-oci/checkout	be1c178682abfc22257c4bafd29584fcf68adbd1	433793	clean source checkout; dodb commit exists in local object database	deleted
+/bench/zfs/db/crossdb-be1c1786-oci/rocksdb-source	abeebd9630f11bd08c28b7bd43c7bdfc62050654	1284513	duplicate pinned RocksDB source; ignored generated build objects only	deleted
+/bench/zfs/db/crossdb-4e35e99d-oci/checkout	4e35e99d067e9a9af2b01b2ec4f88addd1b4685c	433769	clean source checkout; dodb commit exists in local object database	deleted
+/bench/zfs/db/crossdb-4e35e99d-oci/rocksdb-source	abeebd9630f11bd08c28b7bd43c7bdfc62050654	1283594	duplicate pinned RocksDB source; ignored generated build objects only	deleted
+/bench/zfs/db/crossdb-d3f4958-oci/checkout	d3f4958cdcbba3508f79e6d5680b8d1dacbd3345	381728	clean source checkout; dodb commit exists in local object database	deleted
+/bench/zfs/db/crossdb-d3f4958-oci/rocksdb-source	abeebd9630f11bd08c28b7bd43c7bdfc62050654	1266752	duplicate pinned RocksDB source; ignored generated build objects only	deleted

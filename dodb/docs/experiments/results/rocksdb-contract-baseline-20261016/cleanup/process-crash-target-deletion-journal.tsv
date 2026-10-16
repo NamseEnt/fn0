@@ -1,0 +1,5 @@
+path	allocated_kib	classification	result
+/bench/zfs/db/process-crash-target-3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93	578491	Cargo release target with rustc marker, deps and fingerprints	deleted
+/bench/zfs/db/process-crash-target-a3b554191e6c003fd723d4f2b9ade886cbd1d5ee	578451	Cargo release target with rustc marker, deps and fingerprints	deleted
+/bench/zfs/db/process-crash-target-6b5b93fa921225b5acb80d23c32509eb56165dc4	578439	Cargo release target with rustc marker, deps and fingerprints	deleted
+/bench/zfs/db/process-crash-target-5d34c23bd3d594c93419eda66c5177161e56ff24	578439	Cargo release target with rustc marker, deps and fingerprints	deleted

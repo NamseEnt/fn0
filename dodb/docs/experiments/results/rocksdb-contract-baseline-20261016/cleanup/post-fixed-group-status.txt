@@ -1,0 +1,7 @@
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159161298944 141981761536 17179537408  90% /bench/zfs/db
+dodbbench/db	used	141981761536	-
+dodbbench/db	available	17179537408	-
+0
+current_data_retained
+pinned_archive_retained

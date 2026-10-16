@@ -1,0 +1,7 @@
+path	type	sha256	logical_bytes	allocated_bytes	result
+/bench/zfs/db/product-build/rocksdb-product-target	Cargo target with CACHEDIR.TAG and .rustc_info.json		355880960	355880960	deleted
+/bench/zfs/db/product-build/sqlite-product-target	Cargo target with CACHEDIR.TAG and .rustc_info.json		192761856	192761856	deleted
+/bench/zfs/db/product-build/turso-product-target	Cargo target with CACHEDIR.TAG and .rustc_info.json		4591941632	4591941632	deleted
+/bench/zfs/db/crossdb-4e35e99d-oci/rocksdb-source/librocksdb.a	old RocksDB build archive	ec4a7fd01f2d1443cbf4aa69ed58b916238982e9987270f5ea77a758c6ce44bc	1199830546	1223770624	deleted
+/bench/zfs/db/crossdb-be1c1786-oci/rocksdb-source/librocksdb.a	old RocksDB build archive	99c37f8248138effb5359d19e0c2680a48ec8563d6812029f8adb94eb4321588	1201045940	1224471040	deleted
+/bench/zfs/db/crossdb-d3f4958-oci/rocksdb-source/librocksdb.a	old RocksDB build archive	db0d4ba17b699f3b7cace0cf19a0113c27fa8a0d684d618bcaab002ebb9e5abf	1199829890	1223705088	deleted

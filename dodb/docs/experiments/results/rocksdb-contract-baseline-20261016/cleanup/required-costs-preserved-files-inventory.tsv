@@ -1,0 +1,14 @@
+209	/bench/zfs/db/dodb-required-costs-20261016/archive-relocation-capacity.txt
+37384	/bench/zfs/db/dodb-required-costs-20261016/archive-relocations.jsonl
+1951724	/bench/zfs/db/dodb-required-costs-20261016/binaries/response-size-f46340205.gz
+140626801	/bench/zfs/db/dodb-required-costs-20261016/binaries/service-after-f46340205.gz
+377570680	/bench/zfs/db/dodb-required-costs-20261016/binaries/service-before-ef073f1af
+482	/bench/zfs/db/dodb-required-costs-20261016/completion-environment.txt
+12194	/bench/zfs/db/dodb-required-costs-20261016/matrix.log
+30	/bench/zfs/db/dodb-required-costs-20261016/measurements/complete.json
+3106	/bench/zfs/db/dodb-required-costs-20261016/measurements/host-and-source.txt
+1326	/bench/zfs/db/dodb-required-costs-20261016/measurements/plan.json
+76	/bench/zfs/db/dodb-required-costs-20261016/response-size-command.txt
+2	/bench/zfs/db/dodb-required-costs-20261016/response-size-exit-status.txt
+1828	/bench/zfs/db/dodb-required-costs-20261016/response-size-report.json
+0	/bench/zfs/db/dodb-required-costs-20261016/response-size-stderr.txt

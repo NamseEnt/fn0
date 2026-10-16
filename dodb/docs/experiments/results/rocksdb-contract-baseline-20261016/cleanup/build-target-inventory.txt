@@ -1,0 +1,141 @@
+CARGO TARGET MARKERS
+/bench/zfs/db/crossdb-10e3494e-oci/build/target-dodb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-10e3494e-oci/build/target-dodb/.rustc_info.json
+/bench/zfs/db/crossdb-10e3494e-oci/build/target-rocksdb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-10e3494e-oci/build/target-rocksdb/.rustc_info.json
+/bench/zfs/db/crossdb-1ac11e56-oci/build/target-dodb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-1ac11e56-oci/build/target-dodb/.rustc_info.json
+/bench/zfs/db/crossdb-1ac11e56-oci/build/target-rocksdb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-1ac11e56-oci/build/target-rocksdb/.rustc_info.json
+/bench/zfs/db/crossdb-33722487-oci/build/target-dodb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-33722487-oci/build/target-dodb/.rustc_info.json
+/bench/zfs/db/crossdb-33722487-oci/build/target-rocksdb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-33722487-oci/build/target-rocksdb/.rustc_info.json
+/bench/zfs/db/crossdb-3da68648-oci/build/target-dodb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-3da68648-oci/build/target-dodb/.rustc_info.json
+/bench/zfs/db/crossdb-3da68648-oci/build/target-rocksdb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-3da68648-oci/build/target-rocksdb/.rustc_info.json
+/bench/zfs/db/crossdb-4e35e99d-oci/build/target-dodb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-4e35e99d-oci/build/target-dodb/.rustc_info.json
+/bench/zfs/db/crossdb-4e35e99d-oci/build/target-rocksdb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-4e35e99d-oci/build/target-rocksdb/.rustc_info.json
+/bench/zfs/db/crossdb-82c2b6e1-oci/build/target-dodb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-82c2b6e1-oci/build/target-dodb/.rustc_info.json
+/bench/zfs/db/crossdb-82c2b6e1-oci/build/target-rocksdb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-82c2b6e1-oci/build/target-rocksdb/.rustc_info.json
+/bench/zfs/db/crossdb-aa83fab0-oci/build/target-dodb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-aa83fab0-oci/build/target-dodb/.rustc_info.json
+/bench/zfs/db/crossdb-aa83fab0-oci/build/target-rocksdb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-aa83fab0-oci/build/target-rocksdb/.rustc_info.json
+/bench/zfs/db/crossdb-be1c1786-oci/build/target-dodb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-be1c1786-oci/build/target-dodb/.rustc_info.json
+/bench/zfs/db/crossdb-be1c1786-oci/build/target-rocksdb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-be1c1786-oci/build/target-rocksdb/.rustc_info.json
+/bench/zfs/db/crossdb-c1ee7cbf-oci/build/target-dodb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-c1ee7cbf-oci/build/target-dodb/.rustc_info.json
+/bench/zfs/db/crossdb-c1ee7cbf-oci/build/target-rocksdb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-c1ee7cbf-oci/build/target-rocksdb/.rustc_info.json
+/bench/zfs/db/crossdb-d3f4958-oci/build/target-dodb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-d3f4958-oci/build/target-dodb/.rustc_info.json
+/bench/zfs/db/crossdb-d3f4958-oci/build/target-rocksdb/CACHEDIR.TAG
+/bench/zfs/db/crossdb-d3f4958-oci/build/target-rocksdb/.rustc_info.json
+/bench/zfs/db/dodb-rocksdb-r1a-70105e0f871a25a9/target/CACHEDIR.TAG
+/bench/zfs/db/dodb-rocksdb-r1a-70105e0f871a25a9/target/.rustc_info.json
+/bench/zfs/db/dodb-rocksdb-r1b1-2774bd1c3491134b/target/.rustc_info.json
+/bench/zfs/db/dodb-rocksdb-r1b1-e59ae32117df13e2/target/.rustc_info.json
+/bench/zfs/db/dodb-rocksdb-r1b2-558a9283c1a9/target/.rustc_info.json
+/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/.rustc_info.json
+/bench/zfs/db/experiment-build/b5aad16/CACHEDIR.TAG
+/bench/zfs/db/experiment-build/b5aad16/rocksdb/CACHEDIR.TAG
+/bench/zfs/db/experiment-build/b5aad16/rocksdb/.rustc_info.json
+/bench/zfs/db/experiment-build/b5aad16/rocksdb-test/CACHEDIR.TAG
+/bench/zfs/db/experiment-build/b5aad16/rocksdb-test/.rustc_info.json
+/bench/zfs/db/experiment-build/b5aad16/.rustc_info.json
+/bench/zfs/db/experiment-build/borrowed-page-b7c67715-target/CACHEDIR.TAG
+/bench/zfs/db/experiment-build/borrowed-page-b7c67715-target/.rustc_info.json
+/bench/zfs/db/experiment-build/dodb-81f6ce268/.rustc_info.json
+/bench/zfs/db/experiment-build/dodb-8a6f3dc/.rustc_info.json
+/bench/zfs/db/oci-a1-borrowed-query16-4bc4d42e4d816f4a11428f5423d89a4c35494f9b/build-target-feature-on/.rustc_info.json
+/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-base/aarch64-unknown-linux-gnu/CACHEDIR.TAG
+/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-base/.rustc_info.json
+/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-candidate/aarch64-unknown-linux-gnu/CACHEDIR.TAG
+/bench/zfs/db/oci-a1-query-cursor-95954ecaa/target-candidate/.rustc_info.json
+/bench/zfs/db/oci-phase0-followup-087406003b1edbe7e0a2991d54ae8e088e98baed/target/.rustc_info.json
+/bench/zfs/db/oci-phase0-followup-4bc4d42e4d816f4a11428f5423d89a4c35494f9b/target/.rustc_info.json
+/bench/zfs/db/oci-phase0-followup-ff864bf92461c9216e840d9eecf7bb04e52c41ce/target/.rustc_info.json
+/bench/zfs/db/oci-phase0-measurement-5cee905cce6aa93d474112efdcaf561d31eadcf9/cargo-home/registry/CACHEDIR.TAG
+/bench/zfs/db/oci-phase0-measurement-5cee905cce6aa93d474112efdcaf561d31eadcf9/target/.rustc_info.json
+/bench/zfs/db/oci-phase0-measurement-a277c01b5217a8cb8210b94c2be06131b6c4dc4e/target/.rustc_info.json
+/bench/zfs/db/oci-phase0-measurement-aece5d4356f127d63181fd82613ead46bfb52aff/target/CACHEDIR.TAG
+/bench/zfs/db/oci-phase0-measurement-aece5d4356f127d63181fd82613ead46bfb52aff/target/.rustc_info.json
+/bench/zfs/db/process-crash-target-3b3c4998aa1cab1cc6243e1c3f90dfaa8eac3d93/.rustc_info.json
+/bench/zfs/db/process-crash-target-5d34c23bd3d594c93419eda66c5177161e56ff24/.rustc_info.json
+/bench/zfs/db/process-crash-target-6b5b93fa921225b5acb80d23c32509eb56165dc4/.rustc_info.json
+/bench/zfs/db/process-crash-target-a3b554191e6c003fd723d4f2b9ade886cbd1d5ee/.rustc_info.json
+/bench/zfs/db/product-build/dodb-product-target/CACHEDIR.TAG
+/bench/zfs/db/product-build/dodb-product-target/.rustc_info.json
+/bench/zfs/db/product-build/rocksdb-product-target/CACHEDIR.TAG
+/bench/zfs/db/product-build/rocksdb-product-target/.rustc_info.json
+/bench/zfs/db/product-build/sqlite-product-target/CACHEDIR.TAG
+/bench/zfs/db/product-build/sqlite-product-target/.rustc_info.json
+/bench/zfs/db/product-build/turso-0.8.2-pre.2-target/CACHEDIR.TAG
+/bench/zfs/db/product-build/turso-0.8.2-pre.2-target/.rustc_info.json
+/bench/zfs/db/product-build/turso-product-target/CACHEDIR.TAG
+/bench/zfs/db/product-build/turso-product-target/.rustc_info.json
+PRODUCT BUILD TARGET CONTENTS
+d /bench/zfs/db/product-build/dodb-product-target
+d /bench/zfs/db/product-build/rocksdb-product-target
+d /bench/zfs/db/product-build/sqlite-product-target
+d /bench/zfs/db/product-build/turso-0.8.2-pre.2-target
+d /bench/zfs/db/product-build/turso-product-target
+EXPERIMENT BUILD LAYOUT
+d 4 /bench/zfs/db/experiment-build/dodb-81f6ce268
+d 14 /bench/zfs/db/experiment-build/dodb-81f6ce268/release
+d 2 /bench/zfs/db/experiment-build/dodb-81f6ce268/release/examples
+f 1616 /bench/zfs/db/experiment-build/dodb-81f6ce268/release/phase0-bench.d
+f 0 /bench/zfs/db/experiment-build/dodb-81f6ce268/release/.cargo-build-lock
+f 46347136 /bench/zfs/db/experiment-build/dodb-81f6ce268/release/phase0-bench
+d 56 /bench/zfs/db/experiment-build/dodb-81f6ce268/release/.fingerprint
+f 286832264 /bench/zfs/db/experiment-build/dodb-81f6ce268/release/rocksdb-bench
+f 0 /bench/zfs/db/experiment-build/dodb-81f6ce268/release/.cargo-artifact-lock
+f 763 /bench/zfs/db/experiment-build/dodb-81f6ce268/release/rocksdb-bench.d
+d 2 /bench/zfs/db/experiment-build/dodb-81f6ce268/release/incremental
+f 0 /bench/zfs/db/experiment-build/dodb-81f6ce268/release/.cargo-lock
+d 22 /bench/zfs/db/experiment-build/dodb-81f6ce268/release/build
+d 101 /bench/zfs/db/experiment-build/dodb-81f6ce268/release/deps
+f 1687 /bench/zfs/db/experiment-build/dodb-81f6ce268/.rustc_info.json
+d 2 /bench/zfs/db/experiment-build/borrowed-page-b7c67715-tmp
+d 36 /bench/zfs/db/experiment-build/main-compact-source-99924ae7
+d 3 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/.codex
+d 3 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/.codex/skills
+f 4668 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/CLA.md
+d 5 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/infra
+d 11 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/infra/cloud
+d 29 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/infra/pulumi
+d 3 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/infra/r2-worker
+d 4 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/.github
+d 3 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/.github/dist
+d 8 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/.github/workflows
+d 8 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/obsy
+f 277 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/obsy/IMPORT.md
+d 15 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/obsy/signy
+f 4537 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/obsy/README.md
+f 1763 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/obsy/CLAUDE.md
+f 18 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/obsy/.gitignore
+d 13 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/obsy/collecty
+f 441 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/dist-workspace.toml
+d 7 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/doc-db
+d 3 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/doc-db/.cargo
+f 1728 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/doc-db/Cargo.toml
+d 4 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/doc-db/tests
+f 7 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/doc-db/.gitignore
+d 13 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/doc-db/src
+f 72410 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/image.gif
+d 3 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/.cargo
+f 77 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/.cargo/config.toml
+f 603 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/docker-compose.yml
+f 13884 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/README.md
+f 31 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/rust-toolchain.toml
+d 5 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/object-storage
+d 3 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/object-storage/.cargo
+d 9 /bench/zfs/db/experiment-build/main-compact-source-99924ae7/object-storage/src

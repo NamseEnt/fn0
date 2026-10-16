@@ -1,0 +1,22 @@
+OCI cleanup final status
+Date: 2026-10-16
+Host: opc@217.142.246.204
+Mount: /bench/zfs/db on dodbbench/db (ZFS)
+
+Post-cleanup filesystem status:
+/ filesystem: 31,608,274,944 bytes total, 25,814,159,360 used, 5,794,115,584 available
+ZFS dodbbench/db: 159,153,827,840 bytes total, 52,009,025,536 used, 107,144,802,304 available
+ZFS baseline available: 1,301,846,016 bytes
+ZFS available increase: 105,842,956,288 bytes
+Exact pre-cleanup / filesystem available bytes were not recorded.
+
+Preserved build environment:
+Rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+RocksDB source: /bench/zfs/db/product-build/rocksdb-source at abeebd9630f11bd08c28b7bd43c7bdfc62050654
+RocksDB archive SHA-256: 9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5
+Shared cache: /bench/zfs/db/dodb-rocksdb-shared-cache retained (9,645,843 KiB)
+Tooling: /bench/zfs/db/tooling retained
+Current path: /bench/zfs/db/dodb-final-path-20261016 retained
+Representative completed DB archives retained: 2
+Active build or benchmark processes: none found during cleanup checks
+Benchmarks and builds started by cleanup: none

@@ -1,0 +1,11 @@
+toolchain=Rust 1.97.1 via existing helper
+rust_target=aarch64-unknown-linux-gnu
+rust_target_feature=+crc
+rocksdb_source=/bench/zfs/db/product-build/rocksdb-source
+rocksdb_commit=abeebd9630f11bd08c28b7bd43c7bdfc62050654
+rocksdb_archive_sha256=9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5
+cargo_target_dir=/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target
+shared_sccache=/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/sccache
+temp_dirs=/tmp/db-${run_id_sha256_prefix}
+source_worktree=/bench/zfs/db/rocksdb-contract-baseline-20261016/source
+rustup_default=stable-aarch64-unknown-linux-gnu; unchanged
