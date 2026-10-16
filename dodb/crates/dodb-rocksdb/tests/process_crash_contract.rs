@@ -294,22 +294,21 @@ fn receive_hook(child: &mut ChildGuard, backend: Backend) -> String {
         let line = child.handoff_lines.recv_timeout(Duration::from_millis(25));
         match line {
             Ok(Ok(line)) => {
-                let Some(event_line) = extract_handoff_event(&line) else {
-                    continue;
-                };
-                if event_line.starts_with("R1B3B_WRONG_SYNC_TARGET|") {
-                    panic!("wrong_sync_target: {event_line}");
-                }
-                if event_line.starts_with(HOOK_PREFIX) {
-                    let expected_backend_prefix = format!("{HOOK_PREFIX}{}|", backend.as_str());
-                    assert!(
-                        event_line.starts_with(&expected_backend_prefix),
-                        "unexpected WAL sync hook backend: {event_line}"
-                    );
-                    return event_line.to_owned();
-                }
-                if event_line.starts_with("R1B3B_TARGET_RETURNED|") {
-                    panic!("target transaction returned before WAL sync hook: {event_line}");
+                if let Some(event_line) = extract_handoff_event(&line) {
+                    if event_line.starts_with("R1B3B_WRONG_SYNC_TARGET|") {
+                        panic!("wrong_sync_target: {event_line}");
+                    }
+                    if event_line.starts_with(HOOK_PREFIX) {
+                        let expected_backend_prefix = format!("{HOOK_PREFIX}{}|", backend.as_str());
+                        assert!(
+                            event_line.starts_with(&expected_backend_prefix),
+                            "unexpected WAL sync hook backend: {event_line}"
+                        );
+                        return event_line.to_owned();
+                    }
+                    if event_line.starts_with("R1B3B_TARGET_RETURNED|") {
+                        panic!("target transaction returned before WAL sync hook: {event_line}");
+                    }
                 }
             }
             Ok(Err(error)) => panic!("handoff_timeout: failed reading child output: {error}"),

@@ -19,6 +19,10 @@ const INITIAL_ROWS: usize = 10_000;
 const VALUE_SIZE: usize = 512;
 const MAX_WRITE_LEDGER: usize = 1_000_000;
 const INPUT_FINGERPRINT_PREFIX_WORKFLOWS: u64 = 100;
+const HISTOGRAM_EXACT_BUCKETS: usize = 1_024;
+const HISTOGRAM_SUB_BUCKETS_PER_EXPONENT: usize = 1_024;
+const HISTOGRAM_BUCKETS: usize =
+    HISTOGRAM_EXACT_BUCKETS + (u64::BITS as usize - 10) * HISTOGRAM_SUB_BUCKETS_PER_EXPONENT;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum BackendKind {
@@ -61,6 +65,19 @@ enum WriteKind {
     ConditionalOne,
     TransactionFour,
     TransactionEight,
+    TransactionSixteen,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MutationWorkload {
+    NewKey,
+    Overwrite,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LatencyStorageMode {
+    ExactAll,
+    Log1024,
 }
 
 #[derive(Clone, Debug)]
@@ -218,43 +235,161 @@ struct Options {
     revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
     blocking_admission: dodb_rocksdb::BlockingAdmissionMode,
     shared_blocking_slots: usize,
+    mutation_workload: MutationWorkload,
+    overwrite_slots_per_client: usize,
+    latency_storage: LatencyStorageMode,
+    max_write_ledger: usize,
+    require_full_window: bool,
+    include_width_16: bool,
 }
 
-#[derive(Default)]
 struct Latencies {
     count: u64,
-    samples: Vec<u64>,
+    storage: LatencyData,
+}
+
+enum LatencyData {
+    ExactAll(Vec<u64>),
+    Log1024(Vec<u64>),
 }
 
 impl Latencies {
+    fn new(storage_mode: LatencyStorageMode) -> Self {
+        let storage = match storage_mode {
+            LatencyStorageMode::ExactAll => LatencyData::ExactAll(Vec::new()),
+            LatencyStorageMode::Log1024 => LatencyData::Log1024(vec![0; HISTOGRAM_BUCKETS]),
+        };
+        Self { count: 0, storage }
+    }
+
     fn record(&mut self, nanos: u64) {
         self.count += 1;
-        self.samples.push(nanos);
+        match &mut self.storage {
+            LatencyData::ExactAll(samples) => samples.push(nanos),
+            LatencyData::Log1024(buckets) => {
+                buckets[histogram_bucket_index(nanos)] += 1;
+            }
+        }
     }
 
     fn report(&self) -> Value {
-        let mut sorted = self.samples.clone();
-        sorted.sort_unstable();
-        let percentile = |numerator: usize| -> Option<f64> {
-            if sorted.is_empty() {
-                return None;
+        match &self.storage {
+            LatencyData::ExactAll(samples) => {
+                let mut sorted = samples.clone();
+                sorted.sort_unstable();
+                let percentile = |numerator: usize| -> Option<f64> {
+                    percentile_rank(sorted.len(), numerator)
+                        .map(|rank| sorted[rank] as f64 / 1_000_000.0)
+                };
+                json!({
+                    "storage": "exact-all",
+                    "count": self.count,
+                    "sample_count": sorted.len(),
+                    "sample_limit": null,
+                    "sampling": "all recorded completions",
+                    "p50_ms": percentile(50),
+                    "p95_ms": percentile(95),
+                    "p99_ms": percentile(99),
+                })
             }
-            let rank = ((sorted.len() - 1) * numerator).div_ceil(100);
-            Some(sorted[rank] as f64 / 1_000_000.0)
-        };
-        json!({
-            "count": self.count,
-            "sample_count": sorted.len(),
-            "sample_limit": null,
-            "sampling": "all recorded completions",
-            "p50_ms": percentile(50),
-            "p95_ms": percentile(95),
-            "p99_ms": percentile(99),
-        })
+            LatencyData::Log1024(buckets) => {
+                let percentile = |numerator: usize| -> Option<f64> {
+                    let rank = percentile_rank(self.count as usize, numerator)?;
+                    histogram_percentile_upper_bound(buckets, rank)
+                        .map(|nanos| nanos as f64 / 1_000_000.0)
+                };
+                json!({
+                    "storage": "log1024",
+                    "count": self.count,
+                    "sample_count": self.count,
+                    "bucket_count": HISTOGRAM_BUCKETS,
+                    "sampling": "all recorded completions counted in fixed buckets",
+                    "percentile_value": "bucket upper bound in nanoseconds",
+                    "maximum_relative_bucket_width": 1.0 / 1024.0,
+                    "p50_ms": percentile(50),
+                    "p95_ms": percentile(95),
+                    "p99_ms": percentile(99),
+                })
+            }
+        }
+    }
+
+    fn merge(&mut self, other: &Self) {
+        self.count += other.count;
+        match (&mut self.storage, &other.storage) {
+            (LatencyData::ExactAll(samples), LatencyData::ExactAll(other_samples)) => {
+                samples.extend_from_slice(other_samples);
+            }
+            (LatencyData::Log1024(buckets), LatencyData::Log1024(other_buckets)) => {
+                for (bucket_count, other_count) in buckets.iter_mut().zip(other_buckets) {
+                    *bucket_count += other_count;
+                }
+            }
+            _ => unreachable!("latency storage mode must match while merging counters"),
+        }
+    }
+
+    fn memory_accounting(&self) -> (usize, usize, usize) {
+        match &self.storage {
+            LatencyData::ExactAll(samples) => (
+                samples.capacity() * std::mem::size_of::<u64>(),
+                samples.len() * std::mem::size_of::<u64>(),
+                0,
+            ),
+            LatencyData::Log1024(buckets) => {
+                (0, 0, buckets.capacity() * std::mem::size_of::<u64>())
+            }
+        }
     }
 }
 
-#[derive(Default)]
+fn percentile_rank(sample_count: usize, percentile: usize) -> Option<usize> {
+    if sample_count == 0 {
+        return None;
+    }
+    let last_index = sample_count - 1;
+    Some(((last_index as u128 * percentile as u128).div_ceil(100)) as usize)
+}
+
+fn histogram_bucket_index(nanos: u64) -> usize {
+    if nanos < HISTOGRAM_EXACT_BUCKETS as u64 {
+        return nanos as usize;
+    }
+    let exponent = u64::BITS as usize - 1 - nanos.leading_zeros() as usize;
+    let exponent_lower_bound = 1_u64 << exponent;
+    let sub_bucket_width = 1_u64 << (exponent - 10);
+    let sub_bucket_index = ((nanos - exponent_lower_bound) / sub_bucket_width) as usize;
+    HISTOGRAM_EXACT_BUCKETS
+        + (exponent - 10) * HISTOGRAM_SUB_BUCKETS_PER_EXPONENT
+        + sub_bucket_index
+}
+
+fn histogram_bucket_upper_bound(bucket_index: usize) -> Option<u64> {
+    if bucket_index < HISTOGRAM_EXACT_BUCKETS {
+        return Some(bucket_index as u64);
+    }
+    if bucket_index >= HISTOGRAM_BUCKETS {
+        return None;
+    }
+    let relative_index = bucket_index - HISTOGRAM_EXACT_BUCKETS;
+    let exponent = 10 + relative_index / HISTOGRAM_SUB_BUCKETS_PER_EXPONENT;
+    let sub_bucket_index = relative_index % HISTOGRAM_SUB_BUCKETS_PER_EXPONENT;
+    let exponent_lower_bound = 1_u64 << exponent;
+    let sub_bucket_width = 1_u64 << (exponent - 10);
+    exponent_lower_bound.checked_add(sub_bucket_width * (sub_bucket_index as u64 + 1) - 1)
+}
+
+fn histogram_percentile_upper_bound(buckets: &[u64], rank: usize) -> Option<u64> {
+    let mut cumulative_count = 0_u64;
+    for (bucket_index, bucket_count) in buckets.iter().copied().enumerate() {
+        cumulative_count = cumulative_count.saturating_add(bucket_count);
+        if cumulative_count > rank as u64 {
+            return histogram_bucket_upper_bound(bucket_index);
+        }
+    }
+    None
+}
+
 struct Counters {
     api_calls: u64,
     read_calls: u64,
@@ -275,16 +410,79 @@ struct Counters {
     condition_kinds: BTreeMap<String, u64>,
     latencies: BTreeMap<String, Latencies>,
     write_ledger: Vec<LedgerEntry>,
+    write_ledger_entries: usize,
+    max_write_ledger: usize,
+    latency_storage: LatencyStorageMode,
     client_input_prefixes: Vec<ClientInputPrefix>,
     verification_errors: Vec<String>,
     request_limit_reached: bool,
+}
+
+impl Default for Counters {
+    fn default() -> Self {
+        Self::new(LatencyStorageMode::ExactAll, MAX_WRITE_LEDGER)
+    }
+}
+
+impl Counters {
+    fn new(latency_storage: LatencyStorageMode, max_write_ledger: usize) -> Self {
+        Self {
+            max_write_ledger,
+            latency_storage,
+            ..Self::default_values()
+        }
+    }
+
+    fn default_values() -> Self {
+        Self {
+            api_calls: 0,
+            read_calls: 0,
+            preparatory_gets: 0,
+            ordinary_gets: 0,
+            query_calls: 0,
+            query_rows: 0,
+            write_requests: 0,
+            successful_write_transactions: 0,
+            successful_mutations: 0,
+            intended_rejections: 0,
+            natural_conflicts: 0,
+            overloads: 0,
+            other_errors: 0,
+            conditional_attempts: 0,
+            category_attempts: BTreeMap::new(),
+            category_successes: BTreeMap::new(),
+            condition_kinds: BTreeMap::new(),
+            latencies: BTreeMap::new(),
+            write_ledger: Vec::new(),
+            write_ledger_entries: 0,
+            max_write_ledger: MAX_WRITE_LEDGER,
+            latency_storage: LatencyStorageMode::ExactAll,
+            client_input_prefixes: Vec::new(),
+            verification_errors: Vec::new(),
+            request_limit_reached: false,
+        }
+    }
 }
 
 #[derive(Clone)]
 struct LedgerEntry {
     commit_identity: u64,
     workflow_id: u64,
+    client_index: usize,
+    client_sequence: u64,
     kind: WriteKind,
+}
+
+#[derive(Clone)]
+struct SeedLedgerEntry {
+    start: usize,
+    end: usize,
+    commit_identity: u64,
+}
+
+enum ExpectedState {
+    Present { value: Vec<u8>, revision: Revision },
+    Missing { revision: Revision },
 }
 
 #[derive(Clone)]
@@ -294,13 +492,14 @@ struct ClientInputPrefix {
     workflow_count: u64,
     admitted_workflows: u64,
     fingerprint: String,
+    workflow_plan_capacity_bytes: usize,
 }
 
 impl Counters {
     fn latency(&mut self, name: &str, duration: Duration) {
         self.latencies
             .entry(name.to_owned())
-            .or_default()
+            .or_insert_with(|| Latencies::new(self.latency_storage))
             .record(duration.as_nanos().min(u64::MAX as u128) as u64);
     }
 
@@ -311,6 +510,7 @@ impl Counters {
             "conditional_width_1",
             "conditional_width_4",
             "conditional_width_8",
+            "conditional_width_16",
         ];
         let mut category_report = serde_json::Map::new();
         for category in categories {
@@ -342,8 +542,8 @@ impl Counters {
             "write_categories": category_report,
             "condition_kinds": self.condition_kinds,
             "latency": self.latencies.iter().map(|(name, data)| (name.clone(), data.report())).collect::<BTreeMap<_, _>>(),
-            "write_ledger_entries": self.write_ledger.len(),
-            "write_ledger_limit": MAX_WRITE_LEDGER,
+            "write_ledger_entries": self.write_ledger_entries,
+            "write_ledger_limit_per_tenant": self.max_write_ledger,
             "client_input_prefixes": self.client_input_prefixes.iter().map(|entry| json!({
                 "client_index": entry.client_index,
                 "profile": profile_name(entry.profile),
@@ -351,13 +551,15 @@ impl Counters {
                 "admitted_workflows": entry.admitted_workflows,
                 "prefix_limit": INPUT_FINGERPRINT_PREFIX_WORKFLOWS,
                 "fingerprint": entry.fingerprint,
+                "workflow_plan_capacity_bytes": entry.workflow_plan_capacity_bytes,
             })).collect::<Vec<_>>(),
             "verification_errors": self.verification_errors,
             "request_limit_reached": self.request_limit_reached,
+            "collector_memory": self.memory_accounting(),
         })
     }
 
-    fn merge(&mut self, other: Counters) {
+    fn merge(&mut self, other: &Counters) {
         self.api_calls += other.api_calls;
         self.read_calls += other.read_calls;
         self.preparatory_gets += other.preparatory_gets;
@@ -373,24 +575,63 @@ impl Counters {
         self.other_errors += other.other_errors;
         self.conditional_attempts += other.conditional_attempts;
         self.request_limit_reached |= other.request_limit_reached;
-        for (name, count) in other.category_attempts {
-            *self.category_attempts.entry(name).or_default() += count;
+        for (name, count) in &other.category_attempts {
+            *self.category_attempts.entry(name.clone()).or_default() += count;
         }
-        for (name, count) in other.category_successes {
-            *self.category_successes.entry(name).or_default() += count;
+        for (name, count) in &other.category_successes {
+            *self.category_successes.entry(name.clone()).or_default() += count;
         }
-        for (name, count) in other.condition_kinds {
-            *self.condition_kinds.entry(name).or_default() += count;
+        for (name, count) in &other.condition_kinds {
+            *self.condition_kinds.entry(name.clone()).or_default() += count;
         }
-        for (name, latency) in other.latencies {
-            let target = self.latencies.entry(name).or_default();
-            target.count += latency.count;
-            target.samples.extend(latency.samples);
+        for (name, latency) in &other.latencies {
+            self.latencies
+                .entry(name.clone())
+                .or_insert_with(|| Latencies::new(self.latency_storage))
+                .merge(latency);
         }
-        self.write_ledger.extend(other.write_ledger);
+        self.write_ledger_entries += other.write_ledger_entries;
         self.client_input_prefixes
-            .extend(other.client_input_prefixes);
-        self.verification_errors.extend(other.verification_errors);
+            .extend(other.client_input_prefixes.iter().cloned());
+        self.verification_errors
+            .extend(other.verification_errors.iter().cloned());
+    }
+
+    fn memory_accounting(&self) -> Value {
+        let mut exact_latency_capacity_bytes = 0_usize;
+        let mut exact_latency_sample_bytes = 0_usize;
+        let mut histogram_capacity_bytes = 0_usize;
+        for latency in self.latencies.values() {
+            let (capacity_bytes, sample_bytes, histogram_bytes) = latency.memory_accounting();
+            exact_latency_capacity_bytes += capacity_bytes;
+            exact_latency_sample_bytes += sample_bytes;
+            histogram_capacity_bytes += histogram_bytes;
+        }
+        let write_ledger_capacity_bytes =
+            self.write_ledger.capacity() * std::mem::size_of::<LedgerEntry>();
+        let write_ledger_used_bytes = self.write_ledger.len() * std::mem::size_of::<LedgerEntry>();
+        let client_prefix_capacity_bytes =
+            self.client_input_prefixes.capacity() * std::mem::size_of::<ClientInputPrefix>();
+        let client_fingerprint_capacity_bytes = self
+            .client_input_prefixes
+            .iter()
+            .map(|entry| entry.fingerprint.capacity())
+            .sum::<usize>();
+        json!({
+            "scope": "actual collector vector capacities and populated sizes; excludes allocator metadata, map node overhead, runtime, service and document state",
+            "latency_exact_capacity_bytes": exact_latency_capacity_bytes,
+            "latency_exact_sample_bytes": exact_latency_sample_bytes,
+            "latency_histogram_capacity_bytes": histogram_capacity_bytes,
+            "write_ledger_length": self.write_ledger.len(),
+            "write_ledger_capacity": self.write_ledger.capacity(),
+            "write_ledger_used_bytes": write_ledger_used_bytes,
+            "write_ledger_capacity_bytes": write_ledger_capacity_bytes,
+            "client_input_prefix_length": self.client_input_prefixes.len(),
+            "client_input_prefix_capacity": self.client_input_prefixes.capacity(),
+            "client_input_prefix_vector_bytes": client_prefix_capacity_bytes,
+            "client_input_fingerprint_capacity_bytes": client_fingerprint_capacity_bytes,
+            "workflow_plan_capacity_bytes": self.client_input_prefixes.iter().map(|entry| entry.workflow_plan_capacity_bytes).sum::<usize>(),
+        })
     }
 }
 
@@ -492,6 +733,44 @@ fn parse_options() -> Result<Options, String> {
     let read_stage_metrics = parse("--read-stage-metrics", 0)? == 1;
     let detailed_write_metrics =
         parse("--detailed-write-metrics", u64::from(!read_stage_metrics))? == 1;
+    let mutation_workload = match values
+        .get("--mutation-workload")
+        .map(String::as_str)
+        .unwrap_or("new-key")
+    {
+        "new-key" => MutationWorkload::NewKey,
+        "overwrite" => MutationWorkload::Overwrite,
+        other => return Err(format!("unsupported mutation workload {other}")),
+    };
+    let overwrite_slots_per_client = usize::try_from(parse("--overwrite-slots-per-client", 1_024)?)
+        .map_err(|_| "invalid --overwrite-slots-per-client".to_owned())?;
+    if overwrite_slots_per_client == 0 {
+        return Err("--overwrite-slots-per-client must be positive".to_owned());
+    }
+    if overwrite_slots_per_client > (1_usize << 32) {
+        return Err("--overwrite-slots-per-client exceeds the key-space bound".to_owned());
+    }
+    let latency_storage = match values
+        .get("--latency-storage")
+        .map(String::as_str)
+        .unwrap_or("exact-all")
+    {
+        "exact-all" => LatencyStorageMode::ExactAll,
+        "log1024" => LatencyStorageMode::Log1024,
+        other => return Err(format!("unsupported latency storage {other}")),
+    };
+    let max_write_ledger = usize::try_from(parse("--max-write-ledger", MAX_WRITE_LEDGER as u64)?)
+        .map_err(|_| "invalid --max-write-ledger".to_owned())?;
+    if max_write_ledger == 0 {
+        return Err("--max-write-ledger must be positive".to_owned());
+    }
+    let parse_switch = |name: &str| -> Result<bool, String> {
+        match parse(name, 0)? {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(format!("{name} must be 0 or 1")),
+        }
+    };
     Ok(Options {
         backend,
         client_executor,
@@ -511,6 +790,12 @@ fn parse_options() -> Result<Options, String> {
         revision_allocator,
         blocking_admission,
         shared_blocking_slots,
+        mutation_workload,
+        overwrite_slots_per_client,
+        latency_storage,
+        max_write_ledger,
+        require_full_window: parse_switch("--require-full-window")?,
+        include_width_16: parse_switch("--include-width-16")?,
     })
 }
 
@@ -539,6 +824,7 @@ fn category_name(kind: WriteKind) -> &'static str {
         WriteKind::ConditionalOne => "conditional_width_1",
         WriteKind::TransactionFour => "conditional_width_4",
         WriteKind::TransactionEight => "conditional_width_8",
+        WriteKind::TransactionSixteen => "conditional_width_16",
     }
 }
 
@@ -550,15 +836,22 @@ fn condition_name(kind: usize) -> &'static str {
     }
 }
 
-fn make_plan(profile: Profile, seed: u64) -> Vec<WorkflowPlan> {
+fn make_plan(profile: Profile, seed: u64, include_width_16: bool) -> Vec<WorkflowPlan> {
     let read_calls = profile_read_percentage(profile) * 10;
     let write_calls = 1_000 - read_calls;
     let put_count = write_calls * 20 / 100;
     let delete_count = write_calls * 10 / 100;
     let conditional_one = write_calls * 30 / 100;
     let transaction_four = write_calls * 30 / 100;
-    let transaction_eight =
+    let mut transaction_eight =
         write_calls - put_count - delete_count - conditional_one - transaction_four;
+    let transaction_sixteen = if include_width_16 {
+        let moved_count = transaction_eight / 2;
+        transaction_eight -= moved_count;
+        moved_count
+    } else {
+        0
+    };
     let conditional_count = conditional_one + transaction_four + transaction_eight;
     let revision_get_count = (conditional_count + 3) / 4;
     let prep_get_count = revision_get_count;
@@ -585,6 +878,7 @@ fn make_plan(profile: Profile, seed: u64) -> Vec<WorkflowPlan> {
         (WriteKind::ConditionalOne, conditional_one),
         (WriteKind::TransactionFour, transaction_four),
         (WriteKind::TransactionEight, transaction_eight),
+        (WriteKind::TransactionSixteen, transaction_sixteen),
     ] {
         for _ in 0..count {
             writes.push(kind);
@@ -649,9 +943,19 @@ fn profile_for_scenario(scenario: Scenario, tenant_index: usize) -> Profile {
     }
 }
 
-fn schedule_fingerprint(profile: Profile, seed: u64) -> String {
+fn schedule_fingerprint(profile: Profile, seed: u64, options: &Options) -> String {
     let mut fingerprint = 0xcbf2_9ce4_8422_2325_u64;
-    for plan in make_plan(profile, seed) {
+    for value in [
+        options.include_width_16 as u64,
+        options.overwrite_slots_per_client as u64,
+        options.mutation_workload as u64,
+    ] {
+        for byte in value.to_le_bytes() {
+            fingerprint ^= byte as u64;
+            fingerprint = fingerprint.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    for plan in make_plan(profile, seed, options.include_width_16) {
         let (tag, flags) = match plan.kind {
             WorkflowKind::Read(ReadKind::Get) => (1_u64, 0_u64),
             WorkflowKind::Read(ReadKind::Query16) => (2, 0),
@@ -667,6 +971,7 @@ fn schedule_fingerprint(profile: Profile, seed: u64) -> String {
                     WriteKind::ConditionalOne => 5,
                     WriteKind::TransactionFour => 6,
                     WriteKind::TransactionEight => 7,
+                    WriteKind::TransactionSixteen => 8,
                 };
                 let flags = (revision_get as u64)
                     | ((intended_rejection as u64) << 1)
@@ -693,7 +998,9 @@ fn input_workflow_fingerprint(
     client_index: usize,
     tenant_index: usize,
     workflow_id: u64,
+    client_sequence: u64,
     value_size: usize,
+    options: &Options,
     plan: &WorkflowPlan,
 ) -> u64 {
     let (tag, flags) = match &plan.kind {
@@ -711,6 +1018,7 @@ fn input_workflow_fingerprint(
                 WriteKind::ConditionalOne => 5,
                 WriteKind::TransactionFour => 6,
                 WriteKind::TransactionEight => 7,
+                WriteKind::TransactionSixteen => 8,
             };
             let flags = (*revision_get as u64)
                 | ((*intended_rejection as u64) << 1)
@@ -725,7 +1033,11 @@ fn input_workflow_fingerprint(
         client_index as u64,
         tenant_index as u64,
         workflow_id,
+        client_sequence,
         value_size as u64,
+        options.mutation_workload as u64,
+        options.overwrite_slots_per_client as u64,
+        options.include_width_16 as u64,
         tag,
         flags,
         plan.key_ordinal,
@@ -746,11 +1058,23 @@ fn key_from_ordinal(ordinal: u64) -> DocumentKey {
 }
 
 fn mutation_key(
+    options: &Options,
     tenant_index: usize,
     workflow_id: u64,
+    client_index: usize,
+    client_sequence: u64,
     mutation_index: usize,
     kind: WriteKind,
 ) -> DocumentKey {
+    if options.mutation_workload == MutationWorkload::Overwrite {
+        let slot = client_sequence % options.overwrite_slots_per_client as u64;
+        let ordinal = 1_u64 << 60
+            | (tenant_index as u64) << 52
+            | (client_index as u64) << 36
+            | slot * 16
+            | mutation_index as u64;
+        return key_from_ordinal(ordinal);
+    }
     if kind == WriteKind::Delete && mutation_index == 0 && workflow_id % 2 == 0 {
         return key_from_ordinal(workflow_id % 500);
     }
@@ -791,8 +1115,9 @@ async fn seed_tenant(
     tenant_index: usize,
     rows: usize,
     value_size: usize,
-) -> Result<(), Error> {
+) -> Result<Vec<SeedLedgerEntry>, Error> {
     let mut start = 0;
+    let mut ledger = Vec::new();
     while start < rows {
         let end = (start + 64).min(rows);
         let mutations = (start..end)
@@ -801,7 +1126,7 @@ async fn seed_tenant(
                 value: initial_value(value_size, tenant_index, ordinal),
             })
             .collect();
-        service
+        let response = service
             .execute(
                 tenant,
                 Request::Transact {
@@ -809,9 +1134,23 @@ async fn seed_tenant(
                 },
             )
             .await?;
+        let Response::Transact(outcome) = response else {
+            return Err(Error::invalid_request(
+                "seed transaction returned an unexpected response",
+            ));
+        };
+        let commit_identity = outcome
+            .commit_lsn
+            .ok_or_else(|| Error::invalid_request("seed transaction returned no commit identity"))?
+            .get();
+        ledger.push(SeedLedgerEntry {
+            start,
+            end,
+            commit_identity,
+        });
         start = end;
     }
-    Ok(())
+    Ok(ledger)
 }
 
 async fn execute_workflow(
@@ -820,6 +1159,8 @@ async fn execute_workflow(
     tenant_index: usize,
     plan: WorkflowPlan,
     workflow_id: u64,
+    client_index: usize,
+    client_sequence: u64,
     options: &Options,
     counters: &Mutex<Counters>,
 ) {
@@ -943,10 +1284,19 @@ async fn execute_workflow(
                 WriteKind::Put | WriteKind::Delete | WriteKind::ConditionalOne => 1,
                 WriteKind::TransactionFour => 4,
                 WriteKind::TransactionEight => 8,
+                WriteKind::TransactionSixteen => 16,
             };
             let mut mutations = Vec::with_capacity(width);
             for mutation_index in 0..width {
-                let key = mutation_key(tenant_index, workflow_id, mutation_index, kind);
+                let key = mutation_key(
+                    options,
+                    tenant_index,
+                    workflow_id,
+                    client_index,
+                    client_sequence,
+                    mutation_index,
+                    kind,
+                );
                 if kind == WriteKind::Delete {
                     mutations.push(TransactionMutation::Delete { key });
                 } else {
@@ -1063,6 +1413,8 @@ async fn execute_workflow(
                         LedgerEntry {
                             commit_identity: revision.get(),
                             workflow_id,
+                            client_index,
+                            client_sequence,
                             kind,
                         },
                     );
@@ -1085,6 +1437,8 @@ async fn execute_workflow(
                         LedgerEntry {
                             commit_identity,
                             workflow_id,
+                            client_index,
+                            client_sequence,
                             kind,
                         },
                     );
@@ -1109,8 +1463,9 @@ async fn execute_workflow(
 }
 
 fn append_ledger(counters: &mut Counters, entry: LedgerEntry) {
-    if counters.write_ledger.len() < MAX_WRITE_LEDGER {
+    if counters.write_ledger.len() < counters.max_write_ledger {
         counters.write_ledger.push(entry);
+        counters.write_ledger_entries += 1;
     } else {
         counters.request_limit_reached = true;
     }
@@ -1137,7 +1492,7 @@ async fn run_clients(
     run_for: Duration,
     call_cap: u64,
     workflow_id_base: u64,
-) -> (Duration, Duration, u64) {
+) -> (Duration, Duration, u64, bool) {
     let admission_start = Instant::now();
     let deadline = admission_start + run_for;
     let accepting = Arc::new(AtomicBool::new(true));
@@ -1165,13 +1520,20 @@ async fn run_clients(
         };
         let client_executor = options.client_executor;
         let client_operation = async move {
-            let plan = make_plan(profile, options.seed ^ tenant_index as u64);
+            let plan = make_plan(
+                profile,
+                options.seed ^ tenant_index as u64,
+                options.include_width_16,
+            );
             let mut plan_index = client_index % plan.len();
             let mut client_sequence = 0_u64;
             let mut prefix_workflow_count = 0_u64;
             let mut admitted_workflows = 0_u64;
             let mut input_fingerprint = 0xcbf2_9ce4_8422_2325_u64;
             while accepting.load(Ordering::Relaxed) && Instant::now() < deadline {
+                if counters[tenant_index].lock().unwrap().request_limit_reached {
+                    break;
+                }
                 let next = plan[plan_index].clone();
                 let required_calls = match next.kind {
                     WorkflowKind::Write {
@@ -1212,7 +1574,9 @@ async fn run_clients(
                         client_index,
                         tenant_index,
                         next_id,
+                        client_sequence,
                         options.value_size,
+                        &options,
                         &next,
                     );
                     for byte in workflow_fingerprint.to_le_bytes() {
@@ -1228,6 +1592,8 @@ async fn run_clients(
                     tenant_index,
                     next,
                     next_id,
+                    client_index,
+                    client_sequence - 1,
                     &options,
                     &counters[tenant_index],
                 )
@@ -1243,6 +1609,8 @@ async fn run_clients(
                     workflow_count: prefix_workflow_count,
                     admitted_workflows,
                     fingerprint: format!("{input_fingerprint:016x}"),
+                    workflow_plan_capacity_bytes: plan.capacity()
+                        * std::mem::size_of::<WorkflowPlan>(),
                 });
         };
         match client_executor {
@@ -1277,7 +1645,15 @@ async fn run_clients(
         .iter()
         .map(|counter| counter.lock().unwrap().api_calls)
         .sum();
-    (admission_elapsed, drain, calls)
+    let cap = if matches!(options.scenario, Scenario::Smoke) {
+        call_cap
+    } else {
+        (call_cap / tenant_count as u64).max(1)
+    };
+    let call_cap_reached = admitted_calls
+        .iter()
+        .any(|tenant_calls| tenant_calls.load(Ordering::Relaxed) >= cap);
+    (admission_elapsed, drain, calls, call_cap_reached)
 }
 
 fn assignments(scenario: Scenario, clients: usize) -> Vec<(usize, TenantId, usize, Profile)> {
@@ -1287,7 +1663,7 @@ fn assignments(scenario: Scenario, clients: usize) -> Vec<(usize, TenantId, usiz
             .collect(),
         Scenario::Multi => (0..clients)
             .map(|client| {
-                let tenant_index = client / 4;
+                let tenant_index = client * 4 / clients;
                 (
                     client,
                     TenantId::new(tenant_index as u64 + 1),
@@ -1315,23 +1691,26 @@ async fn seed_all(
     scenario: Scenario,
     rows: usize,
     value_size: usize,
-) -> Result<(), Error> {
+) -> Result<Vec<Vec<SeedLedgerEntry>>, Error> {
     let tenant_count = if matches!(scenario, Scenario::Multi | Scenario::Smoke) {
         4
     } else {
         1
     };
+    let mut seed_ledger = Vec::with_capacity(tenant_count);
     for tenant_index in 0..tenant_count {
-        seed_tenant(
-            service,
-            TenantId::new(tenant_index as u64 + 1),
-            tenant_index,
-            rows,
-            value_size,
-        )
-        .await?;
+        seed_ledger.push(
+            seed_tenant(
+                service,
+                TenantId::new(tenant_index as u64 + 1),
+                tenant_index,
+                rows,
+                value_size,
+            )
+            .await?,
+        );
     }
-    Ok(())
+    Ok(seed_ledger)
 }
 
 async fn verify_tenant(
@@ -1339,6 +1718,7 @@ async fn verify_tenant(
     tenant: TenantId,
     tenant_index: usize,
     options: &Options,
+    seed_ledger: &[SeedLedgerEntry],
     counters: &Mutex<Counters>,
 ) -> Value {
     let mut sorted_ledger = counters.lock().unwrap().write_ledger.clone();
@@ -1346,58 +1726,66 @@ async fn verify_tenant(
     let commit_identity_unique = sorted_ledger
         .windows(2)
         .all(|pair| pair[0].commit_identity != pair[1].commit_identity);
-    let mut deleted_seed_ordinals = BTreeSet::new();
-    for entry in &sorted_ledger {
-        if entry.kind == WriteKind::Delete && entry.workflow_id % 2 == 0 {
-            deleted_seed_ordinals.insert(entry.workflow_id % 500);
+    let mut expected = BTreeMap::new();
+    for batch in seed_ledger {
+        for ordinal in batch.start..batch.end {
+            expected.insert(
+                key_from_ordinal(ordinal as u64),
+                ExpectedState::Present {
+                    value: initial_value(options.value_size, tenant_index, ordinal),
+                    revision: Revision::new(batch.commit_identity),
+                },
+            );
         }
     }
-    let put_mutation_count = sorted_ledger
-        .iter()
-        .filter(|entry| entry.kind != WriteKind::Delete)
-        .map(|entry| match entry.kind {
-            WriteKind::Put | WriteKind::Delete | WriteKind::ConditionalOne => 1,
-            WriteKind::TransactionFour => 4,
-            WriteKind::TransactionEight => 8,
-        })
-        .sum::<usize>();
-    let expected_row_count =
-        options.initial_rows - deleted_seed_ordinals.len() + put_mutation_count;
-    let seed_rows = (0..options.initial_rows)
-        .filter(|ordinal| !deleted_seed_ordinals.contains(&(*ordinal as u64)))
-        .map(|ordinal| {
-            (
-                key_from_ordinal(ordinal as u64),
-                initial_value(options.value_size, tenant_index, ordinal),
-            )
-        });
-    sorted_ledger.sort_by_key(|entry| entry.workflow_id);
-    let dynamic_rows = sorted_ledger.into_iter().flat_map(|entry| {
+    for entry in &sorted_ledger {
         let width = match entry.kind {
             WriteKind::Put | WriteKind::Delete | WriteKind::ConditionalOne => 1,
             WriteKind::TransactionFour => 4,
             WriteKind::TransactionEight => 8,
+            WriteKind::TransactionSixteen => 16,
         };
-        (0..width).filter_map(move |mutation_index| {
+        for mutation_index in 0..width {
+            let key = mutation_key(
+                options,
+                tenant_index,
+                entry.workflow_id,
+                entry.client_index,
+                entry.client_sequence,
+                mutation_index,
+                entry.kind,
+            );
             if entry.kind == WriteKind::Delete {
-                return None;
+                expected.insert(
+                    key,
+                    ExpectedState::Missing {
+                        revision: Revision::new(entry.commit_identity),
+                    },
+                );
+            } else {
+                expected.insert(
+                    key,
+                    ExpectedState::Present {
+                        value: generated_value(
+                            options.value_size,
+                            options.seed,
+                            entry.workflow_id,
+                            mutation_index,
+                        ),
+                        revision: Revision::new(entry.commit_identity),
+                    },
+                );
             }
-            let key = mutation_key(tenant_index, entry.workflow_id, mutation_index, entry.kind);
-            Some((
-                key,
-                generated_value(
-                    options.value_size,
-                    options.seed,
-                    entry.workflow_id,
-                    mutation_index,
-                ),
-            ))
-        })
-    });
-    let mut expected = seed_rows.chain(dynamic_rows).peekable();
+        }
+    }
+    let expected_row_count = expected
+        .values()
+        .filter(|state| matches!(state, ExpectedState::Present { .. }))
+        .count();
     let mut actual_rows = 0_usize;
     let mut missing_rows = 0_usize;
     let mut mismatch_samples = Vec::new();
+    let mut seen_keys = BTreeSet::new();
     let mut cursor = None;
     loop {
         match service
@@ -1417,17 +1805,24 @@ async fn verify_tenant(
                 cursor = page.last().map(|document| document.key.clone());
                 for document in page {
                     actual_rows += 1;
-                    match expected.next() {
-                        Some((expected_key, expected_value))
-                            if expected_key == document.key && expected_value == document.value => {
-                        }
-                        Some((expected_key, _)) => {
-                            missing_rows += 1;
+                    seen_keys.insert(document.key.clone());
+                    match expected.get(&document.key) {
+                        Some(ExpectedState::Present { value, revision })
+                            if *value == document.value && *revision == document.revision => {}
+                        Some(ExpectedState::Present { revision, .. }) => {
                             if mismatch_samples.len() < 16 {
                                 mismatch_samples.push(format!(
-                                    "expected {:?}, received {:?}",
-                                    expected_key.encode(),
-                                    document.key.encode()
+                                    "value or revision mismatch at {:?}: expected revision {}, received {}",
+                                    document.key.encode(), revision.get(), document.revision.get()
+                                ));
+                            }
+                        }
+                        Some(ExpectedState::Missing { revision }) => {
+                            if mismatch_samples.len() < 16 {
+                                mismatch_samples.push(format!(
+                                    "deleted key appeared at {:?}, expected revision {}",
+                                    document.key.encode(),
+                                    revision.get()
                                 ));
                             }
                         }
@@ -1444,10 +1839,46 @@ async fn verify_tenant(
             Err(error) => return json!({"passed": false, "error": error.to_string()}),
         }
     }
-    while expected.next().is_some() {
-        missing_rows += 1;
-        if mismatch_samples.len() < 16 {
-            mismatch_samples.push("expected row missing after final Scan row".to_owned());
+    for (key, state) in &expected {
+        match state {
+            ExpectedState::Present { .. } if !seen_keys.contains(key) => {
+                missing_rows += 1;
+                if mismatch_samples.len() < 16 {
+                    mismatch_samples.push(format!("expected row missing at {:?}", key.encode()));
+                }
+            }
+            ExpectedState::Missing { revision } => match service
+                .execute(tenant, Request::Get { key: key.clone() })
+                .await
+            {
+                Ok(Response::Get(RevisionState::Missing { revision: actual }))
+                    if actual == *revision => {}
+                Ok(Response::Get(actual)) => {
+                    if mismatch_samples.len() < 16 {
+                        mismatch_samples.push(format!(
+                            "deleted key {:?} has unexpected state {actual:?}",
+                            key.encode()
+                        ));
+                    }
+                }
+                Ok(_) => {
+                    if mismatch_samples.len() < 16 {
+                        mismatch_samples.push(format!(
+                            "Get returned unexpected response for deleted key {:?}",
+                            key.encode()
+                        ));
+                    }
+                }
+                Err(error) => {
+                    if mismatch_samples.len() < 16 {
+                        mismatch_samples.push(format!(
+                            "Get failed for deleted key {:?}: {error}",
+                            key.encode()
+                        ));
+                    }
+                }
+            },
+            _ => {}
         }
     }
     let passed = actual_rows == expected_row_count
@@ -1460,7 +1891,7 @@ async fn verify_tenant(
         "actual_rows": actual_rows,
         "missing_rows": missing_rows,
         "mismatch_samples": mismatch_samples,
-        "replay_order": "commit identity for write history; ordered expected stream for Scan comparison",
+        "replay_order": "acknowledged commit identity reconstructs final per-key state only; it is not a read-history linearizability proof",
         "commit_identity_unique": commit_identity_unique,
         "commit_identity_entries": counters.lock().unwrap().write_ledger.len(),
         "scan_page_limit": 64,
@@ -1524,6 +1955,12 @@ async fn run(options: Options) -> Result<Value, String> {
     if options.clients == 0 || options.initial_rows == 0 || options.call_cap == 0 {
         return Err("client, row, and call cap values must be nonzero".to_owned());
     }
+    if matches!(options.scenario, Scenario::Multi) && options.clients < 4 {
+        return Err("mt-mix requires at least four clients".to_owned());
+    }
+    if options.clients > 65_535 {
+        return Err("client count exceeds the workload key-space bound".to_owned());
+    }
     if options.read_stage_metrics && !options.research_metrics {
         return Err("read-stage metrics require research metrics".to_owned());
     }
@@ -1541,7 +1978,7 @@ async fn run(options: Options) -> Result<Value, String> {
             .map_err(|error| error.to_string())?,
     );
     let seed_started = Instant::now();
-    seed_all(
+    let seed_ledger = seed_all(
         &service,
         options.scenario,
         options.initial_rows,
@@ -1559,7 +1996,12 @@ async fn run(options: Options) -> Result<Value, String> {
     };
     let warmup_counts = Arc::new(
         (0..tenant_count)
-            .map(|_| Mutex::new(Counters::default()))
+            .map(|_| {
+                Mutex::new(Counters::new(
+                    options.latency_storage,
+                    options.max_write_ledger,
+                ))
+            })
             .collect::<Vec<_>>(),
     );
     if options.warmup > Duration::ZERO {
@@ -1577,7 +2019,12 @@ async fn run(options: Options) -> Result<Value, String> {
     service.set_research_measurement_phase();
     let counters = Arc::new(
         (0..tenant_count)
-            .map(|_| Mutex::new(Counters::default()))
+            .map(|_| {
+                Mutex::new(Counters::new(
+                    options.latency_storage,
+                    options.max_write_ledger,
+                ))
+            })
             .collect::<Vec<_>>(),
     );
     let cpu_before = process_metrics();
@@ -1594,7 +2041,7 @@ async fn run(options: Options) -> Result<Value, String> {
             sampler_samples.lock().unwrap().push(process_metrics());
         }
     });
-    let (admission, drain, total_calls) = run_clients(
+    let (admission, drain, total_calls, call_cap_reached) = run_clients(
         Arc::clone(&service),
         assignments,
         Arc::new(options.clone()),
@@ -1608,6 +2055,20 @@ async fn run(options: Options) -> Result<Value, String> {
     stop_metric_sampling.store(true, Ordering::Relaxed);
     let _ = sampler.await;
     let total_elapsed = admission + drain;
+    let ledger_limit_reached = counters
+        .iter()
+        .any(|counter| counter.lock().unwrap().request_limit_reached);
+    let measurement_complete =
+        admission >= options.measurement && !call_cap_reached && !ledger_limit_reached;
+    let termination_reason = if ledger_limit_reached {
+        "write-ledger-cap"
+    } else if call_cap_reached {
+        "call-cap"
+    } else if admission >= options.measurement {
+        "requested-duration"
+    } else {
+        "early-stop"
+    };
     let cpu_after = process_metrics();
     let sample_values = metric_samples.lock().unwrap().clone();
     let peak_rss_kb = sample_values
@@ -1625,7 +2086,7 @@ async fn run(options: Options) -> Result<Value, String> {
     let cpu_machine_percent = cpu_core_percent.map(|percent| percent / online_processors as f64);
     let mut validation = BTreeMap::new();
     let mut per_tenant = BTreeMap::new();
-    let mut total_counters = Counters::default();
+    let mut total_counters = Counters::new(options.latency_storage, options.max_write_ledger);
     for tenant_index in 0..tenant_count {
         let warmup = warmup_counts[tenant_index].lock().unwrap();
         let mut replay_counters = Counters::default();
@@ -1643,6 +2104,7 @@ async fn run(options: Options) -> Result<Value, String> {
                 TenantId::new(tenant_index as u64 + 1),
                 tenant_index,
                 &options,
+                &seed_ledger[tenant_index],
                 &Mutex::new(replay_counters),
             )
             .await,
@@ -1653,7 +2115,7 @@ async fn run(options: Options) -> Result<Value, String> {
             format!("tenant_{}", tenant_index + 1),
             json!({
                 "profile": profile_name(tenant_profile),
-                "schedule_fingerprint": schedule_fingerprint(tenant_profile, options.seed ^ tenant_index as u64),
+                "schedule_fingerprint": schedule_fingerprint(tenant_profile, options.seed ^ tenant_index as u64, &options),
                 "throughput_per_second": {
                     "api_calls": measured.api_calls as f64 / total_elapsed.as_secs_f64(),
                     "read_calls": measured.read_calls as f64 / total_elapsed.as_secs_f64(),
@@ -1663,42 +2125,7 @@ async fn run(options: Options) -> Result<Value, String> {
                 "counters": measured.report(),
             }),
         );
-        total_counters.merge(Counters {
-            api_calls: measured.api_calls,
-            read_calls: measured.read_calls,
-            preparatory_gets: measured.preparatory_gets,
-            ordinary_gets: measured.ordinary_gets,
-            query_calls: measured.query_calls,
-            query_rows: measured.query_rows,
-            write_requests: measured.write_requests,
-            successful_write_transactions: measured.successful_write_transactions,
-            successful_mutations: measured.successful_mutations,
-            intended_rejections: measured.intended_rejections,
-            natural_conflicts: measured.natural_conflicts,
-            overloads: measured.overloads,
-            other_errors: measured.other_errors,
-            conditional_attempts: measured.conditional_attempts,
-            category_attempts: measured.category_attempts.clone(),
-            category_successes: measured.category_successes.clone(),
-            condition_kinds: measured.condition_kinds.clone(),
-            latencies: measured
-                .latencies
-                .iter()
-                .map(|(name, latency)| {
-                    (
-                        name.clone(),
-                        Latencies {
-                            count: latency.count,
-                            samples: latency.samples.clone(),
-                        },
-                    )
-                })
-                .collect(),
-            write_ledger: measured.write_ledger.clone(),
-            client_input_prefixes: measured.client_input_prefixes.clone(),
-            verification_errors: measured.verification_errors.clone(),
-            request_limit_reached: measured.request_limit_reached,
-        });
+        total_counters.merge(&measured);
     }
     let disk_bytes_before_shutdown = directory_bytes(&options.data_dir);
     service.shutdown().await;
@@ -1727,6 +2154,7 @@ async fn run(options: Options) -> Result<Value, String> {
                 TenantId::new(tenant_index as u64 + 1),
                 tenant_index,
                 &options,
+                &seed_ledger[tenant_index],
                 &Mutex::new(replay_counters),
             )
             .await,
@@ -1756,6 +2184,13 @@ async fn run(options: Options) -> Result<Value, String> {
             "warmup_requested_ms": options.warmup.as_millis(),
             "measurement_requested_ms": options.measurement.as_millis(),
             "call_cap": options.call_cap,
+            "mutation_workload": match options.mutation_workload { MutationWorkload::NewKey => "new-key", MutationWorkload::Overwrite => "overwrite" },
+            "overwrite_slots_per_client": options.overwrite_slots_per_client,
+            "maximum_overwrite_mutation_keys_per_client": options.overwrite_slots_per_client * 16,
+            "latency_storage": match options.latency_storage { LatencyStorageMode::ExactAll => "exact-all", LatencyStorageMode::Log1024 => "log1024" },
+            "max_write_ledger_entries_per_tenant": options.max_write_ledger,
+            "require_full_window": options.require_full_window,
+            "include_width_16": options.include_width_16,
             "query_limit": 16,
             "blink": {"database_cache_capacity_pages": 128, "coordinator_queue_capacity": 256, "coordinator_group_requests": 64, "coordinator_group_bytes": 4194304, "coordinator_collection_delay_ms": 0},
             "rocksdb": {
@@ -1789,6 +2224,11 @@ async fn run(options: Options) -> Result<Value, String> {
             "measurement_deadline_to_last_completion_ms": drain.as_secs_f64() * 1000.0,
             "throughput_denominator_seconds": total_elapsed.as_secs_f64(),
             "completed_api_calls": total_calls,
+            "requested_measurement_ms": options.measurement.as_millis(),
+            "actual_admission_ms": admission.as_secs_f64() * 1000.0,
+            "termination_reason": termination_reason,
+            "measurement_complete": measurement_complete,
+            "accepted_as_full_window": !options.require_full_window || measurement_complete,
         },
         "throughput_per_second": {
             "api_calls": total_calls as f64 / total_elapsed.as_secs_f64(),
@@ -1820,6 +2260,7 @@ async fn main() {
         }
     };
     let report_path = options.report_path.clone();
+    let require_full_window = options.require_full_window;
     match run(options).await {
         Ok(report) => {
             let encoded = serde_json::to_string_pretty(&report).unwrap();
@@ -1830,6 +2271,9 @@ async fn main() {
                 }
             }
             println!("{encoded}");
+            if require_full_window && report["timing"]["measurement_complete"] != true {
+                std::process::exit(3);
+            }
         }
         Err(error) => {
             eprintln!("{error}");
@@ -1845,7 +2289,7 @@ mod tests {
     #[test]
     fn schedules_keep_all_categories_and_api_ratio_including_preparatory_gets() {
         for profile in [Profile::Rw95, Profile::Rw80, Profile::Rw50, Profile::Rw20] {
-            let plan = make_plan(profile, 2_026_101_3);
+            let plan = make_plan(profile, 2_026_101_3, false);
             let reads = plan
                 .iter()
                 .filter(|entry| matches!(entry.kind, WorkflowKind::Read(_)))
@@ -1943,7 +2387,7 @@ mod tests {
 
     #[test]
     fn width_four_and_eight_are_single_transaction_workflows() {
-        let plan = make_plan(Profile::Rw50, 17);
+        let plan = make_plan(Profile::Rw50, 17, false);
         for target_width in [4, 8] {
             assert!(plan.iter().any(|entry| match entry.kind {
                 WorkflowKind::Write {
@@ -1957,6 +2401,118 @@ mod tests {
                 _ => false,
             }));
         }
+    }
+
+    #[test]
+    fn width_sixteen_is_opt_in_and_replaces_half_of_width_eight_writes() {
+        let default_plan = make_plan(Profile::Rw50, 17, false);
+        let expanded_plan = make_plan(Profile::Rw50, 17, true);
+        let count_kind = |plan: &[WorkflowPlan], target: WriteKind| {
+            plan.iter()
+                .filter(|entry| matches!(entry.kind, WorkflowKind::Write { kind, .. } if kind == target))
+                .count()
+        };
+        assert_eq!(
+            count_kind(&default_plan, WriteKind::TransactionEight),
+            count_kind(&expanded_plan, WriteKind::TransactionEight)
+                + count_kind(&expanded_plan, WriteKind::TransactionSixteen)
+        );
+        assert_eq!(
+            count_kind(&expanded_plan, WriteKind::TransactionEight),
+            count_kind(&expanded_plan, WriteKind::TransactionSixteen)
+        );
+    }
+
+    #[test]
+    fn overwrite_key_slots_are_per_client_and_preserve_seeded_key_space() {
+        let options = Options {
+            backend: BackendKind::RocksDb,
+            client_executor: ClientExecutor::Async,
+            scenario: Scenario::Multi,
+            data_dir: PathBuf::new(),
+            seed: 1,
+            warmup: Duration::ZERO,
+            measurement: Duration::ZERO,
+            clients: 16,
+            initial_rows: 10_000,
+            value_size: VALUE_SIZE,
+            call_cap: 100,
+            report_path: None,
+            research_metrics: false,
+            read_stage_metrics: false,
+            detailed_write_metrics: false,
+            revision_allocator: dodb_rocksdb::RevisionAllocatorMode::Serialized,
+            blocking_admission: dodb_rocksdb::BlockingAdmissionMode::Shared,
+            shared_blocking_slots: 8,
+            mutation_workload: MutationWorkload::Overwrite,
+            overwrite_slots_per_client: 4,
+            latency_storage: LatencyStorageMode::Log1024,
+            max_write_ledger: 100,
+            require_full_window: false,
+            include_width_16: true,
+        };
+        let first_key = mutation_key(&options, 0, 7, 0, 3, 0, WriteKind::Delete);
+        let repeated_key = mutation_key(&options, 0, 9, 0, 7, 0, WriteKind::Put);
+        let other_client_key = mutation_key(&options, 0, 7, 1, 3, 0, WriteKind::Delete);
+        let other_tenant_key = mutation_key(&options, 1, 7, 0, 3, 0, WriteKind::Delete);
+        assert_eq!(first_key, repeated_key);
+        assert_ne!(first_key, other_client_key);
+        assert_ne!(first_key, other_tenant_key);
+        assert!(first_key > key_from_ordinal(options.initial_rows as u64));
+        let wide_key = mutation_key(&options, 0, 7, 0, 3, 15, WriteKind::TransactionSixteen);
+        assert_ne!(first_key, wide_key);
+    }
+
+    #[test]
+    fn log1024_histogram_counts_boundaries_and_merges_against_exact_samples() {
+        let observations = [
+            0,
+            1,
+            1_023,
+            1_024,
+            1_025,
+            2_047,
+            2_048,
+            4_095,
+            4_096,
+            u64::MAX,
+        ];
+        let mut exact = Latencies::new(LatencyStorageMode::ExactAll);
+        let mut first_histogram = Latencies::new(LatencyStorageMode::Log1024);
+        let mut second_histogram = Latencies::new(LatencyStorageMode::Log1024);
+        for (observation_index, value) in observations.into_iter().enumerate() {
+            exact.record(value);
+            if observation_index % 2 == 0 {
+                first_histogram.record(value);
+            } else {
+                second_histogram.record(value);
+            }
+        }
+        first_histogram.merge(&second_histogram);
+        assert_eq!(first_histogram.count, observations.len() as u64);
+        let LatencyData::Log1024(buckets) = &first_histogram.storage else {
+            panic!("unexpected latency storage mode");
+        };
+        assert_eq!(buckets.iter().sum::<u64>(), observations.len() as u64);
+        let mut sorted = observations.to_vec();
+        sorted.sort_unstable();
+        for percentile in [50, 95, 99] {
+            let rank = percentile_rank(sorted.len(), percentile).unwrap();
+            let exact_value = sorted[rank];
+            let upper_bound = histogram_percentile_upper_bound(buckets, rank).unwrap();
+            assert!(upper_bound >= exact_value);
+            if exact_value != u64::MAX {
+                let width = upper_bound - exact_value;
+                assert!(width as u128 * 1_024 <= exact_value.max(1) as u128 + 1_024);
+            }
+        }
+        assert_eq!(histogram_bucket_index(1_023), 1_023);
+        assert_eq!(histogram_bucket_index(1_024), 1_024);
+        assert_eq!(
+            histogram_bucket_upper_bound(histogram_bucket_index(u64::MAX)),
+            Some(u64::MAX)
+        );
+        assert!(exact.report()["p50_ms"].is_number());
     }
 
     #[test]

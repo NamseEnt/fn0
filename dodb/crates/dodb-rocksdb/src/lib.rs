@@ -3385,6 +3385,152 @@ mod tests {
     }
 
     #[test]
+    fn reserved_revision_overlap_preserves_commit_order_and_read_after_success() {
+        let directory = temporary_db_directory();
+        let database = Arc::new(
+            TenantDatabase::open_with_allocator(
+                directory.path(),
+                RevisionAllocatorMode::ReservedRanges,
+                4_096,
+            )
+            .unwrap(),
+        );
+        let first_key = DocumentKey::new(b"overlap-x".to_vec(), b"row".to_vec());
+        let second_key = DocumentKey::new(b"overlap-y".to_vec(), b"row".to_vec());
+        let initial = database
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![
+                    TransactionMutation::Put {
+                        key: first_key.clone(),
+                        value: b"old-x".to_vec(),
+                    },
+                    TransactionMutation::Put {
+                        key: second_key.clone(),
+                        value: b"old-y".to_vec(),
+                    },
+                ],
+            ))
+            .unwrap();
+        let initial_revision = Revision::new(initial.revision.unwrap());
+        let first_conditions = vec![
+            TransactionCondition::RevisionEquals {
+                key: first_key.clone(),
+                expected_revision: initial_revision,
+            },
+            TransactionCondition::RevisionEquals {
+                key: second_key.clone(),
+                expected_revision: initial_revision,
+            },
+        ];
+        let (assigned_sender, assigned_receiver) = mpsc::channel();
+        let (release_sender, release_receiver) = mpsc::channel();
+        let first_database = Arc::clone(&database);
+        let first_transaction = std::thread::spawn(move || {
+            first_database.transact_with_hooks(
+                TransactionRequest::new(
+                    first_conditions,
+                    vec![TransactionMutation::Put {
+                        key: first_key,
+                        value: b"new-x".to_vec(),
+                    }],
+                ),
+                || {},
+                || Ok(()),
+                move || {
+                    assigned_sender
+                        .send(())
+                        .map_err(|error| Error::invariant(error.to_string()))?;
+                    release_receiver
+                        .recv_timeout(Duration::from_secs(5))
+                        .map_err(|error| Error::invariant(error.to_string()))?;
+                    Ok(())
+                },
+                None,
+                0,
+            )
+        });
+        assigned_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("first transaction did not reach revision assignment");
+
+        let second_result = database
+            .transact(TransactionRequest::new(
+                vec![
+                    TransactionCondition::RevisionEquals {
+                        key: DocumentKey::new(b"overlap-x".to_vec(), b"row".to_vec()),
+                        expected_revision: initial_revision,
+                    },
+                    TransactionCondition::RevisionEquals {
+                        key: DocumentKey::new(b"overlap-y".to_vec(), b"row".to_vec()),
+                        expected_revision: initial_revision,
+                    },
+                ],
+                vec![TransactionMutation::Put {
+                    key: DocumentKey::new(b"overlap-y".to_vec(), b"row".to_vec()),
+                    value: b"new-y".to_vec(),
+                }],
+            ))
+            .unwrap();
+        let higher_revision = Revision::new(second_result.revision.unwrap());
+        assert!(higher_revision > initial_revision);
+        assert_eq!(
+            database
+                .get(&DocumentKey::new(b"overlap-y".to_vec(), b"row".to_vec()))
+                .unwrap(),
+            RevisionState::present(b"new-y".to_vec(), higher_revision)
+        );
+        assert_eq!(
+            database
+                .get(&DocumentKey::new(b"overlap-x".to_vec(), b"row".to_vec()))
+                .unwrap(),
+            RevisionState::present(b"old-x".to_vec(), initial_revision)
+        );
+
+        release_sender
+            .send(())
+            .expect("first transaction receiver disappeared before release");
+        first_transaction.join().unwrap().unwrap();
+        let lower_revision = match database
+            .get(&DocumentKey::new(b"overlap-x".to_vec(), b"row".to_vec()))
+            .unwrap()
+        {
+            RevisionState::Present { value, revision } => {
+                assert_eq!(value, b"new-x");
+                revision
+            }
+            other => panic!("unexpected first-key state after commit: {other:?}"),
+        };
+        assert!(lower_revision < higher_revision);
+        assert_eq!(
+            database
+                .get(&DocumentKey::new(b"overlap-y".to_vec(), b"row".to_vec()))
+                .unwrap(),
+            RevisionState::present(b"new-y".to_vec(), higher_revision)
+        );
+        let first_partition = database
+            .query(
+                &PrimaryKey::new(b"overlap-x".to_vec()),
+                None,
+                4,
+                ExecutionBudget::new(4096),
+            )
+            .unwrap();
+        let second_partition = database
+            .query(
+                &PrimaryKey::new(b"overlap-y".to_vec()),
+                None,
+                4,
+                ExecutionBudget::new(4096),
+            )
+            .unwrap();
+        assert_eq!(first_partition[0].value, b"new-x");
+        assert_eq!(first_partition[0].revision, lower_revision);
+        assert_eq!(second_partition[0].value, b"new-y");
+        assert_eq!(second_partition[0].revision, higher_revision);
+    }
+
+    #[test]
     fn assigned_revision_is_burned_when_user_transaction_rolls_back() {
         let directory = temporary_db_directory();
         let database = TenantDatabase::open_with_allocator(
