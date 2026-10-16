@@ -96,3 +96,13 @@ impl SynchronousRocksDbTenant {
         Ok(response)
     }
 }
+
+pub fn materialized_transaction_observation(
+    encoded: &[u8],
+) -> Result<dodb_core::ObservedState, Error> {
+    super::decode_state(encoded).map(|state| state.observed())
+}
+
+pub fn header_transaction_observation(encoded: &[u8]) -> Result<dodb_core::ObservedState, Error> {
+    super::decode_transaction_observation(&encoded[..encoded.len().min(10)], encoded.len())
+}
