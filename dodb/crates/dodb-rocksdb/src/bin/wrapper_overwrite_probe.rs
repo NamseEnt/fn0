@@ -15,7 +15,7 @@ use tokio::sync::Barrier;
 const CLIENTS: usize = 16;
 const CLIENT_CALL_LIMIT: usize = 20_000;
 const MEASUREMENT_BASE: u64 = 1 << 32;
-const BUDGET: ExecutionBudget = ExecutionBudget::new(1 << 20);
+const BUDGET: ExecutionBudget = ExecutionBudget::new(68 * 1024 * 1024);
 
 struct ClientResult {
     client_index: usize,
@@ -32,8 +32,8 @@ fn key(client_index: usize) -> DocumentKey {
     )
 }
 
-fn value(client_index: usize, sequence: u64) -> Vec<u8> {
-    let mut bytes = vec![0x5a; 512];
+fn value(client_index: usize, sequence: u64, value_size: usize) -> Vec<u8> {
+    let mut bytes = vec![0x5a; value_size];
     bytes[..8].copy_from_slice(&(client_index as u64).to_be_bytes());
     bytes[8..16].copy_from_slice(&sequence.to_be_bytes());
     bytes
@@ -43,6 +43,8 @@ async fn phase(
     service: &Arc<RocksDbService>,
     conditional: bool,
     measured: bool,
+    value_size: usize,
+    prefix_workflows: usize,
 ) -> Result<(Vec<ClientResult>, Duration), String> {
     let duration = Duration::from_secs(if measured { 5 } else { 1 });
     let started = Instant::now();
@@ -64,8 +66,8 @@ async fn phase(
             while Instant::now() < deadline && result.calls < CLIENT_CALL_LIMIT {
                 let sequence = if measured { MEASUREMENT_BASE } else { 0 } + result.calls as u64;
                 let target = key(client_index);
-                let payload = value(client_index, sequence);
-                if result.calls < 100 {
+                let payload = value(client_index, sequence, value_size);
+                if result.calls < prefix_workflows {
                     for byte in (client_index as u64)
                         .to_be_bytes()
                         .into_iter()
@@ -131,16 +133,22 @@ async fn phase(
     Ok((results, started.elapsed()))
 }
 
-async fn validate(service: &RocksDbService, clients: &[ClientResult]) -> Result<(), String> {
+async fn validate(
+    service: &RocksDbService,
+    clients: &[ClientResult],
+    value_size: usize,
+    prefix_workflows: usize,
+) -> Result<(), String> {
     let mut expected = BTreeMap::new();
     for client in clients {
-        if client.calls < 100 {
-            return Err("fewer than 100 measured workflows".to_owned());
+        if client.calls < prefix_workflows {
+            return Err("fewer measured workflows than the required input prefix".to_owned());
         }
         let target = key(client.client_index);
         let payload = value(
             client.client_index,
             MEASUREMENT_BASE + client.calls as u64 - 1,
+            value_size,
         );
         match service
             .execute(
@@ -204,6 +212,21 @@ async fn main() -> Result<(), String> {
         "exists" => true,
         _ => return Err("invalid mode".to_owned()),
     };
+    let value_size = options
+        .get("--value-size")
+        .map(|value| value.parse::<usize>())
+        .transpose()
+        .map_err(|error| error.to_string())?
+        .unwrap_or(512);
+    let prefix_workflows = options
+        .get("--prefix-workflows")
+        .map(|value| value.parse::<usize>())
+        .transpose()
+        .map_err(|error| error.to_string())?
+        .unwrap_or(100);
+    if !(16..=1_048_576).contains(&value_size) || !(1..=100).contains(&prefix_workflows) {
+        return Err("value size or input prefix outside probe limits".to_owned());
+    }
     let enabled = options.get("--metrics").is_some_and(|value| value == "1");
     let mut config = RocksDbServiceConfig::new(&data_dir);
     config.revision_allocator = RevisionAllocatorMode::ReservedRanges;
@@ -218,7 +241,7 @@ async fn main() -> Result<(), String> {
                     (0..CLIENTS)
                         .map(|client_index| TransactionMutation::Put {
                             key: key(client_index),
-                            value: value(client_index, u64::MAX),
+                            value: value(client_index, u64::MAX, value_size),
                         })
                         .collect(),
                 ),
@@ -228,17 +251,18 @@ async fn main() -> Result<(), String> {
         .await
         .map_err(|error| error.to_string())?;
     service.set_research_warmup_phase();
-    phase(&service, conditional, false).await?;
+    phase(&service, conditional, false, value_size, prefix_workflows).await?;
     service.set_research_measurement_phase();
-    let (clients, elapsed) = phase(&service, conditional, true).await?;
+    let (clients, elapsed) =
+        phase(&service, conditional, true, value_size, prefix_workflows).await?;
     let metrics = service
         .research_metrics_snapshot()
         .unwrap_or_else(|| json!({"enabled": false}));
-    validate(&service, &clients).await?;
+    validate(&service, &clients, value_size, prefix_workflows).await?;
     service.shutdown().await;
     config.research_metrics = false;
     let reopened = RocksDbService::new(config).map_err(|error| error.to_string())?;
-    validate(&reopened, &clients).await?;
+    validate(&reopened, &clients, value_size, prefix_workflows).await?;
     reopened.shutdown().await;
     let calls = clients.iter().map(|client| client.calls).sum::<usize>();
     let mut latencies = clients
@@ -251,12 +275,12 @@ async fn main() -> Result<(), String> {
     };
     let report = json!({
         "schema": "dodb-wrapper-overwrite-probe-v1", "mode": mode, "clients": CLIENTS,
-        "value_bytes": 512, "initial_keys": CLIENTS, "warmup_seconds": 1, "measurement_seconds": 5,
+        "value_bytes": value_size, "input_prefix_workflows": prefix_workflows, "initial_keys": CLIENTS, "warmup_seconds": 1, "measurement_seconds": 5,
         "revision_allocator": "reserved-ranges", "shared_slots": 8,
         "calls": calls, "elapsed_seconds_including_drain": elapsed.as_secs_f64(),
         "calls_per_second": calls as f64 / elapsed.as_secs_f64(),
         "latency": {"samples": latencies.len(), "p50_ms": percentile(50), "p95_ms": percentile(95), "p99_ms": percentile(99)},
-        "client_prefixes": clients.iter().map(|client| json!({"client": client.client_index, "workflows": 100, "fingerprint": format!("{:016x}", client.fingerprint)})).collect::<Vec<_>>(),
+        "client_prefixes": clients.iter().map(|client| json!({"client": client.client_index, "workflows": prefix_workflows, "fingerprint": format!("{:016x}", client.fingerprint)})).collect::<Vec<_>>(),
         "research_metrics": metrics, "validation": true, "reopen_validation": true,
     });
     let text = serde_json::to_string_pretty(&report).map_err(|error| error.to_string())?;
