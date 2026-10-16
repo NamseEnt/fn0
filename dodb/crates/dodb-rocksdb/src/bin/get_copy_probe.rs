@@ -225,7 +225,7 @@ async fn main() -> Result<(), String> {
         .unwrap_or_else(|| json!({"enabled":false}));
     stopped.store(true, Ordering::Relaxed);
     sampler.await.map_err(|error| error.to_string())?;
-    let samples = samples.lock().unwrap();
+    let samples = samples.lock().unwrap().clone();
     let peak_rss = samples
         .iter()
         .filter_map(|sample| sample["rss_kb"].as_u64())
