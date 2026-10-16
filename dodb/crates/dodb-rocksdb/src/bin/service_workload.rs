@@ -852,7 +852,8 @@ fn make_plan(profile: Profile, seed: u64, include_width_16: bool) -> Vec<Workflo
     } else {
         0
     };
-    let conditional_count = conditional_one + transaction_four + transaction_eight;
+    let conditional_count =
+        conditional_one + transaction_four + transaction_eight + transaction_sixteen;
     let revision_get_count = (conditional_count + 3) / 4;
     let prep_get_count = revision_get_count;
     let query_count = read_calls / 5;
@@ -946,7 +947,11 @@ fn profile_for_scenario(scenario: Scenario, tenant_index: usize) -> Profile {
 fn schedule_fingerprint(profile: Profile, seed: u64, options: &Options) -> String {
     let mut fingerprint = 0xcbf2_9ce4_8422_2325_u64;
     for value in [
-        options.include_width_16 as u64,
+        if options.include_width_16 {
+            16_u64
+        } else {
+            8_u64
+        },
         options.overwrite_slots_per_client as u64,
         options.mutation_workload as u64,
     ] {
@@ -1037,7 +1042,7 @@ fn input_workflow_fingerprint(
         value_size as u64,
         options.mutation_workload as u64,
         options.overwrite_slots_per_client as u64,
-        options.include_width_16 as u64,
+        if options.include_width_16 { 16 } else { 8 },
         tag,
         flags,
         plan.key_ordinal,
@@ -1080,7 +1085,7 @@ fn mutation_key(
     }
     let ordinal = 1_000_000_000_u64
         .wrapping_add((tenant_index as u64) << 52)
-        .wrapping_add(workflow_id.wrapping_mul(8))
+        .wrapping_add(workflow_id.wrapping_mul(if options.include_width_16 { 16 } else { 8 }))
         .wrapping_add(mutation_index as u64);
     key_from_ordinal(ordinal)
 }
@@ -1958,7 +1963,7 @@ async fn run(options: Options) -> Result<Value, String> {
     if matches!(options.scenario, Scenario::Multi) && options.clients < 4 {
         return Err("mt-mix requires at least four clients".to_owned());
     }
-    if options.clients > 65_535 {
+    if options.clients > 255 {
         return Err("client count exceeds the workload key-space bound".to_owned());
     }
     if options.read_stage_metrics && !options.research_metrics {
@@ -2424,6 +2429,60 @@ mod tests {
     }
 
     #[test]
+    fn expanded_schedule_keeps_preparatory_inclusive_ratios_for_each_profile() {
+        for profile in [Profile::Rw95, Profile::Rw80, Profile::Rw50, Profile::Rw20] {
+            let plan = make_plan(profile, 2_026_101_3, true);
+            let read_workflows = plan
+                .iter()
+                .filter(|entry| matches!(entry.kind, WorkflowKind::Read(_)))
+                .count();
+            let write_workflows = plan
+                .iter()
+                .filter(|entry| matches!(entry.kind, WorkflowKind::Write { .. }))
+                .count();
+            let preparatory_gets = plan
+                .iter()
+                .filter(|entry| {
+                    matches!(
+                        entry.kind,
+                        WorkflowKind::Write {
+                            revision_get: true,
+                            ..
+                        }
+                    )
+                })
+                .count();
+            let conditional_workflows = plan
+                .iter()
+                .filter(|entry| {
+                    matches!(
+                        entry.kind,
+                        WorkflowKind::Write {
+                            kind: WriteKind::ConditionalOne
+                                | WriteKind::TransactionFour
+                                | WriteKind::TransactionEight
+                                | WriteKind::TransactionSixteen,
+                            ..
+                        }
+                    )
+                })
+                .count();
+            assert_eq!(
+                read_workflows + preparatory_gets,
+                profile_read_percentage(profile) * 10
+            );
+            assert_eq!(read_workflows + preparatory_gets + write_workflows, 1_000);
+            assert_eq!(preparatory_gets, conditional_workflows.div_ceil(4));
+            assert_eq!(
+                plan.iter()
+                    .filter(|entry| { matches!(entry.kind, WorkflowKind::Read(ReadKind::Query16)) })
+                    .count(),
+                profile_read_percentage(profile) * 2
+            );
+        }
+    }
+
+    #[test]
     fn overwrite_key_slots_are_per_client_and_preserve_seeded_key_space() {
         let options = Options {
             backend: BackendKind::RocksDb,
@@ -2461,6 +2520,65 @@ mod tests {
         assert!(first_key > key_from_ordinal(options.initial_rows as u64));
         let wide_key = mutation_key(&options, 0, 7, 0, 3, 15, WriteKind::TransactionSixteen);
         assert_ne!(first_key, wide_key);
+    }
+
+    #[test]
+    fn width_sixteen_new_key_workflows_have_disjoint_adjacent_key_sets() {
+        let options = Options {
+            backend: BackendKind::RocksDb,
+            client_executor: ClientExecutor::Async,
+            scenario: Scenario::Single(Profile::Rw50),
+            data_dir: PathBuf::new(),
+            seed: 1,
+            warmup: Duration::ZERO,
+            measurement: Duration::ZERO,
+            clients: 1,
+            initial_rows: 10_000,
+            value_size: VALUE_SIZE,
+            call_cap: 100,
+            report_path: None,
+            research_metrics: false,
+            read_stage_metrics: false,
+            detailed_write_metrics: false,
+            revision_allocator: dodb_rocksdb::RevisionAllocatorMode::Serialized,
+            blocking_admission: dodb_rocksdb::BlockingAdmissionMode::Shared,
+            shared_blocking_slots: 8,
+            mutation_workload: MutationWorkload::NewKey,
+            overwrite_slots_per_client: 1_024,
+            latency_storage: LatencyStorageMode::ExactAll,
+            max_write_ledger: MAX_WRITE_LEDGER,
+            require_full_window: false,
+            include_width_16: true,
+        };
+        let first_workflow_keys = (0..16)
+            .map(|mutation_index| {
+                mutation_key(
+                    &options,
+                    0,
+                    100,
+                    0,
+                    100,
+                    mutation_index,
+                    WriteKind::TransactionSixteen,
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        let second_workflow_keys = (0..16)
+            .map(|mutation_index| {
+                mutation_key(
+                    &options,
+                    0,
+                    101,
+                    0,
+                    101,
+                    mutation_index,
+                    WriteKind::TransactionSixteen,
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(first_workflow_keys.len(), 16);
+        assert_eq!(second_workflow_keys.len(), 16);
+        assert!(first_workflow_keys.is_disjoint(&second_workflow_keys));
     }
 
     #[test]
