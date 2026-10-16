@@ -1,0 +1,84 @@
+OCI read-only preflight transcript
+Recorded at: 2026-10-16 05:31:23 UTC
+Scope: read-only check of authorized OCI A1 host. No remote files or services changed. SSH identity contents are not included.
+
+Repository evidence checked:
+- Worktree: /Users/namse/fn0-dodb-blink-experiment
+- HEAD: 404026706a9180078c65ce1d29ff499df6ecb5b6
+- Branch: experiment/b-link-batched-engine-monorepo, ahead 8 of origin
+- Existing untracked 20261016 reports/artifacts were present and left untouched.
+- OCI endpoint in reproduction docs: opc@217.142.246.204.
+- Stored identity path: /Users/namse/.ssh/id_late_sh_ed25519 (mode 0600); host key entries for 217.142.246.204 exist in /Users/namse/.ssh/known_hosts. No key content read or recorded.
+- SSH options used: BatchMode=yes, StrictHostKeyChecking=yes, UserKnownHostsFile=/Users/namse/.ssh/known_hosts, IdentitiesOnly=yes, ConnectTimeout=10.
+
+Primary read-only remote command:
+ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/Users/namse/.ssh/known_hosts -o IdentitiesOnly=yes -i /Users/namse/.ssh/id_late_sh_ed25519 -o ConnectTimeout=10 opc@217.142.246.204 '<remote status probes>'
+Remote probes: hostname; uname -a; free -h; selected /proc/meminfo fields; df -hT /bench/zfs/db; zpool list/status dodbbench; zfs get used/available/referenced/quota/reservation/compression/recordsize/sync dodbbench/db; rustc -V; cargo -V; find of RocksDB library files; process list filtered for cargo/rustc/service workload/probe/bench names.
+
+Exact primary output:
+WARNING: connection is not using a post-quantum key exchange algorithm.
+HOST
+instance-20260923-1013
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+MEM
+               total        used        free      shared  buff/cache   available
+Mem:            10Gi       6.1Gi       553Mi        24Mi       4.5Gi       4.6Gi
+Swap:          4.0Gi       360Mi       3.6Gi
+MemTotal:       11159744 kB
+MemFree:          567224 kB
+MemAvailable:    4786040 kB
+Buffers:               8 kB
+Cached:          3731836 kB
+SwapCached:        17128 kB
+SwapTotal:       4194300 kB
+SwapFree:        3824772 kB
+SReclaimable:     940592 kB
+DISK
+Filesystem     Type  Size  Used Avail Use% Mounted on
+dodbbench/db   zfs   149G  148G  1.3G 100% /bench/zfs/db
+POOL
+NAME        SIZE  ALLOC   FREE    CAP    HEALTH
+dodbbench   153G   147G  5.96G    96%    ONLINE
+pool 'dodbbench' is healthy
+DATASET
+dodbbench/db	used	147G
+dodbbench/db	available	1.21G
+dodbbench/db	referenced	147G
+dodbbench/db	quota	none
+dodbbench/db	reservation	none
+dodbbench/db	compression	off
+dodbbench/db	recordsize	4K
+dodbbench/db	sync	standard
+TOOLS
+rustc 1.98.1 (48a229cea 2026-09-01)
+cargo 1.98.1 (797e8a9bc 2026-08-05)
+ROCKS
+/bench/zfs/db/crossdb-4e35e99d-oci/rocksdb-source/librocksdb.a
+/bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+/bench/zfs/db/crossdb-be1c1786-oci/rocksdb-source/librocksdb.a
+/bench/zfs/db/crossdb-d3f4958-oci/rocksdb-source/librocksdb.a
+PROCESSES
+(The filter's output contained only its own `bash -c`/awk probe; it did not show a cargo, rustc, benchmark, or build process.)
+
+Second read-only process/toolchain probe:
+ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/Users/namse/.ssh/known_hosts -o IdentitiesOnly=yes -i /Users/namse/.ssh/id_late_sh_ed25519 -o ConnectTimeout=10 opc@217.142.246.204 'bash -s' <<'REMOTE'
+rustup toolchain list
+for /proc entries: report comm/cmd/cwd only for cargo, rustc, service_workload, get_copy_probe, header*, required*, rocksdb*
+list RocksDB source dirs and their exact git tags
+REMOTE
+Output:
+ROCKS-CANDIDATES included crossdb-b1648b03-oci/rocksdb-source, crossdb-4e35e99d-oci/rocksdb-source (plus .git/worktrees path), product-build/rocksdb-source, crossdb-be1c1786-oci/rocksdb-source, crossdb-d3f4958-oci/rocksdb-source, crossdb-da44dbdf-oci/rocksdb-source.
+PROCESS-SCAN had no output (no matching active process).
+ROCKS-VERSIONS: crossdb-4e35e99d-oci, crossdb-b1648b03-oci, crossdb-be1c1786-oci, crossdb-da44dbdf-oci, product-build all reported v11.8.0.
+rustup toolchain list: stable-aarch64-unknown-linux-gnu (active, default); 1.97.1-aarch64-unknown-linux-gnu.
+
+A subsequent read-only `find` for exact RocksDB 11.8.x archive/library paths plus `rustup run 1.97.1 rustc/cargo -V` was started at 2026-10-16 05:30 UTC and returned no output before the parent requested stopping further remote queries. No conclusion on exact 11.8.1 archive availability is drawn from that incomplete query.
+
+Historical evidence read from existing 20261016 artifacts:
+- Required-costs completion snapshot: dodbbench/db 149G total, 145G used, 4.0G available, 98%.
+- Archive-relocation snapshot: 149G total, 144G used, 4.3G available, 98%.
+- Header-reads completion snapshot: 149G total, 146G used, 3.2G available, 98%.
+- Get-copy report states its final measurement dataset reached about 1.3 GiB free; reproduction records an ENOSPC while copying an executable before any measurement began. Recovery compressed and SHA-verified unused binaries; this file records the history only and performs no cleanup.
+- Existing required-costs reproduction specifies Rust 1.97.1, release +crc, RocksDB 11.8.1 archive, fresh DB per run, three repetitions, serial execution and archives. That evidence is not live confirmation of current 11.8.1 archive availability.
+
+Current finding: OCI host reachable and host-key validated; pool ONLINE; dataset has 1.21 GiB ZFS available (df rounds to 1.3G / 100%); RAM available 4.6 GiB; no active matching build/bench process; pinned Rust 1.97.1 is installed, while default rustc/cargo resolve to 1.98.1. The available ZFS space is the preflight blocker. No data deletion, archive compression, benchmark, build, or further remote query was performed.
