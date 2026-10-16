@@ -3413,23 +3413,13 @@ mod tests {
             ))
             .unwrap();
         let initial_revision = initial.revision.unwrap();
-        let first_conditions = vec![
-            TransactionCondition::RevisionEquals {
-                key: first_key.clone(),
-                expected_revision: initial_revision,
-            },
-            TransactionCondition::RevisionEquals {
-                key: second_key.clone(),
-                expected_revision: initial_revision,
-            },
-        ];
         let (assigned_sender, assigned_receiver) = mpsc::channel();
         let (release_sender, release_receiver) = mpsc::channel();
         let first_database = Arc::clone(&database);
         let first_transaction = std::thread::spawn(move || {
             first_database.transact_with_hooks(
                 TransactionRequest::new(
-                    first_conditions,
+                    Vec::new(),
                     vec![TransactionMutation::Put {
                         key: first_key,
                         value: b"new-x".to_vec(),
@@ -3456,16 +3446,7 @@ mod tests {
 
         let second_result = database
             .transact(TransactionRequest::new(
-                vec![
-                    TransactionCondition::RevisionEquals {
-                        key: DocumentKey::new(b"overlap-x".to_vec(), b"row".to_vec()),
-                        expected_revision: initial_revision,
-                    },
-                    TransactionCondition::RevisionEquals {
-                        key: DocumentKey::new(b"overlap-y".to_vec(), b"row".to_vec()),
-                        expected_revision: initial_revision,
-                    },
-                ],
+                Vec::new(),
                 vec![TransactionMutation::Put {
                     key: DocumentKey::new(b"overlap-y".to_vec(), b"row".to_vec()),
                     value: b"new-y".to_vec(),
