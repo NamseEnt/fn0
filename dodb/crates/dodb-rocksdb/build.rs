@@ -26,6 +26,7 @@ fn main() {
     assert_eq!(source_commit, "abeebd9630f11bd08c28b7bd43c7bdfc62050654");
     println!("cargo:rustc-env=DODB_ROCKSDB_COMMIT={source_commit}");
     println!("cargo:rerun-if-changed=shim/transaction_shim.cc");
+    println!("cargo:rerun-if-changed=shim/raw_write_shim.cc");
     println!(
         "cargo:rerun-if-changed={}",
         rocksdb_dir.join("librocksdb.a").display()
@@ -38,6 +39,14 @@ fn main() {
         .flag_if_supported("-fno-rtti")
         .warnings(true)
         .compile("dodb_rocksdb_transaction_shim");
+    cc::Build::new()
+        .cpp(true)
+        .file("shim/raw_write_shim.cc")
+        .include(rocksdb_dir.join("include"))
+        .flag_if_supported("-std=c++20")
+        .flag_if_supported("-fno-rtti")
+        .warnings(true)
+        .compile("dodb_rocksdb_raw_write_shim");
     println!("cargo:rustc-link-search=native={}", rocksdb_dir.display());
     println!("cargo:rustc-link-lib=static=rocksdb");
     let make_config = std::fs::read_to_string(rocksdb_dir.join("make_config.mk"))

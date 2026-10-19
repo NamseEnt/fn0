@@ -18,6 +18,7 @@ use dodb_service::{
 };
 use tokio::sync::{Notify, OnceCell, Semaphore};
 
+pub mod raw_research;
 pub mod research;
 
 const USER_KEY_PREFIX: u8 = 1;

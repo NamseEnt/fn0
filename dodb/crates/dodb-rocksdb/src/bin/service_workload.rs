@@ -2221,10 +2221,12 @@ async fn run(options: Options) -> Result<Value, String> {
         .sum::<usize>();
     let merged_collector_capacity_bytes = total_counters.collector_memory_capacity_bytes();
     let latency_report_sort_copy_bytes = total_counters.latency_sort_copy_capacity_bytes();
+    let simultaneous_replay_ledger_clone_bytes =
+        largest_replay_ledger_clone_bytes.saturating_mul(2);
     let estimated_collector_peak_bytes = warmup_collector_capacity_bytes
         + measurement_collector_capacity_bytes
         + merged_collector_capacity_bytes
-        + largest_replay_ledger_clone_bytes
+        + simultaneous_replay_ledger_clone_bytes
         + latency_report_sort_copy_bytes;
     let report = json!({
         "schema": "dodb-service-workload-v1",
@@ -2301,11 +2303,13 @@ async fn run(options: Options) -> Result<Value, String> {
         },
         "counters": total_counters.report(),
         "collector_memory_phases": {
-            "accounting_scope": "actual latency, write ledger, client prefix and input plan vector capacities; excludes allocator metadata, map nodes, runtime, service state, document state and replay oracle maps",
+            "accounting_scope": "actual latency, write ledger, client prefix and input plan vector capacities; excludes allocator metadata, map nodes, runtime, service state, document state, expected-state BTreeMap and seen-key set",
             "warmup_capacity_bytes": warmup_collector_capacity_bytes,
             "measurement_capacity_bytes": measurement_collector_capacity_bytes,
             "merged_measurement_capacity_bytes": merged_collector_capacity_bytes,
             "largest_replay_ledger_clone_capacity_bytes": largest_replay_ledger_clone_bytes,
+            "simultaneous_replay_ledger_clones": 2,
+            "simultaneous_replay_ledger_clone_capacity_bytes": simultaneous_replay_ledger_clone_bytes,
             "latency_report_sort_copy_bytes": latency_report_sort_copy_bytes,
             "estimated_simultaneous_collector_peak_bytes": estimated_collector_peak_bytes,
         },
