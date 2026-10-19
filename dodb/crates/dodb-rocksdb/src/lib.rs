@@ -2939,7 +2939,10 @@ mod tests {
         let first_mutation = DocumentKey::new(b"rollback-lock-release".to_vec(), b"first".to_vec());
         let second_mutation =
             DocumentKey::new(b"rollback-lock-release".to_vec(), b"second".to_vec());
-        *database.before_commit_hook.lock().unwrap() = Some(Arc::new(|| {
+        let before_commit_reached = Arc::new(AtomicBool::new(false));
+        let before_commit_reached_hook = Arc::clone(&before_commit_reached);
+        *database.before_commit_hook.lock().unwrap() = Some(Arc::new(move || {
+            before_commit_reached_hook.store(true, Ordering::Release);
             Err(Error::durability("injected rollback before native commit"))
         }));
         let failed = database.transact(TransactionRequest::new(
@@ -2958,7 +2961,12 @@ mod tests {
             ],
         ));
         *database.before_commit_hook.lock().unwrap() = None;
-        assert!(failed.is_err());
+        assert!(before_commit_reached.load(Ordering::Acquire));
+        assert!(matches!(
+            failed,
+            Err(Error::DurabilityFailure(message))
+                if message == "injected rollback before native commit"
+        ));
         assert!(matches!(
             database.get(&first_mutation).unwrap(),
             RevisionState::Missing { .. }

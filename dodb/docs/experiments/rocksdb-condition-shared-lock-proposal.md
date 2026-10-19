@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposal only. No production transaction, WAL, locking policy, API, or default configuration is changed by this document. Any implementation requires a separate explicit design decision and correctness review.
+An opt-in candidate implementation is explicitly authorized for correctness review. The candidate keeps `Exclusive` as the default and does not change the production lock policy or default configuration. Implementation and required gates are tracked in [CONDITION-SHARED-LOCK-DESIGN.md](results/rocksdb-contract-baseline-20261016/condition-shared-lock-20261019/CONDITION-SHARED-LOCK-DESIGN.md), with pinned native behavior in [ROCKSDB-LOCK-REVIEW.md](results/rocksdb-contract-baseline-20261016/condition-shared-lock-20261019/ROCKSDB-LOCK-REVIEW.md). At the current checkpoint, correctness gates and performance comparisons remain pending.
 
 ## Evidence and motivation
 
@@ -12,7 +12,7 @@ The diagnostic was a mixed `rw20` workload, while the raw screen below is uncond
 
 The current synchronous transaction path forms the sorted union of condition and mutation keys and calls `GetForUpdate` on each key in `dodb/crates/dodb-rocksdb/src/lib.rs`. The C++ shim currently uses the default `exclusive=true` overload in `dodb/crates/dodb-rocksdb/shim/transaction_shim.cc`. RocksDB 11.8.1 exposes an `exclusive` argument on `Transaction::GetForUpdate`; `false` requests a shared lock. A candidate could request shared locks for keys that are condition-only in a transaction, while retaining exclusive locks for keys that are mutated. Keys that are both conditioned and mutated must be exclusive from their first lock acquisition.
 
-## Proposed scope, if approved
+## Authorized candidate scope
 
 Change only the lock mode selected for a transaction's user keys:
 
@@ -31,10 +31,10 @@ This proposal does not authorize adding a separate lock manager, lock upgrade pa
 4. Test the inverse order: a writer holding an exclusive lock prevents a later condition check from observing stale state or committing based on it.
 5. Test atomic multi-key transactions where a condition-only key is shared-locked while other keys are mutated; verify rollback and conflict paths leave no partial writes.
 6. Cover duplicate conditions/mutations, condition-only transactions allocating no revision, increasing revisions, missing-key behavior, delete/recreate ABA, same-transaction revision sharing, restart/no-reuse, snapshot reads, and tenant isolation.
-7. Exercise lock timeout, rollback, cancellation, shutdown, and concurrent key acquisition in deterministic schedules; demonstrate no deadlock and no lock leak.
+7. Exercise lock timeout, rollback, cancellation, shutdown, and concurrent key acquisition in deterministic schedules; verify the tested schedules make progress and leave no lock leak. Do not claim universal deadlock freedom, writer priority, or starvation freedom.
 8. Run the shared contract, restart, process-crash, and independent replay gates. State explicitly that process-crash tests do not prove power-loss behavior.
 9. Only after every gate passes, use identical inputs and the existing full-window harness to compare the current policy and candidate across the approved read/write mixes and client counts. Record lock waits, conflicts, throughput, p50/p95/p99, CPU, RSS, fairness, and engine health. Diagnostic instrumentation must remain off in the performance runs.
 
 ## Decision boundary
 
-The measured condition-key wait is a reason to investigate, not proof that changing lock mode improves end-to-end behavior or preserves DODB semantics. Keep production locking unchanged until a reviewer accepts the above scope, the pinned RocksDB behavior is verified, and every correctness gate passes. Any change to lock ordering, transaction isolation, public semantics, default settings, or durability is outside this proposal and requires a separate decision.
+The measured condition-key wait is a reason to investigate, not proof that changing lock mode improves end-to-end behavior or preserves DODB semantics. Keep production locking unchanged until the pinned RocksDB behavior is verified and every correctness gate passes. Adoption remains a separate root decision after the approved A/B comparison. Any change to lock ordering, transaction isolation, public semantics, default settings, or durability is outside this scope and requires a separate decision.
