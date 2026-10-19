@@ -345,11 +345,20 @@ impl Latencies {
                 let validation = validation_samples
                     .as_ref()
                     .map(|samples| histogram_validation_report(samples, buckets, self.count));
+                let nonzero_bins = buckets
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, count)| **count > 0)
+                    .map(|(bucket_index, count)| json!([bucket_index, count]))
+                    .collect::<Vec<_>>();
                 json!({
                     "storage": if validation_samples.is_some() { "log1024-with-exact-validation" } else { "log1024" },
                     "count": self.count,
                     "sample_count": self.count,
                     "bucket_count": HISTOGRAM_BUCKETS,
+                    "histogram_schema_version": 1,
+                    "histogram_binning_schema": "exact integer nanoseconds below 1024; 1024 equal-width sub-buckets per binary exponent thereafter; percentile is the bucket upper bound",
+                    "nonzero_bins": nonzero_bins,
                     "sampling": "all recorded completions counted in fixed buckets",
                     "percentile_value": "bucket upper bound in nanoseconds",
                     "maximum_relative_bucket_width": 1.0 / 1024.0,
@@ -2909,6 +2918,17 @@ mod tests {
         assert_eq!(
             first_histogram.report()["exact_sample_validation"]["passed"],
             true
+        );
+        let histogram_report = first_histogram.report();
+        assert_eq!(histogram_report["histogram_schema_version"], 1);
+        assert_eq!(
+            histogram_report["nonzero_bins"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|bin| bin[1].as_u64().unwrap())
+                .sum::<u64>(),
+            observations.len() as u64
         );
         let mut sorted = observations.to_vec();
         sorted.sort_unstable();

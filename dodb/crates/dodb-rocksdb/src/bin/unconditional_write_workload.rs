@@ -156,10 +156,20 @@ impl SampleHistogram {
         let exact_validation = self.exact_validation_samples.as_ref().map(|samples| {
             sample_histogram_validation_report(samples, &self.bucket_counts, self.observation_count)
         });
+        let nonzero_bins = self
+            .bucket_counts
+            .iter()
+            .enumerate()
+            .filter(|(_, count)| **count > 0)
+            .map(|(bucket_index, count)| json!([bucket_index, count]))
+            .collect::<Vec<_>>();
         json!({
             "storage": if exact_validation.is_some() { "log1024-with-exact-validation" } else { "log1024" },
             "sampling": "all acknowledged batch completions counted in fixed buckets",
             "percentile_value": "bucket upper bound in nanoseconds",
+            "histogram_schema_version": 1,
+            "histogram_binning_schema": "exact integer nanoseconds below 1024; 1024 equal-width sub-buckets per binary exponent thereafter; percentile is the bucket upper bound",
+            "nonzero_bins": nonzero_bins,
             "maximum_relative_bucket_width": 0.0009765625,
             "count": self.observation_count,
             "sample_count": self.observation_count,
@@ -1594,6 +1604,17 @@ mod tests {
         assert_eq!(
             first_histogram.json()["exact_sample_validation"]["passed"],
             true
+        );
+        let histogram_report = first_histogram.json();
+        assert_eq!(histogram_report["histogram_schema_version"], 1);
+        assert_eq!(
+            histogram_report["nonzero_bins"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|bin| bin[1].as_u64().unwrap())
+                .sum::<u64>(),
+            4
         );
     }
 
