@@ -78,6 +78,7 @@ enum MutationWorkload {
 enum LatencyStorageMode {
     ExactAll,
     Log1024,
+    Log1024Validation,
 }
 
 #[derive(Clone, Debug)]
@@ -250,14 +251,24 @@ struct Latencies {
 
 enum LatencyData {
     ExactAll(Vec<u64>),
-    Log1024(Vec<u64>),
+    Log1024 {
+        buckets: Vec<u64>,
+        validation_samples: Option<Vec<u64>>,
+    },
 }
 
 impl Latencies {
     fn new(storage_mode: LatencyStorageMode) -> Self {
         let storage = match storage_mode {
             LatencyStorageMode::ExactAll => LatencyData::ExactAll(Vec::new()),
-            LatencyStorageMode::Log1024 => LatencyData::Log1024(vec![0; HISTOGRAM_BUCKETS]),
+            LatencyStorageMode::Log1024 => LatencyData::Log1024 {
+                buckets: vec![0; HISTOGRAM_BUCKETS],
+                validation_samples: None,
+            },
+            LatencyStorageMode::Log1024Validation => LatencyData::Log1024 {
+                buckets: vec![0; HISTOGRAM_BUCKETS],
+                validation_samples: Some(Vec::new()),
+            },
         };
         Self { count: 0, storage }
     }
@@ -266,8 +277,14 @@ impl Latencies {
         self.count += 1;
         match &mut self.storage {
             LatencyData::ExactAll(samples) => samples.push(nanos),
-            LatencyData::Log1024(buckets) => {
+            LatencyData::Log1024 {
+                buckets,
+                validation_samples,
+            } => {
                 buckets[histogram_bucket_index(nanos)] += 1;
+                if let Some(samples) = validation_samples {
+                    samples.push(nanos);
+                }
             }
         }
     }
@@ -292,14 +309,20 @@ impl Latencies {
                     "p99_ms": percentile(99),
                 })
             }
-            LatencyData::Log1024(buckets) => {
+            LatencyData::Log1024 {
+                buckets,
+                validation_samples,
+            } => {
                 let percentile = |numerator: usize| -> Option<f64> {
                     let rank = percentile_rank(self.count as usize, numerator)?;
                     histogram_percentile_upper_bound(buckets, rank)
                         .map(|nanos| nanos as f64 / 1_000_000.0)
                 };
+                let validation = validation_samples
+                    .as_ref()
+                    .map(|samples| histogram_validation_report(samples, buckets, self.count));
                 json!({
-                    "storage": "log1024",
+                    "storage": if validation_samples.is_some() { "log1024-with-exact-validation" } else { "log1024" },
                     "count": self.count,
                     "sample_count": self.count,
                     "bucket_count": HISTOGRAM_BUCKETS,
@@ -309,6 +332,7 @@ impl Latencies {
                     "p50_ms": percentile(50),
                     "p95_ms": percentile(95),
                     "p99_ms": percentile(99),
+                    "exact_sample_validation": validation,
                 })
             }
         }
@@ -320,9 +344,27 @@ impl Latencies {
             (LatencyData::ExactAll(samples), LatencyData::ExactAll(other_samples)) => {
                 samples.extend_from_slice(other_samples);
             }
-            (LatencyData::Log1024(buckets), LatencyData::Log1024(other_buckets)) => {
+            (
+                LatencyData::Log1024 {
+                    buckets,
+                    validation_samples,
+                },
+                LatencyData::Log1024 {
+                    buckets: other_buckets,
+                    validation_samples: other_samples,
+                },
+            ) => {
                 for (bucket_count, other_count) in buckets.iter_mut().zip(other_buckets) {
                     *bucket_count += other_count;
+                }
+                match (validation_samples, other_samples) {
+                    (Some(samples), Some(other_samples)) => {
+                        samples.extend_from_slice(other_samples)
+                    }
+                    (None, None) => {}
+                    _ => {
+                        unreachable!("histogram validation mode must match while merging counters")
+                    }
                 }
             }
             _ => unreachable!("latency storage mode must match while merging counters"),
@@ -336,8 +378,20 @@ impl Latencies {
                 samples.len() * std::mem::size_of::<u64>(),
                 0,
             ),
-            LatencyData::Log1024(buckets) => {
-                (0, 0, buckets.capacity() * std::mem::size_of::<u64>())
+            LatencyData::Log1024 {
+                buckets,
+                validation_samples,
+            } => {
+                let sample_capacity_bytes = validation_samples
+                    .as_ref()
+                    .map_or(0, |samples| samples.capacity() * std::mem::size_of::<u64>());
+                (
+                    sample_capacity_bytes,
+                    validation_samples
+                        .as_ref()
+                        .map_or(0, |samples| samples.len() * std::mem::size_of::<u64>()),
+                    buckets.capacity() * std::mem::size_of::<u64>(),
+                )
             }
         }
     }
@@ -379,6 +433,18 @@ fn histogram_bucket_upper_bound(bucket_index: usize) -> Option<u64> {
     exponent_lower_bound.checked_add(sub_bucket_width * (sub_bucket_index as u64 + 1) - 1)
 }
 
+fn histogram_bucket_width(bucket_index: usize) -> Option<u64> {
+    if bucket_index < HISTOGRAM_EXACT_BUCKETS {
+        return Some(1);
+    }
+    if bucket_index >= HISTOGRAM_BUCKETS {
+        return None;
+    }
+    let relative_index = bucket_index - HISTOGRAM_EXACT_BUCKETS;
+    let exponent = 10 + relative_index / HISTOGRAM_SUB_BUCKETS_PER_EXPONENT;
+    Some(1_u64 << (exponent - 10))
+}
+
 fn histogram_percentile_upper_bound(buckets: &[u64], rank: usize) -> Option<u64> {
     let mut cumulative_count = 0_u64;
     for (bucket_index, bucket_count) in buckets.iter().copied().enumerate() {
@@ -388,6 +454,54 @@ fn histogram_percentile_upper_bound(buckets: &[u64], rank: usize) -> Option<u64>
         }
     }
     None
+}
+
+fn histogram_validation_report(samples: &[u64], buckets: &[u64], recorded_count: u64) -> Value {
+    let mut sorted_samples = samples.to_vec();
+    sorted_samples.sort_unstable();
+    let histogram_count = buckets.iter().copied().sum::<u64>();
+    let percentile_checks = [50, 95, 99]
+        .into_iter()
+        .map(|percentile| {
+            let rank = percentile_rank(sorted_samples.len(), percentile);
+            let exact_nanos = rank.and_then(|rank| sorted_samples.get(rank).copied());
+            let histogram_nanos =
+                rank.and_then(|rank| histogram_percentile_upper_bound(buckets, rank));
+            let bucket_width_nanos = histogram_nanos
+                .map(histogram_bucket_index)
+                .and_then(histogram_bucket_width);
+            let error_nanos = exact_nanos
+                .zip(histogram_nanos)
+                .map(|(exact, histogram)| histogram.saturating_sub(exact));
+            let histogram_is_upper_bound = exact_nanos
+                .zip(histogram_nanos)
+                .is_some_and(|(exact, histogram)| histogram >= exact);
+            let within_bucket_width = histogram_is_upper_bound
+                && error_nanos
+                    .zip(bucket_width_nanos)
+                    .is_some_and(|(error, width)| error <= width);
+            json!({
+                "percentile": percentile,
+                "exact_nanos": exact_nanos,
+                "histogram_upper_bound_nanos": histogram_nanos,
+                "error_nanos": error_nanos,
+                "bucket_width_nanos": bucket_width_nanos,
+                "within_bucket_width": within_bucket_width,
+            })
+        })
+        .collect::<Vec<_>>();
+    let percentiles_passed = percentile_checks
+        .iter()
+        .all(|check| check.get("within_bucket_width").and_then(Value::as_bool) == Some(true));
+    let counts_match = samples.len() as u64 == recorded_count && histogram_count == recorded_count;
+    json!({
+        "passed": counts_match && percentiles_passed,
+        "recorded_count": recorded_count,
+        "exact_sample_count": samples.len(),
+        "histogram_bucket_count_sum": histogram_count,
+        "counts_match": counts_match,
+        "percentiles": percentile_checks,
+    })
 }
 
 struct Counters {
@@ -622,7 +736,14 @@ impl Counters {
             .values()
             .map(|latency| match &latency.storage {
                 LatencyData::ExactAll(samples) => samples.len() * std::mem::size_of::<u64>(),
-                LatencyData::Log1024(_) => 0,
+                LatencyData::Log1024 {
+                    validation_samples: Some(samples),
+                    ..
+                } => samples.len() * std::mem::size_of::<u64>(),
+                LatencyData::Log1024 {
+                    validation_samples: None,
+                    ..
+                } => 0,
             })
             .sum::<usize>();
         json!({
@@ -667,7 +788,14 @@ impl Counters {
             .values()
             .map(|latency| match &latency.storage {
                 LatencyData::ExactAll(samples) => samples.len() * std::mem::size_of::<u64>(),
-                LatencyData::Log1024(_) => 0,
+                LatencyData::Log1024 {
+                    validation_samples: Some(samples),
+                    ..
+                } => samples.len() * std::mem::size_of::<u64>(),
+                LatencyData::Log1024 {
+                    validation_samples: None,
+                    ..
+                } => 0,
             })
             .sum()
     }
@@ -795,6 +923,7 @@ fn parse_options() -> Result<Options, String> {
     {
         "exact-all" => LatencyStorageMode::ExactAll,
         "log1024" => LatencyStorageMode::Log1024,
+        "log1024-validate" => LatencyStorageMode::Log1024Validation,
         other => return Err(format!("unsupported latency storage {other}")),
     };
     let max_write_ledger = usize::try_from(parse("--max-write-ledger", MAX_WRITE_LEDGER as u64)?)
@@ -2252,7 +2381,7 @@ async fn run(options: Options) -> Result<Value, String> {
             "mutation_workload": match options.mutation_workload { MutationWorkload::NewKey => "new-key", MutationWorkload::Overwrite => "overwrite" },
             "overwrite_slots_per_client": options.overwrite_slots_per_client,
             "maximum_overwrite_mutation_keys_per_client": options.overwrite_slots_per_client * 16,
-            "latency_storage": match options.latency_storage { LatencyStorageMode::ExactAll => "exact-all", LatencyStorageMode::Log1024 => "log1024" },
+            "latency_storage": match options.latency_storage { LatencyStorageMode::ExactAll => "exact-all", LatencyStorageMode::Log1024 => "log1024", LatencyStorageMode::Log1024Validation => "log1024-validate" },
             "max_write_ledger_entries_per_tenant": options.max_write_ledger,
             "require_full_window": options.require_full_window,
             "include_width_16": options.include_width_16,
@@ -2667,8 +2796,8 @@ mod tests {
             u64::MAX,
         ];
         let mut exact = Latencies::new(LatencyStorageMode::ExactAll);
-        let mut first_histogram = Latencies::new(LatencyStorageMode::Log1024);
-        let mut second_histogram = Latencies::new(LatencyStorageMode::Log1024);
+        let mut first_histogram = Latencies::new(LatencyStorageMode::Log1024Validation);
+        let mut second_histogram = Latencies::new(LatencyStorageMode::Log1024Validation);
         for (observation_index, value) in observations.into_iter().enumerate() {
             exact.record(value);
             if observation_index % 2 == 0 {
@@ -2679,10 +2808,17 @@ mod tests {
         }
         first_histogram.merge(&second_histogram);
         assert_eq!(first_histogram.count, observations.len() as u64);
-        let LatencyData::Log1024(buckets) = &first_histogram.storage else {
+        let LatencyData::Log1024 { buckets, .. } = &first_histogram.storage else {
             panic!("unexpected latency storage mode");
         };
         assert_eq!(buckets.iter().sum::<u64>(), observations.len() as u64);
+        let validation =
+            histogram_validation_report(&observations, buckets, observations.len() as u64);
+        assert_eq!(validation["passed"], true);
+        assert_eq!(
+            first_histogram.report()["exact_sample_validation"]["passed"],
+            true
+        );
         let mut sorted = observations.to_vec();
         sorted.sort_unstable();
         for percentile in [50, 95, 99] {

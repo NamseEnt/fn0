@@ -40,6 +40,7 @@ struct Options {
     warmup_ms: u64,
     measurement_ms: u64,
     call_cap: u64,
+    validate_histogram: bool,
     revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
     shared_blocking_slots: usize,
     data_dir: PathBuf,
@@ -50,6 +51,7 @@ struct SampleHistogram {
     bucket_counts: Vec<u64>,
     observation_count: u64,
     maximum_nanos: u64,
+    exact_validation_samples: Option<Vec<u64>>,
 }
 
 enum ProbeBackend {
@@ -89,11 +91,12 @@ struct ProcessSampler {
 }
 
 impl SampleHistogram {
-    fn new() -> Self {
+    fn new(validate_histogram: bool) -> Self {
         Self {
             bucket_counts: vec![0; HISTOGRAM_BUCKETS],
             observation_count: 0,
             maximum_nanos: 0,
+            exact_validation_samples: validate_histogram.then(Vec::new),
         }
     }
 
@@ -102,6 +105,9 @@ impl SampleHistogram {
         self.bucket_counts[bucket_index] = self.bucket_counts[bucket_index].saturating_add(1);
         self.observation_count = self.observation_count.saturating_add(1);
         self.maximum_nanos = self.maximum_nanos.max(elapsed_nanos);
+        if let Some(samples) = &mut self.exact_validation_samples {
+            samples.push(elapsed_nanos);
+        }
     }
 
     fn merge(&mut self, other: &Self) {
@@ -114,6 +120,14 @@ impl SampleHistogram {
             .observation_count
             .saturating_add(other.observation_count);
         self.maximum_nanos = self.maximum_nanos.max(other.maximum_nanos);
+        match (
+            &mut self.exact_validation_samples,
+            &other.exact_validation_samples,
+        ) {
+            (Some(samples), Some(other_samples)) => samples.extend_from_slice(other_samples),
+            (None, None) => {}
+            _ => unreachable!("histogram validation mode must match while merging clients"),
+        }
     }
 
     fn percentile_nanos(&self, percentile: u64) -> u64 {
@@ -136,8 +150,11 @@ impl SampleHistogram {
     }
 
     fn json(&self) -> Value {
+        let exact_validation = self.exact_validation_samples.as_ref().map(|samples| {
+            sample_histogram_validation_report(samples, &self.bucket_counts, self.observation_count)
+        });
         json!({
-            "storage": "log1024",
+            "storage": if exact_validation.is_some() { "log1024-with-exact-validation" } else { "log1024" },
             "sampling": "all acknowledged batch completions counted in fixed buckets",
             "percentile_value": "bucket upper bound in nanoseconds",
             "maximum_relative_bucket_width": 0.0009765625,
@@ -149,6 +166,9 @@ impl SampleHistogram {
             "p99_nanos": self.percentile_nanos(99),
             "bucket_count": self.bucket_counts.len(),
             "histogram_capacity_bytes": self.bucket_counts.capacity() * std::mem::size_of::<u64>(),
+            "exact_validation_sample_count": self.exact_validation_samples.as_ref().map(Vec::len),
+            "exact_validation_sample_capacity_bytes": self.exact_validation_samples.as_ref().map_or(0, |samples| samples.capacity() * std::mem::size_of::<u64>()),
+            "exact_sample_validation": exact_validation,
         })
     }
 }
@@ -430,6 +450,7 @@ fn parse_options() -> Result<Options, String> {
     let mut warmup_ms = 1_000;
     let mut measurement_ms = 5_000;
     let mut call_cap = 100_000_000;
+    let mut validate_histogram = false;
     let mut revision_allocator = dodb_rocksdb::RevisionAllocatorMode::Serialized;
     let mut shared_blocking_slots = 8;
     let mut data_dir = None;
@@ -483,6 +504,13 @@ fn parse_options() -> Result<Options, String> {
                     .parse()
                     .map_err(|error| format!("invalid call cap: {error}"))?
             }
+            "--validate-histogram" => {
+                validate_histogram = match value.as_str() {
+                    "0" => false,
+                    "1" => true,
+                    _ => return Err("--validate-histogram must be 0 or 1".to_owned()),
+                }
+            }
             "--revision-allocator" => {
                 revision_allocator = match value.as_str() {
                     "serialized" => dodb_rocksdb::RevisionAllocatorMode::Serialized,
@@ -509,6 +537,7 @@ fn parse_options() -> Result<Options, String> {
         warmup_ms,
         measurement_ms,
         call_cap,
+        validate_histogram,
         revision_allocator,
         shared_blocking_slots,
         data_dir: data_dir.ok_or_else(|| "--data-dir is required".to_owned())?,
@@ -562,6 +591,7 @@ fn run() -> Result<(), String> {
     let seeded_disk_bytes = directory_bytes(&options.data_dir)?;
     let baseline_rows = tenant.read_all()?;
     let baseline_revisions = collect_baseline_revisions(&baseline_rows, &options)?;
+    drop(baseline_rows);
     let warmup_phase = execute_phase(
         Arc::clone(&tenant),
         &options,
@@ -594,6 +624,7 @@ fn run() -> Result<(), String> {
     {
         return Err(format!("final state oracle failed: {final_validation}"));
     }
+    drop(final_rows);
     tenant.shutdown();
     drop(tenant);
     let reopened_tenant = ProbeBackend::open(&options, runtime.handle().clone())?;
@@ -604,6 +635,7 @@ fn run() -> Result<(), String> {
         &baseline_revisions,
         &options,
     )?;
+    drop(observed_rows);
     reopened_tenant.shutdown();
     drop(reopened_tenant);
     if !reopen_validation
@@ -745,7 +777,7 @@ fn run_client_phase(
     warmup_phase: bool,
     prior_writes: u64,
 ) -> Result<ClientResult, String> {
-    let mut histogram = SampleHistogram::new();
+    let mut histogram = SampleHistogram::new(options.validate_histogram);
     let mut measurement_writes = 0_u64;
     let mut width_keys_acknowledged = 0_u64;
     let mut phase_operation_index = 0_u64;
@@ -1145,7 +1177,7 @@ fn build_report(
     disk_usage_bytes: u64,
     seeded_disk_bytes: u64,
 ) -> Value {
-    let mut histogram = SampleHistogram::new();
+    let mut histogram = SampleHistogram::new(options.validate_histogram);
     let measurement_writes = client_results
         .iter()
         .map(|result| result.measurement_writes)
@@ -1222,6 +1254,7 @@ fn build_report(
             "warmup_requested_ms": options.warmup_ms,
             "measurement_requested_ms": options.measurement_ms,
             "call_cap": options.call_cap,
+            "validate_histogram_against_exact_samples": options.validate_histogram,
             "caller_threads": options.clients,
             "executor": "one dedicated caller thread per client",
             "measurement_slot_schedule": "each client starts a local phase operation index at zero; slot is phase index modulo pool size",
@@ -1256,10 +1289,14 @@ fn build_report(
             "per_client_latency_histogram_capacity_bytes": histogram_capacity_bytes,
             "merged_latency_histogram_capacity_bytes": merged_histogram_capacity_bytes,
             "latency_histogram_capacity_bytes": histogram_capacity_bytes.saturating_add(merged_histogram_capacity_bytes),
+            "exact_validation_samples_capacity_bytes": histogram.exact_validation_samples.as_ref().map_or(0, |samples| samples.capacity() * std::mem::size_of::<u64>()),
             "client_sequence_entries": options.clients * POOL_SLOTS_PER_CLIENT,
             "baseline_revision_entries": options.clients * POOL_SLOTS_PER_CLIENT * options.width,
             "baseline_revision_storage_bytes": options.clients * POOL_SLOTS_PER_CLIENT * options.width * std::mem::size_of::<u64>(),
             "validation_expected_state_btree_and_seen_keys_included": false,
+            "baseline_read_all_rows_retained_during_measurement": false,
+            "final_and_reopened_read_all_rows_dropped_after_each_oracle": true,
+            "validation_expected_state_map_and_key_set_memory_estimate_bytes": null,
             "sampled_process_metrics_include_validation_oracle": false,
             "raw_write_batch_native_memory_included": false,
         },
@@ -1321,6 +1358,78 @@ fn histogram_bucket_upper_bound(bucket_index: u64) -> u64 {
         .saturating_sub(1)
 }
 
+fn sample_histogram_validation_report(
+    samples: &[u64],
+    bucket_counts: &[u64],
+    recorded_count: u64,
+) -> Value {
+    let mut sorted_samples = samples.to_vec();
+    sorted_samples.sort_unstable();
+    let histogram_count = bucket_counts.iter().copied().sum::<u64>();
+    let percentile_checks = [50, 95, 99]
+        .into_iter()
+        .map(|percentile| {
+            let target_rank = (sorted_samples.len() as u64)
+                .saturating_mul(percentile)
+                .div_ceil(100)
+                .max(1);
+            let exact_nanos = target_rank
+                .checked_sub(1)
+                .and_then(|rank| sorted_samples.get(rank as usize).copied());
+            let mut cumulative_count = 0_u64;
+            let histogram_bucket =
+                bucket_counts
+                    .iter()
+                    .enumerate()
+                    .find_map(|(bucket_index, bucket_count)| {
+                        cumulative_count = cumulative_count.saturating_add(*bucket_count);
+                        (cumulative_count >= target_rank).then_some(bucket_index)
+                    });
+            let histogram_nanos = histogram_bucket
+                .map(|bucket_index| histogram_bucket_upper_bound(bucket_index as u64));
+            let bucket_width_nanos = histogram_bucket.map(|bucket_index| {
+                if bucket_index < EXACT_HISTOGRAM_BUCKETS {
+                    1
+                } else {
+                    let exponent =
+                        10 + (bucket_index - EXACT_HISTOGRAM_BUCKETS) / SUB_BUCKETS_PER_EXPONENT;
+                    (1_u64 << exponent) / SUB_BUCKETS_PER_EXPONENT as u64
+                }
+            });
+            let error_nanos = exact_nanos
+                .zip(histogram_nanos)
+                .map(|(exact, histogram)| histogram.saturating_sub(exact));
+            let histogram_is_upper_bound = exact_nanos
+                .zip(histogram_nanos)
+                .is_some_and(|(exact, histogram)| histogram >= exact);
+            let within_bucket_width = histogram_is_upper_bound
+                && error_nanos
+                    .zip(bucket_width_nanos)
+                    .is_some_and(|(error, width)| error <= width);
+            json!({
+                "percentile": percentile,
+                "exact_nanos": exact_nanos,
+                "histogram_upper_bound_nanos": histogram_nanos,
+                "error_nanos": error_nanos,
+                "bucket_width_nanos": bucket_width_nanos,
+                "within_bucket_width": within_bucket_width,
+            })
+        })
+        .collect::<Vec<_>>();
+    let counts_match = samples.len() as u64 == recorded_count && histogram_count == recorded_count;
+    let percentiles_passed = percentile_checks
+        .iter()
+        .all(|check| check.get("within_bucket_width").and_then(Value::as_bool) == Some(true));
+    json!({
+        "passed": counts_match && percentiles_passed,
+        "recorded_count": recorded_count,
+        "exact_sample_count": samples.len(),
+        "histogram_bucket_count_sum": histogram_count,
+        "counts_match": counts_match,
+        "percentiles": percentile_checks,
+    })
+}
+
 impl Options {
     fn clone_for_worker(&self) -> Self {
         Self {
@@ -1332,6 +1441,7 @@ impl Options {
             warmup_ms: self.warmup_ms,
             measurement_ms: self.measurement_ms,
             call_cap: self.call_cap,
+            validate_histogram: self.validate_histogram,
             revision_allocator: self.revision_allocator,
             shared_blocking_slots: self.shared_blocking_slots,
             data_dir: self.data_dir.clone(),
@@ -1352,10 +1462,10 @@ mod tests {
 
     #[test]
     fn bounded_histogram_counts_all_observations_and_merges_buckets() {
-        let mut first_histogram = SampleHistogram::new();
+        let mut first_histogram = SampleHistogram::new(true);
         first_histogram.record(0);
         first_histogram.record(1_023);
-        let mut second_histogram = SampleHistogram::new();
+        let mut second_histogram = SampleHistogram::new(true);
         second_histogram.record(1_024);
         second_histogram.record(2_048);
         first_histogram.merge(&second_histogram);
@@ -1365,6 +1475,22 @@ mod tests {
         assert_eq!(
             first_histogram.percentile_nanos(99),
             histogram_bucket_upper_bound(histogram_bucket_index(2_048) as u64)
+        );
+        let exact_samples = first_histogram
+            .exact_validation_samples
+            .as_ref()
+            .expect("validation samples are enabled in this test");
+        assert_eq!(
+            sample_histogram_validation_report(
+                exact_samples,
+                &first_histogram.bucket_counts,
+                first_histogram.observation_count,
+            )["passed"],
+            true
+        );
+        assert_eq!(
+            first_histogram.json()["exact_sample_validation"]["passed"],
+            true
         );
     }
 
@@ -1445,6 +1571,7 @@ mod tests {
             warmup_ms: 1,
             measurement_ms: 1,
             call_cap: 100,
+            validate_histogram: false,
             revision_allocator: dodb_rocksdb::RevisionAllocatorMode::Serialized,
             shared_blocking_slots: 8,
             data_dir: std::path::PathBuf::from("unused-data"),
@@ -1455,7 +1582,7 @@ mod tests {
                 (
                     document_key(options.seed, 0, slot_index, 0),
                     vec![0; options.value_size],
-                    Some(dodb_core::Revision::from(17)),
+                    Some(dodb_core::Revision::from(dodb_core::Lsn::new(17))),
                 )
             })
             .collect::<Vec<_>>();
@@ -1469,7 +1596,7 @@ mod tests {
             warmup_writes: 0,
             measurement_writes: 0,
             width_keys_acknowledged: 0,
-            histogram: SampleHistogram::new(),
+            histogram: SampleHistogram::new(false),
         }];
 
         let valid_result = validate_rows(
@@ -1482,7 +1609,7 @@ mod tests {
         assert_eq!(valid_result["passed"], true);
 
         let mut changed_rows = baseline_rows;
-        changed_rows[0].2 = Some(dodb_core::Revision::from(16));
+        changed_rows[0].2 = Some(dodb_core::Revision::from(dodb_core::Lsn::new(16)));
         let changed_result = validate_rows(
             &changed_rows,
             &client_results,
