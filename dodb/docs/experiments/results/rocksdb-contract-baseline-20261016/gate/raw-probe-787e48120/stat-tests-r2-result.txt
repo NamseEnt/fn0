@@ -1,0 +1,30 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+0
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/rocksdb-contract-baseline-20261016/source-787e48120/checkout/dodb/crates/dodb-rocksdb)
+    Finished `release` profile [optimized + debuginfo] target(s) in 3.79s
+     Running unittests src/bin/service_workload.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/service_workload-8328e4af95cf3af9)
+
+running 8 tests
+test tests::binary_keys_have_sixteen_raw_bytes_and_canonical_encoded_size_range ... ok
+test tests::expanded_schedule_keeps_preparatory_inclusive_ratios_for_each_profile ... ok
+test tests::log1024_histogram_counts_boundaries_and_merges_against_exact_samples ... ok
+test tests::overwrite_key_slots_are_per_client_and_preserve_seeded_key_space ... ok
+test tests::schedules_keep_all_categories_and_api_ratio_including_preparatory_gets ... ok
+test tests::width_four_and_eight_are_single_transaction_workflows ... ok
+test tests::width_sixteen_is_opt_in_and_replaces_half_of_width_eight_writes ... ok
+test tests::width_sixteen_new_key_workflows_have_disjoint_adjacent_key_sets ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/unconditional_write_workload.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/unconditional_write_workload-246b8ca2e4c59d97)
+
+running 4 tests
+test tests::bounded_histogram_counts_all_observations_and_merges_buckets ... ok
+test tests::measurement_input_prefix_fingerprint_tracks_canonical_keys_and_payloads ... ok
+test tests::raw_key_and_placeholder_match_full_api_physical_envelope ... ok
+test tests::untouched_slots_must_keep_their_exact_baseline_revision ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,8 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+0
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/rocksdb-contract-baseline-20261016/source-787e48120/checkout/dodb/crates/dodb-rocksdb)
+    Finished `release` profile [optimized + debuginfo] target(s) in 48.69s
+8ee11c9afeff6c3687643ad14d6f1c35597d984f988d4f8290935547566d8d48  /bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/unconditional_write_workload
+f5c50d655e1ace5b847edf0a7e4c883dace8ea2a5a079970173754b462c3f1ff  /bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/service_workload

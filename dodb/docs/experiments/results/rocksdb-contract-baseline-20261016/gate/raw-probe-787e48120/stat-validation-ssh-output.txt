@@ -1,0 +1,5 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+pass raw count=40636 p50/p95/p99 bucket bounds validated
+pass service histogram_groups=12 counted_observations=116742; all p50/p95/p99 bucket bounds validated

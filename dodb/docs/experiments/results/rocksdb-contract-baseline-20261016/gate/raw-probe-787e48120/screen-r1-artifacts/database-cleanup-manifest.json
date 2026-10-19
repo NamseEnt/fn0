@@ -1,0 +1,381 @@
+{
+  "scope": "60 completed and validated screening databases only",
+  "validation_source_sha": "5d772a7448b1b6c29a0f00f501bd51fd83be03b9",
+  "validation_binary_sha256": "8ee11c9afeff6c3687643ad14d6f1c35597d984f988d4f8290935547566d8d48",
+  "all_sixty_reports_and_reopened_state_checks_passed": true,
+  "database_file_manifest_verified_for_remaining_databases": true,
+  "preserved_log_content_verified": true,
+  "deleted_database_count": 60,
+  "deleted_bytes_from_database_file_manifest": 8409781017,
+  "already_removed_before_final_cleanup_manifest": [
+    "r01-raw-rocksdb-c16-w1-rep1-slots8",
+    "r02-synchronous-core-c16-w1-rep1-slots8",
+    "r03-rocksdb-service-c16-w1-rep1-slots16"
+  ],
+  "preserved_log_count": 96,
+  "preserved_log_manifest": "preserved-logs-manifest.tsv",
+  "database_file_manifest": "database-files.tsv",
+  "deleted_databases": [
+    {
+      "run_id": "r01-raw-rocksdb-c16-w1-rep1-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r01-raw-rocksdb-c16-w1-rep1-slots8/db",
+      "removed_bytes": 2420042,
+      "already_removed_before_cleanup_manifest": true
+    },
+    {
+      "run_id": "r02-synchronous-core-c16-w1-rep1-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r02-synchronous-core-c16-w1-rep1-slots8/db",
+      "removed_bytes": 31614400,
+      "already_removed_before_cleanup_manifest": true
+    },
+    {
+      "run_id": "r03-rocksdb-service-c16-w1-rep1-slots16",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r03-rocksdb-service-c16-w1-rep1-slots16/db",
+      "removed_bytes": 29752813,
+      "already_removed_before_cleanup_manifest": true
+    },
+    {
+      "run_id": "r04-blink-c16-w1-rep1-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r04-blink-c16-w1-rep1-slots8/db",
+      "removed_bytes": 44313040,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r05-synchronous-core-c16-w1-rep2-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r05-synchronous-core-c16-w1-rep2-slots8/db",
+      "removed_bytes": 30412889,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r06-rocksdb-service-c16-w1-rep2-slots16",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r06-rocksdb-service-c16-w1-rep2-slots16/db",
+      "removed_bytes": 29439016,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r07-blink-c16-w1-rep2-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r07-blink-c16-w1-rep2-slots8/db",
+      "removed_bytes": 44468027,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r08-raw-rocksdb-c16-w1-rep2-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r08-raw-rocksdb-c16-w1-rep2-slots8/db",
+      "removed_bytes": 2420042,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r09-rocksdb-service-c16-w1-rep3-slots16",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r09-rocksdb-service-c16-w1-rep3-slots16/db",
+      "removed_bytes": 30848861,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r10-blink-c16-w1-rep3-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r10-blink-c16-w1-rep3-slots8/db",
+      "removed_bytes": 44048397,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r11-raw-rocksdb-c16-w1-rep3-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r11-raw-rocksdb-c16-w1-rep3-slots8/db",
+      "removed_bytes": 2420042,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r12-synchronous-core-c16-w1-rep3-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r12-synchronous-core-c16-w1-rep3-slots8/db",
+      "removed_bytes": 32782364,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r13-raw-rocksdb-c64-w1-rep1-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r13-raw-rocksdb-c64-w1-rep1-slots8/db",
+      "removed_bytes": 17929065,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r14-synchronous-core-c64-w1-rep1-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r14-synchronous-core-c64-w1-rep1-slots8/db",
+      "removed_bytes": 19208194,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r15-blink-c64-w1-rep1-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r15-blink-c64-w1-rep1-slots8/db",
+      "removed_bytes": 104253141,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r16-rocksdb-service-c64-w1-rep1-slots16",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r16-rocksdb-service-c64-w1-rep1-slots16/db",
+      "removed_bytes": 42959666,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r17-rocksdb-service-c64-w1-rep1-slots32",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r17-rocksdb-service-c64-w1-rep1-slots32/db",
+      "removed_bytes": 59550960,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r18-rocksdb-service-c64-w1-rep1-slots64",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r18-rocksdb-service-c64-w1-rep1-slots64/db",
+      "removed_bytes": 71847454,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r19-synchronous-core-c64-w1-rep2-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r19-synchronous-core-c64-w1-rep2-slots8/db",
+      "removed_bytes": 18824340,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r20-blink-c64-w1-rep2-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r20-blink-c64-w1-rep2-slots8/db",
+      "removed_bytes": 106569552,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r21-rocksdb-service-c64-w1-rep2-slots16",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r21-rocksdb-service-c64-w1-rep2-slots16/db",
+      "removed_bytes": 42964064,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r22-rocksdb-service-c64-w1-rep2-slots32",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r22-rocksdb-service-c64-w1-rep2-slots32/db",
+      "removed_bytes": 59118383,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r23-rocksdb-service-c64-w1-rep2-slots64",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r23-rocksdb-service-c64-w1-rep2-slots64/db",
+      "removed_bytes": 72606827,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r24-raw-rocksdb-c64-w1-rep2-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r24-raw-rocksdb-c64-w1-rep2-slots8/db",
+      "removed_bytes": 18494939,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r25-blink-c64-w1-rep3-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r25-blink-c64-w1-rep3-slots8/db",
+      "removed_bytes": 107683153,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r26-rocksdb-service-c64-w1-rep3-slots16",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r26-rocksdb-service-c64-w1-rep3-slots16/db",
+      "removed_bytes": 43576291,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r27-rocksdb-service-c64-w1-rep3-slots32",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r27-rocksdb-service-c64-w1-rep3-slots32/db",
+      "removed_bytes": 58937831,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r28-rocksdb-service-c64-w1-rep3-slots64",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r28-rocksdb-service-c64-w1-rep3-slots64/db",
+      "removed_bytes": 68784429,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r29-raw-rocksdb-c64-w1-rep3-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r29-raw-rocksdb-c64-w1-rep3-slots8/db",
+      "removed_bytes": 17712903,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r30-synchronous-core-c64-w1-rep3-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r30-synchronous-core-c64-w1-rep3-slots8/db",
+      "removed_bytes": 18281403,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r31-raw-rocksdb-c16-w16-rep1-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r31-raw-rocksdb-c16-w16-rep1-slots8/db",
+      "removed_bytes": 36697830,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r32-synchronous-core-c16-w16-rep1-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r32-synchronous-core-c16-w16-rep1-slots8/db",
+      "removed_bytes": 146418135,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r33-rocksdb-service-c16-w16-rep1-slots16",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r33-rocksdb-service-c16-w16-rep1-slots16/db",
+      "removed_bytes": 125905415,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r34-blink-c16-w16-rep1-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r34-blink-c16-w16-rep1-slots8/db",
+      "removed_bytes": 299951989,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r35-synchronous-core-c16-w16-rep2-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r35-synchronous-core-c16-w16-rep2-slots8/db",
+      "removed_bytes": 129813068,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r36-rocksdb-service-c16-w16-rep2-slots16",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r36-rocksdb-service-c16-w16-rep2-slots16/db",
+      "removed_bytes": 120565778,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r37-blink-c16-w16-rep2-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r37-blink-c16-w16-rep2-slots8/db",
+      "removed_bytes": 297643066,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r38-raw-rocksdb-c16-w16-rep2-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r38-raw-rocksdb-c16-w16-rep2-slots8/db",
+      "removed_bytes": 109870002,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r39-rocksdb-service-c16-w16-rep3-slots16",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r39-rocksdb-service-c16-w16-rep3-slots16/db",
+      "removed_bytes": 132657385,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r40-blink-c16-w16-rep3-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r40-blink-c16-w16-rep3-slots8/db",
+      "removed_bytes": 298254103,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r41-raw-rocksdb-c16-w16-rep3-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r41-raw-rocksdb-c16-w16-rep3-slots8/db",
+      "removed_bytes": 36697835,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r42-synchronous-core-c16-w16-rep3-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r42-synchronous-core-c16-w16-rep3-slots8/db",
+      "removed_bytes": 133831258,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r43-raw-rocksdb-c64-w16-rep1-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r43-raw-rocksdb-c64-w16-rep1-slots8/db",
+      "removed_bytes": 193071046,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r44-synchronous-core-c64-w16-rep1-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r44-synchronous-core-c64-w16-rep1-slots8/db",
+      "removed_bytes": 169136412,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r45-blink-c64-w16-rep1-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r45-blink-c64-w16-rep1-slots8/db",
+      "removed_bytes": 904929088,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r46-rocksdb-service-c64-w16-rep1-slots16",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r46-rocksdb-service-c64-w16-rep1-slots16/db",
+      "removed_bytes": 151414034,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r47-rocksdb-service-c64-w16-rep1-slots32",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r47-rocksdb-service-c64-w16-rep1-slots32/db",
+      "removed_bytes": 151780774,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r48-rocksdb-service-c64-w16-rep1-slots64",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r48-rocksdb-service-c64-w16-rep1-slots64/db",
+      "removed_bytes": 152551335,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r49-synchronous-core-c64-w16-rep2-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r49-synchronous-core-c64-w16-rep2-slots8/db",
+      "removed_bytes": 166641368,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r50-blink-c64-w16-rep2-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r50-blink-c64-w16-rep2-slots8/db",
+      "removed_bytes": 910706635,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r51-rocksdb-service-c64-w16-rep2-slots16",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r51-rocksdb-service-c64-w16-rep2-slots16/db",
+      "removed_bytes": 150184816,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r52-rocksdb-service-c64-w16-rep2-slots32",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r52-rocksdb-service-c64-w16-rep2-slots32/db",
+      "removed_bytes": 152037641,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r53-rocksdb-service-c64-w16-rep2-slots64",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r53-rocksdb-service-c64-w16-rep2-slots64/db",
+      "removed_bytes": 153065083,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r54-raw-rocksdb-c64-w16-rep2-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r54-raw-rocksdb-c64-w16-rep2-slots8/db",
+      "removed_bytes": 206952567,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r55-blink-c64-w16-rep3-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r55-blink-c64-w16-rep3-slots8/db",
+      "removed_bytes": 912202249,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r56-rocksdb-service-c64-w16-rep3-slots16",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r56-rocksdb-service-c64-w16-rep3-slots16/db",
+      "removed_bytes": 209315034,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r57-rocksdb-service-c64-w16-rep3-slots32",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r57-rocksdb-service-c64-w16-rep3-slots32/db",
+      "removed_bytes": 156624262,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r58-rocksdb-service-c64-w16-rep3-slots64",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r58-rocksdb-service-c64-w16-rep3-slots64/db",
+      "removed_bytes": 153064981,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r59-raw-rocksdb-c64-w16-rep3-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r59-raw-rocksdb-c64-w16-rep3-slots8/db",
+      "removed_bytes": 179939556,
+      "already_removed_before_cleanup_manifest": false
+    },
+    {
+      "run_id": "r60-synchronous-core-c64-w16-rep3-slots8",
+      "database_path": "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r60-synchronous-core-c64-w16-rep3-slots8/db",
+      "removed_bytes": 193615744,
+      "already_removed_before_cleanup_manifest": false
+    }
+  ],
+  "utc_epoch_seconds": 1792372431.930381
+}

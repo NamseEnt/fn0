@@ -1,0 +1,69 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+pass 1/60 raw-rocksdb clients=16 width=1 rep=1 slots=8 batches=41298 rps=8257.9 rss_kb=52496
+pass 2/60 synchronous-core clients=16 width=1 rep=1 slots=8 batches=37084 rps=7413.8 rss_kb=51388
+pass 3/60 rocksdb-service clients=16 width=1 rep=1 slots=16 batches=34909 rps=6980.4 rss_kb=49020
+pass 4/60 blink clients=16 width=1 rep=1 slots=8 batches=40455 rps=8089.4 rss_kb=38324
+pass 5/60 synchronous-core clients=16 width=1 rep=2 slots=8 batches=35422 rps=7083.0 rss_kb=50156
+pass 6/60 rocksdb-service clients=16 width=1 rep=2 slots=16 batches=35357 rps=7071.4 rss_kb=50420
+pass 7/60 blink clients=16 width=1 rep=2 slots=8 batches=40446 rps=8087.6 rss_kb=39392
+pass 8/60 raw-rocksdb clients=16 width=1 rep=2 slots=8 batches=39897 rps=7977.8 rss_kb=52092
+pass 9/60 rocksdb-service clients=16 width=1 rep=3 slots=16 batches=36349 rps=7268.3 rss_kb=50252
+pass 10/60 blink clients=16 width=1 rep=3 slots=8 batches=39948 rps=7988.0 rss_kb=38280
+pass 11/60 raw-rocksdb clients=16 width=1 rep=3 slots=8 batches=39230 rps=7844.4 rss_kb=52084
+pass 12/60 synchronous-core clients=16 width=1 rep=3 slots=8 batches=39172 rps=7832.8 rss_kb=52800
+pass 13/60 raw-rocksdb clients=64 width=1 rep=1 slots=8 batches=91407 rps=18266.8 rss_kb=116148
+pass 14/60 synchronous-core clients=64 width=1 rep=1 slots=8 batches=83044 rps=16598.8 rss_kb=126572
+pass 15/60 blink clients=64 width=1 rep=1 slots=8 batches=70436 rps=14075.9 rss_kb=107692
+pass 16/60 rocksdb-service clients=64 width=1 rep=1 slots=16 batches=33132 rps=6614.5 rss_kb=81524
+pass 17/60 rocksdb-service clients=64 width=1 rep=1 slots=32 batches=57214 rps=11429.1 rss_kb=100900
+pass 18/60 rocksdb-service clients=64 width=1 rep=1 slots=64 batches=75754 rps=15138.7 rss_kb=112704
+pass 19/60 synchronous-core clients=64 width=1 rep=2 slots=8 batches=82226 rps=16435.3 rss_kb=122588
+pass 20/60 blink clients=64 width=1 rep=2 slots=8 batches=73730 rps=14734.2 rss_kb=107908
+pass 21/60 rocksdb-service clients=64 width=1 rep=2 slots=16 batches=33264 rps=6639.5 rss_kb=80724
+pass 22/60 rocksdb-service clients=64 width=1 rep=2 slots=32 batches=55668 rps=11118.0 rss_kb=97152
+pass 23/60 rocksdb-service clients=64 width=1 rep=2 slots=64 batches=75501 rps=15088.1 rss_kb=118808
+pass 24/60 raw-rocksdb clients=64 width=1 rep=2 slots=8 batches=89671 rps=17905.6 rss_kb=116336
+pass 25/60 blink clients=64 width=1 rep=3 slots=8 batches=75072 rps=15005.4 rss_kb=109316
+pass 26/60 rocksdb-service clients=64 width=1 rep=3 slots=16 batches=34215 rps=6829.3 rss_kb=80328
+pass 27/60 rocksdb-service clients=64 width=1 rep=3 slots=32 batches=56789 rps=11330.6 rss_kb=98140
+pass 28/60 rocksdb-service clients=64 width=1 rep=3 slots=64 batches=68658 rps=13720.6 rss_kb=110960
+pass 29/60 raw-rocksdb clients=64 width=1 rep=3 slots=8 batches=88938 rps=17776.9 rss_kb=115972
+pass 30/60 synchronous-core clients=64 width=1 rep=3 slots=8 batches=82940 rps=16571.4 rss_kb=120836
+pass 31/60 raw-rocksdb clients=16 width=16 rep=1 slots=8 batches=14178 rps=2833.9 rss_kb=164216
+pass 32/60 synchronous-core clients=16 width=16 rep=1 slots=8 batches=10816 rps=2161.5 rss_kb=253324
+pass 33/60 rocksdb-service clients=16 width=16 rep=1 slots=16 batches=9753 rps=1949.0 rss_kb=222044
+pass 34/60 blink clients=16 width=16 rep=1 slots=8 batches=10412 rps=2079.1 rss_kb=281232
+pass 35/60 synchronous-core clients=16 width=16 rep=2 slots=8 batches=9778 rps=1954.0 rss_kb=248180
+pass 36/60 rocksdb-service clients=16 width=16 rep=2 slots=16 batches=9716 rps=1941.6 rss_kb=218996
+pass 37/60 blink clients=16 width=16 rep=2 slots=8 batches=10279 rps=2054.2 rss_kb=280932
+pass 38/60 raw-rocksdb clients=16 width=16 rep=2 slots=8 batches=13395 rps=2676.9 rss_kb=138224
+pass 39/60 rocksdb-service clients=16 width=16 rep=3 slots=16 batches=10082 rps=2015.2 rss_kb=225708
+pass 40/60 blink clients=16 width=16 rep=3 slots=8 batches=10127 rps=2023.8 rss_kb=279204
+pass 41/60 raw-rocksdb clients=16 width=16 rep=3 slots=8 batches=13812 rps=2760.7 rss_kb=147184
+pass 42/60 synchronous-core clients=16 width=16 rep=3 slots=8 batches=10291 rps=2056.6 rss_kb=252948
+pass 43/60 raw-rocksdb clients=64 width=16 rep=1 slots=8 batches=11993 rps=2391.9 rss_kb=374424
+pass 44/60 synchronous-core clients=64 width=16 rep=1 slots=8 batches=9509 rps=1891.2 rss_kb=484772
+pass 45/60 blink clients=64 width=16 rep=1 slots=8 batches=13766 rps=2743.3 rss_kb=1020440
+pass 46/60 rocksdb-service clients=64 width=16 rep=1 slots=16 batches=8910 rps=1736.2 rss_kb=450480
+pass 47/60 rocksdb-service clients=64 width=16 rep=1 slots=32 batches=9160 rps=1760.2 rss_kb=455760
+pass 48/60 rocksdb-service clients=64 width=16 rep=1 slots=64 batches=9375 rps=1767.2 rss_kb=448596
+pass 49/60 synchronous-core clients=64 width=16 rep=2 slots=8 batches=9467 rps=1753.8 rss_kb=479872
+pass 50/60 blink clients=64 width=16 rep=2 slots=8 batches=14372 rps=2865.2 rss_kb=856080
+pass 51/60 rocksdb-service clients=64 width=16 rep=2 slots=16 batches=9051 rps=1795.1 rss_kb=446440
+pass 52/60 rocksdb-service clients=64 width=16 rep=2 slots=32 batches=8873 rps=1751.5 rss_kb=451860
+pass 53/60 rocksdb-service clients=64 width=16 rep=2 slots=64 batches=9150 rps=1693.5 rss_kb=452552
+pass 54/60 raw-rocksdb clients=64 width=16 rep=2 slots=8 batches=13520 rps=2696.4 rss_kb=387340
+pass 55/60 blink clients=64 width=16 rep=3 slots=8 batches=14357 rps=2864.5 rss_kb=1009208
+pass 56/60 rocksdb-service clients=64 width=16 rep=3 slots=16 batches=8816 rps=1750.6 rss_kb=439384
+pass 57/60 rocksdb-service clients=64 width=16 rep=3 slots=32 batches=9212 rps=1831.0 rss_kb=451720
+pass 58/60 rocksdb-service clients=64 width=16 rep=3 slots=64 batches=8997 rps=1721.9 rss_kb=464008
+pass 59/60 raw-rocksdb clients=64 width=16 rep=3 slots=8 batches=10579 rps=2107.4 rss_kb=381340
+pass 60/60 synchronous-core clients=64 width=16 rep=3 slots=8 batches=7709 rps=1530.5 rss_kb=449640
+Traceback (most recent call last):
+  File "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-probe-787e48120/run-raw-screen.py", line 287, in <module>
+    print(json.dumps({"complete": True, "run_count": len(case_results), "source_sha": source_sha, "binary_sha256": binary_sha, "paired_prefix_groups": len(prefix_fingerprints)}, flush=True))
+  File "/usr/lib64/python3.9/json/__init__.py", line 234, in dumps
+    return cls(
+TypeError: __init__() got an unexpected keyword argument 'flush'

@@ -1,0 +1,42 @@
+{
+  "run_id": "r32-synchronous-core-c16-w16-rep1-slots8",
+  "index": 32,
+  "backend": "synchronous-core",
+  "clients": 16,
+  "width": 16,
+  "repetition": 1,
+  "shared_blocking_slots": 8,
+  "estimated_payload_bytes": 33554432,
+  "zfs_free_bytes_before": 85160505344,
+  "environment": {
+    "DODB_SOURCE_SHA": "5d772a7448b1b6c29a0f00f501bd51fd83be03b9",
+    "DODB_BINARY_SHA256": "8ee11c9afeff6c3687643ad14d6f1c35597d984f988d4f8290935547566d8d48"
+  },
+  "argv": [
+    "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/unconditional_write_workload",
+    "--backend",
+    "synchronous-core",
+    "--width",
+    "16",
+    "--clients",
+    "16",
+    "--seed",
+    "20261013",
+    "--value-size",
+    "512",
+    "--warmup-ms",
+    "1000",
+    "--measurement-ms",
+    "5000",
+    "--call-cap",
+    "100000000",
+    "--shared-blocking-slots",
+    "8",
+    "--data-dir",
+    "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r32-synchronous-core-c16-w16-rep1-slots8/db",
+    "--report",
+    "/bench/zfs/db/rocksdb-contract-baseline-20261016/raw-screen-r1/runs/r32-synchronous-core-c16-w16-rep1-slots8/report.json",
+    "--revision-allocator",
+    "reserved-ranges"
+  ]
+}

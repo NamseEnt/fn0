@@ -1,0 +1,25 @@
+{
+  "utc": "2026-10-19T00:54:23Z",
+  "hostname": "instance-20260923-1013",
+  "uname": "Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux",
+  "lscpu": "Architecture:                            aarch64\nCPU op-mode(s):                          32-bit, 64-bit\nByte Order:                              Little Endian\nCPU(s):                                  2\nOn-line CPU(s) list:                     0,1\nVendor ID:                               ARM\nModel name:                              Neoverse-N1\nModel:                                   1\nThread(s) per core:                      1\nCore(s) per socket:                      2\nSocket(s):                               1\nStepping:                                r3p1\nBogoMIPS:                                50.00\nFlags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0,1\nVulnerability Gather data sampling:      Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Not affected\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; CSV2, BHB\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n",
+  "meminfo": "MemTotal:       11159744 kB\nMemFree:         2858568 kB\nMemAvailable:    4782144 kB\nBuffers:               8 kB\nCached:           997876 kB\nSwapCached:        19280 kB\nActive:           318768 kB\nInactive:         794888 kB\nActive(anon):      98768 kB\nInactive(anon):    53988 kB\nActive(file):     220000 kB\nInactive(file):   740900 kB\nUnevictable:       16116 kB\nMlocked:           12116 kB\nSwapTotal:       4194300 kB\nSwapFree:        3807940 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:                12 kB\nWriteback:             0 kB\nAnonPages:        116608 kB\nMapped:           119872 kB\nShmem:             26732 kB\nKReclaimable:    1211188 kB\nSlab:            2637376 kB\nSReclaimable:    1211188 kB\nSUnreclaim:      1426188 kB\nKernelStack:        6080 kB\nPageTables:         7740 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:     9774172 kB\nCommitted_AS:    3059840 kB\nVmallocTotal:   135288315904 kB\nVmallocUsed:      142512 kB\nVmallocChunk:          0 kB\nPercpu:              984 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:     30720 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:     34816 kB\nFilePmdMapped:     34816 kB\nCmaTotal:              0 kB\nCmaFree:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\n",
+  "mem_available_kb": 4782144,
+  "df": "Filesystem                 1024-blocks     Used Available Capacity Mounted on\n/dev/mapper/ocivolume-root    30867456 20496956  10370500      67% /\ndodbbench/db                 155428916 70873984  84554932      46% /bench/zfs/db\n",
+  "zfs": "dodbbench/db\t72574959616\t86584250368\t/bench/zfs/db\n",
+  "source_sha": "5d772a7448b1b6c29a0f00f501bd51fd83be03b9",
+  "source_tree": "c89e7d50e9fc694823821e5af3ea998f87bee7d3",
+  "binary_sha256": "8ee11c9afeff6c3687643ad14d6f1c35597d984f988d4f8290935547566d8d48",
+  "binary_path": "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/unconditional_write_workload",
+  "rocksdb_source_sha": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+  "rocksdb_archive_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+  "active_build_or_workload_processes": [],
+  "resident_dataset_payload_max_bytes": 134217728,
+  "memory_exceed_axis": "deferred by user",
+  "case_budget": {
+    "warmup_ms": 1000,
+    "measurement_ms": 5000,
+    "timeout_seconds": 180,
+    "minimum_zfs_free_bytes": 21474836480
+  }
+}

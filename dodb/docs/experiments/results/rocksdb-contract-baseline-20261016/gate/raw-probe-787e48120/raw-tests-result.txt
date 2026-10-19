@@ -1,0 +1,28 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+101
+help: the trait `From<{integer}>` is not implemented for `Revision`
+      but trait `From<Lsn>` is implemented for it
+    --> dodb/crates/dodb-core/src/revision.rs:82:1
+     |
+  82 | impl From<Lsn> for Revision {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for that trait implementation, expected `Lsn`, found `{integer}`
+
+error[E0277]: the trait bound `Revision: From<{integer}>` is not satisfied
+    --> dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs:1485:34
+     |
+1485 |         changed_rows[0].2 = Some(dodb_core::Revision::from(16));
+     |                                  ^^^^^^^^^^^^^^^^^^^ the trait `From<{integer}>` is not implemented for `Revision`
+     |
+help: the trait `From<{integer}>` is not implemented for `Revision`
+      but trait `From<Lsn>` is implemented for it
+    --> dodb/crates/dodb-core/src/revision.rs:82:1
+     |
+  82 | impl From<Lsn> for Revision {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for that trait implementation, expected `Lsn`, found `{integer}`
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `dodb-rocksdb` (bin "unconditional_write_workload" test) due to 2 previous errors
