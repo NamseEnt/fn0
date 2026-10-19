@@ -71,6 +71,9 @@ void* dodb_raw_rocksdb_iterator_new(void* database, char** error) {
   if (iterator == nullptr && error != nullptr) {
     *error = copy_error(rocksdb::Status::IOError("iterator allocation returned null"));
   }
+  if (iterator != nullptr) {
+    iterator->SeekToFirst();
+  }
   return iterator;
 }
 
