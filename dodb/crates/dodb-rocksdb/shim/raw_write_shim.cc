@@ -29,7 +29,7 @@ void* dodb_raw_rocksdb_open(const char* path, char** error) {
   rocksdb::Options options;
   options.create_if_missing = true;
   options.compression = rocksdb::kNoCompression;
-  rocksdb::DB* database = nullptr;
+  std::unique_ptr<rocksdb::DB> database;
   const auto status = rocksdb::DB::Open(options, path, &database);
   if (!status.ok()) {
     if (error != nullptr) {
@@ -37,7 +37,7 @@ void* dodb_raw_rocksdb_open(const char* path, char** error) {
     }
     return nullptr;
   }
-  return database;
+  return database.release();
 }
 
 void dodb_raw_rocksdb_close(void* database) {
