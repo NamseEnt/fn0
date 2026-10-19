@@ -3763,10 +3763,17 @@ mod tests {
         shutdown.await.unwrap();
         *tenant_database.locks_acquired_hook.lock().unwrap() = None;
         *service.lifecycle.shutdown_hook.lock().unwrap() = None;
+        drop(tenant_database);
+        drop(tenant_database_cell);
+        drop(service);
 
         let mutation_key = DocumentKey::new(b"cancelled-request".to_vec(), b"mutation".to_vec());
+        let mut reopened_config = RocksDbServiceConfig::new(directory.path());
+        reopened_config.condition_key_lock_mode = ConditionKeyLockMode::Shared;
+        reopened_config.revision_allocator = RevisionAllocatorMode::ReservedRanges;
+        let reopened_service = RocksDbService::new(reopened_config).unwrap();
         assert_eq!(
-            service
+            reopened_service
                 .execute(
                     tenant,
                     Request::Get { key: mutation_key },
@@ -3779,7 +3786,7 @@ mod tests {
                 Revision::new(2)
             ))
         );
-        service.shutdown().await;
+        reopened_service.shutdown().await;
     }
 
     #[test]
