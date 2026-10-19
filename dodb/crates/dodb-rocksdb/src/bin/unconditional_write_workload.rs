@@ -1457,7 +1457,7 @@ mod tests {
         MEASUREMENT_PAYLOAD_SEQUENCE_BASE, Options, POOL_SLOTS_PER_CLIENT, SampleHistogram,
         collect_baseline_revisions, document_key, histogram_bucket_index,
         histogram_bucket_upper_bound, payload, physical_key, raw_envelope,
-        update_input_prefix_fingerprint, validate_rows,
+        sample_histogram_validation_report, update_input_prefix_fingerprint, validate_rows,
     };
 
     #[test]
