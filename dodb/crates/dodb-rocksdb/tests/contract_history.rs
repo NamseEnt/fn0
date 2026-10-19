@@ -254,8 +254,8 @@ struct ModelEntry {
 #[derive(Clone, Debug)]
 enum RecordedOutcome {
     Response(Response),
-    Conflict(String),
-    OtherError(String),
+    Conflict,
+    OtherError,
 }
 
 #[derive(Clone, Debug)]
@@ -270,8 +270,8 @@ struct RecordedOperation {
 fn record_outcome(result: Result<Response, Error>) -> RecordedOutcome {
     match result {
         Ok(response) => RecordedOutcome::Response(response),
-        Err(Error::Conflict(message)) => RecordedOutcome::Conflict(message.to_string()),
-        Err(error) => RecordedOutcome::OtherError(error.to_string()),
+        Err(Error::Conflict(_)) => RecordedOutcome::Conflict,
+        Err(_) => RecordedOutcome::OtherError,
     }
 }
 
@@ -462,14 +462,14 @@ fn result_matches_model(
         (Request::Scan { limit, .. }, RecordedOutcome::Response(Response::Scan(actual))) => {
             document_rows_match(actual, model, None, *limit)
         }
-        (Request::Transact { request }, RecordedOutcome::Conflict(_)) => {
+        (Request::Transact { request }, RecordedOutcome::Conflict) => {
             !conditions_match_model(model, &request.conditions)
                 || conflicting_mutation_overlaps(history, operation_index)
         }
-        (Request::Put { .. } | Request::Delete { .. }, RecordedOutcome::Conflict(_)) => {
+        (Request::Put { .. } | Request::Delete { .. }, RecordedOutcome::Conflict) => {
             conflicting_mutation_overlaps(history, operation_index)
         }
-        (_, RecordedOutcome::OtherError(_)) => false,
+        (_, RecordedOutcome::OtherError) => false,
         _ => false,
     }
 }
