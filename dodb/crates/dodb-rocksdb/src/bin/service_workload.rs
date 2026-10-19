@@ -1542,11 +1542,7 @@ async fn execute_workflow(
                     0 => {
                         let revision = observed_revision.unwrap_or(Revision::new(1));
                         let expected_revision = if intended_rejection {
-                            Revision::new(if revision.get() == 0 {
-                                1
-                            } else {
-                                revision.get() - 1
-                            })
+                            Revision::new(if revision.get() == 0 { u64::MAX } else { 0 })
                         } else {
                             revision
                         };
@@ -1568,7 +1564,7 @@ async fn execute_workflow(
                             key: key_from_ordinal((options.initial_rows + 50_000) as u64),
                         },
                         TransactionCondition::NotExists { .. } => TransactionCondition::NotExists {
-                            key: condition_key.clone(),
+                            key: key_from_ordinal(options.initial_rows.saturating_sub(1) as u64),
                         },
                         revision => revision,
                     }
