@@ -70,7 +70,7 @@ impl EngineHealthObserver {
     where
         T: EngineHealthDatabase + 'static,
     {
-        let erased_database: Arc<dyn EngineHealthDatabase> = Arc::clone(database);
+        let erased_database: Arc<dyn EngineHealthDatabase> = database.clone();
         self.databases
             .push((database_name, Arc::downgrade(&erased_database)));
     }
