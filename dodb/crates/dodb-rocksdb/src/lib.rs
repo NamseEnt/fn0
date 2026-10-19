@@ -1398,6 +1398,7 @@ impl TenantDatabase {
         )
     }
 
+    #[cfg(test)]
     fn open_with_allocator(
         path: &Path,
         revision_allocator: RevisionAllocatorMode,
