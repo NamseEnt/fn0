@@ -107,8 +107,15 @@ impl SynchronousRocksDbTenant {
     }
 
     pub fn engine_health_observer(&self) -> EngineHealthObserver {
+        self.engine_health_observer_named("tenant_0")
+    }
+
+    pub fn engine_health_observer_named(
+        &self,
+        database_name: impl Into<String>,
+    ) -> EngineHealthObserver {
         let mut observer = EngineHealthObserver::new();
-        observer.add_database("tenant_0".to_owned(), &self.database.handle);
+        observer.add_database(database_name.into(), &self.database.handle);
         observer
     }
 }

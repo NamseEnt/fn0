@@ -210,9 +210,9 @@ impl DriverService {
             DriverBackend::RocksDbService(service) => Some(service.engine_health_observer()),
             DriverBackend::Direct { tenants, .. } => {
                 Some(dodb_rocksdb::EngineHealthObserver::combine(
-                    tenants
-                        .values()
-                        .map(|database| database.engine_health_observer()),
+                    tenants.values().map(|(tenant, database)| {
+                        database.engine_health_observer_named(format!("tenant_{tenant}"))
+                    }),
                 ))
             }
         }
@@ -1496,9 +1496,12 @@ async fn execute_workflow(
                                 .push("preparatory Get returned invalid value length".to_owned());
                         }
                     }
+                    Ok(Response::Get(RevisionState::Missing { revision })) => {
+                        observed_revision = Some(revision);
+                    }
                     Ok(_) => state
                         .verification_errors
-                        .push("preparatory Get returned a missing seeded key".to_owned()),
+                        .push("preparatory Get returned an unexpected response".to_owned()),
                     Err(error) => record_error(&mut state, error),
                 }
             }
@@ -1539,7 +1542,11 @@ async fn execute_workflow(
                     0 => {
                         let revision = observed_revision.unwrap_or(Revision::new(1));
                         let expected_revision = if intended_rejection {
-                            Revision::new(revision.get().saturating_sub(1))
+                            Revision::new(if revision.get() == 0 {
+                                1
+                            } else {
+                                revision.get() - 1
+                            })
                         } else {
                             revision
                         };
