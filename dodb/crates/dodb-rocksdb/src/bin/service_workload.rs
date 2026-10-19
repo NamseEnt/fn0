@@ -208,13 +208,13 @@ impl DriverService {
         match &self.backend {
             DriverBackend::Service(_) => None,
             DriverBackend::RocksDbService(service) => Some(service.engine_health_observer()),
-            DriverBackend::Direct { tenants, .. } => Some(
-                dodb_rocksdb::EngineHealthObserver::combine(tenants.iter().map(|entry| {
-                    entry
-                        .value()
-                        .engine_health_observer_named(format!("tenant_{}", entry.key()))
-                })),
-            ),
+            DriverBackend::Direct { tenants, .. } => {
+                Some(dodb_rocksdb::EngineHealthObserver::combine(
+                    tenants.iter().map(|(tenant, database)| {
+                        database.engine_health_observer_named(format!("tenant_{tenant}"))
+                    }),
+                ))
+            }
         }
     }
 
