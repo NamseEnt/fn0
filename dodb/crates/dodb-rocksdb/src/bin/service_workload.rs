@@ -100,6 +100,7 @@ struct WorkflowPlan {
 
 enum DriverBackend {
     Service(Box<dyn DodbService>),
+    RocksDbService(Box<dodb_rocksdb::RocksDbService>),
     Direct {
         tenants: BTreeMap<TenantId, dodb_rocksdb::research::SynchronousRocksDbTenant>,
         admission: tokio::sync::Semaphore,
@@ -139,7 +140,7 @@ impl DriverService {
                 config.condition_key_lock_mode = options.condition_key_lock_mode;
                 let service = dodb_rocksdb::RocksDbService::new(config)?;
                 let metrics = service.research_metrics_handle();
-                (DriverBackend::Service(Box::new(service)), metrics)
+                (DriverBackend::RocksDbService(Box::new(service)), metrics)
             }
             BackendKind::RocksDbDirect => {
                 std::fs::create_dir_all(&data_dir)?;
@@ -179,6 +180,9 @@ impl DriverService {
         let budget = ExecutionBudget::new(RESPONSE_BUDGET);
         match &self.backend {
             DriverBackend::Service(service) => service.execute(tenant, request, budget).await,
+            DriverBackend::RocksDbService(service) => {
+                service.execute(tenant, request, budget).await
+            }
             DriverBackend::Direct { tenants, admission } => {
                 let _permit = admission
                     .acquire()
@@ -193,8 +197,24 @@ impl DriverService {
     }
 
     async fn shutdown(&self) {
-        if let DriverBackend::Service(service) = &self.backend {
-            service.shutdown().await;
+        match &self.backend {
+            DriverBackend::Service(service) => service.shutdown().await,
+            DriverBackend::RocksDbService(service) => service.shutdown().await,
+            DriverBackend::Direct { .. } => {}
+        }
+    }
+
+    fn engine_health_observer(&self) -> Option<dodb_rocksdb::EngineHealthObserver> {
+        match &self.backend {
+            DriverBackend::Service(_) => None,
+            DriverBackend::RocksDbService(service) => Some(service.engine_health_observer()),
+            DriverBackend::Direct { tenants, .. } => {
+                Some(dodb_rocksdb::EngineHealthObserver::combine(
+                    tenants
+                        .values()
+                        .map(|database| database.engine_health_observer()),
+                ))
+            }
         }
     }
 
@@ -237,6 +257,7 @@ struct Options {
     detailed_write_metrics: bool,
     revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
     condition_key_lock_mode: dodb_rocksdb::ConditionKeyLockMode,
+    engine_health_interval_ms: u64,
     blocking_admission: dodb_rocksdb::BlockingAdmissionMode,
     shared_blocking_slots: usize,
     mutation_workload: MutationWorkload,
@@ -845,6 +866,18 @@ fn parse_options() -> Result<Options, String> {
     };
     let condition_key_lock_mode =
         parse_condition_key_lock_mode(values.get("--condition-key-lock-mode").map(String::as_str))?;
+    let engine_health_interval_ms = values
+        .get("--engine-health-interval-ms")
+        .map(|value| {
+            value
+                .parse::<u64>()
+                .map_err(|_| "invalid --engine-health-interval-ms".to_owned())
+        })
+        .transpose()?
+        .unwrap_or(0);
+    if engine_health_interval_ms > 0 && engine_health_interval_ms < 1_000 {
+        return Err("--engine-health-interval-ms must be 0 or at least 1000".to_owned());
+    }
     let blocking_admission = match values
         .get("--blocking-admission")
         .map(String::as_str)
@@ -961,6 +994,7 @@ fn parse_options() -> Result<Options, String> {
         detailed_write_metrics,
         revision_allocator,
         condition_key_lock_mode,
+        engine_health_interval_ms,
         blocking_admission,
         shared_blocking_slots,
         mutation_workload,
@@ -2229,6 +2263,15 @@ async fn run(options: Options) -> Result<Value, String> {
             sampler_samples.lock().unwrap().push(process_metrics());
         }
     });
+    let engine_health_interval = Duration::from_millis(options.engine_health_interval_ms);
+    let engine_health_sampler = if engine_health_interval.is_zero() {
+        None
+    } else {
+        service
+            .engine_health_observer()
+            .map(|observer| observer.start_sampling(engine_health_interval, options.measurement))
+            .transpose()?
+    };
     let (admission, drain, total_calls, call_cap_reached) = run_clients(
         Arc::clone(&service),
         assignments,
@@ -2239,6 +2282,11 @@ async fn run(options: Options) -> Result<Value, String> {
         1 << 56,
     )
     .await;
+    let engine_health_metrics = match engine_health_sampler {
+        Some(sampler) => sampler.finish()?,
+        None if engine_health_interval.is_zero() => dodb_rocksdb::engine_health_disabled_report(),
+        None => dodb_rocksdb::engine_health_unsupported_report(engine_health_interval),
+    };
     let research_metrics = service.research_metrics_snapshot();
     stop_metric_sampling.store(true, Ordering::Relaxed);
     let _ = sampler.await;
@@ -2420,7 +2468,8 @@ async fn run(options: Options) -> Result<Value, String> {
                 "write_blocking_slots": if options.backend == BackendKind::Blink { 0 } else { options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(_, write_slots)| write_slots) },
                 "revision_allocator": match options.revision_allocator { dodb_rocksdb::RevisionAllocatorMode::Serialized => "serialized", dodb_rocksdb::RevisionAllocatorMode::ReservedRanges => "reserved-ranges" },
                 "revision_range_size": if options.revision_allocator == dodb_rocksdb::RevisionAllocatorMode::ReservedRanges { Some(4_096) } else { None },
-                "condition_key_lock_mode": if options.backend == BackendKind::Blink { "not-applicable" } else { match options.condition_key_lock_mode { dodb_rocksdb::ConditionKeyLockMode::Exclusive => "exclusive", dodb_rocksdb::ConditionKeyLockMode::Shared => "shared" } }
+                "condition_key_lock_mode": if options.backend == BackendKind::Blink { "not-applicable" } else { match options.condition_key_lock_mode { dodb_rocksdb::ConditionKeyLockMode::Exclusive => "exclusive", dodb_rocksdb::ConditionKeyLockMode::Shared => "shared" } },
+                "engine_health_interval_ms": options.engine_health_interval_ms
             },
             "research_metrics_enabled": options.research_metrics,
             "read_stage_metrics_enabled": options.read_stage_metrics,
@@ -2464,6 +2513,7 @@ async fn run(options: Options) -> Result<Value, String> {
         "validation": validation,
         "reopen_validation": reopen_validation,
         "process_metrics": {"before": cpu_before, "after": cpu_after, "cpu_ticks_delta": cpu_tick_delta, "cpu_seconds": cpu_seconds, "cpu_percent_of_one_core": cpu_core_percent, "cpu_percent_of_online_machine": cpu_machine_percent, "online_processors": online_processors, "peak_sampled_rss_kb": peak_rss_kb, "rss_sample_count": sample_values.len(), "sampling_interval_ms": 200, "sampling_completeness": if sample_values.len() >= 2 && peak_rss_kb.is_some() { "complete" } else { "incomplete" }},
+        "engine_health": engine_health_metrics,
         "disk_usage_bytes": {"before_shutdown": disk_bytes_before_shutdown, "after_reopen_validation": disk_bytes_after_reopen},
         "disk_usage_scope": "all regular files under this run's isolated data directory after measurement and before shutdown",
         "sync_count_and_group_metrics": "unavailable from existing service interfaces",
@@ -2736,6 +2786,7 @@ mod tests {
             detailed_write_metrics: false,
             revision_allocator: dodb_rocksdb::RevisionAllocatorMode::Serialized,
             condition_key_lock_mode: dodb_rocksdb::ConditionKeyLockMode::Exclusive,
+            engine_health_interval_ms: 0,
             blocking_admission: dodb_rocksdb::BlockingAdmissionMode::Shared,
             shared_blocking_slots: 8,
             mutation_workload: MutationWorkload::Overwrite,
@@ -2777,6 +2828,7 @@ mod tests {
             detailed_write_metrics: false,
             revision_allocator: dodb_rocksdb::RevisionAllocatorMode::Serialized,
             condition_key_lock_mode: dodb_rocksdb::ConditionKeyLockMode::Exclusive,
+            engine_health_interval_ms: 0,
             blocking_admission: dodb_rocksdb::BlockingAdmissionMode::Shared,
             shared_blocking_slots: 8,
             mutation_workload: MutationWorkload::NewKey,

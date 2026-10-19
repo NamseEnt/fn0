@@ -138,6 +138,30 @@ void set_error(char** error, const rocksdb::Status& status) {
   }
 }
 
+int query_int_property(rocksdb::DB* database, const unsigned char* property,
+                       size_t property_length, uint64_t* value,
+                       char** property_text) {
+  if (database == nullptr || property == nullptr || value == nullptr) {
+    return -1;
+  }
+  const rocksdb::Slice property_slice(
+      reinterpret_cast<const char*>(property), property_length);
+  if (database->GetIntProperty(property_slice, value)) {
+    return 0;
+  }
+  std::string fallback_value;
+  if (database->GetProperty(property_slice, &fallback_value)) {
+    if (property_text != nullptr) {
+      *property_text = copy_string(fallback_value);
+      if (*property_text == nullptr) {
+        return -1;
+      }
+    }
+    return 2;
+  }
+  return 1;
+}
+
 }
 
 extern "C" {
@@ -177,6 +201,23 @@ void dodb_rocksdb_arm_wal_sync_hook() {
 
 void dodb_rocksdb_close(void* database) {
   delete static_cast<rocksdb::TransactionDB*>(database);
+}
+
+int dodb_rocksdb_get_int_property(void* database,
+                                  const unsigned char* property,
+                                  size_t property_length, uint64_t* value,
+                                  char** property_text) {
+  auto* database_handle = static_cast<rocksdb::TransactionDB*>(database);
+  return query_int_property(database_handle, property, property_length, value,
+                            property_text);
+}
+
+int dodb_rocksdb_get_int_property_for_db(
+    void* database, const unsigned char* property, size_t property_length,
+    uint64_t* value, char** property_text) {
+  auto* database_handle = static_cast<rocksdb::DB*>(database);
+  return query_int_property(database_handle, property, property_length, value,
+                            property_text);
 }
 
 void* dodb_rocksdb_iterator_new(void* database, const unsigned char* start_key,

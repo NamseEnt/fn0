@@ -1,6 +1,8 @@
 use std::ffi::{CStr, CString, c_char, c_int, c_uchar, c_void};
 use std::path::Path;
 use std::ptr;
+use std::ptr::NonNull;
+use std::sync::Arc;
 
 use dodb_core::Error;
 
@@ -35,6 +37,28 @@ unsafe extern "C" {
 
 pub struct RawRocksDb {
     database: *mut c_void,
+    health_handle: Arc<RawRocksDbHealthHandle>,
+}
+
+struct RawRocksDbHealthHandle(NonNull<c_void>);
+
+unsafe impl Send for RawRocksDbHealthHandle {}
+unsafe impl Sync for RawRocksDbHealthHandle {}
+
+impl super::engine_health::EngineHealthDatabase for RawRocksDbHealthHandle {
+    fn database_pointer(&self) -> *mut c_void {
+        self.0.as_ptr()
+    }
+
+    fn database_kind(&self) -> super::engine_health::EngineHealthDatabaseKind {
+        super::engine_health::EngineHealthDatabaseKind::Db
+    }
+}
+
+impl Drop for RawRocksDbHealthHandle {
+    fn drop(&mut self) {
+        unsafe { dodb_raw_rocksdb_close(self.0.as_ptr()) };
+    }
 }
 
 unsafe impl Send for RawRocksDb {}
@@ -49,7 +73,18 @@ impl RawRocksDb {
         if database.is_null() {
             return Err(take_error(error));
         }
-        Ok(Self { database })
+        let health_handle = NonNull::new(database)
+            .ok_or_else(|| Error::invariant("raw RocksDB open returned a null database"))?;
+        Ok(Self {
+            database,
+            health_handle: Arc::new(RawRocksDbHealthHandle(health_handle)),
+        })
+    }
+
+    pub fn engine_health_observer(&self) -> super::EngineHealthObserver {
+        let mut observer = super::EngineHealthObserver::new();
+        observer.add_database("raw_database".to_owned(), &self.health_handle);
+        observer
     }
 
     pub fn write_batch(&self, entries: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Error> {
@@ -131,14 +166,6 @@ unsafe fn copy_iterator_bytes(pointer: *const c_uchar, length: usize) -> Result<
         ));
     }
     Ok(unsafe { std::slice::from_raw_parts(pointer, length) }.to_vec())
-}
-
-impl Drop for RawRocksDb {
-    fn drop(&mut self) {
-        if !self.database.is_null() {
-            unsafe { dodb_raw_rocksdb_close(self.database) };
-        }
-    }
 }
 
 fn take_error(error: *mut c_char) -> Error {

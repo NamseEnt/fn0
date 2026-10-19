@@ -18,8 +18,14 @@ use dodb_service::{
 };
 use tokio::sync::{Notify, OnceCell, Semaphore};
 
+mod engine_health;
 pub mod raw_research;
 pub mod research;
+
+pub use engine_health::{
+    EngineHealthObserver, EngineHealthSampler, disabled_report as engine_health_disabled_report,
+    unsupported_report as engine_health_unsupported_report,
+};
 
 const USER_KEY_PREFIX: u8 = 1;
 const METADATA_COUNTER_KEY: &[u8] = &[0, 1];
@@ -613,6 +619,16 @@ struct RocksDbHandle(NonNull<c_void>);
 unsafe impl Send for RocksDbHandle {}
 unsafe impl Sync for RocksDbHandle {}
 
+impl engine_health::EngineHealthDatabase for RocksDbHandle {
+    fn database_pointer(&self) -> *mut c_void {
+        self.0.as_ptr()
+    }
+
+    fn database_kind(&self) -> engine_health::EngineHealthDatabaseKind {
+        engine_health::EngineHealthDatabaseKind::TransactionDb
+    }
+}
+
 struct TransactionGuard {
     handle: NonNull<c_void>,
     _database: Arc<RocksDbHandle>,
@@ -685,6 +701,16 @@ impl RocksDbService {
             #[cfg(test)]
             tenant_database_opens: AtomicUsize::new(0),
         })
+    }
+
+    pub fn engine_health_observer(&self) -> EngineHealthObserver {
+        let mut observer = EngineHealthObserver::new();
+        for database_entry in self.databases.iter() {
+            if let Some(database) = database_entry.value().get() {
+                observer.add_database(format!("tenant_{}", database_entry.key()), &database.handle);
+            }
+        }
+        observer
     }
 
     pub async fn shutdown(&self) {
@@ -2535,6 +2561,56 @@ mod tests {
             Some(path) => TempDir::new_in(path).unwrap(),
             None => TempDir::new().unwrap(),
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn weak_engine_health_observer_samples_and_allows_database_reopen() {
+        let directory = temporary_db_directory();
+        let service = RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap();
+        let tenant = TenantId::new(73);
+        let key = DocumentKey::new(b"health".to_vec(), b"key".to_vec());
+        service
+            .execute(
+                tenant,
+                Request::Put {
+                    key: key.clone(),
+                    value: b"observed".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap();
+
+        let observer = service.engine_health_observer();
+        let observation = observer.sample();
+        assert!(observation["timestamp_unix_ms"].as_u64().unwrap() > 0);
+        assert_eq!(observation["databases"][0]["status"], "open");
+        assert!(observation["databases"][0]["properties"]["num-running-compactions"].is_object());
+        let sampler = observer
+            .start_sampling(Duration::from_secs(1), Duration::from_secs(1))
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(1_050));
+        let sampled_report = sampler.finish().unwrap();
+        assert_eq!(sampled_report["status"], "sampled");
+        assert!(sampled_report["sample_count"].as_u64().unwrap() >= 1);
+
+        service.shutdown().await;
+        drop(service);
+        assert_eq!(observer.sample()["databases"][0]["status"], "closed");
+
+        let reopened_service =
+            RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap();
+        assert_eq!(
+            reopened_service
+                .execute(tenant, Request::Get { key }, ExecutionBudget::new(1024),)
+                .await
+                .unwrap(),
+            Response::Get(RevisionState::present(
+                b"observed".to_vec(),
+                Revision::new(1),
+            ))
+        );
+        reopened_service.shutdown().await;
     }
 
     #[test]

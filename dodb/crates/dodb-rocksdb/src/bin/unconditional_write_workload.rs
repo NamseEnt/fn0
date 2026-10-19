@@ -42,6 +42,8 @@ struct Options {
     call_cap: u64,
     validate_histogram: bool,
     revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
+    condition_key_lock_mode: dodb_rocksdb::ConditionKeyLockMode,
+    engine_health_interval_ms: u64,
     shared_blocking_slots: usize,
     data_dir: PathBuf,
     report_path: PathBuf,
@@ -57,6 +59,7 @@ struct SampleHistogram {
 enum ProbeBackend {
     Raw(RawRocksDb),
     Core(dodb_rocksdb::research::SynchronousRocksDbTenant),
+    RocksDbService(Box<dodb_rocksdb::RocksDbService>, tokio::runtime::Handle),
     Service(Box<dyn DodbService>, tokio::runtime::Handle),
 }
 
@@ -286,9 +289,10 @@ impl ProbeBackend {
                 .map(Self::Raw)
                 .map_err(|error| error.to_string()),
             BackendKind::SynchronousCore => {
-                let database = dodb_rocksdb::research::SynchronousRocksDbTenant::open(
+                let database = dodb_rocksdb::research::SynchronousRocksDbTenant::open_with_condition_key_lock_mode(
                     &options.data_dir,
                     options.revision_allocator,
+                    options.condition_key_lock_mode,
                 )
                 .map_err(|error| error.to_string())?;
                 Ok(Self::Core(database))
@@ -296,9 +300,10 @@ impl ProbeBackend {
             BackendKind::RocksDbService => {
                 let mut config = dodb_rocksdb::RocksDbServiceConfig::new(&options.data_dir);
                 config.revision_allocator = options.revision_allocator;
+                config.condition_key_lock_mode = options.condition_key_lock_mode;
                 config.max_blocking_operations = options.shared_blocking_slots;
                 config.detailed_write_metrics = false;
-                Ok(Self::Service(
+                Ok(Self::RocksDbService(
                     Box::new(
                         dodb_rocksdb::RocksDbService::new(config)
                             .map_err(|error| error.to_string())?,
@@ -381,6 +386,31 @@ impl ProbeBackend {
                     other => Err(format!("unexpected service response: {other:?}")),
                 }
             }
+            Self::RocksDbService(service, runtime) => {
+                let mutations = writes
+                    .iter()
+                    .map(|(key, value)| TransactionMutation::Put {
+                        key: key.clone(),
+                        value: value.clone(),
+                    })
+                    .collect();
+                let request = Request::Transact {
+                    request: TransactionRequest::new(Vec::new(), mutations),
+                };
+                let response = runtime
+                    .block_on(service.execute(
+                        TenantId::new(TENANT_NUMBER),
+                        request,
+                        ExecutionBudget::new(RESPONSE_BUDGET_BYTES),
+                    ))
+                    .map_err(|error| error.to_string())?;
+                match response {
+                    Response::Transact(outcome) if outcome.commit_lsn.is_some() => {
+                        Ok(outcome.commit_lsn.map(Revision::from))
+                    }
+                    other => Err(format!("unexpected RocksDB service response: {other:?}")),
+                }
+            }
         }
     }
 
@@ -400,12 +430,27 @@ impl ProbeBackend {
                 runtime.block_on(service.execute(TenantId::new(TENANT_NUMBER), request, budget))
             })
             .map_err(|error| error.to_string()),
+            Self::RocksDbService(service, runtime) => scan_service(|request, budget| {
+                runtime.block_on(service.execute(TenantId::new(TENANT_NUMBER), request, budget))
+            })
+            .map_err(|error| error.to_string()),
         }
     }
 
     fn shutdown(&self) {
-        if let Self::Service(service, runtime) = self {
-            runtime.block_on(service.shutdown());
+        match self {
+            Self::Service(service, runtime) => runtime.block_on(service.shutdown()),
+            Self::RocksDbService(service, runtime) => runtime.block_on(service.shutdown()),
+            Self::Raw(_) | Self::Core(_) => {}
+        }
+    }
+
+    fn engine_health_observer(&self) -> Option<dodb_rocksdb::EngineHealthObserver> {
+        match self {
+            Self::Raw(database) => Some(database.engine_health_observer()),
+            Self::Core(database) => Some(database.engine_health_observer()),
+            Self::RocksDbService(service, _) => Some(service.engine_health_observer()),
+            Self::Service(_, _) => None,
         }
     }
 }
@@ -452,6 +497,8 @@ fn parse_options() -> Result<Options, String> {
     let mut call_cap = 100_000_000;
     let mut validate_histogram = false;
     let mut revision_allocator = dodb_rocksdb::RevisionAllocatorMode::Serialized;
+    let mut condition_key_lock_mode = dodb_rocksdb::ConditionKeyLockMode::Exclusive;
+    let mut engine_health_interval_ms = 0_u64;
     let mut shared_blocking_slots = 8;
     let mut data_dir = None;
     let mut report_path = None;
@@ -518,6 +565,21 @@ fn parse_options() -> Result<Options, String> {
                     _ => return Err(format!("unknown revision allocator: {value}")),
                 }
             }
+            "--condition-key-lock-mode" => {
+                condition_key_lock_mode = match value.as_str() {
+                    "exclusive" => dodb_rocksdb::ConditionKeyLockMode::Exclusive,
+                    "shared" => dodb_rocksdb::ConditionKeyLockMode::Shared,
+                    _ => return Err(format!("unknown condition key lock mode: {value}")),
+                }
+            }
+            "--engine-health-interval-ms" => {
+                engine_health_interval_ms = value
+                    .parse()
+                    .map_err(|error| format!("invalid engine health interval: {error}"))?;
+                if engine_health_interval_ms > 0 && engine_health_interval_ms < 1_000 {
+                    return Err("--engine-health-interval-ms must be 0 or at least 1000".to_owned());
+                }
+            }
             "--shared-blocking-slots" => {
                 shared_blocking_slots = value
                     .parse()
@@ -539,6 +601,8 @@ fn parse_options() -> Result<Options, String> {
         call_cap,
         validate_histogram,
         revision_allocator,
+        condition_key_lock_mode,
+        engine_health_interval_ms,
         shared_blocking_slots,
         data_dir: data_dir.ok_or_else(|| "--data-dir is required".to_owned())?,
         report_path: report_path.ok_or_else(|| "--report is required".to_owned())?,
@@ -601,6 +665,20 @@ fn run() -> Result<(), String> {
         &baseline_revisions,
     )?;
     let process_sampler = ProcessSampler::start()?;
+    let engine_health_interval = Duration::from_millis(options.engine_health_interval_ms);
+    let engine_health_sampler = if engine_health_interval.is_zero() {
+        None
+    } else {
+        tenant
+            .engine_health_observer()
+            .map(|observer| {
+                observer.start_sampling(
+                    engine_health_interval,
+                    Duration::from_millis(options.measurement_ms),
+                )
+            })
+            .transpose()?
+    };
     let measured_phase = execute_phase(
         Arc::clone(&tenant),
         &options,
@@ -609,6 +687,11 @@ fn run() -> Result<(), String> {
         warmup_phase.client_results,
         &baseline_revisions,
     )?;
+    let engine_health_metrics = match engine_health_sampler {
+        Some(sampler) => sampler.finish()?,
+        None if engine_health_interval.is_zero() => dodb_rocksdb::engine_health_disabled_report(),
+        None => dodb_rocksdb::engine_health_unsupported_report(engine_health_interval),
+    };
     let process_metrics = process_sampler.finish()?;
     let final_rows = tenant.read_all()?;
     let final_validation = validate_rows(
@@ -653,6 +736,7 @@ fn run() -> Result<(), String> {
         final_validation,
         reopen_validation,
         process_metrics,
+        engine_health_metrics,
         disk_usage_bytes,
         seeded_disk_bytes,
     );
@@ -1174,6 +1258,7 @@ fn build_report(
     final_validation: Value,
     reopen_validation: Value,
     process_metrics: Value,
+    engine_health_metrics: Value,
     disk_usage_bytes: u64,
     seeded_disk_bytes: u64,
 ) -> Value {
@@ -1245,6 +1330,21 @@ fn build_report(
             } else {
                 None
             },
+            "condition_key_lock_mode_requested": match options.condition_key_lock_mode {
+                dodb_rocksdb::ConditionKeyLockMode::Exclusive => "exclusive",
+                dodb_rocksdb::ConditionKeyLockMode::Shared => "shared",
+            },
+            "condition_key_lock_mode": match options.backend {
+                BackendKind::RawRocksDb => "not-applicable-no-conditional-transactions",
+                BackendKind::Blink => "not-applicable",
+                BackendKind::SynchronousCore | BackendKind::RocksDbService => {
+                    match options.condition_key_lock_mode {
+                        dodb_rocksdb::ConditionKeyLockMode::Exclusive => "exclusive",
+                        dodb_rocksdb::ConditionKeyLockMode::Shared => "shared",
+                    }
+                }
+            },
+            "engine_health_interval_ms": options.engine_health_interval_ms,
             "shared_blocking_slots": if options.backend == BackendKind::RocksDbService {
                 Some(options.shared_blocking_slots)
             } else {
@@ -1306,6 +1406,7 @@ fn build_report(
         "seeded_disk_bytes": seeded_disk_bytes,
         "disk_growth_bytes": disk_usage_bytes.saturating_sub(seeded_disk_bytes),
         "process_metrics": process_metrics,
+        "engine_health": engine_health_metrics,
         "per_client": per_client,
     })
 }
@@ -1443,6 +1544,8 @@ impl Options {
             call_cap: self.call_cap,
             validate_histogram: self.validate_histogram,
             revision_allocator: self.revision_allocator,
+            condition_key_lock_mode: self.condition_key_lock_mode,
+            engine_health_interval_ms: self.engine_health_interval_ms,
             shared_blocking_slots: self.shared_blocking_slots,
             data_dir: self.data_dir.clone(),
             report_path: self.report_path.clone(),
@@ -1573,6 +1676,8 @@ mod tests {
             call_cap: 100,
             validate_histogram: false,
             revision_allocator: dodb_rocksdb::RevisionAllocatorMode::Serialized,
+            condition_key_lock_mode: dodb_rocksdb::ConditionKeyLockMode::Exclusive,
+            engine_health_interval_ms: 0,
             shared_blocking_slots: 8,
             data_dir: std::path::PathBuf::from("unused-data"),
             report_path: std::path::PathBuf::from("unused-report"),

@@ -4,8 +4,8 @@ use dodb_core::{Error, TransactionMutation, TransactionRequest};
 use dodb_service::{ExecutionBudget, Request, Response, TransactionOutcome};
 
 use super::{
-    ConditionKeyLockMode, DEFAULT_REVISION_RANGE_SIZE, RevisionAllocatorMode, TenantDatabase,
-    enforce_response_budget,
+    ConditionKeyLockMode, DEFAULT_REVISION_RANGE_SIZE, EngineHealthObserver, RevisionAllocatorMode,
+    TenantDatabase, enforce_response_budget,
 };
 
 pub struct SynchronousRocksDbTenant {
@@ -104,6 +104,12 @@ impl SynchronousRocksDbTenant {
         };
         enforce_response_budget(&response, budget)?;
         Ok(response)
+    }
+
+    pub fn engine_health_observer(&self) -> EngineHealthObserver {
+        let mut observer = EngineHealthObserver::new();
+        observer.add_database("tenant_0".to_owned(), &self.database.handle);
+        observer
     }
 }
 
