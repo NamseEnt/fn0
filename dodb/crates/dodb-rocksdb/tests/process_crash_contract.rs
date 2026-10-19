@@ -731,6 +731,7 @@ fn build_scenario() -> Scenario {
     let deleted_key = key(b"crash", b"deleted");
     let created_key = key(b"crash", b"created");
     let untouched_key = key(b"crash", b"untouched");
+    let missing_condition_key = key(b"crash", b"missing-condition");
     let target_request = TransactionRequest::new(
         vec![
             TransactionCondition::Exists {
@@ -741,6 +742,12 @@ fn build_scenario() -> Scenario {
             },
             TransactionCondition::NotExists {
                 key: created_key.clone(),
+            },
+            TransactionCondition::Exists {
+                key: untouched_key.clone(),
+            },
+            TransactionCondition::NotExists {
+                key: missing_condition_key,
             },
         ],
         vec![
