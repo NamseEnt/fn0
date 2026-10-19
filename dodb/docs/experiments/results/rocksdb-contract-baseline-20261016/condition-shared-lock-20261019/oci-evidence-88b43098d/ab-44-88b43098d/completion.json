@@ -1,0 +1,13 @@
+{
+  "source_sha": "88b43098dab8736363d8c36446bbede27e1b77e1",
+  "source_tree": "0e8d1da6c60fd83fb11fd3d6f1a643665e3079a2",
+  "binary_sha256_before": "ff659fb3f0ea5ce8998bec1fa4297b9ec16b706f8553ba3555394a21a8db6977",
+  "binary_sha256_after": "ff659fb3f0ea5ce8998bec1fa4297b9ec16b706f8553ba3555394a21a8db6977",
+  "planned_cases": 44,
+  "completed_performance_cases": 42,
+  "completed_diagnostic_cases": 2,
+  "completed_cases": 44,
+  "all_cases_passed": true,
+  "free_bytes_after": 76249071616,
+  "diagnostic_cases_separated_from_performance_summary": true
+}

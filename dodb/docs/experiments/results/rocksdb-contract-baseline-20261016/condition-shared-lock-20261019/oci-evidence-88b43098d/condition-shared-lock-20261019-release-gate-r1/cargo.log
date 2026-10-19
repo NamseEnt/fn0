@@ -1,0 +1,80 @@
+   Compiling dodb-server v0.1.0 (/bench/zfs/db/condition-shared-lock-20261019/source-15e0077b4/dodb/crates/dodb-server)
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/condition-shared-lock-20261019/source-15e0077b4/dodb/crates/dodb-rocksdb)
+warning: associated function `open_with_allocator` is never used
+    --> dodb/crates/dodb-rocksdb/src/lib.rs:1401:8
+     |
+1391 | impl TenantDatabase {
+     | ------------------- associated function in this implementation
+...
+1401 |     fn open_with_allocator(
+     |        ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `dodb-rocksdb` (lib) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 3m 16s
+     Running unittests src/lib.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/dodb_rocksdb-ab9831430d697c48)
+
+running 27 tests
+test tests::allocator_modes_switch_above_existing_counter_high_water ... ok
+test tests::assigned_revision_is_burned_when_user_transaction_rolls_back ... ok
+test tests::condition_only_transactions_return_without_revision_in_both_lock_modes ... ok
+test tests::disk_tenant_cold_open_is_shared_and_then_uses_read_fast_path ... ok
+test tests::failed_tenant_open_can_be_retried ... ok
+test tests::get_completes_while_same_tenant_transaction_is_open ... ok
+test tests::initialized_tenant_reads_skip_repeated_path_checks ... ok
+test tests::missing_tenant_reads_do_not_create_database_directory ... ok
+test tests::overlapping_condition_and_mutation_key_is_exclusive_from_first_lock ... ok
+test tests::partial_range_is_abandoned_after_reopen_and_failed_tokens_are_burned ... ok
+test tests::range_reservation_rejects_overflow_and_corrupt_counter ... ok
+test tests::read_iterator_keeps_database_alive_after_tenant_owner_drops ... ok
+test tests::read_iterator_keeps_one_snapshot_across_atomic_transaction_commit ... ok
+test tests::read_waits_for_an_initializing_registry_cell ... ok
+test tests::request_kinds_use_the_expected_admission_lane ... ok
+test tests::reserved_revision_overlap_preserves_commit_order_and_read_after_success ... ok
+test tests::reserved_revision_ranges_are_unique_under_concurrent_assignment ... ok
+test tests::shared_admission_accepts_sixteen_slots_and_rejects_zero ... ok
+test tests::shared_admission_remains_the_default_eight_slot_mode ... ok
+test tests::shared_condition_locks_allow_concurrent_holders_for_present_and_missing_keys ... ok
+test tests::shared_sixteen_slot_admission_stays_bounded_until_blocking_work_finishes ... ok
+test tests::shutdown_drains_a_blocking_operation_after_its_request_is_cancelled ... ok
+test tests::shutdown_waits_for_an_in_flight_request_and_service_reopens ... ok
+test tests::split_admission_reserves_two_read_and_six_write_slots ... ok
+test tests::timed_out_writer_does_not_leak_lock_and_succeeds_after_holder_releases ... ok
+test tests::uncertain_reservation_commit_does_not_publish_its_range ... ok
+test tests::writer_first_prevents_stale_condition_success_and_rollback_releases_shared_locks ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.65s
+
+     Running tests/contract_history.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/contract_history-4cd16ad45119ef70)
+
+running 1 test
+test conditional_multi_key_history_agrees_for_blink_and_rocksdb_allocators ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/process_crash_contract.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/process_crash_contract-000fdf912f3d3bf3)
+
+running 4 tests
+test handoff_event_framing_accepts_raw_and_prefixed_lines ... ok
+test native_wal_sync_interruption_recovers_all_or_none ... ok
+test rocksdb_wal_sync_interruption_recovers_all_or_none ... ok
+test service_child ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/read_contract.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/read_contract-630430930621a210)
+
+running 2 tests
+test btree_blink_and_rocksdb_share_the_same_read_contract ... ok
+test rocksdb_query_and_scan_survive_shutdown_and_reopen ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+
+     Running tests/transaction_contract.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/transaction_contract-23c1dac7304bab49)
+
+running 1 test
+test btree_blink_and_rocksdb_share_transaction_contract ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.15s
+

@@ -1,0 +1,9 @@
+{
+  "case_number": 33,
+  "case_id": "c32-mt-mix-r1-exclusive-slots32-n33",
+  "source_sha": "88b43098dab8736363d8c36446bbede27e1b77e1",
+  "binary_sha256": "ff659fb3f0ea5ce8998bec1fa4297b9ec16b706f8553ba3555394a21a8db6977",
+  "free_bytes_before": 76200079360,
+  "database_budget_bytes": 1073741824,
+  "database_path_absent": true
+}

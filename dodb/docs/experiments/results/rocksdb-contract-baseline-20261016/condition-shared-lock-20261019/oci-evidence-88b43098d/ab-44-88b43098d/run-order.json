@@ -1,0 +1,398 @@
+[
+  {
+    "case_number": 1,
+    "scenario": "rw95",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 1,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 2,
+    "scenario": "rw95",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 1,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 3,
+    "scenario": "rw80",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 1,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 4,
+    "scenario": "rw80",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 1,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 5,
+    "scenario": "rw50",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 1,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 6,
+    "scenario": "rw50",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 1,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 7,
+    "scenario": "rw20",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 1,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 8,
+    "scenario": "rw20",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 1,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 9,
+    "scenario": "mt-mix",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 1,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 10,
+    "scenario": "mt-mix",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 1,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 11,
+    "scenario": "rw80",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 2,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 12,
+    "scenario": "rw80",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 2,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 13,
+    "scenario": "rw50",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 2,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 14,
+    "scenario": "rw50",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 2,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 15,
+    "scenario": "rw20",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 2,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 16,
+    "scenario": "rw20",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 2,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 17,
+    "scenario": "mt-mix",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 2,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 18,
+    "scenario": "mt-mix",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 2,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 19,
+    "scenario": "rw95",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 2,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 20,
+    "scenario": "rw95",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 2,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 21,
+    "scenario": "rw50",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 3,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 22,
+    "scenario": "rw50",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 3,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 23,
+    "scenario": "rw20",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 3,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 24,
+    "scenario": "rw20",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 3,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 25,
+    "scenario": "mt-mix",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 3,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 26,
+    "scenario": "mt-mix",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 3,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 27,
+    "scenario": "rw95",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 3,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 28,
+    "scenario": "rw95",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 3,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 29,
+    "scenario": "rw80",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 3,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 30,
+    "scenario": "rw80",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 3,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 31,
+    "scenario": "rw20",
+    "clients": 32,
+    "slots": 32,
+    "repetition": 1,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 32,
+    "scenario": "rw20",
+    "clients": 32,
+    "slots": 32,
+    "repetition": 1,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 33,
+    "scenario": "mt-mix",
+    "clients": 32,
+    "slots": 32,
+    "repetition": 1,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 34,
+    "scenario": "mt-mix",
+    "clients": 32,
+    "slots": 32,
+    "repetition": 1,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 35,
+    "scenario": "mt-mix",
+    "clients": 32,
+    "slots": 32,
+    "repetition": 2,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 36,
+    "scenario": "mt-mix",
+    "clients": 32,
+    "slots": 32,
+    "repetition": 2,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 37,
+    "scenario": "rw20",
+    "clients": 32,
+    "slots": 32,
+    "repetition": 2,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 38,
+    "scenario": "rw20",
+    "clients": 32,
+    "slots": 32,
+    "repetition": 2,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 39,
+    "scenario": "rw20",
+    "clients": 32,
+    "slots": 32,
+    "repetition": 3,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 40,
+    "scenario": "rw20",
+    "clients": 32,
+    "slots": 32,
+    "repetition": 3,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 41,
+    "scenario": "mt-mix",
+    "clients": 32,
+    "slots": 32,
+    "repetition": 3,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": false
+  },
+  {
+    "case_number": 42,
+    "scenario": "mt-mix",
+    "clients": 32,
+    "slots": 32,
+    "repetition": 3,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": false
+  },
+  {
+    "case_number": 43,
+    "scenario": "rw20",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 1,
+    "condition_key_lock_mode": "exclusive",
+    "diagnostic": true
+  },
+  {
+    "case_number": 44,
+    "scenario": "rw20",
+    "clients": 16,
+    "slots": 16,
+    "repetition": 1,
+    "condition_key_lock_mode": "shared",
+    "diagnostic": true
+  }
+]

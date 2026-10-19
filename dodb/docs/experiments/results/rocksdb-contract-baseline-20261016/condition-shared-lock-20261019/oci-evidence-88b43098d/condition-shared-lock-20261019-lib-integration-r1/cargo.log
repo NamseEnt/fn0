@@ -1,0 +1,239 @@
+   Compiling proc-macro2 v1.0.105
+   Compiling quote v1.0.45
+   Compiling unicode-ident v1.0.24
+   Compiling libc v0.2.185
+   Compiling syn v2.0.113
+   Compiling pin-project-lite v0.2.16
+   Compiling jobserver v0.1.34
+   Compiling find-msvc-tools v0.1.14
+   Compiling shlex v1.3.0
+   Compiling cc v1.2.55
+   Compiling bytes v1.11.1
+   Compiling futures-core v0.3.31
+   Compiling errno v0.3.14
+   Compiling synstructure v0.13.2
+   Compiling socket2 v0.6.5
+   Compiling syn v3.0.3
+   Compiling once_cell v1.21.3
+   Compiling signal-hook-registry v1.4.8
+   Compiling mio v1.2.2
+   Compiling zerofrom-derive v0.1.6
+   Compiling zerofrom v0.1.6
+   Compiling yoke-derive v0.8.2
+   Compiling tokio-macros v2.7.2
+   Compiling stable_deref_trait v1.2.1
+   Compiling futures-sink v0.3.31
+   Compiling yoke v0.8.2
+   Compiling tokio v1.53.1
+   Compiling cmake v0.1.57
+   Compiling cfg-if v1.0.4
+   Compiling dunce v1.0.5
+   Compiling itoa v1.0.17
+   Compiling fs_extra v1.3.0
+   Compiling aws-lc-sys v0.39.0
+   Compiling tracing-core v0.1.36
+   Compiling tracing-attributes v0.1.31
+   Compiling zerovec-derive v0.11.3
+   Compiling slab v0.4.11
+   Compiling zerovec v0.11.6
+   Compiling tracing v0.1.44
+   Compiling futures-channel v0.3.31
+   Compiling displaydoc v0.2.5
+   Compiling zeroize v1.8.2
+   Compiling memchr v2.7.6
+   Compiling http v1.4.0
+   Compiling futures-macro v0.3.31
+   Compiling percent-encoding v2.3.2
+   Compiling futures-task v0.3.31
+   Compiling pin-utils v0.1.0
+   Compiling futures-io v0.3.31
+   Compiling aws-lc-rs v1.16.2
+   Compiling smallvec v1.15.1
+   Compiling futures-util v0.3.31
+   Compiling http-body v1.0.1
+   Compiling rustls-pki-types v1.13.2
+   Compiling tinystr v0.8.3
+   Compiling tower-service v0.3.3
+   Compiling writeable v0.6.2
+   Compiling litemap v0.8.1
+   Compiling icu_locale_core v2.2.0
+   Compiling zerotrie v0.2.4
+   Compiling potential_utf v0.1.4
+   Compiling untrusted v0.9.0
+   Compiling icu_properties_data v2.2.0
+   Compiling utf8_iter v1.0.4
+   Compiling thiserror v2.0.18
+   Compiling rustls v0.23.28
+   Compiling icu_normalizer_data v2.2.0
+   Compiling icu_collections v2.2.0
+   Compiling icu_provider v2.2.0
+   Compiling thiserror-impl v2.0.18
+   Compiling sync_wrapper v1.0.2
+   Compiling base64 v0.22.1
+   Compiling getrandom v0.3.4
+   Compiling httparse v1.10.1
+   Compiling subtle v2.6.1
+   Compiling serde_core v1.0.228
+   Compiling tower-layer v0.3.3
+   Compiling log v0.4.29
+   Compiling zerocopy v0.8.31
+   Compiling rand_core v0.10.1
+   Compiling try-lock v0.2.5
+   Compiling anyhow v1.0.104
+   Compiling want v0.3.1
+   Compiling icu_normalizer v2.2.0
+   Compiling icu_properties v2.2.0
+   Compiling http-body-util v0.1.3
+   Compiling serde v1.0.228
+   Compiling unicase v2.9.0
+   Compiling atomic-waker v1.1.2
+   Compiling cfg_aliases v0.2.1
+   Compiling bitflags v2.13.1
+   Compiling zmij v1.0.12
+   Compiling getrandom v0.4.2
+   Compiling either v1.15.0
+   Compiling itertools v0.14.0
+   Compiling hyper v1.11.0
+   Compiling mime_guess v2.0.5
+   Compiling ppv-lite86 v0.2.21
+   Compiling rand_core v0.9.5
+   Compiling idna_adapter v1.2.1
+   Compiling form_urlencoded v1.2.2
+   Compiling tokio-stream v0.1.18
+   Compiling pin-project-internal v1.1.10
+   Compiling async-trait v0.1.89
+   Compiling semver v1.0.27
+   Compiling serde_json v1.0.148
+   Compiling ipnet v2.12.0
+   Compiling hyper-util v0.1.20
+   Compiling rustc_version v0.4.1
+   Compiling pin-project v1.1.10
+   Compiling prost-derive v0.14.3
+   Compiling idna v1.1.0
+   Compiling rand_chacha v0.9.0
+   Compiling opentelemetry v0.31.0
+   Compiling tower v0.5.3
+   Compiling webpki-roots v1.0.9
+   Compiling futures-executor v0.3.31
+   Compiling libmimalloc-sys v0.1.49
+   Compiling iri-string v0.7.11
+   Compiling utf8parse v0.2.2
+   Compiling ryu v1.0.23
+   Compiling mime v0.3.17
+   Compiling serde_urlencoded v0.7.1
+   Compiling anstyle-parse v0.2.7
+   Compiling tower-http v0.6.8
+   Compiling rand v0.9.2
+   Compiling url v2.5.8
+   Compiling prost v0.14.3
+   Compiling tonic v0.14.5
+   Compiling crc32c v0.6.8
+   Compiling quinn-udp v0.5.14
+   Compiling chacha20 v0.10.1
+   Compiling tokio-util v0.7.18
+   Compiling colorchoice v1.0.5
+   Compiling anstyle v1.0.14
+   Compiling dodb-core v0.1.0 (/bench/zfs/db/condition-shared-lock-20261019/source-5210838f3/dodb/crates/dodb-core)
+   Compiling anstyle-query v1.1.5
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling tinyvec_macros v0.1.1
+   Compiling tinyvec v1.11.0
+   Compiling anstream v0.6.21
+   Compiling rand v0.10.2
+   Compiling tonic-prost v0.14.5
+   Compiling opentelemetry_sdk v0.31.0
+   Compiling quinn v0.11.11
+   Compiling rand_pcg v0.10.2
+   Compiling strsim v0.11.1
+   Compiling lru-slab v0.1.2
+   Compiling clap_lex v1.1.0
+   Compiling rustc-hash v2.1.1
+   Compiling crossbeam-utils v0.8.21
+   Compiling parking_lot_core v0.9.12
+   Compiling heck v0.5.0
+   Compiling clap_derive v4.5.55
+   Compiling clap_builder v4.5.60
+   Compiling mimalloc v0.1.52
+   Compiling opentelemetry-proto v0.31.0
+   Compiling dodb-service v0.1.0 (/bench/zfs/db/condition-shared-lock-20261019/source-5210838f3/dodb/crates/dodb-service)
+   Compiling scopeguard v1.2.0
+   Compiling lock_api v0.4.14
+   Compiling dodb-protocol v0.1.0 (/bench/zfs/db/condition-shared-lock-20261019/source-5210838f3/dodb/crates/dodb-protocol)
+   Compiling dodb-storage v0.1.0 (/bench/zfs/db/condition-shared-lock-20261019/source-5210838f3/dodb/crates/dodb-storage)
+   Compiling clap v4.5.60
+   Compiling rustls-pemfile v2.2.0
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/condition-shared-lock-20261019/source-5210838f3/dodb/crates/dodb-rocksdb)
+   Compiling hashbrown v0.14.5
+   Compiling dashmap v6.1.0
+   Compiling futures v0.3.31
+   Compiling rustix v1.1.4
+   Compiling linux-raw-sys v0.12.1
+   Compiling fastrand v2.3.0
+   Compiling tempfile v3.27.0
+   Compiling rustls-webpki v0.103.10
+   Compiling tokio-rustls v0.26.4
+   Compiling quinn-proto v0.11.18
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.12.28
+   Compiling opentelemetry-http v0.31.0
+   Compiling opentelemetry-otlp v0.31.1
+   Compiling dodb-server v0.1.0 (/bench/zfs/db/condition-shared-lock-20261019/source-5210838f3/dodb/crates/dodb-server)
+warning: associated function `open_with_allocator` is never used
+    --> dodb/crates/dodb-rocksdb/src/lib.rs:1401:8
+     |
+1391 | impl TenantDatabase {
+     | ------------------- associated function in this implementation
+...
+1401 |     fn open_with_allocator(
+     |        ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `dodb-rocksdb` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 18s
+     Running unittests src/lib.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/debug/deps/dodb_rocksdb-88faab56630d2db9)
+
+running 27 tests
+test tests::allocator_modes_switch_above_existing_counter_high_water ... ok
+test tests::assigned_revision_is_burned_when_user_transaction_rolls_back ... ok
+test tests::condition_only_transactions_return_without_revision_in_both_lock_modes ... ok
+test tests::disk_tenant_cold_open_is_shared_and_then_uses_read_fast_path ... ok
+test tests::failed_tenant_open_can_be_retried ... ok
+test tests::get_completes_while_same_tenant_transaction_is_open ... ok
+test tests::initialized_tenant_reads_skip_repeated_path_checks ... ok
+test tests::missing_tenant_reads_do_not_create_database_directory ... ok
+test tests::overlapping_condition_and_mutation_key_is_exclusive_from_first_lock ... ok
+test tests::partial_range_is_abandoned_after_reopen_and_failed_tokens_are_burned ... ok
+test tests::range_reservation_rejects_overflow_and_corrupt_counter ... ok
+test tests::read_iterator_keeps_database_alive_after_tenant_owner_drops ... ok
+test tests::read_iterator_keeps_one_snapshot_across_atomic_transaction_commit ... ok
+test tests::read_waits_for_an_initializing_registry_cell ... ok
+test tests::request_kinds_use_the_expected_admission_lane ... ok
+test tests::reserved_revision_overlap_preserves_commit_order_and_read_after_success ... ok
+test tests::reserved_revision_ranges_are_unique_under_concurrent_assignment ... ok
+test tests::shared_admission_accepts_sixteen_slots_and_rejects_zero ... ok
+test tests::shared_admission_remains_the_default_eight_slot_mode ... ok
+test tests::shared_condition_locks_allow_concurrent_holders_for_present_and_missing_keys ... ok
+test tests::shared_sixteen_slot_admission_stays_bounded_until_blocking_work_finishes ... ok
+test tests::shutdown_drains_a_blocking_operation_after_its_request_is_cancelled ... FAILED
+test tests::shutdown_waits_for_an_in_flight_request_and_service_reopens ... ok
+test tests::split_admission_reserves_two_read_and_six_write_slots ... ok
+test tests::timed_out_writer_does_not_leak_lock_and_succeeds_after_holder_releases ... ok
+test tests::uncertain_reservation_commit_does_not_publish_its_range ... ok
+test tests::writer_first_prevents_stale_condition_success_and_rollback_releases_shared_locks ... ok
+
+failures:
+
+---- tests::shutdown_drains_a_blocking_operation_after_its_request_is_cancelled stdout ----
+
+thread 'tests::shutdown_drains_a_blocking_operation_after_its_request_is_cancelled' (1521396) panicked at dodb/crates/dodb-rocksdb/src/lib.rs:3776:18:
+called `Result::unwrap()` on an `Err` value: Io(Custom { kind: Other, error: "IO error: lock hold by current process, acquire time 1792384160 acquiring thread 1521399: /tmp/db-e174ce206c515685/.tmpljv2PH/tenant-42/LOCK: No locks available" })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::shutdown_drains_a_blocking_operation_after_its_request_is_cancelled
+
+test result: FAILED. 26 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.83s
+
+error: test failed, to rerun pass `-p dodb-rocksdb --lib`

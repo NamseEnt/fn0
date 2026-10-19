@@ -2,7 +2,7 @@
 
 ## Status
 
-An opt-in candidate implementation is explicitly authorized for correctness review. The candidate keeps `Exclusive` as the default and does not change the production lock policy or default configuration. Implementation and required gates are tracked in [CONDITION-SHARED-LOCK-DESIGN.md](results/rocksdb-contract-baseline-20261016/condition-shared-lock-20261019/CONDITION-SHARED-LOCK-DESIGN.md), with pinned native behavior in [ROCKSDB-LOCK-REVIEW.md](results/rocksdb-contract-baseline-20261016/condition-shared-lock-20261019/ROCKSDB-LOCK-REVIEW.md). At the current checkpoint, correctness gates and performance comparisons remain pending.
+The opt-in candidate is implemented and its required correctness gates passed. The 44-case five-second comparison completed successfully; it favors Shared in the tested write-heavy mixes. This remains short-screen evidence. The engine-health observation harness gate precedes the approved 30-second confirmation and representative five-minute comparison; both measurements and the adoption decision remain pending. `Exclusive` remains the default and the production lock policy is unchanged. See the [candidate design and gate status](results/rocksdb-contract-baseline-20261016/condition-shared-lock-20261019/CONDITION-SHARED-LOCK-DESIGN.md), [screening results](results/rocksdb-contract-baseline-20261016/condition-shared-lock-20261019/SCREENING-RESULTS.md), and [pinned native behavior review](results/rocksdb-contract-baseline-20261016/condition-shared-lock-20261019/ROCKSDB-LOCK-REVIEW.md).
 
 ## Evidence and motivation
 
@@ -23,7 +23,7 @@ Change only the lock mode selected for a transaction's user keys:
 
 This proposal does not authorize adding a separate lock manager, lock upgrade path, retry policy, optimistic read path, or new database algorithm. If RocksDB cannot provide the required behavior without one of those changes, stop and return a design question.
 
-## Required correctness gates before performance testing
+## Correctness gates completed before the short screen
 
 1. Verify against the pinned RocksDB 11.8.1 implementation that a shared `GetForUpdate` lock is retained through transaction commit/rollback and prevents conflicting writes while the condition is evaluated and mutations commit.
 2. Prove that any key appearing in both conditions and mutations is exclusively locked before its state is read; no shared-to-exclusive promotion is permitted.
@@ -33,8 +33,8 @@ This proposal does not authorize adding a separate lock manager, lock upgrade pa
 6. Cover duplicate conditions/mutations, condition-only transactions allocating no revision, increasing revisions, missing-key behavior, delete/recreate ABA, same-transaction revision sharing, restart/no-reuse, snapshot reads, and tenant isolation.
 7. Exercise lock timeout, rollback, cancellation, shutdown, and concurrent key acquisition in deterministic schedules; verify the tested schedules make progress and leave no lock leak. Do not claim universal deadlock freedom, writer priority, or starvation freedom.
 8. Run the shared contract, restart, process-crash, and independent replay gates. State explicitly that process-crash tests do not prove power-loss behavior.
-9. Only after every gate passes, use identical inputs and the existing full-window harness to compare the current policy and candidate across the approved read/write mixes and client counts. Record lock waits, conflicts, throughput, p50/p95/p99, CPU, RSS, fairness, and engine health. Diagnostic instrumentation must remain off in the performance runs.
+9. All listed correctness requirements passed on the pinned release gates. The exact-source follow-up crash gate covers Shared locks for an existing untouched condition key and a missing condition key. The 44-case screen used identical inputs and full-window validation across the approved read/write mixes and client counts; diagnostic instrumentation stayed off for all 42 performance cases and ran separately for the two diagnostic cases. Full details and evidence links are in [SCREENING-RESULTS.md](results/rocksdb-contract-baseline-20261016/condition-shared-lock-20261019/SCREENING-RESULTS.md).
 
 ## Decision boundary
 
-The measured condition-key wait is a reason to investigate, not proof that changing lock mode improves end-to-end behavior or preserves DODB semantics. Keep production locking unchanged until the pinned RocksDB behavior is verified and every correctness gate passes. Adoption remains a separate root decision after the approved A/B comparison. Any change to lock ordering, transaction isolation, public semantics, default settings, or durability is outside this scope and requires a separate decision.
+The measured condition-key wait and short-screen throughput are reasons to continue confirmation, not proof of universal benefit or fairness. Keep production locking unchanged through the approved 30-second and five-minute comparisons and the separate adoption decision. Any change to lock ordering, transaction isolation, public semantics, default settings, or durability remains outside this scope and requires a separate decision.

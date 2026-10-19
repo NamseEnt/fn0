@@ -1,0 +1,42 @@
+[
+  {
+    "relative_path": "tenant-1/LOG",
+    "bytes": 41664,
+    "sha256": "197dfde490d54f38f72e930e8c5aa1c66fbc8fbaf846856cfb73918fb12888f4"
+  },
+  {
+    "relative_path": "tenant-1/LOG.old.1792385276443428",
+    "bytes": 42638,
+    "sha256": "5e89c73e182f724307dfff25d95939559c0977e3ce7429057900f2e78bc89547"
+  },
+  {
+    "relative_path": "tenant-2/LOG",
+    "bytes": 41664,
+    "sha256": "4acf92a45259c75277e4fba47c432367ad136060c392b587f6b34b66deef9f8b"
+  },
+  {
+    "relative_path": "tenant-2/LOG.old.1792385276711722",
+    "bytes": 42667,
+    "sha256": "4a04b978044dac9b1210c2dd8fc62e2f758265f9f5e4feb1756a243bdfffbc8e"
+  },
+  {
+    "relative_path": "tenant-3/LOG",
+    "bytes": 41664,
+    "sha256": "ca8951223310e2642502ebc07c3a5d9f32de6ae4a7b113413c15937f98623922"
+  },
+  {
+    "relative_path": "tenant-3/LOG.old.1792385277013880",
+    "bytes": 39353,
+    "sha256": "b6790c29e7a6d09b3dd6d222f4bb23896802852d0b48f365b3e9cbca30275df4"
+  },
+  {
+    "relative_path": "tenant-4/LOG",
+    "bytes": 41664,
+    "sha256": "5bfa8d420b8a79dec344b9b5b7514d36a5a61db7b7cdd98275c5c8eda81481e5"
+  },
+  {
+    "relative_path": "tenant-4/LOG.old.1792385277306859",
+    "bytes": 39353,
+    "sha256": "6f2561fd033d2fa7e1a6b8324b639b802fbe12fca3d88aedbba8f3eaee59b549"
+  }
+]

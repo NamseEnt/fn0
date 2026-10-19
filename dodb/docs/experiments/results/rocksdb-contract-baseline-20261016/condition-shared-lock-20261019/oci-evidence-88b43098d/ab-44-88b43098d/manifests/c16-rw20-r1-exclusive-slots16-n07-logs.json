@@ -1,0 +1,12 @@
+[
+  {
+    "relative_path": "tenant-1/LOG",
+    "bytes": 41669,
+    "sha256": "2fd85dab1a7bfe1a48d3ce8923ac1a156aae9785192c673d201fccea6c5685b0"
+  },
+  {
+    "relative_path": "tenant-1/LOG.old.1792385193521260",
+    "bytes": 42642,
+    "sha256": "d5e9f66439b147d323c6c3957a7365149737687316f935b59b1f97c8c526b0c3"
+  }
+]

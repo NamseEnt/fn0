@@ -1,0 +1,18 @@
+{
+  "hostname": "instance-20260923-1013",
+  "cpu_count": 2,
+  "memory_available_kb": 5047584,
+  "zfs_mount": "dodbbench/db zfs    /bench/zfs/db",
+  "active_build_or_workload_processes": [],
+  "source_sha": "88b43098dab8736363d8c36446bbede27e1b77e1",
+  "source_tree": "0e8d1da6c60fd83fb11fd3d6f1a643665e3079a2",
+  "binary_path": "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/service_workload",
+  "binary_sha256": "ff659fb3f0ea5ce8998bec1fa4297b9ec16b706f8553ba3555394a21a8db6977",
+  "planned_cases": 44,
+  "per_case_database_budget_bytes": 1073741824,
+  "matrix_evidence_budget_bytes": 536870912,
+  "free_bytes_before": 76266508288,
+  "minimum_free_bytes": 2147483648,
+  "estimated_maximum_live_database_bytes": 1073741824,
+  "estimated_matrix_evidence_bytes": 536870912
+}
