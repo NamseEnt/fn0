@@ -557,13 +557,13 @@ fn run() -> Result<(), String> {
         .enable_all()
         .build()
         .map_err(|error| error.to_string())?;
-    let tenant = ProbeBackend::open(&options, runtime.handle().clone())?;
+    let tenant = Arc::new(ProbeBackend::open(&options, runtime.handle().clone())?);
     prepopulate_pool(&tenant, &options)?;
     let seeded_disk_bytes = directory_bytes(&options.data_dir)?;
     let baseline_rows = tenant.read_all()?;
     let baseline_revisions = collect_baseline_revisions(&baseline_rows, &options)?;
     let warmup_phase = execute_phase(
-        &tenant,
+        Arc::clone(&tenant),
         &options,
         options.warmup_ms,
         true,
@@ -572,7 +572,7 @@ fn run() -> Result<(), String> {
     )?;
     let process_sampler = ProcessSampler::start()?;
     let measured_phase = execute_phase(
-        &tenant,
+        Arc::clone(&tenant),
         &options,
         options.measurement_ms,
         false,
@@ -632,7 +632,7 @@ fn run() -> Result<(), String> {
 }
 
 fn execute_phase(
-    backend: &ProbeBackend,
+    backend: Arc<ProbeBackend>,
     options: &Options,
     duration_ms: u64,
     warmup_phase: bool,
@@ -655,7 +655,6 @@ fn execute_phase(
     let shared_start = Arc::new(Mutex::new(None));
     let acknowledged_calls = Arc::new(AtomicU64::new(0));
     let call_limit_reached = Arc::new(AtomicBool::new(false));
-    let backend = Arc::new(backend);
     let mut workers = Vec::with_capacity(options.clients);
     for client_index in 0..options.clients {
         let worker_backend = Arc::clone(&backend);
@@ -731,7 +730,7 @@ fn execute_phase(
 }
 
 fn run_client_phase(
-    backend: Arc<&ProbeBackend>,
+    backend: Arc<ProbeBackend>,
     options: Options,
     client_index: usize,
     mut slot_write_counts: Vec<u64>,
@@ -989,7 +988,7 @@ fn validate_rows(
     let mut grouped_revisions = BTreeMap::<(usize, usize), BTreeSet<u64>>::new();
     for (key, value, revision) in observed_rows {
         let physical = physical_key(key);
-        let (client_index, slot_index, width_index) = key_coordinates(key)?;
+        let (client_index, slot_index, _) = key_coordinates(key)?;
         if let Some(revision) = revision {
             grouped_revisions
                 .entry((client_index, slot_index))
