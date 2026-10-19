@@ -538,7 +538,7 @@ fn is_linearizable_history(
     search(history, &predecessor_masks, full_mask, 0, initial_model)
 }
 
-async fn check_bounded_read_write_history<S: DodbService>(service: Arc<S>) {
+async fn check_bounded_read_write_history<S: DodbService + 'static>(service: Arc<S>) {
     const HISTORY_FIXTURE_SEED: u64 = 20261019;
     const PARTITION: &[u8] = b"bounded-history";
     let first_key = key(PARTITION, b"a");
