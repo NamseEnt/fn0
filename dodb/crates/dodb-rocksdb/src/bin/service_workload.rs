@@ -136,6 +136,7 @@ impl DriverService {
                 config.research_metrics = options.research_metrics;
                 config.detailed_write_metrics = options.detailed_write_metrics;
                 config.revision_allocator = options.revision_allocator;
+                config.condition_key_lock_mode = options.condition_key_lock_mode;
                 let service = dodb_rocksdb::RocksDbService::new(config)?;
                 let metrics = service.research_metrics_handle();
                 (DriverBackend::Service(Box::new(service)), metrics)
@@ -151,9 +152,10 @@ impl DriverService {
                 let tenants = (1..=tenant_count)
                     .map(|tenant_number| {
                         let tenant = TenantId::new(tenant_number);
-                        let database = dodb_rocksdb::research::SynchronousRocksDbTenant::open(
+                        let database = dodb_rocksdb::research::SynchronousRocksDbTenant::open_with_condition_key_lock_mode(
                             &data_dir.join(format!("tenant-{tenant_number}")),
                             options.revision_allocator,
+                            options.condition_key_lock_mode,
                         )?;
                         Ok((tenant, database))
                     })
@@ -234,6 +236,7 @@ struct Options {
     read_stage_metrics: bool,
     detailed_write_metrics: bool,
     revision_allocator: dodb_rocksdb::RevisionAllocatorMode,
+    condition_key_lock_mode: dodb_rocksdb::ConditionKeyLockMode,
     blocking_admission: dodb_rocksdb::BlockingAdmissionMode,
     shared_blocking_slots: usize,
     mutation_workload: MutationWorkload,
@@ -840,6 +843,8 @@ fn parse_options() -> Result<Options, String> {
         "reserved-ranges" => dodb_rocksdb::RevisionAllocatorMode::ReservedRanges,
         other => return Err(format!("unsupported revision allocator {other}")),
     };
+    let condition_key_lock_mode =
+        parse_condition_key_lock_mode(values.get("--condition-key-lock-mode").map(String::as_str))?;
     let blocking_admission = match values
         .get("--blocking-admission")
         .map(String::as_str)
@@ -955,6 +960,7 @@ fn parse_options() -> Result<Options, String> {
         read_stage_metrics,
         detailed_write_metrics,
         revision_allocator,
+        condition_key_lock_mode,
         blocking_admission,
         shared_blocking_slots,
         mutation_workload,
@@ -964,6 +970,16 @@ fn parse_options() -> Result<Options, String> {
         require_full_window: parse_switch("--require-full-window")?,
         include_width_16: parse_switch("--include-width-16")?,
     })
+}
+
+fn parse_condition_key_lock_mode(
+    value: Option<&str>,
+) -> Result<dodb_rocksdb::ConditionKeyLockMode, String> {
+    match value.unwrap_or("exclusive") {
+        "exclusive" => Ok(dodb_rocksdb::ConditionKeyLockMode::Exclusive),
+        "shared" => Ok(dodb_rocksdb::ConditionKeyLockMode::Shared),
+        other => Err(format!("unsupported condition key lock mode {other}")),
+    }
 }
 
 fn profile_name(profile: Profile) -> &'static str {
@@ -2403,7 +2419,8 @@ async fn run(options: Options) -> Result<Value, String> {
                 "read_blocking_slots": if options.backend == BackendKind::Blink { 0 } else { options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(read_slots, _)| read_slots) },
                 "write_blocking_slots": if options.backend == BackendKind::Blink { 0 } else { options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(_, write_slots)| write_slots) },
                 "revision_allocator": match options.revision_allocator { dodb_rocksdb::RevisionAllocatorMode::Serialized => "serialized", dodb_rocksdb::RevisionAllocatorMode::ReservedRanges => "reserved-ranges" },
-                "revision_range_size": if options.revision_allocator == dodb_rocksdb::RevisionAllocatorMode::ReservedRanges { Some(4_096) } else { None }
+                "revision_range_size": if options.revision_allocator == dodb_rocksdb::RevisionAllocatorMode::ReservedRanges { Some(4_096) } else { None },
+                "condition_key_lock_mode": if options.backend == BackendKind::Blink { "not-applicable" } else { match options.condition_key_lock_mode { dodb_rocksdb::ConditionKeyLockMode::Exclusive => "exclusive", dodb_rocksdb::ConditionKeyLockMode::Shared => "shared" } }
             },
             "research_metrics_enabled": options.research_metrics,
             "read_stage_metrics_enabled": options.read_stage_metrics,
@@ -2490,6 +2507,23 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn condition_key_lock_mode_cli_defaults_and_accepts_only_named_modes() {
+        assert_eq!(
+            parse_condition_key_lock_mode(None).unwrap(),
+            dodb_rocksdb::ConditionKeyLockMode::Exclusive
+        );
+        assert_eq!(
+            parse_condition_key_lock_mode(Some("exclusive")).unwrap(),
+            dodb_rocksdb::ConditionKeyLockMode::Exclusive
+        );
+        assert_eq!(
+            parse_condition_key_lock_mode(Some("shared")).unwrap(),
+            dodb_rocksdb::ConditionKeyLockMode::Shared
+        );
+        assert!(parse_condition_key_lock_mode(Some("upgrade")).is_err());
+    }
 
     #[test]
     fn schedules_keep_all_categories_and_api_ratio_including_preparatory_gets() {
@@ -2701,6 +2735,7 @@ mod tests {
             read_stage_metrics: false,
             detailed_write_metrics: false,
             revision_allocator: dodb_rocksdb::RevisionAllocatorMode::Serialized,
+            condition_key_lock_mode: dodb_rocksdb::ConditionKeyLockMode::Exclusive,
             blocking_admission: dodb_rocksdb::BlockingAdmissionMode::Shared,
             shared_blocking_slots: 8,
             mutation_workload: MutationWorkload::Overwrite,
@@ -2741,6 +2776,7 @@ mod tests {
             read_stage_metrics: false,
             detailed_write_metrics: false,
             revision_allocator: dodb_rocksdb::RevisionAllocatorMode::Serialized,
+            condition_key_lock_mode: dodb_rocksdb::ConditionKeyLockMode::Exclusive,
             blocking_admission: dodb_rocksdb::BlockingAdmissionMode::Shared,
             shared_blocking_slots: 8,
             mutation_workload: MutationWorkload::NewKey,

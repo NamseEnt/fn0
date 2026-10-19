@@ -472,6 +472,7 @@ unsafe extern "C" {
         transaction: *mut c_void,
         key: *const u8,
         key_length: usize,
+        exclusive: i32,
         value: *mut *mut u8,
         value_length: *mut usize,
         collect_lock_wait: i32,
@@ -504,6 +505,7 @@ pub struct RocksDbServiceConfig {
     pub research_metrics: bool,
     pub detailed_write_metrics: bool,
     pub revision_allocator: RevisionAllocatorMode,
+    pub condition_key_lock_mode: ConditionKeyLockMode,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -531,6 +533,13 @@ pub enum RevisionAllocatorMode {
     ReservedRanges,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ConditionKeyLockMode {
+    #[default]
+    Exclusive,
+    Shared,
+}
+
 impl RocksDbServiceConfig {
     pub fn new(data_dir: impl Into<PathBuf>) -> Self {
         Self {
@@ -540,6 +549,7 @@ impl RocksDbServiceConfig {
             research_metrics: false,
             detailed_write_metrics: true,
             revision_allocator: RevisionAllocatorMode::Serialized,
+            condition_key_lock_mode: ConditionKeyLockMode::Exclusive,
         }
     }
 }
@@ -555,6 +565,7 @@ pub struct RocksDbService {
     research_metrics: Option<Arc<ResearchMetrics>>,
     detailed_write_metrics: bool,
     revision_allocator: RevisionAllocatorMode,
+    condition_key_lock_mode: ConditionKeyLockMode,
     lifecycle: LifecycleCoordinator,
     #[cfg(test)]
     blocking_operation_hook: std::sync::Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
@@ -567,8 +578,13 @@ pub struct RocksDbService {
 struct TenantDatabase {
     handle: Arc<RocksDbHandle>,
     revision_allocator: RevisionAllocatorMode,
+    condition_key_lock_mode: ConditionKeyLockMode,
     reserved_revisions: Mutex<ReservedRevisionRange>,
     revision_range_size: u64,
+    #[cfg(test)]
+    locks_acquired_hook: Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
+    #[cfg(test)]
+    before_commit_hook: Mutex<Option<Arc<dyn Fn() -> Result<(), Error> + Send + Sync>>>,
 }
 
 #[derive(Default)]
@@ -660,6 +676,7 @@ impl RocksDbService {
                 .then(|| Arc::new(ResearchMetrics::default())),
             detailed_write_metrics: config.detailed_write_metrics,
             revision_allocator: config.revision_allocator,
+            condition_key_lock_mode: config.condition_key_lock_mode,
             lifecycle: LifecycleCoordinator::new(),
             #[cfg(test)]
             blocking_operation_hook: std::sync::Mutex::new(None),
@@ -773,6 +790,7 @@ impl RocksDbService {
         let semaphore = self.semaphore_for(lane);
         let research_metrics = self.research_metrics.clone();
         let revision_allocator = self.revision_allocator;
+        let condition_key_lock_mode = self.condition_key_lock_mode;
         let database = cell
             .get_or_try_init(|| async move {
                 #[cfg(test)]
@@ -803,10 +821,11 @@ impl RocksDbService {
                             dispatch_started.elapsed(),
                         );
                     }
-                    TenantDatabase::open_with_allocator(
+                    TenantDatabase::open_with_modes(
                         &path,
                         revision_allocator,
                         DEFAULT_REVISION_RANGE_SIZE,
+                        condition_key_lock_mode,
                     )
                     .map(Arc::new)
                 })
@@ -1384,6 +1403,20 @@ impl TenantDatabase {
         revision_allocator: RevisionAllocatorMode,
         revision_range_size: u64,
     ) -> Result<Self, Error> {
+        Self::open_with_modes(
+            path,
+            revision_allocator,
+            revision_range_size,
+            ConditionKeyLockMode::Exclusive,
+        )
+    }
+
+    fn open_with_modes(
+        path: &Path,
+        revision_allocator: RevisionAllocatorMode,
+        revision_range_size: u64,
+        condition_key_lock_mode: ConditionKeyLockMode,
+    ) -> Result<Self, Error> {
         if revision_range_size == 0 {
             return Err(Error::invalid_input("revision range size must be nonzero"));
         }
@@ -1398,8 +1431,13 @@ impl TenantDatabase {
         Ok(Self {
             handle: Arc::new(RocksDbHandle(handle)),
             revision_allocator,
+            condition_key_lock_mode,
             reserved_revisions: Mutex::new(ReservedRevisionRange::default()),
             revision_range_size,
+            #[cfg(test)]
+            locks_acquired_hook: Mutex::new(None),
+            #[cfg(test)]
+            before_commit_hook: Mutex::new(None),
         })
     }
 
@@ -1680,6 +1718,7 @@ impl TenantDatabase {
             let counter = transaction_get_for_update(
                 &transaction_guard,
                 METADATA_COUNTER_KEY,
+                true,
                 metrics.is_some() && stage > 0,
                 &mut lock_wait_nanos,
                 &mut lock_wait_count,
@@ -1809,12 +1848,14 @@ impl TenantDatabase {
             active: true,
         };
         on_begin();
-        let mut encoded_keys = BTreeSet::new();
+        let mut encoded_keys = BTreeMap::new();
         for condition in &request.conditions {
-            encoded_keys.insert(user_key(condition.key()));
+            encoded_keys
+                .entry(user_key(condition.key()))
+                .or_insert(false);
         }
         for mutation in &request.mutations {
-            encoded_keys.insert(user_key(mutation.key()));
+            encoded_keys.insert(user_key(mutation.key()), true);
         }
         let mut states = BTreeMap::new();
         let condition_keys = metrics.as_ref().filter(|_| stage > 0).map(|_| {
@@ -1824,15 +1865,19 @@ impl TenantDatabase {
                 .map(|condition| user_key(condition.key()))
                 .collect::<BTreeSet<_>>()
         });
-        for encoded_key in encoded_keys {
+        for (encoded_key, is_mutation_key) in encoded_keys {
             let get_started = Instant::now();
             let is_user_key = encoded_key.first() == Some(&USER_KEY_PREFIX);
             let mut lock_wait_nanos = 0;
             let mut lock_wait_count = 0;
             let mut observation = WriteReadObservation::default();
+            let exclusive = self.condition_key_lock_mode == ConditionKeyLockMode::Exclusive
+                || is_mutation_key
+                || !is_user_key;
             let encoded_state = transaction_get_for_update(
                 &transaction_guard,
                 &encoded_key,
+                exclusive,
                 metrics.is_some() && stage > 0,
                 &mut lock_wait_nanos,
                 &mut lock_wait_count,
@@ -1920,6 +1965,16 @@ impl TenantDatabase {
             }
             states.insert(encoded_key, state);
         }
+        #[cfg(test)]
+        let locks_acquired_hook = self
+            .locks_acquired_hook
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        #[cfg(test)]
+        if let Some(locks_acquired_hook) = locks_acquired_hook {
+            locks_acquired_hook();
+        }
         let condition_started = Instant::now();
         for condition in &request.conditions {
             let actual = states
@@ -1960,6 +2015,7 @@ impl TenantDatabase {
             let counter = transaction_get_for_update(
                 &transaction_guard,
                 METADATA_COUNTER_KEY,
+                true,
                 metrics.is_some() && stage > 0,
                 &mut counter_lock_wait_nanos,
                 &mut counter_lock_wait_count,
@@ -2047,6 +2103,16 @@ impl TenantDatabase {
                 mutation_started.elapsed(),
                 stage,
             );
+        }
+        #[cfg(test)]
+        let before_commit_hook = self
+            .before_commit_hook
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        #[cfg(test)]
+        if let Some(before_commit_hook) = before_commit_hook {
+            before_commit_hook()?;
         }
         let commit_started = Instant::now();
         let mut commit_error = std::ptr::null_mut();
@@ -2364,6 +2430,7 @@ fn transaction_put(transaction: &TransactionGuard, key: &[u8], value: &[u8]) -> 
 fn transaction_get_for_update(
     transaction: &TransactionGuard,
     key: &[u8],
+    exclusive: bool,
     collect_lock_wait: bool,
     lock_wait_nanos: &mut u64,
     lock_wait_count: &mut u64,
@@ -2378,6 +2445,7 @@ fn transaction_get_for_update(
             transaction.handle.as_ptr(),
             key.as_ptr(),
             key.len(),
+            i32::from(exclusive),
             &mut value,
             &mut value_length,
             i32::from(collect_lock_wait),
@@ -2456,7 +2524,7 @@ unsafe fn take_error(error: *mut c_char, fallback: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::mpsc;
     use std::time::Duration;
     use tempfile::TempDir;
@@ -2466,6 +2534,452 @@ mod tests {
             Some(path) => TempDir::new_in(path).unwrap(),
             None => TempDir::new().unwrap(),
         }
+    }
+
+    #[test]
+    fn shared_condition_locks_allow_concurrent_holders_for_present_and_missing_keys() {
+        for present in [true, false] {
+            let directory = temporary_db_directory();
+            let database = Arc::new(
+                TenantDatabase::open_with_modes(
+                    directory.path(),
+                    RevisionAllocatorMode::ReservedRanges,
+                    DEFAULT_REVISION_RANGE_SIZE,
+                    ConditionKeyLockMode::Shared,
+                )
+                .unwrap(),
+            );
+            let condition_key =
+                DocumentKey::new(b"shared-condition".to_vec(), vec![u8::from(present)]);
+            if present {
+                database
+                    .transact(TransactionRequest::new(
+                        Vec::new(),
+                        vec![TransactionMutation::Put {
+                            key: condition_key.clone(),
+                            value: b"present".to_vec(),
+                        }],
+                    ))
+                    .unwrap();
+            }
+            let (arrival_sender, arrival_receiver) = mpsc::channel();
+            let (release_sender, release_receiver) = mpsc::channel();
+            let release_receiver = Arc::new(std::sync::Mutex::new(release_receiver));
+            let hook_calls = Arc::new(AtomicUsize::new(0));
+            let hook_release_receiver = Arc::clone(&release_receiver);
+            let hook_arrival_sender = arrival_sender.clone();
+            let hook_calls_clone = Arc::clone(&hook_calls);
+            *database.locks_acquired_hook.lock().unwrap() = Some(Arc::new(move || {
+                if hook_calls_clone.fetch_add(1, Ordering::Relaxed) < 2 {
+                    hook_arrival_sender.send(()).unwrap();
+                    hook_release_receiver
+                        .lock()
+                        .unwrap()
+                        .recv_timeout(Duration::from_secs(5))
+                        .expect("shared lock holder release timed out");
+                }
+            }));
+            let condition = if present {
+                TransactionCondition::Exists {
+                    key: condition_key.clone(),
+                }
+            } else {
+                TransactionCondition::NotExists {
+                    key: condition_key.clone(),
+                }
+            };
+            let mut transactions = Vec::new();
+            for mutation_number in 0..2 {
+                let database = Arc::clone(&database);
+                let condition = condition.clone();
+                let mutation_key =
+                    DocumentKey::new(b"independent-mutation".to_vec(), vec![mutation_number]);
+                transactions.push(std::thread::spawn(move || {
+                    database.transact(TransactionRequest::new(
+                        vec![condition],
+                        vec![TransactionMutation::Put {
+                            key: mutation_key,
+                            value: vec![mutation_number],
+                        }],
+                    ))
+                }));
+            }
+            arrival_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("first shared transaction did not reach the lock hook");
+            arrival_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("second shared transaction could not hold the condition lock");
+
+            let (writer_result_sender, writer_result_receiver) = mpsc::channel();
+            let writer_database = Arc::clone(&database);
+            let writer_key = condition_key.clone();
+            let writer = std::thread::spawn(move || {
+                let result = writer_database.transact(TransactionRequest::new(
+                    Vec::new(),
+                    vec![TransactionMutation::Put {
+                        key: writer_key,
+                        value: b"writer".to_vec(),
+                    }],
+                ));
+                writer_result_sender.send(result).unwrap();
+            });
+            assert!(
+                writer_result_receiver
+                    .recv_timeout(Duration::from_millis(100))
+                    .is_err()
+            );
+            release_sender.send(()).unwrap();
+            release_sender.send(()).unwrap();
+            for transaction in transactions {
+                transaction.join().unwrap().unwrap();
+            }
+            writer_result_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("writer did not proceed after shared holders released")
+                .unwrap();
+            writer.join().unwrap();
+            match database.get(&condition_key).unwrap() {
+                RevisionState::Present { value, .. } => assert_eq!(value, b"writer"),
+                RevisionState::Missing { .. } => panic!("writer value was not stored"),
+            }
+        }
+    }
+
+    #[test]
+    fn condition_only_transactions_return_without_revision_in_both_lock_modes() {
+        for condition_key_lock_mode in [
+            ConditionKeyLockMode::Exclusive,
+            ConditionKeyLockMode::Shared,
+        ] {
+            for revision_allocator in [
+                RevisionAllocatorMode::Serialized,
+                RevisionAllocatorMode::ReservedRanges,
+            ] {
+                let directory = temporary_db_directory();
+                let database = TenantDatabase::open_with_modes(
+                    directory.path(),
+                    revision_allocator,
+                    DEFAULT_REVISION_RANGE_SIZE,
+                    condition_key_lock_mode,
+                )
+                .unwrap();
+                let key = DocumentKey::new(b"condition-only".to_vec(), b"missing".to_vec());
+                let result = database
+                    .transact(TransactionRequest::new(
+                        vec![TransactionCondition::NotExists { key }],
+                        Vec::new(),
+                    ))
+                    .unwrap();
+                assert_eq!(result.revision, None);
+                assert_eq!(result.commit_lsn, None);
+            }
+        }
+    }
+
+    #[test]
+    fn overlapping_condition_and_mutation_key_is_exclusive_from_first_lock() {
+        let directory = temporary_db_directory();
+        let database = Arc::new(
+            TenantDatabase::open_with_modes(
+                directory.path(),
+                RevisionAllocatorMode::ReservedRanges,
+                DEFAULT_REVISION_RANGE_SIZE,
+                ConditionKeyLockMode::Shared,
+            )
+            .unwrap(),
+        );
+        let key = DocumentKey::new(b"overlap".to_vec(), b"key".to_vec());
+        let initial = database
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: key.clone(),
+                    value: b"initial".to_vec(),
+                }],
+            ))
+            .unwrap()
+            .revision
+            .unwrap();
+        let (first_arrival_sender, first_arrival_receiver) = mpsc::channel();
+        let (second_arrival_sender, second_arrival_receiver) = mpsc::channel();
+        let (release_sender, release_receiver) = mpsc::channel();
+        let release_receiver = Arc::new(std::sync::Mutex::new(release_receiver));
+        let hook_calls = Arc::new(AtomicUsize::new(0));
+        let hook_release_receiver = Arc::clone(&release_receiver);
+        *database.locks_acquired_hook.lock().unwrap() = Some(Arc::new(move || {
+            match hook_calls.fetch_add(1, Ordering::Relaxed) {
+                0 => {
+                    first_arrival_sender.send(()).unwrap();
+                    hook_release_receiver
+                        .lock()
+                        .unwrap()
+                        .recv_timeout(Duration::from_secs(5))
+                        .expect("overlapping mutation holder release timed out");
+                }
+                1 => second_arrival_sender.send(()).unwrap(),
+                _ => {}
+            }
+        }));
+
+        let first_database = Arc::clone(&database);
+        let first_key = key.clone();
+        let first = std::thread::spawn(move || {
+            first_database.transact(TransactionRequest::new(
+                vec![TransactionCondition::RevisionEquals {
+                    key: first_key.clone(),
+                    expected_revision: initial,
+                }],
+                vec![TransactionMutation::Put {
+                    key: first_key,
+                    value: b"updated".to_vec(),
+                }],
+            ))
+        });
+        first_arrival_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("overlapping transaction did not acquire its key");
+
+        let second_database = Arc::clone(&database);
+        let second_key = key.clone();
+        let second = std::thread::spawn(move || {
+            second_database.transact(TransactionRequest::new(
+                vec![TransactionCondition::Exists { key: second_key }],
+                Vec::new(),
+            ))
+        });
+        assert!(
+            second_arrival_receiver
+                .recv_timeout(Duration::from_millis(150))
+                .is_err()
+        );
+        release_sender.send(()).unwrap();
+        first.join().unwrap().unwrap();
+        second.join().unwrap().unwrap();
+        assert!(
+            second_arrival_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn timed_out_writer_does_not_leak_lock_and_succeeds_after_holder_releases() {
+        let directory = temporary_db_directory();
+        let database = Arc::new(
+            TenantDatabase::open_with_modes(
+                directory.path(),
+                RevisionAllocatorMode::ReservedRanges,
+                DEFAULT_REVISION_RANGE_SIZE,
+                ConditionKeyLockMode::Shared,
+            )
+            .unwrap(),
+        );
+        let condition_key = DocumentKey::new(b"timeout-lock".to_vec(), b"condition".to_vec());
+        let (holder_arrival_sender, holder_arrival_receiver) = mpsc::channel();
+        let (release_sender, release_receiver) = mpsc::channel();
+        let release_receiver = Arc::new(std::sync::Mutex::new(release_receiver));
+        let hook_calls = Arc::new(AtomicUsize::new(0));
+        let hook_release_receiver = Arc::clone(&release_receiver);
+        *database.locks_acquired_hook.lock().unwrap() = Some(Arc::new(move || {
+            if hook_calls.fetch_add(1, Ordering::Relaxed) == 0 {
+                holder_arrival_sender.send(()).unwrap();
+                hook_release_receiver
+                    .lock()
+                    .unwrap()
+                    .recv_timeout(Duration::from_secs(5))
+                    .expect("timeout test holder release timed out");
+            }
+        }));
+        let holder_database = Arc::clone(&database);
+        let holder_key = condition_key.clone();
+        let holder = std::thread::spawn(move || {
+            holder_database.transact(TransactionRequest::new(
+                vec![TransactionCondition::NotExists { key: holder_key }],
+                vec![TransactionMutation::Put {
+                    key: DocumentKey::new(b"timeout-lock".to_vec(), b"separate".to_vec()),
+                    value: b"holder".to_vec(),
+                }],
+            ))
+        });
+        holder_arrival_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("shared lock holder did not reach the test barrier");
+
+        let (writer_result_sender, writer_result_receiver) = mpsc::channel();
+        let writer_database = Arc::clone(&database);
+        let writer_key = condition_key.clone();
+        let writer = std::thread::spawn(move || {
+            let result = writer_database.transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: writer_key,
+                    value: b"timed out".to_vec(),
+                }],
+            ));
+            writer_result_sender.send(result).unwrap();
+        });
+        assert!(
+            writer_result_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("exclusive writer did not time out under shared holder")
+                .is_err()
+        );
+        writer.join().unwrap();
+        release_sender.send(()).unwrap();
+        holder.join().unwrap().unwrap();
+        database
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: condition_key.clone(),
+                    value: b"after timeout".to_vec(),
+                }],
+            ))
+            .unwrap();
+        match database.get(&condition_key).unwrap() {
+            RevisionState::Present { value, .. } => assert_eq!(value, b"after timeout"),
+            RevisionState::Missing { .. } => panic!("post-timeout writer value was not stored"),
+        }
+    }
+
+    #[test]
+    fn writer_first_prevents_stale_condition_success_and_rollback_releases_shared_locks() {
+        let directory = temporary_db_directory();
+        let database = Arc::new(
+            TenantDatabase::open_with_modes(
+                directory.path(),
+                RevisionAllocatorMode::ReservedRanges,
+                DEFAULT_REVISION_RANGE_SIZE,
+                ConditionKeyLockMode::Shared,
+            )
+            .unwrap(),
+        );
+        let condition_key = DocumentKey::new(b"writer-first".to_vec(), b"key".to_vec());
+        let initial_revision = database
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: condition_key.clone(),
+                    value: b"initial".to_vec(),
+                }],
+            ))
+            .unwrap()
+            .revision
+            .unwrap();
+        let (writer_arrival_sender, writer_arrival_receiver) = mpsc::channel();
+        let (condition_arrival_sender, condition_arrival_receiver) = mpsc::channel();
+        let (release_sender, release_receiver) = mpsc::channel();
+        let release_receiver = Arc::new(std::sync::Mutex::new(release_receiver));
+        let hook_calls = Arc::new(AtomicUsize::new(0));
+        let hook_release_receiver = Arc::clone(&release_receiver);
+        *database.locks_acquired_hook.lock().unwrap() = Some(Arc::new(move || {
+            match hook_calls.fetch_add(1, Ordering::Relaxed) {
+                0 => {
+                    writer_arrival_sender.send(()).unwrap();
+                    hook_release_receiver
+                        .lock()
+                        .unwrap()
+                        .recv_timeout(Duration::from_secs(5))
+                        .expect("writer-first release timed out");
+                }
+                1 => condition_arrival_sender.send(()).unwrap(),
+                _ => {}
+            }
+        }));
+        let writer_database = Arc::clone(&database);
+        let writer_key = condition_key.clone();
+        let writer = std::thread::spawn(move || {
+            writer_database.transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: writer_key,
+                    value: b"new".to_vec(),
+                }],
+            ))
+        });
+        writer_arrival_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("writer did not hold its exclusive key lock");
+        let conditional_database = Arc::clone(&database);
+        let stale_condition_key = condition_key.clone();
+        let conditional = std::thread::spawn(move || {
+            conditional_database.transact(TransactionRequest::new(
+                vec![TransactionCondition::RevisionEquals {
+                    key: stale_condition_key.clone(),
+                    expected_revision: initial_revision,
+                }],
+                vec![TransactionMutation::Put {
+                    key: DocumentKey::new(b"conditional-output".to_vec(), b"key".to_vec()),
+                    value: b"must-not-commit".to_vec(),
+                }],
+            ))
+        });
+        assert!(
+            condition_arrival_receiver
+                .recv_timeout(Duration::from_millis(150))
+                .is_err()
+        );
+        release_sender.send(()).unwrap();
+        writer.join().unwrap().unwrap();
+        let conditional_result = conditional.join().unwrap();
+        assert!(matches!(conditional_result, Err(Error::Conflict(_))));
+        assert!(matches!(
+            database
+                .get(&DocumentKey::new(
+                    b"conditional-output".to_vec(),
+                    b"key".to_vec()
+                ))
+                .unwrap(),
+            RevisionState::Missing { .. }
+        ));
+
+        let missing_key =
+            DocumentKey::new(b"rollback-lock-release".to_vec(), b"condition".to_vec());
+        let first_mutation = DocumentKey::new(b"rollback-lock-release".to_vec(), b"first".to_vec());
+        let second_mutation =
+            DocumentKey::new(b"rollback-lock-release".to_vec(), b"second".to_vec());
+        *database.before_commit_hook.lock().unwrap() = Some(Arc::new(|| {
+            Err(Error::durability("injected rollback before native commit"))
+        }));
+        let failed = database.transact(TransactionRequest::new(
+            vec![TransactionCondition::NotExists {
+                key: missing_key.clone(),
+            }],
+            vec![
+                TransactionMutation::Put {
+                    key: first_mutation.clone(),
+                    value: b"partial-one".to_vec(),
+                },
+                TransactionMutation::Put {
+                    key: second_mutation.clone(),
+                    value: b"partial-two".to_vec(),
+                },
+            ],
+        ));
+        *database.before_commit_hook.lock().unwrap() = None;
+        assert!(failed.is_err());
+        assert!(matches!(
+            database.get(&first_mutation).unwrap(),
+            RevisionState::Missing { .. }
+        ));
+        assert!(matches!(
+            database.get(&second_mutation).unwrap(),
+            RevisionState::Missing { .. }
+        ));
+        assert_eq!(
+            database.get(&missing_key).unwrap(),
+            RevisionState::missing(Revision::ZERO)
+        );
+        database
+            .transact(TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: missing_key,
+                    value: b"after rollback".to_vec(),
+                }],
+            ))
+            .unwrap();
     }
 
     #[test]
@@ -2799,8 +3313,10 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn shutdown_waits_for_an_in_flight_request_and_service_reopens() {
         let directory = temporary_db_directory();
-        let service =
-            Arc::new(RocksDbService::new(RocksDbServiceConfig::new(directory.path())).unwrap());
+        let mut config = RocksDbServiceConfig::new(directory.path());
+        config.condition_key_lock_mode = ConditionKeyLockMode::Shared;
+        config.revision_allocator = RevisionAllocatorMode::ReservedRanges;
+        let service = Arc::new(RocksDbService::new(config).unwrap());
         let tenant = TenantId::new(41);
         let key = DocumentKey::new(b"lifecycle".to_vec(), b"key".to_vec());
         service
@@ -3162,6 +3678,8 @@ mod tests {
         let directory = temporary_db_directory();
         let mut config = RocksDbServiceConfig::new(directory.path());
         config.blocking_admission = BlockingAdmissionMode::SplitReadWrite;
+        config.condition_key_lock_mode = ConditionKeyLockMode::Shared;
+        config.revision_allocator = RevisionAllocatorMode::ReservedRanges;
         let service = Arc::new(RocksDbService::new(config).unwrap());
         let tenant = TenantId::new(42);
         let key = DocumentKey::new(b"cancelled-request".to_vec(), b"key".to_vec());
@@ -3177,36 +3695,43 @@ mod tests {
             .await
             .unwrap();
 
-        let (operation_started_sender, operation_started_receiver) = mpsc::channel();
-        let (continue_operation_sender, continue_operation_receiver) = mpsc::channel();
-        let continue_operation_receiver = std::sync::Mutex::new(continue_operation_receiver);
-        let operation_index = Arc::new(AtomicUsize::new(0));
-        *service.blocking_operation_hook.lock().unwrap() = Some(Arc::new(move || {
-            if operation_index.fetch_add(1, Ordering::SeqCst) == 0 {
-                operation_started_sender.send(()).unwrap();
-                continue_operation_receiver
-                    .lock()
-                    .unwrap()
-                    .recv_timeout(Duration::from_secs(10))
-                    .expect("request continuation timed out");
-            }
+        let tenant_database_cell = Arc::clone(service.databases.get(&tenant).unwrap().value());
+        let tenant_database = Arc::clone(tenant_database_cell.get().unwrap());
+        let (lock_acquired_sender, lock_acquired_receiver) = mpsc::channel();
+        let (continue_transaction_sender, continue_transaction_receiver) = mpsc::channel();
+        let continue_transaction_receiver = std::sync::Mutex::new(continue_transaction_receiver);
+        *tenant_database.locks_acquired_hook.lock().unwrap() = Some(Arc::new(move || {
+            lock_acquired_sender.send(()).unwrap();
+            continue_transaction_receiver
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(10))
+                .expect("shared transaction continuation timed out");
         }));
 
         let request_service = Arc::clone(&service);
-        let request_key = key.clone();
+        let mutation_key = DocumentKey::new(b"cancelled-request".to_vec(), b"mutation".to_vec());
         let request = tokio::spawn(async move {
             request_service
                 .execute(
                     tenant,
-                    Request::Get { key: request_key },
+                    Request::Transact {
+                        request: TransactionRequest::new(
+                            vec![TransactionCondition::Exists { key: key.clone() }],
+                            vec![TransactionMutation::Put {
+                                key: mutation_key,
+                                value: b"completed after cancellation".to_vec(),
+                            }],
+                        ),
+                    },
                     ExecutionBudget::new(1024),
                 )
                 .await
         });
         tokio::task::spawn_blocking(move || {
-            operation_started_receiver
+            lock_acquired_receiver
                 .recv_timeout(Duration::from_secs(5))
-                .expect("RocksDB Get did not reach its blocking operation");
+                .expect("shared condition transaction did not acquire its lock");
         })
         .await
         .unwrap();
@@ -3226,17 +3751,25 @@ mod tests {
         })
         .await
         .unwrap();
-        continue_operation_sender.send(()).unwrap();
+        continue_transaction_sender.send(()).unwrap();
         shutdown.await.unwrap();
-        *service.blocking_operation_hook.lock().unwrap() = None;
+        *tenant_database.locks_acquired_hook.lock().unwrap() = None;
         *service.lifecycle.shutdown_hook.lock().unwrap() = None;
 
+        let mutation_key = DocumentKey::new(b"cancelled-request".to_vec(), b"mutation".to_vec());
         assert_eq!(
             service
-                .execute(tenant, Request::Get { key }, ExecutionBudget::new(1024),)
+                .execute(
+                    tenant,
+                    Request::Get { key: mutation_key },
+                    ExecutionBudget::new(1024),
+                )
                 .await
                 .unwrap(),
-            Response::Get(RevisionState::present(b"alive".to_vec(), Revision::new(1)))
+            Response::Get(RevisionState::present(
+                b"completed after cancellation".to_vec(),
+                Revision::new(2)
+            ))
         );
         service.shutdown().await;
     }

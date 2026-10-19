@@ -4,7 +4,8 @@ use dodb_core::{Error, TransactionMutation, TransactionRequest};
 use dodb_service::{ExecutionBudget, Request, Response, TransactionOutcome};
 
 use super::{
-    DEFAULT_REVISION_RANGE_SIZE, RevisionAllocatorMode, TenantDatabase, enforce_response_budget,
+    ConditionKeyLockMode, DEFAULT_REVISION_RANGE_SIZE, RevisionAllocatorMode, TenantDatabase,
+    enforce_response_budget,
 };
 
 pub struct SynchronousRocksDbTenant {
@@ -13,11 +14,20 @@ pub struct SynchronousRocksDbTenant {
 
 impl SynchronousRocksDbTenant {
     pub fn open(path: &Path, allocator: RevisionAllocatorMode) -> Result<Self, Error> {
+        Self::open_with_condition_key_lock_mode(path, allocator, ConditionKeyLockMode::Exclusive)
+    }
+
+    pub fn open_with_condition_key_lock_mode(
+        path: &Path,
+        allocator: RevisionAllocatorMode,
+        condition_key_lock_mode: ConditionKeyLockMode,
+    ) -> Result<Self, Error> {
         Ok(Self {
-            database: TenantDatabase::open_with_allocator(
+            database: TenantDatabase::open_with_modes(
                 path,
                 allocator,
                 DEFAULT_REVISION_RANGE_SIZE,
+                condition_key_lock_mode,
             )?,
         })
     }

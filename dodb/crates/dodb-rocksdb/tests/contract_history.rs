@@ -2,7 +2,9 @@ use dodb_core::{
     DocumentKey, Error, PrimaryKey, Revision, RevisionState, TenantId, TransactionCondition,
     TransactionMutation, TransactionRequest,
 };
-use dodb_rocksdb::{RevisionAllocatorMode, RocksDbService, RocksDbServiceConfig};
+use dodb_rocksdb::{
+    ConditionKeyLockMode, RevisionAllocatorMode, RocksDbService, RocksDbServiceConfig,
+};
 use dodb_server::{BlinkTenantService, LocalTenantServiceConfig};
 use dodb_service::{DodbService, ExecutionBudget, Request, Response};
 use std::sync::Arc;
@@ -222,13 +224,19 @@ async fn conditional_multi_key_history_agrees_for_blink_and_rocksdb_allocators()
     .unwrap();
     check_conditional_history(Arc::new(blink_service)).await;
 
-    for allocator in [
-        RevisionAllocatorMode::Serialized,
-        RevisionAllocatorMode::ReservedRanges,
+    for condition_key_lock_mode in [
+        ConditionKeyLockMode::Exclusive,
+        ConditionKeyLockMode::Shared,
     ] {
-        let rocks_directory = temporary_db_directory();
-        let mut config = RocksDbServiceConfig::new(rocks_directory.path());
-        config.revision_allocator = allocator;
-        check_conditional_history(Arc::new(RocksDbService::new(config).unwrap())).await;
+        for allocator in [
+            RevisionAllocatorMode::Serialized,
+            RevisionAllocatorMode::ReservedRanges,
+        ] {
+            let rocks_directory = temporary_db_directory();
+            let mut config = RocksDbServiceConfig::new(rocks_directory.path());
+            config.condition_key_lock_mode = condition_key_lock_mode;
+            config.revision_allocator = allocator;
+            check_conditional_history(Arc::new(RocksDbService::new(config).unwrap())).await;
+        }
     }
 }

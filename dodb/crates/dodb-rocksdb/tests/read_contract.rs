@@ -3,7 +3,9 @@ use dodb_core::{
     TransactionRequest,
 };
 use dodb_protocol::{ProtocolLimits, ResponseEnvelope, encode_response};
-use dodb_rocksdb::{RocksDbService, RocksDbServiceConfig};
+use dodb_rocksdb::{
+    ConditionKeyLockMode, RevisionAllocatorMode, RocksDbService, RocksDbServiceConfig,
+};
 use dodb_server::{BlinkTenantService, LocalTenantService, LocalTenantServiceConfig};
 use dodb_service::{Document, DodbService, ExecutionBudget, Request, Response};
 use std::path::PathBuf;
@@ -525,7 +527,6 @@ async fn check_read_contract<S: DodbService>(service: &S) {
 async fn btree_blink_and_rocksdb_share_the_same_read_contract() {
     let native_directory = temporary_db_directory();
     let blink_directory = temporary_db_directory();
-    let rocks_directory = temporary_db_directory();
     let native = LocalTenantService::new(LocalTenantServiceConfig {
         data_dir: PathBuf::from(native_directory.path()),
         ..LocalTenantServiceConfig::default()
@@ -536,15 +537,29 @@ async fn btree_blink_and_rocksdb_share_the_same_read_contract() {
         ..LocalTenantServiceConfig::default()
     })
     .unwrap();
-    let rocksdb = RocksDbService::new(RocksDbServiceConfig::new(rocks_directory.path())).unwrap();
-
     check_read_contract(&native).await;
     check_read_contract(&blink).await;
-    check_read_contract(&rocksdb).await;
+
+    for condition_key_lock_mode in [
+        ConditionKeyLockMode::Exclusive,
+        ConditionKeyLockMode::Shared,
+    ] {
+        for revision_allocator in [
+            RevisionAllocatorMode::Serialized,
+            RevisionAllocatorMode::ReservedRanges,
+        ] {
+            let rocks_directory = temporary_db_directory();
+            let mut config = RocksDbServiceConfig::new(rocks_directory.path());
+            config.condition_key_lock_mode = condition_key_lock_mode;
+            config.revision_allocator = revision_allocator;
+            let rocksdb = RocksDbService::new(config).unwrap();
+            check_read_contract(&rocksdb).await;
+            rocksdb.shutdown().await;
+        }
+    }
 
     native.shutdown().await;
     blink.shutdown().await;
-    rocksdb.shutdown().await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

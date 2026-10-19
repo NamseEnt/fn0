@@ -275,7 +275,8 @@ int dodb_rocksdb_get(void* database, const unsigned char* key, size_t key_length
 
 int dodb_rocksdb_transaction_get_for_update(
     void* transaction, const unsigned char* key, size_t key_length,
-    unsigned char** value, size_t* value_length, int collect_lock_wait,
+    int exclusive, unsigned char** value, size_t* value_length,
+    int collect_lock_wait,
     uint64_t* lock_wait_nanos, uint64_t* lock_wait_count,
     DodbRocksDbReadTimings* timings, char** error) {
   auto* perf_context = rocksdb::get_perf_context();
@@ -286,7 +287,8 @@ int dodb_rocksdb_transaction_get_for_update(
   const auto native_started = collect_lock_wait != 0
       ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
   const auto status = static_cast<rocksdb::Transaction*>(transaction)->GetForUpdate(
-      rocksdb::ReadOptions(), rocksdb::Slice(reinterpret_cast<const char*>(key), key_length), &stored);
+      rocksdb::ReadOptions(), rocksdb::Slice(reinterpret_cast<const char*>(key), key_length), &stored,
+      exclusive != 0, true);
   if (collect_lock_wait != 0) {
     timings->native_call_nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now() - native_started).count();

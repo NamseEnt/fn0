@@ -12,7 +12,9 @@ use dodb_core::{
     DocumentKey, Error, Revision, RevisionState, TenantId, TransactionCondition,
     TransactionMutation, TransactionRequest,
 };
-use dodb_rocksdb::{RocksDbService, RocksDbServiceConfig};
+use dodb_rocksdb::{
+    ConditionKeyLockMode, RevisionAllocatorMode, RocksDbService, RocksDbServiceConfig,
+};
 use dodb_server::{FaultInjectorFactory, LocalTenantService, LocalTenantServiceConfig};
 use dodb_service::{DodbService, ExecutionBudget, Request, Response};
 use dodb_storage::FaultInjector;
@@ -24,6 +26,8 @@ const RESPONSE_BUDGET: ExecutionBudget = ExecutionBudget::new(1 << 20);
 const HANDOFF_TIMEOUT: Duration = Duration::from_secs(60);
 const CHILD_BACKEND_ENV: &str = "DODB_R1B3B_CHILD_BACKEND";
 const CHILD_DATA_DIR_ENV: &str = "DODB_R1B3B_CHILD_DATA_DIR";
+const CHILD_CONDITION_LOCK_MODE_ENV: &str = "DODB_R1B3B_CONDITION_LOCK_MODE";
+const CHILD_REVISION_ALLOCATOR_ENV: &str = "DODB_R1B3B_REVISION_ALLOCATOR";
 const ROCKSDB_HOOK_ENV: &str = "DODB_R1B3B_ENABLE_WAL_SYNC_HOOK";
 const HOOK_PREFIX: &str = "R1B3B_HOOK|";
 
@@ -80,7 +84,11 @@ fn native_wal_sync_interruption_recovers_all_or_none() {
     if std::env::var_os(CHILD_BACKEND_ENV).is_some() {
         return;
     }
-    run_backend_case(Backend::Native);
+    run_backend_case(
+        Backend::Native,
+        ConditionKeyLockMode::Exclusive,
+        RevisionAllocatorMode::Serialized,
+    );
 }
 
 #[test]
@@ -88,7 +96,21 @@ fn rocksdb_wal_sync_interruption_recovers_all_or_none() {
     if std::env::var_os(CHILD_BACKEND_ENV).is_some() {
         return;
     }
-    run_backend_case(Backend::RocksDb);
+    for condition_key_lock_mode in [
+        ConditionKeyLockMode::Exclusive,
+        ConditionKeyLockMode::Shared,
+    ] {
+        for revision_allocator in [
+            RevisionAllocatorMode::Serialized,
+            RevisionAllocatorMode::ReservedRanges,
+        ] {
+            run_backend_case(
+                Backend::RocksDb,
+                condition_key_lock_mode,
+                revision_allocator,
+            );
+        }
+    }
 }
 
 #[test]
@@ -97,6 +119,12 @@ fn service_child() {
         return;
     };
     let backend = parse_backend(&backend.to_string_lossy());
+    let condition_key_lock_mode = parse_condition_lock_mode(
+        &std::env::var(CHILD_CONDITION_LOCK_MODE_ENV).unwrap_or_else(|_| "exclusive".to_owned()),
+    );
+    let revision_allocator = parse_revision_allocator(
+        &std::env::var(CHILD_REVISION_ALLOCATOR_ENV).unwrap_or_else(|_| "serialized".to_owned()),
+    );
     assert_eq!(
         backend == Backend::RocksDb,
         std::env::var_os(ROCKSDB_HOOK_ENV).is_some(),
@@ -137,8 +165,10 @@ fn service_child() {
                 service.shutdown().await;
             }
             Backend::RocksDb => {
-                let service = RocksDbService::new(RocksDbServiceConfig::new(data_dir))
-                    .expect("RocksDB service should open");
+                let mut config = RocksDbServiceConfig::new(data_dir);
+                config.condition_key_lock_mode = condition_key_lock_mode;
+                config.revision_allocator = revision_allocator;
+                let service = RocksDbService::new(config).expect("RocksDB service should open");
                 execute_seed(&service, &scenario).await;
                 unsafe { dodb_rocksdb_arm_wal_sync_hook() };
                 execute_target(&service, scenario.target_request).await;
@@ -150,7 +180,11 @@ fn service_child() {
     });
 }
 
-fn run_backend_case(backend: Backend) {
+fn run_backend_case(
+    backend: Backend,
+    condition_key_lock_mode: ConditionKeyLockMode,
+    revision_allocator: RevisionAllocatorMode,
+) {
     let scenario = build_scenario();
     let previous_documents = scenario.previous_documents.clone();
     let expected_documents = scenario.expected_documents.clone();
@@ -159,7 +193,12 @@ fn run_backend_case(backend: Backend) {
     let directory = TempDir::new().expect("new crash test directory should be created");
     let data_dir = directory.path().join("service-data");
     assert!(!data_dir.exists());
-    let mut child = spawn_service_child(backend, &data_dir);
+    let mut child = spawn_service_child(
+        backend,
+        &data_dir,
+        condition_key_lock_mode,
+        revision_allocator,
+    );
     let wal_path = data_dir.join(format!("tenant-{TENANT_ID}-shard-{TENANT_ID}.wal"));
     let hook = receive_hook(&mut child, backend);
     if backend == Backend::Native {
@@ -234,7 +273,10 @@ fn run_backend_case(backend: Backend) {
                 service.shutdown().await;
             }
             Backend::RocksDb => {
-                let service = RocksDbService::new(RocksDbServiceConfig::new(&data_dir))
+                let mut config = RocksDbServiceConfig::new(&data_dir);
+                config.condition_key_lock_mode = condition_key_lock_mode;
+                config.revision_allocator = revision_allocator;
+                let service = RocksDbService::new(config)
                     .expect("RocksDB service should reopen after child exit");
                 let recovered = verify_reopened_state(
                     &service,
@@ -256,7 +298,12 @@ fn run_backend_case(backend: Backend) {
     );
 }
 
-fn spawn_service_child(backend: Backend, data_dir: &Path) -> ChildGuard {
+fn spawn_service_child(
+    backend: Backend,
+    data_dir: &Path,
+    condition_key_lock_mode: ConditionKeyLockMode,
+    revision_allocator: RevisionAllocatorMode,
+) -> ChildGuard {
     let executable = std::env::current_exe().expect("test executable path should be available");
     let mut command = Command::new(executable);
     command
@@ -265,6 +312,20 @@ fn spawn_service_child(backend: Backend, data_dir: &Path) -> ChildGuard {
         .arg("--nocapture")
         .env(CHILD_BACKEND_ENV, backend.as_str())
         .env(CHILD_DATA_DIR_ENV, data_dir)
+        .env(
+            CHILD_CONDITION_LOCK_MODE_ENV,
+            match condition_key_lock_mode {
+                ConditionKeyLockMode::Exclusive => "exclusive",
+                ConditionKeyLockMode::Shared => "shared",
+            },
+        )
+        .env(
+            CHILD_REVISION_ALLOCATOR_ENV,
+            match revision_allocator {
+                RevisionAllocatorMode::Serialized => "serialized",
+                RevisionAllocatorMode::ReservedRanges => "reserved-ranges",
+            },
+        )
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -748,5 +809,21 @@ fn parse_backend(value: &str) -> Backend {
         "native" => Backend::Native,
         "rocksdb" => Backend::RocksDb,
         _ => panic!("unknown child backend {value}"),
+    }
+}
+
+fn parse_condition_lock_mode(value: &str) -> ConditionKeyLockMode {
+    match value {
+        "exclusive" => ConditionKeyLockMode::Exclusive,
+        "shared" => ConditionKeyLockMode::Shared,
+        _ => panic!("unknown child condition key lock mode {value}"),
+    }
+}
+
+fn parse_revision_allocator(value: &str) -> RevisionAllocatorMode {
+    match value {
+        "serialized" => RevisionAllocatorMode::Serialized,
+        "reserved-ranges" => RevisionAllocatorMode::ReservedRanges,
+        _ => panic!("unknown child revision allocator {value}"),
     }
 }
