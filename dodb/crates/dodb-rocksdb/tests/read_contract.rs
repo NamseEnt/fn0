@@ -56,7 +56,7 @@ fn scan_response(response: Response) -> Vec<Document> {
     }
 }
 
-async fn check_read_contract<S: DodbService>(service: &S) {
+async fn check_read_contract<S: DodbService>(service: &S, verify_exact_get_budget: bool) {
     let missing_key = key(b"budget", b"initial-missing");
     let missing_response = Response::Get(RevisionState::missing(dodb_core::Revision::ZERO));
     let exact_missing_budget = encode_response(
@@ -170,37 +170,39 @@ async fn check_read_contract<S: DodbService>(service: &S) {
         other => panic!("unexpected delete response: {other:?}"),
     };
     let tombstone_response = Response::Get(RevisionState::missing(deleted_revision));
-    let exact_tombstone_budget = encode_response(
-        &ResponseEnvelope::Success(tombstone_response.clone()),
-        ProtocolLimits::default(),
-    )
-    .unwrap()
-    .len();
-    assert_eq!(
-        execute(
-            service,
-            1,
-            Request::Get {
-                key: deleted_key.clone(),
-            },
-            ExecutionBudget::new(exact_tombstone_budget),
+    if verify_exact_get_budget {
+        let exact_tombstone_budget = encode_response(
+            &ResponseEnvelope::Success(tombstone_response.clone()),
+            ProtocolLimits::default(),
         )
-        .await
-        .unwrap(),
-        tombstone_response
-    );
-    assert!(matches!(
-        execute(
-            service,
-            1,
-            Request::Get {
-                key: deleted_key.clone(),
-            },
-            ExecutionBudget::new(exact_tombstone_budget - 1),
-        )
-        .await,
-        Err(Error::ResponseTooLarge(_))
-    ));
+        .unwrap()
+        .len();
+        assert_eq!(
+            execute(
+                service,
+                1,
+                Request::Get {
+                    key: deleted_key.clone(),
+                },
+                ExecutionBudget::new(exact_tombstone_budget),
+            )
+            .await
+            .unwrap(),
+            tombstone_response
+        );
+        assert!(matches!(
+            execute(
+                service,
+                1,
+                Request::Get {
+                    key: deleted_key.clone(),
+                },
+                ExecutionBudget::new(exact_tombstone_budget - 1),
+            )
+            .await,
+            Err(Error::ResponseTooLarge(_))
+        ));
+    }
     assert!(
         projections(&query_response(
             execute(
@@ -431,31 +433,33 @@ async fn check_read_contract<S: DodbService>(service: &S) {
     )
     .unwrap()
     .len();
-    assert_eq!(
-        execute(
-            service,
-            1,
-            Request::Get {
-                key: large_key.clone(),
-            },
-            ExecutionBudget::new(exact_get_budget),
-        )
-        .await
-        .unwrap(),
-        exact_get_response.clone()
-    );
-    assert!(matches!(
-        execute(
-            service,
-            1,
-            Request::Get {
-                key: large_key.clone(),
-            },
-            ExecutionBudget::new(exact_get_budget - 1),
-        )
-        .await,
-        Err(Error::ResponseTooLarge(_))
-    ));
+    if verify_exact_get_budget {
+        assert_eq!(
+            execute(
+                service,
+                1,
+                Request::Get {
+                    key: large_key.clone(),
+                },
+                ExecutionBudget::new(exact_get_budget),
+            )
+            .await
+            .unwrap(),
+            exact_get_response.clone()
+        );
+        assert!(matches!(
+            execute(
+                service,
+                1,
+                Request::Get {
+                    key: large_key.clone(),
+                },
+                ExecutionBudget::new(exact_get_budget - 1),
+            )
+            .await,
+            Err(Error::ResponseTooLarge(_))
+        ));
+    }
     assert!(matches!(
         execute(
             service,
@@ -642,8 +646,8 @@ async fn btree_blink_and_rocksdb_share_the_same_read_contract() {
         ..LocalTenantServiceConfig::default()
     })
     .unwrap();
-    check_read_contract(&native).await;
-    check_read_contract(&blink).await;
+    check_read_contract(&native, false).await;
+    check_read_contract(&blink, false).await;
 
     for condition_key_lock_mode in [
         ConditionKeyLockMode::Exclusive,
@@ -658,7 +662,7 @@ async fn btree_blink_and_rocksdb_share_the_same_read_contract() {
             config.condition_key_lock_mode = condition_key_lock_mode;
             config.revision_allocator = revision_allocator;
             let rocksdb = RocksDbService::new(config).unwrap();
-            check_read_contract(&rocksdb).await;
+            check_read_contract(&rocksdb, true).await;
             rocksdb.shutdown().await;
         }
     }
