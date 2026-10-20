@@ -3045,6 +3045,9 @@ mod tests {
             max_write_ledger: 100,
             require_full_window: false,
             include_width_16: true,
+            memory_diagnostic: false,
+            source_revision: None,
+            memory_worker_startup_timeout_ms: 20_000,
         };
         let first_key = mutation_key(&options, 0, 7, 0, 3, 0, WriteKind::Delete);
         let repeated_key = mutation_key(&options, 0, 9, 0, 7, 0, WriteKind::Put);
@@ -3087,6 +3090,9 @@ mod tests {
             max_write_ledger: MAX_WRITE_LEDGER,
             require_full_window: false,
             include_width_16: true,
+            memory_diagnostic: false,
+            source_revision: None,
+            memory_worker_startup_timeout_ms: 20_000,
         };
         let first_workflow_keys = (0..16)
             .map(|mutation_index| {
