@@ -557,7 +557,7 @@ pub async fn bounded_scan_digest(
     tenant: TenantId,
     response_budget_bytes: usize,
 ) -> Result<Value, String> {
-    const PAGE_LIMIT: usize = 128;
+    const PAGE_LIMIT: usize = 64;
     let client = connection.for_tenant(tenant);
     let mut cursor = None;
     let mut row_count = 0_u64;
