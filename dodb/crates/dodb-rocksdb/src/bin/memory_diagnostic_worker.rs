@@ -35,6 +35,7 @@ struct Arguments {
     source_revision: String,
     worker_binary_sha256: String,
     parent_binary_sha256: String,
+    parent_pid: u32,
     response_budget: usize,
     max_mutations: usize,
     max_concurrent_requests: usize,
@@ -201,6 +202,7 @@ impl DodbService for BackendService {
 async fn main() -> WorkerResult<()> {
     let _ = quinn::rustls::crypto::aws_lc_rs::default_provider().install_default();
     let arguments = parse_arguments()?;
+    install_parent_death_signal(arguments.parent_pid)?;
     let backend = Arc::new(BackendService::open(&arguments)?);
     let protocol_limits = ProtocolLimits {
         max_response_frame_size: arguments.response_budget,
@@ -319,6 +321,19 @@ async fn main() -> WorkerResult<()> {
             return Err("diagnostic worker shutdown exceeded 15 seconds".into());
         }
     }
+    drop(server);
+    drop(backend);
+    let worker_process_high_water_kb =
+        std::fs::read_to_string("/proc/self/status")
+            .ok()
+            .and_then(|contents| {
+                contents.lines().find_map(|line| {
+                    let (field_name, field_value) = line.split_once(':')?;
+                    (field_name == "VmHWM")
+                        .then(|| field_value.split_whitespace().next()?.parse::<u64>().ok())
+                        .flatten()
+                })
+            });
     std::fs::write(
         &arguments.health_path,
         serde_json::to_vec_pretty(&json!({
@@ -341,6 +356,7 @@ async fn main() -> WorkerResult<()> {
             "worker_pid": readiness.pid,
             "worker_process_start_time_ticks": readiness.process_start_time_ticks,
             "worker_epoch_id": format!("{}:{}", readiness.pid, readiness.process_start_time_ticks),
+            "worker_process_high_water_rss_kb_after_backend_shutdown": worker_process_high_water_kb,
             "shutdown_complete": true,
         }))?,
     )?;
@@ -357,6 +373,7 @@ fn parse_arguments() -> WorkerResult<Arguments> {
     let source_revision = argument_value(&values, "--memory-source-revision")?;
     let worker_binary_sha256 = argument_value(&values, "--memory-worker-binary-sha256")?;
     let parent_binary_sha256 = argument_value(&values, "--memory-parent-binary-sha256")?;
+    let parent_pid = argument_value(&values, "--memory-parent-pid")?.parse()?;
     let response_budget = argument_value(&values, "--memory-response-budget")?.parse()?;
     let max_mutations = argument_value(&values, "--memory-max-mutations")?.parse()?;
     let max_concurrent_requests =
@@ -423,6 +440,7 @@ fn parse_arguments() -> WorkerResult<Arguments> {
         source_revision,
         worker_binary_sha256,
         parent_binary_sha256,
+        parent_pid,
         response_budget,
         max_mutations,
         max_concurrent_requests,
@@ -436,6 +454,33 @@ fn parse_arguments() -> WorkerResult<Arguments> {
         blink_max_open_shards,
         blink_cache_pages,
     })
+}
+
+fn install_parent_death_signal(expected_parent_pid: u32) -> WorkerResult<()> {
+    #[cfg(target_os = "linux")]
+    let current_parent_pid = unsafe { libc::getppid() as u32 };
+    #[cfg(not(target_os = "linux"))]
+    let current_parent_pid = 0;
+    if current_parent_pid != expected_parent_pid {
+        return Err("diagnostic worker parent changed before backend startup".into());
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let result = unsafe { libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) };
+        if result != 0 {
+            return Err(std::io::Error::last_os_error().into());
+        }
+        if unsafe { libc::getppid() as u32 } != expected_parent_pid {
+            return Err(
+                "diagnostic worker parent exited while installing parent-death signal".into(),
+            );
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        Err("memory diagnostic workers require Linux parent-death signals".into())
+    }
 }
 
 fn argument_value(arguments: &[String], name: &str) -> WorkerResult<String> {

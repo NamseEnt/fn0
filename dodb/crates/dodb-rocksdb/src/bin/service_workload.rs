@@ -188,6 +188,7 @@ impl DriverService {
                     dodb_protocol::ProtocolLimits::default().max_mutations,
                     options.clients,
                     &data_dir,
+                    Duration::from_millis(options.memory_worker_startup_timeout_ms),
                 )
                 .await
                 .map_err(Error::invariant)?;
@@ -405,6 +406,7 @@ struct Options {
     include_width_16: bool,
     memory_diagnostic: bool,
     source_revision: Option<String>,
+    memory_worker_startup_timeout_ms: u64,
 }
 
 struct Latencies {
@@ -1125,6 +1127,16 @@ fn parse_options() -> Result<Options, String> {
         }
     };
     let memory_diagnostic = parse_switch("--memory-diagnostic")?;
+    let memory_worker_startup_timeout_ms = parse(
+        "--memory-worker-startup-timeout-ms",
+        dodb_rocksdb::memory_diagnostic::DEFAULT_WORKER_START_TIMEOUT_MS,
+    )?;
+    if memory_worker_startup_timeout_ms == 0
+        || memory_worker_startup_timeout_ms
+            > dodb_rocksdb::memory_diagnostic::MAX_WORKER_START_TIMEOUT_MS
+    {
+        return Err("--memory-worker-startup-timeout-ms must be between 1 and 300000".to_owned());
+    }
     let source_revision = values.get("--source-revision").cloned();
     if memory_diagnostic && source_revision.is_none() {
         return Err("--source-revision is required with --memory-diagnostic 1".to_owned());
@@ -1163,6 +1175,7 @@ fn parse_options() -> Result<Options, String> {
         include_width_16: parse_switch("--include-width-16")?,
         memory_diagnostic,
         source_revision,
+        memory_worker_startup_timeout_ms,
     })
 }
 
@@ -2660,6 +2673,7 @@ async fn run(options: Options) -> Result<Value, String> {
         "seed": options.seed,
         "api_boundary": if options.backend == BackendKind::RocksDbDirect { "synchronous TenantDatabase core with shared Request/Response and ExecutionBudget; preopened tenant handles; same transaction and revision implementation" } else { "DodbService::execute with shared Request/Response and ExecutionBudget" },
         "memory_diagnostic_execution": if options.memory_diagnostic { "parent workload uses DodbClient over loopback TLS to a separate backend worker; throughput and latency include transport and are memory-only evidence" } else { "disabled; existing in-process backend path" },
+        "memory_worker_startup_timeout_ms": if options.memory_diagnostic { Some(options.memory_worker_startup_timeout_ms) } else { None },
         "configuration": {
             "clients": options.clients,
             "client_executor": match options.client_executor { ClientExecutor::Async => "async", ClientExecutor::Dedicated => "dedicated" },

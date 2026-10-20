@@ -23,8 +23,9 @@ use tempfile::TempDir;
 const PROCESS_SAMPLE_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_MEMORY_DIAGNOSTIC_SAMPLES: usize = 4_096;
 const BINARY_HASH_BUFFER_SIZE: usize = 64 * 1024;
-const WORKER_START_TIMEOUT: Duration = Duration::from_secs(20);
 const WORKER_STOP_TIMEOUT: Duration = Duration::from_secs(20);
+pub const DEFAULT_WORKER_START_TIMEOUT_MS: u64 = 20_000;
+pub const MAX_WORKER_START_TIMEOUT_MS: u64 = 300_000;
 
 #[derive(Clone, Debug)]
 struct ProcessIdentity {
@@ -160,7 +161,15 @@ impl MemoryDiagnosticSession {
         maximum_mutations: usize,
         maximum_concurrent_requests: usize,
         data_dir: &Path,
+        startup_timeout: Duration,
     ) -> Result<MemoryDiagnosticWorker, String> {
+        if startup_timeout.is_zero()
+            || startup_timeout > Duration::from_millis(MAX_WORKER_START_TIMEOUT_MS)
+        {
+            return Err(
+                "diagnostic worker startup timeout must be between 1 ms and 300 seconds".to_owned(),
+            );
+        }
         let worker_binary_sha256 = sha256_file(worker_executable)?;
         let health_path = self
             .tls_directory
@@ -192,10 +201,26 @@ impl MemoryDiagnosticSession {
             .arg(maximum_mutations.to_string())
             .arg("--memory-max-concurrent-requests")
             .arg(maximum_concurrent_requests.to_string())
+            .arg("--memory-parent-pid")
+            .arg(std::process::id().to_string())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
         let mut child = command.spawn().map_err(|error| error.to_string())?;
+        let spawn_identity = match process_identity("backend-process", child.id()) {
+            Some(identity) => identity,
+            None => {
+                terminate_child(&mut child);
+                return Err("could not register diagnostic worker process at spawn".to_owned());
+            }
+        };
+        match self.process_identities.lock() {
+            Ok(mut identities) => identities.push(spawn_identity.clone()),
+            Err(_) => {
+                terminate_child(&mut child);
+                return Err("process identity lock poisoned".to_owned());
+            }
+        }
         let child_stdin = child
             .stdin
             .take()
@@ -219,22 +244,21 @@ impl MemoryDiagnosticSession {
                 });
             let _ = ready_sender.send(read_result);
         });
-        let readiness_line = match tokio::task::spawn_blocking(move || {
-            ready_receiver.recv_timeout(WORKER_START_TIMEOUT)
-        })
-        .await
-        .map_err(|error| format!("worker readiness wait task failed: {error}"))?
-        {
-            Ok(Ok(readiness_line)) => readiness_line,
-            Ok(Err(error)) => {
-                terminate_child(&mut child);
-                return Err(error);
-            }
-            Err(error) => {
-                terminate_child(&mut child);
-                return Err(format!("diagnostic worker readiness timed out: {error}"));
-            }
-        };
+        let readiness_line =
+            match tokio::task::spawn_blocking(move || ready_receiver.recv_timeout(startup_timeout))
+                .await
+                .map_err(|error| format!("worker readiness wait task failed: {error}"))?
+            {
+                Ok(Ok(readiness_line)) => readiness_line,
+                Ok(Err(error)) => {
+                    terminate_child(&mut child);
+                    return Err(error);
+                }
+                Err(error) => {
+                    terminate_child(&mut child);
+                    return Err(format!("diagnostic worker readiness timed out: {error}"));
+                }
+            };
         let readiness: WorkerReadiness = match serde_json::from_str(&readiness_line) {
             Ok(readiness) => readiness,
             Err(error) => {
@@ -244,6 +268,7 @@ impl MemoryDiagnosticSession {
         };
         if !readiness.ready
             || readiness.pid != child.id()
+            || readiness.process_start_time_ticks != spawn_identity.start_time_ticks
             || readiness.max_concurrent_requests != maximum_concurrent_requests
             || readiness.source_revision != self.source_revision
             || readiness.worker_binary_sha256 != worker_binary_sha256
@@ -292,13 +317,6 @@ impl MemoryDiagnosticSession {
                 return Err(format!("diagnostic worker connection timed out: {error}"));
             }
         };
-        let identity = ProcessIdentity {
-            role: "backend-process".to_owned(),
-            pid: readiness.pid,
-            process_group_id: readiness.process_group_id,
-            start_time_ticks: readiness.process_start_time_ticks,
-            start_time_unix_ms: readiness.started_unix_ms,
-        };
         let parent_process_group_id = match self.process_identities.lock() {
             Ok(identities) => identities.first().map(|identity| identity.process_group_id),
             Err(_) => None,
@@ -307,16 +325,11 @@ impl MemoryDiagnosticSession {
             terminate_child(&mut child);
             return Err("harness process identity is missing".to_owned());
         };
-        if identity.process_group_id != parent_process_group_id {
+        if spawn_identity.process_group_id != parent_process_group_id
+            || readiness.process_group_id != spawn_identity.process_group_id
+        {
             terminate_child(&mut child);
             return Err("diagnostic worker did not inherit the workload process group".to_owned());
-        }
-        match self.process_identities.lock() {
-            Ok(mut identities) => identities.push(identity),
-            Err(_) => {
-                terminate_child(&mut child);
-                return Err("process identity lock poisoned".to_owned());
-            }
         }
         let worker = MemoryDiagnosticWorker {
             child: Mutex::new(child),
@@ -326,6 +339,7 @@ impl MemoryDiagnosticSession {
             session: Arc::clone(self),
             readiness,
             worker_binary_sha256,
+            startup_timeout_ms: startup_timeout.as_millis() as u64,
             stopped: AtomicBool::new(false),
         };
         worker.record_event("started");
@@ -434,6 +448,7 @@ pub struct MemoryDiagnosticWorker {
     session: Arc<MemoryDiagnosticSession>,
     readiness: WorkerReadiness,
     worker_binary_sha256: String,
+    startup_timeout_ms: u64,
     stopped: AtomicBool,
 }
 
@@ -520,6 +535,7 @@ impl MemoryDiagnosticWorker {
             "source_revision": self.readiness.source_revision,
             "harness_binary_sha256": self.session.parent_binary_sha256,
             "worker_binary_sha256": self.worker_binary_sha256,
+            "startup_timeout_ms": self.startup_timeout_ms,
         }));
     }
 }
@@ -933,6 +949,7 @@ fn process_usage(identity: &ProcessIdentity) -> Value {
         "anonymous_kb": rollup_values.get("Anonymous").copied(),
         "file_kb": rollup_values.get("Pss_File").copied(),
         "swap_kb": rollup_values.get("Swap").copied().or_else(|| status_values.get("VmSwap").copied()),
+        "vm_hwm_kb": status_values.get("VmHWM").copied(),
     })
 }
 

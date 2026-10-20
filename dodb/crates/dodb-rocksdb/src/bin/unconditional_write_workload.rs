@@ -49,6 +49,7 @@ struct Options {
     report_path: PathBuf,
     memory_diagnostic: bool,
     source_revision: Option<String>,
+    memory_worker_startup_timeout_ms: u64,
 }
 
 struct SampleHistogram {
@@ -350,6 +351,7 @@ impl ProbeBackend {
                 dodb_protocol::ProtocolLimits::default().max_mutations,
                 options.clients,
                 &options.data_dir,
+                Duration::from_millis(options.memory_worker_startup_timeout_ms),
             ))?;
             let service = dodb_rocksdb::memory_diagnostic::RemoteDodbService::new(
                 worker.connection().clone(),
@@ -668,6 +670,8 @@ fn parse_options() -> Result<Options, String> {
     let mut report_path = None;
     let mut memory_diagnostic = false;
     let mut source_revision = None;
+    let mut memory_worker_startup_timeout_ms =
+        dodb_rocksdb::memory_diagnostic::DEFAULT_WORKER_START_TIMEOUT_MS;
     while let Some(argument) = arguments.next() {
         let value = arguments
             .next()
@@ -759,6 +763,11 @@ fn parse_options() -> Result<Options, String> {
                 }
             }
             "--source-revision" => source_revision = Some(value),
+            "--memory-worker-startup-timeout-ms" => {
+                memory_worker_startup_timeout_ms = value
+                    .parse()
+                    .map_err(|_| "invalid --memory-worker-startup-timeout-ms".to_owned())?
+            }
             "--data-dir" => data_dir = Some(PathBuf::from(value)),
             "--report" => report_path = Some(PathBuf::from(value)),
             _ => return Err(format!("unknown argument: {argument}")),
@@ -782,6 +791,7 @@ fn parse_options() -> Result<Options, String> {
         report_path: report_path.ok_or_else(|| "--report is required".to_owned())?,
         memory_diagnostic,
         source_revision,
+        memory_worker_startup_timeout_ms,
     };
     if ![1, 16].contains(&options.width) {
         return Err("width must be 1 or 16".to_owned());
@@ -801,6 +811,12 @@ fn parse_options() -> Result<Options, String> {
     }
     if options.memory_diagnostic && options.source_revision.is_none() {
         return Err("--source-revision is required with --memory-diagnostic 1".to_owned());
+    }
+    if options.memory_worker_startup_timeout_ms == 0
+        || options.memory_worker_startup_timeout_ms
+            > dodb_rocksdb::memory_diagnostic::MAX_WORKER_START_TIMEOUT_MS
+    {
+        return Err("--memory-worker-startup-timeout-ms must be between 1 and 300000".to_owned());
     }
     Ok(options)
 }
@@ -1583,6 +1599,7 @@ fn build_report(
                 }
             },
             "engine_health_interval_ms": options.engine_health_interval_ms,
+            "memory_worker_startup_timeout_ms": if options.memory_diagnostic { Some(options.memory_worker_startup_timeout_ms) } else { None },
             "shared_blocking_slots": if options.backend == BackendKind::RocksDbService {
                 Some(options.shared_blocking_slots)
             } else {
@@ -1789,6 +1806,7 @@ impl Options {
             report_path: self.report_path.clone(),
             memory_diagnostic: self.memory_diagnostic,
             source_revision: self.source_revision.clone(),
+            memory_worker_startup_timeout_ms: self.memory_worker_startup_timeout_ms,
         }
     }
 }
