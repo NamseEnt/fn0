@@ -2689,8 +2689,6 @@ async fn run(options: Options) -> Result<Value, String> {
         + latency_report_sort_copy_bytes;
     let mut report = json!({
         "schema": "dodb-service-workload-v1",
-        "source_sha": std::env::var("DODB_SOURCE_SHA").unwrap_or_else(|_| "not-recorded".to_owned()),
-        "binary_sha256": std::env::var("DODB_BINARY_SHA256").unwrap_or_else(|_| "not-recorded".to_owned()),
         "backend": match options.backend { BackendKind::Blink => "blink", BackendKind::RocksDb => "rocksdb", BackendKind::RocksDbDirect => "rocksdb-direct", BackendKind::MinimalNative => "minimal-native" },
         "scenario": match options.scenario { Scenario::Single(profile) => profile_name(profile), Scenario::Multi => "mt-mix", Scenario::Smoke => "smoke" },
         "seed": options.seed,

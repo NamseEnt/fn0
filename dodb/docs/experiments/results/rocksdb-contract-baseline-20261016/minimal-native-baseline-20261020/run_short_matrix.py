@@ -184,6 +184,14 @@ def wait_for_case(command, case_id, database_path, report_path):
     if stop_reason is not None or exit_code != 0 or not report_path.is_file():
         raise RuntimeError(f"case failed and database is preserved: {run_result}")
     report_value = json.loads(report_path.read_text())
+    raw_report_path = case_root / "workload-report.raw.json"
+    shutil.copy2(report_path, raw_report_path)
+    report_value["source_sha"] = source_revision
+    report_value["binary_sha256"] = binary_digest
+    report_path.write_text(json.dumps(report_value, indent=2) + "\n")
+    (case_root / "workload-report-raw-sha256.txt").write_text(
+        sha256_file(raw_report_path) + "\n"
+    )
     (case_root / "workload-report-sha256.txt").write_text(sha256_file(report_path) + "\n")
     final_validation = report_value.get("final_validation", report_value.get("validation"))
     if not validation_passed(final_validation):
