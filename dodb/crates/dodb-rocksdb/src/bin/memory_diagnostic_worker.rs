@@ -208,17 +208,20 @@ async fn main() -> WorkerResult<()> {
     let certificate = std::fs::read(&arguments.certificate_path)?;
     let private_key = std::fs::read(&arguments.private_key_path)?;
     let tls = ServerTlsConfig::from_der(vec![certificate], private_key)?;
-    let server = Arc::new(DodbServer::bind(
-        Arc::clone(&backend),
-        DodbServerConfig {
-            listen_addr: SocketAddr::from(([127, 0, 0, 1], 0)),
-            tls,
-            protocol_limits,
-            max_connections: 4,
-            max_concurrent_streams: 1_024,
-            max_concurrent_requests: 1_024,
-        },
-    )?);
+    let server = Arc::new(
+        DodbServer::bind(
+            Arc::clone(&backend),
+            DodbServerConfig {
+                listen_addr: SocketAddr::from(([127, 0, 0, 1], 0)),
+                tls,
+                protocol_limits,
+                max_connections: 4,
+                max_concurrent_streams: 1_024,
+                max_concurrent_requests: 1_024,
+            },
+        )
+        .map_err(|error| Box::new(error) as WorkerError)?,
+    );
     let listen_address = server.local_addr()?;
     let mut server_task = tokio::spawn({
         let server = Arc::clone(&server);
@@ -301,8 +304,8 @@ async fn main() -> WorkerResult<()> {
     .await;
     match shutdown {
         Ok(Ok(Ok(()))) => {}
-        Ok(Ok(Err(error))) => return Err(Box::new(error)),
-        Ok(Err(error)) => return Err(Box::new(error)),
+        Ok(Ok(Err(error))) => return Err(Box::new(error) as WorkerError),
+        Ok(Err(error)) => return Err(Box::new(error) as WorkerError),
         Err(_) => {
             server_task.abort();
             return Err("diagnostic worker shutdown exceeded 15 seconds".into());

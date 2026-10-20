@@ -134,9 +134,11 @@ impl DriverService {
             } else {
                 1
             };
-            let source_revision = options.source_revision.clone().ok_or_else(|| {
-                Error::invalid_request("memory diagnostic requires --source-revision")
-            })?;
+            if options.source_revision.is_none() {
+                return Err(Error::invalid_request(
+                    "memory diagnostic requires --source-revision",
+                ));
+            }
             let worker_arguments = vec![
                 "--backend".to_owned(),
                 backend.to_owned(),
@@ -2605,17 +2607,11 @@ async fn run(options: Options) -> Result<Value, String> {
         let mut residency_reports = Vec::new();
         for tenant_index in 0..tenant_count {
             let tenant = TenantId::new(tenant_index as u64 + 1);
-            let first_scan = reopened
-                .residency_scan(tenant)
-                .await
-                .map_err(Error::invariant)?;
+            let first_scan = reopened.residency_scan(tenant).await?;
             let host_before = memory_session.boundary_snapshot();
             let process_before = memory_session.process_boundary_snapshot();
             memory_session.set_phase("residency-second-scan");
-            let second_scan = reopened
-                .residency_scan(tenant)
-                .await
-                .map_err(Error::invariant)?;
+            let second_scan = reopened.residency_scan(tenant).await?;
             let process_after = memory_session.process_boundary_snapshot();
             let host_after = memory_session.boundary_snapshot();
             let reopen_oracle_passed = reopen_validation
@@ -2632,7 +2628,7 @@ async fn run(options: Options) -> Result<Value, String> {
                 &process_after,
                 reopen_oracle_passed,
             );
-            residency_reports.push(json!({"tenant": tenant, "result": residency_report}));
+            residency_reports.push(json!({"tenant": tenant.get(), "result": residency_report}));
         }
         memory_session.record_residency_report(json!(residency_reports));
     }
