@@ -23,7 +23,8 @@ use dodb_storage::{CoordinatorConfig, DatabaseConfig};
 use serde_json::json;
 use tokio::sync::mpsc;
 
-type WorkerResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+type WorkerError = Box<dyn std::error::Error + Send + Sync>;
+type WorkerResult<T> = Result<T, WorkerError>;
 
 struct Arguments {
     backend: String,
