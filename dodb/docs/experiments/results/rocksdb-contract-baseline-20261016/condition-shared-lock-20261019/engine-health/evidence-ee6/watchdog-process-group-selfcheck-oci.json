@@ -1,0 +1,9 @@
+{
+  "target_process_group_id": 1545884,
+  "target_exit_status": -15,
+  "grandchild_process_id": 1545886,
+  "grandchild_final_state": "absent",
+  "unrelated_process_group_id": 1545885,
+  "unrelated_survived_target_termination": true,
+  "only_target_process_group_terminated": true
+}

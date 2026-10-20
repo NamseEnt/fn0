@@ -1,0 +1,51 @@
+# Representative Five-Minute Results
+
+## Scope and acceptance
+
+The approved representative subset completed 21 of the 111 definitions in the five-minute plan at performance source `ee6cd94f1a4e7b2bab7af603bc8983bbf8184542`, using frozen `service_workload` SHA-256 `7c8b35679df63402b3454067d720c53e1a194f5be6fe459eb7bec35862bdd4b5` and `unconditional_write_workload` SHA-256 `97b2b38717679bba4000a9eed2bf8c2435114e3d7fa5717e9727381e3586e3f4`. The recovery runner SHA-256 is `9e936b7f4b6b7ba41fd859a0fa30ac5a957b14e330f18ed0a865fca56b99fc24`. The selected plan fingerprint is `e06d2e159cd4d8085550d6b8809bd553f55e84a65d467330cb0cbb857d55120d`; its original definition contains 111 cases, with cohorts B, C, and D still outside this representative selection.
+
+Each selected case requested 10 seconds of warmup and a full 300-second measurement. The controller exited 0; all 21 reports record full-window completion, final-state and reopen validation passed, histogram counts match their latency observations, the first-100 canonical input fingerprints match across clients within each family, and every successful database was removed after its file manifest and RocksDB logs were retained. No failure database remains under the recovery result root. The committed [extracted result reports](evidence-ee6/five-minute-ee6-ae-r2/extracted/results/cases/) preserve per-case histograms, health samples, validation results, and configuration. The committed [post-run audit](evidence-ee6/five-minute-ee6-ae-r2/postrun-audit.json) and [recovery evidence hash index](evidence-ee6/SHA256SUMS.json) summarize and identify the artifacts. A full compressed copy is retained at `/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r2/results-evidence.tar.gz` and locally at `evidence-ee6/five-minute-ee6-ae-r2/results-evidence.tar.gz`, SHA-256 `dac4f8ffa2c11af6a7b611326fdf5220f0420357e5654c8f9b04550a7d04353a`; the compressed archive is not a repository link.
+
+The matrix used one shared performance source and binary set. A is conditional `rw20/c16`, reserved-range revisions, Shared condition locks, and overwrite workload. The RocksDB service uses its Shared-16 blocking admission; synchronous core uses 16 dedicated callers and a separate 16-permit driver semaphore before invoking the core, not the service admission semaphore ([driver setup and acquire](../../../../../../crates/dodb-rocksdb/src/bin/service_workload.rs#L145-L195)). E is unconditional `c64/width16` with preseeded 262,144 keys; service uses 32 admission slots, synchronous core uses 64 direct callers with no driver or service admission semaphore, and raw RocksDB has no logical DODB revision/condition semantics. The raw path alone omits DODB revision and transaction validation. Core uses the full synchronous DODB semantics; service uses the actual DodbService path; B-link uses its service implementation. All four E paths still validate final state and reopen, and do not issue conditional requests.
+
+## Throughput, tail latency, and fairness
+
+Values below are per-report observations in writes/s or write batches/s; ranges are across the three independent repetitions. Percentiles are medians of each run's bounded histogram estimate, with the observed minimum and maximum run estimate in parentheses. Percentiles are not pooled or added across runs.
+
+| Family and path | Throughput median (min–max) | p99 latency median (min–max) | Pooled client completion/admission min / median / max; per-run min/max ratio |
+| --- | ---: | ---: | ---: |
+| A Blink | 4,338.07 tx/s (4,284.37–4,369.11) | Workflow 7.590 ms (7.557–7.995); successful write 7.655 ms (7.623–8.081) | 91,201 / 93,647 / 95,316 admitted workflows; per-run ratio 0.9710–0.9849 |
+| A RocksDB service Shared-16 | 4,753.17 tx/s (4,714.80–4,794.18) | Workflow 7.922 ms (7.786–7.946); successful write 8.184 ms (8.061–8.196) | 102,058 / 103,020 / 104,117 admitted workflows; per-run ratio 0.9966–0.9978 |
+| A synchronous RocksDB core, 16 callers / driver permits | 5,241.32 tx/s (5,240.71–5,266.51) | Workflow 7.037 ms (6.885–7.258); successful write 7.320 ms (7.160–7.594) | 113,450 / 113,670 / 114,265 admitted workflows; per-run ratio 0.9978–0.9978 |
+| E raw RocksDB | 2,722.44 batches/s (2,696.88–2,734.25) | Write batch 317.981 ms (317.194–319.816) | 12,511 / 12,763.5 / 12,872 batches; per-run ratio 0.9847–0.9867 |
+| E synchronous RocksDB core, 64 callers | 1,754.96 batches/s (1,753.45–1,779.80) | Write batch 322.961 ms (322.699–324.534) | 8,167 / 8,235.5 / 8,387 batches; per-run ratio 0.9884–0.9891 |
+| E RocksDB service Shared-32 | 1,565.34 batches/s (1,546.92–1,572.33) | Write batch 325.583 ms (322.961–333.971) | 7,213 / 7,339 / 7,410 batches; per-run ratio 0.9893–0.9919 |
+| E Blink | 2,787.81 batches/s (2,777.40–2,972.48) | Write batch 44.106 ms (41.484–44.335) | 12,045 / 13,185.5 / 14,069 batches; per-run ratio 0.9024–0.9140 |
+
+A p99 values are read from each report’s `counters.latency.workflow.p99_ms` and `counters.latency.write_transaction_success.p99_ms`; E p99 values use each write-batch histogram. Client count min/median/max values pool the three repetitions (48 client-run records for A, 192 for E); every ratio is instead calculated within each repetition, and the displayed range is the minimum-to-maximum per-run ratio. A uses each client’s `admitted_workflows`, sorted by `client_index`; `workflow_count=100` is only the retained input-prefix sample limit and is not used as a fairness denominator. E uses `fairness.per_client_write_batch_counts`. The A values describe successful write transactions; preparatory Gets are separate API calls. The E values are acknowledged write batches. Raw throughput is an engine-only unconditional reference; its missing DODB semantic checks make it an explicitly narrower path rather than an equivalent API result.
+
+## Memory, engine properties, and resident-data evidence
+
+The controllers enforce a 3 GiB process-group RSS limit, a 1,500 MiB host `MemAvailable` reserve, a 12 GiB per-case database limit, and a 900-second child timeout. Across the 21 runs, the lowest observed host `MemAvailable` was 3.14 GiB, and the largest whole-child `/usr/bin/time -v` maximum RSS was 1,505.4 MiB. The largest live sampled database was 8.29 GiB. Every run remained within those runtime caps. Whole-child maximum RSS includes setup, measurement, validation, reopen, and teardown; the in-process RSS samples cover the measurement interval only.
+
+| Path | Measurement-window sampled RSS range | Whole-child maximum RSS range | Max live database | Logical live value bytes |
+| --- | ---: | ---: | ---: | ---: |
+| A Blink | 674.5–940.2 MiB | 1,171.5–1,505.4 MiB | 3.37 GiB | 132.02–132.07 MiB |
+| A RocksDB service Shared-16 | 357.0–363.3 MiB | 666.3–728.5 MiB | 0.43 GiB | 132.02–132.07 MiB |
+| A synchronous RocksDB core Shared-16 | 367.9–374.3 MiB | 720.8–745.7 MiB | 0.46 GiB | 132.02–132.07 MiB |
+| E raw RocksDB | 454.1–456.3 MiB | 831.6–833.4 MiB | 0.56 GiB | 128 MiB |
+| E synchronous RocksDB core, 64 callers | 684.4–701.8 MiB | 1,029.7–1,046.2 MiB | 0.53 GiB | 128 MiB |
+| E RocksDB service Shared-32 | 627.0–647.5 MiB | 1,045.9–1,097.0 MiB | 0.55 GiB | 128 MiB |
+| E Blink | 772.6–854.6 MiB | 1,395.1–1,477.1 MiB | 8.29 GiB | 128 MiB |
+
+Logical live value bytes are `validated row count × 512-byte value`; they exclude keys, revision metadata, tombstones, page/index overhead, WAL, allocator fragmentation, and native engine state. These values do not describe physical database size or resident working set.
+
+Collector accounting reports vector capacities, not collector-phase RSS. A's estimated simultaneous latency/ledger/prefix/input collector capacities were 190.2–192.2 MiB for Blink, 203.1–204.7 MiB for the RocksDB service, and 215.6–216.1 MiB for synchronous core. E's listed histogram, merged/per-client histogram, and baseline-revision capacities sum to 57.9 MiB per run. The reports explicitly exclude expected-state maps and key sets, runtime/service allocations, allocator metadata, and native engine memory; E also marks native raw write-batch memory excluded and gives no expected-state map estimate. No report attributes RSS to harness versus RocksDB, or records RSS deltas at each collector phase. The process values above are aggregate process observations, not a harness/native split.
+
+RocksDB health sampling returned 299–300 one-second samples per five-minute run with complete coverage. Across all sampled RocksDB cases, reported `block-cache-usage` peaked at 32 MiB; `cur-size-all-mem-tables` peaked between 65.6 and 72.5 MiB by run. These are measured property values, not configured cache capacities. The driver does not record the effective cache capacity or establish the fraction of the logical dataset resident in cache or host memory. Blink reports these RocksDB properties as unsupported. The requested in-memory-data comparison is supported by row/value totals and host/process budgets, but the effective-cache-to-dataset and actual-residency comparison remains unmeasured; the memory-exceed axis remains deferred by user.
+
+## Recovery and limits
+
+The original five-minute runner stopped during A/r2 core at 132 seconds because the A backend order did not rotate. Its incomplete case and database remain preserved under the original r1 root. The first three completed A/r1 cases were copied into the recovery root byte-for-byte, not rerun; the recovery migration manifest records the source/destination hashes and timestamps. The corrected A order was `C1,B1,S1,B2,S2,C2,S3,C3,B3`; E retained its rotated order. The 30-second A matrix used a scenario rotation and a backend rotation whose composition left backend order unchanged across repetitions. That limitation is reported here and those already complete 30-second runs were not repeated.
+
+These 21 runs complete only the approved representative five-minute subset, not all 111 definitions or the full six-phase plan. The separate D new-key 30-second workload completed, while cohorts B and C and the other 90 five-minute definitions were not selected here. The short and five-minute measurements are evidence for the listed workloads and paths, not a general performance ranking or a production-default decision; Exclusive condition-key locking remains the default.

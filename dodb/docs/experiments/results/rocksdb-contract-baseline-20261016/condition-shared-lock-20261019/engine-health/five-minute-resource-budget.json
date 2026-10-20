@@ -1,0 +1,660 @@
+{
+  "artifact_kind": "five_minute_resource_budget",
+  "source_sha": "ee6cd94f1a4e7b2bab7af603bc8983bbf8184542",
+  "service_binary_sha256": "7c8b35679df63402b3454067d720c53e1a194f5be6fe459eb7bec35862bdd4b5",
+  "raw_binary_sha256": "97b2b38717679bba4000a9eed2bf8c2435114e3d7fa5717e9727381e3586e3f4",
+  "planned_cases": 21,
+  "planned_wall_time_seconds": 6510,
+  "warmup_ms": 10000,
+  "measurement_ms": 300000,
+  "health_interval_ms": 1000,
+  "process_rss_cap_bytes": 3221225472,
+  "database_cap_bytes": 12884901888,
+  "host_memavailable_reserve_bytes": 1572864000,
+  "preflight_free_space_bytes": 27917287424,
+  "child_timeout_seconds": 900,
+  "evidence_budget_bytes": 4294967296,
+  "started": false,
+  "duration_scale_basis": "30-second cases include a 10-second warmup plus 30-second measurement; 5-minute cases total 310 seconds, ratio 7.75.",
+  "blink_physical_wal_recovery": "Blink service opens physical page WAL in ScanMaterialization::Recovery. Recovery retains latest page image per PageId in a BTreeMap, not all committed batches; the map is dropped before loading the data file. Memory can still grow with distinct recovered pages and recovery reads the WAL.",
+  "source_paths": [
+    "dodb/crates/dodb-server/src/lib.rs",
+    "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "dodb/crates/dodb-storage/src/wal.rs"
+  ],
+  "evidence_archive_sha256": "6612765b87becbf2e80ed9b5a2dcb9bd01fc568fa7343c477a4fec41e9b5eee9",
+  "paths": [
+    {
+      "family": "Blink",
+      "repetitions": 3,
+      "observed_whole_process_rss_bytes": {
+        "median": 749281280,
+        "min": 659599360,
+        "max": 754221056
+      },
+      "observed_measurement_rss_bytes": {
+        "median": 450510848,
+        "min": 450473984,
+        "max": 457011200
+      },
+      "observed_rows": {
+        "median": 143436,
+        "min": 142910,
+        "max": 143627
+      },
+      "runs": [
+        {
+          "case_id": "A-rw20-c16-r1-blink-reserved-ranges-shared-sna",
+          "family": "blink",
+          "whole_process_rss_bytes": 659599360,
+          "measurement_peak_rss_bytes": 450510848,
+          "rows": 143436,
+          "domain_rows": 272144,
+          "collector_peak_bytes": 27576560,
+          "measurement_capacity_bytes": 8277760,
+          "merged_capacity_bytes": 3034880,
+          "replay_clone_capacity_bytes": 11918320,
+          "write_ledger_entries": 119416,
+          "database_before_shutdown_bytes": 672964814,
+          "database_after_reopen_bytes": 845504718,
+          "wal_bytes": 672952526
+        },
+        {
+          "case_id": "A-rw20-c16-r2-blink-reserved-ranges-shared-sna",
+          "family": "blink",
+          "whole_process_rss_bytes": 754221056,
+          "measurement_peak_rss_bytes": 457011200,
+          "rows": 142910,
+          "domain_rows": 272144,
+          "collector_peak_bytes": 27539520,
+          "measurement_capacity_bytes": 8277760,
+          "merged_capacity_bytes": 3034880,
+          "replay_clone_capacity_bytes": 11881280,
+          "write_ledger_entries": 118611,
+          "database_before_shutdown_bytes": 670711677,
+          "database_after_reopen_bytes": 842637181,
+          "wal_bytes": 670699389
+        },
+        {
+          "case_id": "A-rw20-c16-r3-blink-reserved-ranges-shared-sna",
+          "family": "blink",
+          "whole_process_rss_bytes": 749281280,
+          "measurement_peak_rss_bytes": 450473984,
+          "rows": 143627,
+          "domain_rows": 272144,
+          "collector_peak_bytes": 27571680,
+          "measurement_capacity_bytes": 8277760,
+          "merged_capacity_bytes": 3034880,
+          "replay_clone_capacity_bytes": 11913440,
+          "write_ledger_entries": 119670,
+          "database_before_shutdown_bytes": 673830940,
+          "database_after_reopen_bytes": 846743580,
+          "wal_bytes": 673818652
+        }
+      ],
+      "rss_budget": {
+        "remaining_rows": 128708,
+        "expected_state_increment_bytes": 527187968,
+        "collector_increment_bytes": 209078640,
+        "validation_reserve_bytes": 536870912,
+        "projected_peak_rss_bytes": 2027358576,
+        "projected_peak_rss_gib": 1.8881248086690903
+      },
+      "observed_db_and_wal_bytes": {
+        "database_before_shutdown_min": 670711677,
+        "database_before_shutdown_max": 673830940,
+        "database_after_reopen_min": 842637181,
+        "database_after_reopen_max": 846743580,
+        "physical_wal_min": 670699389,
+        "physical_wal_max": 673818652
+      },
+      "disk_projection": {
+        "scale_310_seconds_over_40_seconds": 7.75,
+        "projected_max_after_reopen_bytes": 6562262745,
+        "caveat": "Conservative proxy; WAL turnover and compaction may change directory growth."
+      }
+    },
+    {
+      "family": "Synchronous RocksDB core Shared condition lock, 64 callers",
+      "repetitions": 3,
+      "observed_whole_process_rss_bytes": {
+        "median": 493293568,
+        "min": 489508864,
+        "max": 497520640
+      },
+      "observed_measurement_rss_bytes": {
+        "median": 303177728,
+        "min": 300216320,
+        "max": 305070080
+      },
+      "observed_rows": {
+        "median": 163597,
+        "min": 163308,
+        "max": 163920
+      },
+      "runs": [
+        {
+          "case_id": "A-rw20-c16-r1-rocksdb-direct-reserved-ranges-shared-s16",
+          "family": "rocksdb-direct",
+          "whole_process_rss_bytes": 497520640,
+          "measurement_peak_rss_bytes": 303177728,
+          "rows": 163920,
+          "domain_rows": 272144,
+          "collector_peak_bytes": 39959680,
+          "measurement_capacity_bytes": 13520640,
+          "merged_capacity_bytes": 3034880,
+          "replay_clone_capacity_bytes": 17747840,
+          "write_ledger_entries": 164270,
+          "database_before_shutdown_bytes": 149570196,
+          "database_after_reopen_bytes": 177839768,
+          "wal_bytes": 32999227
+        },
+        {
+          "case_id": "A-rw20-c16-r2-rocksdb-direct-reserved-ranges-shared-s16",
+          "family": "rocksdb-direct",
+          "whole_process_rss_bytes": 489508864,
+          "measurement_peak_rss_bytes": 300216320,
+          "rows": 163308,
+          "domain_rows": 272144,
+          "collector_peak_bytes": 39673040,
+          "measurement_capacity_bytes": 13520640,
+          "merged_capacity_bytes": 3034880,
+          "replay_clone_capacity_bytes": 17461200,
+          "write_ledger_entries": 160854,
+          "database_before_shutdown_bytes": 145429748,
+          "database_after_reopen_bytes": 171393578,
+          "wal_bytes": 28859874
+        },
+        {
+          "case_id": "A-rw20-c16-r3-rocksdb-direct-reserved-ranges-shared-s16",
+          "family": "rocksdb-direct",
+          "whole_process_rss_bytes": 493293568,
+          "measurement_peak_rss_bytes": 305070080,
+          "rows": 163597,
+          "domain_rows": 272144,
+          "collector_peak_bytes": 39870160,
+          "measurement_capacity_bytes": 13520640,
+          "merged_capacity_bytes": 3034880,
+          "replay_clone_capacity_bytes": 17658320,
+          "write_ledger_entries": 163241,
+          "database_before_shutdown_bytes": 148502409,
+          "database_after_reopen_bytes": 176094797,
+          "wal_bytes": 31894184
+        }
+      ],
+      "rss_budget": {
+        "remaining_rows": 108547,
+        "expected_state_increment_bytes": 444608512,
+        "collector_increment_bytes": 308730240,
+        "validation_reserve_bytes": 536870912,
+        "projected_peak_rss_bytes": 1787730304,
+        "projected_peak_rss_gib": 1.664953589439392
+      },
+      "observed_db_and_wal_bytes": {
+        "database_before_shutdown_min": 145429748,
+        "database_before_shutdown_max": 149570196,
+        "database_after_reopen_min": 171393578,
+        "database_after_reopen_max": 177839768,
+        "physical_wal_min": 28859874,
+        "physical_wal_max": 32999227
+      },
+      "disk_projection": {
+        "scale_310_seconds_over_40_seconds": 7.75,
+        "projected_max_after_reopen_bytes": 1378258202,
+        "caveat": "Conservative proxy; WAL turnover and compaction may change directory growth."
+      },
+      "actual_caller_threads": 64,
+      "service_admission_slots_applied": false
+    },
+    {
+      "family": "RocksDB service Shared-16",
+      "repetitions": 3,
+      "observed_whole_process_rss_bytes": {
+        "median": 454176768,
+        "min": 441315328,
+        "max": 472518656
+      },
+      "observed_measurement_rss_bytes": {
+        "median": 295936000,
+        "min": 289103872,
+        "max": 301592576
+      },
+      "observed_rows": {
+        "median": 157129,
+        "min": 154936,
+        "max": 158589
+      },
+      "runs": [
+        {
+          "case_id": "A-rw20-c16-r1-rocksdb-reserved-ranges-shared-s16",
+          "family": "rocksdb",
+          "whole_process_rss_bytes": 454176768,
+          "measurement_peak_rss_bytes": 301592576,
+          "rows": 158589,
+          "domain_rows": 272144,
+          "collector_peak_bytes": 38598160,
+          "measurement_capacity_bytes": 13520640,
+          "merged_capacity_bytes": 3034880,
+          "replay_clone_capacity_bytes": 16386320,
+          "write_ledger_entries": 151005,
+          "database_before_shutdown_bytes": 125382763,
+          "database_after_reopen_bytes": 132986620,
+          "wal_bytes": 7605099
+        },
+        {
+          "case_id": "A-rw20-c16-r2-rocksdb-reserved-ranges-shared-s16",
+          "family": "rocksdb",
+          "whole_process_rss_bytes": 472518656,
+          "measurement_peak_rss_bytes": 289103872,
+          "rows": 154936,
+          "domain_rows": 272144,
+          "collector_peak_bytes": 37967600,
+          "measurement_capacity_bytes": 13520640,
+          "merged_capacity_bytes": 3034880,
+          "replay_clone_capacity_bytes": 15755760,
+          "write_ledger_entries": 142830,
+          "database_before_shutdown_bytes": 134439161,
+          "database_after_reopen_bytes": 175486654,
+          "wal_bytes": 59813256
+        },
+        {
+          "case_id": "A-rw20-c16-r3-rocksdb-reserved-ranges-shared-s16",
+          "family": "rocksdb",
+          "whole_process_rss_bytes": 441315328,
+          "measurement_peak_rss_bytes": 295936000,
+          "rows": 157129,
+          "domain_rows": 272144,
+          "collector_peak_bytes": 38212960,
+          "measurement_capacity_bytes": 13520640,
+          "merged_capacity_bytes": 3034880,
+          "replay_clone_capacity_bytes": 16001120,
+          "write_ledger_entries": 146131,
+          "database_before_shutdown_bytes": 119278833,
+          "database_after_reopen_bytes": 121298586,
+          "wal_bytes": 1991835
+        }
+      ],
+      "rss_budget": {
+        "remaining_rows": 115015,
+        "expected_state_increment_bytes": 471101440,
+        "collector_increment_bytes": 296476560,
+        "validation_reserve_bytes": 536870912,
+        "projected_peak_rss_bytes": 1776967568,
+        "projected_peak_rss_gib": 1.6549300104379654
+      },
+      "observed_db_and_wal_bytes": {
+        "database_before_shutdown_min": 119278833,
+        "database_before_shutdown_max": 134439161,
+        "database_after_reopen_min": 121298586,
+        "database_after_reopen_max": 175486654,
+        "physical_wal_min": 1991835,
+        "physical_wal_max": 59813256
+      },
+      "disk_projection": {
+        "scale_310_seconds_over_40_seconds": 7.75,
+        "projected_max_after_reopen_bytes": 1360021568,
+        "caveat": "Conservative proxy; WAL turnover and compaction may change directory growth."
+      }
+    },
+    {
+      "family": "Blink",
+      "repetitions": 3,
+      "observed_whole_process_rss_bytes": {
+        "median": 1638666240,
+        "min": 1613828096,
+        "max": 1759629312
+      },
+      "observed_measurement_rss_bytes": {
+        "median": 986939392,
+        "min": 962121728,
+        "max": 1108901888
+      },
+      "observed_rows": {
+        "median": 262144,
+        "min": 262144,
+        "max": 262144
+      },
+      "runs": [
+        {
+          "case_id": "E-w16-c64-r1-blink-reserved-ranges-shared-sna",
+          "family": "Blink",
+          "whole_process_rss_bytes": 1638666240,
+          "measurement_peak_rss_bytes": 986939392,
+          "rows": 262144,
+          "domain_rows": 262144,
+          "latency_histogram_capacity_bytes": 29286400,
+          "baseline_revision_storage_bytes": 2097152,
+          "seeded_database_bytes": 383154816,
+          "measured_disk_growth_bytes": 1394928905,
+          "final_database_bytes": 1778083721,
+          "wal_bytes": 1405241225
+        },
+        {
+          "case_id": "E-w16-c64-r2-blink-reserved-ranges-shared-sna",
+          "family": "Blink",
+          "whole_process_rss_bytes": 1613828096,
+          "measurement_peak_rss_bytes": 962121728,
+          "rows": 262144,
+          "domain_rows": 262144,
+          "latency_histogram_capacity_bytes": 29286400,
+          "baseline_revision_storage_bytes": 2097152,
+          "seeded_database_bytes": 383154816,
+          "measured_disk_growth_bytes": 1370694535,
+          "final_database_bytes": 1753849351,
+          "wal_bytes": 1381006855
+        },
+        {
+          "case_id": "E-w16-c64-r3-blink-reserved-ranges-shared-sna",
+          "family": "Blink",
+          "whole_process_rss_bytes": 1759629312,
+          "measurement_peak_rss_bytes": 1108901888,
+          "rows": 262144,
+          "domain_rows": 262144,
+          "latency_histogram_capacity_bytes": 29286400,
+          "baseline_revision_storage_bytes": 2097152,
+          "seeded_database_bytes": 383154816,
+          "measured_disk_growth_bytes": 1378637488,
+          "final_database_bytes": 1761792304,
+          "wal_bytes": 1388949808
+        }
+      ],
+      "fixed_state": {
+        "rows": 262144,
+        "latency_histogram_capacity_bytes": 29286400,
+        "baseline_revision_storage_bytes": 2097152
+      },
+      "rss_budget": {
+        "validation_reserve_bytes": 536870912,
+        "projected_peak_rss_bytes": 2296500224,
+        "projected_peak_rss_gib": 2.138782501220703,
+        "caveat": "Fixed data/collector estimate; process-group watchdog controls native engine growth."
+      },
+      "observed_db_and_wal_bytes": {
+        "seeded_min": 383154816,
+        "seeded_max": 383154816,
+        "growth_min": 1370694535,
+        "growth_max": 1394928905,
+        "final_min": 1753849351,
+        "final_max": 1778083721,
+        "physical_wal_min": 1381006855,
+        "physical_wal_max": 1405241225
+      },
+      "disk_projection": {
+        "scale_310_seconds_over_40_seconds": 7.75,
+        "seed_plus_median_growth_bytes": 11067595348,
+        "seed_plus_max_growth_bytes": 11193853829,
+        "caveat": "Estimate from measured 40-second total growth; not a long-run measurement."
+      }
+    },
+    {
+      "family": "Raw RocksDB",
+      "repetitions": 3,
+      "observed_whole_process_rss_bytes": {
+        "median": 831225856,
+        "min": 827006976,
+        "max": 831991808
+      },
+      "observed_measurement_rss_bytes": {
+        "median": 439316480,
+        "min": 435113984,
+        "max": 440676352
+      },
+      "observed_rows": {
+        "median": 262144,
+        "min": 262144,
+        "max": 262144
+      },
+      "runs": [
+        {
+          "case_id": "E-w16-c64-r1-raw-rocksdb-reserved-ranges-shared-sna",
+          "family": "RawRocksDb",
+          "whole_process_rss_bytes": 827006976,
+          "measurement_peak_rss_bytes": 435113984,
+          "rows": 262144,
+          "domain_rows": 262144,
+          "latency_histogram_capacity_bytes": 29286400,
+          "baseline_revision_storage_bytes": 2097152,
+          "seeded_database_bytes": 147698854,
+          "measured_disk_growth_bytes": 0,
+          "final_database_bytes": 146587216,
+          "wal_bytes": 0
+        },
+        {
+          "case_id": "E-w16-c64-r2-raw-rocksdb-reserved-ranges-shared-sna",
+          "family": "RawRocksDb",
+          "whole_process_rss_bytes": 831225856,
+          "measurement_peak_rss_bytes": 439316480,
+          "rows": 262144,
+          "domain_rows": 262144,
+          "latency_histogram_capacity_bytes": 29286400,
+          "baseline_revision_storage_bytes": 2097152,
+          "seeded_database_bytes": 147698854,
+          "measured_disk_growth_bytes": 0,
+          "final_database_bytes": 146587218,
+          "wal_bytes": 0
+        },
+        {
+          "case_id": "E-w16-c64-r3-raw-rocksdb-reserved-ranges-shared-sna",
+          "family": "RawRocksDb",
+          "whole_process_rss_bytes": 831991808,
+          "measurement_peak_rss_bytes": 440676352,
+          "rows": 262144,
+          "domain_rows": 262144,
+          "latency_histogram_capacity_bytes": 29286400,
+          "baseline_revision_storage_bytes": 2097152,
+          "seeded_database_bytes": 147698854,
+          "measured_disk_growth_bytes": 0,
+          "final_database_bytes": 146587223,
+          "wal_bytes": 0
+        }
+      ],
+      "fixed_state": {
+        "rows": 262144,
+        "latency_histogram_capacity_bytes": 29286400,
+        "baseline_revision_storage_bytes": 2097152
+      },
+      "rss_budget": {
+        "validation_reserve_bytes": 536870912,
+        "projected_peak_rss_bytes": 1368862720,
+        "projected_peak_rss_gib": 1.2748527526855469,
+        "caveat": "Fixed data/collector estimate; process-group watchdog controls native engine growth."
+      },
+      "observed_db_and_wal_bytes": {
+        "seeded_min": 147698854,
+        "seeded_max": 147698854,
+        "growth_min": 0,
+        "growth_max": 0,
+        "final_min": 146587216,
+        "final_max": 146587223,
+        "physical_wal_min": 0,
+        "physical_wal_max": 0
+      },
+      "disk_projection": {
+        "scale_310_seconds_over_40_seconds": 7.75,
+        "seed_plus_median_growth_bytes": 147698854,
+        "seed_plus_max_growth_bytes": 147698854,
+        "caveat": "Estimate from measured 40-second total growth; not a long-run measurement."
+      }
+    },
+    {
+      "family": "RocksDB service Shared-32",
+      "repetitions": 3,
+      "observed_whole_process_rss_bytes": {
+        "median": 1108541440,
+        "min": 1066418176,
+        "max": 1114894336
+      },
+      "observed_measurement_rss_bytes": {
+        "median": 581808128,
+        "min": 576757760,
+        "max": 596320256
+      },
+      "observed_rows": {
+        "median": 262144,
+        "min": 262144,
+        "max": 262144
+      },
+      "runs": [
+        {
+          "case_id": "E-w16-c64-r1-rocksdb-service-reserved-ranges-shared-s32",
+          "family": "RocksDbService",
+          "whole_process_rss_bytes": 1108541440,
+          "measurement_peak_rss_bytes": 596320256,
+          "rows": 262144,
+          "domain_rows": 262144,
+          "latency_histogram_capacity_bytes": 29286400,
+          "baseline_revision_storage_bytes": 2097152,
+          "seeded_database_bytes": 147716039,
+          "measured_disk_growth_bytes": 18489362,
+          "final_database_bytes": 166205401,
+          "wal_bytes": 10082429
+        },
+        {
+          "case_id": "E-w16-c64-r2-rocksdb-service-reserved-ranges-shared-s32",
+          "family": "RocksDbService",
+          "whole_process_rss_bytes": 1114894336,
+          "measurement_peak_rss_bytes": 576757760,
+          "rows": 262144,
+          "domain_rows": 262144,
+          "latency_histogram_capacity_bytes": 29286400,
+          "baseline_revision_storage_bytes": 2097152,
+          "seeded_database_bytes": 147716039,
+          "measured_disk_growth_bytes": 61483119,
+          "final_database_bytes": 209199158,
+          "wal_bytes": 62648579
+        },
+        {
+          "case_id": "E-w16-c64-r3-rocksdb-service-reserved-ranges-shared-s32",
+          "family": "RocksDbService",
+          "whole_process_rss_bytes": 1066418176,
+          "measurement_peak_rss_bytes": 581808128,
+          "rows": 262144,
+          "domain_rows": 262144,
+          "latency_histogram_capacity_bytes": 29286400,
+          "baseline_revision_storage_bytes": 2097152,
+          "seeded_database_bytes": 147716039,
+          "measured_disk_growth_bytes": 5408065,
+          "final_database_bytes": 153124104,
+          "wal_bytes": 3370228
+        }
+      ],
+      "fixed_state": {
+        "rows": 262144,
+        "latency_histogram_capacity_bytes": 29286400,
+        "baseline_revision_storage_bytes": 2097152
+      },
+      "rss_budget": {
+        "validation_reserve_bytes": 536870912,
+        "projected_peak_rss_bytes": 1651765248,
+        "projected_peak_rss_gib": 1.5383262634277344,
+        "caveat": "Fixed data/collector estimate; process-group watchdog controls native engine growth."
+      },
+      "observed_db_and_wal_bytes": {
+        "seeded_min": 147716039,
+        "seeded_max": 147716039,
+        "growth_min": 5408065,
+        "growth_max": 61483119,
+        "final_min": 153124104,
+        "final_max": 209199158,
+        "physical_wal_min": 3370228,
+        "physical_wal_max": 62648579
+      },
+      "disk_projection": {
+        "scale_310_seconds_over_40_seconds": 7.75,
+        "seed_plus_median_growth_bytes": 291008594,
+        "seed_plus_max_growth_bytes": 624210211,
+        "caveat": "Estimate from measured 40-second total growth; not a long-run measurement."
+      }
+    },
+    {
+      "family": "Synchronous RocksDB core Shared-32",
+      "repetitions": 3,
+      "observed_whole_process_rss_bytes": {
+        "median": 989233152,
+        "min": 983662592,
+        "max": 995299328
+      },
+      "observed_measurement_rss_bytes": {
+        "median": 633122816,
+        "min": 633085952,
+        "max": 636497920
+      },
+      "observed_rows": {
+        "median": 262144,
+        "min": 262144,
+        "max": 262144
+      },
+      "runs": [
+        {
+          "case_id": "E-w16-c64-r1-synchronous-core-reserved-ranges-shared-s32",
+          "family": "SynchronousCore",
+          "whole_process_rss_bytes": 995299328,
+          "measurement_peak_rss_bytes": 636497920,
+          "rows": 262144,
+          "domain_rows": 262144,
+          "latency_histogram_capacity_bytes": 29286400,
+          "baseline_revision_storage_bytes": 2097152,
+          "seeded_database_bytes": 147715991,
+          "measured_disk_growth_bytes": 83748597,
+          "final_database_bytes": 231464588,
+          "wal_bytes": 43567294
+        },
+        {
+          "case_id": "E-w16-c64-r2-synchronous-core-reserved-ranges-shared-s32",
+          "family": "SynchronousCore",
+          "whole_process_rss_bytes": 989233152,
+          "measurement_peak_rss_bytes": 633122816,
+          "rows": 262144,
+          "domain_rows": 262144,
+          "latency_histogram_capacity_bytes": 29286400,
+          "baseline_revision_storage_bytes": 2097152,
+          "seeded_database_bytes": 147715991,
+          "measured_disk_growth_bytes": 89876293,
+          "final_database_bytes": 237592284,
+          "wal_bytes": 46711407
+        },
+        {
+          "case_id": "E-w16-c64-r3-synchronous-core-reserved-ranges-shared-s32",
+          "family": "SynchronousCore",
+          "whole_process_rss_bytes": 983662592,
+          "measurement_peak_rss_bytes": 633085952,
+          "rows": 262144,
+          "domain_rows": 262144,
+          "latency_histogram_capacity_bytes": 29286400,
+          "baseline_revision_storage_bytes": 2097152,
+          "seeded_database_bytes": 147715991,
+          "measured_disk_growth_bytes": 99636824,
+          "final_database_bytes": 247352815,
+          "wal_bytes": 51719467
+        }
+      ],
+      "fixed_state": {
+        "rows": 262144,
+        "latency_histogram_capacity_bytes": 29286400,
+        "baseline_revision_storage_bytes": 2097152
+      },
+      "rss_budget": {
+        "validation_reserve_bytes": 536870912,
+        "projected_peak_rss_bytes": 1532170240,
+        "projected_peak_rss_gib": 1.4269447326660156,
+        "caveat": "Fixed data/collector estimate; process-group watchdog controls native engine growth."
+      },
+      "observed_db_and_wal_bytes": {
+        "seeded_min": 147715991,
+        "seeded_max": 147715991,
+        "growth_min": 83748597,
+        "growth_max": 99636824,
+        "final_min": 231464588,
+        "final_max": 247352815,
+        "physical_wal_min": 43567294,
+        "physical_wal_max": 51719467
+      },
+      "disk_projection": {
+        "scale_310_seconds_over_40_seconds": 7.75,
+        "seed_plus_median_growth_bytes": 844257261,
+        "seed_plus_max_growth_bytes": 919901377,
+        "caveat": "Estimate from measured 40-second total growth; not a long-run measurement."
+      }
+    }
+  ]
+}

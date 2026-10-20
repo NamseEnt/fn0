@@ -1,0 +1,17 @@
+{
+  "database_path": "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r1/results/databases/A-rw20-c16-r1-blink-reserved-ranges-shared-sna",
+  "file_count": 2,
+  "files": [
+    {
+      "path": "blink/tenant-1-shard-1.db",
+      "size_bytes": 330776576,
+      "sha256": "cfa89303dadab4022b69f23d3522a6fe3b930ae5029045ba75592bf913ca831f"
+    },
+    {
+      "path": "blink/tenant-1-shard-1.wal",
+      "size_bytes": 3241502288,
+      "sha256": "291ba5217a0773494eff5c21c2ec18f89445d0eefbc6e5f507f62cc6b9b9df6d"
+    }
+  ],
+  "database_removed_after_validation": true
+}

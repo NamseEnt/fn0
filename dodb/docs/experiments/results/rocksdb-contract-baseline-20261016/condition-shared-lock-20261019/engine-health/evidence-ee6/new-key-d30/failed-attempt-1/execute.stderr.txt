@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/bench/zfs/db/condition-shared-lock-20261019/new-key-d30-ee6/run-new-key-d30.py", line 1139, in <module>
+    main()
+  File "/bench/zfs/db/condition-shared-lock-20261019/new-key-d30-ee6/run-new-key-d30.py", line 1087, in main
+    preflight_report = preflight(binary_paths, args.result_root)
+  File "/bench/zfs/db/condition-shared-lock-20261019/new-key-d30-ee6/run-new-key-d30.py", line 818, in preflight
+    raise RuntimeError(f"{name} binary hash mismatch")
+RuntimeError: service binary hash mismatch

@@ -1,0 +1,23 @@
+	Command being timed: "env /bench/zfs/db/condition-shared-lock-20261019/long-matrix-ee6-abce/frozen-ee6-88b43098d/unconditional_write_workload --backend synchronous-core --width 16 --clients 64 --seed 20261013 --value-size 512 --warmup-ms 10000 --measurement-ms 300000 --call-cap 100000000 --validate-histogram 0 --revision-allocator reserved-ranges --condition-key-lock-mode shared --engine-health-interval-ms 1000 --data-dir /bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r2/results/databases/E-w16-c64-r1-synchronous-core-reserved-ranges-shared-s32 --report /bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r2/results/cases/E-w16-c64-r1-synchronous-core-reserved-ranges-shared-s32/report.json --shared-blocking-slots 32"
+	User time (seconds): 168.71
+	System time (seconds): 98.41
+	Percent of CPU this job got: 83%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 5:20.49
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1059652
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1308
+	Minor (reclaiming a frame) page faults: 318490
+	Voluntary context switches: 1223611
+	Involuntary context switches: 2383265
+	Swaps: 0
+	File system inputs: 24639260
+	File system outputs: 25929784
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

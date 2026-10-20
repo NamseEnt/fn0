@@ -1,0 +1,17 @@
+{
+  "database_path": "/bench/zfs/db/condition-shared-lock-20261019/engine-health-smokes-ee6/databases/blink-rw50-new-key-c16",
+  "file_count": 2,
+  "files": [
+    {
+      "path": "blink/tenant-1-shard-1.db",
+      "size_bytes": 80891904,
+      "sha256": "70c098af158ee989a23304b47b4c123ce4c9e7931238e9c08369e3a0d8819e87"
+    },
+    {
+      "path": "blink/tenant-1-shard-1.wal",
+      "size_bytes": 231697073,
+      "sha256": "1013830c7017cd2a1234df1c51794b17c99ac59796e4bf136eb77f8c0d3da2ec"
+    }
+  ],
+  "database_removed_after_validation": true
+}

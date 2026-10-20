@@ -1,0 +1,1 @@
+{"completed_cases": 21, "plan_case_count": 111, "pending_cohorts": ["B", "C", "D"], "result_root": "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r2/results"}

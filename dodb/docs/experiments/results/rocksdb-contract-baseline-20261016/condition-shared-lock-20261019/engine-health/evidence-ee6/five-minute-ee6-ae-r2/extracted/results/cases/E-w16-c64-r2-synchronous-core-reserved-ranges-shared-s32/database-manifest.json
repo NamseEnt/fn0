@@ -1,0 +1,88 @@
+{
+  "database_path": "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r2/results/databases/E-w16-c64-r2-synchronous-core-reserved-ranges-shared-s32",
+  "file_count": 16,
+  "files": [
+    {
+      "path": "000228.sst",
+      "size_bytes": 68356220,
+      "sha256": "a0853e1705beb5812408b3c604c6b7a647ee144672addce1ef8011fb40b5d590"
+    },
+    {
+      "path": "000229.sst",
+      "size_bytes": 68355060,
+      "sha256": "5c680865c939dbc6d1cc0317e3c6108e11220b1e5086bf69ca11bd7b49f768f8"
+    },
+    {
+      "path": "000230.sst",
+      "size_bytes": 9649450,
+      "sha256": "ea8e7ad9bce4a04dff17e2f62e1c8e1462f461514107bb6afa3b58630002d4ef"
+    },
+    {
+      "path": "000232.sst",
+      "size_bytes": 60781013,
+      "sha256": "499be598b208e6653b67e45ae5a11ea4fe6b56e7936e4210b25cfdc4a62373c8"
+    },
+    {
+      "path": "000233.log",
+      "size_bytes": 20691652,
+      "sha256": "246d02c1256c92cd0789e2abb2e2ede6f13ae82d941a9ec106085dbbad932544"
+    },
+    {
+      "path": "000234.sst",
+      "size_bytes": 60781387,
+      "sha256": "3ba69626ebad14e835b2ce00f6ff53503356874bcba04a9246ed46de0b921bbd"
+    },
+    {
+      "path": "000237.sst",
+      "size_bytes": 19636354,
+      "sha256": "8fce7a6e294712a1edfc5937f763592260ac4baca22107621f4f22f80473a690"
+    },
+    {
+      "path": "000238.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "CURRENT",
+      "size_bytes": 16,
+      "sha256": "558606921738b11a314b5fb3b59cfac140b3d1088b8c564dd17fdb0b05ecd387"
+    },
+    {
+      "path": "IDENTITY",
+      "size_bytes": 36,
+      "sha256": "f35754acee3083e07f38b5dbe55ca5651ec77f398929b682991a625566723653"
+    },
+    {
+      "path": "LOCK",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "LOG",
+      "size_bytes": 41910,
+      "sha256": "430dad4eda89b8a33c95a1456b4c9abf13d3b8ffd750ec2fb40cf239e6b4dcc5",
+      "preserved_log_path": "database-logs/LOG"
+    },
+    {
+      "path": "LOG.old.1792404481894026",
+      "size_bytes": 637615,
+      "sha256": "835ca4f2301773d2f26b3beda4238473503c25f6d90d5587dd89579c3a89b7ab"
+    },
+    {
+      "path": "MANIFEST-000239",
+      "size_bytes": 1202,
+      "sha256": "5fef3879cbd5a89126980f5d0335b59453d7a66a61dab5fb103346c8d9f0d31b"
+    },
+    {
+      "path": "OPTIONS-000241",
+      "size_bytes": 8992,
+      "sha256": "d5c08ddaee238bb752b5e668825a2bab4fd30f4ad6e430890e83d5fe7933897b"
+    },
+    {
+      "path": "OPTIONS-000243",
+      "size_bytes": 8993,
+      "sha256": "da62a94c915dfafeb62e725b4138379f99d322b42c11b7a6cc67dd5f2257267e"
+    }
+  ],
+  "database_removed_after_validation": true
+}

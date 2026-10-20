@@ -1,0 +1,83 @@
+{
+  "database_path": "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r2/results/databases/E-w16-c64-r1-raw-rocksdb-reserved-ranges-shared-sna",
+  "file_count": 15,
+  "files": [
+    {
+      "path": "000346.sst",
+      "size_bytes": 68356199,
+      "sha256": "04a4423b6558a4584a38599ae36bc20353be45ac294d0475fbde3ea8b4bf008e"
+    },
+    {
+      "path": "000347.sst",
+      "size_bytes": 68355060,
+      "sha256": "4a45d4777b825dd4686166815fe7d7bd0f370175ed0ffcbd059a1e8ac5a5cfcb"
+    },
+    {
+      "path": "000348.sst",
+      "size_bytes": 9649450,
+      "sha256": "31f61175ab3a2eb922f020c9b8970e11f49a7eff153e4d1e8f161cbf3aeb9235"
+    },
+    {
+      "path": "000350.sst",
+      "size_bytes": 60906547,
+      "sha256": "47150bf5c9607bab2bb3bd63dc3398d2d756501d446396ca8dcd9b22e4ef723e"
+    },
+    {
+      "path": "000352.sst",
+      "size_bytes": 60906190,
+      "sha256": "c3f93edf4b7a34acc1509c3d355db9035b7ffd90b2ff9b03861439aa3f59a1d3"
+    },
+    {
+      "path": "000355.sst",
+      "size_bytes": 52598693,
+      "sha256": "74febeaa0f2c18774287d1bd6fe7fd5ef5e15881a93caeb6fe173a410ea1480a"
+    },
+    {
+      "path": "000356.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "CURRENT",
+      "size_bytes": 16,
+      "sha256": "b51239ceaac8c80996f4a2461eba3d1b75c566113435b8cffa55ab60bf14bfb7"
+    },
+    {
+      "path": "IDENTITY",
+      "size_bytes": 36,
+      "sha256": "36332d16d623095ef9d956dc9eaea0c2debdbf2c083dc3b94933b48b885f45d5"
+    },
+    {
+      "path": "LOCK",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "LOG",
+      "size_bytes": 34297,
+      "sha256": "f2110cc016e6236da9369b9377ffe95a24adc78448686d2e7ceb2f3baaae966d",
+      "preserved_log_path": "database-logs/LOG"
+    },
+    {
+      "path": "LOG.old.1792402999534163",
+      "size_bytes": 934521,
+      "sha256": "a08595a43f0014ad1df9b675398c3546ba6c298b6526a16bb6abf1c1f017fcc7"
+    },
+    {
+      "path": "MANIFEST-000357",
+      "size_bytes": 1393,
+      "sha256": "0f3e033d97440fbb63d8315ca7a2a654923ee8cfbaee190a05539ae68c9a5ea2"
+    },
+    {
+      "path": "OPTIONS-000007",
+      "size_bytes": 8986,
+      "sha256": "b4f7477a13ef5549fcaf67552a4e522e12cbbc9521afd91eddabf5ab394da75c"
+    },
+    {
+      "path": "OPTIONS-000359",
+      "size_bytes": 8986,
+      "sha256": "b4f7477a13ef5549fcaf67552a4e522e12cbbc9521afd91eddabf5ab394da75c"
+    }
+  ],
+  "database_removed_after_validation": true
+}

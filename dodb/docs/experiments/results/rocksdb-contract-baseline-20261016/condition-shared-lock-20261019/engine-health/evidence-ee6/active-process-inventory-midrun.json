@@ -1,0 +1,28 @@
+{
+  "observed_at_utc": "2026-10-19T06:00:31.993696+00:00",
+  "hostname": "instance-20260923-1013",
+  "matching_processes": [
+    {
+      "pid": 1546329,
+      "comm": "python3",
+      "argv0": "python3",
+      "process_group_id": 1546329,
+      "role": "controller"
+    },
+    {
+      "pid": 1549053,
+      "comm": "time",
+      "argv0": "/usr/bin/time",
+      "process_group_id": 1549053,
+      "role": "time-parent"
+    },
+    {
+      "pid": 1549054,
+      "comm": "service_workloa",
+      "argv0": "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/service_workload",
+      "process_group_id": 1549053,
+      "role": "workload"
+    }
+  ],
+  "other_competing_build_or_workload_processes": []
+}

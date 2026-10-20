@@ -1,0 +1,63 @@
+{
+  "database_path": "/bench/zfs/db/condition-shared-lock-20261019/engine-health-smokes-ee6/databases/rocksdb-service-rw50-new-key-c16-shared16",
+  "file_count": 11,
+  "files": [
+    {
+      "path": "tenant-1/000004.log",
+      "size_bytes": 59103941,
+      "sha256": "fffc03c7dc88adb0dda839ac8904eb1cb4ba0da382fd86a6f625b79f779a20b8"
+    },
+    {
+      "path": "tenant-1/000010.sst",
+      "size_bytes": 58451801,
+      "sha256": "39b6eb7c784e134e8281cc875af0a53bf288779e82d40aea86d1b7f4582669b4"
+    },
+    {
+      "path": "tenant-1/000011.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tenant-1/CURRENT",
+      "size_bytes": 16,
+      "sha256": "eaab30ed3bde0318e208d83e6b0701b3ee9eb6b11da2d9fbab1552e8e4ce88f8"
+    },
+    {
+      "path": "tenant-1/IDENTITY",
+      "size_bytes": 36,
+      "sha256": "26d8565a7e9ed58c6da10ccc1e12461be6e135ce462dc0252df141b01102af2e"
+    },
+    {
+      "path": "tenant-1/LOCK",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tenant-1/LOG",
+      "size_bytes": 41770,
+      "sha256": "779212947608542bf88870096937324def14430f81af8c3e73049ba02958c6b0",
+      "preserved_log_path": "database-logs/tenant-1/LOG"
+    },
+    {
+      "path": "tenant-1/LOG.old.1792387575410363",
+      "size_bytes": 42738,
+      "sha256": "814c4030464b37351919bafb7c10822874e81b0edbca93f16a38f1deacb67b15"
+    },
+    {
+      "path": "tenant-1/MANIFEST-000012",
+      "size_bytes": 268,
+      "sha256": "c8303c6dc11783550abfbc5dae615d58832832e041f4f94c6761eba8c58ce429"
+    },
+    {
+      "path": "tenant-1/OPTIONS-000014",
+      "size_bytes": 8992,
+      "sha256": "d5c08ddaee238bb752b5e668825a2bab4fd30f4ad6e430890e83d5fe7933897b"
+    },
+    {
+      "path": "tenant-1/OPTIONS-000016",
+      "size_bytes": 8993,
+      "sha256": "da62a94c915dfafeb62e725b4138379f99d322b42c11b7a6cc67dd5f2257267e"
+    }
+  ],
+  "database_removed_after_validation": true
+}

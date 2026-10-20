@@ -1,0 +1,152 @@
+{
+  "artifact_kind": "overwrite_cohort_memory_and_database_budget_evidence",
+  "source_sha": "ee6cd94f1a4e7b2bab7af603bc8983bbf8184542",
+  "service_binary_sha256": "7c8b35679df63402b3454067d720c53e1a194f5be6fe459eb7bec35862bdd4b5",
+  "raw_binary_sha256": "97b2b38717679bba4000a9eed2bf8c2435114e3d7fa5717e9727381e3586e3f4",
+  "selected_plan_fingerprint": "8c2be9f3d3518291b7d93e37958bbd06b826dc4a4e83aceff21c080607bceabd",
+  "full_plan_fingerprint": "8e34874cf8299ac5916314537f6cfdf673059e42c9de68a50de0d22a604e6d50",
+  "selected_cohorts": [
+    "A",
+    "B",
+    "C",
+    "E"
+  ],
+  "selected_case_count": 102,
+  "pending_cohorts": [
+    "D"
+  ],
+  "measured_inputs_are_short_screening_evidence_not_long_run_peaks": true,
+  "projection_method": {
+    "run_duration": "8x the 5-second measurement growth for 40 seconds total including warmup and measurement",
+    "projected_rows": "base rows plus 8x observed growth, capped at base rows plus clients times key_domain_per_client; E remains fixed at strict-preseed rows",
+    "validation_state_budget": "4096 bytes per projected row for expected-state and seen-key validation structures",
+    "observed_process_rss": "measured sampled peak retained as fixed process overhead; not multiplied by 8",
+    "collector_and_ledger": "observed simultaneous collector peak multiplied by 8 for A-D; E uses fixed raw smoke accounting",
+    "validation_runtime_reserve_bytes": 536870912,
+    "database_size": "observed database bytes multiplied by 8 for A-D; E is fixed strict-preseed footprint",
+    "caps": {
+      "process_group_rss_bytes": 3221225472,
+      "database_bytes": 4294967296,
+      "available_memory_reserve_bytes": 4794089472,
+      "minimum_free_disk_bytes": 10737418240
+    },
+    "interpretation": "projections are conservative budgets, not measured whole-process peaks; live process-group and host watchdogs plus /usr/bin/time -v remain required"
+  },
+  "cohorts": {
+    "A": {
+      "evidence": "gate/rescreen-r3-results/screen-summary.csv rows 1-35; source 15762ba40",
+      "projected_rows": 302144,
+      "validation_expected_state_budget_bytes_at_4096_bytes_per_row": 1237581824,
+      "observed_peak_rss_bytes_not_scaled": 193015808,
+      "collector_and_ledger_projection_bytes": 218924352,
+      "validation_runtime_reserve_bytes": 536870912,
+      "projected_peak_bytes": 2186392896,
+      "projected_peak_gib": 2.036237061023712,
+      "observed_database_bytes": 317062847,
+      "projected_database_bytes": 2536502776,
+      "per_case_rss_cap_bytes": 3221225472,
+      "per_case_database_cap_bytes": 4294967296
+    },
+    "B": {
+      "evidence": "gate/rescreen-r3-results/screen-summary.csv rw20/c16; source 15762ba40, cross-checked with condition-shared-lock-20261019/oci-evidence-88b43098d/ab-44-88b43098d",
+      "projected_rows": 272144,
+      "validation_expected_state_budget_bytes_at_4096_bytes_per_row": 1114701824,
+      "observed_peak_rss_bytes_not_scaled": 83873792,
+      "collector_and_ledger_projection_bytes": 109169280,
+      "validation_runtime_reserve_bytes": 536870912,
+      "projected_peak_bytes": 1844615808,
+      "projected_peak_gib": 1.7179323434829712,
+      "observed_database_bytes": 265605774,
+      "projected_database_bytes": 2124846192,
+      "per_case_rss_cap_bytes": 3221225472,
+      "per_case_database_cap_bytes": 4294967296
+    },
+    "C": {
+      "evidence": "condition-shared-lock-20261019/oci-evidence-88b43098d/ab-44-88b43098d c32/rw20 and gate/rescreen-r3-results/screen-summary.csv c32/mt-mix; Blink RSS from source 15762ba40; direct-core c32 uses the same-caller-count service/engine bounds",
+      "projected_rows": 525480,
+      "validation_expected_state_budget_bytes_at_4096_bytes_per_row": 2152366080,
+      "observed_peak_rss_bytes_not_scaled": 218484736,
+      "collector_and_ledger_projection_bytes": 229536384,
+      "validation_runtime_reserve_bytes": 536870912,
+      "projected_peak_bytes": 3137258112,
+      "projected_peak_gib": 2.9217993021011353,
+      "observed_database_bytes": 360747297,
+      "projected_database_bytes": 2885978376,
+      "per_case_rss_cap_bytes": 3221225472,
+      "per_case_database_cap_bytes": 4294967296
+    },
+    "E": {
+      "evidence": "engine-health/evidence-ee6/engine-health-smokes-ee6/raw-unconditional-width16-c64/report.json; source ee6cd94f",
+      "projected_rows": 16384,
+      "validation_expected_state_budget_bytes_at_4096_bytes_per_row": 67108864,
+      "observed_peak_rss_bytes_not_scaled": 383193088,
+      "collector_and_ledger_projection_bytes": 30932992,
+      "validation_runtime_reserve_bytes": 536870912,
+      "projected_peak_bytes": 1018105856,
+      "projected_peak_gib": 0.9481849670410156,
+      "observed_database_bytes": 191570101,
+      "projected_database_bytes": 191570101,
+      "per_case_rss_cap_bytes": 3221225472,
+      "per_case_database_cap_bytes": 4294967296
+    }
+  },
+  "excluded_new_key_cohort_projections": {
+    "blink": {
+      "smoke_measurement_ms": 5000,
+      "smoke_warmup_ms": 1000,
+      "projected_total_run_ms_including_warmup_and_measurement": 40000,
+      "smoke_non_delete_mutations": 41536,
+      "projected_new_key_insertions": 332288,
+      "smoke_peak_sampled_rss_bytes": 142589952,
+      "whole_process_rss_projection_bytes": 1140719616,
+      "validation_expected_state_budget_bytes_at_4096_bytes_per_row": 1402011648,
+      "smoke_simultaneous_collector_peak_bytes": 11451424,
+      "collector_and_ledger_budget_projection_bytes": 91611392,
+      "validation_runtime_reserve_bytes": 536870912,
+      "projected_peak_bytes": 3171213568,
+      "projected_peak_gib": 2.953422784805298,
+      "per_case_rss_cap_bytes": 3221225472,
+      "smoke_database_bytes": 312588977,
+      "projected_database_bytes": 2500711816,
+      "per_case_database_cap_bytes": 4294967296
+    },
+    "rocksdb-service": {
+      "smoke_measurement_ms": 5000,
+      "smoke_warmup_ms": 1000,
+      "projected_total_run_ms_including_warmup_and_measurement": 40000,
+      "smoke_non_delete_mutations": 79025,
+      "projected_new_key_insertions": 632200,
+      "smoke_peak_sampled_rss_bytes": 80187392,
+      "whole_process_rss_projection_bytes": 641499136,
+      "validation_expected_state_budget_bytes_at_4096_bytes_per_row": 2630451200,
+      "smoke_simultaneous_collector_peak_bytes": 13524384,
+      "collector_and_ledger_budget_projection_bytes": 108195072,
+      "validation_runtime_reserve_bytes": 536870912,
+      "projected_peak_bytes": 3917016320,
+      "projected_peak_gib": 3.648005723953247,
+      "per_case_rss_cap_bytes": 3221225472,
+      "smoke_database_bytes": 117658555,
+      "projected_database_bytes": 941268440,
+      "per_case_database_cap_bytes": 4294967296
+    },
+    "synchronous-core": {
+      "smoke_measurement_ms": 5000,
+      "smoke_warmup_ms": 1000,
+      "projected_total_run_ms_including_warmup_and_measurement": 40000,
+      "smoke_non_delete_mutations": 87416,
+      "projected_new_key_insertions": 699328,
+      "smoke_peak_sampled_rss_bytes": 87924736,
+      "whole_process_rss_projection_bytes": 703397888,
+      "validation_expected_state_budget_bytes_at_4096_bytes_per_row": 2905407488,
+      "smoke_simultaneous_collector_peak_bytes": 13838544,
+      "collector_and_ledger_budget_projection_bytes": 110708352,
+      "validation_runtime_reserve_bytes": 536870912,
+      "projected_peak_bytes": 4256384640,
+      "projected_peak_gib": 3.9640671014785767,
+      "per_case_rss_cap_bytes": 3221225472,
+      "smoke_database_bytes": 64747462,
+      "projected_database_bytes": 517979696,
+      "per_case_database_cap_bytes": 4294967296
+    }
+  }
+}

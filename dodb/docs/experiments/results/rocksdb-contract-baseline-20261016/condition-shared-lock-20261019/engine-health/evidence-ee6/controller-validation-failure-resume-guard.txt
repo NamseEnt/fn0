@@ -1,0 +1,3 @@
+Resume attempt with runner SHA-256 6ad613c631dc4a2ba4a3009716b121d978a372b4890b34f37dc527bc1ec1adc6 exited before starting a workload. The interrupted-running guard ran before completed-child recovery, so the already completed case remained at 79 complete and 1 running in the journal. Its database and case artifacts were preserved.
+
+journal contains an interrupted running case; inspect its database before resuming

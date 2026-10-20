@@ -32,6 +32,33 @@ The RocksDB wrapper dispatches those same variants in
 | Scan | Canonical document-key order, exclusive document-key cursor, limit, tombstone omission, a per-call snapshot, and budget reservation before value copy. Wrapper dispatch: [`lib.rs`](../../../../crates/dodb-rocksdb/src/lib.rs#L1244-L1262); cursor, limit, and budget handling: [`lib.rs`](../../../../crates/dodb-rocksdb/src/lib.rs#L1591-L1633). |
 | Transact | Conditions are evaluated under locks covering the canonical union of condition and mutation keys; all mutations commit atomically and share one nonzero revision/identity. Empty requests and duplicate condition/mutation keys are invalid; condition plus mutation on one key is supported. A condition-only success allocates nothing and returns no identity. Implementation: [`lib.rs`](../../../../crates/dodb-rocksdb/src/lib.rs#L1792-L2084); common evidence for condition-only and shared multi-key revisions: [`transaction_contract.rs`](../../../../crates/dodb-rocksdb/tests/common/transaction_contract.rs#L263-L290) and [`transaction_contract.rs`](../../../../crates/dodb-rocksdb/tests/common/transaction_contract.rs#L352-L405). |
 
+## Response-budget enforcement boundary
+
+The current response limit preserves the API's rejection behavior, but it is
+not a universal guard before result materialization. For `Get`, RocksDB returns
+a native allocation and `decode_and_free_get_value` copies the encoded state
+into a Rust `Vec`; only after `RevisionState` exists does the wrapper construct
+`Response::Get` and call `enforce_response_budget`. Thus a single returned value
+is copied before the frame-size check. This is per-key bounded by the stored
+value, but it does not satisfy a plan requirement to reject every oversized
+result before allocating its result value.
+
+For `Query` and `Scan`, each key is decoded and the native iterator exposes the
+current value before `ReadResponseBudget::reserve_document` checks the
+cumulative encoded result budget. The wrapper performs that reservation before
+copying that document's value into the returned vector. Earlier documents may
+already be materialized, and the current native iterator value has already
+been read; the guarantee is limited to checking before each per-document Rust
+value copy, not before all query/scan work or allocation.
+
+The response-budget validation in `read_contract.rs` proves exact-fit and
+too-small responses and tenant-scoped behavior. It does not prove pre-allocation
+rejection for every API path. A broader pre-materialization enforcement
+requirement therefore remains incomplete; no implementation change is made by
+this audit.
+
+Implementation: [Get dispatch and post-response check](../../../../crates/dodb-rocksdb/src/lib.rs#L1100-L1139), [native Get decoder](../../../../crates/dodb-rocksdb/src/lib.rs#L2523-L2533), [present-value Vec copy](../../../../crates/dodb-rocksdb/src/lib.rs#L2386-L2400), [Query reserve and copy](../../../../crates/dodb-rocksdb/src/lib.rs#L1622-L1631), [Scan reserve and copy](../../../../crates/dodb-rocksdb/src/lib.rs#L1660-L1700), [budget tests](../../../../crates/dodb-rocksdb/tests/read_contract.rs#L342-L463).
+
 For each key, `RevisionEquals` identifies the complete present or missing state.
 Missing revision zero is the initial state. Deleted states retain revisions, and
 issued revisions are not reused for another committed state after recreation

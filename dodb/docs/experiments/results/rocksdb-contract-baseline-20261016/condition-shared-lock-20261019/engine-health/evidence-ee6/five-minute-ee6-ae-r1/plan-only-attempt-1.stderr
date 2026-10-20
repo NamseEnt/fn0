@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r1/runner.py", line 1059, in <module>
+    main()
+  File "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r1/runner.py", line 1000, in main
+    plan = make_plan(args.smoke_root, selected_cohorts)
+  File "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r1/runner.py", line 630, in make_plan
+    raise ValueError("B-link new-key projection exceeds the per-case database budget")
+ValueError: B-link new-key projection exceeds the per-case database budget

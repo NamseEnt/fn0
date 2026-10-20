@@ -1,0 +1,23 @@
+	Command being timed: "env /bench/zfs/db/condition-shared-lock-20261019/long-matrix-ee6-abce/frozen-ee6-88b43098d/service_workload --backend rocksdb --scenario rw20 --data-dir /bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r2/results/databases/A-rw20-c16-r3-rocksdb-reserved-ranges-shared-s16 --report /bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r2/results/cases/A-rw20-c16-r3-rocksdb-reserved-ranges-shared-s16/report.json --seed 20261013 --rows 10000 --value-size 512 --clients 16 --warmup-ms 10000 --measurement-ms 300000 --call-cap 100000000 --max-write-ledger 5000000 --require-full-window 1 --mutation-workload overwrite --overwrite-slots-per-client 1024 --latency-storage log1024 --include-width-16 1 --revision-allocator reserved-ranges --condition-key-lock-mode shared --engine-health-interval-ms 1000 --research-metrics 0 --read-stage-metrics 0 --detailed-write-metrics 0 --shared-blocking-slots 16 --client-executor dedicated"
+	User time (seconds): 186.34
+	System time (seconds): 98.75
+	Percent of CPU this job got: 87%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 5:26.43
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 713116
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 355024
+	Voluntary context switches: 7919130
+	Involuntary context switches: 2394571
+	Swaps: 0
+	File system inputs: 13620456
+	File system outputs: 10011223
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

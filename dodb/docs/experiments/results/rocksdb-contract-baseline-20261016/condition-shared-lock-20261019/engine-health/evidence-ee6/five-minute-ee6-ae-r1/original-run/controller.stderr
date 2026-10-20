@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r1/runner.py", line 1079, in <module>
+    main()
+  File "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r1/runner.py", line 1069, in main
+    run_case(job, args.result_root, binary_paths, journal)
+  File "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r1/runner.py", line 902, in run_case
+    raise RuntimeError(f"{case_id} exited {completed_returncode}; database preserved")
+RuntimeError: A-rw20-c16-r2-rocksdb-direct-reserved-ranges-shared-s16 exited -15; database preserved

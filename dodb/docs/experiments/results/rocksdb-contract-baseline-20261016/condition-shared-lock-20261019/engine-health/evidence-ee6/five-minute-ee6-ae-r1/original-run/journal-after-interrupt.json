@@ -1,0 +1,126 @@
+{
+  "source_sha": "ee6cd94f1a4e7b2bab7af603bc8983bbf8184542",
+  "plan_case_count": 111,
+  "selected_cohorts": [
+    "A",
+    "E"
+  ],
+  "selected_case_count": 21,
+  "selected_case_ids": [
+    "A-rw20-c16-r1-rocksdb-direct-reserved-ranges-shared-s16",
+    "A-rw20-c16-r1-blink-reserved-ranges-shared-sna",
+    "A-rw20-c16-r1-rocksdb-reserved-ranges-shared-s16",
+    "A-rw20-c16-r2-rocksdb-direct-reserved-ranges-shared-s16",
+    "A-rw20-c16-r2-blink-reserved-ranges-shared-sna",
+    "A-rw20-c16-r2-rocksdb-reserved-ranges-shared-s16",
+    "A-rw20-c16-r3-rocksdb-direct-reserved-ranges-shared-s16",
+    "A-rw20-c16-r3-blink-reserved-ranges-shared-sna",
+    "A-rw20-c16-r3-rocksdb-reserved-ranges-shared-s16",
+    "E-w16-c64-r1-synchronous-core-reserved-ranges-shared-s32",
+    "E-w16-c64-r1-rocksdb-service-reserved-ranges-shared-s32",
+    "E-w16-c64-r1-blink-reserved-ranges-shared-sna",
+    "E-w16-c64-r1-raw-rocksdb-reserved-ranges-shared-sna",
+    "E-w16-c64-r2-rocksdb-service-reserved-ranges-shared-s32",
+    "E-w16-c64-r2-blink-reserved-ranges-shared-sna",
+    "E-w16-c64-r2-raw-rocksdb-reserved-ranges-shared-sna",
+    "E-w16-c64-r2-synchronous-core-reserved-ranges-shared-s32",
+    "E-w16-c64-r3-blink-reserved-ranges-shared-sna",
+    "E-w16-c64-r3-raw-rocksdb-reserved-ranges-shared-sna",
+    "E-w16-c64-r3-synchronous-core-reserved-ranges-shared-s32",
+    "E-w16-c64-r3-rocksdb-service-reserved-ranges-shared-s32"
+  ],
+  "plan_fingerprint": "97ee39577f8029f36d2fdf112448ab0927da12dd2d4f494271b61a09abebb14c",
+  "pending_cohorts": [
+    "B",
+    "C",
+    "D"
+  ],
+  "input_fingerprints": {
+    "service-rw20-c16-overwrite": [
+      [
+        0,
+        "5d78753cccb1fdf2"
+      ],
+      [
+        1,
+        "1d948c8ddf6c8727"
+      ],
+      [
+        2,
+        "f96ed4727ba26ca5"
+      ],
+      [
+        3,
+        "b04b0a15c374f57c"
+      ],
+      [
+        4,
+        "9d4a1156bebd5d26"
+      ],
+      [
+        5,
+        "0b5ac490f0383867"
+      ],
+      [
+        6,
+        "995cef2be0b628ab"
+      ],
+      [
+        7,
+        "0017854c1bfb1f52"
+      ],
+      [
+        8,
+        "b50b24dd873fe6a2"
+      ],
+      [
+        9,
+        "25bdf4a7f006fddc"
+      ],
+      [
+        10,
+        "50d2d6e9c7fcab5b"
+      ],
+      [
+        11,
+        "9bedb82440595bf6"
+      ],
+      [
+        12,
+        "4064b22158d16673"
+      ],
+      [
+        13,
+        "ad44a2dbe8955c05"
+      ],
+      [
+        14,
+        "13935709f525503e"
+      ],
+      [
+        15,
+        "382037aba8f857ae"
+      ]
+    ]
+  },
+  "A-rw20-c16-r1-rocksdb-direct-reserved-ranges-shared-s16": {
+    "status": "complete",
+    "maximum_rss_kb": 763608,
+    "input_fingerprint_group": "service-rw20-c16-overwrite"
+  },
+  "A-rw20-c16-r1-blink-reserved-ranges-shared-sna": {
+    "status": "complete",
+    "maximum_rss_kb": 1199608,
+    "input_fingerprint_group": "service-rw20-c16-overwrite"
+  },
+  "A-rw20-c16-r1-rocksdb-reserved-ranges-shared-s16": {
+    "status": "complete",
+    "maximum_rss_kb": 745992,
+    "input_fingerprint_group": "service-rw20-c16-overwrite"
+  },
+  "A-rw20-c16-r2-rocksdb-direct-reserved-ranges-shared-s16": {
+    "status": "failed",
+    "exit_status": -15,
+    "database_preserved": true
+  }
+}

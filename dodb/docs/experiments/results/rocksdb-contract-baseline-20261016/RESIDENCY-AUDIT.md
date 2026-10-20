@@ -113,6 +113,31 @@ that resident set exceeds the imposed limit, the run becomes a capacity/failure
 case rather than a comparable over-cache throughput measurement.
 
 This audit records a source-backed feasibility limit only. No B-link paging or
-cache behavior was changed, no benchmark axis was narrowed, and no memory or
-OOM experiment was performed. The phase decision remains pending the user's
-response to the root's question about comparison scope.
+cache behavior was changed, and no memory-exceed or OOM experiment was
+performed. The memory-exceed axis is Deferred by user, not complete.
+
+## Evidence from the completed representative five-minute runs
+
+The selected resident-data workloads validated 270,376–270,481 live rows for
+the A conditional family, equal to 132.02–132.07 MiB of logical 512-byte value
+payload, and 262,144 rows for E, equal to 128 MiB of logical value payload.
+These figures omit keys, revision metadata, tombstones, indexes, allocator
+overhead, and physical WAL/database bytes. They establish the workload's
+logical live-value domain, not the number of pages resident in host memory.
+
+RocksDB health reports observed `block-cache-usage` up to 32 MiB and
+`cur-size-all-mem-tables` up to 72.5 MiB. The reports do not include the
+effective block-cache capacity, a cache-to-dataset ratio, or a measurement of
+the complete working set's residency. Therefore, those property values cannot
+show that the whole logical dataset fits inside RocksDB's effective cache or
+inside host RAM. B-link reports these RocksDB-specific properties as
+unsupported. The workloads completed with the process RSS and host-memory
+limits recorded in [the five-minute results](condition-shared-lock-20261019/engine-health/FIVE-MINUTE-RESULTS.md),
+but this is not an over-cache comparison or proof of page residency.
+
+The resource reports also do not split harness and native-engine RSS. They
+provide measurement-window process samples, `/usr/bin/time -v` whole-child
+maximum RSS through validation and reopen, collector buffer-capacity
+accounting, and selected RocksDB property values. None is an engine-only RSS
+measurement. The resident-versus-effective-cache requirement remains
+incomplete pending effective-capacity and residency evidence.

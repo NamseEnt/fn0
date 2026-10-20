@@ -1,0 +1,11 @@
+{
+  "completed_cases": 9,
+  "plan_case_count": 111,
+  "pending_cohorts": [
+    "A",
+    "B",
+    "C",
+    "E"
+  ],
+  "result_root": "/bench/zfs/db/condition-shared-lock-20261019/new-key-d30-ee6/results"
+}

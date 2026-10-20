@@ -1,0 +1,108 @@
+{
+  "source_sha": "ee6cd94f1a4e7b2bab7af603bc8983bbf8184542",
+  "plan_case_count": 111,
+  "selected_cohorts": [
+    "D"
+  ],
+  "selected_case_count": 3,
+  "selected_case_ids": [
+    "D-rw50-c16-r1-blink-reserved-ranges-shared-sna",
+    "D-rw50-c16-r1-rocksdb-reserved-ranges-shared-s16",
+    "D-rw50-c16-r1-rocksdb-direct-reserved-ranges-shared-s16"
+  ],
+  "plan_fingerprint": "467045eda94ea614763b995bc1ba7a062bff660a4472f6bc918ef386db957a54",
+  "pending_cohorts": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "input_fingerprints": {
+    "service-rw50-c16-new-key": [
+      [
+        0,
+        "ea11e742de6c820c"
+      ],
+      [
+        1,
+        "0253497f8ea911b9"
+      ],
+      [
+        2,
+        "253566fd1f71b1d1"
+      ],
+      [
+        3,
+        "422fb7551b9f6168"
+      ],
+      [
+        4,
+        "ead1f6f5220906dd"
+      ],
+      [
+        5,
+        "c7decbeb95441ac0"
+      ],
+      [
+        6,
+        "b1470d7a7afecc7b"
+      ],
+      [
+        7,
+        "7b89c7dd68017511"
+      ],
+      [
+        8,
+        "8a1a848c15980d43"
+      ],
+      [
+        9,
+        "51c763850b7da796"
+      ],
+      [
+        10,
+        "0255014725b6cde4"
+      ],
+      [
+        11,
+        "88fa9ba42887782f"
+      ],
+      [
+        12,
+        "1ef2bef5fd435fab"
+      ],
+      [
+        13,
+        "421aec5ee9bba68c"
+      ],
+      [
+        14,
+        "18aa179a2ba699eb"
+      ],
+      [
+        15,
+        "eac32f0bbae3d07a"
+      ]
+    ]
+  },
+  "D-rw50-c16-r1-blink-reserved-ranges-shared-sna": {
+    "status": "complete",
+    "maximum_rss_kb": 652820,
+    "input_fingerprint_group": "service-rw50-c16-new-key"
+  },
+  "D-rw50-c16-r1-rocksdb-reserved-ranges-shared-s16": {
+    "status": "complete",
+    "maximum_rss_kb": 477544,
+    "input_fingerprint_group": "service-rw50-c16-new-key"
+  },
+  "D-rw50-c16-r1-rocksdb-direct-reserved-ranges-shared-s16": {
+    "status": "complete",
+    "maximum_rss_kb": 560748,
+    "input_fingerprint_group": "service-rw50-c16-new-key"
+  },
+  "selected_cohorts_complete": true,
+  "full_matrix_complete": false,
+  "status": "selected-cohorts-complete",
+  "finished_unix_time_ns": 1792396021683470524
+}

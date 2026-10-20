@@ -1,0 +1,12 @@
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/condition-shared-lock-20261019/phase6-history-ee6/dodb/crates/dodb-rocksdb)
+    Finished `release` profile [optimized + debuginfo] target(s) in 17.18s
+     Running tests/contract_history.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/contract_history-4cd16ad45119ef70)
+
+running 4 tests
+test bounded_history_checker_accepts_reverse_global_revision_order_for_independent_keys ... ok
+test bounded_history_checker_rejects_stale_read_and_partial_atomic_snapshot ... ok
+test bounded_read_write_histories_replay_for_blink_and_rocksdb_modes ... ok
+test conditional_multi_key_history_agrees_for_blink_and_rocksdb_allocators ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+

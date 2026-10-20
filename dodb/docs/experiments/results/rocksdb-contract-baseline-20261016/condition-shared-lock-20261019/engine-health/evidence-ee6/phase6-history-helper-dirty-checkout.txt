@@ -1,0 +1,3 @@
+The first focused OCI gate invocation exited before compiling because the pinned build helper requires a clean checkout. The separate checkout was based at ee6cd94f1a4e7b2bab7af603bc8983bbf8184542 and contained only the approved test-only change in dodb/crates/dodb-rocksdb/tests/contract_history.rs. The source has since been committed in that separate checkout before retrying the gate.
+
+source checkout must be clean

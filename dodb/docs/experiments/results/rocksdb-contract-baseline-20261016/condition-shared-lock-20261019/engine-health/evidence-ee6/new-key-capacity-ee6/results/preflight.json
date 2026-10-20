@@ -1,0 +1,22 @@
+{
+  "source_sha": "ee6cd94f1a4e7b2bab7af603bc8983bbf8184542",
+  "source_status": "",
+  "hostname": "instance-20260923-1013",
+  "architecture": "aarch64",
+  "online_cpu_count": 2,
+  "memory_bytes": {
+    "MemTotal": 11427577856,
+    "MemAvailable": 5051285504,
+    "Cached": 1653268480,
+    "SwapFree": 3885944832
+  },
+  "filesystem_path": "/bench/zfs/db/condition-shared-lock-20261019/new-key-capacity-ee6",
+  "filesystem_free_bytes": 73562902528,
+  "active_build_or_workload_processes": [],
+  "time_binary": "/usr/bin/time",
+  "binary_sha256": {
+    "service": "7c8b35679df63402b3454067d720c53e1a194f5be6fe459eb7bec35862bdd4b5",
+    "raw": "97b2b38717679bba4000a9eed2bf8c2435114e3d7fa5717e9727381e3586e3f4"
+  },
+  "checked_unix_time_ns": 1792395935021766174
+}

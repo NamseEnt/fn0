@@ -1,0 +1,163 @@
+{
+  "source_sha": "ee6cd94f1a4e7b2bab7af603bc8983bbf8184542",
+  "service_binary_sha256": "7c8b35679df63402b3454067d720c53e1a194f5be6fe459eb7bec35862bdd4b5",
+  "raw_binary_sha256": "97b2b38717679bba4000a9eed2bf8c2435114e3d7fa5717e9727381e3586e3f4",
+  "case_count": 5,
+  "property_status_counts": {
+    "actual-delayed-write-rate:value": 34,
+    "block-cache-usage:value": 34,
+    "compaction-pending:value": 34,
+    "cur-size-all-mem-tables:value": 34,
+    "estimate-pending-compaction-bytes:value": 34,
+    "is-write-stopped:value": 34,
+    "mem-table-flush-pending:value": 34,
+    "num-running-compactions:value": 34,
+    "num-running-flushes:value": 34
+  },
+  "cases": [
+    {
+      "case": "blink-rw50-new-key-c16",
+      "backend": "blink",
+      "scenario": "rw50",
+      "health_status": "unsupported",
+      "health_samples": 0,
+      "database_names": [],
+      "rss_peak_sampled_kb": 139248,
+      "rss_sample_count": 24,
+      "api_calls": 32087,
+      "successful_mutations": 43159,
+      "successful_deletes": 1623,
+      "intentional_rejections": 1118,
+      "natural_conflicts": 0,
+      "other_errors": 0,
+      "verification_error_count": 0,
+      "final_validation_passed": true,
+      "reopen_validation_passed": true,
+      "disk_bytes_after_reopen": 312588977
+    },
+    {
+      "case": "raw-unconditional-width16-c64",
+      "backend": "RawRocksDb",
+      "scenario": null,
+      "health_status": "sampled",
+      "health_samples": 5,
+      "database_names": [
+        "raw_database"
+      ],
+      "rss_peak_sampled_kb": 374212,
+      "rss_sample_count": 27,
+      "measurement_acknowledged_batches": 11741,
+      "final_validation_passed": true,
+      "reopen_validation_passed": true,
+      "disk_bytes": 191570101,
+      "disk_growth_bytes": 43871403
+    },
+    {
+      "case": "rocksdb-core-mt-mix-c16-shared16",
+      "backend": "rocksdb-direct",
+      "scenario": "mt-mix",
+      "health_status": "sampled",
+      "health_samples": 5,
+      "database_names": [
+        "tenant_1",
+        "tenant_2",
+        "tenant_3",
+        "tenant_4"
+      ],
+      "rss_peak_sampled_kb": 98784,
+      "rss_sample_count": 25,
+      "api_calls": 198018,
+      "successful_mutations": 82566,
+      "successful_deletes": 2962,
+      "intentional_rejections": 2150,
+      "natural_conflicts": 12,
+      "other_errors": 0,
+      "verification_error_count": 0,
+      "final_validation_passed": true,
+      "reopen_validation_passed": true,
+      "disk_bytes_after_reopen": 151834861
+    },
+    {
+      "case": "rocksdb-core-rw50-new-key-c16-shared16",
+      "backend": "rocksdb-direct",
+      "scenario": "rw50",
+      "health_status": "sampled",
+      "health_samples": 5,
+      "database_names": [
+        "tenant_1"
+      ],
+      "rss_peak_sampled_kb": 85864,
+      "rss_sample_count": 25,
+      "api_calls": 67377,
+      "successful_mutations": 90880,
+      "successful_deletes": 3464,
+      "intentional_rejections": 2299,
+      "natural_conflicts": 0,
+      "other_errors": 0,
+      "verification_error_count": 0,
+      "final_validation_passed": true,
+      "reopen_validation_passed": true,
+      "disk_bytes_after_reopen": 64747462
+    },
+    {
+      "case": "rocksdb-service-rw50-new-key-c16-shared16",
+      "backend": "rocksdb",
+      "scenario": "rw50",
+      "health_status": "sampled",
+      "health_samples": 4,
+      "database_names": [
+        "tenant_1"
+      ],
+      "rss_peak_sampled_kb": 78308,
+      "rss_sample_count": 24,
+      "api_calls": 60162,
+      "successful_mutations": 82085,
+      "successful_deletes": 3060,
+      "intentional_rejections": 2065,
+      "natural_conflicts": 0,
+      "other_errors": 0,
+      "verification_error_count": 0,
+      "final_validation_passed": true,
+      "reopen_validation_passed": true,
+      "disk_bytes_after_reopen": 117658555
+    }
+  ],
+  "long_matrix_plan": {
+    "path": "long-matrix-plan.json",
+    "case_count": 111,
+    "cohort_counts": {
+      "A": 60,
+      "B": 9,
+      "C": 9,
+      "D": 9,
+      "E": 24
+    },
+    "selected_plan_path": "long-matrix-plan-abce.json",
+    "selected_case_count": 102,
+    "selected_cohorts": [
+      "A",
+      "B",
+      "C",
+      "E"
+    ],
+    "pending_cohorts": [
+      "D"
+    ],
+    "selected_plan_fingerprint": "8c2be9f3d3518291b7d93e37958bbd06b826dc4a4e83aceff21c080607bceabd",
+    "selected_requested_seconds": 4080.0,
+    "execution_started": false,
+    "execution_budget_status": "selected cohorts fit projected caps; cohort D remains unselected and pending",
+    "overwrite_projection_gib": {
+      "A": 2.036237061023712,
+      "B": 1.7179323434829712,
+      "C": 2.9217993021011353,
+      "E": 0.9481849670410156
+    },
+    "new_key_projection_gib": {
+      "blink": 2.953422784805298,
+      "rocksdb-service": 3.648005723953247,
+      "synchronous-core": 3.9640671014785767
+    },
+    "watchdog_process_group_selfcheck": "passed locally and on OCI"
+  }
+}

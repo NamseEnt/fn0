@@ -1,0 +1,83 @@
+{
+  "database_path": "/bench/zfs/db/condition-shared-lock-20261019/new-key-d30-ee6/results/databases/D-rw50-c16-r3-rocksdb-reserved-ranges-shared-s16",
+  "file_count": 15,
+  "files": [
+    {
+      "path": "tenant-1/000017.log",
+      "size_bytes": 39312446,
+      "sha256": "c782f2d2f8ec033b1b30e35ad6597ac5d2adc039f374f3692a6784043aefdd97"
+    },
+    {
+      "path": "tenant-1/000019.sst",
+      "size_bytes": 67720436,
+      "sha256": "7af1dff53fc0e28300d3205e5863d9cd80187ac4be047ae08f5bdea0a77d8461"
+    },
+    {
+      "path": "tenant-1/000020.sst",
+      "size_bytes": 67679942,
+      "sha256": "83861d759dc782f2e67424893bd59c2bcf515cedd053a4ff4293b77057119a82"
+    },
+    {
+      "path": "tenant-1/000021.sst",
+      "size_bytes": 67669220,
+      "sha256": "8b88507ff3ea4ea0e16ce7954bc041bfe59242f873ff40a76e29884dc2a00de0"
+    },
+    {
+      "path": "tenant-1/000022.sst",
+      "size_bytes": 49914991,
+      "sha256": "35cb24beccddd17e3ed9fb4a6f514475f2f73e326d584cdd658a25d2136ba90a"
+    },
+    {
+      "path": "tenant-1/000025.sst",
+      "size_bytes": 39031062,
+      "sha256": "f9d6a4ea50c22ee5ae6be86fdee04b4d6ee08ec11a9dd0995cee2c1c7473cfd3"
+    },
+    {
+      "path": "tenant-1/000026.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tenant-1/CURRENT",
+      "size_bytes": 16,
+      "sha256": "306d61aa07213eb5ff589100ad05aedf9b844bccec89d638b94259494e54d751"
+    },
+    {
+      "path": "tenant-1/IDENTITY",
+      "size_bytes": 36,
+      "sha256": "1bb8e8533aaaf4dfd4bf1b4cb1c42d63319154741804661ff319c74d6c9fd429"
+    },
+    {
+      "path": "tenant-1/LOCK",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tenant-1/LOG",
+      "size_bytes": 45800,
+      "sha256": "81d480c38c2cf377e11b60e3efa3ebca98585455727d1e09332899df011cc032",
+      "preserved_log_path": "database-logs/tenant-1/LOG"
+    },
+    {
+      "path": "tenant-1/LOG.old.1792397064014698",
+      "size_bytes": 75959,
+      "sha256": "2ddad087b4a4cf2c67e7e7fbe45a88026a28b1411c76c428806011ee36bcf13e"
+    },
+    {
+      "path": "tenant-1/MANIFEST-000027",
+      "size_bytes": 770,
+      "sha256": "67be3aad3e51992e38ad313f231300d216e99b20a5270554dcf6f80d7fd21dde"
+    },
+    {
+      "path": "tenant-1/OPTIONS-000029",
+      "size_bytes": 8992,
+      "sha256": "d5c08ddaee238bb752b5e668825a2bab4fd30f4ad6e430890e83d5fe7933897b"
+    },
+    {
+      "path": "tenant-1/OPTIONS-000031",
+      "size_bytes": 8993,
+      "sha256": "da62a94c915dfafeb62e725b4138379f99d322b42c11b7a6cc67dd5f2257267e"
+    }
+  ],
+  "database_removed_after_validation": true
+}

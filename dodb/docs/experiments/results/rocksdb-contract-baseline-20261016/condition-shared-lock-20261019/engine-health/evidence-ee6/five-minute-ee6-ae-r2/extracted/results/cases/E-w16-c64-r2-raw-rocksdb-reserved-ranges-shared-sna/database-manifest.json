@@ -1,0 +1,68 @@
+{
+  "database_path": "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r2/results/databases/E-w16-c64-r2-raw-rocksdb-reserved-ranges-shared-sna",
+  "file_count": 12,
+  "files": [
+    {
+      "path": "000358.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "000362.sst",
+      "size_bytes": 68356199,
+      "sha256": "03ed2366aa61965c3229fdf85c5434097d120d7345c3e849d3928982078ac6a8"
+    },
+    {
+      "path": "000363.sst",
+      "size_bytes": 68355060,
+      "sha256": "bcd1f56cf40530785defe751a08061880fb942392639bc712093776fa057be82"
+    },
+    {
+      "path": "000364.sst",
+      "size_bytes": 9649450,
+      "sha256": "dc60e9db7b4b8fa1a7eca34f62fef4ccb4801af9ef1136869790747f6ce4bbe2"
+    },
+    {
+      "path": "CURRENT",
+      "size_bytes": 16,
+      "sha256": "ac405627d2ab1f4c2e34e4d5dbdeebea78c8b82c6975fb756eee29d2f26ab851"
+    },
+    {
+      "path": "IDENTITY",
+      "size_bytes": 36,
+      "sha256": "e2eb07bb8d26f7806e1e75d04d6ee0736e92153bd8275df4e199b55931594fef"
+    },
+    {
+      "path": "LOCK",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "LOG",
+      "size_bytes": 45287,
+      "sha256": "5f2b1f3c981ada964bda546294b5c3898d062f36ebbceb379e9a44445679068f",
+      "preserved_log_path": "database-logs/LOG"
+    },
+    {
+      "path": "LOG.old.1792404158664416",
+      "size_bytes": 938980,
+      "sha256": "099ad510996c99a5e2b3616e041e7566beeb616e7c9768820b5c3ae1ea3919c1"
+    },
+    {
+      "path": "MANIFEST-000359",
+      "size_bytes": 2223,
+      "sha256": "60f121a1c3e088221ab0d5848bac72e4ed7c4a1ffb10be0578457184da78ee43"
+    },
+    {
+      "path": "OPTIONS-000007",
+      "size_bytes": 8986,
+      "sha256": "b4f7477a13ef5549fcaf67552a4e522e12cbbc9521afd91eddabf5ab394da75c"
+    },
+    {
+      "path": "OPTIONS-000361",
+      "size_bytes": 8986,
+      "sha256": "b4f7477a13ef5549fcaf67552a4e522e12cbbc9521afd91eddabf5ab394da75c"
+    }
+  ],
+  "database_removed_after_validation": true
+}

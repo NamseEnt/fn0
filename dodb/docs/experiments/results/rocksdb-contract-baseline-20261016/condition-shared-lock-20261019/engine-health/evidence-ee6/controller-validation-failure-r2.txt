@@ -1,0 +1,11 @@
+Resume attempt did not start a workload. Recovery failed while revalidating the already completed child because the controller referred to Path without importing it; pathlib was already imported. The case database and journal were preserved.
+
+Traceback (most recent call last):
+  File "/bench/zfs/db/condition-shared-lock-20261019/long-matrix-ee6-abce/run-condition-lock-long-matrix.py", line 1029, in <module>
+    main()
+  File "/bench/zfs/db/condition-shared-lock-20261019/long-matrix-ee6-abce/run-condition-lock-long-matrix.py", line 1005, in main
+    recover_completed_case(jobs_by_id[case_id], args.result_root, binary_paths, journal)
+  File "/bench/zfs/db/condition-shared-lock-20261019/long-matrix-ee6-abce/run-condition-lock-long-matrix.py", line 916, in recover_completed_case
+    if Path(case_manifest.get("database_path", "")) != database_path:
+       ^^^^
+NameError: name 'Path' is not defined

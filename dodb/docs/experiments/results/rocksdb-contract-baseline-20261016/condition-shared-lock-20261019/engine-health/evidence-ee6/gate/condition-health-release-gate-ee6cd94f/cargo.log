@@ -1,0 +1,93 @@
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/condition-shared-lock-20261019/source-88b43098d/dodb/crates/dodb-rocksdb)
+    Finished `release` profile [optimized + debuginfo] target(s) in 42.18s
+     Running unittests src/lib.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/dodb_rocksdb-ab9831430d697c48)
+
+running 28 tests
+test tests::allocator_modes_switch_above_existing_counter_high_water ... ok
+test tests::assigned_revision_is_burned_when_user_transaction_rolls_back ... ok
+test tests::condition_only_transactions_return_without_revision_in_both_lock_modes ... ok
+test tests::disk_tenant_cold_open_is_shared_and_then_uses_read_fast_path ... ok
+test tests::failed_tenant_open_can_be_retried ... ok
+test tests::get_completes_while_same_tenant_transaction_is_open ... ok
+test tests::initialized_tenant_reads_skip_repeated_path_checks ... ok
+test tests::missing_tenant_reads_do_not_create_database_directory ... ok
+test tests::overlapping_condition_and_mutation_key_is_exclusive_from_first_lock ... ok
+test tests::partial_range_is_abandoned_after_reopen_and_failed_tokens_are_burned ... ok
+test tests::range_reservation_rejects_overflow_and_corrupt_counter ... ok
+test tests::read_iterator_keeps_database_alive_after_tenant_owner_drops ... ok
+test tests::read_iterator_keeps_one_snapshot_across_atomic_transaction_commit ... ok
+test tests::read_waits_for_an_initializing_registry_cell ... ok
+test tests::request_kinds_use_the_expected_admission_lane ... ok
+test tests::reserved_revision_overlap_preserves_commit_order_and_read_after_success ... ok
+test tests::reserved_revision_ranges_are_unique_under_concurrent_assignment ... ok
+test tests::shared_admission_accepts_sixteen_slots_and_rejects_zero ... ok
+test tests::shared_admission_remains_the_default_eight_slot_mode ... ok
+test tests::shared_condition_locks_allow_concurrent_holders_for_present_and_missing_keys ... ok
+test tests::shared_sixteen_slot_admission_stays_bounded_until_blocking_work_finishes ... ok
+test tests::shutdown_drains_a_blocking_operation_after_its_request_is_cancelled ... ok
+test tests::shutdown_waits_for_an_in_flight_request_and_service_reopens ... ok
+test tests::split_admission_reserves_two_read_and_six_write_slots ... ok
+test tests::timed_out_writer_does_not_leak_lock_and_succeeds_after_holder_releases ... ok
+test tests::uncertain_reservation_commit_does_not_publish_its_range ... ok
+test tests::weak_engine_health_observer_samples_and_allows_database_reopen ... ok
+test tests::writer_first_prevents_stale_condition_success_and_rollback_releases_shared_locks ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.70s
+
+     Running unittests src/bin/service_workload.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/service_workload-8328e4af95cf3af9)
+
+running 9 tests
+test tests::binary_keys_have_sixteen_raw_bytes_and_canonical_encoded_size_range ... ok
+test tests::condition_key_lock_mode_cli_defaults_and_accepts_only_named_modes ... ok
+test tests::expanded_schedule_keeps_preparatory_inclusive_ratios_for_each_profile ... ok
+test tests::log1024_histogram_counts_boundaries_and_merges_against_exact_samples ... ok
+test tests::overwrite_key_slots_are_per_client_and_preserve_seeded_key_space ... ok
+test tests::schedules_keep_all_categories_and_api_ratio_including_preparatory_gets ... ok
+test tests::width_four_and_eight_are_single_transaction_workflows ... ok
+test tests::width_sixteen_is_opt_in_and_replaces_half_of_width_eight_writes ... ok
+test tests::width_sixteen_new_key_workflows_have_disjoint_adjacent_key_sets ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/unconditional_write_workload.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/unconditional_write_workload-246b8ca2e4c59d97)
+
+running 4 tests
+test tests::bounded_histogram_counts_all_observations_and_merges_buckets ... ok
+test tests::measurement_input_prefix_fingerprint_tracks_canonical_keys_and_payloads ... ok
+test tests::raw_key_and_placeholder_match_full_api_physical_envelope ... ok
+test tests::untouched_slots_must_keep_their_exact_baseline_revision ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/contract_history.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/contract_history-4cd16ad45119ef70)
+
+running 1 test
+test conditional_multi_key_history_agrees_for_blink_and_rocksdb_allocators ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/process_crash_contract.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/process_crash_contract-000fdf912f3d3bf3)
+
+running 4 tests
+test handoff_event_framing_accepts_raw_and_prefixed_lines ... ok
+test native_wal_sync_interruption_recovers_all_or_none ... ok
+test rocksdb_wal_sync_interruption_recovers_all_or_none ... ok
+test service_child ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/read_contract.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/read_contract-630430930621a210)
+
+running 2 tests
+test btree_blink_and_rocksdb_share_the_same_read_contract ... ok
+test rocksdb_query_and_scan_survive_shutdown_and_reopen ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+
+     Running tests/transaction_contract.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/transaction_contract-23c1dac7304bab49)
+
+running 1 test
+test btree_blink_and_rocksdb_share_transaction_contract ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.19s
+

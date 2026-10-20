@@ -1,0 +1,60 @@
+{
+  "original_root": "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r1/results",
+  "recovery_root": "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r2/results",
+  "original_plan_fingerprint": "97ee39577f8029f36d2fdf112448ab0927da12dd2d4f494271b61a09abebb14c",
+  "recovery_plan_fingerprint": "e06d2e159cd4d8085550d6b8809bd553f55e84a65d467330cb0cbb857d55120d",
+  "original_runner_sha256": "424e08131e421aec768ce37d9ada9819a647a45f20653ddbb0258d4226ab6dac",
+  "recovery_runner_sha256": "9e936b7f4b6b7ba41fd859a0fa30ac5a957b14e330f18ed0a865fca56b99fc24",
+  "recovery_plan_sha256": "e14cedcd493f4e4a66d2278c271f08ae839158144f6cc6c1206eb3430abf3d6d",
+  "reused_completed_case_count": 3,
+  "failed_incomplete_case_retained_at_original_root": "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r1/results/databases/A-rw20-c16-r2-rocksdb-direct-reserved-ranges-shared-s16",
+  "cases": [
+    {
+      "case_id": "A-rw20-c16-r1-rocksdb-direct-reserved-ranges-shared-s16",
+      "started_unix_time_ns": 1792397921912363154,
+      "finished_unix_time_ns": 1792398250279413536,
+      "file_sha256": {
+        "command.json": "98bb4ee466cf3f559a8f081b0d770e5f681b3b1cee490097c325bd260a4a195c",
+        "database-logs/tenant-1/LOG": "ab271d33ebf5980633fa8d7b88a64ccaa5426b633e46b9520b1d506351724685",
+        "database-manifest.json": "27019a9fbadedd4e6ac527ad88652697de926afe44bfbb606650ddee797dcdb7",
+        "host-samples.jsonl": "1181c0e3046bdfd8b22d58dd3a5f55aaab2ece9656d701542ba5ce1f85d094ab",
+        "live-budget-samples.jsonl": "a473f92c84981dd22ae97b0da8591fd047c7539c5ffb2f60b4defff271cf6e32",
+        "report.json": "60b58670bf4a737971adcd6617453dad9cdbe0117ab8fab776e1b4c130240b25",
+        "stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout.txt": "60b58670bf4a737971adcd6617453dad9cdbe0117ab8fab776e1b4c130240b25",
+        "time-v.txt": "b0ea3a5fdc11c4a3bb3a50402995b0d3d56c1a83b60a4beb5552aa5a8bbbe675"
+      }
+    },
+    {
+      "case_id": "A-rw20-c16-r1-blink-reserved-ranges-shared-sna",
+      "started_unix_time_ns": 1792398252012309807,
+      "finished_unix_time_ns": 1792398618768911495,
+      "file_sha256": {
+        "command.json": "9131c228bbe72aa3599ac854d3df001e4bfa3f71720e0a488b5dcf7615604161",
+        "database-manifest.json": "d3a92a24c8ef81d59196ab27afab3a3781d6176a3c05a9ffc66a14ae2f60eed0",
+        "host-samples.jsonl": "84b128f918145cde713e38a37c18df5671b68518c7b97e509412e4106b307d53",
+        "live-budget-samples.jsonl": "766edbe56194fed3e4a54631a913f26a2875aec5b7603e536647cd5780d30f11",
+        "report.json": "a5b500553991e490a790862118ca1167e2e1ab98d6c40a5086642e89c9fdcc8f",
+        "stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout.txt": "a5b500553991e490a790862118ca1167e2e1ab98d6c40a5086642e89c9fdcc8f",
+        "time-v.txt": "61331a8213c6839d0d260c183f9f2b3044eb2a65e5024e65689edbb83a41928a"
+      }
+    },
+    {
+      "case_id": "A-rw20-c16-r1-rocksdb-reserved-ranges-shared-s16",
+      "started_unix_time_ns": 1792398626353375841,
+      "finished_unix_time_ns": 1792398953644436770,
+      "file_sha256": {
+        "command.json": "81751ca19d680569bdbc5bc98a2979ec174bb39e98184ad7e2cf67e184608ec0",
+        "database-logs/tenant-1/LOG": "2a1ff29a3ec3d3a89fd9dc48f5f2fa63d8d4663f2935dc365a821f4e3be63c4c",
+        "database-manifest.json": "c4924067ea65b0888848deb41ea02ed0f550c8e6b235df4a04f452efbdf3132e",
+        "host-samples.jsonl": "30976dddf43658506b5efa83f5e4479caae88e6436c5b95620d795064e9ee6c0",
+        "live-budget-samples.jsonl": "ebe840b3b6c51eb6f48a2c8dfdfa170a292fb1f5bdcedd8ab058e9378e079f55",
+        "report.json": "fcd950f060793cd8d71f411bf4bf9cd4b1154ba568603faa73045b5170ecd1ab",
+        "stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout.txt": "fcd950f060793cd8d71f411bf4bf9cd4b1154ba568603faa73045b5170ecd1ab",
+        "time-v.txt": "e7600334efe4ba4596261494704561df293289e2d6b0088c6edff9c3e3855984"
+      }
+    }
+  ]
+}

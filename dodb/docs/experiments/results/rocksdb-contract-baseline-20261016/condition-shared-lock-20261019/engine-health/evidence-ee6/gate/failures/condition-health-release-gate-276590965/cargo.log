@@ -1,0 +1,41 @@
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/condition-shared-lock-20261019/source-88b43098d/dodb/crates/dodb-rocksdb)
+error[E0308]: mismatched types
+  --> dodb/crates/dodb-rocksdb/src/engine_health.rs:73:73
+   |
+69 |     pub(crate) fn add_database<T>(&mut self, database_name: String, database: &Arc<T>)
+   |                                - found this type parameter
+...
+73 |         let erased_database: Arc<dyn EngineHealthDatabase> = Arc::clone(database);
+   |                                                              ---------- ^^^^^^^^ expected `&Arc<dyn EngineHealthDatabase>`, found `&Arc<T>`
+   |                                                              |
+   |                                                              arguments to this function are incorrect
+   |
+   = note: expected reference `&std::sync::Arc<dyn EngineHealthDatabase>`
+              found reference `&std::sync::Arc<T>`
+   = help: type parameters must be constrained to match other types
+   = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters
+note: method defined here
+  --> /rustc/8bab26f4f68e0e26f0bb7960be334d5b520ea452/library/core/src/clone.rs:236:7
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `dodb-rocksdb` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error[E0308]: mismatched types
+  --> dodb/crates/dodb-rocksdb/src/engine_health.rs:73:73
+   |
+69 |     pub(crate) fn add_database<T>(&mut self, database_name: String, database: &Arc<T>)
+   |                                - found this type parameter
+...
+73 |         let erased_database: Arc<dyn EngineHealthDatabase> = Arc::clone(database);
+   |                                                              ---------- ^^^^^^^^ expected `&Arc<dyn EngineHealthDatabase>`, found `&Arc<T>`
+   |                                                              |
+   |                                                              arguments to this function are incorrect
+   |
+   = note: expected reference `&Arc<dyn EngineHealthDatabase>`
+              found reference `&Arc<T>`
+   = help: type parameters must be constrained to match other types
+   = note: for more information, visit https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters
+note: method defined here
+  --> /rustc/8bab26f4f68e0e26f0bb7960be334d5b520ea452/library/core/src/clone.rs:236:7
+
+error: could not compile `dodb-rocksdb` (lib) due to 1 previous error

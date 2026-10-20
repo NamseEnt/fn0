@@ -1,0 +1,19 @@
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/condition-shared-lock-20261019/source-88b43098d/dodb/crates/dodb-rocksdb)
+error[E0599]: no method named `value` found for tuple `(&TenantId, &SynchronousRocksDbTenant)` in the current scope
+   --> dodb/crates/dodb-rocksdb/src/bin/service_workload.rs:214:26
+    |
+213 | /                     entry
+214 | |                         .value()
+    | |                         -^^^^^ method not found in `(&TenantId, &SynchronousRocksDbTenant)`
+    | |_________________________|
+    |
+
+error[E0599]: no method named `key` found for tuple `(&TenantId, &SynchronousRocksDbTenant)` in the current scope
+   --> dodb/crates/dodb-rocksdb/src/bin/service_workload.rs:215:82
+    |
+215 |                         .engine_health_observer_named(format!("tenant_{}", entry.key()))
+    |                                                                                  ^^^ method not found in `(&TenantId, &SynchronousRocksDbTenant)`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `dodb-rocksdb` (bin "service_workload" test) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

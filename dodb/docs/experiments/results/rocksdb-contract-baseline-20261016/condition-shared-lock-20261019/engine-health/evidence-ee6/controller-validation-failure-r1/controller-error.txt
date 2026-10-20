@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/bench/zfs/db/condition-shared-lock-20261019/long-matrix-ee6-abce/run-condition-lock-long-matrix.py", line 968, in <module>
+    main()
+  File "/bench/zfs/db/condition-shared-lock-20261019/long-matrix-ee6-abce/run-condition-lock-long-matrix.py", line 958, in main
+    run_case(job, args.result_root, binary_paths, journal)
+  File "/bench/zfs/db/condition-shared-lock-20261019/long-matrix-ee6-abce/run-condition-lock-long-matrix.py", line 860, in run_case
+    input_fingerprint = verify_report(report, job)
+  File "/bench/zfs/db/condition-shared-lock-20261019/long-matrix-ee6-abce/run-condition-lock-long-matrix.py", line 386, in verify_report
+    raise ValueError("unconditional direct-core API boundary mismatch")
+ValueError: unconditional direct-core API boundary mismatch

@@ -1,0 +1,73 @@
+{
+  "database_path": "/bench/zfs/db/condition-shared-lock-20261019/five-minute-ee6-ae-r2/results/databases/E-w16-c64-r3-synchronous-core-reserved-ranges-shared-s32",
+  "file_count": 13,
+  "files": [
+    {
+      "path": "000235.log",
+      "size_bytes": 30744888,
+      "sha256": "a64c9ef5157b6a414a9ef1874321a127ad9665b9e19bbd800bd206bbe7ac6f93"
+    },
+    {
+      "path": "000240.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "000245.sst",
+      "size_bytes": 68356220,
+      "sha256": "a8d360edfa98a2091a95b3cb95ae034af5b5e5159bda43bbbd37bd64b285f44a"
+    },
+    {
+      "path": "000247.sst",
+      "size_bytes": 68355060,
+      "sha256": "8d0d49182da3c1147fbc4d1b8e7dde8903059b321ae16cbf4c775f34acd281a3"
+    },
+    {
+      "path": "000248.sst",
+      "size_bytes": 9649450,
+      "sha256": "5a63637f37b475c64bf2fee7ecddccc7e320ce91f7ffeaef9a93919aa93c98e2"
+    },
+    {
+      "path": "CURRENT",
+      "size_bytes": 16,
+      "sha256": "f237b223d85f0c821063f4efe56c83715dfeb140c75f5645a46617045a09d89d"
+    },
+    {
+      "path": "IDENTITY",
+      "size_bytes": 36,
+      "sha256": "093735af0b22814cab2c28f9c9dfee78f0306b569f4be0fc2808fb1e1dfc41ff"
+    },
+    {
+      "path": "LOCK",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "LOG",
+      "size_bytes": 52936,
+      "sha256": "060fb5d89646f754b8f574c31ca69a2744139fa2e8b1dd06c9e5f1c330e3a7fc",
+      "preserved_log_path": "database-logs/LOG"
+    },
+    {
+      "path": "LOG.old.1792405625255156",
+      "size_bytes": 642164,
+      "sha256": "b44f135140def51cbf980c71bd087c2a45166f4934212ea6c38bf4b7c15fff8d"
+    },
+    {
+      "path": "MANIFEST-000241",
+      "size_bytes": 1905,
+      "sha256": "d9bab9b55923eddd37a012873b45515a7b89c568f7eceb383f26c6dbaf812f67"
+    },
+    {
+      "path": "OPTIONS-000243",
+      "size_bytes": 8992,
+      "sha256": "d5c08ddaee238bb752b5e668825a2bab4fd30f4ad6e430890e83d5fe7933897b"
+    },
+    {
+      "path": "OPTIONS-000246",
+      "size_bytes": 8993,
+      "sha256": "da62a94c915dfafeb62e725b4138379f99d322b42c11b7a6cc67dd5f2257267e"
+    }
+  ],
+  "database_removed_after_validation": true
+}

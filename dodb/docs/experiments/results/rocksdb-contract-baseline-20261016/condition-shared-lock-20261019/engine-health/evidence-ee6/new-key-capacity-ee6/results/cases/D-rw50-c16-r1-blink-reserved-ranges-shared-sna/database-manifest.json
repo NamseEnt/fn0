@@ -1,0 +1,17 @@
+{
+  "database_path": "/bench/zfs/db/condition-shared-lock-20261019/new-key-capacity-ee6/results/databases/D-rw50-c16-r1-blink-reserved-ranges-shared-sna",
+  "file_count": 2,
+  "files": [
+    {
+      "path": "blink/tenant-1-shard-1.db",
+      "size_bytes": 197361664,
+      "sha256": "3abf5810f17735b35ef65c5b376e3a9a25a719d23eaa606fef6a2495ae291451"
+    },
+    {
+      "path": "blink/tenant-1-shard-1.wal",
+      "size_bytes": 613771873,
+      "sha256": "45e967bea9b53cf7a381c3484cf057800bb5c0e1896ff40e51d56662eb15598e"
+    }
+  ],
+  "database_removed_after_validation": true
+}
