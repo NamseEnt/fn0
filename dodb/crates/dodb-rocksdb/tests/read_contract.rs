@@ -193,7 +193,9 @@ async fn check_read_contract<S: DodbService>(service: &S) {
         execute(
             service,
             1,
-            Request::Get { key: deleted_key },
+            Request::Get {
+                key: deleted_key.clone(),
+            },
             ExecutionBudget::new(exact_tombstone_budget - 1),
         )
         .await,
