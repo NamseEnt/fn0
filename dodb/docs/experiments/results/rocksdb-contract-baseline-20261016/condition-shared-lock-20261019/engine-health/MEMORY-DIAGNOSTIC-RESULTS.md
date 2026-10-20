@@ -12,7 +12,7 @@ The clean release gate evidence is in [gate-c39db5ddd-release-r2](memory-diagnos
 
 ## Process and host observations
 
-Parent and backend figures are the maximum sampled RSS/PSS for their respective processes. Backend includes the adapter, service/runtime, and loopback transport; it is not a pure RocksDB allocator measurement. The whole-process group peak is the maximum concurrent one-second RSS/PSS observation and is not the sum of separate process maxima. The worker VmHWM is recorded after backend shutdown and provides a per-process lifetime high-water mark.
+Parent and backend figures are the maximum sampled RSS/PSS for their respective processes. Backend includes the adapter, service/runtime, and loopback transport; it is not a pure RocksDB allocator measurement. Group RSS/PSS uses the greater per-metric maximum from the controller live-budget samples and the independent backend process-memory samples. These are two independent one-second sample streams; the reported group value is the highest observed concurrent sample, not a sum of per-process peaks. The worker VmHWM is recorded after backend shutdown and provides a per-process lifetime high-water mark.
 
 | Path | Parent RSS/PSS (MiB) | Backend RSS/PSS (MiB) | Backend VmHWM after shutdown (MiB) | Group RSS/PSS peak (MiB) | Minimum host MemAvailable (GiB) | Live database peak (GiB) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -20,8 +20,8 @@ Parent and backend figures are the maximum sampled RSS/PSS for their respective 
 | A RocksDB service Shared-16 | 143.8 / 140.7 | 241.6 / 238.5 | 245.4 | 330.4 / 324.2 | 5.06 | 0.13 |
 | A synchronous RocksDB core Shared-16 | 145.5 / 142.4 | 240.0 / 236.9 | 242.2 | 334.2 / 328.0 | 5.03 | 0.14 |
 | E raw RocksDB | 618.3 / 615.2 | 215.7 / 212.5 | 215.4 | 817.8 / 802.4 | 4.44 | 0.43 |
-| E synchronous RocksDB core, 64 callers | 621.2 / 618.1 | 400.8 / 397.7 | 400.7 | 803.1 / 796.9 | 4.23 | 0.51 |
-| E RocksDB service Shared-32 | 620.3 / 617.2 | 393.5 / 390.3 | 395.2 | 720.2 / 714.0 | 4.30 | 0.45 |
+| E synchronous RocksDB core, 64 callers | 621.2 / 618.1 | 400.8 / 397.7 | 400.7 | 1,019.1 / 1,012.8 | 4.23 | 0.51 |
+| E RocksDB service Shared-32 | 620.3 / 617.2 | 393.5 / 390.3 | 395.2 | 1,008.8 / 1,002.6 | 4.30 | 0.45 |
 | E Blink | 621.5 / 618.4 | 916.3 / 913.4 | 916.1 | 1,536.2 / 1,530.1 | 3.25 | 1.42 |
 
 The highest sampled group RSS was 1,536.2 MiB, below the 3 GiB cap. The lowest sampled host `MemAvailable` was 3.25 GiB, above the 1.5 GiB runtime reserve. The largest sampled database was 1.42 GiB, below the 12 GiB per-case cap. Group swap remained zero. The one-second group samples and per-process VmHWM are distinct observations; the group peak can miss a sub-second transient, while each process VmHWM captures its own lifetime high water.
