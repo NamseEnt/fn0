@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use dodb_client::{ClientError, ClientTlsConfig, DodbClient, DodbConnection};
+use dodb_client::{ClientError, ClientTlsConfig, DodbConnection};
 use dodb_core::{Error, TenantId, TransactionConflict};
 use dodb_protocol::{ApplicationErrorKind, ProtocolLimits};
 use dodb_service::{DodbService, ExecutionBudget, Request, Response, ServiceFuture};
@@ -62,7 +62,7 @@ impl MemoryDiagnosticSession {
                 format!("temporary diagnostic certificate generation failed: {error}")
             })?;
         let certificate_der = certified_key.cert.der().to_vec();
-        let private_key_der = certified_key.key_pair.serialize_der();
+        let private_key_der = certified_key.signing_key.serialize_der();
         let tls_directory = tempfile::Builder::new()
             .prefix("dodb-memory-diagnostic-")
             .tempdir()
@@ -313,7 +313,7 @@ impl MemoryDiagnosticSession {
                 return Err("process identity lock poisoned".to_owned());
             }
         }
-        let mut worker = MemoryDiagnosticWorker {
+        let worker = MemoryDiagnosticWorker {
             child: Mutex::new(child),
             stdin: Mutex::new(child_stdin),
             connection,
@@ -386,7 +386,7 @@ impl MemoryDiagnosticSession {
             "worker_lifecycle": worker_events,
             "process_memory_samples": process_samples,
             "process_group_scope": "sum of sampled harness-process and backend-process RSS/PSS for the recorded PID/starttime identities",
-            "workload_process_group_id": process_identities.first().map(|identity| identity.process_group_id),
+            "workload_process_group_id": process_identities.first().and_then(|identity| identity["process_group_id"].as_i64()),
             "host_sampling_interval_ms": PROCESS_SAMPLE_INTERVAL.as_millis(),
             "host_sample_count": host_samples.len(),
             "host_samples_truncated": self.host_samples_truncated.load(Ordering::Relaxed),
@@ -460,16 +460,15 @@ impl MemoryDiagnosticWorker {
             return Err(error);
         }
         let stop_started = Instant::now();
-        let mut exit_status = None;
-        loop {
-            exit_status = self
+        let exit_status = loop {
+            let exit_status = self
                 .child
                 .lock()
                 .map_err(|_| "diagnostic worker process lock poisoned".to_owned())?
                 .try_wait()
                 .map_err(|error| error.to_string())?;
             if exit_status.is_some() {
-                break;
+                break exit_status;
             }
             if stop_started.elapsed() >= WORKER_STOP_TIMEOUT {
                 if let Ok(mut child) = self.child.lock() {
@@ -478,7 +477,7 @@ impl MemoryDiagnosticWorker {
                 return Err("diagnostic worker shutdown timed out and was killed".to_owned());
             }
             thread::sleep(Duration::from_millis(50));
-        }
+        };
         if !exit_status.is_some_and(|status| status.success()) {
             return Err(format!(
                 "diagnostic worker exited unsuccessfully: {exit_status:?}"
