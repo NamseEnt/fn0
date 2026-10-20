@@ -170,13 +170,13 @@ async fn check_read_contract<S: DodbService>(service: &S, verify_exact_get_budge
         other => panic!("unexpected delete response: {other:?}"),
     };
     let tombstone_response = Response::Get(RevisionState::missing(deleted_revision));
+    let exact_tombstone_budget = encode_response(
+        &ResponseEnvelope::Success(tombstone_response.clone()),
+        ProtocolLimits::default(),
+    )
+    .unwrap()
+    .len();
     if verify_exact_get_budget {
-        let exact_tombstone_budget = encode_response(
-            &ResponseEnvelope::Success(tombstone_response.clone()),
-            ProtocolLimits::default(),
-        )
-        .unwrap()
-        .len();
         assert_eq!(
             execute(
                 service,
@@ -190,19 +190,32 @@ async fn check_read_contract<S: DodbService>(service: &S, verify_exact_get_budge
             .unwrap(),
             tombstone_response
         );
-        assert!(matches!(
-            execute(
-                service,
-                1,
-                Request::Get {
-                    key: deleted_key.clone(),
-                },
-                ExecutionBudget::new(exact_tombstone_budget - 1),
-            )
-            .await,
-            Err(Error::ResponseTooLarge(_))
-        ));
     }
+    assert_eq!(
+        execute(
+            service,
+            1,
+            Request::Get {
+                key: deleted_key.clone(),
+            },
+            MAXIMUM_BUDGET,
+        )
+        .await
+        .unwrap(),
+        tombstone_response
+    );
+    assert!(matches!(
+        execute(
+            service,
+            1,
+            Request::Get {
+                key: deleted_key.clone(),
+            },
+            ExecutionBudget::new(exact_tombstone_budget - 1),
+        )
+        .await,
+        Err(Error::ResponseTooLarge(_))
+    ));
     assert!(
         projections(&query_response(
             execute(
@@ -447,19 +460,19 @@ async fn check_read_contract<S: DodbService>(service: &S, verify_exact_get_budge
             .unwrap(),
             exact_get_response.clone()
         );
-        assert!(matches!(
-            execute(
-                service,
-                1,
-                Request::Get {
-                    key: large_key.clone(),
-                },
-                ExecutionBudget::new(exact_get_budget - 1),
-            )
-            .await,
-            Err(Error::ResponseTooLarge(_))
-        ));
     }
+    assert!(matches!(
+        execute(
+            service,
+            1,
+            Request::Get {
+                key: large_key.clone(),
+            },
+            ExecutionBudget::new(exact_get_budget - 1),
+        )
+        .await,
+        Err(Error::ResponseTooLarge(_))
+    ));
     assert!(matches!(
         execute(
             service,
