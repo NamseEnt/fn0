@@ -301,6 +301,10 @@ async fn main() -> WorkerResult<()> {
     if let Some(sampler) = health_sampler.take() {
         health_report = sampler.finish()?;
     }
+    let shutdown_property_snapshot = backend.engine_health_observer().map_or_else(
+        || json!({"status": "unsupported", "reason": "backend exposes no RocksDB properties"}),
+        |observer| observer.sample(),
+    );
     let shutdown = tokio::time::timeout(Duration::from_secs(15), async {
         server.shutdown().await;
         (&mut server_task).await
@@ -319,11 +323,24 @@ async fn main() -> WorkerResult<()> {
         &arguments.health_path,
         serde_json::to_vec_pretty(&json!({
             "backend": arguments.backend,
+            "blink_configuration": if arguments.backend == "blink" {
+                json!({
+                    "max_open_shards": arguments.blink_max_open_shards,
+                    "cache_capacity_pages": arguments.blink_cache_pages.unwrap_or_else(|| DatabaseConfig::default().cache_capacity),
+                    "coordinator_config": "default",
+                })
+            } else {
+                serde_json::Value::Null
+            },
             "response_budget_bytes": arguments.response_budget,
             "max_mutations": arguments.max_mutations,
             "max_concurrent_requests": arguments.max_concurrent_requests,
             "engine_health_interval_ms": arguments.engine_health_interval_ms,
             "engine_health": health_report,
+            "shutdown_property_snapshot": shutdown_property_snapshot,
+            "worker_pid": readiness.pid,
+            "worker_process_start_time_ticks": readiness.process_start_time_ticks,
+            "worker_epoch_id": format!("{}:{}", readiness.pid, readiness.process_start_time_ticks),
             "shutdown_complete": true,
         }))?,
     )?;
