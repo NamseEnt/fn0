@@ -57,6 +57,38 @@ fn scan_response(response: Response) -> Vec<Document> {
 }
 
 async fn check_read_contract<S: DodbService>(service: &S) {
+    let missing_key = key(b"budget", b"initial-missing");
+    let missing_response = Response::Get(RevisionState::missing(dodb_core::Revision::ZERO));
+    let exact_missing_budget = encode_response(
+        &ResponseEnvelope::Success(missing_response.clone()),
+        ProtocolLimits::default(),
+    )
+    .unwrap()
+    .len();
+    assert_eq!(
+        execute(
+            service,
+            90,
+            Request::Get {
+                key: missing_key.clone(),
+            },
+            ExecutionBudget::new(exact_missing_budget),
+        )
+        .await
+        .unwrap(),
+        missing_response
+    );
+    assert!(matches!(
+        execute(
+            service,
+            90,
+            Request::Get { key: missing_key },
+            ExecutionBudget::new(exact_missing_budget - 1),
+        )
+        .await,
+        Err(Error::ResponseTooLarge(_))
+    ));
+
     let empty_scan = execute(
         service,
         90,
@@ -123,7 +155,7 @@ async fn check_read_contract<S: DodbService>(service: &S) {
         .await
         .unwrap();
     }
-    execute(
+    let deleted_revision = match execute(
         service,
         1,
         Request::Delete {
@@ -132,7 +164,41 @@ async fn check_read_contract<S: DodbService>(service: &S) {
         MAXIMUM_BUDGET,
     )
     .await
-    .unwrap();
+    .unwrap()
+    {
+        Response::Delete(revision) => revision,
+        other => panic!("unexpected delete response: {other:?}"),
+    };
+    let tombstone_response = Response::Get(RevisionState::missing(deleted_revision));
+    let exact_tombstone_budget = encode_response(
+        &ResponseEnvelope::Success(tombstone_response.clone()),
+        ProtocolLimits::default(),
+    )
+    .unwrap()
+    .len();
+    assert_eq!(
+        execute(
+            service,
+            1,
+            Request::Get {
+                key: deleted_key.clone(),
+            },
+            ExecutionBudget::new(exact_tombstone_budget),
+        )
+        .await
+        .unwrap(),
+        tombstone_response
+    );
+    assert!(matches!(
+        execute(
+            service,
+            1,
+            Request::Get { key: deleted_key },
+            ExecutionBudget::new(exact_tombstone_budget - 1),
+        )
+        .await,
+        Err(Error::ResponseTooLarge(_))
+    ));
     assert!(
         projections(&query_response(
             execute(
@@ -340,7 +406,7 @@ async fn check_read_contract<S: DodbService>(service: &S) {
 
     let large_document = vec![0x5a; 2_000];
     let large_key = key(b"budget", b"single");
-    execute(
+    let put_revision = match execute(
         service,
         1,
         Request::Put {
@@ -350,7 +416,44 @@ async fn check_read_contract<S: DodbService>(service: &S) {
         MAXIMUM_BUDGET,
     )
     .await
-    .unwrap();
+    .unwrap()
+    {
+        Response::Put(revision) => revision,
+        other => panic!("unexpected put response: {other:?}"),
+    };
+    let exact_get_response =
+        Response::Get(RevisionState::present(large_document.clone(), put_revision));
+    let exact_get_budget = encode_response(
+        &ResponseEnvelope::Success(exact_get_response.clone()),
+        ProtocolLimits::default(),
+    )
+    .unwrap()
+    .len();
+    assert_eq!(
+        execute(
+            service,
+            1,
+            Request::Get {
+                key: large_key.clone(),
+            },
+            ExecutionBudget::new(exact_get_budget),
+        )
+        .await,
+        .unwrap(),
+        exact_get_response.clone()
+    );
+    assert!(matches!(
+        execute(
+            service,
+            1,
+            Request::Get {
+                key: large_key.clone(),
+            },
+            ExecutionBudget::new(exact_get_budget - 1),
+        )
+        .await,
+        Err(Error::ResponseTooLarge(_))
+    ));
     assert!(matches!(
         execute(
             service,

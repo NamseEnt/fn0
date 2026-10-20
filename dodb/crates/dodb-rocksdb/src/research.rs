@@ -39,6 +39,7 @@ impl SynchronousRocksDbTenant {
                 &key,
                 None,
                 None,
+                budget,
             )?),
             Request::Put { key, value } => {
                 let result = self.database.transact_with_metrics(

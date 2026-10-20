@@ -1121,7 +1121,7 @@ impl RocksDbService {
                         let metrics = self.research_metrics.clone();
                         let kind = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok();
                         self.run_blocking(tenant, lane, move || {
-                            database.get_with_metrics(tenant, &key, metrics, kind)
+                            database.get_with_metrics(tenant, &key, metrics, kind, budget)
                         })
                         .await?
                     }
@@ -1470,7 +1470,13 @@ impl TenantDatabase {
 
     #[cfg(test)]
     fn get(&self, key: &DocumentKey) -> Result<RevisionState, Error> {
-        self.get_with_metrics(TenantId::new(0), key, None, None)
+        self.get_with_metrics(
+            TenantId::new(0),
+            key,
+            None,
+            None,
+            ExecutionBudget::new(usize::MAX),
+        )
     }
 
     fn get_with_metrics(
@@ -1479,6 +1485,7 @@ impl TenantDatabase {
         key: &DocumentKey,
         metrics: Option<Arc<ResearchMetrics>>,
         kind: Option<ResearchReadKind>,
+        budget: ExecutionBudget,
     ) -> Result<RevisionState, Error> {
         let encoded_key = user_key(key);
         let mut value = std::ptr::null_mut();
@@ -1507,7 +1514,7 @@ impl TenantDatabase {
         let decoded = match result {
             1 => Ok(RevisionState::missing(Revision::ZERO)),
             2 => Err(ffi_error(error, "RocksDB get failed")),
-            _ => unsafe { decode_and_free_get_value(value, value_length) },
+            _ => unsafe { decode_and_free_get_value(value, value_length, budget) },
         };
         if let (Some(metrics), Some(kind)) = (&metrics, kind) {
             metrics.record_read(
@@ -2285,13 +2292,13 @@ fn decode_present_record(
     encoded_pointer: *const u8,
     encoded_length: usize,
 ) -> Result<Option<(Revision, usize)>, Error> {
-    if encoded_length < 10 {
-        return Err(Error::corruption(
-            "unsupported RocksDB logical value format",
-        ));
-    }
     let encoded = unsafe { std::slice::from_raw_parts(encoded_pointer, encoded_length) };
-    if encoded[0] != VALUE_FORMAT {
+    let (revision, value_length) = decode_value_header(encoded)?;
+    Ok(value_length.map(|value_length| (revision, value_length)))
+}
+
+fn decode_value_header(encoded: &[u8]) -> Result<(Revision, Option<usize>), Error> {
+    if encoded.len() < 10 || encoded[0] != VALUE_FORMAT {
         return Err(Error::corruption(
             "unsupported RocksDB logical value format",
         ));
@@ -2302,8 +2309,8 @@ fn decode_present_record(
             .map_err(|_| Error::corruption("invalid RocksDB revision bytes"))?,
     ));
     match encoded[1] {
-        PRESENT_TAG => Ok(Some((revision, encoded_length - 10))),
-        MISSING_TAG if encoded.len() == 10 => Ok(None),
+        PRESENT_TAG => Ok((revision, Some(encoded.len() - 10))),
+        MISSING_TAG if encoded.len() == 10 => Ok((revision, None)),
         MISSING_TAG => Err(Error::corruption("tombstone contains value bytes")),
         _ => Err(Error::corruption("unknown RocksDB logical value state")),
     }
@@ -2384,21 +2391,10 @@ fn encode_state(state: &RevisionState) -> Vec<u8> {
 }
 
 fn decode_state(encoded: &[u8]) -> Result<RevisionState, Error> {
-    if encoded.len() < 10 || encoded[0] != VALUE_FORMAT {
-        return Err(Error::corruption(
-            "unsupported RocksDB logical value format",
-        ));
-    }
-    let revision = Revision::new(u64::from_be_bytes(
-        encoded[2..10]
-            .try_into()
-            .map_err(|_| Error::corruption("invalid RocksDB revision bytes"))?,
-    ));
-    match encoded[1] {
-        PRESENT_TAG => Ok(RevisionState::present(encoded[10..].to_vec(), revision)),
-        MISSING_TAG if encoded.len() == 10 => Ok(RevisionState::missing(revision)),
-        MISSING_TAG => Err(Error::corruption("tombstone contains value bytes")),
-        _ => Err(Error::corruption("unknown RocksDB logical value state")),
+    let (revision, value_length) = decode_value_header(encoded)?;
+    match value_length {
+        Some(_) => Ok(RevisionState::present(encoded[10..].to_vec(), revision)),
+        None => Ok(RevisionState::missing(revision)),
     }
 }
 
@@ -2506,6 +2502,34 @@ fn enforce_response_budget(response: &Response, budget: ExecutionBudget) -> Resu
         .map_err(|error| Error::response_too_large(format!("response exceeds budget: {error}")))
 }
 
+fn enforce_get_present_response_budget(
+    value_length: usize,
+    revision: Revision,
+    budget: ExecutionBudget,
+) -> Result<(), Error> {
+    let mut limits = ProtocolLimits::default();
+    limits.max_response_frame_size = budget.max_response_bytes;
+    if value_length > limits.max_value_size {
+        return Err(Error::response_too_large(format!(
+            "Get value exceeds protocol maximum of {} bytes",
+            limits.max_value_size
+        )));
+    }
+    let empty_response = Response::Get(RevisionState::present(Vec::new(), revision));
+    let empty_frame_size = encoded_success_response_size(&empty_response, limits)
+        .map_err(|error| Error::response_too_large(format!("response exceeds budget: {error}")))?;
+    let frame_size = empty_frame_size
+        .checked_add(value_length)
+        .ok_or_else(|| Error::response_too_large("encoded response size overflows"))?;
+    if frame_size > limits.max_response_frame_size {
+        return Err(Error::response_too_large(format!(
+            "response exceeds budget: encoded frame is {frame_size} bytes, maximum is {}",
+            limits.max_response_frame_size
+        )));
+    }
+    Ok(())
+}
+
 unsafe fn copy_and_free_value(value: *mut u8, value_length: usize) -> Vec<u8> {
     let bytes = unsafe { std::slice::from_raw_parts(value, value_length) }.to_vec();
     unsafe { dodb_rocksdb_value_free(value) };
@@ -2523,13 +2547,21 @@ impl Drop for NativeGetValue {
 unsafe fn decode_and_free_get_value(
     value: *mut u8,
     value_length: usize,
+    budget: ExecutionBudget,
 ) -> Result<RevisionState, Error> {
     let allocation = NativeGetValue(
         NonNull::new(value)
             .ok_or_else(|| Error::invariant("successful RocksDB Get returned null"))?,
     );
     let encoded = unsafe { std::slice::from_raw_parts(allocation.0.as_ptr(), value_length) };
-    decode_state(encoded)
+    let (revision, stored_value_length) = decode_value_header(encoded)?;
+    match stored_value_length {
+        Some(stored_value_length) => {
+            enforce_get_present_response_budget(stored_value_length, revision, budget)?;
+            Ok(RevisionState::present(encoded[10..].to_vec(), revision))
+        }
+        None => Ok(RevisionState::missing(revision)),
+    }
 }
 
 fn ffi_error(error: *mut c_char, fallback: &str) -> Error {
@@ -2551,6 +2583,7 @@ unsafe fn take_error(error: *mut c_char, fallback: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dodb_protocol::{ResponseEnvelope, encode_response};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::mpsc;
     use std::time::Duration;
@@ -2561,6 +2594,145 @@ mod tests {
             Some(path) => TempDir::new_in(path).unwrap(),
             None => TempDir::new().unwrap(),
         }
+    }
+
+    #[test]
+    fn get_present_budget_matches_encoded_frame_boundaries() {
+        let revision = Revision::new(7);
+        let value = vec![0x5a; 2_000];
+        let response = Response::Get(RevisionState::present(value.clone(), revision));
+        let exact_budget = encode_response(
+            &ResponseEnvelope::Success(response),
+            ProtocolLimits::default(),
+        )
+        .unwrap()
+        .len();
+        assert!(
+            enforce_get_present_response_budget(
+                value.len(),
+                revision,
+                ExecutionBudget::new(exact_budget),
+            )
+            .is_ok()
+        );
+        assert!(matches!(
+            enforce_get_present_response_budget(
+                value.len(),
+                revision,
+                ExecutionBudget::new(exact_budget - 1),
+            ),
+            Err(Error::ResponseTooLarge(_))
+        ));
+        assert!(matches!(
+            enforce_get_present_response_budget(
+                ProtocolLimits::default().max_value_size + 1,
+                revision,
+                ExecutionBudget::new(usize::MAX),
+            ),
+            Err(Error::ResponseTooLarge(_))
+        ));
+    }
+
+    #[test]
+    fn get_value_header_validates_initial_and_tombstone_states() {
+        let initial = encode_state(&RevisionState::missing(Revision::ZERO));
+        assert_eq!(
+            decode_state(&initial).unwrap(),
+            RevisionState::missing(Revision::ZERO)
+        );
+        let tombstone = encode_state(&RevisionState::missing(Revision::new(9)));
+        assert_eq!(
+            decode_value_header(&tombstone).unwrap(),
+            (Revision::new(9), None)
+        );
+        for malformed in [
+            Vec::new(),
+            vec![VALUE_FORMAT, PRESENT_TAG],
+            vec![0, PRESENT_TAG, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![VALUE_FORMAT, MISSING_TAG, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+            vec![VALUE_FORMAT, 99, 0, 0, 0, 0, 0, 0, 0, 1],
+        ] {
+            assert!(matches!(
+                decode_value_header(&malformed),
+                Err(Error::Corruption(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn synchronous_core_get_checks_budget_before_returning_present_value() {
+        let directory = temporary_db_directory();
+        let database = research::SynchronousRocksDbTenant::open(
+            directory.path(),
+            RevisionAllocatorMode::Serialized,
+        )
+        .unwrap();
+        let key = DocumentKey::new(b"budget".to_vec(), b"core".to_vec());
+        let value = vec![0x35; 4_096];
+        assert!(matches!(
+            database.execute(
+                Request::Put {
+                    key: key.clone(),
+                    value: value.clone(),
+                },
+                ExecutionBudget::new(1024),
+            ),
+            Ok(Response::Put(_))
+        ));
+        let expected_response =
+            Response::Get(RevisionState::present(value.clone(), Revision::new(1)));
+        let exact_budget = encode_response(
+            &ResponseEnvelope::Success(expected_response.clone()),
+            ProtocolLimits::default(),
+        )
+        .unwrap()
+        .len();
+        assert_eq!(
+            database
+                .execute(
+                    Request::Get { key: key.clone() },
+                    ExecutionBudget::new(exact_budget),
+                )
+                .unwrap(),
+            expected_response
+        );
+        assert!(matches!(
+            database.execute(Request::Get { key }, ExecutionBudget::new(exact_budget - 1),),
+            Err(Error::ResponseTooLarge(_))
+        ));
+    }
+
+    #[test]
+    fn malformed_persisted_get_value_returns_corruption() {
+        let directory = temporary_db_directory();
+        let database = TenantDatabase::open(directory.path()).unwrap();
+        let document_key = DocumentKey::new(b"malformed".to_vec(), b"value".to_vec());
+        let encoded_key = user_key(&document_key);
+        let transaction =
+            unsafe { dodb_rocksdb_begin(database.handle.0.as_ptr(), &mut std::ptr::null_mut()) };
+        let transaction = NonNull::new(transaction).unwrap();
+        let mut guard = TransactionGuard {
+            handle: transaction,
+            _database: Arc::clone(&database.handle),
+            active: true,
+        };
+        transaction_put(&guard, &encoded_key, &[VALUE_FORMAT, PRESENT_TAG]).unwrap();
+        let mut commit_error = std::ptr::null_mut();
+        assert_eq!(
+            unsafe { dodb_rocksdb_transaction_commit(guard.handle.as_ptr(), &mut commit_error) },
+            0
+        );
+        guard.finish();
+        assert!(matches!(
+            database.get_with_metrics(
+                TenantId::new(0),
+                &document_key,
+                None,
+                None,
+                ExecutionBudget::new(1024),
+            ),
+            Err(Error::Corruption(_))
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
