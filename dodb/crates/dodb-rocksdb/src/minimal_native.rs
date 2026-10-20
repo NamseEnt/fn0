@@ -247,7 +247,7 @@ impl MinimalNativeTenant {
 
     fn transact(&self, request: TransactionRequest) -> Result<Option<Revision>, Error> {
         request.validate()?;
-        let transaction = begin_transaction(&self.handle)?;
+        let mut transaction = begin_transaction(&self.handle)?;
         let mut locked_states = std::collections::BTreeMap::new();
         let mut transaction_keys = std::collections::BTreeMap::new();
         for condition in &request.conditions {
