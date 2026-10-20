@@ -1,0 +1,7 @@
+[
+  {
+    "failed_case_processing": "matrix resume preflight",
+    "failure": "JSON comparison used integer repetition keys against the serialized string keys; no workload cell was launched",
+    "existing_results": "preserved"
+  }
+]

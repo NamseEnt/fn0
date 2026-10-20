@@ -1,0 +1,16 @@
+{
+  "case_id": "E-minimal-native-r1",
+  "exit_code": 0,
+  "stop_reason": null,
+  "elapsed_seconds": 50.13895315397531,
+  "sample_count": 50,
+  "peak_process_group_rss_bytes": 996102144,
+  "minimum_mem_available_bytes": 4355977216,
+  "maximum_database_bytes": 569586730,
+  "maximum_wal_bytes": 0,
+  "minimum_filesystem_available_bytes": 48123920384,
+  "report_exists": true,
+  "database_file_count": 14,
+  "database_bytes_before_removal": 213996553,
+  "rocksdb_log_file_count": 2
+}

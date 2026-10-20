@@ -21,7 +21,7 @@ When an automatic checkpoint fails, the coordinator stores one failure message, 
 - Workload reports include process RSS and CPU at measurement boundaries, a bounded 200 ms resource series, database and WAL file bytes at measurement boundaries and across the series, and the number of omitted resource samples. The OCI controller separately records process-group RSS, host available memory, per-run database size, and filesystem headroom.
 - File sizes are point-in-time observations. They are not cumulative disk writes or write amplification. Existing `bytes_written` is not used as a physical I/O total.
 
-Seed, warmup, measurement, coordinator drain, final validation, and reopen validation are recorded as separate workload phases. Both policy and counters are active during seed and warmup; coordinators are drained and counters reset before measurement, so setup checkpoints do not enter measurement totals.
+Execution order separates seed preparation and warmup from measurement, coordinator drain, final validation, and reopen validation. Both policy and counters are active during seed and warmup; coordinators are drained and counters reset before measurement, so setup checkpoints do not enter measurement totals. Reports record warmup completions, measurement windows, drain, final validation, and reopen validation. The service workload reports seed setup duration; the unconditional workload reports that prepopulation precedes warmup but does not expose an exact seed-preparation duration. Its admission-plus-last-completion duration is recorded, and drain is derived from that value minus the requested measurement window.
 
 ## Test and workload integration
 

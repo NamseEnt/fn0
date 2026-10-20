@@ -1,0 +1,39 @@
+{
+  "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+  "binary_hashes": {
+    "service_workload": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+    "unconditional_write_workload": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55"
+  },
+  "path_orders": {
+    "1": [
+      "minimal-native",
+      "blink-off",
+      "blink-32m",
+      "blink-128m"
+    ],
+    "2": [
+      "blink-off",
+      "blink-32m",
+      "blink-128m",
+      "minimal-native"
+    ],
+    "3": [
+      "blink-32m",
+      "blink-128m",
+      "minimal-native",
+      "blink-off"
+    ]
+  },
+  "workloads": [
+    "A-rw20",
+    "E-width16-unconditional"
+  ],
+  "repetitions": 3,
+  "cells": 24,
+  "limits": {
+    "max_process_group_rss_bytes": 3221225472,
+    "minimum_mem_available_bytes": 1572864000,
+    "maximum_database_bytes": 4294967296,
+    "minimum_filesystem_available_bytes": 10737418240
+  }
+}

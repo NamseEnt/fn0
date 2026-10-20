@@ -1,38 +1,46 @@
 # Validation Record
 
-## Source
+## Source and preserved state
 
-- Starting source SHA: `a5b37c23ab72d95c8d5d7bed263459fd7af141e2`
-- Work branch: `experiment/blink-wal-reclamation-20261020`
-- Worktree: `/Users/namse/fn0-dodb-wal-reclamation`
-- Existing checkouts and result trees were inspected and left unchanged.
+- Starting source SHA: `a5b37c23ab72d95c8d5d7bed263459fd7af141e2`.
+- Branch: `experiment/blink-wal-reclamation-20261020`.
+- Worktree: `/Users/namse/fn0-dodb-wal-reclamation`.
+- Implementation and process-termination test SHA: `876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d`.
+- The existing `/Users/namse/dodb`, `/Users/namse/fn0-dodb-rocksdb-baseline`, and the prior baseline result directory were left unchanged.
 
-## Local checks
+## Local validation
 
-- `cargo fmt --all -- --check`: passed after formatting the task-owned Rust files.
+- `cargo fmt -p dodb-server -p dodb-storage -p dodb-rocksdb -- --check`: passed.
 - `git diff --check`: passed.
-- `cargo test -p dodb-server`: passed, including six new B-link WAL checkpoint tests and the existing server integration suite.
-- `cargo test -p dodb-storage --lib page_delta_checkpoint_fault_matrix_preserves_acknowledged_writes`: passed. This validates the existing function-level physical checkpoint fault matrix.
+- `cargo test -p dodb-server`: passed, including six B-link checkpoint integration tests and the existing server suite.
+- `cargo test -p dodb-storage --lib page_delta_checkpoint_fault_matrix_preserves_acknowledged_writes`: passed. This reuses the physical checkpoint fault matrix covering page write/sync, checkpoint metadata write/sync, and WAL reset boundaries.
+- `cargo test -p dodb-server --test blink_wal_checkpoint`: passed 6/6, including default-disabled behavior, threshold behavior and repeated reset, policy rejection, fail-closed handling, reopen/revision preservation, and process termination during checkpoint.
 
-The local B-link checkpoint tests include a subprocess that commits and acknowledges a transaction, pauses inside the physical checkpoint before page flush, receives SIGKILL, and then verifies recovery after reopening the same database. This is actual process termination coverage; it does not simulate host reset or power loss.
+The SIGKILL test commits and acknowledges a transaction, blocks at `before_checkpoint_data_flush`, kills the child process, then reopens the same database and verifies WAL replay. This is real process termination evidence, separate from function-level fault injection. It is not a host-reset or power-loss test.
 
-The local RocksDB build dependency at `/tmp/dodb-r1a-rocksdb-abeebd9` contains source files but has incomplete Git metadata and no `librocksdb.a`; Cargo stops in `dodb-rocksdb/build.rs` before compiling its binaries or tests. An attempt to fetch a fresh RocksDB source checkout was interrupted after the remote connection disconnected. Neither pre-existing path was changed. The required RocksDB-backed CLI checks and common backend contract tests remain gated on the approved OCI build helper.
+The local RocksDB build dependency had source files but incomplete Git metadata and no `librocksdb.a`, so local `dodb-rocksdb` tests could not compile. A separate local fetch attempt was interrupted by a remote connection reset; the existing dependency path was not changed.
 
-## OCI preflight
+## OCI build and contract tests
 
-Read-only preflight connected to the requested `opc@217.142.246.204` using `/Users/namse/.ssh/id_late_sh_ed25519`, `IdentitiesOnly=yes`, and normal host-key validation.
+The approved OCI host was connected using `/Users/namse/.ssh/id_late_sh_ed25519`, `IdentitiesOnly=yes`, and normal host-key validation. It reported Linux AArch64, Rust/Cargo 1.97.1, ZFS at `/bench/zfs/db`, pinned RocksDB source `abeebd9630f11bd08c28b7bd43c7bdfc62050654`, and archive SHA-256 `9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5`.
 
-- Host: `instance-20260923-1013`, Linux AArch64.
-- Rust: `1.97.1`; Cargo: `1.97.1`.
-- Filesystem: `/bench/zfs/db`, ZFS, 47 GiB available at preflight.
-- `MemAvailable`: 6,756 MiB at preflight.
-- Pinned RocksDB archive present; source SHA: `abeebd9630f11bd08c28b7bd43c7bdfc62050654`.
-- The process list showed no benchmark or build process.
+The final source SHA build used `CARGO_BUILD_JOBS=1` and the repository OCI helper. Both release workload binaries built successfully. The monitored build reached 126,709,760 bytes process-group RSS, minimum 5,113,733,120 bytes `MemAvailable`, and minimum 49,102,462,976 bytes filesystem free. The earlier unconstrained build attempt exceeded the 3 GiB process-group RSS stop line and is preserved; it was not used for measurement.
 
-Preflight values are snapshots, not a reservation. Recheck all limits immediately before every build and run. No OCI build, contract test, or performance cell has run yet.
+At the final source SHA, the following OCI tests passed serially:
 
-## Performance status
+- `cargo test --locked --release -p dodb-rocksdb --test transaction_contract --test read_contract --test contract_history -- --test-threads=1`: 9 tests passed, including B-link with automatic threshold checkpoints, minimal-native, and RocksDB common transaction/read/history contracts.
+- `cargo test --locked --release -p dodb-server --test blink_wal_checkpoint -- --test-threads=1`: 6 tests passed, including SIGKILL recovery.
 
-Before adding the process-termination test, OCI build `blink-wal-reclamation-build-j1-faf1f2b0` and contract run `blink-wal-reclamation-contracts-faf1f2b0` passed for source `faf1f2b0df3f4af0b7bc108df675561dbf98b0bb`. The build used `CARGO_BUILD_JOBS=1`, peak process-group RSS 1,946,234,880 bytes, minimum `MemAvailable` 3,574,898,688 bytes, and minimum ZFS free space 48,212,434,944 bytes. The transaction, read, and conditional-history suites passed with B-link's one-byte WAL threshold. That evidence predates the added SIGKILL test and does not validate the current source SHA; repeat the build and contracts at the updated SHA before performance measurement.
+Each OCI build/test run was monitored for process-group RSS, `MemAvailable`, and filesystem free space. Build and workload execution did not overlap. The first two failed build-controller invocations and the prior SHA's successful build/test records remain under `oci/builds/` and `oci/helper-runs/` as historical evidence.
 
-No performance result is recorded yet. The four-path, two-workload, three-repetition matrix remains gated on building and passing the B-link-enabled contract tests at the current source SHA.
+## Performance validation
+
+The predeclared matrix ran 24/24 cells: minimal-native, B-link off, B-link 32 MiB, and B-link 128 MiB; A/rw20 and E/width-16 unconditional; three independent repetitions. Each report records a successful full measurement window and passing final/reopen validation. The exact report set and per-run metric checks are recorded in `oci/matrix-verification-final-v3.json`.
+
+The first controller attempt stopped after the first completed cell because its A fingerprint parser read `client_input_prefixes` at the wrong JSON nesting level. A resumed attempt then rejected serialized matrix-plan keys before launching a workload. Both attempts and the first successful cell were preserved; that cell was not rerun. The final full run completed all cells, after which its equality check mistakenly included `admitted_workflows`, a throughput-dependent count, alongside the actual input fingerprint. The failed comparison is retained in `oci/input-prefix-fingerprints.json` and controller-failure records. The separate final verifier compares only per-client input-prefix fingerprints and fixed prefix lengths; all fingerprints matched, all 24 cells passed their controller and validation checks, and no cell was silently replaced.
+
+For A, checkpoint event wall timestamps were compared against the 30-second measurement interval using the workload's timestamped process samples. For E, whose process sampler has no wall-clock timestamps, the conservative in-measurement count subtracts one possible final queued coordinator group from post-reset checkpoint completions. E's threshold runs still have at least six conservatively counted measurement checkpoints. All 12 threshold workload/repetition cells therefore satisfy the three-checkpoint observation requirement.
+
+Full stdout, stderr, raw/enriched JSON, per-run commands and settings, process/resource time series, checkpoint events, database-file manifests and hashes, RocksDB LOG files, completion records, and controller failure artifacts are under `oci/`. The source SHA and executable hashes are in the matrix plan, commands, and reports.
+
+The 30-second results answer the short-run comparison only. They do not establish long-term steady state. The memory experiment remains a follow-up; these data do not show equal-memory performance or page-cache eviction/reload behavior.

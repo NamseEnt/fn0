@@ -1,0 +1,16 @@
+{
+  "case_id": "A-blink-32m-r1",
+  "exit_code": 0,
+  "stop_reason": null,
+  "elapsed_seconds": 43.558844652958214,
+  "sample_count": 44,
+  "peak_process_group_rss_bytes": 408850432,
+  "minimum_mem_available_bytes": 5270654976,
+  "maximum_database_bytes": 171115339,
+  "maximum_wal_bytes": 33600774,
+  "minimum_filesystem_available_bytes": 46801936384,
+  "report_exists": true,
+  "database_file_count": 2,
+  "database_bytes_before_removal": 158858487,
+  "rocksdb_log_file_count": 0
+}

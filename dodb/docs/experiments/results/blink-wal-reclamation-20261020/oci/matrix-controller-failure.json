@@ -1,0 +1,5 @@
+{
+  "failed_case_processing": "A-minimal-native-r1",
+  "failure": "runner looked for client_input_prefixes at the per-tenant level instead of inside counters",
+  "performance_cell_status": "completed and validated; preserved; not rerun"
+}

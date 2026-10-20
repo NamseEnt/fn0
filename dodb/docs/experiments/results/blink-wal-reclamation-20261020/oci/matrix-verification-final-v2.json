@@ -1,0 +1,8004 @@
+{
+  "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+  "binary_hashes": {
+    "service_workload": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+    "unconditional_write_workload": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55"
+  },
+  "expected_cells": 24,
+  "observed_cells": 24,
+  "all_cells_passed_controller_and_reopen_validation": true,
+  "cell_errors": {},
+  "input_prefix_fingerprints_match_across_paths": true,
+  "input_prefix_mismatch_cases": [],
+  "threshold_cells_insufficient": [],
+  "threshold_measurement_checkpoint_method": {
+    "A": "count checkpoint events whose start and end timestamps fall inside the first timestamped 30-second measurement sample window",
+    "E": "count post-reset checkpoint completions conservatively minus one possible final queued coordinator group during drain; the runner uses 64 clients, one in-flight transaction per dedicated client, and a 64-request coordinator group"
+  },
+  "predeclared_path_orders": {
+    "1": [
+      "minimal-native",
+      "blink-off",
+      "blink-32m",
+      "blink-128m"
+    ],
+    "2": [
+      "blink-off",
+      "blink-32m",
+      "blink-128m",
+      "minimal-native"
+    ],
+    "3": [
+      "blink-32m",
+      "blink-128m",
+      "minimal-native",
+      "blink-off"
+    ]
+  },
+  "aggregates": {
+    "A-minimal-native": {
+      "median_throughput_per_second": 3575.609418943262,
+      "throughput_per_repetition": [
+        3575.609418943262,
+        3599.408195141116,
+        3531.359501687021
+      ],
+      "median_latency_ms": {
+        "p50": 2.057215,
+        "p95": 25.821183,
+        "p99": 62.619647
+      },
+      "latency_count_per_repetition": [
+        92290,
+        92915,
+        91142
+      ],
+      "checkpoint_completed_per_repetition": [
+        0,
+        0,
+        0
+      ],
+      "measurement_checkpoint_completed_per_repetition": [
+        0,
+        0,
+        0
+      ],
+      "median_checkpoint_total_ms": 0.0,
+      "median_mutation_group_size": 0,
+      "median_cpu_seconds": 13.55,
+      "median_peak_process_group_rss_mib": 370.3125,
+      "median_maximum_database_mib": 160.17851543426514,
+      "median_maximum_wal_mib": 0.0,
+      "median_commit_wal_syncs": 0,
+      "median_checkpoint_wal_syncs": 0
+    },
+    "A-blink-off": {
+      "median_throughput_per_second": 5203.390139537218,
+      "throughput_per_repetition": [
+        5236.980085749366,
+        5158.312961286912,
+        5203.390139537218
+      ],
+      "median_latency_ms": {
+        "p50": 3.454975,
+        "p95": 6.676479,
+        "p99": 8.781823
+      },
+      "latency_count_per_repetition": [
+        135142,
+        133096,
+        134274
+      ],
+      "checkpoint_completed_per_repetition": [
+        0,
+        0,
+        0
+      ],
+      "measurement_checkpoint_completed_per_repetition": [
+        0,
+        0,
+        0
+      ],
+      "median_checkpoint_total_ms": 0.0,
+      "median_mutation_group_size": 9.736695151874102,
+      "median_cpu_seconds": 13.57,
+      "median_peak_process_group_rss_mib": 703.32421875,
+      "median_maximum_database_mib": 791.3437280654907,
+      "median_maximum_wal_mib": 628.7695093154907,
+      "median_commit_wal_syncs": 11819,
+      "median_checkpoint_wal_syncs": 0
+    },
+    "A-blink-32m": {
+      "median_throughput_per_second": 3596.5786232870973,
+      "throughput_per_repetition": [
+        3596.5786232870973,
+        3601.477144427634,
+        3568.5115570352123
+      ],
+      "median_latency_ms": {
+        "p50": 4.431871,
+        "p95": 8.220671,
+        "p99": 11.018239
+      },
+      "latency_count_per_repetition": [
+        92801,
+        92930,
+        92076
+      ],
+      "checkpoint_completed_per_repetition": [
+        15,
+        15,
+        15
+      ],
+      "measurement_checkpoint_completed_per_repetition": [
+        15,
+        15,
+        15
+      ],
+      "median_checkpoint_total_ms": 3937.850045,
+      "median_mutation_group_size": 9.670886075949367,
+      "median_cpu_seconds": 12.44,
+      "median_peak_process_group_rss_mib": 389.91015625,
+      "median_maximum_database_mib": 163.18830394744873,
+      "median_maximum_wal_mib": 32.09122276306152,
+      "median_commit_wal_syncs": 8295,
+      "median_checkpoint_wal_syncs": 15
+    },
+    "A-blink-128m": {
+      "median_throughput_per_second": 3968.061105359487,
+      "throughput_per_repetition": [
+        4080.4451484439965,
+        3903.3065503982857,
+        3968.061105359487
+      ],
+      "median_latency_ms": {
+        "p50": 4.206591,
+        "p95": 8.224767,
+        "p99": 10.870783
+      },
+      "latency_count_per_repetition": [
+        105326,
+        100676,
+        102411
+      ],
+      "checkpoint_completed_per_repetition": [
+        3,
+        3,
+        3
+      ],
+      "measurement_checkpoint_completed_per_repetition": [
+        3,
+        3,
+        3
+      ],
+      "median_checkpoint_total_ms": 1995.196167,
+      "median_mutation_group_size": 9.670590848511772,
+      "median_cpu_seconds": 12.38,
+      "median_peak_process_group_rss_mib": 499.171875,
+      "median_maximum_database_mib": 245.55108737945557,
+      "median_maximum_wal_mib": 128.05109119415283,
+      "median_commit_wal_syncs": 9164,
+      "median_checkpoint_wal_syncs": 3
+    },
+    "E-minimal-native": {
+      "median_throughput_per_second": 1712.472939217319,
+      "throughput_per_repetition": [
+        1712.472939217319,
+        1685.2709047920343,
+        1762.5916055962691
+      ],
+      "median_latency_ms": {
+        "p50": 31.260671,
+        "p95": 55.345151,
+        "p99": 325.058559
+      },
+      "latency_count_per_repetition": [
+        51417,
+        50607,
+        52913
+      ],
+      "checkpoint_completed_per_repetition": [
+        0,
+        0,
+        0
+      ],
+      "measurement_checkpoint_completed_per_repetition": [
+        0,
+        0,
+        0
+      ],
+      "median_checkpoint_total_ms": 0.0,
+      "median_mutation_group_size": 0,
+      "median_cpu_seconds": 26.14,
+      "median_peak_process_group_rss_mib": 949.95703125,
+      "median_maximum_database_mib": 543.2002353668213,
+      "median_maximum_wal_mib": 0.0,
+      "median_commit_wal_syncs": 0,
+      "median_checkpoint_wal_syncs": 0
+    },
+    "E-blink-off": {
+      "median_throughput_per_second": 2852.57477849577,
+      "throughput_per_repetition": [
+        2852.57477849577,
+        2862.9854126423766,
+        2723.3957486506297
+      ],
+      "median_latency_ms": {
+        "p50": 19.972095,
+        "p95": 36.732927,
+        "p99": 43.778047
+      },
+      "latency_count_per_repetition": [
+        85640,
+        85964,
+        81740
+      ],
+      "checkpoint_completed_per_repetition": [
+        0,
+        0,
+        0
+      ],
+      "measurement_checkpoint_completed_per_repetition": [
+        0,
+        0,
+        0
+      ],
+      "median_checkpoint_total_ms": 0.0,
+      "median_mutation_group_size": 53.69394128669582,
+      "median_cpu_seconds": 24.63,
+      "median_peak_process_group_rss_mib": 1490.51953125,
+      "median_maximum_database_mib": 1692.2537956237793,
+      "median_maximum_wal_mib": 1336.6834831237793,
+      "median_commit_wal_syncs": 1597,
+      "median_checkpoint_wal_syncs": 0
+    },
+    "E-blink-32m": {
+      "median_throughput_per_second": 1317.509494303418,
+      "throughput_per_repetition": [
+        1304.747014404045,
+        1346.8096443319569,
+        1317.509494303418
+      ],
+      "median_latency_ms": {
+        "p50": 24.674303,
+        "p95": 61.964287,
+        "p99": 546.308095
+      },
+      "latency_count_per_repetition": [
+        39222,
+        40442,
+        39549
+      ],
+      "checkpoint_completed_per_repetition": [
+        27,
+        27,
+        26
+      ],
+      "measurement_checkpoint_completed_per_repetition": [
+        26,
+        26,
+        25
+      ],
+      "median_checkpoint_total_ms": 12726.397426,
+      "median_mutation_group_size": 53.21845318860244,
+      "median_cpu_seconds": 20.71,
+      "median_peak_process_group_rss_mib": 1115.66015625,
+      "median_maximum_database_mib": 388.82814598083496,
+      "median_maximum_wal_mib": 33.36310005187988,
+      "median_commit_wal_syncs": 737,
+      "median_checkpoint_wal_syncs": 27
+    },
+    "E-blink-128m": {
+      "median_throughput_per_second": 1361.6255829447036,
+      "throughput_per_repetition": [
+        1372.3393624462876,
+        1361.6255829447036,
+        1353.5605984871206
+      ],
+      "median_latency_ms": {
+        "p50": 25.346047,
+        "p95": 51.478527,
+        "p99": 1193.279487
+      },
+      "latency_count_per_repetition": [
+        41199,
+        40876,
+        40619
+      ],
+      "checkpoint_completed_per_repetition": [
+        7,
+        7,
+        7
+      ],
+      "measurement_checkpoint_completed_per_repetition": [
+        6,
+        6,
+        6
+      ],
+      "median_checkpoint_total_ms": 11549.278701,
+      "median_mutation_group_size": 52.74322580645161,
+      "median_cpu_seconds": 16.41,
+      "median_peak_process_group_rss_mib": 1193.64453125,
+      "median_maximum_database_mib": 484.72836780548096,
+      "median_maximum_wal_mib": 129.15805530548096,
+      "median_commit_wal_syncs": 775,
+      "median_checkpoint_wal_syncs": 7
+    }
+  },
+  "comparisons": {
+    "A": {
+      "blink_off_vs_minimal_native": {
+        "throughput_change_percent": 45.52456741975557,
+        "p99_change_percent": -85.97593020605817
+      },
+      "threshold_vs_blink_off": {
+        "blink-32m": {
+          "throughput_change_percent": -30.88008919494605,
+          "p99_change_percent": 25.466420810348843
+        },
+        "blink-128m": {
+          "throughput_change_percent": -23.740849735468792,
+          "p99_change_percent": 23.78731614153462
+        }
+      },
+      "threshold_vs_minimal_native": {
+        "blink-32m": {
+          "throughput_change_percent": 0.5864511999756461,
+          "p99_change_percent": -82.40450157759592
+        },
+        "blink-128m": {
+          "throughput_change_percent": 10.97579854044044,
+          "p99_change_percent": -82.63998038826377
+        }
+      }
+    },
+    "E": {
+      "blink_off_vs_minimal_native": {
+        "throughput_change_percent": 66.57634191869515,
+        "p99_change_percent": -86.53225833072126
+      },
+      "threshold_vs_blink_off": {
+        "blink-32m": {
+          "throughput_change_percent": -53.813323169106475,
+          "p99_change_percent": 1147.904217837767
+        },
+        "blink-128m": {
+          "throughput_change_percent": -52.266787422739505,
+          "p99_change_percent": 2625.74856297267
+        }
+      },
+      "threshold_vs_minimal_native": {
+        "blink-32m": {
+          "throughput_change_percent": -23.063923281288044,
+          "p99_change_percent": 68.06451633842381
+        },
+        "blink-128m": {
+          "throughput_change_percent": -20.48776060852495,
+          "p99_change_percent": 267.0967750152366
+        }
+      }
+    }
+  },
+  "cases": [
+    {
+      "case_id": "A-minimal-native-r1",
+      "workload": "A",
+      "backend_key": "minimal-native",
+      "repetition": 1,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+      "blink_checkpoint_policy": "disabled",
+      "threshold_bytes": null,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 3575.609418943262,
+      "latency": {
+        "condition_rejection": {
+          "count": 6085,
+          "sample_count": 6085,
+          "p50_ms": 0.044767,
+          "p95_ms": 0.361727,
+          "p99_ms": 0.701439
+        },
+        "get": {
+          "count": 2120,
+          "sample_count": 2120,
+          "p50_ms": 0.014447,
+          "p95_ms": 0.028895,
+          "p99_ms": 0.319231
+        },
+        "preparatory_get": {
+          "count": 15022,
+          "sample_count": 15022,
+          "p50_ms": 0.015247,
+          "p95_ms": 0.030735,
+          "p99_ms": 0.341759
+        },
+        "query16": {
+          "count": 4325,
+          "sample_count": 4325,
+          "p50_ms": 0.055743,
+          "p95_ms": 0.255871,
+          "p99_ms": 0.455935
+        },
+        "workflow": {
+          "count": 92290,
+          "sample_count": 92290,
+          "p50_ms": 2.057215,
+          "p95_ms": 25.673727,
+          "p99_ms": 62.619647
+        },
+        "write_transaction_success": {
+          "count": 79760,
+          "sample_count": 79760,
+          "p50_ms": 2.166783,
+          "p95_ms": 28.934143,
+          "p99_ms": 65.634303
+        }
+      },
+      "outcomes": {
+        "successful_mutations": 233244,
+        "successful_write_transactions": 79760,
+        "intentional_condition_rejections": 6085,
+        "natural_conflicts": 0,
+        "overloads": 0,
+        "other_errors": 0,
+        "read_calls": 21467
+      },
+      "cpu_seconds": 13.55,
+      "process_peak_rss_bytes": 243834880,
+      "controller_peak_process_group_rss_bytes": 388300800,
+      "maximum_database_bytes": 167425845,
+      "maximum_wal_bytes": 0,
+      "database_bytes_at_end": 167425845,
+      "database_manifest_file_count": 13,
+      "checkpoint_started": 0,
+      "checkpoint_completed": 0,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 0,
+      "checkpoint_window_method": "checkpoint event timestamps within the sampled measurement window",
+      "threshold_cell_status": "not_applicable",
+      "checkpoint_total_ms": 0.0,
+      "checkpoint_max_ms": 0.0,
+      "wal_bytes_at_measurement_start": null,
+      "wal_bytes_at_measurement_end": null,
+      "wal_bytes_max": null,
+      "threshold_excess_max_bytes": null,
+      "successful_mutation_transactions": null,
+      "mutation_commit_groups": null,
+      "average_mutation_transactions_per_group": null,
+      "transaction_group_histogram": [],
+      "wal_syncs": null,
+      "commit_wal_syncs": null,
+      "checkpoint_wal_syncs": null,
+      "drain_ms": 11.322537,
+      "final_checkpoint_drain_ms": 0.00052,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          "rw20",
+          100,
+          "5d78753cccb1fdf2"
+        ],
+        [
+          1,
+          "rw20",
+          100,
+          "1d948c8ddf6c8727"
+        ],
+        [
+          2,
+          "rw20",
+          100,
+          "f96ed4727ba26ca5"
+        ],
+        [
+          3,
+          "rw20",
+          100,
+          "b04b0a15c374f57c"
+        ],
+        [
+          4,
+          "rw20",
+          100,
+          "9d4a1156bebd5d26"
+        ],
+        [
+          5,
+          "rw20",
+          100,
+          "0b5ac490f0383867"
+        ],
+        [
+          6,
+          "rw20",
+          100,
+          "995cef2be0b628ab"
+        ],
+        [
+          7,
+          "rw20",
+          100,
+          "0017854c1bfb1f52"
+        ],
+        [
+          8,
+          "rw20",
+          100,
+          "b50b24dd873fe6a2"
+        ],
+        [
+          9,
+          "rw20",
+          100,
+          "25bdf4a7f006fddc"
+        ],
+        [
+          10,
+          "rw20",
+          100,
+          "50d2d6e9c7fcab5b"
+        ],
+        [
+          11,
+          "rw20",
+          100,
+          "9bedb82440595bf6"
+        ],
+        [
+          12,
+          "rw20",
+          100,
+          "4064b22158d16673"
+        ],
+        [
+          13,
+          "rw20",
+          100,
+          "ad44a2dbe8955c05"
+        ],
+        [
+          14,
+          "rw20",
+          100,
+          "13935709f525503e"
+        ],
+        [
+          15,
+          "rw20",
+          100,
+          "382037aba8f857ae"
+        ]
+      ]
+    },
+    {
+      "case_id": "E-minimal-native-r1",
+      "workload": "E",
+      "backend_key": "minimal-native",
+      "repetition": 1,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55",
+      "blink_checkpoint_policy": "disabled",
+      "threshold_bytes": null,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 1712.472939217319,
+      "latency": {
+        "write_batch": {
+          "count": 51417,
+          "sample_count": 51417,
+          "p50_ms": 31.260671,
+          "p95_ms": 55.345151,
+          "p99_ms": 311.951359
+        }
+      },
+      "outcomes": {
+        "measurement_write_batches_acknowledged": 51417,
+        "warmup_write_batches_acknowledged": 17649,
+        "overloads": 0,
+        "other_errors": 0
+      },
+      "cpu_seconds": 26.14,
+      "process_peak_rss_bytes": 642945024,
+      "controller_peak_process_group_rss_bytes": 996102144,
+      "maximum_database_bytes": 569586730,
+      "maximum_wal_bytes": 0,
+      "database_bytes_at_end": 213996553,
+      "database_manifest_file_count": 14,
+      "checkpoint_started": 0,
+      "checkpoint_completed": 0,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 0,
+      "checkpoint_window_method": "completed events since the measurement reset minus one possible final coordinator group during drain",
+      "threshold_cell_status": "not_applicable",
+      "checkpoint_total_ms": 0.0,
+      "checkpoint_max_ms": 0.0,
+      "wal_bytes_at_measurement_start": null,
+      "wal_bytes_at_measurement_end": null,
+      "wal_bytes_max": null,
+      "threshold_excess_max_bytes": null,
+      "successful_mutation_transactions": null,
+      "mutation_commit_groups": null,
+      "average_mutation_transactions_per_group": null,
+      "transaction_group_histogram": [],
+      "wal_syncs": null,
+      "commit_wal_syncs": null,
+      "checkpoint_wal_syncs": null,
+      "drain_ms": 30025,
+      "final_checkpoint_drain_ms": 0,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          100,
+          "1f4048d2bfd553c1"
+        ],
+        [
+          1,
+          100,
+          "51cd15a2404e2fd5"
+        ],
+        [
+          2,
+          100,
+          "69592da121d84a4d"
+        ],
+        [
+          3,
+          100,
+          "0566421500eae711"
+        ],
+        [
+          4,
+          100,
+          "cc8a35d5dd01ce21"
+        ],
+        [
+          5,
+          100,
+          "ff6e1138354c352d"
+        ],
+        [
+          6,
+          100,
+          "9000645f0d022655"
+        ],
+        [
+          7,
+          100,
+          "a57a77ef31bcb841"
+        ],
+        [
+          8,
+          100,
+          "c38b3808c09aae51"
+        ],
+        [
+          9,
+          100,
+          "93f1a077e6e3b115"
+        ],
+        [
+          10,
+          100,
+          "c024871dc147a28d"
+        ],
+        [
+          11,
+          100,
+          "537cbbaa2b680361"
+        ],
+        [
+          12,
+          100,
+          "16cc31e71aece9d1"
+        ],
+        [
+          13,
+          100,
+          "52259ad6dcf417ad"
+        ],
+        [
+          14,
+          100,
+          "be4fa4d09cf82145"
+        ],
+        [
+          15,
+          100,
+          "fa17a8aca03277c1"
+        ],
+        [
+          16,
+          100,
+          "ef0f6d8db17d5419"
+        ],
+        [
+          17,
+          100,
+          "e0f91033972e89ad"
+        ],
+        [
+          18,
+          100,
+          "d5c970c3a2785355"
+        ],
+        [
+          19,
+          100,
+          "775d80553d6bf689"
+        ],
+        [
+          20,
+          100,
+          "362739a6fc0cc169"
+        ],
+        [
+          21,
+          100,
+          "c9523a0fac312715"
+        ],
+        [
+          22,
+          100,
+          "71c579d33ed12f0d"
+        ],
+        [
+          23,
+          100,
+          "1fae86a6c54ea6a9"
+        ],
+        [
+          24,
+          100,
+          "067557f5078b9c19"
+        ],
+        [
+          25,
+          100,
+          "2cb5cfe24edde0cd"
+        ],
+        [
+          26,
+          100,
+          "3d7b17abb2a1e035"
+        ],
+        [
+          27,
+          100,
+          "9716e6aca725f6c9"
+        ],
+        [
+          28,
+          100,
+          "a2eb9d5787469f09"
+        ],
+        [
+          29,
+          100,
+          "6e1f39d9be966095"
+        ],
+        [
+          30,
+          100,
+          "9e14a5949b96393d"
+        ],
+        [
+          31,
+          100,
+          "19537355c173c839"
+        ],
+        [
+          32,
+          100,
+          "b1675b9e4d7eb2f1"
+        ],
+        [
+          33,
+          100,
+          "09597a498fa5f625"
+        ],
+        [
+          34,
+          100,
+          "a68112e4af194c7d"
+        ],
+        [
+          35,
+          100,
+          "62ae5a9abb23f031"
+        ],
+        [
+          36,
+          100,
+          "4a7143dbc30db271"
+        ],
+        [
+          37,
+          100,
+          "9e4e270851fd7f4d"
+        ],
+        [
+          38,
+          100,
+          "4a7963cb29af31e5"
+        ],
+        [
+          39,
+          100,
+          "4e3c114f422be711"
+        ],
+        [
+          40,
+          100,
+          "f6271eaf8ebc0201"
+        ],
+        [
+          41,
+          100,
+          "a0d19be42eb443e5"
+        ],
+        [
+          42,
+          100,
+          "65cd964be790fc9d"
+        ],
+        [
+          43,
+          100,
+          "c4021a417cd26be1"
+        ],
+        [
+          44,
+          100,
+          "210fa8cc929480b1"
+        ],
+        [
+          45,
+          100,
+          "f302705429c791dd"
+        ],
+        [
+          46,
+          100,
+          "ee874d17265b8145"
+        ],
+        [
+          47,
+          100,
+          "05a4e6a725f651c1"
+        ],
+        [
+          48,
+          100,
+          "bcaab568afa0c549"
+        ],
+        [
+          49,
+          100,
+          "751a88f107d2cc1d"
+        ],
+        [
+          50,
+          100,
+          "25bd7e5262ebd395"
+        ],
+        [
+          51,
+          100,
+          "b387f7ec2df85e59"
+        ],
+        [
+          52,
+          100,
+          "5f4d056abcd073e9"
+        ],
+        [
+          53,
+          100,
+          "e32b7dd664af7525"
+        ],
+        [
+          54,
+          100,
+          "c6915c6cdcb1027d"
+        ],
+        [
+          55,
+          100,
+          "fa263852a76cbab9"
+        ],
+        [
+          56,
+          100,
+          "1d8a1bc311d99359"
+        ],
+        [
+          57,
+          100,
+          "783d00c71de0516d"
+        ],
+        [
+          58,
+          100,
+          "9f5b41565160d4c5"
+        ],
+        [
+          59,
+          100,
+          "b2a85e3583a98949"
+        ],
+        [
+          60,
+          100,
+          "8466021ab06d2929"
+        ],
+        [
+          61,
+          100,
+          "94289d8dd09ee805"
+        ],
+        [
+          62,
+          100,
+          "fc0e0413fadabccd"
+        ],
+        [
+          63,
+          100,
+          "c7f9dd03d2a5a949"
+        ]
+      ]
+    },
+    {
+      "case_id": "A-blink-off-r1",
+      "workload": "A",
+      "backend_key": "blink-off",
+      "repetition": 1,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+      "blink_checkpoint_policy": "disabled",
+      "threshold_bytes": null,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 5236.980085749366,
+      "latency": {
+        "condition_rejection": {
+          "count": 8823,
+          "sample_count": 8823,
+          "p50_ms": 3.450879,
+          "p95_ms": 6.705151,
+          "p99_ms": 8.568831
+        },
+        "get": {
+          "count": 3150,
+          "sample_count": 3150,
+          "p50_ms": 0.026255,
+          "p95_ms": 0.097471,
+          "p99_ms": 0.419583
+        },
+        "preparatory_get": {
+          "count": 21986,
+          "sample_count": 21986,
+          "p50_ms": 0.026287,
+          "p95_ms": 0.079487,
+          "p99_ms": 0.467967
+        },
+        "query16": {
+          "count": 6303,
+          "sample_count": 6303,
+          "p50_ms": 0.037215,
+          "p95_ms": 0.101119,
+          "p99_ms": 0.464895
+        },
+        "workflow": {
+          "count": 135142,
+          "sample_count": 135142,
+          "p50_ms": 3.422207,
+          "p95_ms": 6.676479,
+          "p99_ms": 8.667135
+        },
+        "write_transaction_success": {
+          "count": 116866,
+          "sample_count": 116866,
+          "p50_ms": 3.500031,
+          "p95_ms": 6.729727,
+          "p99_ms": 8.716287
+        }
+      },
+      "outcomes": {
+        "successful_mutations": 340835,
+        "successful_write_transactions": 116866,
+        "intentional_condition_rejections": 8823,
+        "natural_conflicts": 0,
+        "overloads": 0,
+        "other_errors": 0,
+        "read_calls": 31439
+      },
+      "cpu_seconds": 13.54,
+      "process_peak_rss_bytes": 381984768,
+      "controller_peak_process_group_rss_bytes": 677560320,
+      "maximum_database_bytes": 834672175,
+      "maximum_wal_bytes": 663561775,
+      "database_bytes_at_end": 834672175,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 0,
+      "checkpoint_completed": 0,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 0,
+      "checkpoint_window_method": "checkpoint event timestamps within the sampled measurement window",
+      "threshold_cell_status": "not_applicable",
+      "checkpoint_total_ms": 0.0,
+      "checkpoint_max_ms": 0.0,
+      "wal_bytes_at_measurement_start": 272877461,
+      "wal_bytes_at_measurement_end": 663561775,
+      "wal_bytes_max": 663561775,
+      "threshold_excess_max_bytes": 0,
+      "successful_mutation_transactions": 116866,
+      "mutation_commit_groups": 12109,
+      "average_mutation_transactions_per_group": 9.65116855231646,
+      "transaction_group_histogram": [
+        0,
+        125,
+        243,
+        360,
+        434,
+        613,
+        767,
+        885,
+        974,
+        1078,
+        1182,
+        1201,
+        1215,
+        1131,
+        1000,
+        647,
+        254
+      ],
+      "wal_syncs": 12109,
+      "commit_wal_syncs": 12109,
+      "checkpoint_wal_syncs": 0,
+      "drain_ms": 1.720615,
+      "final_checkpoint_drain_ms": 0.0006799999999999999,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          "rw20",
+          100,
+          "5d78753cccb1fdf2"
+        ],
+        [
+          1,
+          "rw20",
+          100,
+          "1d948c8ddf6c8727"
+        ],
+        [
+          2,
+          "rw20",
+          100,
+          "f96ed4727ba26ca5"
+        ],
+        [
+          3,
+          "rw20",
+          100,
+          "b04b0a15c374f57c"
+        ],
+        [
+          4,
+          "rw20",
+          100,
+          "9d4a1156bebd5d26"
+        ],
+        [
+          5,
+          "rw20",
+          100,
+          "0b5ac490f0383867"
+        ],
+        [
+          6,
+          "rw20",
+          100,
+          "995cef2be0b628ab"
+        ],
+        [
+          7,
+          "rw20",
+          100,
+          "0017854c1bfb1f52"
+        ],
+        [
+          8,
+          "rw20",
+          100,
+          "b50b24dd873fe6a2"
+        ],
+        [
+          9,
+          "rw20",
+          100,
+          "25bdf4a7f006fddc"
+        ],
+        [
+          10,
+          "rw20",
+          100,
+          "50d2d6e9c7fcab5b"
+        ],
+        [
+          11,
+          "rw20",
+          100,
+          "9bedb82440595bf6"
+        ],
+        [
+          12,
+          "rw20",
+          100,
+          "4064b22158d16673"
+        ],
+        [
+          13,
+          "rw20",
+          100,
+          "ad44a2dbe8955c05"
+        ],
+        [
+          14,
+          "rw20",
+          100,
+          "13935709f525503e"
+        ],
+        [
+          15,
+          "rw20",
+          100,
+          "382037aba8f857ae"
+        ]
+      ]
+    },
+    {
+      "case_id": "E-blink-off-r1",
+      "workload": "E",
+      "backend_key": "blink-off",
+      "repetition": 1,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55",
+      "blink_checkpoint_policy": "disabled",
+      "threshold_bytes": null,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 2852.57477849577,
+      "latency": {
+        "write_batch": {
+          "count": 85640,
+          "sample_count": 85640,
+          "p50_ms": 19.972095,
+          "p95_ms": 36.732927,
+          "p99_ms": 43.778047
+        }
+      },
+      "outcomes": {
+        "measurement_write_batches_acknowledged": 85640,
+        "warmup_write_batches_acknowledged": 29811,
+        "overloads": 0,
+        "other_errors": 0
+      },
+      "cpu_seconds": 24.39,
+      "process_peak_rss_bytes": 933380096,
+      "controller_peak_process_group_rss_bytes": 1562923008,
+      "maximum_database_bytes": 1776407438,
+      "maximum_wal_bytes": 1403564942,
+      "database_bytes_at_end": 1776407438,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 0,
+      "checkpoint_completed": 0,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 0,
+      "checkpoint_window_method": "completed events since the measurement reset minus one possible final coordinator group during drain",
+      "threshold_cell_status": "not_applicable",
+      "checkpoint_total_ms": 0.0,
+      "checkpoint_max_ms": 0.0,
+      "wal_bytes_at_measurement_start": 647508639,
+      "wal_bytes_at_measurement_end": 1403564942,
+      "wal_bytes_max": 1403564942,
+      "threshold_excess_max_bytes": 0,
+      "successful_mutation_transactions": 85640,
+      "mutation_commit_groups": 1597,
+      "average_mutation_transactions_per_group": 53.625547902316846,
+      "transaction_group_histogram": [
+        0,
+        0,
+        1,
+        1,
+        0,
+        3,
+        0,
+        1,
+        1,
+        0,
+        1,
+        1,
+        3,
+        2,
+        2,
+        3,
+        2,
+        2,
+        3,
+        2,
+        4,
+        3,
+        4,
+        4,
+        4,
+        6,
+        6,
+        7,
+        8,
+        7,
+        7,
+        5,
+        7,
+        8,
+        11,
+        7,
+        17,
+        14,
+        13,
+        18,
+        17,
+        10,
+        17,
+        20,
+        19,
+        21,
+        17,
+        20,
+        27,
+        41,
+        42,
+        45,
+        44,
+        60,
+        33,
+        42,
+        71,
+        69,
+        69,
+        95,
+        74,
+        132,
+        134,
+        151,
+        139
+      ],
+      "wal_syncs": 1597,
+      "commit_wal_syncs": 1597,
+      "checkpoint_wal_syncs": 0,
+      "drain_ms": 30022,
+      "final_checkpoint_drain_ms": 0,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          100,
+          "1f4048d2bfd553c1"
+        ],
+        [
+          1,
+          100,
+          "51cd15a2404e2fd5"
+        ],
+        [
+          2,
+          100,
+          "69592da121d84a4d"
+        ],
+        [
+          3,
+          100,
+          "0566421500eae711"
+        ],
+        [
+          4,
+          100,
+          "cc8a35d5dd01ce21"
+        ],
+        [
+          5,
+          100,
+          "ff6e1138354c352d"
+        ],
+        [
+          6,
+          100,
+          "9000645f0d022655"
+        ],
+        [
+          7,
+          100,
+          "a57a77ef31bcb841"
+        ],
+        [
+          8,
+          100,
+          "c38b3808c09aae51"
+        ],
+        [
+          9,
+          100,
+          "93f1a077e6e3b115"
+        ],
+        [
+          10,
+          100,
+          "c024871dc147a28d"
+        ],
+        [
+          11,
+          100,
+          "537cbbaa2b680361"
+        ],
+        [
+          12,
+          100,
+          "16cc31e71aece9d1"
+        ],
+        [
+          13,
+          100,
+          "52259ad6dcf417ad"
+        ],
+        [
+          14,
+          100,
+          "be4fa4d09cf82145"
+        ],
+        [
+          15,
+          100,
+          "fa17a8aca03277c1"
+        ],
+        [
+          16,
+          100,
+          "ef0f6d8db17d5419"
+        ],
+        [
+          17,
+          100,
+          "e0f91033972e89ad"
+        ],
+        [
+          18,
+          100,
+          "d5c970c3a2785355"
+        ],
+        [
+          19,
+          100,
+          "775d80553d6bf689"
+        ],
+        [
+          20,
+          100,
+          "362739a6fc0cc169"
+        ],
+        [
+          21,
+          100,
+          "c9523a0fac312715"
+        ],
+        [
+          22,
+          100,
+          "71c579d33ed12f0d"
+        ],
+        [
+          23,
+          100,
+          "1fae86a6c54ea6a9"
+        ],
+        [
+          24,
+          100,
+          "067557f5078b9c19"
+        ],
+        [
+          25,
+          100,
+          "2cb5cfe24edde0cd"
+        ],
+        [
+          26,
+          100,
+          "3d7b17abb2a1e035"
+        ],
+        [
+          27,
+          100,
+          "9716e6aca725f6c9"
+        ],
+        [
+          28,
+          100,
+          "a2eb9d5787469f09"
+        ],
+        [
+          29,
+          100,
+          "6e1f39d9be966095"
+        ],
+        [
+          30,
+          100,
+          "9e14a5949b96393d"
+        ],
+        [
+          31,
+          100,
+          "19537355c173c839"
+        ],
+        [
+          32,
+          100,
+          "b1675b9e4d7eb2f1"
+        ],
+        [
+          33,
+          100,
+          "09597a498fa5f625"
+        ],
+        [
+          34,
+          100,
+          "a68112e4af194c7d"
+        ],
+        [
+          35,
+          100,
+          "62ae5a9abb23f031"
+        ],
+        [
+          36,
+          100,
+          "4a7143dbc30db271"
+        ],
+        [
+          37,
+          100,
+          "9e4e270851fd7f4d"
+        ],
+        [
+          38,
+          100,
+          "4a7963cb29af31e5"
+        ],
+        [
+          39,
+          100,
+          "4e3c114f422be711"
+        ],
+        [
+          40,
+          100,
+          "f6271eaf8ebc0201"
+        ],
+        [
+          41,
+          100,
+          "a0d19be42eb443e5"
+        ],
+        [
+          42,
+          100,
+          "65cd964be790fc9d"
+        ],
+        [
+          43,
+          100,
+          "c4021a417cd26be1"
+        ],
+        [
+          44,
+          100,
+          "210fa8cc929480b1"
+        ],
+        [
+          45,
+          100,
+          "f302705429c791dd"
+        ],
+        [
+          46,
+          100,
+          "ee874d17265b8145"
+        ],
+        [
+          47,
+          100,
+          "05a4e6a725f651c1"
+        ],
+        [
+          48,
+          100,
+          "bcaab568afa0c549"
+        ],
+        [
+          49,
+          100,
+          "751a88f107d2cc1d"
+        ],
+        [
+          50,
+          100,
+          "25bd7e5262ebd395"
+        ],
+        [
+          51,
+          100,
+          "b387f7ec2df85e59"
+        ],
+        [
+          52,
+          100,
+          "5f4d056abcd073e9"
+        ],
+        [
+          53,
+          100,
+          "e32b7dd664af7525"
+        ],
+        [
+          54,
+          100,
+          "c6915c6cdcb1027d"
+        ],
+        [
+          55,
+          100,
+          "fa263852a76cbab9"
+        ],
+        [
+          56,
+          100,
+          "1d8a1bc311d99359"
+        ],
+        [
+          57,
+          100,
+          "783d00c71de0516d"
+        ],
+        [
+          58,
+          100,
+          "9f5b41565160d4c5"
+        ],
+        [
+          59,
+          100,
+          "b2a85e3583a98949"
+        ],
+        [
+          60,
+          100,
+          "8466021ab06d2929"
+        ],
+        [
+          61,
+          100,
+          "94289d8dd09ee805"
+        ],
+        [
+          62,
+          100,
+          "fc0e0413fadabccd"
+        ],
+        [
+          63,
+          100,
+          "c7f9dd03d2a5a949"
+        ]
+      ]
+    },
+    {
+      "case_id": "A-blink-32m-r1",
+      "workload": "A",
+      "backend_key": "blink-32m",
+      "repetition": 1,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+      "blink_checkpoint_policy": "wal_bytes_threshold",
+      "threshold_bytes": 33554432,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 3596.5786232870973,
+      "latency": {
+        "condition_rejection": {
+          "count": 6075,
+          "sample_count": 6075,
+          "p50_ms": 4.493311,
+          "p95_ms": 7.905279,
+          "p99_ms": 10.838015
+        },
+        "get": {
+          "count": 2146,
+          "sample_count": 2146,
+          "p50_ms": 0.027375,
+          "p95_ms": 0.077311,
+          "p99_ms": 0.224127
+        },
+        "preparatory_get": {
+          "count": 15108,
+          "sample_count": 15108,
+          "p50_ms": 0.027967,
+          "p95_ms": 0.080447,
+          "p99_ms": 0.291071
+        },
+        "query16": {
+          "count": 4360,
+          "sample_count": 4360,
+          "p50_ms": 0.039231,
+          "p95_ms": 0.102591,
+          "p99_ms": 0.417535
+        },
+        "workflow": {
+          "count": 92801,
+          "sample_count": 92801,
+          "p50_ms": 4.431871,
+          "p95_ms": 8.122367,
+          "p99_ms": 10.821631
+        },
+        "write_transaction_success": {
+          "count": 80220,
+          "sample_count": 80220,
+          "p50_ms": 4.567039,
+          "p95_ms": 8.237055,
+          "p99_ms": 10.960895
+        }
+      },
+      "outcomes": {
+        "successful_mutations": 233779,
+        "successful_write_transactions": 80220,
+        "intentional_condition_rejections": 6075,
+        "natural_conflicts": 0,
+        "overloads": 0,
+        "other_errors": 0,
+        "read_calls": 21614
+      },
+      "cpu_seconds": 12.48,
+      "process_peak_rss_bytes": 220639232,
+      "controller_peak_process_group_rss_bytes": 408850432,
+      "maximum_database_bytes": 171115339,
+      "maximum_wal_bytes": 33600774,
+      "database_bytes_at_end": 158858487,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 15,
+      "checkpoint_completed": 15,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 15,
+      "checkpoint_window_method": "checkpoint event timestamps within the sampled measurement window",
+      "threshold_cell_status": "repeated_measurement_checkpoints_observed",
+      "checkpoint_total_ms": 3893.895868,
+      "checkpoint_max_ms": 300.90631,
+      "wal_bytes_at_measurement_start": 24891120,
+      "wal_bytes_at_measurement_end": 13651191,
+      "wal_bytes_max": 33653834,
+      "threshold_excess_max_bytes": 99402,
+      "successful_mutation_transactions": 80220,
+      "mutation_commit_groups": 8295,
+      "average_mutation_transactions_per_group": 9.670886075949367,
+      "transaction_group_histogram": [
+        0,
+        117,
+        180,
+        241,
+        357,
+        384,
+        490,
+        592,
+        623,
+        703,
+        781,
+        822,
+        841,
+        819,
+        681,
+        472,
+        192
+      ],
+      "wal_syncs": 8310,
+      "commit_wal_syncs": 8295,
+      "checkpoint_wal_syncs": 15,
+      "drain_ms": 1.506453,
+      "final_checkpoint_drain_ms": 0.00064,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          "rw20",
+          100,
+          "5d78753cccb1fdf2"
+        ],
+        [
+          1,
+          "rw20",
+          100,
+          "1d948c8ddf6c8727"
+        ],
+        [
+          2,
+          "rw20",
+          100,
+          "f96ed4727ba26ca5"
+        ],
+        [
+          3,
+          "rw20",
+          100,
+          "b04b0a15c374f57c"
+        ],
+        [
+          4,
+          "rw20",
+          100,
+          "9d4a1156bebd5d26"
+        ],
+        [
+          5,
+          "rw20",
+          100,
+          "0b5ac490f0383867"
+        ],
+        [
+          6,
+          "rw20",
+          100,
+          "995cef2be0b628ab"
+        ],
+        [
+          7,
+          "rw20",
+          100,
+          "0017854c1bfb1f52"
+        ],
+        [
+          8,
+          "rw20",
+          100,
+          "b50b24dd873fe6a2"
+        ],
+        [
+          9,
+          "rw20",
+          100,
+          "25bdf4a7f006fddc"
+        ],
+        [
+          10,
+          "rw20",
+          100,
+          "50d2d6e9c7fcab5b"
+        ],
+        [
+          11,
+          "rw20",
+          100,
+          "9bedb82440595bf6"
+        ],
+        [
+          12,
+          "rw20",
+          100,
+          "4064b22158d16673"
+        ],
+        [
+          13,
+          "rw20",
+          100,
+          "ad44a2dbe8955c05"
+        ],
+        [
+          14,
+          "rw20",
+          100,
+          "13935709f525503e"
+        ],
+        [
+          15,
+          "rw20",
+          100,
+          "382037aba8f857ae"
+        ]
+      ]
+    },
+    {
+      "case_id": "E-blink-32m-r1",
+      "workload": "E",
+      "backend_key": "blink-32m",
+      "repetition": 1,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55",
+      "blink_checkpoint_policy": "wal_bytes_threshold",
+      "threshold_bytes": 33554432,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 1304.747014404045,
+      "latency": {
+        "write_batch": {
+          "count": 39222,
+          "sample_count": 39222,
+          "p50_ms": 24.575999,
+          "p95_ms": 65.372159,
+          "p99_ms": 558.366719
+        }
+      },
+      "outcomes": {
+        "measurement_write_batches_acknowledged": 39222,
+        "warmup_write_batches_acknowledged": 14366,
+        "overloads": 0,
+        "other_errors": 0
+      },
+      "cpu_seconds": 20.71,
+      "process_peak_rss_bytes": 588587008,
+      "controller_peak_process_group_rss_bytes": 1031852032,
+      "maximum_database_bytes": 407715862,
+      "maximum_wal_bytes": 34873366,
+      "database_bytes_at_end": 374442856,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 27,
+      "checkpoint_completed": 27,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 26,
+      "checkpoint_window_method": "completed events since the measurement reset minus one possible final coordinator group during drain",
+      "threshold_cell_status": "repeated_measurement_checkpoints_observed",
+      "checkpoint_total_ms": 13087.950375,
+      "checkpoint_max_ms": 640.180908,
+      "wal_bytes_at_measurement_start": 25360959,
+      "wal_bytes_at_measurement_end": 1600360,
+      "wal_bytes_max": 35031705,
+      "threshold_excess_max_bytes": 1477273,
+      "successful_mutation_transactions": 39222,
+      "mutation_commit_groups": 737,
+      "average_mutation_transactions_per_group": 53.21845318860244,
+      "transaction_group_histogram": [
+        0,
+        1,
+        1,
+        1,
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        1,
+        3,
+        1,
+        2,
+        2,
+        3,
+        0,
+        3,
+        1,
+        4,
+        1,
+        3,
+        2,
+        0,
+        1,
+        2,
+        4,
+        3,
+        2,
+        9,
+        5,
+        2,
+        4,
+        6,
+        9,
+        3,
+        10,
+        11,
+        7,
+        15,
+        11,
+        15,
+        6,
+        4,
+        13,
+        12,
+        13,
+        14,
+        12,
+        22,
+        22,
+        21,
+        25,
+        27,
+        23,
+        32,
+        31,
+        42,
+        43,
+        68,
+        70,
+        85
+      ],
+      "wal_syncs": 764,
+      "commit_wal_syncs": 737,
+      "checkpoint_wal_syncs": 27,
+      "drain_ms": 30061,
+      "final_checkpoint_drain_ms": 0,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          100,
+          "1f4048d2bfd553c1"
+        ],
+        [
+          1,
+          100,
+          "51cd15a2404e2fd5"
+        ],
+        [
+          2,
+          100,
+          "69592da121d84a4d"
+        ],
+        [
+          3,
+          100,
+          "0566421500eae711"
+        ],
+        [
+          4,
+          100,
+          "cc8a35d5dd01ce21"
+        ],
+        [
+          5,
+          100,
+          "ff6e1138354c352d"
+        ],
+        [
+          6,
+          100,
+          "9000645f0d022655"
+        ],
+        [
+          7,
+          100,
+          "a57a77ef31bcb841"
+        ],
+        [
+          8,
+          100,
+          "c38b3808c09aae51"
+        ],
+        [
+          9,
+          100,
+          "93f1a077e6e3b115"
+        ],
+        [
+          10,
+          100,
+          "c024871dc147a28d"
+        ],
+        [
+          11,
+          100,
+          "537cbbaa2b680361"
+        ],
+        [
+          12,
+          100,
+          "16cc31e71aece9d1"
+        ],
+        [
+          13,
+          100,
+          "52259ad6dcf417ad"
+        ],
+        [
+          14,
+          100,
+          "be4fa4d09cf82145"
+        ],
+        [
+          15,
+          100,
+          "fa17a8aca03277c1"
+        ],
+        [
+          16,
+          100,
+          "ef0f6d8db17d5419"
+        ],
+        [
+          17,
+          100,
+          "e0f91033972e89ad"
+        ],
+        [
+          18,
+          100,
+          "d5c970c3a2785355"
+        ],
+        [
+          19,
+          100,
+          "775d80553d6bf689"
+        ],
+        [
+          20,
+          100,
+          "362739a6fc0cc169"
+        ],
+        [
+          21,
+          100,
+          "c9523a0fac312715"
+        ],
+        [
+          22,
+          100,
+          "71c579d33ed12f0d"
+        ],
+        [
+          23,
+          100,
+          "1fae86a6c54ea6a9"
+        ],
+        [
+          24,
+          100,
+          "067557f5078b9c19"
+        ],
+        [
+          25,
+          100,
+          "2cb5cfe24edde0cd"
+        ],
+        [
+          26,
+          100,
+          "3d7b17abb2a1e035"
+        ],
+        [
+          27,
+          100,
+          "9716e6aca725f6c9"
+        ],
+        [
+          28,
+          100,
+          "a2eb9d5787469f09"
+        ],
+        [
+          29,
+          100,
+          "6e1f39d9be966095"
+        ],
+        [
+          30,
+          100,
+          "9e14a5949b96393d"
+        ],
+        [
+          31,
+          100,
+          "19537355c173c839"
+        ],
+        [
+          32,
+          100,
+          "b1675b9e4d7eb2f1"
+        ],
+        [
+          33,
+          100,
+          "09597a498fa5f625"
+        ],
+        [
+          34,
+          100,
+          "a68112e4af194c7d"
+        ],
+        [
+          35,
+          100,
+          "62ae5a9abb23f031"
+        ],
+        [
+          36,
+          100,
+          "4a7143dbc30db271"
+        ],
+        [
+          37,
+          100,
+          "9e4e270851fd7f4d"
+        ],
+        [
+          38,
+          100,
+          "4a7963cb29af31e5"
+        ],
+        [
+          39,
+          100,
+          "4e3c114f422be711"
+        ],
+        [
+          40,
+          100,
+          "f6271eaf8ebc0201"
+        ],
+        [
+          41,
+          100,
+          "a0d19be42eb443e5"
+        ],
+        [
+          42,
+          100,
+          "65cd964be790fc9d"
+        ],
+        [
+          43,
+          100,
+          "c4021a417cd26be1"
+        ],
+        [
+          44,
+          100,
+          "210fa8cc929480b1"
+        ],
+        [
+          45,
+          100,
+          "f302705429c791dd"
+        ],
+        [
+          46,
+          100,
+          "ee874d17265b8145"
+        ],
+        [
+          47,
+          100,
+          "05a4e6a725f651c1"
+        ],
+        [
+          48,
+          100,
+          "bcaab568afa0c549"
+        ],
+        [
+          49,
+          100,
+          "751a88f107d2cc1d"
+        ],
+        [
+          50,
+          100,
+          "25bd7e5262ebd395"
+        ],
+        [
+          51,
+          100,
+          "b387f7ec2df85e59"
+        ],
+        [
+          52,
+          100,
+          "5f4d056abcd073e9"
+        ],
+        [
+          53,
+          100,
+          "e32b7dd664af7525"
+        ],
+        [
+          54,
+          100,
+          "c6915c6cdcb1027d"
+        ],
+        [
+          55,
+          100,
+          "fa263852a76cbab9"
+        ],
+        [
+          56,
+          100,
+          "1d8a1bc311d99359"
+        ],
+        [
+          57,
+          100,
+          "783d00c71de0516d"
+        ],
+        [
+          58,
+          100,
+          "9f5b41565160d4c5"
+        ],
+        [
+          59,
+          100,
+          "b2a85e3583a98949"
+        ],
+        [
+          60,
+          100,
+          "8466021ab06d2929"
+        ],
+        [
+          61,
+          100,
+          "94289d8dd09ee805"
+        ],
+        [
+          62,
+          100,
+          "fc0e0413fadabccd"
+        ],
+        [
+          63,
+          100,
+          "c7f9dd03d2a5a949"
+        ]
+      ]
+    },
+    {
+      "case_id": "A-blink-128m-r1",
+      "workload": "A",
+      "backend_key": "blink-128m",
+      "repetition": 1,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+      "blink_checkpoint_policy": "wal_bytes_threshold",
+      "threshold_bytes": 134217728,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 4080.4451484439965,
+      "latency": {
+        "condition_rejection": {
+          "count": 6912,
+          "sample_count": 6912,
+          "p50_ms": 4.251647,
+          "p95_ms": 7.864319,
+          "p99_ms": 10.182655
+        },
+        "get": {
+          "count": 2425,
+          "sample_count": 2425,
+          "p50_ms": 0.027567,
+          "p95_ms": 0.084927,
+          "p99_ms": 0.444671
+        },
+        "preparatory_get": {
+          "count": 17138,
+          "sample_count": 17138,
+          "p50_ms": 0.027855,
+          "p95_ms": 0.085887,
+          "p99_ms": 0.378111
+        },
+        "query16": {
+          "count": 4939,
+          "sample_count": 4939,
+          "p50_ms": 0.039711,
+          "p95_ms": 0.116159,
+          "p99_ms": 0.450815
+        },
+        "workflow": {
+          "count": 105326,
+          "sample_count": 105326,
+          "p50_ms": 4.139007,
+          "p95_ms": 7.843839,
+          "p99_ms": 10.223615
+        },
+        "write_transaction_success": {
+          "count": 91050,
+          "sample_count": 91050,
+          "p50_ms": 4.308991,
+          "p95_ms": 7.938047,
+          "p99_ms": 10.289151
+        }
+      },
+      "outcomes": {
+        "successful_mutations": 265535,
+        "successful_write_transactions": 91050,
+        "intentional_condition_rejections": 6912,
+        "natural_conflicts": 0,
+        "overloads": 0,
+        "other_errors": 0,
+        "read_calls": 24502
+      },
+      "cpu_seconds": 12.38,
+      "process_peak_rss_bytes": 276287488,
+      "controller_peak_process_group_rss_bytes": 483463168,
+      "maximum_database_bytes": 257478977,
+      "maximum_wal_bytes": 134247846,
+      "database_bytes_at_end": 229738031,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 3,
+      "checkpoint_completed": 3,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 3,
+      "checkpoint_window_method": "checkpoint event timestamps within the sampled measurement window",
+      "threshold_cell_status": "repeated_measurement_checkpoints_observed",
+      "checkpoint_total_ms": 1952.534042,
+      "checkpoint_max_ms": 683.29148,
+      "wal_bytes_at_measurement_start": 150808,
+      "wal_bytes_at_measurement_end": 76531247,
+      "wal_bytes_max": 134247846,
+      "threshold_excess_max_bytes": 30118,
+      "successful_mutation_transactions": 91050,
+      "mutation_commit_groups": 9386,
+      "average_mutation_transactions_per_group": 9.700617941615171,
+      "transaction_group_histogram": [
+        0,
+        100,
+        168,
+        269,
+        373,
+        478,
+        544,
+        649,
+        745,
+        848,
+        888,
+        995,
+        980,
+        887,
+        748,
+        486,
+        228
+      ],
+      "wal_syncs": 9389,
+      "commit_wal_syncs": 9386,
+      "checkpoint_wal_syncs": 3,
+      "drain_ms": 0.140281,
+      "final_checkpoint_drain_ms": 0.0005600000000000001,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          "rw20",
+          100,
+          "5d78753cccb1fdf2"
+        ],
+        [
+          1,
+          "rw20",
+          100,
+          "1d948c8ddf6c8727"
+        ],
+        [
+          2,
+          "rw20",
+          100,
+          "f96ed4727ba26ca5"
+        ],
+        [
+          3,
+          "rw20",
+          100,
+          "b04b0a15c374f57c"
+        ],
+        [
+          4,
+          "rw20",
+          100,
+          "9d4a1156bebd5d26"
+        ],
+        [
+          5,
+          "rw20",
+          100,
+          "0b5ac490f0383867"
+        ],
+        [
+          6,
+          "rw20",
+          100,
+          "995cef2be0b628ab"
+        ],
+        [
+          7,
+          "rw20",
+          100,
+          "0017854c1bfb1f52"
+        ],
+        [
+          8,
+          "rw20",
+          100,
+          "b50b24dd873fe6a2"
+        ],
+        [
+          9,
+          "rw20",
+          100,
+          "25bdf4a7f006fddc"
+        ],
+        [
+          10,
+          "rw20",
+          100,
+          "50d2d6e9c7fcab5b"
+        ],
+        [
+          11,
+          "rw20",
+          100,
+          "9bedb82440595bf6"
+        ],
+        [
+          12,
+          "rw20",
+          100,
+          "4064b22158d16673"
+        ],
+        [
+          13,
+          "rw20",
+          100,
+          "ad44a2dbe8955c05"
+        ],
+        [
+          14,
+          "rw20",
+          100,
+          "13935709f525503e"
+        ],
+        [
+          15,
+          "rw20",
+          100,
+          "382037aba8f857ae"
+        ]
+      ]
+    },
+    {
+      "case_id": "E-blink-128m-r1",
+      "workload": "E",
+      "backend_key": "blink-128m",
+      "repetition": 1,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55",
+      "blink_checkpoint_policy": "wal_bytes_threshold",
+      "threshold_bytes": 134217728,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 1372.3393624462876,
+      "latency": {
+        "write_batch": {
+          "count": 41199,
+          "sample_count": 41199,
+          "p50_ms": 25.346047,
+          "p95_ms": 51.380223,
+          "p99_ms": 1572.863999
+        }
+      },
+      "outcomes": {
+        "measurement_write_batches_acknowledged": 41199,
+        "warmup_write_batches_acknowledged": 13223,
+        "overloads": 0,
+        "other_errors": 0
+      },
+      "cpu_seconds": 16.73,
+      "process_peak_rss_bytes": 606842880,
+      "controller_peak_process_group_rss_bytes": 1258795008,
+      "maximum_database_bytes": 508274533,
+      "maximum_wal_bytes": 135432037,
+      "database_bytes_at_end": 376887536,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 7,
+      "checkpoint_completed": 7,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 6,
+      "checkpoint_window_method": "completed events since the measurement reset minus one possible final coordinator group during drain",
+      "threshold_cell_status": "repeated_measurement_checkpoints_observed",
+      "checkpoint_total_ms": 11549.278701,
+      "checkpoint_max_ms": 1801.065898,
+      "wal_bytes_at_measurement_start": 6225249,
+      "wal_bytes_at_measurement_end": 4045040,
+      "wal_bytes_max": 135432037,
+      "threshold_excess_max_bytes": 1214309,
+      "successful_mutation_transactions": 41199,
+      "mutation_commit_groups": 788,
+      "average_mutation_transactions_per_group": 52.28299492385787,
+      "transaction_group_histogram": [
+        0,
+        1,
+        2,
+        1,
+        3,
+        0,
+        1,
+        1,
+        1,
+        0,
+        1,
+        1,
+        0,
+        2,
+        1,
+        1,
+        1,
+        4,
+        2,
+        3,
+        1,
+        2,
+        5,
+        4,
+        1,
+        4,
+        2,
+        5,
+        3,
+        5,
+        3,
+        3,
+        4,
+        5,
+        8,
+        11,
+        1,
+        5,
+        7,
+        11,
+        10,
+        10,
+        7,
+        14,
+        9,
+        15,
+        12,
+        19,
+        11,
+        18,
+        18,
+        18,
+        19,
+        19,
+        23,
+        21,
+        26,
+        33,
+        25,
+        32,
+        45,
+        43,
+        58,
+        72,
+        95
+      ],
+      "wal_syncs": 795,
+      "commit_wal_syncs": 788,
+      "checkpoint_wal_syncs": 7,
+      "drain_ms": 30021,
+      "final_checkpoint_drain_ms": 0,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          100,
+          "1f4048d2bfd553c1"
+        ],
+        [
+          1,
+          100,
+          "51cd15a2404e2fd5"
+        ],
+        [
+          2,
+          100,
+          "69592da121d84a4d"
+        ],
+        [
+          3,
+          100,
+          "0566421500eae711"
+        ],
+        [
+          4,
+          100,
+          "cc8a35d5dd01ce21"
+        ],
+        [
+          5,
+          100,
+          "ff6e1138354c352d"
+        ],
+        [
+          6,
+          100,
+          "9000645f0d022655"
+        ],
+        [
+          7,
+          100,
+          "a57a77ef31bcb841"
+        ],
+        [
+          8,
+          100,
+          "c38b3808c09aae51"
+        ],
+        [
+          9,
+          100,
+          "93f1a077e6e3b115"
+        ],
+        [
+          10,
+          100,
+          "c024871dc147a28d"
+        ],
+        [
+          11,
+          100,
+          "537cbbaa2b680361"
+        ],
+        [
+          12,
+          100,
+          "16cc31e71aece9d1"
+        ],
+        [
+          13,
+          100,
+          "52259ad6dcf417ad"
+        ],
+        [
+          14,
+          100,
+          "be4fa4d09cf82145"
+        ],
+        [
+          15,
+          100,
+          "fa17a8aca03277c1"
+        ],
+        [
+          16,
+          100,
+          "ef0f6d8db17d5419"
+        ],
+        [
+          17,
+          100,
+          "e0f91033972e89ad"
+        ],
+        [
+          18,
+          100,
+          "d5c970c3a2785355"
+        ],
+        [
+          19,
+          100,
+          "775d80553d6bf689"
+        ],
+        [
+          20,
+          100,
+          "362739a6fc0cc169"
+        ],
+        [
+          21,
+          100,
+          "c9523a0fac312715"
+        ],
+        [
+          22,
+          100,
+          "71c579d33ed12f0d"
+        ],
+        [
+          23,
+          100,
+          "1fae86a6c54ea6a9"
+        ],
+        [
+          24,
+          100,
+          "067557f5078b9c19"
+        ],
+        [
+          25,
+          100,
+          "2cb5cfe24edde0cd"
+        ],
+        [
+          26,
+          100,
+          "3d7b17abb2a1e035"
+        ],
+        [
+          27,
+          100,
+          "9716e6aca725f6c9"
+        ],
+        [
+          28,
+          100,
+          "a2eb9d5787469f09"
+        ],
+        [
+          29,
+          100,
+          "6e1f39d9be966095"
+        ],
+        [
+          30,
+          100,
+          "9e14a5949b96393d"
+        ],
+        [
+          31,
+          100,
+          "19537355c173c839"
+        ],
+        [
+          32,
+          100,
+          "b1675b9e4d7eb2f1"
+        ],
+        [
+          33,
+          100,
+          "09597a498fa5f625"
+        ],
+        [
+          34,
+          100,
+          "a68112e4af194c7d"
+        ],
+        [
+          35,
+          100,
+          "62ae5a9abb23f031"
+        ],
+        [
+          36,
+          100,
+          "4a7143dbc30db271"
+        ],
+        [
+          37,
+          100,
+          "9e4e270851fd7f4d"
+        ],
+        [
+          38,
+          100,
+          "4a7963cb29af31e5"
+        ],
+        [
+          39,
+          100,
+          "4e3c114f422be711"
+        ],
+        [
+          40,
+          100,
+          "f6271eaf8ebc0201"
+        ],
+        [
+          41,
+          100,
+          "a0d19be42eb443e5"
+        ],
+        [
+          42,
+          100,
+          "65cd964be790fc9d"
+        ],
+        [
+          43,
+          100,
+          "c4021a417cd26be1"
+        ],
+        [
+          44,
+          100,
+          "210fa8cc929480b1"
+        ],
+        [
+          45,
+          100,
+          "f302705429c791dd"
+        ],
+        [
+          46,
+          100,
+          "ee874d17265b8145"
+        ],
+        [
+          47,
+          100,
+          "05a4e6a725f651c1"
+        ],
+        [
+          48,
+          100,
+          "bcaab568afa0c549"
+        ],
+        [
+          49,
+          100,
+          "751a88f107d2cc1d"
+        ],
+        [
+          50,
+          100,
+          "25bd7e5262ebd395"
+        ],
+        [
+          51,
+          100,
+          "b387f7ec2df85e59"
+        ],
+        [
+          52,
+          100,
+          "5f4d056abcd073e9"
+        ],
+        [
+          53,
+          100,
+          "e32b7dd664af7525"
+        ],
+        [
+          54,
+          100,
+          "c6915c6cdcb1027d"
+        ],
+        [
+          55,
+          100,
+          "fa263852a76cbab9"
+        ],
+        [
+          56,
+          100,
+          "1d8a1bc311d99359"
+        ],
+        [
+          57,
+          100,
+          "783d00c71de0516d"
+        ],
+        [
+          58,
+          100,
+          "9f5b41565160d4c5"
+        ],
+        [
+          59,
+          100,
+          "b2a85e3583a98949"
+        ],
+        [
+          60,
+          100,
+          "8466021ab06d2929"
+        ],
+        [
+          61,
+          100,
+          "94289d8dd09ee805"
+        ],
+        [
+          62,
+          100,
+          "fc0e0413fadabccd"
+        ],
+        [
+          63,
+          100,
+          "c7f9dd03d2a5a949"
+        ]
+      ]
+    },
+    {
+      "case_id": "A-blink-off-r2",
+      "workload": "A",
+      "backend_key": "blink-off",
+      "repetition": 2,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+      "blink_checkpoint_policy": "disabled",
+      "threshold_bytes": null,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 5158.312961286912,
+      "latency": {
+        "condition_rejection": {
+          "count": 8709,
+          "sample_count": 8709,
+          "p50_ms": 3.536895,
+          "p95_ms": 6.660095,
+          "p99_ms": 8.732671
+        },
+        "get": {
+          "count": 3081,
+          "sample_count": 3081,
+          "p50_ms": 0.025855,
+          "p95_ms": 0.076031,
+          "p99_ms": 0.407551
+        },
+        "preparatory_get": {
+          "count": 21677,
+          "sample_count": 21677,
+          "p50_ms": 0.026895,
+          "p95_ms": 0.090303,
+          "p99_ms": 0.449535
+        },
+        "query16": {
+          "count": 6228,
+          "sample_count": 6228,
+          "p50_ms": 0.038943,
+          "p95_ms": 0.127295,
+          "p99_ms": 0.524799
+        },
+        "workflow": {
+          "count": 133096,
+          "sample_count": 133096,
+          "p50_ms": 3.493887,
+          "p95_ms": 6.709247,
+          "p99_ms": 8.781823
+        },
+        "write_transaction_success": {
+          "count": 115078,
+          "sample_count": 115078,
+          "p50_ms": 3.567615,
+          "p95_ms": 6.778879,
+          "p99_ms": 8.830975
+        }
+      },
+      "outcomes": {
+        "successful_mutations": 335563,
+        "successful_write_transactions": 115078,
+        "intentional_condition_rejections": 8709,
+        "natural_conflicts": 0,
+        "overloads": 0,
+        "other_errors": 0,
+        "read_calls": 30986
+      },
+      "cpu_seconds": 13.57,
+      "process_peak_rss_bytes": 443088896,
+      "controller_peak_process_group_rss_bytes": 737488896,
+      "maximum_database_bytes": 827381312,
+      "maximum_wal_bytes": 657389120,
+      "database_bytes_at_end": 827381312,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 0,
+      "checkpoint_completed": 0,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 0,
+      "checkpoint_window_method": "checkpoint event timestamps within the sampled measurement window",
+      "threshold_cell_status": "not_applicable",
+      "checkpoint_total_ms": 0.0,
+      "checkpoint_max_ms": 0.0,
+      "wal_bytes_at_measurement_start": 272073937,
+      "wal_bytes_at_measurement_end": 657389120,
+      "wal_bytes_max": 657389120,
+      "threshold_excess_max_bytes": 0,
+      "successful_mutation_transactions": 115078,
+      "mutation_commit_groups": 11819,
+      "average_mutation_transactions_per_group": 9.736695151874102,
+      "transaction_group_histogram": [
+        0,
+        111,
+        217,
+        321,
+        500,
+        545,
+        682,
+        864,
+        912,
+        991,
+        1197,
+        1264,
+        1230,
+        1098,
+        974,
+        662,
+        251
+      ],
+      "wal_syncs": 11819,
+      "commit_wal_syncs": 11819,
+      "checkpoint_wal_syncs": 0,
+      "drain_ms": 1.8102159999999998,
+      "final_checkpoint_drain_ms": 0.00064,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          "rw20",
+          100,
+          "5d78753cccb1fdf2"
+        ],
+        [
+          1,
+          "rw20",
+          100,
+          "1d948c8ddf6c8727"
+        ],
+        [
+          2,
+          "rw20",
+          100,
+          "f96ed4727ba26ca5"
+        ],
+        [
+          3,
+          "rw20",
+          100,
+          "b04b0a15c374f57c"
+        ],
+        [
+          4,
+          "rw20",
+          100,
+          "9d4a1156bebd5d26"
+        ],
+        [
+          5,
+          "rw20",
+          100,
+          "0b5ac490f0383867"
+        ],
+        [
+          6,
+          "rw20",
+          100,
+          "995cef2be0b628ab"
+        ],
+        [
+          7,
+          "rw20",
+          100,
+          "0017854c1bfb1f52"
+        ],
+        [
+          8,
+          "rw20",
+          100,
+          "b50b24dd873fe6a2"
+        ],
+        [
+          9,
+          "rw20",
+          100,
+          "25bdf4a7f006fddc"
+        ],
+        [
+          10,
+          "rw20",
+          100,
+          "50d2d6e9c7fcab5b"
+        ],
+        [
+          11,
+          "rw20",
+          100,
+          "9bedb82440595bf6"
+        ],
+        [
+          12,
+          "rw20",
+          100,
+          "4064b22158d16673"
+        ],
+        [
+          13,
+          "rw20",
+          100,
+          "ad44a2dbe8955c05"
+        ],
+        [
+          14,
+          "rw20",
+          100,
+          "13935709f525503e"
+        ],
+        [
+          15,
+          "rw20",
+          100,
+          "382037aba8f857ae"
+        ]
+      ]
+    },
+    {
+      "case_id": "E-blink-off-r2",
+      "workload": "E",
+      "backend_key": "blink-off",
+      "repetition": 2,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55",
+      "blink_checkpoint_policy": "disabled",
+      "threshold_bytes": null,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 2862.9854126423766,
+      "latency": {
+        "write_batch": {
+          "count": 85964,
+          "sample_count": 85964,
+          "p50_ms": 19.808255,
+          "p95_ms": 36.241407,
+          "p99_ms": 42.500095
+        }
+      },
+      "outcomes": {
+        "measurement_write_batches_acknowledged": 85964,
+        "warmup_write_batches_acknowledged": 29266,
+        "overloads": 0,
+        "other_errors": 0
+      },
+      "cpu_seconds": 24.63,
+      "process_peak_rss_bytes": 1103454208,
+      "controller_peak_process_group_rss_bytes": 1755394048,
+      "maximum_database_bytes": 1774456716,
+      "maximum_wal_bytes": 1401614220,
+      "database_bytes_at_end": 1774456716,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 0,
+      "checkpoint_completed": 0,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 0,
+      "checkpoint_window_method": "completed events since the measurement reset minus one possible final coordinator group during drain",
+      "threshold_cell_status": "not_applicable",
+      "checkpoint_total_ms": 0.0,
+      "checkpoint_max_ms": 0.0,
+      "wal_bytes_at_measurement_start": 642698895,
+      "wal_bytes_at_measurement_end": 1401614220,
+      "wal_bytes_max": 1401614220,
+      "threshold_excess_max_bytes": 0,
+      "successful_mutation_transactions": 85964,
+      "mutation_commit_groups": 1601,
+      "average_mutation_transactions_per_group": 53.69394128669582,
+      "transaction_group_histogram": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        3,
+        1,
+        2,
+        1,
+        1,
+        2,
+        2,
+        1,
+        1,
+        1,
+        2,
+        5,
+        2,
+        5,
+        3,
+        4,
+        0,
+        5,
+        3,
+        10,
+        4,
+        9,
+        2,
+        8,
+        11,
+        11,
+        11,
+        16,
+        13,
+        10,
+        10,
+        13,
+        25,
+        16,
+        21,
+        28,
+        28,
+        31,
+        25,
+        25,
+        43,
+        36,
+        42,
+        52,
+        39,
+        43,
+        63,
+        62,
+        70,
+        84,
+        78,
+        96,
+        120,
+        134,
+        145,
+        120
+      ],
+      "wal_syncs": 1601,
+      "commit_wal_syncs": 1601,
+      "checkpoint_wal_syncs": 0,
+      "drain_ms": 30026,
+      "final_checkpoint_drain_ms": 0,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          100,
+          "1f4048d2bfd553c1"
+        ],
+        [
+          1,
+          100,
+          "51cd15a2404e2fd5"
+        ],
+        [
+          2,
+          100,
+          "69592da121d84a4d"
+        ],
+        [
+          3,
+          100,
+          "0566421500eae711"
+        ],
+        [
+          4,
+          100,
+          "cc8a35d5dd01ce21"
+        ],
+        [
+          5,
+          100,
+          "ff6e1138354c352d"
+        ],
+        [
+          6,
+          100,
+          "9000645f0d022655"
+        ],
+        [
+          7,
+          100,
+          "a57a77ef31bcb841"
+        ],
+        [
+          8,
+          100,
+          "c38b3808c09aae51"
+        ],
+        [
+          9,
+          100,
+          "93f1a077e6e3b115"
+        ],
+        [
+          10,
+          100,
+          "c024871dc147a28d"
+        ],
+        [
+          11,
+          100,
+          "537cbbaa2b680361"
+        ],
+        [
+          12,
+          100,
+          "16cc31e71aece9d1"
+        ],
+        [
+          13,
+          100,
+          "52259ad6dcf417ad"
+        ],
+        [
+          14,
+          100,
+          "be4fa4d09cf82145"
+        ],
+        [
+          15,
+          100,
+          "fa17a8aca03277c1"
+        ],
+        [
+          16,
+          100,
+          "ef0f6d8db17d5419"
+        ],
+        [
+          17,
+          100,
+          "e0f91033972e89ad"
+        ],
+        [
+          18,
+          100,
+          "d5c970c3a2785355"
+        ],
+        [
+          19,
+          100,
+          "775d80553d6bf689"
+        ],
+        [
+          20,
+          100,
+          "362739a6fc0cc169"
+        ],
+        [
+          21,
+          100,
+          "c9523a0fac312715"
+        ],
+        [
+          22,
+          100,
+          "71c579d33ed12f0d"
+        ],
+        [
+          23,
+          100,
+          "1fae86a6c54ea6a9"
+        ],
+        [
+          24,
+          100,
+          "067557f5078b9c19"
+        ],
+        [
+          25,
+          100,
+          "2cb5cfe24edde0cd"
+        ],
+        [
+          26,
+          100,
+          "3d7b17abb2a1e035"
+        ],
+        [
+          27,
+          100,
+          "9716e6aca725f6c9"
+        ],
+        [
+          28,
+          100,
+          "a2eb9d5787469f09"
+        ],
+        [
+          29,
+          100,
+          "6e1f39d9be966095"
+        ],
+        [
+          30,
+          100,
+          "9e14a5949b96393d"
+        ],
+        [
+          31,
+          100,
+          "19537355c173c839"
+        ],
+        [
+          32,
+          100,
+          "b1675b9e4d7eb2f1"
+        ],
+        [
+          33,
+          100,
+          "09597a498fa5f625"
+        ],
+        [
+          34,
+          100,
+          "a68112e4af194c7d"
+        ],
+        [
+          35,
+          100,
+          "62ae5a9abb23f031"
+        ],
+        [
+          36,
+          100,
+          "4a7143dbc30db271"
+        ],
+        [
+          37,
+          100,
+          "9e4e270851fd7f4d"
+        ],
+        [
+          38,
+          100,
+          "4a7963cb29af31e5"
+        ],
+        [
+          39,
+          100,
+          "4e3c114f422be711"
+        ],
+        [
+          40,
+          100,
+          "f6271eaf8ebc0201"
+        ],
+        [
+          41,
+          100,
+          "a0d19be42eb443e5"
+        ],
+        [
+          42,
+          100,
+          "65cd964be790fc9d"
+        ],
+        [
+          43,
+          100,
+          "c4021a417cd26be1"
+        ],
+        [
+          44,
+          100,
+          "210fa8cc929480b1"
+        ],
+        [
+          45,
+          100,
+          "f302705429c791dd"
+        ],
+        [
+          46,
+          100,
+          "ee874d17265b8145"
+        ],
+        [
+          47,
+          100,
+          "05a4e6a725f651c1"
+        ],
+        [
+          48,
+          100,
+          "bcaab568afa0c549"
+        ],
+        [
+          49,
+          100,
+          "751a88f107d2cc1d"
+        ],
+        [
+          50,
+          100,
+          "25bd7e5262ebd395"
+        ],
+        [
+          51,
+          100,
+          "b387f7ec2df85e59"
+        ],
+        [
+          52,
+          100,
+          "5f4d056abcd073e9"
+        ],
+        [
+          53,
+          100,
+          "e32b7dd664af7525"
+        ],
+        [
+          54,
+          100,
+          "c6915c6cdcb1027d"
+        ],
+        [
+          55,
+          100,
+          "fa263852a76cbab9"
+        ],
+        [
+          56,
+          100,
+          "1d8a1bc311d99359"
+        ],
+        [
+          57,
+          100,
+          "783d00c71de0516d"
+        ],
+        [
+          58,
+          100,
+          "9f5b41565160d4c5"
+        ],
+        [
+          59,
+          100,
+          "b2a85e3583a98949"
+        ],
+        [
+          60,
+          100,
+          "8466021ab06d2929"
+        ],
+        [
+          61,
+          100,
+          "94289d8dd09ee805"
+        ],
+        [
+          62,
+          100,
+          "fc0e0413fadabccd"
+        ],
+        [
+          63,
+          100,
+          "c7f9dd03d2a5a949"
+        ]
+      ]
+    },
+    {
+      "case_id": "A-blink-32m-r2",
+      "workload": "A",
+      "backend_key": "blink-32m",
+      "repetition": 2,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+      "blink_checkpoint_policy": "wal_bytes_threshold",
+      "threshold_bytes": 33554432,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 3601.477144427634,
+      "latency": {
+        "condition_rejection": {
+          "count": 6073,
+          "sample_count": 6073,
+          "p50_ms": 4.481023,
+          "p95_ms": 8.368127,
+          "p99_ms": 11.755519
+        },
+        "get": {
+          "count": 2157,
+          "sample_count": 2157,
+          "p50_ms": 0.027727,
+          "p95_ms": 0.074495,
+          "p99_ms": 0.239231
+        },
+        "preparatory_get": {
+          "count": 15128,
+          "sample_count": 15128,
+          "p50_ms": 0.028287,
+          "p95_ms": 0.078591,
+          "p99_ms": 0.260479
+        },
+        "query16": {
+          "count": 4357,
+          "sample_count": 4357,
+          "p50_ms": 0.039615,
+          "p95_ms": 0.103935,
+          "p99_ms": 0.401919
+        },
+        "workflow": {
+          "count": 92930,
+          "sample_count": 92930,
+          "p50_ms": 4.395007,
+          "p95_ms": 8.220671,
+          "p99_ms": 11.362303
+        },
+        "write_transaction_success": {
+          "count": 80343,
+          "sample_count": 80343,
+          "p50_ms": 4.542463,
+          "p95_ms": 8.310783,
+          "p99_ms": 11.526143
+        }
+      },
+      "outcomes": {
+        "successful_mutations": 234071,
+        "successful_write_transactions": 80343,
+        "intentional_condition_rejections": 6073,
+        "natural_conflicts": 0,
+        "overloads": 0,
+        "other_errors": 0,
+        "read_calls": 21642
+      },
+      "cpu_seconds": 12.44,
+      "process_peak_rss_bytes": 191827968,
+      "controller_peak_process_group_rss_bytes": 400220160,
+      "maximum_database_bytes": 172279529,
+      "maximum_wal_bytes": 33604538,
+      "database_bytes_at_end": 156757010,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 15,
+      "checkpoint_completed": 15,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 15,
+      "checkpoint_window_method": "checkpoint event timestamps within the sampled measurement window",
+      "threshold_cell_status": "repeated_measurement_checkpoints_observed",
+      "checkpoint_total_ms": 3937.850045,
+      "checkpoint_max_ms": 318.815664,
+      "wal_bytes_at_measurement_start": 21183751,
+      "wal_bytes_at_measurement_end": 11525138,
+      "wal_bytes_max": 33650086,
+      "threshold_excess_max_bytes": 95654,
+      "successful_mutation_transactions": 80343,
+      "mutation_commit_groups": 8345,
+      "average_mutation_transactions_per_group": 9.627681246255243,
+      "transaction_group_histogram": [
+        0,
+        101,
+        134,
+        243,
+        334,
+        407,
+        530,
+        640,
+        690,
+        766,
+        816,
+        814,
+        792,
+        761,
+        672,
+        439,
+        206
+      ],
+      "wal_syncs": 8360,
+      "commit_wal_syncs": 8345,
+      "checkpoint_wal_syncs": 15,
+      "drain_ms": 2.052857,
+      "final_checkpoint_drain_ms": 0.0005600000000000001,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          "rw20",
+          100,
+          "5d78753cccb1fdf2"
+        ],
+        [
+          1,
+          "rw20",
+          100,
+          "1d948c8ddf6c8727"
+        ],
+        [
+          2,
+          "rw20",
+          100,
+          "f96ed4727ba26ca5"
+        ],
+        [
+          3,
+          "rw20",
+          100,
+          "b04b0a15c374f57c"
+        ],
+        [
+          4,
+          "rw20",
+          100,
+          "9d4a1156bebd5d26"
+        ],
+        [
+          5,
+          "rw20",
+          100,
+          "0b5ac490f0383867"
+        ],
+        [
+          6,
+          "rw20",
+          100,
+          "995cef2be0b628ab"
+        ],
+        [
+          7,
+          "rw20",
+          100,
+          "0017854c1bfb1f52"
+        ],
+        [
+          8,
+          "rw20",
+          100,
+          "b50b24dd873fe6a2"
+        ],
+        [
+          9,
+          "rw20",
+          100,
+          "25bdf4a7f006fddc"
+        ],
+        [
+          10,
+          "rw20",
+          100,
+          "50d2d6e9c7fcab5b"
+        ],
+        [
+          11,
+          "rw20",
+          100,
+          "9bedb82440595bf6"
+        ],
+        [
+          12,
+          "rw20",
+          100,
+          "4064b22158d16673"
+        ],
+        [
+          13,
+          "rw20",
+          100,
+          "ad44a2dbe8955c05"
+        ],
+        [
+          14,
+          "rw20",
+          100,
+          "13935709f525503e"
+        ],
+        [
+          15,
+          "rw20",
+          100,
+          "382037aba8f857ae"
+        ]
+      ]
+    },
+    {
+      "case_id": "E-blink-32m-r2",
+      "workload": "E",
+      "backend_key": "blink-32m",
+      "repetition": 2,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55",
+      "blink_checkpoint_policy": "wal_bytes_threshold",
+      "threshold_bytes": 33554432,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 1346.8096443319569,
+      "latency": {
+        "write_batch": {
+          "count": 40442,
+          "sample_count": 40442,
+          "p50_ms": 24.674303,
+          "p95_ms": 61.964287,
+          "p99_ms": 513.015807
+        }
+      },
+      "outcomes": {
+        "measurement_write_batches_acknowledged": 40442,
+        "warmup_write_batches_acknowledged": 13947,
+        "overloads": 0,
+        "other_errors": 0
+      },
+      "cpu_seconds": 20.67,
+      "process_peak_rss_bytes": 517615616,
+      "controller_peak_process_group_rss_bytes": 1169854464,
+      "maximum_database_bytes": 407805312,
+      "maximum_wal_bytes": 34962816,
+      "database_bytes_at_end": 389292430,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 27,
+      "checkpoint_completed": 27,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 26,
+      "checkpoint_window_method": "completed events since the measurement reset minus one possible final coordinator group during drain",
+      "threshold_cell_status": "repeated_measurement_checkpoints_observed",
+      "checkpoint_total_ms": 12726.397426,
+      "checkpoint_max_ms": 554.33041,
+      "wal_bytes_at_measurement_start": 16671797,
+      "wal_bytes_at_measurement_end": 16449934,
+      "wal_bytes_max": 34962816,
+      "threshold_excess_max_bytes": 1408384,
+      "successful_mutation_transactions": 40442,
+      "mutation_commit_groups": 762,
+      "average_mutation_transactions_per_group": 53.07349081364829,
+      "transaction_group_histogram": [
+        0,
+        0,
+        2,
+        0,
+        0,
+        1,
+        0,
+        1,
+        1,
+        2,
+        3,
+        2,
+        1,
+        2,
+        1,
+        0,
+        1,
+        2,
+        1,
+        3,
+        0,
+        3,
+        1,
+        5,
+        2,
+        3,
+        1,
+        1,
+        6,
+        7,
+        3,
+        3,
+        2,
+        3,
+        7,
+        2,
+        9,
+        3,
+        4,
+        9,
+        7,
+        15,
+        8,
+        12,
+        6,
+        13,
+        13,
+        10,
+        11,
+        10,
+        20,
+        15,
+        21,
+        28,
+        22,
+        17,
+        32,
+        33,
+        23,
+        33,
+        35,
+        49,
+        65,
+        75,
+        92
+      ],
+      "wal_syncs": 789,
+      "commit_wal_syncs": 762,
+      "checkpoint_wal_syncs": 27,
+      "drain_ms": 30028,
+      "final_checkpoint_drain_ms": 0,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          100,
+          "1f4048d2bfd553c1"
+        ],
+        [
+          1,
+          100,
+          "51cd15a2404e2fd5"
+        ],
+        [
+          2,
+          100,
+          "69592da121d84a4d"
+        ],
+        [
+          3,
+          100,
+          "0566421500eae711"
+        ],
+        [
+          4,
+          100,
+          "cc8a35d5dd01ce21"
+        ],
+        [
+          5,
+          100,
+          "ff6e1138354c352d"
+        ],
+        [
+          6,
+          100,
+          "9000645f0d022655"
+        ],
+        [
+          7,
+          100,
+          "a57a77ef31bcb841"
+        ],
+        [
+          8,
+          100,
+          "c38b3808c09aae51"
+        ],
+        [
+          9,
+          100,
+          "93f1a077e6e3b115"
+        ],
+        [
+          10,
+          100,
+          "c024871dc147a28d"
+        ],
+        [
+          11,
+          100,
+          "537cbbaa2b680361"
+        ],
+        [
+          12,
+          100,
+          "16cc31e71aece9d1"
+        ],
+        [
+          13,
+          100,
+          "52259ad6dcf417ad"
+        ],
+        [
+          14,
+          100,
+          "be4fa4d09cf82145"
+        ],
+        [
+          15,
+          100,
+          "fa17a8aca03277c1"
+        ],
+        [
+          16,
+          100,
+          "ef0f6d8db17d5419"
+        ],
+        [
+          17,
+          100,
+          "e0f91033972e89ad"
+        ],
+        [
+          18,
+          100,
+          "d5c970c3a2785355"
+        ],
+        [
+          19,
+          100,
+          "775d80553d6bf689"
+        ],
+        [
+          20,
+          100,
+          "362739a6fc0cc169"
+        ],
+        [
+          21,
+          100,
+          "c9523a0fac312715"
+        ],
+        [
+          22,
+          100,
+          "71c579d33ed12f0d"
+        ],
+        [
+          23,
+          100,
+          "1fae86a6c54ea6a9"
+        ],
+        [
+          24,
+          100,
+          "067557f5078b9c19"
+        ],
+        [
+          25,
+          100,
+          "2cb5cfe24edde0cd"
+        ],
+        [
+          26,
+          100,
+          "3d7b17abb2a1e035"
+        ],
+        [
+          27,
+          100,
+          "9716e6aca725f6c9"
+        ],
+        [
+          28,
+          100,
+          "a2eb9d5787469f09"
+        ],
+        [
+          29,
+          100,
+          "6e1f39d9be966095"
+        ],
+        [
+          30,
+          100,
+          "9e14a5949b96393d"
+        ],
+        [
+          31,
+          100,
+          "19537355c173c839"
+        ],
+        [
+          32,
+          100,
+          "b1675b9e4d7eb2f1"
+        ],
+        [
+          33,
+          100,
+          "09597a498fa5f625"
+        ],
+        [
+          34,
+          100,
+          "a68112e4af194c7d"
+        ],
+        [
+          35,
+          100,
+          "62ae5a9abb23f031"
+        ],
+        [
+          36,
+          100,
+          "4a7143dbc30db271"
+        ],
+        [
+          37,
+          100,
+          "9e4e270851fd7f4d"
+        ],
+        [
+          38,
+          100,
+          "4a7963cb29af31e5"
+        ],
+        [
+          39,
+          100,
+          "4e3c114f422be711"
+        ],
+        [
+          40,
+          100,
+          "f6271eaf8ebc0201"
+        ],
+        [
+          41,
+          100,
+          "a0d19be42eb443e5"
+        ],
+        [
+          42,
+          100,
+          "65cd964be790fc9d"
+        ],
+        [
+          43,
+          100,
+          "c4021a417cd26be1"
+        ],
+        [
+          44,
+          100,
+          "210fa8cc929480b1"
+        ],
+        [
+          45,
+          100,
+          "f302705429c791dd"
+        ],
+        [
+          46,
+          100,
+          "ee874d17265b8145"
+        ],
+        [
+          47,
+          100,
+          "05a4e6a725f651c1"
+        ],
+        [
+          48,
+          100,
+          "bcaab568afa0c549"
+        ],
+        [
+          49,
+          100,
+          "751a88f107d2cc1d"
+        ],
+        [
+          50,
+          100,
+          "25bd7e5262ebd395"
+        ],
+        [
+          51,
+          100,
+          "b387f7ec2df85e59"
+        ],
+        [
+          52,
+          100,
+          "5f4d056abcd073e9"
+        ],
+        [
+          53,
+          100,
+          "e32b7dd664af7525"
+        ],
+        [
+          54,
+          100,
+          "c6915c6cdcb1027d"
+        ],
+        [
+          55,
+          100,
+          "fa263852a76cbab9"
+        ],
+        [
+          56,
+          100,
+          "1d8a1bc311d99359"
+        ],
+        [
+          57,
+          100,
+          "783d00c71de0516d"
+        ],
+        [
+          58,
+          100,
+          "9f5b41565160d4c5"
+        ],
+        [
+          59,
+          100,
+          "b2a85e3583a98949"
+        ],
+        [
+          60,
+          100,
+          "8466021ab06d2929"
+        ],
+        [
+          61,
+          100,
+          "94289d8dd09ee805"
+        ],
+        [
+          62,
+          100,
+          "fc0e0413fadabccd"
+        ],
+        [
+          63,
+          100,
+          "c7f9dd03d2a5a949"
+        ]
+      ]
+    },
+    {
+      "case_id": "A-blink-128m-r2",
+      "workload": "A",
+      "backend_key": "blink-128m",
+      "repetition": 2,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+      "blink_checkpoint_policy": "wal_bytes_threshold",
+      "threshold_bytes": 134217728,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 3903.3065503982857,
+      "latency": {
+        "condition_rejection": {
+          "count": 6629,
+          "sample_count": 6629,
+          "p50_ms": 4.337663,
+          "p95_ms": 8.667135,
+          "p99_ms": 11.337727
+        },
+        "get": {
+          "count": 2311,
+          "sample_count": 2311,
+          "p50_ms": 0.025967,
+          "p95_ms": 0.078143,
+          "p99_ms": 0.430335
+        },
+        "preparatory_get": {
+          "count": 16444,
+          "sample_count": 16444,
+          "p50_ms": 0.027615,
+          "p95_ms": 0.084671,
+          "p99_ms": 0.319487
+        },
+        "query16": {
+          "count": 4662,
+          "sample_count": 4662,
+          "p50_ms": 0.040927,
+          "p95_ms": 0.120575,
+          "p99_ms": 0.471807
+        },
+        "workflow": {
+          "count": 100676,
+          "sample_count": 100676,
+          "p50_ms": 4.218879,
+          "p95_ms": 8.650751,
+          "p99_ms": 11.509759
+        },
+        "write_transaction_success": {
+          "count": 87074,
+          "sample_count": 87074,
+          "p50_ms": 4.411391,
+          "p95_ms": 8.757247,
+          "p99_ms": 11.599871
+        }
+      },
+      "outcomes": {
+        "successful_mutations": 255062,
+        "successful_write_transactions": 87074,
+        "intentional_condition_rejections": 6629,
+        "natural_conflicts": 0,
+        "overloads": 0,
+        "other_errors": 0,
+        "read_calls": 23417
+      },
+      "cpu_seconds": 12.3,
+      "process_peak_rss_bytes": 334159872,
+      "controller_peak_process_group_rss_bytes": 551944192,
+      "maximum_database_bytes": 278645928,
+      "maximum_wal_bytes": 134290600,
+      "database_bytes_at_end": 205841140,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 3,
+      "checkpoint_completed": 3,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 3,
+      "checkpoint_window_method": "checkpoint event timestamps within the sampled measurement window",
+      "threshold_cell_status": "repeated_measurement_checkpoints_observed",
+      "checkpoint_total_ms": 1995.196167,
+      "checkpoint_max_ms": 718.182819,
+      "wal_bytes_at_measurement_start": 138340,
+      "wal_bytes_at_measurement_end": 54444788,
+      "wal_bytes_max": 134290600,
+      "threshold_excess_max_bytes": 72872,
+      "successful_mutation_transactions": 87074,
+      "mutation_commit_groups": 9004,
+      "average_mutation_transactions_per_group": 9.670590848511772,
+      "transaction_group_histogram": [
+        0,
+        160,
+        185,
+        260,
+        337,
+        441,
+        550,
+        606,
+        683,
+        778,
+        849,
+        925,
+        883,
+        884,
+        738,
+        482,
+        243
+      ],
+      "wal_syncs": 9007,
+      "commit_wal_syncs": 9004,
+      "checkpoint_wal_syncs": 3,
+      "drain_ms": 3.097667,
+      "final_checkpoint_drain_ms": 0.00044,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          "rw20",
+          100,
+          "5d78753cccb1fdf2"
+        ],
+        [
+          1,
+          "rw20",
+          100,
+          "1d948c8ddf6c8727"
+        ],
+        [
+          2,
+          "rw20",
+          100,
+          "f96ed4727ba26ca5"
+        ],
+        [
+          3,
+          "rw20",
+          100,
+          "b04b0a15c374f57c"
+        ],
+        [
+          4,
+          "rw20",
+          100,
+          "9d4a1156bebd5d26"
+        ],
+        [
+          5,
+          "rw20",
+          100,
+          "0b5ac490f0383867"
+        ],
+        [
+          6,
+          "rw20",
+          100,
+          "995cef2be0b628ab"
+        ],
+        [
+          7,
+          "rw20",
+          100,
+          "0017854c1bfb1f52"
+        ],
+        [
+          8,
+          "rw20",
+          100,
+          "b50b24dd873fe6a2"
+        ],
+        [
+          9,
+          "rw20",
+          100,
+          "25bdf4a7f006fddc"
+        ],
+        [
+          10,
+          "rw20",
+          100,
+          "50d2d6e9c7fcab5b"
+        ],
+        [
+          11,
+          "rw20",
+          100,
+          "9bedb82440595bf6"
+        ],
+        [
+          12,
+          "rw20",
+          100,
+          "4064b22158d16673"
+        ],
+        [
+          13,
+          "rw20",
+          100,
+          "ad44a2dbe8955c05"
+        ],
+        [
+          14,
+          "rw20",
+          100,
+          "13935709f525503e"
+        ],
+        [
+          15,
+          "rw20",
+          100,
+          "382037aba8f857ae"
+        ]
+      ]
+    },
+    {
+      "case_id": "E-blink-128m-r2",
+      "workload": "E",
+      "backend_key": "blink-128m",
+      "repetition": 2,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55",
+      "blink_checkpoint_policy": "wal_bytes_threshold",
+      "threshold_bytes": 134217728,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 1361.6255829447036,
+      "latency": {
+        "write_batch": {
+          "count": 40876,
+          "sample_count": 40876,
+          "p50_ms": 25.952255,
+          "p95_ms": 54.624255,
+          "p99_ms": 1193.279487
+        }
+      },
+      "outcomes": {
+        "measurement_write_batches_acknowledged": 40876,
+        "warmup_write_batches_acknowledged": 14070,
+        "overloads": 0,
+        "other_errors": 0
+      },
+      "cpu_seconds": 16.41,
+      "process_peak_rss_bytes": 598999040,
+      "controller_peak_process_group_rss_bytes": 1251168256,
+      "maximum_database_bytes": 508160190,
+      "maximum_wal_bytes": 135317694,
+      "database_bytes_at_end": 388967374,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 7,
+      "checkpoint_completed": 7,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 6,
+      "checkpoint_window_method": "completed events since the measurement reset minus one possible final coordinator group during drain",
+      "threshold_cell_status": "repeated_measurement_checkpoints_observed",
+      "checkpoint_total_ms": 10832.37737,
+      "checkpoint_max_ms": 2134.042603,
+      "wal_bytes_at_measurement_start": 25528879,
+      "wal_bytes_at_measurement_end": 16124878,
+      "wal_bytes_max": 135271060,
+      "threshold_excess_max_bytes": 1053332,
+      "successful_mutation_transactions": 40876,
+      "mutation_commit_groups": 775,
+      "average_mutation_transactions_per_group": 52.74322580645161,
+      "transaction_group_histogram": [
+        0,
+        1,
+        2,
+        0,
+        2,
+        0,
+        1,
+        1,
+        0,
+        2,
+        1,
+        0,
+        1,
+        3,
+        2,
+        2,
+        0,
+        3,
+        3,
+        1,
+        2,
+        3,
+        5,
+        1,
+        1,
+        4,
+        3,
+        4,
+        0,
+        3,
+        4,
+        2,
+        4,
+        3,
+        11,
+        12,
+        7,
+        6,
+        5,
+        3,
+        11,
+        5,
+        8,
+        13,
+        11,
+        15,
+        9,
+        16,
+        13,
+        13,
+        14,
+        25,
+        15,
+        16,
+        25,
+        22,
+        26,
+        24,
+        36,
+        28,
+        38,
+        43,
+        69,
+        70,
+        102
+      ],
+      "wal_syncs": 782,
+      "commit_wal_syncs": 775,
+      "checkpoint_wal_syncs": 7,
+      "drain_ms": 30020,
+      "final_checkpoint_drain_ms": 0,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          100,
+          "1f4048d2bfd553c1"
+        ],
+        [
+          1,
+          100,
+          "51cd15a2404e2fd5"
+        ],
+        [
+          2,
+          100,
+          "69592da121d84a4d"
+        ],
+        [
+          3,
+          100,
+          "0566421500eae711"
+        ],
+        [
+          4,
+          100,
+          "cc8a35d5dd01ce21"
+        ],
+        [
+          5,
+          100,
+          "ff6e1138354c352d"
+        ],
+        [
+          6,
+          100,
+          "9000645f0d022655"
+        ],
+        [
+          7,
+          100,
+          "a57a77ef31bcb841"
+        ],
+        [
+          8,
+          100,
+          "c38b3808c09aae51"
+        ],
+        [
+          9,
+          100,
+          "93f1a077e6e3b115"
+        ],
+        [
+          10,
+          100,
+          "c024871dc147a28d"
+        ],
+        [
+          11,
+          100,
+          "537cbbaa2b680361"
+        ],
+        [
+          12,
+          100,
+          "16cc31e71aece9d1"
+        ],
+        [
+          13,
+          100,
+          "52259ad6dcf417ad"
+        ],
+        [
+          14,
+          100,
+          "be4fa4d09cf82145"
+        ],
+        [
+          15,
+          100,
+          "fa17a8aca03277c1"
+        ],
+        [
+          16,
+          100,
+          "ef0f6d8db17d5419"
+        ],
+        [
+          17,
+          100,
+          "e0f91033972e89ad"
+        ],
+        [
+          18,
+          100,
+          "d5c970c3a2785355"
+        ],
+        [
+          19,
+          100,
+          "775d80553d6bf689"
+        ],
+        [
+          20,
+          100,
+          "362739a6fc0cc169"
+        ],
+        [
+          21,
+          100,
+          "c9523a0fac312715"
+        ],
+        [
+          22,
+          100,
+          "71c579d33ed12f0d"
+        ],
+        [
+          23,
+          100,
+          "1fae86a6c54ea6a9"
+        ],
+        [
+          24,
+          100,
+          "067557f5078b9c19"
+        ],
+        [
+          25,
+          100,
+          "2cb5cfe24edde0cd"
+        ],
+        [
+          26,
+          100,
+          "3d7b17abb2a1e035"
+        ],
+        [
+          27,
+          100,
+          "9716e6aca725f6c9"
+        ],
+        [
+          28,
+          100,
+          "a2eb9d5787469f09"
+        ],
+        [
+          29,
+          100,
+          "6e1f39d9be966095"
+        ],
+        [
+          30,
+          100,
+          "9e14a5949b96393d"
+        ],
+        [
+          31,
+          100,
+          "19537355c173c839"
+        ],
+        [
+          32,
+          100,
+          "b1675b9e4d7eb2f1"
+        ],
+        [
+          33,
+          100,
+          "09597a498fa5f625"
+        ],
+        [
+          34,
+          100,
+          "a68112e4af194c7d"
+        ],
+        [
+          35,
+          100,
+          "62ae5a9abb23f031"
+        ],
+        [
+          36,
+          100,
+          "4a7143dbc30db271"
+        ],
+        [
+          37,
+          100,
+          "9e4e270851fd7f4d"
+        ],
+        [
+          38,
+          100,
+          "4a7963cb29af31e5"
+        ],
+        [
+          39,
+          100,
+          "4e3c114f422be711"
+        ],
+        [
+          40,
+          100,
+          "f6271eaf8ebc0201"
+        ],
+        [
+          41,
+          100,
+          "a0d19be42eb443e5"
+        ],
+        [
+          42,
+          100,
+          "65cd964be790fc9d"
+        ],
+        [
+          43,
+          100,
+          "c4021a417cd26be1"
+        ],
+        [
+          44,
+          100,
+          "210fa8cc929480b1"
+        ],
+        [
+          45,
+          100,
+          "f302705429c791dd"
+        ],
+        [
+          46,
+          100,
+          "ee874d17265b8145"
+        ],
+        [
+          47,
+          100,
+          "05a4e6a725f651c1"
+        ],
+        [
+          48,
+          100,
+          "bcaab568afa0c549"
+        ],
+        [
+          49,
+          100,
+          "751a88f107d2cc1d"
+        ],
+        [
+          50,
+          100,
+          "25bd7e5262ebd395"
+        ],
+        [
+          51,
+          100,
+          "b387f7ec2df85e59"
+        ],
+        [
+          52,
+          100,
+          "5f4d056abcd073e9"
+        ],
+        [
+          53,
+          100,
+          "e32b7dd664af7525"
+        ],
+        [
+          54,
+          100,
+          "c6915c6cdcb1027d"
+        ],
+        [
+          55,
+          100,
+          "fa263852a76cbab9"
+        ],
+        [
+          56,
+          100,
+          "1d8a1bc311d99359"
+        ],
+        [
+          57,
+          100,
+          "783d00c71de0516d"
+        ],
+        [
+          58,
+          100,
+          "9f5b41565160d4c5"
+        ],
+        [
+          59,
+          100,
+          "b2a85e3583a98949"
+        ],
+        [
+          60,
+          100,
+          "8466021ab06d2929"
+        ],
+        [
+          61,
+          100,
+          "94289d8dd09ee805"
+        ],
+        [
+          62,
+          100,
+          "fc0e0413fadabccd"
+        ],
+        [
+          63,
+          100,
+          "c7f9dd03d2a5a949"
+        ]
+      ]
+    },
+    {
+      "case_id": "A-minimal-native-r2",
+      "workload": "A",
+      "backend_key": "minimal-native",
+      "repetition": 2,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+      "blink_checkpoint_policy": "disabled",
+      "threshold_bytes": null,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 3599.408195141116,
+      "latency": {
+        "condition_rejection": {
+          "count": 6096,
+          "sample_count": 6096,
+          "p50_ms": 0.046847,
+          "p95_ms": 0.361471,
+          "p99_ms": 0.579583
+        },
+        "get": {
+          "count": 2144,
+          "sample_count": 2144,
+          "p50_ms": 0.014607,
+          "p95_ms": 0.027375,
+          "p99_ms": 0.329471
+        },
+        "preparatory_get": {
+          "count": 15105,
+          "sample_count": 15105,
+          "p50_ms": 0.015727,
+          "p95_ms": 0.030367,
+          "p99_ms": 0.341503
+        },
+        "query16": {
+          "count": 4359,
+          "sample_count": 4359,
+          "p50_ms": 0.056703,
+          "p95_ms": 0.233727,
+          "p99_ms": 0.454143
+        },
+        "workflow": {
+          "count": 92915,
+          "sample_count": 92915,
+          "p50_ms": 2.023423,
+          "p95_ms": 25.821183,
+          "p99_ms": 62.455807
+        },
+        "write_transaction_success": {
+          "count": 80316,
+          "sample_count": 80316,
+          "p50_ms": 2.127871,
+          "p95_ms": 29.016063,
+          "p99_ms": 65.798143
+        }
+      },
+      "outcomes": {
+        "successful_mutations": 234455,
+        "successful_write_transactions": 80316,
+        "intentional_condition_rejections": 6096,
+        "natural_conflicts": 0,
+        "overloads": 0,
+        "other_errors": 0,
+        "read_calls": 21608
+      },
+      "cpu_seconds": 13.7,
+      "process_peak_rss_bytes": 246063104,
+      "controller_peak_process_group_rss_bytes": 390905856,
+      "maximum_database_bytes": 170686879,
+      "maximum_wal_bytes": 0,
+      "database_bytes_at_end": 170686879,
+      "database_manifest_file_count": 13,
+      "checkpoint_started": 0,
+      "checkpoint_completed": 0,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 0,
+      "checkpoint_window_method": "checkpoint event timestamps within the sampled measurement window",
+      "threshold_cell_status": "not_applicable",
+      "checkpoint_total_ms": 0.0,
+      "checkpoint_max_ms": 0.0,
+      "wal_bytes_at_measurement_start": null,
+      "wal_bytes_at_measurement_end": null,
+      "wal_bytes_max": null,
+      "threshold_excess_max_bytes": null,
+      "successful_mutation_transactions": null,
+      "mutation_commit_groups": null,
+      "average_mutation_transactions_per_group": null,
+      "transaction_group_histogram": [],
+      "wal_syncs": null,
+      "commit_wal_syncs": null,
+      "checkpoint_wal_syncs": null,
+      "drain_ms": 10.205846,
+      "final_checkpoint_drain_ms": 0.00035999999999999997,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          "rw20",
+          100,
+          "5d78753cccb1fdf2"
+        ],
+        [
+          1,
+          "rw20",
+          100,
+          "1d948c8ddf6c8727"
+        ],
+        [
+          2,
+          "rw20",
+          100,
+          "f96ed4727ba26ca5"
+        ],
+        [
+          3,
+          "rw20",
+          100,
+          "b04b0a15c374f57c"
+        ],
+        [
+          4,
+          "rw20",
+          100,
+          "9d4a1156bebd5d26"
+        ],
+        [
+          5,
+          "rw20",
+          100,
+          "0b5ac490f0383867"
+        ],
+        [
+          6,
+          "rw20",
+          100,
+          "995cef2be0b628ab"
+        ],
+        [
+          7,
+          "rw20",
+          100,
+          "0017854c1bfb1f52"
+        ],
+        [
+          8,
+          "rw20",
+          100,
+          "b50b24dd873fe6a2"
+        ],
+        [
+          9,
+          "rw20",
+          100,
+          "25bdf4a7f006fddc"
+        ],
+        [
+          10,
+          "rw20",
+          100,
+          "50d2d6e9c7fcab5b"
+        ],
+        [
+          11,
+          "rw20",
+          100,
+          "9bedb82440595bf6"
+        ],
+        [
+          12,
+          "rw20",
+          100,
+          "4064b22158d16673"
+        ],
+        [
+          13,
+          "rw20",
+          100,
+          "ad44a2dbe8955c05"
+        ],
+        [
+          14,
+          "rw20",
+          100,
+          "13935709f525503e"
+        ],
+        [
+          15,
+          "rw20",
+          100,
+          "382037aba8f857ae"
+        ]
+      ]
+    },
+    {
+      "case_id": "E-minimal-native-r2",
+      "workload": "E",
+      "backend_key": "minimal-native",
+      "repetition": 2,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55",
+      "blink_checkpoint_policy": "disabled",
+      "threshold_bytes": null,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 1685.2709047920343,
+      "latency": {
+        "write_batch": {
+          "count": 50607,
+          "sample_count": 50607,
+          "p50_ms": 31.440895,
+          "p95_ms": 56.098815,
+          "p99_ms": 325.844991
+        }
+      },
+      "outcomes": {
+        "measurement_write_batches_acknowledged": 50607,
+        "warmup_write_batches_acknowledged": 17619,
+        "overloads": 0,
+        "other_errors": 0
+      },
+      "cpu_seconds": 26.39,
+      "process_peak_rss_bytes": 627556352,
+      "controller_peak_process_group_rss_bytes": 985767936,
+      "maximum_database_bytes": 570316638,
+      "maximum_wal_bytes": 0,
+      "database_bytes_at_end": 198181734,
+      "database_manifest_file_count": 14,
+      "checkpoint_started": 0,
+      "checkpoint_completed": 0,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 0,
+      "checkpoint_window_method": "completed events since the measurement reset minus one possible final coordinator group during drain",
+      "threshold_cell_status": "not_applicable",
+      "checkpoint_total_ms": 0.0,
+      "checkpoint_max_ms": 0.0,
+      "wal_bytes_at_measurement_start": null,
+      "wal_bytes_at_measurement_end": null,
+      "wal_bytes_max": null,
+      "threshold_excess_max_bytes": null,
+      "successful_mutation_transactions": null,
+      "mutation_commit_groups": null,
+      "average_mutation_transactions_per_group": null,
+      "transaction_group_histogram": [],
+      "wal_syncs": null,
+      "commit_wal_syncs": null,
+      "checkpoint_wal_syncs": null,
+      "drain_ms": 30029,
+      "final_checkpoint_drain_ms": 0,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          100,
+          "1f4048d2bfd553c1"
+        ],
+        [
+          1,
+          100,
+          "51cd15a2404e2fd5"
+        ],
+        [
+          2,
+          100,
+          "69592da121d84a4d"
+        ],
+        [
+          3,
+          100,
+          "0566421500eae711"
+        ],
+        [
+          4,
+          100,
+          "cc8a35d5dd01ce21"
+        ],
+        [
+          5,
+          100,
+          "ff6e1138354c352d"
+        ],
+        [
+          6,
+          100,
+          "9000645f0d022655"
+        ],
+        [
+          7,
+          100,
+          "a57a77ef31bcb841"
+        ],
+        [
+          8,
+          100,
+          "c38b3808c09aae51"
+        ],
+        [
+          9,
+          100,
+          "93f1a077e6e3b115"
+        ],
+        [
+          10,
+          100,
+          "c024871dc147a28d"
+        ],
+        [
+          11,
+          100,
+          "537cbbaa2b680361"
+        ],
+        [
+          12,
+          100,
+          "16cc31e71aece9d1"
+        ],
+        [
+          13,
+          100,
+          "52259ad6dcf417ad"
+        ],
+        [
+          14,
+          100,
+          "be4fa4d09cf82145"
+        ],
+        [
+          15,
+          100,
+          "fa17a8aca03277c1"
+        ],
+        [
+          16,
+          100,
+          "ef0f6d8db17d5419"
+        ],
+        [
+          17,
+          100,
+          "e0f91033972e89ad"
+        ],
+        [
+          18,
+          100,
+          "d5c970c3a2785355"
+        ],
+        [
+          19,
+          100,
+          "775d80553d6bf689"
+        ],
+        [
+          20,
+          100,
+          "362739a6fc0cc169"
+        ],
+        [
+          21,
+          100,
+          "c9523a0fac312715"
+        ],
+        [
+          22,
+          100,
+          "71c579d33ed12f0d"
+        ],
+        [
+          23,
+          100,
+          "1fae86a6c54ea6a9"
+        ],
+        [
+          24,
+          100,
+          "067557f5078b9c19"
+        ],
+        [
+          25,
+          100,
+          "2cb5cfe24edde0cd"
+        ],
+        [
+          26,
+          100,
+          "3d7b17abb2a1e035"
+        ],
+        [
+          27,
+          100,
+          "9716e6aca725f6c9"
+        ],
+        [
+          28,
+          100,
+          "a2eb9d5787469f09"
+        ],
+        [
+          29,
+          100,
+          "6e1f39d9be966095"
+        ],
+        [
+          30,
+          100,
+          "9e14a5949b96393d"
+        ],
+        [
+          31,
+          100,
+          "19537355c173c839"
+        ],
+        [
+          32,
+          100,
+          "b1675b9e4d7eb2f1"
+        ],
+        [
+          33,
+          100,
+          "09597a498fa5f625"
+        ],
+        [
+          34,
+          100,
+          "a68112e4af194c7d"
+        ],
+        [
+          35,
+          100,
+          "62ae5a9abb23f031"
+        ],
+        [
+          36,
+          100,
+          "4a7143dbc30db271"
+        ],
+        [
+          37,
+          100,
+          "9e4e270851fd7f4d"
+        ],
+        [
+          38,
+          100,
+          "4a7963cb29af31e5"
+        ],
+        [
+          39,
+          100,
+          "4e3c114f422be711"
+        ],
+        [
+          40,
+          100,
+          "f6271eaf8ebc0201"
+        ],
+        [
+          41,
+          100,
+          "a0d19be42eb443e5"
+        ],
+        [
+          42,
+          100,
+          "65cd964be790fc9d"
+        ],
+        [
+          43,
+          100,
+          "c4021a417cd26be1"
+        ],
+        [
+          44,
+          100,
+          "210fa8cc929480b1"
+        ],
+        [
+          45,
+          100,
+          "f302705429c791dd"
+        ],
+        [
+          46,
+          100,
+          "ee874d17265b8145"
+        ],
+        [
+          47,
+          100,
+          "05a4e6a725f651c1"
+        ],
+        [
+          48,
+          100,
+          "bcaab568afa0c549"
+        ],
+        [
+          49,
+          100,
+          "751a88f107d2cc1d"
+        ],
+        [
+          50,
+          100,
+          "25bd7e5262ebd395"
+        ],
+        [
+          51,
+          100,
+          "b387f7ec2df85e59"
+        ],
+        [
+          52,
+          100,
+          "5f4d056abcd073e9"
+        ],
+        [
+          53,
+          100,
+          "e32b7dd664af7525"
+        ],
+        [
+          54,
+          100,
+          "c6915c6cdcb1027d"
+        ],
+        [
+          55,
+          100,
+          "fa263852a76cbab9"
+        ],
+        [
+          56,
+          100,
+          "1d8a1bc311d99359"
+        ],
+        [
+          57,
+          100,
+          "783d00c71de0516d"
+        ],
+        [
+          58,
+          100,
+          "9f5b41565160d4c5"
+        ],
+        [
+          59,
+          100,
+          "b2a85e3583a98949"
+        ],
+        [
+          60,
+          100,
+          "8466021ab06d2929"
+        ],
+        [
+          61,
+          100,
+          "94289d8dd09ee805"
+        ],
+        [
+          62,
+          100,
+          "fc0e0413fadabccd"
+        ],
+        [
+          63,
+          100,
+          "c7f9dd03d2a5a949"
+        ]
+      ]
+    },
+    {
+      "case_id": "A-blink-32m-r3",
+      "workload": "A",
+      "backend_key": "blink-32m",
+      "repetition": 3,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+      "blink_checkpoint_policy": "wal_bytes_threshold",
+      "threshold_bytes": 33554432,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 3568.5115570352123,
+      "latency": {
+        "condition_rejection": {
+          "count": 6047,
+          "sample_count": 6047,
+          "p50_ms": 4.550655,
+          "p95_ms": 8.429567,
+          "p99_ms": 11.001855
+        },
+        "get": {
+          "count": 2119,
+          "sample_count": 2119,
+          "p50_ms": 0.027167,
+          "p95_ms": 0.079423,
+          "p99_ms": 0.254335
+        },
+        "preparatory_get": {
+          "count": 14992,
+          "sample_count": 14992,
+          "p50_ms": 0.027647,
+          "p95_ms": 0.088447,
+          "p99_ms": 0.309247
+        },
+        "query16": {
+          "count": 4319,
+          "sample_count": 4319,
+          "p50_ms": 0.039743,
+          "p95_ms": 0.106943,
+          "p99_ms": 0.310015
+        },
+        "workflow": {
+          "count": 92076,
+          "sample_count": 92076,
+          "p50_ms": 4.435967,
+          "p95_ms": 8.220671,
+          "p99_ms": 11.018239
+        },
+        "write_transaction_success": {
+          "count": 79591,
+          "sample_count": 79591,
+          "p50_ms": 4.567039,
+          "p95_ms": 8.343551,
+          "p99_ms": 11.141119
+        }
+      },
+      "outcomes": {
+        "successful_mutations": 232127,
+        "successful_write_transactions": 79591,
+        "intentional_condition_rejections": 6047,
+        "natural_conflicts": 0,
+        "overloads": 0,
+        "other_errors": 0,
+        "read_calls": 21430
+      },
+      "cpu_seconds": 12.28,
+      "process_peak_rss_bytes": 206622720,
+      "controller_peak_process_group_rss_bytes": 414375936,
+      "maximum_database_bytes": 170727837,
+      "maximum_wal_bytes": 33610874,
+      "database_bytes_at_end": 154049209,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 15,
+      "checkpoint_completed": 15,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 15,
+      "checkpoint_window_method": "checkpoint event timestamps within the sampled measurement window",
+      "threshold_cell_status": "repeated_measurement_checkpoints_observed",
+      "checkpoint_total_ms": 4078.298,
+      "checkpoint_max_ms": 334.628269,
+      "wal_bytes_at_measurement_start": 23582415,
+      "wal_bytes_at_measurement_end": 9153209,
+      "wal_bytes_max": 33641784,
+      "threshold_excess_max_bytes": 87352,
+      "successful_mutation_transactions": 79591,
+      "mutation_commit_groups": 8218,
+      "average_mutation_transactions_per_group": 9.684959844244341,
+      "transaction_group_histogram": [
+        0,
+        120,
+        210,
+        246,
+        335,
+        401,
+        483,
+        561,
+        588,
+        686,
+        773,
+        794,
+        819,
+        790,
+        705,
+        479,
+        228
+      ],
+      "wal_syncs": 8233,
+      "commit_wal_syncs": 8218,
+      "checkpoint_wal_syncs": 15,
+      "drain_ms": 2.1492579999999997,
+      "final_checkpoint_drain_ms": 0.0007199999999999999,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          "rw20",
+          100,
+          "5d78753cccb1fdf2"
+        ],
+        [
+          1,
+          "rw20",
+          100,
+          "1d948c8ddf6c8727"
+        ],
+        [
+          2,
+          "rw20",
+          100,
+          "f96ed4727ba26ca5"
+        ],
+        [
+          3,
+          "rw20",
+          100,
+          "b04b0a15c374f57c"
+        ],
+        [
+          4,
+          "rw20",
+          100,
+          "9d4a1156bebd5d26"
+        ],
+        [
+          5,
+          "rw20",
+          100,
+          "0b5ac490f0383867"
+        ],
+        [
+          6,
+          "rw20",
+          100,
+          "995cef2be0b628ab"
+        ],
+        [
+          7,
+          "rw20",
+          100,
+          "0017854c1bfb1f52"
+        ],
+        [
+          8,
+          "rw20",
+          100,
+          "b50b24dd873fe6a2"
+        ],
+        [
+          9,
+          "rw20",
+          100,
+          "25bdf4a7f006fddc"
+        ],
+        [
+          10,
+          "rw20",
+          100,
+          "50d2d6e9c7fcab5b"
+        ],
+        [
+          11,
+          "rw20",
+          100,
+          "9bedb82440595bf6"
+        ],
+        [
+          12,
+          "rw20",
+          100,
+          "4064b22158d16673"
+        ],
+        [
+          13,
+          "rw20",
+          100,
+          "ad44a2dbe8955c05"
+        ],
+        [
+          14,
+          "rw20",
+          100,
+          "13935709f525503e"
+        ],
+        [
+          15,
+          "rw20",
+          100,
+          "382037aba8f857ae"
+        ]
+      ]
+    },
+    {
+      "case_id": "E-blink-32m-r3",
+      "workload": "E",
+      "backend_key": "blink-32m",
+      "repetition": 3,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55",
+      "blink_checkpoint_policy": "wal_bytes_threshold",
+      "threshold_bytes": 33554432,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 1317.509494303418,
+      "latency": {
+        "write_batch": {
+          "count": 39549,
+          "sample_count": 39549,
+          "p50_ms": 25.591807,
+          "p95_ms": 60.391423,
+          "p99_ms": 546.308095
+        }
+      },
+      "outcomes": {
+        "measurement_write_batches_acknowledged": 39549,
+        "warmup_write_batches_acknowledged": 13492,
+        "overloads": 0,
+        "other_errors": 0
+      },
+      "cpu_seconds": 21.0,
+      "process_peak_rss_bytes": 522240000,
+      "controller_peak_process_group_rss_bytes": 1174360064,
+      "maximum_database_bytes": 407618127,
+      "maximum_wal_bytes": 34775631,
+      "database_bytes_at_end": 394633303,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 26,
+      "checkpoint_completed": 26,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 25,
+      "checkpoint_window_method": "completed events since the measurement reset minus one possible final coordinator group during drain",
+      "threshold_cell_status": "repeated_measurement_checkpoints_observed",
+      "checkpoint_total_ms": 12574.435948,
+      "checkpoint_max_ms": 585.837873,
+      "wal_bytes_at_measurement_start": 4741263,
+      "wal_bytes_at_measurement_end": 21790807,
+      "wal_bytes_max": 34983746,
+      "threshold_excess_max_bytes": 1429314,
+      "successful_mutation_transactions": 39549,
+      "mutation_commit_groups": 732,
+      "average_mutation_transactions_per_group": 54.028688524590166,
+      "transaction_group_histogram": [
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        4,
+        1,
+        0,
+        2,
+        2,
+        2,
+        0,
+        1,
+        1,
+        2,
+        0,
+        1,
+        2,
+        3,
+        1,
+        4,
+        2,
+        2,
+        2,
+        2,
+        4,
+        4,
+        7,
+        5,
+        2,
+        6,
+        4,
+        7,
+        4,
+        7,
+        9,
+        10,
+        5,
+        6,
+        12,
+        12,
+        12,
+        13,
+        13,
+        12,
+        19,
+        7,
+        20,
+        14,
+        21,
+        30,
+        28,
+        29,
+        35,
+        40,
+        62,
+        62,
+        78,
+        93
+      ],
+      "wal_syncs": 758,
+      "commit_wal_syncs": 732,
+      "checkpoint_wal_syncs": 26,
+      "drain_ms": 30018,
+      "final_checkpoint_drain_ms": 0,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          100,
+          "1f4048d2bfd553c1"
+        ],
+        [
+          1,
+          100,
+          "51cd15a2404e2fd5"
+        ],
+        [
+          2,
+          100,
+          "69592da121d84a4d"
+        ],
+        [
+          3,
+          100,
+          "0566421500eae711"
+        ],
+        [
+          4,
+          100,
+          "cc8a35d5dd01ce21"
+        ],
+        [
+          5,
+          100,
+          "ff6e1138354c352d"
+        ],
+        [
+          6,
+          100,
+          "9000645f0d022655"
+        ],
+        [
+          7,
+          100,
+          "a57a77ef31bcb841"
+        ],
+        [
+          8,
+          100,
+          "c38b3808c09aae51"
+        ],
+        [
+          9,
+          100,
+          "93f1a077e6e3b115"
+        ],
+        [
+          10,
+          100,
+          "c024871dc147a28d"
+        ],
+        [
+          11,
+          100,
+          "537cbbaa2b680361"
+        ],
+        [
+          12,
+          100,
+          "16cc31e71aece9d1"
+        ],
+        [
+          13,
+          100,
+          "52259ad6dcf417ad"
+        ],
+        [
+          14,
+          100,
+          "be4fa4d09cf82145"
+        ],
+        [
+          15,
+          100,
+          "fa17a8aca03277c1"
+        ],
+        [
+          16,
+          100,
+          "ef0f6d8db17d5419"
+        ],
+        [
+          17,
+          100,
+          "e0f91033972e89ad"
+        ],
+        [
+          18,
+          100,
+          "d5c970c3a2785355"
+        ],
+        [
+          19,
+          100,
+          "775d80553d6bf689"
+        ],
+        [
+          20,
+          100,
+          "362739a6fc0cc169"
+        ],
+        [
+          21,
+          100,
+          "c9523a0fac312715"
+        ],
+        [
+          22,
+          100,
+          "71c579d33ed12f0d"
+        ],
+        [
+          23,
+          100,
+          "1fae86a6c54ea6a9"
+        ],
+        [
+          24,
+          100,
+          "067557f5078b9c19"
+        ],
+        [
+          25,
+          100,
+          "2cb5cfe24edde0cd"
+        ],
+        [
+          26,
+          100,
+          "3d7b17abb2a1e035"
+        ],
+        [
+          27,
+          100,
+          "9716e6aca725f6c9"
+        ],
+        [
+          28,
+          100,
+          "a2eb9d5787469f09"
+        ],
+        [
+          29,
+          100,
+          "6e1f39d9be966095"
+        ],
+        [
+          30,
+          100,
+          "9e14a5949b96393d"
+        ],
+        [
+          31,
+          100,
+          "19537355c173c839"
+        ],
+        [
+          32,
+          100,
+          "b1675b9e4d7eb2f1"
+        ],
+        [
+          33,
+          100,
+          "09597a498fa5f625"
+        ],
+        [
+          34,
+          100,
+          "a68112e4af194c7d"
+        ],
+        [
+          35,
+          100,
+          "62ae5a9abb23f031"
+        ],
+        [
+          36,
+          100,
+          "4a7143dbc30db271"
+        ],
+        [
+          37,
+          100,
+          "9e4e270851fd7f4d"
+        ],
+        [
+          38,
+          100,
+          "4a7963cb29af31e5"
+        ],
+        [
+          39,
+          100,
+          "4e3c114f422be711"
+        ],
+        [
+          40,
+          100,
+          "f6271eaf8ebc0201"
+        ],
+        [
+          41,
+          100,
+          "a0d19be42eb443e5"
+        ],
+        [
+          42,
+          100,
+          "65cd964be790fc9d"
+        ],
+        [
+          43,
+          100,
+          "c4021a417cd26be1"
+        ],
+        [
+          44,
+          100,
+          "210fa8cc929480b1"
+        ],
+        [
+          45,
+          100,
+          "f302705429c791dd"
+        ],
+        [
+          46,
+          100,
+          "ee874d17265b8145"
+        ],
+        [
+          47,
+          100,
+          "05a4e6a725f651c1"
+        ],
+        [
+          48,
+          100,
+          "bcaab568afa0c549"
+        ],
+        [
+          49,
+          100,
+          "751a88f107d2cc1d"
+        ],
+        [
+          50,
+          100,
+          "25bd7e5262ebd395"
+        ],
+        [
+          51,
+          100,
+          "b387f7ec2df85e59"
+        ],
+        [
+          52,
+          100,
+          "5f4d056abcd073e9"
+        ],
+        [
+          53,
+          100,
+          "e32b7dd664af7525"
+        ],
+        [
+          54,
+          100,
+          "c6915c6cdcb1027d"
+        ],
+        [
+          55,
+          100,
+          "fa263852a76cbab9"
+        ],
+        [
+          56,
+          100,
+          "1d8a1bc311d99359"
+        ],
+        [
+          57,
+          100,
+          "783d00c71de0516d"
+        ],
+        [
+          58,
+          100,
+          "9f5b41565160d4c5"
+        ],
+        [
+          59,
+          100,
+          "b2a85e3583a98949"
+        ],
+        [
+          60,
+          100,
+          "8466021ab06d2929"
+        ],
+        [
+          61,
+          100,
+          "94289d8dd09ee805"
+        ],
+        [
+          62,
+          100,
+          "fc0e0413fadabccd"
+        ],
+        [
+          63,
+          100,
+          "c7f9dd03d2a5a949"
+        ]
+      ]
+    },
+    {
+      "case_id": "A-blink-128m-r3",
+      "workload": "A",
+      "backend_key": "blink-128m",
+      "repetition": 3,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+      "blink_checkpoint_policy": "wal_bytes_threshold",
+      "threshold_bytes": 134217728,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 3968.061105359487,
+      "latency": {
+        "condition_rejection": {
+          "count": 6759,
+          "sample_count": 6759,
+          "p50_ms": 4.317183,
+          "p95_ms": 8.253439,
+          "p99_ms": 10.838015
+        },
+        "get": {
+          "count": 2348,
+          "sample_count": 2348,
+          "p50_ms": 0.027727,
+          "p95_ms": 0.092863,
+          "p99_ms": 0.282879
+        },
+        "preparatory_get": {
+          "count": 16645,
+          "sample_count": 16645,
+          "p50_ms": 0.028367,
+          "p95_ms": 0.094463,
+          "p99_ms": 0.397311
+        },
+        "query16": {
+          "count": 4780,
+          "sample_count": 4780,
+          "p50_ms": 0.040255,
+          "p95_ms": 0.135679,
+          "p99_ms": 0.384255
+        },
+        "workflow": {
+          "count": 102411,
+          "sample_count": 102411,
+          "p50_ms": 4.206591,
+          "p95_ms": 8.224767,
+          "p99_ms": 10.870783
+        },
+        "write_transaction_success": {
+          "count": 88524,
+          "sample_count": 88524,
+          "p50_ms": 4.378623,
+          "p95_ms": 8.310783,
+          "p99_ms": 11.010047
+        }
+      },
+      "outcomes": {
+        "successful_mutations": 259100,
+        "successful_write_transactions": 88524,
+        "intentional_condition_rejections": 6759,
+        "natural_conflicts": 0,
+        "overloads": 0,
+        "other_errors": 0,
+        "read_calls": 23773
+      },
+      "cpu_seconds": 12.42,
+      "process_peak_rss_bytes": 321368064,
+      "controller_peak_process_group_rss_bytes": 523419648,
+      "maximum_database_bytes": 253284436,
+      "maximum_wal_bytes": 133730317,
+      "database_bytes_at_end": 213534748,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 3,
+      "checkpoint_completed": 3,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 3,
+      "checkpoint_window_method": "checkpoint event timestamps within the sampled measurement window",
+      "threshold_cell_status": "repeated_measurement_checkpoints_observed",
+      "checkpoint_total_ms": 2073.182887,
+      "checkpoint_max_ms": 752.227079,
+      "wal_bytes_at_measurement_start": 196524,
+      "wal_bytes_at_measurement_end": 61585436,
+      "wal_bytes_max": 134271301,
+      "threshold_excess_max_bytes": 53573,
+      "successful_mutation_transactions": 88524,
+      "mutation_commit_groups": 9164,
+      "average_mutation_transactions_per_group": 9.659973810563073,
+      "transaction_group_histogram": [
+        0,
+        125,
+        161,
+        302,
+        388,
+        455,
+        530,
+        614,
+        721,
+        796,
+        865,
+        950,
+        950,
+        834,
+        709,
+        558,
+        206
+      ],
+      "wal_syncs": 9167,
+      "commit_wal_syncs": 9164,
+      "checkpoint_wal_syncs": 3,
+      "drain_ms": 2.1565790000000002,
+      "final_checkpoint_drain_ms": 0.0006,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          "rw20",
+          100,
+          "5d78753cccb1fdf2"
+        ],
+        [
+          1,
+          "rw20",
+          100,
+          "1d948c8ddf6c8727"
+        ],
+        [
+          2,
+          "rw20",
+          100,
+          "f96ed4727ba26ca5"
+        ],
+        [
+          3,
+          "rw20",
+          100,
+          "b04b0a15c374f57c"
+        ],
+        [
+          4,
+          "rw20",
+          100,
+          "9d4a1156bebd5d26"
+        ],
+        [
+          5,
+          "rw20",
+          100,
+          "0b5ac490f0383867"
+        ],
+        [
+          6,
+          "rw20",
+          100,
+          "995cef2be0b628ab"
+        ],
+        [
+          7,
+          "rw20",
+          100,
+          "0017854c1bfb1f52"
+        ],
+        [
+          8,
+          "rw20",
+          100,
+          "b50b24dd873fe6a2"
+        ],
+        [
+          9,
+          "rw20",
+          100,
+          "25bdf4a7f006fddc"
+        ],
+        [
+          10,
+          "rw20",
+          100,
+          "50d2d6e9c7fcab5b"
+        ],
+        [
+          11,
+          "rw20",
+          100,
+          "9bedb82440595bf6"
+        ],
+        [
+          12,
+          "rw20",
+          100,
+          "4064b22158d16673"
+        ],
+        [
+          13,
+          "rw20",
+          100,
+          "ad44a2dbe8955c05"
+        ],
+        [
+          14,
+          "rw20",
+          100,
+          "13935709f525503e"
+        ],
+        [
+          15,
+          "rw20",
+          100,
+          "382037aba8f857ae"
+        ]
+      ]
+    },
+    {
+      "case_id": "E-blink-128m-r3",
+      "workload": "E",
+      "backend_key": "blink-128m",
+      "repetition": 3,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55",
+      "blink_checkpoint_policy": "wal_bytes_threshold",
+      "threshold_bytes": 134217728,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 1353.5605984871206,
+      "latency": {
+        "write_batch": {
+          "count": 40619,
+          "sample_count": 40619,
+          "p50_ms": 24.870911,
+          "p95_ms": 51.478527,
+          "p99_ms": 1169.162239
+        }
+      },
+      "outcomes": {
+        "measurement_write_batches_acknowledged": 40619,
+        "warmup_write_batches_acknowledged": 14704,
+        "overloads": 0,
+        "other_errors": 0
+      },
+      "cpu_seconds": 16.21,
+      "process_peak_rss_bytes": 599523328,
+      "controller_peak_process_group_rss_bytes": 1251627008,
+      "maximum_database_bytes": 508447787,
+      "maximum_wal_bytes": 135605291,
+      "database_bytes_at_end": 398316661,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 7,
+      "checkpoint_completed": 7,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 6,
+      "checkpoint_window_method": "completed events since the measurement reset minus one possible final coordinator group during drain",
+      "threshold_cell_status": "repeated_measurement_checkpoints_observed",
+      "checkpoint_total_ms": 11919.372209,
+      "checkpoint_max_ms": 1984.185774,
+      "wal_bytes_at_measurement_start": 40522285,
+      "wal_bytes_at_measurement_end": 25474165,
+      "wal_bytes_max": 135605291,
+      "threshold_excess_max_bytes": 1387563,
+      "successful_mutation_transactions": 40619,
+      "mutation_commit_groups": 764,
+      "average_mutation_transactions_per_group": 53.166230366492144,
+      "transaction_group_histogram": [
+        0,
+        2,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        3,
+        1,
+        1,
+        0,
+        2,
+        1,
+        2,
+        0,
+        2,
+        2,
+        1,
+        1,
+        3,
+        2,
+        3,
+        3,
+        5,
+        7,
+        3,
+        6,
+        2,
+        6,
+        5,
+        6,
+        4,
+        3,
+        3,
+        8,
+        6,
+        3,
+        6,
+        4,
+        11,
+        6,
+        5,
+        7,
+        11,
+        14,
+        14,
+        15,
+        9,
+        17,
+        19,
+        17,
+        24,
+        23,
+        19,
+        24,
+        34,
+        33,
+        32,
+        37,
+        46,
+        66,
+        85,
+        88
+      ],
+      "wal_syncs": 771,
+      "commit_wal_syncs": 764,
+      "checkpoint_wal_syncs": 7,
+      "drain_ms": 30009,
+      "final_checkpoint_drain_ms": 0,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          100,
+          "1f4048d2bfd553c1"
+        ],
+        [
+          1,
+          100,
+          "51cd15a2404e2fd5"
+        ],
+        [
+          2,
+          100,
+          "69592da121d84a4d"
+        ],
+        [
+          3,
+          100,
+          "0566421500eae711"
+        ],
+        [
+          4,
+          100,
+          "cc8a35d5dd01ce21"
+        ],
+        [
+          5,
+          100,
+          "ff6e1138354c352d"
+        ],
+        [
+          6,
+          100,
+          "9000645f0d022655"
+        ],
+        [
+          7,
+          100,
+          "a57a77ef31bcb841"
+        ],
+        [
+          8,
+          100,
+          "c38b3808c09aae51"
+        ],
+        [
+          9,
+          100,
+          "93f1a077e6e3b115"
+        ],
+        [
+          10,
+          100,
+          "c024871dc147a28d"
+        ],
+        [
+          11,
+          100,
+          "537cbbaa2b680361"
+        ],
+        [
+          12,
+          100,
+          "16cc31e71aece9d1"
+        ],
+        [
+          13,
+          100,
+          "52259ad6dcf417ad"
+        ],
+        [
+          14,
+          100,
+          "be4fa4d09cf82145"
+        ],
+        [
+          15,
+          100,
+          "fa17a8aca03277c1"
+        ],
+        [
+          16,
+          100,
+          "ef0f6d8db17d5419"
+        ],
+        [
+          17,
+          100,
+          "e0f91033972e89ad"
+        ],
+        [
+          18,
+          100,
+          "d5c970c3a2785355"
+        ],
+        [
+          19,
+          100,
+          "775d80553d6bf689"
+        ],
+        [
+          20,
+          100,
+          "362739a6fc0cc169"
+        ],
+        [
+          21,
+          100,
+          "c9523a0fac312715"
+        ],
+        [
+          22,
+          100,
+          "71c579d33ed12f0d"
+        ],
+        [
+          23,
+          100,
+          "1fae86a6c54ea6a9"
+        ],
+        [
+          24,
+          100,
+          "067557f5078b9c19"
+        ],
+        [
+          25,
+          100,
+          "2cb5cfe24edde0cd"
+        ],
+        [
+          26,
+          100,
+          "3d7b17abb2a1e035"
+        ],
+        [
+          27,
+          100,
+          "9716e6aca725f6c9"
+        ],
+        [
+          28,
+          100,
+          "a2eb9d5787469f09"
+        ],
+        [
+          29,
+          100,
+          "6e1f39d9be966095"
+        ],
+        [
+          30,
+          100,
+          "9e14a5949b96393d"
+        ],
+        [
+          31,
+          100,
+          "19537355c173c839"
+        ],
+        [
+          32,
+          100,
+          "b1675b9e4d7eb2f1"
+        ],
+        [
+          33,
+          100,
+          "09597a498fa5f625"
+        ],
+        [
+          34,
+          100,
+          "a68112e4af194c7d"
+        ],
+        [
+          35,
+          100,
+          "62ae5a9abb23f031"
+        ],
+        [
+          36,
+          100,
+          "4a7143dbc30db271"
+        ],
+        [
+          37,
+          100,
+          "9e4e270851fd7f4d"
+        ],
+        [
+          38,
+          100,
+          "4a7963cb29af31e5"
+        ],
+        [
+          39,
+          100,
+          "4e3c114f422be711"
+        ],
+        [
+          40,
+          100,
+          "f6271eaf8ebc0201"
+        ],
+        [
+          41,
+          100,
+          "a0d19be42eb443e5"
+        ],
+        [
+          42,
+          100,
+          "65cd964be790fc9d"
+        ],
+        [
+          43,
+          100,
+          "c4021a417cd26be1"
+        ],
+        [
+          44,
+          100,
+          "210fa8cc929480b1"
+        ],
+        [
+          45,
+          100,
+          "f302705429c791dd"
+        ],
+        [
+          46,
+          100,
+          "ee874d17265b8145"
+        ],
+        [
+          47,
+          100,
+          "05a4e6a725f651c1"
+        ],
+        [
+          48,
+          100,
+          "bcaab568afa0c549"
+        ],
+        [
+          49,
+          100,
+          "751a88f107d2cc1d"
+        ],
+        [
+          50,
+          100,
+          "25bd7e5262ebd395"
+        ],
+        [
+          51,
+          100,
+          "b387f7ec2df85e59"
+        ],
+        [
+          52,
+          100,
+          "5f4d056abcd073e9"
+        ],
+        [
+          53,
+          100,
+          "e32b7dd664af7525"
+        ],
+        [
+          54,
+          100,
+          "c6915c6cdcb1027d"
+        ],
+        [
+          55,
+          100,
+          "fa263852a76cbab9"
+        ],
+        [
+          56,
+          100,
+          "1d8a1bc311d99359"
+        ],
+        [
+          57,
+          100,
+          "783d00c71de0516d"
+        ],
+        [
+          58,
+          100,
+          "9f5b41565160d4c5"
+        ],
+        [
+          59,
+          100,
+          "b2a85e3583a98949"
+        ],
+        [
+          60,
+          100,
+          "8466021ab06d2929"
+        ],
+        [
+          61,
+          100,
+          "94289d8dd09ee805"
+        ],
+        [
+          62,
+          100,
+          "fc0e0413fadabccd"
+        ],
+        [
+          63,
+          100,
+          "c7f9dd03d2a5a949"
+        ]
+      ]
+    },
+    {
+      "case_id": "A-minimal-native-r3",
+      "workload": "A",
+      "backend_key": "minimal-native",
+      "repetition": 3,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+      "blink_checkpoint_policy": "disabled",
+      "threshold_bytes": null,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 3531.359501687021,
+      "latency": {
+        "condition_rejection": {
+          "count": 6020,
+          "sample_count": 6020,
+          "p50_ms": 0.045791,
+          "p95_ms": 0.321791,
+          "p99_ms": 0.545791
+        },
+        "get": {
+          "count": 2102,
+          "sample_count": 2102,
+          "p50_ms": 0.014247,
+          "p95_ms": 0.028767,
+          "p99_ms": 0.310527
+        },
+        "preparatory_get": {
+          "count": 14837,
+          "sample_count": 14837,
+          "p50_ms": 0.015527,
+          "p95_ms": 0.031455,
+          "p99_ms": 0.338943
+        },
+        "query16": {
+          "count": 4240,
+          "sample_count": 4240,
+          "p50_ms": 0.057951,
+          "p95_ms": 0.185215,
+          "p99_ms": 0.464383
+        },
+        "workflow": {
+          "count": 91142,
+          "sample_count": 91142,
+          "p50_ms": 2.071551,
+          "p95_ms": 26.443775,
+          "p99_ms": 63.373311
+        },
+        "write_transaction_success": {
+          "count": 78780,
+          "sample_count": 78780,
+          "p50_ms": 2.177023,
+          "p95_ms": 29.704191,
+          "p99_ms": 66.650111
+        }
+      },
+      "outcomes": {
+        "successful_mutations": 230538,
+        "successful_write_transactions": 78780,
+        "intentional_condition_rejections": 6020,
+        "natural_conflicts": 0,
+        "overloads": 0,
+        "other_errors": 0,
+        "read_calls": 21179
+      },
+      "cpu_seconds": 13.51,
+      "process_peak_rss_bytes": 244015104,
+      "controller_peak_process_group_rss_bytes": 385933312,
+      "maximum_database_bytes": 167959347,
+      "maximum_wal_bytes": 0,
+      "database_bytes_at_end": 167959347,
+      "database_manifest_file_count": 13,
+      "checkpoint_started": 0,
+      "checkpoint_completed": 0,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 0,
+      "checkpoint_window_method": "checkpoint event timestamps within the sampled measurement window",
+      "threshold_cell_status": "not_applicable",
+      "checkpoint_total_ms": 0.0,
+      "checkpoint_max_ms": 0.0,
+      "wal_bytes_at_measurement_start": null,
+      "wal_bytes_at_measurement_end": null,
+      "wal_bytes_max": null,
+      "threshold_excess_max_bytes": null,
+      "successful_mutation_transactions": null,
+      "mutation_commit_groups": null,
+      "average_mutation_transactions_per_group": null,
+      "transaction_group_histogram": [],
+      "wal_syncs": null,
+      "commit_wal_syncs": null,
+      "checkpoint_wal_syncs": null,
+      "drain_ms": 7.684065,
+      "final_checkpoint_drain_ms": 0.00044,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          "rw20",
+          100,
+          "5d78753cccb1fdf2"
+        ],
+        [
+          1,
+          "rw20",
+          100,
+          "1d948c8ddf6c8727"
+        ],
+        [
+          2,
+          "rw20",
+          100,
+          "f96ed4727ba26ca5"
+        ],
+        [
+          3,
+          "rw20",
+          100,
+          "b04b0a15c374f57c"
+        ],
+        [
+          4,
+          "rw20",
+          100,
+          "9d4a1156bebd5d26"
+        ],
+        [
+          5,
+          "rw20",
+          100,
+          "0b5ac490f0383867"
+        ],
+        [
+          6,
+          "rw20",
+          100,
+          "995cef2be0b628ab"
+        ],
+        [
+          7,
+          "rw20",
+          100,
+          "0017854c1bfb1f52"
+        ],
+        [
+          8,
+          "rw20",
+          100,
+          "b50b24dd873fe6a2"
+        ],
+        [
+          9,
+          "rw20",
+          100,
+          "25bdf4a7f006fddc"
+        ],
+        [
+          10,
+          "rw20",
+          100,
+          "50d2d6e9c7fcab5b"
+        ],
+        [
+          11,
+          "rw20",
+          100,
+          "9bedb82440595bf6"
+        ],
+        [
+          12,
+          "rw20",
+          100,
+          "4064b22158d16673"
+        ],
+        [
+          13,
+          "rw20",
+          100,
+          "ad44a2dbe8955c05"
+        ],
+        [
+          14,
+          "rw20",
+          100,
+          "13935709f525503e"
+        ],
+        [
+          15,
+          "rw20",
+          100,
+          "382037aba8f857ae"
+        ]
+      ]
+    },
+    {
+      "case_id": "E-minimal-native-r3",
+      "workload": "E",
+      "backend_key": "minimal-native",
+      "repetition": 3,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55",
+      "blink_checkpoint_policy": "disabled",
+      "threshold_bytes": null,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 1762.5916055962691,
+      "latency": {
+        "write_batch": {
+          "count": 52913,
+          "sample_count": 52913,
+          "p50_ms": 29.491199,
+          "p95_ms": 55.246847,
+          "p99_ms": 325.058559
+        }
+      },
+      "outcomes": {
+        "measurement_write_batches_acknowledged": 52913,
+        "warmup_write_batches_acknowledged": 17977,
+        "overloads": 0,
+        "other_errors": 0
+      },
+      "cpu_seconds": 25.97,
+      "process_peak_rss_bytes": 641056768,
+      "controller_peak_process_group_rss_bytes": 998334464,
+      "maximum_database_bytes": 559889793,
+      "maximum_wal_bytes": 0,
+      "database_bytes_at_end": 246836905,
+      "database_manifest_file_count": 14,
+      "checkpoint_started": 0,
+      "checkpoint_completed": 0,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 0,
+      "checkpoint_window_method": "completed events since the measurement reset minus one possible final coordinator group during drain",
+      "threshold_cell_status": "not_applicable",
+      "checkpoint_total_ms": 0.0,
+      "checkpoint_max_ms": 0.0,
+      "wal_bytes_at_measurement_start": null,
+      "wal_bytes_at_measurement_end": null,
+      "wal_bytes_max": null,
+      "threshold_excess_max_bytes": null,
+      "successful_mutation_transactions": null,
+      "mutation_commit_groups": null,
+      "average_mutation_transactions_per_group": null,
+      "transaction_group_histogram": [],
+      "wal_syncs": null,
+      "commit_wal_syncs": null,
+      "checkpoint_wal_syncs": null,
+      "drain_ms": 30020,
+      "final_checkpoint_drain_ms": 0,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          100,
+          "1f4048d2bfd553c1"
+        ],
+        [
+          1,
+          100,
+          "51cd15a2404e2fd5"
+        ],
+        [
+          2,
+          100,
+          "69592da121d84a4d"
+        ],
+        [
+          3,
+          100,
+          "0566421500eae711"
+        ],
+        [
+          4,
+          100,
+          "cc8a35d5dd01ce21"
+        ],
+        [
+          5,
+          100,
+          "ff6e1138354c352d"
+        ],
+        [
+          6,
+          100,
+          "9000645f0d022655"
+        ],
+        [
+          7,
+          100,
+          "a57a77ef31bcb841"
+        ],
+        [
+          8,
+          100,
+          "c38b3808c09aae51"
+        ],
+        [
+          9,
+          100,
+          "93f1a077e6e3b115"
+        ],
+        [
+          10,
+          100,
+          "c024871dc147a28d"
+        ],
+        [
+          11,
+          100,
+          "537cbbaa2b680361"
+        ],
+        [
+          12,
+          100,
+          "16cc31e71aece9d1"
+        ],
+        [
+          13,
+          100,
+          "52259ad6dcf417ad"
+        ],
+        [
+          14,
+          100,
+          "be4fa4d09cf82145"
+        ],
+        [
+          15,
+          100,
+          "fa17a8aca03277c1"
+        ],
+        [
+          16,
+          100,
+          "ef0f6d8db17d5419"
+        ],
+        [
+          17,
+          100,
+          "e0f91033972e89ad"
+        ],
+        [
+          18,
+          100,
+          "d5c970c3a2785355"
+        ],
+        [
+          19,
+          100,
+          "775d80553d6bf689"
+        ],
+        [
+          20,
+          100,
+          "362739a6fc0cc169"
+        ],
+        [
+          21,
+          100,
+          "c9523a0fac312715"
+        ],
+        [
+          22,
+          100,
+          "71c579d33ed12f0d"
+        ],
+        [
+          23,
+          100,
+          "1fae86a6c54ea6a9"
+        ],
+        [
+          24,
+          100,
+          "067557f5078b9c19"
+        ],
+        [
+          25,
+          100,
+          "2cb5cfe24edde0cd"
+        ],
+        [
+          26,
+          100,
+          "3d7b17abb2a1e035"
+        ],
+        [
+          27,
+          100,
+          "9716e6aca725f6c9"
+        ],
+        [
+          28,
+          100,
+          "a2eb9d5787469f09"
+        ],
+        [
+          29,
+          100,
+          "6e1f39d9be966095"
+        ],
+        [
+          30,
+          100,
+          "9e14a5949b96393d"
+        ],
+        [
+          31,
+          100,
+          "19537355c173c839"
+        ],
+        [
+          32,
+          100,
+          "b1675b9e4d7eb2f1"
+        ],
+        [
+          33,
+          100,
+          "09597a498fa5f625"
+        ],
+        [
+          34,
+          100,
+          "a68112e4af194c7d"
+        ],
+        [
+          35,
+          100,
+          "62ae5a9abb23f031"
+        ],
+        [
+          36,
+          100,
+          "4a7143dbc30db271"
+        ],
+        [
+          37,
+          100,
+          "9e4e270851fd7f4d"
+        ],
+        [
+          38,
+          100,
+          "4a7963cb29af31e5"
+        ],
+        [
+          39,
+          100,
+          "4e3c114f422be711"
+        ],
+        [
+          40,
+          100,
+          "f6271eaf8ebc0201"
+        ],
+        [
+          41,
+          100,
+          "a0d19be42eb443e5"
+        ],
+        [
+          42,
+          100,
+          "65cd964be790fc9d"
+        ],
+        [
+          43,
+          100,
+          "c4021a417cd26be1"
+        ],
+        [
+          44,
+          100,
+          "210fa8cc929480b1"
+        ],
+        [
+          45,
+          100,
+          "f302705429c791dd"
+        ],
+        [
+          46,
+          100,
+          "ee874d17265b8145"
+        ],
+        [
+          47,
+          100,
+          "05a4e6a725f651c1"
+        ],
+        [
+          48,
+          100,
+          "bcaab568afa0c549"
+        ],
+        [
+          49,
+          100,
+          "751a88f107d2cc1d"
+        ],
+        [
+          50,
+          100,
+          "25bd7e5262ebd395"
+        ],
+        [
+          51,
+          100,
+          "b387f7ec2df85e59"
+        ],
+        [
+          52,
+          100,
+          "5f4d056abcd073e9"
+        ],
+        [
+          53,
+          100,
+          "e32b7dd664af7525"
+        ],
+        [
+          54,
+          100,
+          "c6915c6cdcb1027d"
+        ],
+        [
+          55,
+          100,
+          "fa263852a76cbab9"
+        ],
+        [
+          56,
+          100,
+          "1d8a1bc311d99359"
+        ],
+        [
+          57,
+          100,
+          "783d00c71de0516d"
+        ],
+        [
+          58,
+          100,
+          "9f5b41565160d4c5"
+        ],
+        [
+          59,
+          100,
+          "b2a85e3583a98949"
+        ],
+        [
+          60,
+          100,
+          "8466021ab06d2929"
+        ],
+        [
+          61,
+          100,
+          "94289d8dd09ee805"
+        ],
+        [
+          62,
+          100,
+          "fc0e0413fadabccd"
+        ],
+        [
+          63,
+          100,
+          "c7f9dd03d2a5a949"
+        ]
+      ]
+    },
+    {
+      "case_id": "A-blink-off-r3",
+      "workload": "A",
+      "backend_key": "blink-off",
+      "repetition": 3,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "bfcbfd277172bf06f8e5bdab58b01e8589b9d2580b9ee23e5606644d805f0199",
+      "blink_checkpoint_policy": "disabled",
+      "threshold_bytes": null,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 5203.390139537218,
+      "latency": {
+        "condition_rejection": {
+          "count": 8782,
+          "sample_count": 8782,
+          "p50_ms": 3.504127,
+          "p95_ms": 6.574079,
+          "p99_ms": 8.609791
+        },
+        "get": {
+          "count": 3125,
+          "sample_count": 3125,
+          "p50_ms": 0.026255,
+          "p95_ms": 0.096383,
+          "p99_ms": 0.438271
+        },
+        "preparatory_get": {
+          "count": 21850,
+          "sample_count": 21850,
+          "p50_ms": 0.026575,
+          "p95_ms": 0.095103,
+          "p99_ms": 0.447743
+        },
+        "query16": {
+          "count": 6261,
+          "sample_count": 6261,
+          "p50_ms": 0.038527,
+          "p95_ms": 0.124927,
+          "p99_ms": 0.458495
+        },
+        "workflow": {
+          "count": 134274,
+          "sample_count": 134274,
+          "p50_ms": 3.454975,
+          "p95_ms": 6.676479,
+          "p99_ms": 8.790015
+        },
+        "write_transaction_success": {
+          "count": 116106,
+          "sample_count": 116106,
+          "p50_ms": 3.526655,
+          "p95_ms": 6.742015,
+          "p99_ms": 8.888319
+        }
+      },
+      "outcomes": {
+        "successful_mutations": 338778,
+        "successful_write_transactions": 116106,
+        "intentional_condition_rejections": 8782,
+        "natural_conflicts": 0,
+        "overloads": 0,
+        "other_errors": 0,
+        "read_calls": 31236
+      },
+      "cpu_seconds": 13.74,
+      "process_peak_rss_bytes": 443940864,
+      "controller_peak_process_group_rss_bytes": 738480128,
+      "maximum_database_bytes": 829784041,
+      "maximum_wal_bytes": 659312617,
+      "database_bytes_at_end": 829784041,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 0,
+      "checkpoint_completed": 0,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 0,
+      "checkpoint_window_method": "checkpoint event timestamps within the sampled measurement window",
+      "threshold_cell_status": "not_applicable",
+      "checkpoint_total_ms": 0.0,
+      "checkpoint_max_ms": 0.0,
+      "wal_bytes_at_measurement_start": 270666505,
+      "wal_bytes_at_measurement_end": 659312617,
+      "wal_bytes_max": 659312617,
+      "threshold_excess_max_bytes": 0,
+      "successful_mutation_transactions": 116106,
+      "mutation_commit_groups": 11763,
+      "average_mutation_transactions_per_group": 9.870441213976026,
+      "transaction_group_histogram": [
+        0,
+        150,
+        227,
+        304,
+        425,
+        546,
+        670,
+        738,
+        907,
+        1014,
+        1136,
+        1229,
+        1177,
+        1175,
+        1007,
+        712,
+        346
+      ],
+      "wal_syncs": 11763,
+      "commit_wal_syncs": 11763,
+      "checkpoint_wal_syncs": 0,
+      "drain_ms": 4.249995999999999,
+      "final_checkpoint_drain_ms": 0.00052,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          "rw20",
+          100,
+          "5d78753cccb1fdf2"
+        ],
+        [
+          1,
+          "rw20",
+          100,
+          "1d948c8ddf6c8727"
+        ],
+        [
+          2,
+          "rw20",
+          100,
+          "f96ed4727ba26ca5"
+        ],
+        [
+          3,
+          "rw20",
+          100,
+          "b04b0a15c374f57c"
+        ],
+        [
+          4,
+          "rw20",
+          100,
+          "9d4a1156bebd5d26"
+        ],
+        [
+          5,
+          "rw20",
+          100,
+          "0b5ac490f0383867"
+        ],
+        [
+          6,
+          "rw20",
+          100,
+          "995cef2be0b628ab"
+        ],
+        [
+          7,
+          "rw20",
+          100,
+          "0017854c1bfb1f52"
+        ],
+        [
+          8,
+          "rw20",
+          100,
+          "b50b24dd873fe6a2"
+        ],
+        [
+          9,
+          "rw20",
+          100,
+          "25bdf4a7f006fddc"
+        ],
+        [
+          10,
+          "rw20",
+          100,
+          "50d2d6e9c7fcab5b"
+        ],
+        [
+          11,
+          "rw20",
+          100,
+          "9bedb82440595bf6"
+        ],
+        [
+          12,
+          "rw20",
+          100,
+          "4064b22158d16673"
+        ],
+        [
+          13,
+          "rw20",
+          100,
+          "ad44a2dbe8955c05"
+        ],
+        [
+          14,
+          "rw20",
+          100,
+          "13935709f525503e"
+        ],
+        [
+          15,
+          "rw20",
+          100,
+          "382037aba8f857ae"
+        ]
+      ]
+    },
+    {
+      "case_id": "E-blink-off-r3",
+      "workload": "E",
+      "backend_key": "blink-off",
+      "repetition": 3,
+      "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+      "binary_sha256": "aca4e83310fb35d3a4b2f378458e84cbcb6d414bbb3b3dbf597fac4a91c45f55",
+      "blink_checkpoint_policy": "disabled",
+      "threshold_bytes": null,
+      "run_status": "completed",
+      "accepted_as_full_window": true,
+      "throughput_per_second": 2723.3957486506297,
+      "latency": {
+        "write_batch": {
+          "count": 81740,
+          "sample_count": 81740,
+          "p50_ms": 21.086207,
+          "p95_ms": 37.584895,
+          "p99_ms": 44.892159
+        }
+      },
+      "outcomes": {
+        "measurement_write_batches_acknowledged": 81740,
+        "warmup_write_batches_acknowledged": 27847,
+        "overloads": 0,
+        "other_errors": 0
+      },
+      "cpu_seconds": 25.04,
+      "process_peak_rss_bytes": 902541312,
+      "controller_peak_process_group_rss_bytes": 1343852544,
+      "maximum_database_bytes": 1724655415,
+      "maximum_wal_bytes": 1351812919,
+      "database_bytes_at_end": 1724655415,
+      "database_manifest_file_count": 2,
+      "checkpoint_started": 0,
+      "checkpoint_completed": 0,
+      "checkpoint_failed": 0,
+      "measurement_checkpoint_completed": 0,
+      "checkpoint_window_method": "completed events since the measurement reset minus one possible final coordinator group during drain",
+      "threshold_cell_status": "not_applicable",
+      "checkpoint_total_ms": 0.0,
+      "checkpoint_max_ms": 0.0,
+      "wal_bytes_at_measurement_start": 630175731,
+      "wal_bytes_at_measurement_end": 1351812919,
+      "wal_bytes_max": 1351812919,
+      "threshold_excess_max_bytes": 0,
+      "successful_mutation_transactions": 81740,
+      "mutation_commit_groups": 1498,
+      "average_mutation_transactions_per_group": 54.56608811748999,
+      "transaction_group_histogram": [
+        0,
+        0,
+        0,
+        3,
+        0,
+        0,
+        0,
+        2,
+        0,
+        1,
+        0,
+        1,
+        1,
+        3,
+        1,
+        4,
+        0,
+        2,
+        1,
+        2,
+        1,
+        4,
+        1,
+        2,
+        4,
+        4,
+        2,
+        5,
+        4,
+        3,
+        5,
+        4,
+        9,
+        7,
+        9,
+        9,
+        7,
+        13,
+        7,
+        22,
+        7,
+        12,
+        23,
+        22,
+        16,
+        23,
+        21,
+        19,
+        27,
+        22,
+        40,
+        38,
+        31,
+        41,
+        44,
+        37,
+        64,
+        65,
+        68,
+        90,
+        84,
+        129,
+        133,
+        167,
+        132
+      ],
+      "wal_syncs": 1498,
+      "commit_wal_syncs": 1498,
+      "checkpoint_wal_syncs": 0,
+      "drain_ms": 30014,
+      "final_checkpoint_drain_ms": 0,
+      "errors": [],
+      "input_prefix_signature": [
+        [
+          0,
+          100,
+          "1f4048d2bfd553c1"
+        ],
+        [
+          1,
+          100,
+          "51cd15a2404e2fd5"
+        ],
+        [
+          2,
+          100,
+          "69592da121d84a4d"
+        ],
+        [
+          3,
+          100,
+          "0566421500eae711"
+        ],
+        [
+          4,
+          100,
+          "cc8a35d5dd01ce21"
+        ],
+        [
+          5,
+          100,
+          "ff6e1138354c352d"
+        ],
+        [
+          6,
+          100,
+          "9000645f0d022655"
+        ],
+        [
+          7,
+          100,
+          "a57a77ef31bcb841"
+        ],
+        [
+          8,
+          100,
+          "c38b3808c09aae51"
+        ],
+        [
+          9,
+          100,
+          "93f1a077e6e3b115"
+        ],
+        [
+          10,
+          100,
+          "c024871dc147a28d"
+        ],
+        [
+          11,
+          100,
+          "537cbbaa2b680361"
+        ],
+        [
+          12,
+          100,
+          "16cc31e71aece9d1"
+        ],
+        [
+          13,
+          100,
+          "52259ad6dcf417ad"
+        ],
+        [
+          14,
+          100,
+          "be4fa4d09cf82145"
+        ],
+        [
+          15,
+          100,
+          "fa17a8aca03277c1"
+        ],
+        [
+          16,
+          100,
+          "ef0f6d8db17d5419"
+        ],
+        [
+          17,
+          100,
+          "e0f91033972e89ad"
+        ],
+        [
+          18,
+          100,
+          "d5c970c3a2785355"
+        ],
+        [
+          19,
+          100,
+          "775d80553d6bf689"
+        ],
+        [
+          20,
+          100,
+          "362739a6fc0cc169"
+        ],
+        [
+          21,
+          100,
+          "c9523a0fac312715"
+        ],
+        [
+          22,
+          100,
+          "71c579d33ed12f0d"
+        ],
+        [
+          23,
+          100,
+          "1fae86a6c54ea6a9"
+        ],
+        [
+          24,
+          100,
+          "067557f5078b9c19"
+        ],
+        [
+          25,
+          100,
+          "2cb5cfe24edde0cd"
+        ],
+        [
+          26,
+          100,
+          "3d7b17abb2a1e035"
+        ],
+        [
+          27,
+          100,
+          "9716e6aca725f6c9"
+        ],
+        [
+          28,
+          100,
+          "a2eb9d5787469f09"
+        ],
+        [
+          29,
+          100,
+          "6e1f39d9be966095"
+        ],
+        [
+          30,
+          100,
+          "9e14a5949b96393d"
+        ],
+        [
+          31,
+          100,
+          "19537355c173c839"
+        ],
+        [
+          32,
+          100,
+          "b1675b9e4d7eb2f1"
+        ],
+        [
+          33,
+          100,
+          "09597a498fa5f625"
+        ],
+        [
+          34,
+          100,
+          "a68112e4af194c7d"
+        ],
+        [
+          35,
+          100,
+          "62ae5a9abb23f031"
+        ],
+        [
+          36,
+          100,
+          "4a7143dbc30db271"
+        ],
+        [
+          37,
+          100,
+          "9e4e270851fd7f4d"
+        ],
+        [
+          38,
+          100,
+          "4a7963cb29af31e5"
+        ],
+        [
+          39,
+          100,
+          "4e3c114f422be711"
+        ],
+        [
+          40,
+          100,
+          "f6271eaf8ebc0201"
+        ],
+        [
+          41,
+          100,
+          "a0d19be42eb443e5"
+        ],
+        [
+          42,
+          100,
+          "65cd964be790fc9d"
+        ],
+        [
+          43,
+          100,
+          "c4021a417cd26be1"
+        ],
+        [
+          44,
+          100,
+          "210fa8cc929480b1"
+        ],
+        [
+          45,
+          100,
+          "f302705429c791dd"
+        ],
+        [
+          46,
+          100,
+          "ee874d17265b8145"
+        ],
+        [
+          47,
+          100,
+          "05a4e6a725f651c1"
+        ],
+        [
+          48,
+          100,
+          "bcaab568afa0c549"
+        ],
+        [
+          49,
+          100,
+          "751a88f107d2cc1d"
+        ],
+        [
+          50,
+          100,
+          "25bd7e5262ebd395"
+        ],
+        [
+          51,
+          100,
+          "b387f7ec2df85e59"
+        ],
+        [
+          52,
+          100,
+          "5f4d056abcd073e9"
+        ],
+        [
+          53,
+          100,
+          "e32b7dd664af7525"
+        ],
+        [
+          54,
+          100,
+          "c6915c6cdcb1027d"
+        ],
+        [
+          55,
+          100,
+          "fa263852a76cbab9"
+        ],
+        [
+          56,
+          100,
+          "1d8a1bc311d99359"
+        ],
+        [
+          57,
+          100,
+          "783d00c71de0516d"
+        ],
+        [
+          58,
+          100,
+          "9f5b41565160d4c5"
+        ],
+        [
+          59,
+          100,
+          "b2a85e3583a98949"
+        ],
+        [
+          60,
+          100,
+          "8466021ab06d2929"
+        ],
+        [
+          61,
+          100,
+          "94289d8dd09ee805"
+        ],
+        [
+          62,
+          100,
+          "fc0e0413fadabccd"
+        ],
+        [
+          63,
+          100,
+          "c7f9dd03d2a5a949"
+        ]
+      ]
+    }
+  ]
+}

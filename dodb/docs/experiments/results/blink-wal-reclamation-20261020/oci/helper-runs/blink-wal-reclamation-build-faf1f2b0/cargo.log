@@ -1,0 +1,7 @@
+   Compiling dodb-core v0.1.0 (/bench/zfs/db/blink-wal-reclamation-20261020/source/dodb/crates/dodb-core)
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/blink-wal-reclamation-20261020/source/dodb/crates/dodb-rocksdb)
+   Compiling dodb-service v0.1.0 (/bench/zfs/db/blink-wal-reclamation-20261020/source/dodb/crates/dodb-service)
+   Compiling dodb-protocol v0.1.0 (/bench/zfs/db/blink-wal-reclamation-20261020/source/dodb/crates/dodb-protocol)
+   Compiling dodb-storage v0.1.0 (/bench/zfs/db/blink-wal-reclamation-20261020/source/dodb/crates/dodb-storage)
+   Compiling dodb-client v0.1.0 (/bench/zfs/db/blink-wal-reclamation-20261020/source/dodb/crates/dodb-client)
+   Compiling dodb-server v0.1.0 (/bench/zfs/db/blink-wal-reclamation-20261020/source/dodb/crates/dodb-server)

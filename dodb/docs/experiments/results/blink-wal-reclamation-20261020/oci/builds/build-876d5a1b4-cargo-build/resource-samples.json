@@ -1,0 +1,14 @@
+[
+  {
+    "elapsed_seconds": 0.0026898239739239216,
+    "process_group_rss_bytes": 0,
+    "mem_available_bytes": 5230215168,
+    "filesystem_available_bytes": 49102811136
+  },
+  {
+    "elapsed_seconds": 1.0131522389128804,
+    "process_group_rss_bytes": 0,
+    "mem_available_bytes": 5230104576,
+    "filesystem_available_bytes": 49102811136
+  }
+]

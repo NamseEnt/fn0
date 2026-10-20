@@ -1,0 +1,24 @@
+{
+  "argv": [
+    "env",
+    "CARGO_BUILD_JOBS=1",
+    "DODB_BUILD_RUN_ID=blink-wal-reclamation-contracts-876d5a1b4-rocksdb",
+    "bash",
+    "dodb/scripts/run-oci-rocksdb-build.sh",
+    "test",
+    "--locked",
+    "--release",
+    "-p",
+    "dodb-rocksdb",
+    "--test",
+    "transaction_contract",
+    "--test",
+    "read_contract",
+    "--test",
+    "contract_history",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/bench/zfs/db/blink-wal-reclamation-20261020/source",
+  "run_id": "contracts-876d5a1b4-rocksdb"
+}

@@ -1,0 +1,67 @@
+[
+  {
+    "path": "tenant-1/000012.sst",
+    "size_bytes": 41113814,
+    "sha256": "33bce974413d98ef05e1c5c32af301b8612eb99b37b9db7cbde5e30cf2cda820"
+  },
+  {
+    "path": "tenant-1/000013.log",
+    "size_bytes": 49994327,
+    "sha256": "8b0fd189c21a48d2ae83d3b6d89dfed6b376b34a41a0ca8853fc49f2856e2ab6"
+  },
+  {
+    "path": "tenant-1/000014.sst",
+    "size_bytes": 42587273,
+    "sha256": "79256ba551eb20d827f89d78c92edbcef862b200206a1a9d2606f5b3ebaeebe9"
+  },
+  {
+    "path": "tenant-1/000017.sst",
+    "size_bytes": 36875916,
+    "sha256": "1ecad634320e711ae2433630d07de9f5aa581635ad88d716a6517410e6bb185e"
+  },
+  {
+    "path": "tenant-1/000018.log",
+    "size_bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "tenant-1/CURRENT",
+    "size_bytes": 16,
+    "sha256": "300feb3870e7d5e43b28bd6b7826d9e0c21e0e81ac1b44e9c4e35957ad0fa023"
+  },
+  {
+    "path": "tenant-1/IDENTITY",
+    "size_bytes": 36,
+    "sha256": "173c38047644e4e5d7e3efbb58c894e1a2ef4eed1cc3aace90824a61c81aac32"
+  },
+  {
+    "path": "tenant-1/LOCK",
+    "size_bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "tenant-1/LOG",
+    "size_bytes": 41624,
+    "sha256": "52a46d94604091ca81d038719008e2d98f419cbb6245e324bc5a609714f6114e"
+  },
+  {
+    "path": "tenant-1/LOG.old.1792488426685897",
+    "size_bytes": 55395,
+    "sha256": "8d707e993838aeed63bd8e882b499d6d84e206b5e5e645b8e1ab3f9c9062a146"
+  },
+  {
+    "path": "tenant-1/MANIFEST-000019",
+    "size_bytes": 493,
+    "sha256": "2df5610b53ef7a0c12bb8b4d705290f401e89dae83bc27a7f5538497aa0e923a"
+  },
+  {
+    "path": "tenant-1/OPTIONS-000021",
+    "size_bytes": 8992,
+    "sha256": "d5c08ddaee238bb752b5e668825a2bab4fd30f4ad6e430890e83d5fe7933897b"
+  },
+  {
+    "path": "tenant-1/OPTIONS-000023",
+    "size_bytes": 8993,
+    "sha256": "da62a94c915dfafeb62e725b4138379f99d322b42c11b7a6cc67dd5f2257267e"
+  }
+]

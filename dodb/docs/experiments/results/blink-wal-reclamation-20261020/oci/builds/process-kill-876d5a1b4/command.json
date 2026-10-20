@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "env",
+    "CARGO_BUILD_JOBS=1",
+    "DODB_BUILD_RUN_ID=blink-wal-reclamation-process-kill-876d5a1b4",
+    "bash",
+    "dodb/scripts/run-oci-rocksdb-build.sh",
+    "test",
+    "--locked",
+    "--release",
+    "-p",
+    "dodb-server",
+    "--test",
+    "blink_wal_checkpoint",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/bench/zfs/db/blink-wal-reclamation-20261020/source",
+  "run_id": "process-kill-876d5a1b4"
+}

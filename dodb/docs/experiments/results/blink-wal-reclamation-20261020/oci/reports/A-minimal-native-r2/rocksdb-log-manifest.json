@@ -1,0 +1,14 @@
+[
+  {
+    "path": "tenant-1/LOG",
+    "preserved_path": "/bench/zfs/db/blink-wal-reclamation-20261020/reports/A-minimal-native-r2/rocksdb-logs/tenant-1__LOG",
+    "size_bytes": 41624,
+    "sha256": "52a46d94604091ca81d038719008e2d98f419cbb6245e324bc5a609714f6114e"
+  },
+  {
+    "path": "tenant-1/LOG.old.1792488426685897",
+    "preserved_path": "/bench/zfs/db/blink-wal-reclamation-20261020/reports/A-minimal-native-r2/rocksdb-logs/tenant-1__LOG.old.1792488426685897",
+    "size_bytes": 55395,
+    "sha256": "8d707e993838aeed63bd8e882b499d6d84e206b5e5e645b8e1ab3f9c9062a146"
+  }
+]

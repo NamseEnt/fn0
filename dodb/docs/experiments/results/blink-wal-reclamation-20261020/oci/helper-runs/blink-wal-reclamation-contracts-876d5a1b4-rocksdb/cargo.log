@@ -1,0 +1,28 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.35s
+     Running tests/contract_history.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/contract_history-dc41e75b2405322b)
+
+running 4 tests
+test bounded_history_checker_accepts_reverse_global_revision_order_for_independent_keys ... ok
+test bounded_history_checker_rejects_stale_read_and_partial_atomic_snapshot ... ok
+test bounded_read_write_histories_replay_for_blink_and_rocksdb_modes ... ok
+test conditional_multi_key_history_agrees_for_blink_and_rocksdb_allocators ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/read_contract.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/read_contract-2262d3d0500e8616)
+
+running 3 tests
+test btree_blink_and_rocksdb_share_the_same_read_contract ... ok
+test minimal_native_reads_satisfy_common_contract ... ok
+test rocksdb_query_and_scan_survive_shutdown_and_reopen ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.15s
+
+     Running tests/transaction_contract.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/transaction_contract-f05b402c0807ad20)
+
+running 2 tests
+test btree_blink_and_rocksdb_share_transaction_contract ... ok
+test minimal_native_transaction_path_satisfies_common_contract ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.64s
+

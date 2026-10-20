@@ -1,0 +1,72 @@
+[
+  {
+    "path": "tenant-1/000039.log",
+    "size_bytes": 34605517,
+    "sha256": "19f50e8d768b101525a25fc18f138c8d2e8914aec3ac77a5fb6bb8867dbb40bf"
+  },
+  {
+    "path": "tenant-1/000041.sst",
+    "size_bytes": 68356219,
+    "sha256": "96f5b91dbe91cbb2d192601be4c1bdbf66bac1e3f9a264607a71bcfcc8797ac3"
+  },
+  {
+    "path": "tenant-1/000042.sst",
+    "size_bytes": 68355059,
+    "sha256": "1bb33ce766b3d2373644af155d183ae51dae249131754777c5cdbaffa590b59b"
+  },
+  {
+    "path": "tenant-1/000043.sst",
+    "size_bytes": 9649449,
+    "sha256": "d38b9d602ab8cce9e61441b9b607e91fedbcc359d09647941ee29fa0bc4b14b9"
+  },
+  {
+    "path": "tenant-1/000046.sst",
+    "size_bytes": 32839368,
+    "sha256": "5546b03c1966c8de5505b1594265e1eac45db68ec065095fceaaf13e0237f063"
+  },
+  {
+    "path": "tenant-1/000047.log",
+    "size_bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "tenant-1/CURRENT",
+    "size_bytes": 16,
+    "sha256": "67bf9950e818713e054268d40bed61a22d324385ce98e89ddf406a405b870802"
+  },
+  {
+    "path": "tenant-1/IDENTITY",
+    "size_bytes": 36,
+    "sha256": "356db1a140a53a94c2a6dea1dd4d4f4cab22b3473a664320034c67f440e62055"
+  },
+  {
+    "path": "tenant-1/LOCK",
+    "size_bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "tenant-1/LOG",
+    "size_bytes": 41643,
+    "sha256": "54d3f1e38dcb99ae3770eccd48e50f55af8f42bae5014f6514a89a834f017bef"
+  },
+  {
+    "path": "tenant-1/LOG.old.1792487721857836",
+    "size_bytes": 130355,
+    "sha256": "caa72180f06f44a875e7503a8f693ac1c49e07a16322e76a36514f93c6755d29"
+  },
+  {
+    "path": "tenant-1/MANIFEST-000048",
+    "size_bytes": 906,
+    "sha256": "c93b477c3699f344436fbd3d3f70823c26183d0ba3aed36c12f397a41efca478"
+  },
+  {
+    "path": "tenant-1/OPTIONS-000050",
+    "size_bytes": 8992,
+    "sha256": "d5c08ddaee238bb752b5e668825a2bab4fd30f4ad6e430890e83d5fe7933897b"
+  },
+  {
+    "path": "tenant-1/OPTIONS-000052",
+    "size_bytes": 8993,
+    "sha256": "da62a94c915dfafeb62e725b4138379f99d322b42c11b7a6cc67dd5f2257267e"
+  }
+]

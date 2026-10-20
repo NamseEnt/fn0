@@ -1,0 +1,6 @@
+{
+  "failure": "The final runner compared the full per-client prefix record, including admitted_workflows, a run-throughput-dependent count, instead of comparing the fixed input-prefix fingerprints.",
+  "runner_exit": "The 24 workload cells had completed and passed controller, final-state, reopen, and latency-count validation before the aggregate comparison failed.",
+  "preservation": "No performance cell was rerun or replaced. The initial comparison remains in input-prefix-fingerprints.json.",
+  "corrected_verification": "matrix-verification-final-v3.json compares each client's fixed prefix length and fingerprint; all 24 cells pass and fingerprints match across paths."
+}

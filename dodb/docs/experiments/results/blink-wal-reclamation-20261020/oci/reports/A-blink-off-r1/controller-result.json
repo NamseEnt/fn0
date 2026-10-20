@@ -1,0 +1,16 @@
+{
+  "case_id": "A-blink-off-r1",
+  "exit_code": 0,
+  "stop_reason": null,
+  "elapsed_seconds": 49.66338438191451,
+  "sample_count": 50,
+  "peak_process_group_rss_bytes": 677560320,
+  "minimum_mem_available_bytes": 4429697024,
+  "maximum_database_bytes": 834672175,
+  "maximum_wal_bytes": 663561775,
+  "minimum_filesystem_available_bytes": 47869546496,
+  "report_exists": true,
+  "database_file_count": 2,
+  "database_bytes_before_removal": 834672175,
+  "rocksdb_log_file_count": 0
+}

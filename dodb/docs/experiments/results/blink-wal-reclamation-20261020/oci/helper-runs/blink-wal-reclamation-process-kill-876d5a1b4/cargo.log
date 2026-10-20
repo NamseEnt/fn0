@@ -1,0 +1,25 @@
+   Compiling futures-util v0.3.31
+   Compiling hyper-util v0.1.20
+   Compiling tower v0.5.3
+   Compiling tower-http v0.6.8
+   Compiling hyper-rustls v0.27.7
+   Compiling futures-executor v0.3.31
+   Compiling reqwest v0.12.28
+   Compiling opentelemetry_sdk v0.31.0
+   Compiling opentelemetry-proto v0.31.0
+   Compiling opentelemetry-http v0.31.0
+   Compiling opentelemetry-otlp v0.31.1
+   Compiling dodb-server v0.1.0 (/bench/zfs/db/blink-wal-reclamation-20261020/source/dodb/crates/dodb-server)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 31s
+     Running tests/blink_wal_checkpoint.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/blink_wal_checkpoint-7f7f44713588e8c2)
+
+running 6 tests
+test checkpoint_failure_keeps_acknowledged_commit_and_fails_later_writes ... ok
+test disabled_policy_does_not_checkpoint_and_default_is_disabled ... ok
+test process_kill_during_checkpoint_replays_acknowledged_commit ... ok
+test threshold_below_current_wal_does_not_checkpoint ... ok
+test threshold_checkpoints_repeat_and_reopen_keeps_latest_revision ... ok
+test zero_threshold_and_btree_policy_are_rejected ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+

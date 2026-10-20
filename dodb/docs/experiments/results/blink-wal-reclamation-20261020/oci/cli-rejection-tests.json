@@ -1,0 +1,50 @@
+[
+  {
+    "argv": [
+      "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/service_workload",
+      "--backend",
+      "blink",
+      "--blink-checkpoint-wal-bytes",
+      "0"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "--blink-checkpoint-wal-bytes must be off or a positive byte count\n"
+  },
+  {
+    "argv": [
+      "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/service_workload",
+      "--backend",
+      "minimal-native",
+      "--blink-checkpoint-wal-bytes",
+      "off"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "--blink-checkpoint-wal-bytes is supported only with --backend blink\n"
+  },
+  {
+    "argv": [
+      "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/unconditional_write_workload",
+      "--backend",
+      "blink",
+      "--blink-checkpoint-wal-bytes",
+      "0"
+    ],
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "unconditional_write_workload: --blink-checkpoint-wal-bytes must be off or a positive byte count\n"
+  },
+  {
+    "argv": [
+      "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/unconditional_write_workload",
+      "--backend",
+      "minimal-native",
+      "--blink-checkpoint-wal-bytes",
+      "off"
+    ],
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "unconditional_write_workload: --data-dir is required\n"
+  }
+]

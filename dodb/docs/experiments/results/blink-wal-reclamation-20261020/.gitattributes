@@ -1,0 +1,3 @@
+oci/reports/**/rocksdb-logs/** -whitespace
+oci/helper-runs/**/environment.txt -whitespace
+oci/helper-runs/**/cargo.log -whitespace

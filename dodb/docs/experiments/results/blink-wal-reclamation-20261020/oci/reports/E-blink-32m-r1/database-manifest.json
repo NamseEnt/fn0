@@ -1,0 +1,12 @@
+[
+  {
+    "path": "blink/tenant-1-shard-1.db",
+    "size_bytes": 372842496,
+    "sha256": "75df0f25314fb008146d1ac8d9f0c284a1892ef3543b1de4aef1bec84aacd6b0"
+  },
+  {
+    "path": "blink/tenant-1-shard-1.wal",
+    "size_bytes": 1600360,
+    "sha256": "6171b4df6483a983f878464a5ae6304fa14b1420ffffcd34c17977383fddc491"
+  }
+]
