@@ -1,0 +1,5 @@
+parent_pid=1670909
+worker_pid=1671060
+parent_pgid=1670869
+worker_pgid=1670869
+worker_exited_after_parent_kill=1

@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "actual_rows": 118742,
+  "measurement_ms": 30000,
+  "plan_fingerprint": "cfae221e3d559ff09a038d548fe9a440b183cafb5409ce859ceac8498e14949a",
+  "revalidated_without_rerun": true
+}

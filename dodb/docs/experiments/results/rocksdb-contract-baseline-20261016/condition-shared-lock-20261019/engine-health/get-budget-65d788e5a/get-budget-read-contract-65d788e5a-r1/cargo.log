@@ -1,0 +1,9 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.33s
+     Running tests/read_contract.rs (/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/deps/read_contract-630430930621a210)
+
+running 2 tests
+test btree_blink_and_rocksdb_share_the_same_read_contract ... ok
+test rocksdb_query_and_scan_survive_shutdown_and_reopen ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+

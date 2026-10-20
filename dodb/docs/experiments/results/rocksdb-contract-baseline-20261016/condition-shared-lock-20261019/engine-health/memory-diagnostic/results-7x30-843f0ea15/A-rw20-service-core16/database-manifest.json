@@ -1,0 +1,70 @@
+{
+  "database_path": "/bench/zfs/db/condition-shared-lock-20261019/engine-health/memory-diagnostic-843f0ea15-7x30/db/A-rw20-service-core16",
+  "file_count": 12,
+  "files": [
+    {
+      "path": "tenant-1/000015.log",
+      "size_bytes": 13421483,
+      "sha256": "1d108e5d6444287247e1cf4e2abc149b1b6650acfdc5908da6d95327a9c78316"
+    },
+    {
+      "path": "tenant-1/000020.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tenant-1/000025.sst",
+      "size_bytes": 67743256,
+      "sha256": "ed51861fd0afa456e0c922bc52ab72a1316f252c549dfa98c10a761896eab6dd"
+    },
+    {
+      "path": "tenant-1/000027.sst",
+      "size_bytes": 2475535,
+      "sha256": "ac2fc1fc6738b20fea265b9664d9d451ff7fb7e2dce0cc79af3bdb91342b612a"
+    },
+    {
+      "path": "tenant-1/CURRENT",
+      "size_bytes": 16,
+      "sha256": "48f34d554286463a41c71dcdcbd2989dc8475936fa8f313d0e1b2531aa9c257c"
+    },
+    {
+      "path": "tenant-1/IDENTITY",
+      "size_bytes": 36,
+      "sha256": "b1c85eeaf1dc6573af8b3782752de76b8d0cf473c07b7084a75cfd471c8c8463"
+    },
+    {
+      "path": "tenant-1/LOCK",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tenant-1/LOG",
+      "size_bytes": 53002,
+      "sha256": "9a699e7759f17a83594baa725e75831b655b8c5bebc4fdc3848bca28fbf06041",
+      "preserved_log_path": "native-logs/tenant-1/LOG"
+    },
+    {
+      "path": "tenant-1/LOG.old.1792466207709748",
+      "size_bytes": 60126,
+      "sha256": "9e27c8c50c46ef4b023bb87b46343b0a02ffec392fd73d97ab39be4583d71604",
+      "preserved_log_path": "native-logs/tenant-1/LOG.old.1792466207709748"
+    },
+    {
+      "path": "tenant-1/MANIFEST-000021",
+      "size_bytes": 844,
+      "sha256": "429a4594a8cdd06214b7182d68d6fbe4fa55ce68a025d6a71e5f8c37ef00a281"
+    },
+    {
+      "path": "tenant-1/OPTIONS-000023",
+      "size_bytes": 8992,
+      "sha256": "d5c08ddaee238bb752b5e668825a2bab4fd30f4ad6e430890e83d5fe7933897b"
+    },
+    {
+      "path": "tenant-1/OPTIONS-000026",
+      "size_bytes": 8993,
+      "sha256": "da62a94c915dfafeb62e725b4138379f99d322b42c11b7a6cc67dd5f2257267e"
+    }
+  ],
+  "native_log_count": 2,
+  "database_removed_after_validation": true
+}

@@ -1,0 +1,85 @@
+{
+  "database_path": "/bench/zfs/db/condition-shared-lock-20261019/engine-health/memory-diagnostic-843f0ea15-7x30/db/E-width16-raw-rocksdb",
+  "file_count": 15,
+  "files": [
+    {
+      "path": "000038.sst",
+      "size_bytes": 68356198,
+      "sha256": "4a72aa5474d1a6349f380fcb4adb56d4f9b54f9304b384d2a58626a890cc0831"
+    },
+    {
+      "path": "000039.sst",
+      "size_bytes": 68355059,
+      "sha256": "d67c8ad96592e57e3d04e6fab70e77e9c486634d40c94566c63f5704778a74ba"
+    },
+    {
+      "path": "000041.sst",
+      "size_bytes": 60870939,
+      "sha256": "75981578f8a08868dbdba21cd972df946d896088e08bddfb17d03d77b690cee8"
+    },
+    {
+      "path": "000042.sst",
+      "size_bytes": 9649449,
+      "sha256": "6c0cfa63874b29308743fd5974e5d5664d41babcf41608a7f24e0c6878f6a52b"
+    },
+    {
+      "path": "000044.sst",
+      "size_bytes": 60790203,
+      "sha256": "90ae6f548940dfeeb15a4891158af91034a13349120278e07b5ec188b3cddb19"
+    },
+    {
+      "path": "000047.sst",
+      "size_bytes": 21270804,
+      "sha256": "e3ff46dddf44a557d172316bb4a569e03b1c30e58171c5d5a21016b2c194099f"
+    },
+    {
+      "path": "000048.log",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "CURRENT",
+      "size_bytes": 16,
+      "sha256": "d670e26d51e6a00c6cb9e013c00e32bbf8c4b7aa6a612be53f92eb9013459710"
+    },
+    {
+      "path": "IDENTITY",
+      "size_bytes": 36,
+      "sha256": "6b3d483b3edee60fc11ee16d994e1d2d560a1901d231864ff0719b5b699bf37f"
+    },
+    {
+      "path": "LOCK",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "LOG",
+      "size_bytes": 38075,
+      "sha256": "392076620d76706b5dc623b4a53a5c3156e877823efb2f1a9a08c3e98584d381",
+      "preserved_log_path": "native-logs/LOG"
+    },
+    {
+      "path": "LOG.old.1792466279451041",
+      "size_bytes": 127252,
+      "sha256": "5723292ed0c15723fec3bd507015c5dc4fd46dfb245c9e2551c1d4e5150361c8",
+      "preserved_log_path": "native-logs/LOG.old.1792466279451041"
+    },
+    {
+      "path": "MANIFEST-000049",
+      "size_bytes": 1367,
+      "sha256": "92d450cb732b8d140ecad27352b6e57b831f06a9c3ff45cfd8ba64c8158e06d8"
+    },
+    {
+      "path": "OPTIONS-000007",
+      "size_bytes": 8986,
+      "sha256": "b4f7477a13ef5549fcaf67552a4e522e12cbbc9521afd91eddabf5ab394da75c"
+    },
+    {
+      "path": "OPTIONS-000051",
+      "size_bytes": 8986,
+      "sha256": "b4f7477a13ef5549fcaf67552a4e522e12cbbc9521afd91eddabf5ab394da75c"
+    }
+  ],
+  "native_log_count": 2,
+  "database_removed_after_validation": true
+}

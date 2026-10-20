@@ -1,0 +1,706 @@
+{
+  "source_sha": "843f0ea1598a4fa87284d1e3ee421612f288b4c2",
+  "plan_fingerprint": "cfae221e3d559ff09a038d548fe9a440b183cafb5409ce859ceac8498e14949a",
+  "runner_sha256": "08b97c447b269d6560da332d9c22a85407074d00107b7e68f8f60782f6233dfa",
+  "completed_cases": 7,
+  "cases": [
+    {
+      "case_id": "A-rw20-service-blink",
+      "family": "A",
+      "backend": "blink",
+      "source_revision": "843f0ea1598a4fa87284d1e3ee421612f288b4c2",
+      "measurement_ms": 30000,
+      "full_window": true,
+      "final_passed": true,
+      "reopen_passed": true,
+      "other_errors": 0,
+      "stderr_bytes": 0,
+      "rows": 118742,
+      "key_bytes": 3325245,
+      "value_bytes": 60795904,
+      "second_scan_page_rows": 64,
+      "second_scan_vdev": "sda4",
+      "second_scan_physical_read_delta_bytes": 0,
+      "second_scan_backend_swap_kb": [
+        0,
+        0
+      ],
+      "second_scan_ram_classified": true,
+      "same_backend_identity_and_vdev": true,
+      "parent_process_peaks_kb": {
+        "rss_kb": 136444,
+        "pss_kb": 133239,
+        "anonymous_kb": 128044,
+        "file_kb": 5468,
+        "swap_kb": 0,
+        "vm_hwm_kb": 136444
+      },
+      "backend_process_sampled_peaks_kb": {
+        "rss_kb": 251940,
+        "pss_kb": 248905,
+        "anonymous_kb": 244084,
+        "file_kb": 5144,
+        "swap_kb": 0,
+        "vm_hwm_kb": 251940
+      },
+      "backend_vm_hwm_after_shutdown_kb": 251680,
+      "sampled_process_group_peak_bytes": {
+        "process_group_rss_bytes": 390045696,
+        "process_group_pss_bytes": 383648768,
+        "process_group_swap_bytes": 0
+      },
+      "sampled_process_group_peak_kib": {
+        "process_group_rss_bytes": 380904,
+        "process_group_pss_bytes": 374657,
+        "process_group_swap_bytes": 0
+      },
+      "minimum_mem_available_kib": 4466332,
+      "sampled_database_peak_bytes": 650747988,
+      "database_manifest_file_bytes": 650747988,
+      "database_manifest_file_count": 2,
+      "native_log_count": 0,
+      "database_removed_after_validation": true,
+      "engine_health_epochs": [
+        {
+          "health_status": "unsupported",
+          "health_sample_count": 0,
+          "coverage_complete": null,
+          "databases": []
+        },
+        {
+          "health_status": "disabled",
+          "health_sample_count": 0,
+          "coverage_complete": null,
+          "databases": []
+        }
+      ],
+      "host_sample_count": 60,
+      "host_samples_truncated": false,
+      "zfs_vdevs": [
+        "sda4"
+      ],
+      "zfs_arc_start_bytes": 5317929696,
+      "zfs_arc_end_bytes": 5698319664,
+      "zfs_arc_c_max_bytes": 5713788928,
+      "process_memory_samples_truncated": false,
+      "process_memory_sample_count": 60,
+      "report_sha256": "002f1eaff466e8a52d7c434927a97dd19a3033da20e32b9b421380c468568e88",
+      "database_manifest_sha256": "f2b31826be5fd617b6f7e617d998682a91a741f128c62328f54880979319060d",
+      "row_value_bytes": 64121149
+    },
+    {
+      "case_id": "A-rw20-service-core16",
+      "family": "A",
+      "backend": "rocksdb-direct",
+      "source_revision": "843f0ea1598a4fa87284d1e3ee421612f288b4c2",
+      "measurement_ms": 30000,
+      "full_window": true,
+      "final_passed": true,
+      "reopen_passed": true,
+      "other_errors": 0,
+      "stderr_bytes": 0,
+      "rows": 127485,
+      "key_bytes": 3565654,
+      "value_bytes": 65272320,
+      "second_scan_page_rows": 64,
+      "second_scan_vdev": "sda4",
+      "second_scan_physical_read_delta_bytes": 0,
+      "second_scan_backend_swap_kb": [
+        0,
+        0
+      ],
+      "second_scan_ram_classified": true,
+      "same_backend_identity_and_vdev": true,
+      "parent_process_peaks_kb": {
+        "rss_kb": 148996,
+        "pss_kb": 145806,
+        "anonymous_kb": 140280,
+        "file_kb": 5823,
+        "swap_kb": 0,
+        "vm_hwm_kb": 148996
+      },
+      "backend_process_sampled_peaks_kb": {
+        "rss_kb": 245800,
+        "pss_kb": 242604,
+        "anonymous_kb": 234908,
+        "file_kb": 7696,
+        "swap_kb": 0,
+        "vm_hwm_kb": 247988
+      },
+      "backend_vm_hwm_after_shutdown_kb": 247988,
+      "sampled_process_group_peak_bytes": {
+        "process_group_rss_bytes": 350474240,
+        "process_group_pss_bytes": 343956480,
+        "process_group_swap_bytes": 0
+      },
+      "sampled_process_group_peak_kib": {
+        "process_group_rss_bytes": 342260,
+        "process_group_pss_bytes": 335895,
+        "process_group_swap_bytes": 0
+      },
+      "minimum_mem_available_kib": 5269568,
+      "sampled_database_peak_bytes": 148038314,
+      "database_manifest_file_bytes": 83772283,
+      "database_manifest_file_count": 12,
+      "native_log_count": 2,
+      "database_removed_after_validation": true,
+      "engine_health_epochs": [
+        {
+          "health_status": "sampled",
+          "health_sample_count": 29,
+          "coverage_complete": true,
+          "databases": [
+            {
+              "database": "tenant_1",
+              "snapshot_status": "open",
+              "block_cache_capacity_bytes": 33554432,
+              "block_cache_usage_peak_bytes": 33554336,
+              "block_cache_usage_shutdown_bytes": 33551920,
+              "estimate_live_data_size_bytes": 42574055,
+              "live_sst_files_size_bytes": 131091713,
+              "cur_size_all_mem_tables_bytes": 14682224
+            }
+          ]
+        },
+        {
+          "health_status": "disabled",
+          "health_sample_count": 0,
+          "coverage_complete": null,
+          "databases": [
+            {
+              "database": "tenant_1",
+              "snapshot_status": "open",
+              "block_cache_capacity_bytes": 33554432,
+              "block_cache_usage_peak_bytes": 33532848,
+              "block_cache_usage_shutdown_bytes": 33532848,
+              "estimate_live_data_size_bytes": 70218791,
+              "live_sst_files_size_bytes": 70218791,
+              "cur_size_all_mem_tables_bytes": 2048
+            }
+          ]
+        }
+      ],
+      "host_sample_count": 57,
+      "host_samples_truncated": false,
+      "zfs_vdevs": [
+        "sda4"
+      ],
+      "zfs_arc_start_bytes": 5002057712,
+      "zfs_arc_end_bytes": 5072802616,
+      "zfs_arc_c_max_bytes": 5713788928,
+      "process_memory_samples_truncated": false,
+      "process_memory_sample_count": 57,
+      "report_sha256": "096a53f4747c86863175a9c021c9a126c54fb7f021f2c4bd090a90c5d96ca851",
+      "database_manifest_sha256": "90fedf3a394abe6ccc161dce4b260a0fef748aaa1a302d7a20a1d7c4f4ef5f67",
+      "row_value_bytes": 68837974
+    },
+    {
+      "case_id": "A-rw20-service-rocksdb16",
+      "family": "A",
+      "backend": "rocksdb",
+      "source_revision": "843f0ea1598a4fa87284d1e3ee421612f288b4c2",
+      "measurement_ms": 30000,
+      "full_window": true,
+      "final_passed": true,
+      "reopen_passed": true,
+      "other_errors": 0,
+      "stderr_bytes": 0,
+      "rows": 126458,
+      "key_bytes": 3537451,
+      "value_bytes": 64746496,
+      "second_scan_page_rows": 64,
+      "second_scan_vdev": "sda4",
+      "second_scan_physical_read_delta_bytes": 0,
+      "second_scan_backend_swap_kb": [
+        0,
+        0
+      ],
+      "second_scan_ram_classified": true,
+      "same_backend_identity_and_vdev": true,
+      "parent_process_peaks_kb": {
+        "rss_kb": 147220,
+        "pss_kb": 144046,
+        "anonymous_kb": 138828,
+        "file_kb": 5506,
+        "swap_kb": 0,
+        "vm_hwm_kb": 147220
+      },
+      "backend_process_sampled_peaks_kb": {
+        "rss_kb": 247424,
+        "pss_kb": 244207,
+        "anonymous_kb": 236632,
+        "file_kb": 7689,
+        "swap_kb": 0,
+        "vm_hwm_kb": 251276
+      },
+      "backend_vm_hwm_after_shutdown_kb": 251276,
+      "sampled_process_group_peak_bytes": {
+        "process_group_rss_bytes": 346451968,
+        "process_group_pss_bytes": 339905536,
+        "process_group_swap_bytes": 0
+      },
+      "sampled_process_group_peak_kib": {
+        "process_group_rss_bytes": 338332,
+        "process_group_pss_bytes": 331939,
+        "process_group_swap_bytes": 0
+      },
+      "minimum_mem_available_kib": 5303092,
+      "sampled_database_peak_bytes": 140683933,
+      "database_manifest_file_bytes": 76867105,
+      "database_manifest_file_count": 12,
+      "native_log_count": 2,
+      "database_removed_after_validation": true,
+      "engine_health_epochs": [
+        {
+          "health_status": "sampled",
+          "health_sample_count": 29,
+          "coverage_complete": true,
+          "databases": [
+            {
+              "database": "tenant_1",
+              "snapshot_status": "open",
+              "block_cache_capacity_bytes": 33554432,
+              "block_cache_usage_peak_bytes": 33553872,
+              "block_cache_usage_shutdown_bytes": 33550928,
+              "estimate_live_data_size_bytes": 42488668,
+              "live_sst_files_size_bytes": 129548203,
+              "cur_size_all_mem_tables_bytes": 8390720
+            }
+          ]
+        },
+        {
+          "health_status": "disabled",
+          "health_sample_count": 0,
+          "coverage_complete": null,
+          "databases": [
+            {
+              "database": "tenant_1",
+              "snapshot_status": "open",
+              "block_cache_capacity_bytes": 33554432,
+              "block_cache_usage_peak_bytes": 33554320,
+              "block_cache_usage_shutdown_bytes": 33554320,
+              "estimate_live_data_size_bytes": 69658675,
+              "live_sst_files_size_bytes": 69658675,
+              "cur_size_all_mem_tables_bytes": 2048
+            }
+          ]
+        }
+      ],
+      "host_sample_count": 57,
+      "host_samples_truncated": false,
+      "zfs_vdevs": [
+        "sda4"
+      ],
+      "zfs_arc_start_bytes": 4990328384,
+      "zfs_arc_end_bytes": 5000278816,
+      "zfs_arc_c_max_bytes": 5713788928,
+      "process_memory_samples_truncated": false,
+      "process_memory_sample_count": 57,
+      "report_sha256": "c503c3c40bc5be6178b70bd8729c675b43e17a179881ab6d1dae6abb3c755d1a",
+      "database_manifest_sha256": "53c15a6875a26ac6b036627fdcfd8ca1b759523ea1191083bb190905c0d838a4",
+      "row_value_bytes": 68283947
+    },
+    {
+      "case_id": "E-width16-blink",
+      "family": "E",
+      "backend": "Blink",
+      "source_revision": "843f0ea1598a4fa87284d1e3ee421612f288b4c2",
+      "measurement_ms": 30000,
+      "full_window": true,
+      "final_passed": true,
+      "reopen_passed": true,
+      "other_errors": 0,
+      "stderr_bytes": 0,
+      "rows": 262144,
+      "key_bytes": 16012288,
+      "value_bytes": 134217728,
+      "second_scan_page_rows": 64,
+      "second_scan_vdev": "sda4",
+      "second_scan_physical_read_delta_bytes": 0,
+      "second_scan_backend_swap_kb": [
+        0,
+        0
+      ],
+      "second_scan_ram_classified": true,
+      "same_backend_identity_and_vdev": true,
+      "parent_process_peaks_kb": {
+        "rss_kb": 636396,
+        "pss_kb": 633262,
+        "anonymous_kb": 627908,
+        "file_kb": 5643,
+        "swap_kb": 0,
+        "vm_hwm_kb": 636396
+      },
+      "backend_process_sampled_peaks_kb": {
+        "rss_kb": 938312,
+        "pss_kb": 935319,
+        "anonymous_kb": 927968,
+        "file_kb": 7378,
+        "swap_kb": 0,
+        "vm_hwm_kb": 938312
+      },
+      "backend_vm_hwm_after_shutdown_kb": 938048,
+      "sampled_process_group_peak_bytes": {
+        "process_group_rss_bytes": 1610776576,
+        "process_group_pss_bytes": 1604466688,
+        "process_group_swap_bytes": 0
+      },
+      "sampled_process_group_peak_kib": {
+        "process_group_rss_bytes": 1573024,
+        "process_group_pss_bytes": 1566862,
+        "process_group_swap_bytes": 0
+      },
+      "minimum_mem_available_kib": 3408188,
+      "sampled_database_peak_bytes": 1522006735,
+      "database_manifest_file_bytes": 1522006735,
+      "database_manifest_file_count": 2,
+      "native_log_count": 0,
+      "database_removed_after_validation": true,
+      "engine_health_epochs": [
+        {
+          "health_status": "unsupported",
+          "health_sample_count": 0,
+          "coverage_complete": null,
+          "databases": []
+        },
+        {
+          "health_status": "disabled",
+          "health_sample_count": 0,
+          "coverage_complete": null,
+          "databases": []
+        }
+      ],
+      "host_sample_count": 82,
+      "host_samples_truncated": false,
+      "zfs_vdevs": [
+        "sda4"
+      ],
+      "zfs_arc_start_bytes": 4852947888,
+      "zfs_arc_end_bytes": 5563581768,
+      "zfs_arc_c_max_bytes": 5713788928,
+      "process_memory_samples_truncated": false,
+      "process_memory_sample_count": 82,
+      "report_sha256": "081f4d0b4b210d8afdecd2f79b9a3b48d0ff8c4ad9290d5e613c05b8e6545179",
+      "database_manifest_sha256": "0e6d9bb8b36c3244d35b489e3936b38386d38348b0c33ab15b719debf9c0d33d",
+      "row_value_bytes": 150230016
+    },
+    {
+      "case_id": "E-width16-raw-rocksdb",
+      "family": "E",
+      "backend": "RawRocksDb",
+      "source_revision": "843f0ea1598a4fa87284d1e3ee421612f288b4c2",
+      "measurement_ms": 30000,
+      "full_window": true,
+      "final_passed": true,
+      "reopen_passed": true,
+      "other_errors": 0,
+      "stderr_bytes": 0,
+      "rows": 262144,
+      "key_bytes": 16012288,
+      "value_bytes": 134217728,
+      "second_scan_page_rows": 64,
+      "second_scan_vdev": "sda4",
+      "second_scan_physical_read_delta_bytes": 0,
+      "second_scan_backend_swap_kb": [
+        0,
+        0
+      ],
+      "second_scan_ram_classified": true,
+      "same_backend_identity_and_vdev": true,
+      "parent_process_peaks_kb": {
+        "rss_kb": 633104,
+        "pss_kb": 629918,
+        "anonymous_kb": 624880,
+        "file_kb": 5314,
+        "swap_kb": 0,
+        "vm_hwm_kb": 633104
+      },
+      "backend_process_sampled_peaks_kb": {
+        "rss_kb": 220832,
+        "pss_kb": 217633,
+        "anonymous_kb": 209940,
+        "file_kb": 7693,
+        "swap_kb": 0,
+        "vm_hwm_kb": 220832
+      },
+      "backend_vm_hwm_after_shutdown_kb": 220564,
+      "sampled_process_group_peak_bytes": {
+        "process_group_rss_bytes": 857522176,
+        "process_group_pss_bytes": 841355264,
+        "process_group_swap_bytes": 0
+      },
+      "sampled_process_group_peak_kib": {
+        "process_group_rss_bytes": 837424,
+        "process_group_pss_bytes": 821636,
+        "process_group_swap_bytes": 0
+      },
+      "minimum_mem_available_kib": 4654272,
+      "sampled_database_peak_bytes": 457232480,
+      "database_manifest_file_bytes": 289477370,
+      "database_manifest_file_count": 15,
+      "native_log_count": 2,
+      "database_removed_after_validation": true,
+      "engine_health_epochs": [
+        {
+          "health_status": "sampled",
+          "health_sample_count": 30,
+          "coverage_complete": true,
+          "databases": [
+            {
+              "database": "raw_database",
+              "snapshot_status": "open",
+              "block_cache_capacity_bytes": 33554432,
+              "block_cache_usage_peak_bytes": 33547424,
+              "block_cache_usage_shutdown_bytes": 33547424,
+              "estimate_live_data_size_bytes": 146360706,
+              "live_sst_files_size_bytes": 268021848,
+              "cur_size_all_mem_tables_bytes": 24119480
+            }
+          ]
+        },
+        {
+          "health_status": "disabled",
+          "health_sample_count": 0,
+          "coverage_complete": null,
+          "databases": [
+            {
+              "database": "raw_database",
+              "snapshot_status": "open",
+              "block_cache_capacity_bytes": 33554432,
+              "block_cache_usage_peak_bytes": 33547392,
+              "block_cache_usage_shutdown_bytes": 33547392,
+              "estimate_live_data_size_bytes": 146360706,
+              "live_sst_files_size_bytes": 289292652,
+              "cur_size_all_mem_tables_bytes": 2048
+            }
+          ]
+        }
+      ],
+      "host_sample_count": 73,
+      "host_samples_truncated": false,
+      "zfs_vdevs": [
+        "sda4"
+      ],
+      "zfs_arc_start_bytes": 5008865936,
+      "zfs_arc_end_bytes": 5145960160,
+      "zfs_arc_c_max_bytes": 5713788928,
+      "process_memory_samples_truncated": false,
+      "process_memory_sample_count": 73,
+      "report_sha256": "9b4c1547d0bd120a53ad68485aaaa14e9da1ba5d6d8e80b6ecb6d4adbc952f13",
+      "database_manifest_sha256": "dcef2174232ea83112c4f58bbc73c7c79fd95290863a1098e9cb1d4d93a6623b",
+      "row_value_bytes": 150230016
+    },
+    {
+      "case_id": "E-width16-rocksdb-service",
+      "family": "E",
+      "backend": "RocksDbService",
+      "source_revision": "843f0ea1598a4fa87284d1e3ee421612f288b4c2",
+      "measurement_ms": 30000,
+      "full_window": true,
+      "final_passed": true,
+      "reopen_passed": true,
+      "other_errors": 0,
+      "stderr_bytes": 0,
+      "rows": 262144,
+      "key_bytes": 16012288,
+      "value_bytes": 134217728,
+      "second_scan_page_rows": 64,
+      "second_scan_vdev": "sda4",
+      "second_scan_physical_read_delta_bytes": 0,
+      "second_scan_backend_swap_kb": [
+        0,
+        0
+      ],
+      "second_scan_ram_classified": true,
+      "same_backend_identity_and_vdev": true,
+      "parent_process_peaks_kb": {
+        "rss_kb": 635180,
+        "pss_kb": 631990,
+        "anonymous_kb": 626648,
+        "file_kb": 5643,
+        "swap_kb": 0,
+        "vm_hwm_kb": 635180
+      },
+      "backend_process_sampled_peaks_kb": {
+        "rss_kb": 402928,
+        "pss_kb": 399694,
+        "anonymous_kb": 392012,
+        "file_kb": 7710,
+        "swap_kb": 0,
+        "vm_hwm_kb": 404676
+      },
+      "backend_vm_hwm_after_shutdown_kb": 404676,
+      "sampled_process_group_peak_bytes": {
+        "process_group_rss_bytes": 755150848,
+        "process_group_pss_bytes": 748686336,
+        "process_group_swap_bytes": 0
+      },
+      "sampled_process_group_peak_kib": {
+        "process_group_rss_bytes": 737452,
+        "process_group_pss_bytes": 731139,
+        "process_group_swap_bytes": 0
+      },
+      "minimum_mem_available_kib": 4513468,
+      "sampled_database_peak_bytes": 480865394,
+      "database_manifest_file_bytes": 313651180,
+      "database_manifest_file_count": 16,
+      "native_log_count": 2,
+      "database_removed_after_validation": true,
+      "engine_health_epochs": [
+        {
+          "health_status": "sampled",
+          "health_sample_count": 30,
+          "coverage_complete": true,
+          "databases": [
+            {
+              "database": "tenant_1",
+              "snapshot_status": "open",
+              "block_cache_capacity_bytes": 33554432,
+              "block_cache_usage_peak_bytes": 33554400,
+              "block_cache_usage_shutdown_bytes": 33549504,
+              "estimate_live_data_size_bytes": 146360727,
+              "live_sst_files_size_bytes": 268119951,
+              "cur_size_all_mem_tables_bytes": 25168064
+            }
+          ]
+        },
+        {
+          "health_status": "disabled",
+          "health_sample_count": 0,
+          "coverage_complete": null,
+          "databases": [
+            {
+              "database": "tenant_1",
+              "snapshot_status": "open",
+              "block_cache_capacity_bytes": 33554432,
+              "block_cache_usage_peak_bytes": 33550624,
+              "block_cache_usage_shutdown_bytes": 33550624,
+              "estimate_live_data_size_bytes": 146360727,
+              "live_sst_files_size_bytes": 290203710,
+              "cur_size_all_mem_tables_bytes": 2048
+            }
+          ]
+        }
+      ],
+      "host_sample_count": 71,
+      "host_samples_truncated": false,
+      "zfs_vdevs": [
+        "sda4"
+      ],
+      "zfs_arc_start_bytes": 4849355464,
+      "zfs_arc_end_bytes": 5170814848,
+      "zfs_arc_c_max_bytes": 5713788928,
+      "process_memory_samples_truncated": false,
+      "process_memory_sample_count": 71,
+      "report_sha256": "391273f7d3c6d87fef4c98210df9ace460310107af0008be0098f8944d0ddc02",
+      "database_manifest_sha256": "b58ac55a4bbd45bd8dba1d9e3304f97d15f23af7f16c55c891f9dbdb10e4b3ac",
+      "row_value_bytes": 150230016
+    },
+    {
+      "case_id": "E-width16-synchronous-core",
+      "family": "E",
+      "backend": "SynchronousCore",
+      "source_revision": "843f0ea1598a4fa87284d1e3ee421612f288b4c2",
+      "measurement_ms": 30000,
+      "full_window": true,
+      "final_passed": true,
+      "reopen_passed": true,
+      "other_errors": 0,
+      "stderr_bytes": 0,
+      "rows": 262144,
+      "key_bytes": 16012288,
+      "value_bytes": 134217728,
+      "second_scan_page_rows": 64,
+      "second_scan_vdev": "sda4",
+      "second_scan_physical_read_delta_bytes": 0,
+      "second_scan_backend_swap_kb": [
+        0,
+        0
+      ],
+      "second_scan_ram_classified": true,
+      "same_backend_identity_and_vdev": true,
+      "parent_process_peaks_kb": {
+        "rss_kb": 636160,
+        "pss_kb": 632932,
+        "anonymous_kb": 627620,
+        "file_kb": 5623,
+        "swap_kb": 0,
+        "vm_hwm_kb": 636160
+      },
+      "backend_process_sampled_peaks_kb": {
+        "rss_kb": 410440,
+        "pss_kb": 407239,
+        "anonymous_kb": 399520,
+        "file_kb": 7719,
+        "swap_kb": 0,
+        "vm_hwm_kb": 410440
+      },
+      "backend_vm_hwm_after_shutdown_kb": 410300,
+      "sampled_process_group_peak_bytes": {
+        "process_group_rss_bytes": 842100736,
+        "process_group_pss_bytes": 835575808,
+        "process_group_swap_bytes": 0
+      },
+      "sampled_process_group_peak_kib": {
+        "process_group_rss_bytes": 822364,
+        "process_group_pss_bytes": 815992,
+        "process_group_swap_bytes": 0
+      },
+      "minimum_mem_available_kib": 4430904,
+      "sampled_database_peak_bytes": 549664417,
+      "database_manifest_file_bytes": 371418703,
+      "database_manifest_file_count": 16,
+      "native_log_count": 2,
+      "database_removed_after_validation": true,
+      "engine_health_epochs": [
+        {
+          "health_status": "sampled",
+          "health_sample_count": 30,
+          "coverage_complete": true,
+          "databases": [
+            {
+              "database": "tenant_1",
+              "snapshot_status": "open",
+              "block_cache_capacity_bytes": 33554432,
+              "block_cache_usage_peak_bytes": 33554384,
+              "block_cache_usage_shutdown_bytes": 33553488,
+              "estimate_live_data_size_bytes": 146360727,
+              "live_sst_files_size_bytes": 267986085,
+              "cur_size_all_mem_tables_bytes": 56625584
+            }
+          ]
+        },
+        {
+          "health_status": "disabled",
+          "health_sample_count": 0,
+          "coverage_complete": null,
+          "databases": [
+            {
+              "database": "tenant_1",
+              "snapshot_status": "open",
+              "block_cache_capacity_bytes": 33554432,
+              "block_cache_usage_peak_bytes": 33550960,
+              "block_cache_usage_shutdown_bytes": 33550960,
+              "estimate_live_data_size_bytes": 146360727,
+              "live_sst_files_size_bytes": 318262024,
+              "cur_size_all_mem_tables_bytes": 2048
+            }
+          ]
+        }
+      ],
+      "host_sample_count": 72,
+      "host_samples_truncated": false,
+      "zfs_vdevs": [
+        "sda4"
+      ],
+      "zfs_arc_start_bytes": 5089958384,
+      "zfs_arc_end_bytes": 5231450712,
+      "zfs_arc_c_max_bytes": 5713788928,
+      "process_memory_samples_truncated": false,
+      "process_memory_sample_count": 72,
+      "report_sha256": "a606f38185336f9c72da4498a4cfaddb27de2427d1a556d47c35602183ea76dc",
+      "database_manifest_sha256": "0ea82e0711ade4e3dc6a4cb21ac3067be6020bbe913d047e8bad7f4644f19055",
+      "row_value_bytes": 150230016
+    }
+  ]
+}

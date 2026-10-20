@@ -1,0 +1,117 @@
+{
+  "source_sha": "843f0ea1598a4fa87284d1e3ee421612f288b4c2",
+  "plan_fingerprint": "cfae221e3d559ff09a038d548fe9a440b183cafb5409ce859ceac8498e14949a",
+  "preflight": {
+    "timestamp_unix_ns": 1792466151015990920,
+    "hostname": "instance-20260923-1013",
+    "architecture": "aarch64",
+    "online_cpu_count": 2,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemFree": 2821083136,
+      "MemAvailable": 5835698176,
+      "Buffers": 8192,
+      "Cached": 2276376576,
+      "SwapCached": 27459584,
+      "Active": 2173173760,
+      "Inactive": 210894848,
+      "Active(anon)": 92381184,
+      "Inactive(anon)": 34328576,
+      "Active(file)": 2080792576,
+      "Inactive(file)": 176566272,
+      "Unevictable": 16551936,
+      "Mlocked": 12455936,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3878113280,
+      "Zswap": 0,
+      "Zswapped": 0,
+      "Dirty": 0,
+      "Writeback": 0,
+      "AnonPages": 118120448,
+      "Mapped": 94605312,
+      "Shmem": 8478720,
+      "KReclaimable": 978178048,
+      "Slab": 1793683456,
+      "SReclaimable": 978178048,
+      "SUnreclaim": 815505408,
+      "KernelStack": 5767168,
+      "PageTables": 7786496,
+      "SecPageTables": 0,
+      "NFS_Unstable": 0,
+      "Bounce": 0,
+      "WritebackTmp": 0,
+      "CommitLimit": 10008752128,
+      "Committed_AS": 3088171008,
+      "VmallocTotal": 138535235485696,
+      "VmallocUsed": 147734528,
+      "VmallocChunk": 0,
+      "Percpu": 1007616,
+      "HardwareCorrupted": 0,
+      "AnonHugePages": 33554432,
+      "ShmemHugePages": 0,
+      "ShmemPmdMapped": 0,
+      "FileHugePages": 37748736,
+      "FilePmdMapped": 23068672,
+      "CmaTotal": 0,
+      "CmaFree": 0,
+      "HugePages_Total": 0,
+      "HugePages_Free": 0,
+      "HugePages_Rsvd": 0,
+      "HugePages_Surp": 0,
+      "Hugepagesize": 2097152,
+      "Hugetlb": 0
+    },
+    "filesystem_path": "/bench/zfs/db",
+    "filesystem_free_bytes": 51481825280,
+    "active_build_or_workload_processes": []
+  },
+  "jobs": {
+    "A-rw20-service-blink": {
+      "exit_status": 0,
+      "watchdog_failure": null,
+      "live_sample_count": 60,
+      "status": "complete",
+      "resumed_existing_evidence": true
+    },
+    "A-rw20-service-rocksdb16": {
+      "exit_status": 0,
+      "watchdog_failure": null,
+      "live_sample_count": 57,
+      "status": "complete",
+      "revalidated_without_rerun": true
+    },
+    "A-rw20-service-core16": {
+      "exit_status": 0,
+      "watchdog_failure": null,
+      "live_sample_count": 57,
+      "status": "complete"
+    },
+    "E-width16-raw-rocksdb": {
+      "exit_status": 0,
+      "watchdog_failure": null,
+      "live_sample_count": 72,
+      "status": "complete"
+    },
+    "E-width16-synchronous-core": {
+      "exit_status": 0,
+      "watchdog_failure": null,
+      "live_sample_count": 72,
+      "status": "complete"
+    },
+    "E-width16-rocksdb-service": {
+      "exit_status": 0,
+      "watchdog_failure": null,
+      "live_sample_count": 70,
+      "status": "complete"
+    },
+    "E-width16-blink": {
+      "exit_status": 0,
+      "watchdog_failure": null,
+      "live_sample_count": 82,
+      "status": "complete"
+    }
+  },
+  "started_unix_ns": 1792466151018531061,
+  "finished_unix_ns": 1792466544458958776,
+  "status": "complete"
+}

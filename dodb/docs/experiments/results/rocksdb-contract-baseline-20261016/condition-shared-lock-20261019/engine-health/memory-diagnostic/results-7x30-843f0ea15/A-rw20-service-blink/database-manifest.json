@@ -1,0 +1,18 @@
+{
+  "database_path": "/bench/zfs/db/condition-shared-lock-20261019/engine-health/memory-diagnostic-843f0ea15-7x30/db/A-rw20-service-blink",
+  "file_count": 2,
+  "files": [
+    {
+      "path": "blink/tenant-1-shard-1.db",
+      "size_bytes": 142983168,
+      "sha256": "aa08121676c9dd7d4e6cf7531d2ee5d1d5907ca7c8fdb797e8bf72db1bf07f25"
+    },
+    {
+      "path": "blink/tenant-1-shard-1.wal",
+      "size_bytes": 507764820,
+      "sha256": "72db2a4938449e82f4f6291212199d64f53ab3ddf24af718437dfaf426ec793f"
+    }
+  ],
+  "native_log_count": 0,
+  "database_removed_after_validation": true
+}
