@@ -438,7 +438,7 @@ async fn check_read_contract<S: DodbService>(service: &S) {
             },
             ExecutionBudget::new(exact_get_budget),
         )
-        .await,
+        .await
         .unwrap(),
         exact_get_response.clone()
     );

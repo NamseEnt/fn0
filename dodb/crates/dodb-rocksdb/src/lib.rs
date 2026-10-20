@@ -2292,6 +2292,16 @@ fn decode_present_record(
     encoded_pointer: *const u8,
     encoded_length: usize,
 ) -> Result<Option<(Revision, usize)>, Error> {
+    if encoded_length < 10 {
+        return Err(Error::corruption(
+            "unsupported RocksDB logical value format",
+        ));
+    }
+    if encoded_pointer.is_null() {
+        return Err(Error::corruption(
+            "RocksDB logical value has a null data pointer",
+        ));
+    }
     let encoded = unsafe { std::slice::from_raw_parts(encoded_pointer, encoded_length) };
     let (revision, value_length) = decode_value_header(encoded)?;
     Ok(value_length.map(|value_length| (revision, value_length)))
@@ -2507,8 +2517,10 @@ fn enforce_get_present_response_budget(
     revision: Revision,
     budget: ExecutionBudget,
 ) -> Result<(), Error> {
-    let mut limits = ProtocolLimits::default();
-    limits.max_response_frame_size = budget.max_response_bytes;
+    let limits = ProtocolLimits {
+        max_response_frame_size: budget.max_response_bytes,
+        ..ProtocolLimits::default()
+    };
     if value_length > limits.max_value_size {
         return Err(Error::response_too_large(format!(
             "Get value exceeds protocol maximum of {} bytes",
@@ -2731,6 +2743,32 @@ mod tests {
                 None,
                 ExecutionBudget::new(1024),
             ),
+            Err(Error::Corruption(_))
+        ));
+    }
+
+    #[test]
+    fn scan_rejects_empty_encoded_iterator_value_before_slice_creation() {
+        let directory = temporary_db_directory();
+        let database = TenantDatabase::open(directory.path()).unwrap();
+        let document_key = DocumentKey::new(b"malformed-iterator".to_vec(), b"empty".to_vec());
+        let transaction =
+            unsafe { dodb_rocksdb_begin(database.handle.0.as_ptr(), &mut std::ptr::null_mut()) };
+        let transaction = NonNull::new(transaction).unwrap();
+        let mut guard = TransactionGuard {
+            handle: transaction,
+            _database: Arc::clone(&database.handle),
+            active: true,
+        };
+        transaction_put(&guard, &user_key(&document_key), &[]).unwrap();
+        let mut commit_error = std::ptr::null_mut();
+        assert_eq!(
+            unsafe { dodb_rocksdb_transaction_commit(guard.handle.as_ptr(), &mut commit_error) },
+            0
+        );
+        guard.finish();
+        assert!(matches!(
+            database.scan(None, 1, ExecutionBudget::new(1024)),
             Err(Error::Corruption(_))
         ));
     }
