@@ -830,12 +830,12 @@ fn run() -> Result<(), String> {
         .map_err(|error| error.to_string())?;
     let memory_session = if options.memory_diagnostic {
         let _ = quinn::rustls::crypto::aws_lc_rs::default_provider().install_default();
-        Some(Arc::new(
+        Some(
             dodb_rocksdb::memory_diagnostic::MemoryDiagnosticSession::new(
                 options.source_revision.clone().unwrap_or_default(),
             )
             .map_err(|error| error.to_string())?,
-        ))
+        )
     } else {
         None
     };
@@ -1786,6 +1786,8 @@ impl Options {
             shared_blocking_slots: self.shared_blocking_slots,
             data_dir: self.data_dir.clone(),
             report_path: self.report_path.clone(),
+            memory_diagnostic: self.memory_diagnostic,
+            source_revision: self.source_revision.clone(),
         }
     }
 }
