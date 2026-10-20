@@ -186,6 +186,7 @@ impl DriverService {
                     &worker_arguments,
                     RESPONSE_BUDGET,
                     dodb_protocol::ProtocolLimits::default().max_mutations,
+                    options.clients,
                     &data_dir,
                 )
                 .await

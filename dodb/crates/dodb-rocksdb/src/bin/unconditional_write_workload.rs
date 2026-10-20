@@ -348,6 +348,7 @@ impl ProbeBackend {
                 &worker_arguments,
                 RESPONSE_BUDGET_BYTES,
                 dodb_protocol::ProtocolLimits::default().max_mutations,
+                options.clients,
                 &options.data_dir,
             ))?;
             let service = dodb_rocksdb::memory_diagnostic::RemoteDodbService::new(

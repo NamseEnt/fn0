@@ -37,6 +37,7 @@ struct Arguments {
     parent_binary_sha256: String,
     response_budget: usize,
     max_mutations: usize,
+    max_concurrent_requests: usize,
     revision_allocator: RevisionAllocatorMode,
     condition_key_lock_mode: ConditionKeyLockMode,
     blocking_slots: usize,
@@ -216,9 +217,9 @@ async fn main() -> WorkerResult<()> {
                 listen_addr: SocketAddr::from(([127, 0, 0, 1], 0)),
                 tls,
                 protocol_limits,
-                max_connections: 4,
-                max_concurrent_streams: 1_024,
-                max_concurrent_requests: 1_024,
+                max_connections: 1,
+                max_concurrent_streams: arguments.max_concurrent_requests,
+                max_concurrent_requests: arguments.max_concurrent_requests,
             },
         )
         .map_err(|error| Box::new(error) as WorkerError)?,
@@ -233,6 +234,7 @@ async fn main() -> WorkerResult<()> {
         listen_address,
         arguments.source_revision.clone(),
         arguments.worker_binary_sha256.clone(),
+        arguments.max_concurrent_requests,
     )?;
     println!(
         "{}",
@@ -241,6 +243,7 @@ async fn main() -> WorkerResult<()> {
             "listen_address": readiness.listen_address,
             "pid": readiness.pid,
             "process_group_id": readiness.process_group_id,
+            "max_concurrent_requests": readiness.max_concurrent_requests,
             "started_unix_ms": readiness.started_unix_ms,
             "process_start_time_ticks": readiness.process_start_time_ticks,
             "source_revision": readiness.source_revision,
@@ -318,6 +321,7 @@ async fn main() -> WorkerResult<()> {
             "backend": arguments.backend,
             "response_budget_bytes": arguments.response_budget,
             "max_mutations": arguments.max_mutations,
+            "max_concurrent_requests": arguments.max_concurrent_requests,
             "engine_health_interval_ms": arguments.engine_health_interval_ms,
             "engine_health": health_report,
             "shutdown_complete": true,
@@ -338,6 +342,11 @@ fn parse_arguments() -> WorkerResult<Arguments> {
     let parent_binary_sha256 = argument_value(&values, "--memory-parent-binary-sha256")?;
     let response_budget = argument_value(&values, "--memory-response-budget")?.parse()?;
     let max_mutations = argument_value(&values, "--memory-max-mutations")?.parse()?;
+    let max_concurrent_requests =
+        argument_value(&values, "--memory-max-concurrent-requests")?.parse()?;
+    if max_concurrent_requests == 0 {
+        return Err("maximum concurrent requests must be nonzero".into());
+    }
     let blocking_slots = option_value(&values, "--shared-blocking-slots")
         .unwrap_or_else(|| "8".to_owned())
         .parse()?;
@@ -399,6 +408,7 @@ fn parse_arguments() -> WorkerResult<Arguments> {
         parent_binary_sha256,
         response_budget,
         max_mutations,
+        max_concurrent_requests,
         revision_allocator,
         condition_key_lock_mode,
         blocking_slots,

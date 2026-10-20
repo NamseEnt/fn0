@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::SocketAddr;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -22,6 +22,7 @@ use tempfile::TempDir;
 
 const PROCESS_SAMPLE_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_MEMORY_DIAGNOSTIC_SAMPLES: usize = 4_096;
+const BINARY_HASH_BUFFER_SIZE: usize = 64 * 1024;
 const WORKER_START_TIMEOUT: Duration = Duration::from_secs(20);
 const WORKER_STOP_TIMEOUT: Duration = Duration::from_secs(20);
 
@@ -157,6 +158,7 @@ impl MemoryDiagnosticSession {
         worker_arguments: &[String],
         response_budget_bytes: usize,
         maximum_mutations: usize,
+        maximum_concurrent_requests: usize,
         data_dir: &Path,
     ) -> Result<MemoryDiagnosticWorker, String> {
         let worker_binary_sha256 = sha256_file(worker_executable)?;
@@ -188,6 +190,8 @@ impl MemoryDiagnosticSession {
             .arg(response_budget_bytes.to_string())
             .arg("--memory-max-mutations")
             .arg(maximum_mutations.to_string())
+            .arg("--memory-max-concurrent-requests")
+            .arg(maximum_concurrent_requests.to_string())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
@@ -240,6 +244,7 @@ impl MemoryDiagnosticSession {
         };
         if !readiness.ready
             || readiness.pid != child.id()
+            || readiness.max_concurrent_requests != maximum_concurrent_requests
             || readiness.source_revision != self.source_revision
             || readiness.worker_binary_sha256 != worker_binary_sha256
         {
@@ -378,6 +383,7 @@ impl MemoryDiagnosticSession {
             "harness_binary": self.parent_binary,
             "harness_binary_sha256": self.parent_binary_sha256,
             "backend_process_definition": "backend, service adapter, runtime, and loopback transport in the worker process; not a pure native allocator RSS measurement",
+            "binary_hash_stream_buffer_bytes": BINARY_HASH_BUFFER_SIZE,
             "process_memory_sampling_interval_ms": PROCESS_SAMPLE_INTERVAL.as_millis(),
             "process_memory_sample_count": process_samples.len(),
             "process_memory_sample_limit": MAX_MEMORY_DIAGNOSTIC_SAMPLES,
@@ -509,6 +515,7 @@ impl MemoryDiagnosticWorker {
             "event": event_name,
             "role": "backend-process",
             "pid": self.readiness.pid,
+            "max_concurrent_requests": self.readiness.max_concurrent_requests,
             "started_unix_ms": self.readiness.started_unix_ms,
             "source_revision": self.readiness.source_revision,
             "harness_binary_sha256": self.session.parent_binary_sha256,
@@ -534,6 +541,7 @@ pub struct WorkerReadiness {
     pub listen_address: String,
     pub pid: u32,
     pub process_group_id: i32,
+    pub max_concurrent_requests: usize,
     pub started_unix_ms: u64,
     pub process_start_time_ticks: u64,
     pub source_revision: String,
@@ -779,6 +787,7 @@ pub fn worker_readiness(
     listen_address: SocketAddr,
     source_revision: String,
     expected_worker_binary_sha256: String,
+    max_concurrent_requests: usize,
 ) -> Result<WorkerReadiness, String> {
     let pid = std::process::id();
     let worker_binary_sha256 = sha256_file(Path::new("/proc/self/exe"))?;
@@ -796,6 +805,7 @@ pub fn worker_readiness(
         listen_address: listen_address.to_string(),
         pid,
         process_group_id,
+        max_concurrent_requests,
         started_unix_ms: unix_time_ms(),
         process_start_time_ticks: start_ticks,
         source_revision,
@@ -804,8 +814,17 @@ pub fn worker_readiness(
 }
 
 pub fn sha256_file(path: &Path) -> Result<String, String> {
-    let contents = fs::read(path).map_err(|error| error.to_string())?;
-    let digest = Sha256::digest(contents);
+    let mut file = fs::File::open(path).map_err(|error| error.to_string())?;
+    let mut buffer = [0_u8; BINARY_HASH_BUFFER_SIZE];
+    let mut digest = Sha256::new();
+    loop {
+        let read_length = file.read(&mut buffer).map_err(|error| error.to_string())?;
+        if read_length == 0 {
+            break;
+        }
+        digest.update(&buffer[..read_length]);
+    }
+    let digest = digest.finalize();
     Ok(digest.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
