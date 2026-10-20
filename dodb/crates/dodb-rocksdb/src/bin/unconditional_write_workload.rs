@@ -35,6 +35,7 @@ enum BackendKind {
 
 struct Options {
     backend: BackendKind,
+    blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy,
     width: usize,
     clients: usize,
     seed: u64,
@@ -65,7 +66,11 @@ enum ProbeBackend {
     Raw(RawRocksDb),
     Core(dodb_rocksdb::research::SynchronousRocksDbTenant),
     RocksDbService(Box<dodb_rocksdb::RocksDbService>, tokio::runtime::Handle),
-    Service(Box<dyn DodbService>, tokio::runtime::Handle),
+    Service(
+        Box<dyn DodbService>,
+        tokio::runtime::Handle,
+        Option<dodb_server::BlinkWalCheckpointMetricsHandle>,
+    ),
     Diagnostic {
         backend_kind: BackendKind,
         worker: dodb_rocksdb::memory_diagnostic::MemoryDiagnosticWorker,
@@ -95,11 +100,14 @@ struct ProcessSample {
     elapsed_ms: u64,
     rss_kb: u64,
     cpu_ticks: u64,
+    database_bytes: u64,
+    wal_bytes: u64,
 }
 
 struct ProcessSampler {
     stopped: Arc<AtomicBool>,
     samples: Arc<Mutex<Vec<ProcessSample>>>,
+    omitted_samples: Arc<AtomicU64>,
     started: Instant,
     worker: Option<thread::JoinHandle<()>>,
 }
@@ -198,38 +206,56 @@ impl SampleHistogram {
 }
 
 impl ProcessSampler {
-    fn start() -> Result<Self, String> {
+    fn start(data_dir: PathBuf) -> Result<Self, String> {
         let stopped = Arc::new(AtomicBool::new(false));
         let samples = Arc::new(Mutex::new(Vec::new()));
+        let omitted_samples = Arc::new(AtomicU64::new(0));
         let worker_stopped = Arc::clone(&stopped);
         let worker_samples = Arc::clone(&samples);
+        let worker_omitted_samples = Arc::clone(&omitted_samples);
         let started = Instant::now();
         let worker = thread::spawn(move || {
             while !worker_stopped.load(Ordering::Relaxed) {
                 if let Some((rss_kb, cpu_ticks)) = read_process_sample() {
+                    let (database_bytes, wal_bytes) = database_and_wal_bytes(&data_dir);
                     if let Ok(mut sample_values) = worker_samples.lock() {
-                        sample_values.push(ProcessSample {
-                            elapsed_ms: started.elapsed().as_millis().min(u64::MAX as u128) as u64,
-                            rss_kb,
-                            cpu_ticks,
-                        });
+                        if sample_values.len() < 1_024 {
+                            sample_values.push(ProcessSample {
+                                elapsed_ms: started.elapsed().as_millis().min(u64::MAX as u128)
+                                    as u64,
+                                rss_kb,
+                                cpu_ticks,
+                                database_bytes,
+                                wal_bytes,
+                            });
+                        } else {
+                            worker_omitted_samples.fetch_add(1, Ordering::Relaxed);
+                        }
                     }
                 }
                 thread::sleep(Duration::from_millis(200));
             }
             if let Some((rss_kb, cpu_ticks)) = read_process_sample() {
+                let (database_bytes, wal_bytes) = database_and_wal_bytes(&data_dir);
                 if let Ok(mut sample_values) = worker_samples.lock() {
-                    sample_values.push(ProcessSample {
-                        elapsed_ms: started.elapsed().as_millis().min(u64::MAX as u128) as u64,
-                        rss_kb,
-                        cpu_ticks,
-                    });
+                    if sample_values.len() < 1_024 {
+                        sample_values.push(ProcessSample {
+                            elapsed_ms: started.elapsed().as_millis().min(u64::MAX as u128) as u64,
+                            rss_kb,
+                            cpu_ticks,
+                            database_bytes,
+                            wal_bytes,
+                        });
+                    } else {
+                        worker_omitted_samples.fetch_add(1, Ordering::Relaxed);
+                    }
                 }
             }
         });
         Ok(Self {
             stopped,
             samples,
+            omitted_samples,
             started,
             worker: Some(worker),
         })
@@ -264,7 +290,7 @@ impl ProcessSampler {
             last_cpu_ticks.saturating_sub(first_cpu_ticks) as f64 / ticks_per_second as f64;
         let samples = sample_values
             .iter()
-            .map(|sample| json!({"elapsed_ms": sample.elapsed_ms, "rss_kb": sample.rss_kb, "cpu_ticks": sample.cpu_ticks}))
+            .map(|sample| json!({"elapsed_ms": sample.elapsed_ms, "rss_kb": sample.rss_kb, "cpu_ticks": sample.cpu_ticks, "database_file_bytes": sample.database_bytes, "wal_file_bytes": sample.wal_bytes}))
             .collect::<Vec<_>>();
         if sample_values.is_empty() || peak_rss_kb == 0 {
             return Err("process RSS/CPU samples are unavailable".to_owned());
@@ -274,6 +300,7 @@ impl ProcessSampler {
             "sampling_scope": "measurement phase including admission and drain; warmup and final validation excluded",
             "sampling_completeness": "complete",
             "rss_sample_count": sample_values.len(),
+            "omitted_resource_samples": self.omitted_samples.load(Ordering::Relaxed),
             "peak_sampled_rss_kb": peak_rss_kb,
             "cpu_seconds": cpu_seconds,
             "elapsed_ms": self.started.elapsed().as_millis(),
@@ -397,20 +424,18 @@ impl ProbeBackend {
                 let mut config = dodb_server::LocalTenantServiceConfig::default();
                 config.data_dir = options.data_dir.clone();
                 config.max_open_shards = 1_024;
-                Ok(Self::Service(
-                    Box::new(
-                        dodb_server::BlinkTenantService::new(config)
-                            .map_err(|error| error.to_string())?,
-                    ),
-                    runtime,
-                ))
+                config.blink_checkpoint_policy = options.blink_checkpoint_policy;
+                let service = dodb_server::BlinkTenantService::new(config)
+                    .map_err(|error| error.to_string())?;
+                let metrics = service.checkpoint_metrics_handle();
+                Ok(Self::Service(Box::new(service), runtime, Some(metrics)))
             }
             BackendKind::MinimalNative => {
                 let service = dodb_rocksdb::minimal_native::MinimalNativeService::new(
                     dodb_rocksdb::minimal_native::MinimalNativeConfig::new(&options.data_dir),
                 )
                 .map_err(|error| error.to_string())?;
-                Ok(Self::Service(Box::new(service), runtime))
+                Ok(Self::Service(Box::new(service), runtime, None))
             }
         }
     }
@@ -450,7 +475,7 @@ impl ProbeBackend {
                     )),
                 }
             }
-            Self::Service(service, runtime) => {
+            Self::Service(service, runtime, _) => {
                 let mutations = writes
                     .iter()
                     .map(|(key, value)| TransactionMutation::Put {
@@ -550,7 +575,7 @@ impl ProbeBackend {
                 scan_service(|request, budget| database.execute(request, budget))
                     .map_err(|error| error.to_string())
             }
-            Self::Service(service, runtime) => scan_service(|request, budget| {
+            Self::Service(service, runtime, _) => scan_service(|request, budget| {
                 runtime.block_on(service.execute(TenantId::new(TENANT_NUMBER), request, budget))
             })
             .map_err(|error| error.to_string()),
@@ -580,7 +605,7 @@ impl ProbeBackend {
 
     fn shutdown(&self) -> Result<(), String> {
         match self {
-            Self::Service(service, runtime) => runtime.block_on(service.shutdown()),
+            Self::Service(service, runtime, _) => runtime.block_on(service.shutdown()),
             Self::RocksDbService(service, runtime) => runtime.block_on(service.shutdown()),
             Self::Diagnostic {
                 worker, service, ..
@@ -599,7 +624,7 @@ impl ProbeBackend {
             Self::Core(database) => Some(database.engine_health_observer()),
             Self::RocksDbService(service, _) => Some(service.engine_health_observer()),
             Self::Diagnostic { .. } => None,
-            Self::Service(_, _) => None,
+            Self::Service(_, _, _) => None,
         }
     }
 
@@ -615,6 +640,62 @@ impl ProbeBackend {
             worker.stop_measurement()?;
         }
         Ok(())
+    }
+
+    fn reset_blink_checkpoint_metrics(&self) {
+        if let Self::Service(_, _, Some(metrics)) = self {
+            metrics.reset();
+        }
+    }
+
+    fn wait_for_blink_coordinators_idle(&self) {
+        if let Self::Service(_, runtime, Some(metrics)) = self {
+            runtime.block_on(metrics.wait_for_coordinators_idle());
+        }
+    }
+
+    fn blink_checkpoint_metrics(&self) -> Value {
+        let Self::Service(_, _, Some(metrics)) = self else {
+            return serde_json::json!({"enabled": false});
+        };
+        let metrics = metrics.snapshot();
+        serde_json::json!({
+            "enabled": matches!(metrics.policy, dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { .. }),
+            "policy": match metrics.policy {
+                dodb_server::BlinkCheckpointPolicy::Disabled => "disabled",
+                dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { .. } => "wal_bytes_threshold",
+            },
+            "threshold_bytes": metrics.threshold_bytes,
+            "checkpoints_started": metrics.checkpoints_started,
+            "checkpoints_completed": metrics.checkpoints_completed,
+            "checkpoints_failed": metrics.checkpoints_failed,
+            "checkpoint_total_nanos": metrics.checkpoint_total_nanos,
+            "checkpoint_max_nanos": metrics.checkpoint_max_nanos,
+            "wal_bytes_current": metrics.wal_bytes_current,
+            "wal_bytes_at_measurement_start": metrics.wal_bytes_at_measurement_start,
+            "wal_bytes_at_measurement_end": metrics.wal_bytes_at_measurement_end,
+            "wal_bytes_max": metrics.wal_bytes_max,
+            "threshold_excess_max_bytes": metrics.threshold_excess_max_bytes,
+            "successful_mutation_transactions": metrics.successful_mutation_transactions,
+            "mutation_commit_groups": metrics.mutation_commit_groups,
+            "transaction_group_histogram": metrics.transaction_group_histogram,
+            "transaction_group_count": metrics.transaction_group_count,
+            "wal_syncs": metrics.wal_syncs,
+            "commit_wal_syncs": metrics.commit_wal_syncs,
+            "checkpoint_wal_syncs": metrics.checkpoint_wal_syncs,
+            "omitted_checkpoint_events": metrics.omitted_checkpoint_events,
+            "checkpoint_events": metrics.checkpoint_events.iter().map(|event| serde_json::json!({
+                "phase": event.phase,
+                "started_unix_nanos": event.started_unix_nanos.to_string(),
+                "ended_unix_nanos": event.ended_unix_nanos.to_string(),
+                "wal_bytes_before": event.wal_bytes_before,
+                "wal_bytes_after": event.wal_bytes_after,
+                "reclaimed_bytes": event.reclaimed_bytes,
+                "duration_nanos": event.duration_nanos,
+                "succeeded": event.succeeded,
+            })).collect::<Vec<_>>(),
+            "failed_message": metrics.failed_message,
+        })
     }
 
     fn residency_scan(&self) -> Result<serde_json::Value, String> {
@@ -664,6 +745,8 @@ where
 fn parse_options() -> Result<Options, String> {
     let mut arguments = std::env::args().skip(1);
     let mut backend = None;
+    let mut blink_checkpoint_policy = dodb_server::BlinkCheckpointPolicy::Disabled;
+    let mut blink_checkpoint_option_seen = false;
     let mut width = 1;
     let mut clients = 16;
     let mut seed = 20261013;
@@ -696,6 +779,24 @@ fn parse_options() -> Result<Options, String> {
                     "minimal-native" => BackendKind::MinimalNative,
                     _ => return Err(format!("unknown backend: {value}")),
                 });
+            }
+            "--blink-checkpoint-wal-bytes" => {
+                blink_checkpoint_option_seen = true;
+                blink_checkpoint_policy = if value == "off" {
+                    dodb_server::BlinkCheckpointPolicy::Disabled
+                } else {
+                    let threshold_bytes = value.parse::<u64>().map_err(|_| {
+                        "--blink-checkpoint-wal-bytes must be off or a positive byte count"
+                            .to_owned()
+                    })?;
+                    if threshold_bytes == 0 {
+                        return Err(
+                            "--blink-checkpoint-wal-bytes must be off or a positive byte count"
+                                .to_owned(),
+                        );
+                    }
+                    dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes }
+                };
             }
             "--width" => {
                 width = value
@@ -786,6 +887,7 @@ fn parse_options() -> Result<Options, String> {
     }
     let options = Options {
         backend: backend.ok_or_else(|| "--backend is required".to_owned())?,
+        blink_checkpoint_policy,
         width,
         clients,
         seed,
@@ -804,6 +906,22 @@ fn parse_options() -> Result<Options, String> {
         source_revision,
         memory_worker_startup_timeout_ms,
     };
+    if blink_checkpoint_option_seen && options.backend != BackendKind::Blink {
+        return Err(
+            "--blink-checkpoint-wal-bytes is supported only with --backend blink".to_owned(),
+        );
+    }
+    if options.memory_diagnostic
+        && matches!(
+            options.blink_checkpoint_policy,
+            dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { .. }
+        )
+    {
+        return Err(
+            "B-link WAL checkpoint policy is unavailable through the memory diagnostic worker"
+                .to_owned(),
+        );
+    }
     if ![1, 16].contains(&options.width) {
         return Err("width must be 1 or 16".to_owned());
     }
@@ -893,8 +1011,11 @@ fn run() -> Result<(), String> {
         Vec::new(),
         &baseline_revisions,
     )?;
-    let process_sampler = ProcessSampler::start()?;
+    tenant.wait_for_blink_coordinators_idle();
+    let process_sampler = ProcessSampler::start(options.data_dir.clone())?;
+    let storage_before_measurement = database_and_wal_bytes(&options.data_dir);
     let engine_health_interval = Duration::from_millis(options.engine_health_interval_ms);
+    tenant.reset_blink_checkpoint_metrics();
     tenant.start_measurement()?;
     if let Some(memory_session) = &memory_session {
         memory_session.set_phase("measurement");
@@ -920,7 +1041,11 @@ fn run() -> Result<(), String> {
         warmup_phase.client_results,
         &baseline_revisions,
     )?;
+    let checkpoint_drain_started = Instant::now();
+    tenant.wait_for_blink_coordinators_idle();
+    let checkpoint_drain_ms = checkpoint_drain_started.elapsed().as_millis() as u64;
     tenant.stop_measurement()?;
+    let storage_after_measurement = database_and_wal_bytes(&options.data_dir);
     let engine_health_metrics = match engine_health_sampler {
         Some(sampler) => sampler.finish()?,
         None if options.memory_diagnostic => serde_json::json!({
@@ -950,6 +1075,7 @@ fn run() -> Result<(), String> {
         memory_session.set_phase("reopen-validation");
     }
     tenant.shutdown()?;
+    let blink_checkpoint_metrics = tenant.blink_checkpoint_metrics();
     drop(tenant);
     let reopened_tenant =
         ProbeBackend::open(&options, runtime.handle().clone(), memory_session.clone())?;
@@ -1006,6 +1132,10 @@ fn run() -> Result<(), String> {
         engine_health_metrics,
         disk_usage_bytes,
         seeded_disk_bytes,
+        blink_checkpoint_metrics,
+        checkpoint_drain_ms,
+        storage_before_measurement,
+        storage_after_measurement,
     );
     if let Some(memory_session) = memory_session {
         report["memory_only_diagnostic"] = memory_session.finish_sampling();
@@ -1014,6 +1144,13 @@ fn run() -> Result<(), String> {
     std::fs::write(&options.report_path, format!("{report_text}\n"))
         .map_err(|error| error.to_string())?;
     println!("{report_text}");
+    if report["blink_checkpoint_metrics"]["checkpoints_failed"]
+        .as_u64()
+        .unwrap_or(0)
+        > 0
+    {
+        return Err("B-link checkpoint failed during the measurement run".to_owned());
+    }
     Ok(())
 }
 
@@ -1531,6 +1668,10 @@ fn build_report(
     engine_health_metrics: Value,
     disk_usage_bytes: u64,
     seeded_disk_bytes: u64,
+    blink_checkpoint_metrics: Value,
+    checkpoint_drain_ms: u64,
+    storage_before_measurement: (u64, u64),
+    storage_after_measurement: (u64, u64),
 ) -> Value {
     let mut histogram = SampleHistogram::new(options.validate_histogram);
     let measurement_writes = client_results
@@ -1576,6 +1717,7 @@ fn build_report(
         histogram.bucket_counts.capacity() * std::mem::size_of::<u64>();
     json!({
         "benchmark_kind": "unconditional_write_probe",
+        "run_status": if blink_checkpoint_metrics["checkpoints_failed"].as_u64().unwrap_or(0) > 0 { "failed_checkpoint" } else { "completed" },
         "backend": format!("{:?}", options.backend),
         "source_sha": std::env::var("DODB_SOURCE_SHA").unwrap_or_else(|_| "not-recorded".to_owned()),
         "binary_sha256": std::env::var("DODB_BINARY_SHA256").unwrap_or_else(|_| "not-recorded".to_owned()),
@@ -1626,6 +1768,10 @@ fn build_report(
             "requested_shared_blocking_slots": options.shared_blocking_slots,
             "warmup_requested_ms": options.warmup_ms,
             "measurement_requested_ms": options.measurement_ms,
+            "blink_checkpoint_policy": match options.blink_checkpoint_policy {
+                dodb_server::BlinkCheckpointPolicy::Disabled => serde_json::json!({"mode": "disabled"}),
+                dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => serde_json::json!({"mode": "wal_bytes_threshold", "threshold_bytes": threshold_bytes}),
+            },
             "call_cap": options.call_cap,
             "validate_histogram_against_exact_samples": options.validate_histogram,
             "caller_threads": options.clients,
@@ -1640,6 +1786,7 @@ fn build_report(
             "termination_reason": "requested-duration",
             "requested_measurement_ms": options.measurement_ms,
             "actual_admission_drain_and_last_completion_ms": actual_measurement_duration_ms,
+            "final_checkpoint_drain_ms": checkpoint_drain_ms,
             "actual_write_batches": measurement_writes,
             "write_batches_per_second": measurement_writes as f64 / (actual_measurement_duration_ms as f64 / 1_000.0),
         },
@@ -1652,6 +1799,7 @@ fn build_report(
             "request_limit_reached": false,
         },
         "latency": histogram.json(),
+        "blink_checkpoint_metrics": blink_checkpoint_metrics,
         "fairness": {
             "per_client_write_batch_counts": client_results.iter().map(|result| result.measurement_writes).collect::<Vec<_>>(),
             "minimum_client_write_batches": minimum_client_writes,
@@ -1679,6 +1827,10 @@ fn build_report(
         "seeded_disk_bytes": seeded_disk_bytes,
         "disk_growth_bytes": disk_usage_bytes.saturating_sub(seeded_disk_bytes),
         "process_metrics": process_metrics,
+        "storage_file_bytes_at_measurement_boundaries": {
+            "start": {"database": storage_before_measurement.0, "wal": storage_before_measurement.1},
+            "end": {"database": storage_after_measurement.0, "wal": storage_after_measurement.1},
+        },
         "engine_health": engine_health_metrics,
         "per_client": per_client,
     })
@@ -1704,6 +1856,34 @@ fn directory_bytes(directory: &Path) -> Result<u64, String> {
         }
     }
     Ok(total_bytes)
+}
+
+fn database_and_wal_bytes(directory: &Path) -> (u64, u64) {
+    let mut database_bytes = 0_u64;
+    let mut wal_bytes = 0_u64;
+    let mut pending = vec![directory.to_path_buf()];
+    while let Some(current_directory) = pending.pop() {
+        let Ok(entries) = std::fs::read_dir(current_directory) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let Ok(metadata) = entry.metadata() else {
+                continue;
+            };
+            if metadata.is_dir() {
+                pending.push(entry.path());
+            } else if entry
+                .path()
+                .extension()
+                .is_some_and(|extension| extension == "wal")
+            {
+                wal_bytes = wal_bytes.saturating_add(metadata.len());
+            } else {
+                database_bytes = database_bytes.saturating_add(metadata.len());
+            }
+        }
+    }
+    (database_bytes, wal_bytes)
 }
 
 fn histogram_bucket_index(elapsed_nanos: u64) -> usize {
@@ -1808,6 +1988,7 @@ impl Options {
     fn clone_for_worker(&self) -> Self {
         Self {
             backend: self.backend,
+            blink_checkpoint_policy: self.blink_checkpoint_policy,
             width: self.width,
             clients: self.clients,
             seed: self.seed,
@@ -1954,6 +2135,7 @@ mod tests {
     fn untouched_slots_must_keep_their_exact_baseline_revision() {
         let options = Options {
             backend: BackendKind::SynchronousCore,
+            blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy::Disabled,
             width: 1,
             clients: 1,
             seed: 20261013,

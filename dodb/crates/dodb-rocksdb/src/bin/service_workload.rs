@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use dodb_core::{
     DocumentKey, Error, Revision, RevisionState, TenantId, TransactionCondition,
@@ -116,6 +116,7 @@ enum DriverBackend {
 struct DriverService {
     backend: DriverBackend,
     research_metrics: Option<Arc<dodb_rocksdb::ResearchMetrics>>,
+    blink_checkpoint_metrics: Option<dodb_server::BlinkWalCheckpointMetricsHandle>,
 }
 
 impl DriverService {
@@ -205,18 +206,23 @@ impl DriverService {
                         .then(|| tokio::sync::Semaphore::new(options.shared_blocking_slots)),
                 },
                 research_metrics: None,
+                blink_checkpoint_metrics: None,
             });
         }
-        let (backend, research_metrics) = match options.backend {
+        let (backend, research_metrics, blink_checkpoint_metrics) = match options.backend {
             BackendKind::Blink => {
                 let mut config = LocalTenantServiceConfig::default();
                 config.data_dir = data_dir;
                 config.max_open_shards = 16;
                 config.database_config = DatabaseConfig::default().with_cache_capacity(128);
                 config.coordinator_config = CoordinatorConfig::default();
+                config.blink_checkpoint_policy = options.blink_checkpoint_policy;
+                let service = BlinkTenantService::new(config)?;
+                let checkpoint_metrics = service.checkpoint_metrics_handle();
                 (
-                    DriverBackend::Service(Box::new(BlinkTenantService::new(config)?)),
+                    DriverBackend::Service(Box::new(service)),
                     None,
+                    Some(checkpoint_metrics),
                 )
             }
             BackendKind::RocksDb => {
@@ -233,7 +239,11 @@ impl DriverService {
                 config.condition_key_lock_mode = options.condition_key_lock_mode;
                 let service = dodb_rocksdb::RocksDbService::new(config)?;
                 let metrics = service.research_metrics_handle();
-                (DriverBackend::RocksDbService(Box::new(service)), metrics)
+                (
+                    DriverBackend::RocksDbService(Box::new(service)),
+                    metrics,
+                    None,
+                )
             }
             BackendKind::RocksDbDirect => {
                 std::fs::create_dir_all(&data_dir)?;
@@ -260,6 +270,7 @@ impl DriverService {
                         admission: tokio::sync::Semaphore::new(options.shared_blocking_slots),
                     },
                     None,
+                    None,
                 )
             }
             BackendKind::MinimalNative => {
@@ -269,12 +280,14 @@ impl DriverService {
                         dodb_rocksdb::minimal_native::MinimalNativeService::new(config)?,
                     )),
                     None,
+                    None,
                 )
             }
         };
         Ok(Self {
             backend,
             research_metrics,
+            blink_checkpoint_metrics,
         })
     }
 
@@ -372,6 +385,69 @@ impl DriverService {
         Ok(())
     }
 
+    fn reset_blink_checkpoint_metrics(&self) {
+        if let Some(metrics) = &self.blink_checkpoint_metrics {
+            metrics.reset();
+        }
+    }
+
+    async fn wait_for_blink_coordinators_idle(&self) {
+        if let Some(metrics) = &self.blink_checkpoint_metrics {
+            metrics.wait_for_coordinators_idle().await;
+        }
+    }
+
+    fn blink_checkpoint_metrics_snapshot(&self) -> serde_json::Value {
+        let Some(metrics) = &self.blink_checkpoint_metrics else {
+            return json!({"enabled": false});
+        };
+        let metrics = metrics.snapshot();
+        let events = metrics
+            .checkpoint_events
+            .iter()
+            .map(|event| {
+                json!({
+                    "phase": event.phase,
+                    "started_unix_nanos": event.started_unix_nanos.to_string(),
+                    "ended_unix_nanos": event.ended_unix_nanos.to_string(),
+                    "wal_bytes_before": event.wal_bytes_before,
+                    "wal_bytes_after": event.wal_bytes_after,
+                    "reclaimed_bytes": event.reclaimed_bytes,
+                    "duration_nanos": event.duration_nanos,
+                    "succeeded": event.succeeded,
+                })
+            })
+            .collect::<Vec<_>>();
+        json!({
+            "enabled": matches!(metrics.policy, dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { .. }),
+            "policy": match metrics.policy {
+                dodb_server::BlinkCheckpointPolicy::Disabled => "disabled",
+                dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { .. } => "wal_bytes_threshold",
+            },
+            "threshold_bytes": metrics.threshold_bytes,
+            "checkpoints_started": metrics.checkpoints_started,
+            "checkpoints_completed": metrics.checkpoints_completed,
+            "checkpoints_failed": metrics.checkpoints_failed,
+            "checkpoint_total_nanos": metrics.checkpoint_total_nanos,
+            "checkpoint_max_nanos": metrics.checkpoint_max_nanos,
+            "wal_bytes_current": metrics.wal_bytes_current,
+            "wal_bytes_at_measurement_start": metrics.wal_bytes_at_measurement_start,
+            "wal_bytes_at_measurement_end": metrics.wal_bytes_at_measurement_end,
+            "wal_bytes_max": metrics.wal_bytes_max,
+            "threshold_excess_max_bytes": metrics.threshold_excess_max_bytes,
+            "successful_mutation_transactions": metrics.successful_mutation_transactions,
+            "mutation_commit_groups": metrics.mutation_commit_groups,
+            "transaction_group_histogram": metrics.transaction_group_histogram,
+            "transaction_group_count": metrics.transaction_group_count,
+            "wal_syncs": metrics.wal_syncs,
+            "commit_wal_syncs": metrics.commit_wal_syncs,
+            "checkpoint_wal_syncs": metrics.checkpoint_wal_syncs,
+            "omitted_checkpoint_events": metrics.omitted_checkpoint_events,
+            "checkpoint_events": events,
+            "failed_message": metrics.failed_message,
+        })
+    }
+
     async fn residency_scan(&self, tenant: TenantId) -> Result<serde_json::Value, String> {
         match &self.backend {
             DriverBackend::Diagnostic { worker, .. } => {
@@ -390,6 +466,7 @@ impl DriverService {
 #[derive(Clone, Debug)]
 struct Options {
     backend: BackendKind,
+    blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy,
     client_executor: ClientExecutor,
     scenario: Scenario,
     data_dir: PathBuf,
@@ -1005,6 +1082,26 @@ fn parse_options() -> Result<Options, String> {
         "minimal-native" => BackendKind::MinimalNative,
         other => return Err(format!("unsupported backend {other}")),
     };
+    let blink_checkpoint_policy = match values.get("--blink-checkpoint-wal-bytes") {
+        Some(_) if backend != BackendKind::Blink => {
+            return Err(
+                "--blink-checkpoint-wal-bytes is supported only with --backend blink".to_owned(),
+            );
+        }
+        Some(value) if value == "off" => dodb_server::BlinkCheckpointPolicy::Disabled,
+        Some(value) => {
+            let threshold_bytes = value.parse::<u64>().map_err(|_| {
+                "--blink-checkpoint-wal-bytes must be off or a positive byte count".to_owned()
+            })?;
+            if threshold_bytes == 0 {
+                return Err(
+                    "--blink-checkpoint-wal-bytes must be off or a positive byte count".to_owned(),
+                );
+            }
+            dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes }
+        }
+        None => dodb_server::BlinkCheckpointPolicy::Disabled,
+    };
     let client_executor = match values
         .get("--client-executor")
         .map(String::as_str)
@@ -1148,6 +1245,17 @@ fn parse_options() -> Result<Options, String> {
         }
     };
     let memory_diagnostic = parse_switch("--memory-diagnostic")?;
+    if memory_diagnostic
+        && matches!(
+            blink_checkpoint_policy,
+            dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { .. }
+        )
+    {
+        return Err(
+            "B-link WAL checkpoint policy is unavailable through the memory diagnostic worker"
+                .to_owned(),
+        );
+    }
     let memory_worker_startup_timeout_ms = parse(
         "--memory-worker-startup-timeout-ms",
         dodb_rocksdb::memory_diagnostic::DEFAULT_WORKER_START_TIMEOUT_MS,
@@ -1169,6 +1277,7 @@ fn parse_options() -> Result<Options, String> {
     }
     Ok(Options {
         backend,
+        blink_checkpoint_policy,
         client_executor,
         scenario,
         data_dir: PathBuf::from(values.get("--data-dir").ok_or("--data-dir is required")?),
@@ -2363,6 +2472,34 @@ fn directory_bytes(path: &Path) -> u64 {
     total_bytes
 }
 
+fn database_and_wal_bytes(path: &Path) -> (u64, u64) {
+    let mut database_bytes = 0_u64;
+    let mut wal_bytes = 0_u64;
+    let mut pending = vec![path.to_path_buf()];
+    while let Some(current_path) = pending.pop() {
+        let Ok(entries) = std::fs::read_dir(current_path) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let Ok(metadata) = entry.metadata() else {
+                continue;
+            };
+            if metadata.is_dir() {
+                pending.push(entry.path());
+            } else if entry
+                .path()
+                .extension()
+                .is_some_and(|extension| extension == "wal")
+            {
+                wal_bytes = wal_bytes.saturating_add(metadata.len());
+            } else {
+                database_bytes = database_bytes.saturating_add(metadata.len());
+            }
+        }
+    }
+    (database_bytes, wal_bytes)
+}
+
 fn encoded_key_range(rows: usize) -> Value {
     let lengths = (0..rows.max(1))
         .map(|ordinal| key_from_ordinal(ordinal as u64).encoded_len())
@@ -2450,10 +2587,12 @@ async fn run(options: Options) -> Result<Value, String> {
         )
         .await;
     }
+    service.wait_for_blink_coordinators_idle().await;
     if let Some(memory_session) = &memory_session {
         memory_session.set_phase("measurement");
     }
     service.set_research_measurement_phase();
+    service.reset_blink_checkpoint_metrics();
     let counters = Arc::new(
         (0..tenant_count)
             .map(|_| {
@@ -2465,17 +2604,39 @@ async fn run(options: Options) -> Result<Value, String> {
             .collect::<Vec<_>>(),
     );
     let cpu_before = process_metrics();
+    let storage_before = database_and_wal_bytes(&options.data_dir);
     let metric_samples = Arc::new(Mutex::new(Vec::new()));
     let stop_metric_sampling = Arc::new(AtomicBool::new(false));
     let sampler_samples = Arc::clone(&metric_samples);
     let sampler_stop = Arc::clone(&stop_metric_sampling);
+    let omitted_metric_samples = Arc::new(AtomicU64::new(0));
+    let sampler_omitted_samples = Arc::clone(&omitted_metric_samples);
+    let sampler_data_dir = options.data_dir.clone();
     let sampler = tokio::spawn(async move {
         while !sampler_stop.load(Ordering::Relaxed) {
             tokio::time::sleep(Duration::from_millis(200)).await;
             if sampler_stop.load(Ordering::Relaxed) {
                 break;
             }
-            sampler_samples.lock().unwrap().push(process_metrics());
+            let mut sample = process_metrics();
+            let (database_bytes, wal_bytes) = database_and_wal_bytes(&sampler_data_dir);
+            if let Some(object) = sample.as_object_mut() {
+                object.insert("database_file_bytes".to_owned(), json!(database_bytes));
+                object.insert("wal_file_bytes".to_owned(), json!(wal_bytes));
+                object.insert(
+                    "elapsed_unix_nanos".to_owned(),
+                    json!(SystemTime::now().duration_since(UNIX_EPOCH).map_or_else(
+                        |_| "0".to_owned(),
+                        |duration| duration.as_nanos().to_string()
+                    )),
+                );
+            }
+            let mut samples = sampler_samples.lock().unwrap();
+            if samples.len() < 1_024 {
+                samples.push(sample);
+            } else {
+                sampler_omitted_samples.fetch_add(1, Ordering::Relaxed);
+            }
         }
     });
     let engine_health_interval = Duration::from_millis(options.engine_health_interval_ms);
@@ -2490,7 +2651,7 @@ async fn run(options: Options) -> Result<Value, String> {
             .map(|observer| observer.start_sampling(engine_health_interval, options.measurement))
             .transpose()?
     };
-    let (admission, drain, total_calls, call_cap_reached) = run_clients(
+    let (admission, mut drain, total_calls, call_cap_reached) = run_clients(
         Arc::clone(&service),
         assignments,
         Arc::new(options.clone()),
@@ -2500,6 +2661,10 @@ async fn run(options: Options) -> Result<Value, String> {
         1 << 56,
     )
     .await;
+    let checkpoint_drain_started = Instant::now();
+    service.wait_for_blink_coordinators_idle().await;
+    let checkpoint_drain = checkpoint_drain_started.elapsed();
+    drain = drain.saturating_add(checkpoint_drain);
     service
         .stop_measurement()
         .map_err(|error| error.to_string())?;
@@ -2531,6 +2696,7 @@ async fn run(options: Options) -> Result<Value, String> {
         "early-stop"
     };
     let cpu_after = process_metrics();
+    let storage_after = database_and_wal_bytes(&options.data_dir);
     let sample_values = metric_samples.lock().unwrap().clone();
     let peak_rss_kb = sample_values
         .iter()
@@ -2596,6 +2762,7 @@ async fn run(options: Options) -> Result<Value, String> {
     }
     let disk_bytes_before_shutdown = directory_bytes(&options.data_dir);
     service.shutdown().await?;
+    let blink_checkpoint_metrics = service.blink_checkpoint_metrics_snapshot();
     drop(service);
     let mut reopen_options = options.clone();
     reopen_options.research_metrics = false;
@@ -2689,6 +2856,7 @@ async fn run(options: Options) -> Result<Value, String> {
         + latency_report_sort_copy_bytes;
     let mut report = json!({
         "schema": "dodb-service-workload-v1",
+        "run_status": if blink_checkpoint_metrics["checkpoints_failed"].as_u64().unwrap_or(0) > 0 { "failed_checkpoint" } else { "completed" },
         "backend": match options.backend { BackendKind::Blink => "blink", BackendKind::RocksDb => "rocksdb", BackendKind::RocksDbDirect => "rocksdb-direct", BackendKind::MinimalNative => "minimal-native" },
         "scenario": match options.scenario { Scenario::Single(profile) => profile_name(profile), Scenario::Multi => "mt-mix", Scenario::Smoke => "smoke" },
         "seed": options.seed,
@@ -2718,7 +2886,7 @@ async fn run(options: Options) -> Result<Value, String> {
             "require_full_window": options.require_full_window,
             "include_width_16": options.include_width_16,
             "query_limit": 16,
-            "blink": {"database_cache_capacity_pages": 128, "coordinator_queue_capacity": 256, "coordinator_group_requests": 64, "coordinator_group_bytes": 4194304, "coordinator_collection_delay_ms": 0},
+            "blink": {"database_cache_capacity_pages": 128, "coordinator_queue_capacity": 256, "coordinator_group_requests": 64, "coordinator_group_bytes": 4194304, "coordinator_collection_delay_ms": 0, "wal_checkpoint_policy": match options.blink_checkpoint_policy { dodb_server::BlinkCheckpointPolicy::Disabled => json!({"mode": "disabled"}), dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => json!({"mode": "wal_bytes_threshold", "threshold_bytes": threshold_bytes}) }},
             "rocksdb": {
                 "blocking_operation_limit": if !matches!(options.backend, BackendKind::Blink | BackendKind::MinimalNative) {
                     options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(read_slots, write_slots)| read_slots + write_slots)
@@ -2750,6 +2918,7 @@ async fn run(options: Options) -> Result<Value, String> {
             "warmup_count_by_tenant": warmup_counts.iter().map(|counter| counter.lock().unwrap().api_calls).collect::<Vec<_>>(),
             "admission_ms": admission.as_secs_f64() * 1000.0,
             "drain_ms": drain.as_secs_f64() * 1000.0,
+            "final_checkpoint_drain_ms": checkpoint_drain.as_secs_f64() * 1000.0,
             "total_elapsed_ms": total_elapsed.as_secs_f64() * 1000.0,
             "measurement_deadline_to_last_completion_ms": drain.as_secs_f64() * 1000.0,
             "throughput_denominator_seconds": total_elapsed.as_secs_f64(),
@@ -2779,10 +2948,11 @@ async fn run(options: Options) -> Result<Value, String> {
             "estimated_simultaneous_collector_peak_bytes": estimated_collector_peak_bytes,
         },
         "rocksdb_research_metrics": research_metrics,
+        "blink_checkpoint_metrics": blink_checkpoint_metrics,
         "per_tenant": per_tenant,
         "validation": validation,
         "reopen_validation": reopen_validation,
-        "process_metrics": {"before": cpu_before, "after": cpu_after, "cpu_ticks_delta": cpu_tick_delta, "cpu_seconds": cpu_seconds, "cpu_percent_of_one_core": cpu_core_percent, "cpu_percent_of_online_machine": cpu_machine_percent, "online_processors": online_processors, "peak_sampled_rss_kb": peak_rss_kb, "rss_sample_count": sample_values.len(), "sampling_interval_ms": 200, "sampling_completeness": if sample_values.len() >= 2 && peak_rss_kb.is_some() { "complete" } else { "incomplete" }},
+        "process_metrics": {"before": cpu_before, "after": cpu_after, "cpu_ticks_delta": cpu_tick_delta, "cpu_seconds": cpu_seconds, "cpu_percent_of_one_core": cpu_core_percent, "cpu_percent_of_online_machine": cpu_machine_percent, "online_processors": online_processors, "peak_sampled_rss_kb": peak_rss_kb, "rss_sample_count": sample_values.len(), "storage_file_bytes_before": {"database": storage_before.0, "wal": storage_before.1}, "storage_file_bytes_after": {"database": storage_after.0, "wal": storage_after.1}, "resource_samples": sample_values, "omitted_resource_samples": omitted_metric_samples.load(Ordering::Relaxed), "sampling_interval_ms": 200, "sampling_completeness": if sample_values.len() >= 2 && peak_rss_kb.is_some() { "complete" } else { "incomplete" }},
         "engine_health": engine_health_metrics,
         "disk_usage_bytes": {"before_shutdown": disk_bytes_before_shutdown, "after_reopen_validation": disk_bytes_after_reopen},
         "disk_usage_scope": "all regular files under this run's isolated data directory after measurement and before shutdown",
@@ -2818,6 +2988,9 @@ async fn main() {
             println!("{encoded}");
             if require_full_window && report["timing"]["measurement_complete"] != true {
                 std::process::exit(3);
+            }
+            if report["run_status"] == "failed_checkpoint" {
+                std::process::exit(1);
             }
         }
         Err(error) => {
@@ -3043,6 +3216,7 @@ mod tests {
     fn overwrite_key_slots_are_per_client_and_preserve_seeded_key_space() {
         let options = Options {
             backend: BackendKind::RocksDb,
+            blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy::Disabled,
             client_executor: ClientExecutor::Async,
             scenario: Scenario::Multi,
             data_dir: PathBuf::new(),
@@ -3088,6 +3262,7 @@ mod tests {
     fn width_sixteen_new_key_workflows_have_disjoint_adjacent_key_sets() {
         let options = Options {
             backend: BackendKind::RocksDb,
+            blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy::Disabled,
             client_executor: ClientExecutor::Async,
             scenario: Scenario::Single(Profile::Rw50),
             data_dir: PathBuf::new(),

@@ -5,7 +5,9 @@ use dodb_rocksdb::{
     ConditionKeyLockMode, RevisionAllocatorMode, RocksDbService, RocksDbServiceConfig,
     minimal_native::{MinimalNativeConfig, MinimalNativeService},
 };
-use dodb_server::{BlinkTenantService, LocalTenantService, LocalTenantServiceConfig};
+use dodb_server::{
+    BlinkCheckpointPolicy, BlinkTenantService, LocalTenantService, LocalTenantServiceConfig,
+};
 use tempfile::TempDir;
 
 fn temporary_db_directory() -> TempDir {
@@ -41,6 +43,9 @@ async fn btree_blink_and_rocksdb_share_transaction_contract() {
     let blink_service = || {
         BlinkTenantService::new(LocalTenantServiceConfig {
             data_dir: blink_path.clone(),
+            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                threshold_bytes: 1,
+            },
             ..LocalTenantServiceConfig::default()
         })
         .unwrap()

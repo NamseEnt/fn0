@@ -1,0 +1,30 @@
+# Implementation and Metric Definitions
+
+## Service boundary
+
+`BlinkCheckpointPolicy::Disabled` is the default. `WalBytesThreshold` is accepted only by `BlinkTenantService`; a zero threshold is rejected by the service constructor and both workload CLIs. The CLIs accept `--blink-checkpoint-wal-bytes off` or a positive decimal byte count, and reject its use with another backend. The memory diagnostic worker does not carry this policy and rejects an enabled setting explicitly.
+
+The existing request channel and `DodbService` protocol are unchanged. Each coordinator continues to gather and apply groups using the configured limits. After a group is applied, its original per-transaction results are sent. Only a group containing a successfully committed mutation can trigger the WAL-size check. If the WAL is at or above the configured threshold, the coordinator moves its owned store into `spawn_blocking`, calls the physical checkpoint, and resumes the loop only after the store returns. The threshold is checked after a group and is not a hard cap. No timer runs while the shard is idle.
+
+The physical checkpoint path in `BlinkStore` flushes and syncs dirty page data, publishes and syncs the checkpoint superblock, then resets and syncs the physical WAL. Existing storage fault tests exercise the page-write/sync, checkpoint-metadata, and WAL-reset boundaries. The new service fault test injects a failure before page flush after an acknowledged transaction, verifies that later writes receive a durability error, and reopens the database to verify that the acknowledged transaction is retained. This is function-level fault injection, not process termination or power-loss evidence.
+
+When an automatic checkpoint fails, the coordinator stores one failure message, closes intake, answers its already-queued requests with a durability error, drains the remaining receiver queue, and rejects future writes with the stored failure. A response already sent for a committed transaction is unchanged. Shutdown joins the coordinator. Workload runners wait for coordinator activity to return to zero before resetting measurement counters and before ending measurement; the last checkpoint is therefore included in the reported drain and cannot remain in flight when checkpoint metrics are captured.
+
+## Metric definitions
+
+- `policy` and `threshold_bytes` describe the effective service setting.
+- `checkpoints_started`, `checkpoints_completed`, and `checkpoints_failed` count automatic physical checkpoint attempts in the current measurement phase. The bounded event vector holds at most 1,024 entries; `omitted_checkpoint_events` counts additional events.
+- Each checkpoint event records the phase sequence label, UTC Unix start and end timestamps in nanoseconds, physical WAL bytes before and after, reclaimed WAL bytes (`max(before - after, 0)`), elapsed duration, and success. The duration spans the flush, metadata publication, and WAL reset sequence; per-stage durations are not exposed by the current storage API.
+- `wal_bytes_at_measurement_start` is sampled before the first measured transaction group; it is null if no measured group runs. `wal_bytes_at_measurement_end` is the latest measured group or completed checkpoint observation. `wal_bytes_max` records the largest observed post-group or post-checkpoint WAL size. `threshold_excess_max_bytes` is the largest observed post-group size above the trigger threshold. A group can exceed the threshold before the coordinator checks it.
+- `successful_mutation_transactions` counts successful transactions with a commit LSN. `mutation_commit_groups` counts actual coordinator groups containing at least one such transaction. `transaction_group_histogram` is indexed by successful mutation transactions in each group, with index 64 representing 64 or more. `transaction_group_count` is the number of histogram observations. Configured maximum group requests are not used as an observed group size.
+- `commit_wal_syncs` accumulates physical WAL sync counter deltas around transaction groups. `checkpoint_wal_syncs` accumulates the physical WAL sync counter delta around checkpoints, including WAL reset sync. `wal_syncs` is their sum. A counter decrease is treated as a reset and the post-reset value is accumulated rather than subtracted into an underflow.
+- Workload reports include process RSS and CPU at measurement boundaries, a bounded 200 ms resource series, database and WAL file bytes at measurement boundaries and across the series, and the number of omitted resource samples. The OCI controller separately records process-group RSS, host available memory, per-run database size, and filesystem headroom.
+- File sizes are point-in-time observations. They are not cumulative disk writes or write amplification. Existing `bytes_written` is not used as a physical I/O total.
+
+Seed, warmup, measurement, coordinator drain, final validation, and reopen validation are recorded as separate workload phases. Both policy and counters are active during seed and warmup; coordinators are drained and counters reset before measurement, so setup checkpoints do not enter measurement totals.
+
+## Test and workload integration
+
+The new server tests cover disabled defaults, below-threshold behavior, repeated threshold-triggered reclamation, continued writes after WAL reset, Get consistency while a checkpoint may be running, shutdown/reopen revision and value preservation, invalid zero thresholds, B-tree rejection, and checkpoint-failure behavior. Existing read, transaction, and conditional-history contract tests run B-link with a one-byte threshold so their operations pass through repeated physical checkpoints when executed.
+
+Workload JSON records the applied B-link setting and checkpoint counters for both the mixed service workload and the unconditional width-16 workload. A checkpoint failure sets `run_status` to `failed_checkpoint` and makes the process exit unsuccessfully after writing its report. The controller preserves the database and all attempt evidence on nonzero exit or resource stop.

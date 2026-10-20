@@ -5,7 +5,7 @@ use dodb_core::{
 use dodb_rocksdb::{
     ConditionKeyLockMode, RevisionAllocatorMode, RocksDbService, RocksDbServiceConfig,
 };
-use dodb_server::{BlinkTenantService, LocalTenantServiceConfig};
+use dodb_server::{BlinkCheckpointPolicy, BlinkTenantService, LocalTenantServiceConfig};
 use dodb_service::Document;
 use dodb_service::{DodbService, ExecutionBudget, Request, Response};
 use std::collections::{BTreeMap, BTreeSet};
@@ -223,6 +223,7 @@ async fn conditional_multi_key_history_agrees_for_blink_and_rocksdb_allocators()
     let blink_directory = temporary_db_directory();
     let blink_service = BlinkTenantService::new(LocalTenantServiceConfig {
         data_dir: blink_directory.path().to_path_buf(),
+        blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes: 1 },
         ..LocalTenantServiceConfig::default()
     })
     .unwrap();
@@ -662,6 +663,7 @@ async fn bounded_read_write_histories_replay_for_blink_and_rocksdb_modes() {
     let blink_directory = temporary_db_directory();
     let blink_service = BlinkTenantService::new(LocalTenantServiceConfig {
         data_dir: blink_directory.path().to_path_buf(),
+        blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes: 1 },
         ..LocalTenantServiceConfig::default()
     })
     .unwrap();

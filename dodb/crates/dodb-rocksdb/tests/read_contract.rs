@@ -7,7 +7,9 @@ use dodb_rocksdb::{
     ConditionKeyLockMode, RevisionAllocatorMode, RocksDbService, RocksDbServiceConfig,
     minimal_native::{MinimalNativeConfig, MinimalNativeService},
 };
-use dodb_server::{BlinkTenantService, LocalTenantService, LocalTenantServiceConfig};
+use dodb_server::{
+    BlinkCheckpointPolicy, BlinkTenantService, LocalTenantService, LocalTenantServiceConfig,
+};
 use dodb_service::{Document, DodbService, ExecutionBudget, Request, Response};
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -657,6 +659,7 @@ async fn btree_blink_and_rocksdb_share_the_same_read_contract() {
     .unwrap();
     let blink = BlinkTenantService::new(LocalTenantServiceConfig {
         data_dir: PathBuf::from(blink_directory.path()),
+        blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes: 1 },
         ..LocalTenantServiceConfig::default()
     })
     .unwrap();

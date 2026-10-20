@@ -4,8 +4,9 @@ use std::fmt;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex as StdMutex;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 pub const REQUEST_LATENCY_BUCKETS_SECONDS: [f64; 18] = [
     0.000025, 0.00005, 0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25,
@@ -931,6 +932,103 @@ pub struct LocalTenantServiceConfig {
     pub max_open_shards: usize,
     pub database_config: DatabaseConfig,
     pub coordinator_config: CoordinatorConfig,
+    pub blink_checkpoint_policy: BlinkCheckpointPolicy,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BlinkCheckpointPolicy {
+    #[default]
+    Disabled,
+    WalBytesThreshold {
+        threshold_bytes: u64,
+    },
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BlinkCheckpointEvent {
+    pub phase: String,
+    pub started_unix_nanos: u128,
+    pub ended_unix_nanos: u128,
+    pub wal_bytes_before: u64,
+    pub wal_bytes_after: u64,
+    pub reclaimed_bytes: u64,
+    pub duration_nanos: u64,
+    pub succeeded: bool,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BlinkWalCheckpointMetrics {
+    pub policy: BlinkCheckpointPolicy,
+    pub threshold_bytes: Option<u64>,
+    pub checkpoints_started: u64,
+    pub checkpoints_completed: u64,
+    pub checkpoints_failed: u64,
+    pub checkpoint_total_nanos: u64,
+    pub checkpoint_max_nanos: u64,
+    pub wal_bytes_current: u64,
+    pub wal_bytes_at_measurement_start: Option<u64>,
+    pub wal_bytes_at_measurement_end: Option<u64>,
+    pub wal_bytes_max: u64,
+    pub threshold_excess_max_bytes: u64,
+    pub successful_mutation_transactions: u64,
+    pub mutation_commit_groups: u64,
+    pub transaction_group_histogram: Vec<u64>,
+    pub transaction_group_count: u64,
+    pub wal_syncs: u64,
+    pub commit_wal_syncs: u64,
+    pub checkpoint_wal_syncs: u64,
+    pub omitted_checkpoint_events: u64,
+    pub checkpoint_events: Vec<BlinkCheckpointEvent>,
+    pub failed_message: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct BlinkWalCheckpointMetricsHandle {
+    inner: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
+    activity: Arc<CoordinatorActivity>,
+}
+
+impl BlinkWalCheckpointMetricsHandle {
+    pub fn snapshot(&self) -> BlinkWalCheckpointMetrics {
+        self.inner
+            .lock()
+            .map(|metrics| metrics.clone())
+            .unwrap_or_default()
+    }
+
+    pub fn reset(&self) {
+        if let Ok(mut metrics) = self.inner.lock() {
+            metrics.reset();
+        }
+    }
+
+    pub async fn wait_for_coordinators_idle(&self) {
+        self.activity.wait_until_idle().await;
+    }
+}
+
+impl BlinkWalCheckpointMetrics {
+    fn reset(&mut self) {
+        let policy = self.policy;
+        *self = Self {
+            policy,
+            threshold_bytes: match policy {
+                BlinkCheckpointPolicy::Disabled => None,
+                BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => {
+                    Some(threshold_bytes)
+                }
+            },
+            ..Self::default()
+        };
+    }
+
+    fn record_event(&mut self, event: BlinkCheckpointEvent) {
+        if self.checkpoint_events.len() < 1_024 {
+            self.checkpoint_events.push(event);
+        } else {
+            self.omitted_checkpoint_events = self.omitted_checkpoint_events.saturating_add(1);
+        }
+    }
 }
 
 impl Default for LocalTenantServiceConfig {
@@ -940,6 +1038,7 @@ impl Default for LocalTenantServiceConfig {
             max_open_shards: 1_024,
             database_config: DatabaseConfig::default(),
             coordinator_config: CoordinatorConfig::default(),
+            blink_checkpoint_policy: BlinkCheckpointPolicy::Disabled,
         }
     }
 }
@@ -972,13 +1071,62 @@ pub struct BlinkTenantService {
     max_open_shards: usize,
     database_config: DatabaseConfig,
     coordinator_config: CoordinatorConfig,
+    checkpoint_policy: BlinkCheckpointPolicy,
+    checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
+    coordinator_activity: Arc<CoordinatorActivity>,
     shards: Mutex<BTreeMap<TenantId, Arc<AsyncBlinkShard>>>,
+    fault_injector_factory: Mutex<Option<FaultInjectorFactory>>,
+}
+
+struct CoordinatorActivity {
+    active: AtomicU64,
+    idle: tokio::sync::Notify,
+}
+
+struct CoordinatorActivityGuard {
+    activity: Arc<CoordinatorActivity>,
+}
+
+impl CoordinatorActivity {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            active: AtomicU64::new(0),
+            idle: tokio::sync::Notify::new(),
+        })
+    }
+
+    fn enter(self: &Arc<Self>) -> CoordinatorActivityGuard {
+        self.active.fetch_add(1, Ordering::SeqCst);
+        CoordinatorActivityGuard {
+            activity: Arc::clone(self),
+        }
+    }
+
+    async fn wait_until_idle(&self) {
+        loop {
+            let notified = self.idle.notified();
+            if self.active.load(Ordering::SeqCst) == 0 {
+                return;
+            }
+            notified.await;
+        }
+    }
+}
+
+impl Drop for CoordinatorActivityGuard {
+    fn drop(&mut self) {
+        if self.activity.active.fetch_sub(1, Ordering::SeqCst) == 1 {
+            self.activity.idle.notify_waiters();
+        }
+    }
 }
 
 struct AsyncBlinkShard {
     read_handle: dodb_storage::BlinkReadHandle,
     request_tx: Mutex<Option<tokio::sync::mpsc::Sender<QueuedBlinkTransaction>>>,
     coordinator_task: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    failed_message: Arc<StdMutex<Option<String>>>,
+    activity: Arc<CoordinatorActivity>,
 }
 
 struct QueuedBlinkTransaction {
@@ -991,14 +1139,76 @@ impl BlinkTenantService {
         if config.max_open_shards == 0 {
             return Err(Error::invalid_request("max_open_shards must be nonzero"));
         }
+        if matches!(
+            config.blink_checkpoint_policy,
+            BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes: 0 }
+        ) {
+            return Err(Error::invalid_request(
+                "B-link WAL checkpoint threshold must be positive",
+            ));
+        }
         std::fs::create_dir_all(config.data_dir.join("blink"))?;
+        let checkpoint_metrics = Arc::new(StdMutex::new(BlinkWalCheckpointMetrics {
+            policy: config.blink_checkpoint_policy,
+            threshold_bytes: match config.blink_checkpoint_policy {
+                BlinkCheckpointPolicy::Disabled => None,
+                BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => {
+                    Some(threshold_bytes)
+                }
+            },
+            ..BlinkWalCheckpointMetrics::default()
+        }));
+        let coordinator_activity = CoordinatorActivity::new();
         Ok(Self {
             data_dir: config.data_dir,
             max_open_shards: config.max_open_shards,
             database_config: config.database_config,
             coordinator_config: config.coordinator_config,
+            checkpoint_policy: config.blink_checkpoint_policy,
+            checkpoint_metrics,
+            coordinator_activity,
             shards: Mutex::new(BTreeMap::new()),
+            fault_injector_factory: Mutex::new(None),
         })
+    }
+
+    pub fn set_fault_injector_factory(&mut self, factory: FaultInjectorFactory) {
+        if let Ok(mut current) = self.fault_injector_factory.try_lock() {
+            *current = Some(factory);
+        }
+    }
+
+    pub fn checkpoint_metrics_snapshot(&self) -> BlinkWalCheckpointMetrics {
+        self.checkpoint_metrics
+            .lock()
+            .map(|metrics| metrics.clone())
+            .unwrap_or_default()
+    }
+
+    pub fn checkpoint_metrics_handle(&self) -> BlinkWalCheckpointMetricsHandle {
+        BlinkWalCheckpointMetricsHandle {
+            inner: Arc::clone(&self.checkpoint_metrics),
+            activity: Arc::clone(&self.coordinator_activity),
+        }
+    }
+
+    pub fn reset_checkpoint_metrics(&self) {
+        if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
+            metrics.reset();
+        }
+    }
+
+    pub async fn wait_for_coordinators_idle(&self) {
+        let shards = self
+            .shards
+            .lock()
+            .await
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        for shard in shards {
+            shard.activity.wait_until_idle().await;
+        }
     }
 
     pub async fn shutdown(&self) {
@@ -1159,8 +1369,17 @@ impl BlinkTenantService {
             &database_path,
             database_config,
         )?;
+        if let Some(factory) = self.fault_injector_factory.lock().await.clone() {
+            store.set_boxed_fault_injector(factory(tenant, shard_id));
+        }
         store.enable_planned_execution();
-        let shard = Arc::new(AsyncBlinkShard::start(store, self.coordinator_config));
+        let shard = Arc::new(AsyncBlinkShard::start(
+            store,
+            self.coordinator_config,
+            self.checkpoint_policy,
+            Arc::clone(&self.checkpoint_metrics),
+            Arc::clone(&self.coordinator_activity),
+        ));
         shards.insert(tenant, Arc::clone(&shard));
         Ok(shard)
     }
@@ -1178,10 +1397,16 @@ impl AsyncBlinkShard {
     fn start(
         mut store: dodb_storage::BlinkStore<ProductionFile, ProductionFile>,
         config: CoordinatorConfig,
+        checkpoint_policy: BlinkCheckpointPolicy,
+        checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
+        activity: Arc<CoordinatorActivity>,
     ) -> Self {
         let read_handle = store.versioned_read_handle();
         let (request_tx, mut request_rx) =
             tokio::sync::mpsc::channel::<QueuedBlinkTransaction>(config.queue_capacity.max(1));
+        let failed_message = Arc::new(StdMutex::new(None));
+        let coordinator_failed_message = Arc::clone(&failed_message);
+        let coordinator_activity = Arc::clone(&activity);
         let coordinator_task = tokio::spawn(async move {
             let mut pending = None;
             loop {
@@ -1190,6 +1415,7 @@ impl AsyncBlinkShard {
                     None => request_rx.recv().await,
                 };
                 let Some(first) = first else { break };
+                let _activity_guard = coordinator_activity.enter();
                 let mut queued = vec![first];
                 let mut request_bytes = transaction_size(&queued[0].request);
                 tokio::task::yield_now().await;
@@ -1231,28 +1457,244 @@ impl AsyncBlinkShard {
                     .iter()
                     .map(|entry| entry.request.clone())
                     .collect::<Vec<_>>();
-                let (updated_store, results) = match tokio::task::spawn_blocking(move || {
-                    let results = store.apply_transaction_group(&requests);
-                    (store, results)
-                })
-                .await
-                {
-                    Ok(result) => result,
-                    Err(error) => {
-                        let message = format!("Blink coordinator worker failed: {error}");
-                        for entry in queued {
-                            let _ = entry
-                                .response_tx
-                                .send(Err(Error::durability(message.clone())));
+                let (updated_store, wal_before, wal_after, results) =
+                    match tokio::task::spawn_blocking(move || {
+                        let wal_before = store.wal_metrics().ok().flatten();
+                        let results = store.apply_transaction_group(&requests);
+                        let wal_after = store.wal_metrics().ok().flatten();
+                        (store, wal_before, wal_after, results)
+                    })
+                    .await
+                    {
+                        Ok(result) => result,
+                        Err(error) => {
+                            let message = format!("Blink coordinator worker failed: {error}");
+                            for entry in queued {
+                                let _ = entry
+                                    .response_tx
+                                    .send(Err(Error::durability(message.clone())));
+                            }
+                            if let Ok(mut failed) = coordinator_failed_message.lock() {
+                                *failed = Some(message.clone());
+                            }
+                            request_rx.close();
+                            break;
                         }
-                        break;
-                    }
-                };
+                    };
                 store = updated_store;
                 match results {
                     Ok(results) => {
+                        let successful_mutations = results
+                            .iter()
+                            .filter(|result| {
+                                result
+                                    .as_ref()
+                                    .is_ok_and(|transaction| transaction.commit_lsn.is_some())
+                            })
+                            .count();
+                        let contains_mutations = successful_mutations > 0;
+                        let group_size = successful_mutations;
                         for (entry, result) in queued.into_iter().zip(results) {
                             let _ = entry.response_tx.send(result);
+                        }
+                        if let Ok(mut metrics) = checkpoint_metrics.lock() {
+                            if metrics.wal_bytes_at_measurement_start.is_none() {
+                                metrics.wal_bytes_at_measurement_start =
+                                    wal_before.as_ref().map(|wal| wal.wal_bytes);
+                            }
+                            let syncs_before = wal_before.as_ref().map_or(0, |wal| wal.wal_syncs);
+                            let syncs_after =
+                                wal_after.as_ref().map_or(syncs_before, |wal| wal.wal_syncs);
+                            let sync_delta = if syncs_after >= syncs_before {
+                                syncs_after - syncs_before
+                            } else {
+                                syncs_after
+                            };
+                            metrics.wal_syncs = metrics.wal_syncs.saturating_add(sync_delta);
+                            metrics.commit_wal_syncs =
+                                metrics.commit_wal_syncs.saturating_add(sync_delta);
+                            metrics.wal_bytes_current =
+                                wal_after.as_ref().map_or(0, |wal| wal.wal_bytes);
+                            metrics.wal_bytes_at_measurement_end = Some(metrics.wal_bytes_current);
+                            metrics.wal_bytes_max =
+                                metrics.wal_bytes_max.max(metrics.wal_bytes_current);
+                            metrics.successful_mutation_transactions = metrics
+                                .successful_mutation_transactions
+                                .saturating_add(successful_mutations as u64);
+                            if contains_mutations {
+                                metrics.mutation_commit_groups =
+                                    metrics.mutation_commit_groups.saturating_add(1);
+                                let histogram_bucket = group_size.min(64);
+                                if metrics.transaction_group_histogram.len() <= histogram_bucket {
+                                    metrics
+                                        .transaction_group_histogram
+                                        .resize(histogram_bucket + 1, 0);
+                                }
+                                metrics.transaction_group_histogram[histogram_bucket] = metrics
+                                    .transaction_group_histogram[histogram_bucket]
+                                    .saturating_add(1);
+                                metrics.transaction_group_count =
+                                    metrics.transaction_group_count.saturating_add(1);
+                            }
+                        }
+                        let threshold_exceeded = match checkpoint_policy {
+                            BlinkCheckpointPolicy::Disabled => false,
+                            BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => {
+                                contains_mutations
+                                    && wal_after
+                                        .as_ref()
+                                        .is_some_and(|wal| wal.wal_bytes >= threshold_bytes)
+                            }
+                        };
+                        if threshold_exceeded {
+                            let wal_bytes_before =
+                                wal_after.as_ref().map_or(0, |wal| wal.wal_bytes);
+                            let started_unix_nanos = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .map_or(0, |duration| duration.as_nanos());
+                            if let Ok(mut metrics) = checkpoint_metrics.lock() {
+                                metrics.checkpoints_started =
+                                    metrics.checkpoints_started.saturating_add(1);
+                            }
+                            let (updated_store, checkpoint_result, wal_bytes_after) =
+                                match tokio::task::spawn_blocking(move || {
+                                    let result = store.checkpoint();
+                                    let wal_bytes_after = store
+                                        .wal_metrics()
+                                        .ok()
+                                        .flatten()
+                                        .map_or(0, |wal| wal.wal_bytes);
+                                    (store, result, wal_bytes_after)
+                                })
+                                .await
+                                {
+                                    Ok(result) => result,
+                                    Err(error) => {
+                                        let message =
+                                            format!("B-link checkpoint worker failed: {error}");
+                                        let ended_unix_nanos = SystemTime::now()
+                                            .duration_since(UNIX_EPOCH)
+                                            .map_or(0, |duration| duration.as_nanos());
+                                        let duration_nanos = ended_unix_nanos
+                                            .saturating_sub(started_unix_nanos)
+                                            .min(u64::MAX as u128)
+                                            as u64;
+                                        if let Ok(mut metrics) = checkpoint_metrics.lock() {
+                                            metrics.checkpoints_failed =
+                                                metrics.checkpoints_failed.saturating_add(1);
+                                            metrics.checkpoint_total_nanos = metrics
+                                                .checkpoint_total_nanos
+                                                .saturating_add(duration_nanos);
+                                            metrics.checkpoint_max_nanos =
+                                                metrics.checkpoint_max_nanos.max(duration_nanos);
+                                            metrics.failed_message = Some(message.clone());
+                                            metrics.record_event(BlinkCheckpointEvent {
+                                                phase: "physical_checkpoint_worker".to_owned(),
+                                                started_unix_nanos,
+                                                ended_unix_nanos,
+                                                wal_bytes_before,
+                                                wal_bytes_after: 0,
+                                                reclaimed_bytes: 0,
+                                                duration_nanos,
+                                                succeeded: false,
+                                            });
+                                        }
+                                        if let Ok(mut failed) = coordinator_failed_message.lock() {
+                                            *failed = Some(message.clone());
+                                        }
+                                        request_rx.close();
+                                        if let Some(entry) = pending.take() {
+                                            let _ = entry
+                                                .response_tx
+                                                .send(Err(Error::durability(message.clone())));
+                                        }
+                                        while let Ok(entry) = request_rx.try_recv() {
+                                            let _ = entry
+                                                .response_tx
+                                                .send(Err(Error::durability(message.clone())));
+                                        }
+                                        break;
+                                    }
+                                };
+                            store = updated_store;
+                            let ended_unix_nanos = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .map_or(0, |duration| duration.as_nanos());
+                            let checkpoint_duration_nanos = ended_unix_nanos
+                                .saturating_sub(started_unix_nanos)
+                                .min(u64::MAX as u128)
+                                as u64;
+                            let succeeded = checkpoint_result.is_ok();
+                            if let Ok(mut metrics) = checkpoint_metrics.lock() {
+                                if succeeded {
+                                    metrics.checkpoints_completed =
+                                        metrics.checkpoints_completed.saturating_add(1);
+                                } else {
+                                    metrics.checkpoints_failed =
+                                        metrics.checkpoints_failed.saturating_add(1);
+                                }
+                                metrics.checkpoint_total_nanos = metrics
+                                    .checkpoint_total_nanos
+                                    .saturating_add(checkpoint_duration_nanos);
+                                metrics.checkpoint_max_nanos =
+                                    metrics.checkpoint_max_nanos.max(checkpoint_duration_nanos);
+                                metrics.wal_bytes_current = wal_bytes_after;
+                                metrics.wal_bytes_at_measurement_end = Some(wal_bytes_after);
+                                metrics.wal_bytes_max = metrics.wal_bytes_max.max(wal_bytes_after);
+                                if let Some(threshold_bytes) = metrics.threshold_bytes {
+                                    metrics.threshold_excess_max_bytes = metrics
+                                        .threshold_excess_max_bytes
+                                        .max(wal_bytes_before.saturating_sub(threshold_bytes));
+                                }
+                                metrics.record_event(BlinkCheckpointEvent {
+                                    phase: "data_flush_sync_metadata_publish_sync_wal_reset_sync"
+                                        .to_owned(),
+                                    started_unix_nanos,
+                                    ended_unix_nanos,
+                                    wal_bytes_before,
+                                    wal_bytes_after,
+                                    reclaimed_bytes: wal_bytes_before
+                                        .saturating_sub(wal_bytes_after),
+                                    duration_nanos: checkpoint_duration_nanos,
+                                    succeeded,
+                                });
+                                let syncs_after = store
+                                    .wal_metrics()
+                                    .ok()
+                                    .flatten()
+                                    .map_or(0, |wal| wal.wal_syncs);
+                                metrics.checkpoint_wal_syncs = metrics
+                                    .checkpoint_wal_syncs
+                                    .saturating_add(syncs_after.saturating_sub(
+                                        wal_after.as_ref().map_or(syncs_after, |wal| wal.wal_syncs),
+                                    ));
+                                metrics.wal_syncs = metrics
+                                    .commit_wal_syncs
+                                    .saturating_add(metrics.checkpoint_wal_syncs);
+                                if !succeeded {
+                                    metrics.failed_message =
+                                        checkpoint_result.as_ref().err().map(ToString::to_string);
+                                }
+                            }
+                            if let Err(error) = checkpoint_result {
+                                let message =
+                                    format!("B-link automatic checkpoint failed: {error}");
+                                if let Ok(mut failed) = coordinator_failed_message.lock() {
+                                    *failed = Some(message.clone());
+                                }
+                                request_rx.close();
+                                if let Some(entry) = pending.take() {
+                                    let _ = entry
+                                        .response_tx
+                                        .send(Err(Error::durability(message.clone())));
+                                }
+                                while let Ok(entry) = request_rx.try_recv() {
+                                    let _ = entry
+                                        .response_tx
+                                        .send(Err(Error::durability(message.clone())));
+                                }
+                                break;
+                            }
                         }
                     }
                     Err(error) => {
@@ -1270,12 +1712,20 @@ impl AsyncBlinkShard {
             read_handle,
             request_tx: Mutex::new(Some(request_tx)),
             coordinator_task: Mutex::new(Some(coordinator_task)),
+            failed_message,
+            activity,
         }
     }
 
     async fn transact(&self, request: TransactionRequest) -> Result<TransactionResult, Error> {
+        if let Ok(failed) = self.failed_message.lock() {
+            if let Some(message) = failed.as_ref() {
+                return Err(Error::durability(message.clone()));
+            }
+        }
         let (response_tx, response_rx) = tokio::sync::oneshot::channel();
-        self.request_tx
+        let send_result = self
+            .request_tx
             .lock()
             .await
             .as_ref()
@@ -1283,15 +1733,24 @@ impl AsyncBlinkShard {
             .try_send(QueuedBlinkTransaction {
                 request,
                 response_tx,
-            })
-            .map_err(|error| match error {
+            });
+        if let Err(error) = send_result {
+            if matches!(error, tokio::sync::mpsc::error::TrySendError::Closed(_)) {
+                if let Ok(failed) = self.failed_message.lock() {
+                    if let Some(message) = failed.as_ref() {
+                        return Err(Error::durability(message.clone()));
+                    }
+                }
+            }
+            return Err(match error {
                 tokio::sync::mpsc::error::TrySendError::Full(_) => {
                     Error::overloaded("Blink coordinator queue is full")
                 }
                 tokio::sync::mpsc::error::TrySendError::Closed(_) => {
                     Error::invariant("Blink coordinator is closed")
                 }
-            })?;
+            });
+        }
         response_rx
             .await
             .map_err(|_| Error::invariant("Blink coordinator dropped a response"))?
@@ -1356,6 +1815,11 @@ impl LocalTenantService {
     pub fn new(config: LocalTenantServiceConfig) -> Result<Self, Error> {
         if config.max_open_shards == 0 {
             return Err(Error::invalid_request("max_open_shards must be nonzero"));
+        }
+        if config.blink_checkpoint_policy != BlinkCheckpointPolicy::Disabled {
+            return Err(Error::invalid_request(
+                "B-link WAL checkpoint policy is unsupported by the B-tree service",
+            ));
         }
         std::fs::create_dir_all(&config.data_dir)?;
         Ok(Self {

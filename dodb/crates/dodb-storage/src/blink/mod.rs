@@ -2227,6 +2227,10 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         self.fault_injector = Some(Box::new(injector));
     }
 
+    pub fn set_boxed_fault_injector(&mut self, injector: Box<dyn FaultInjector + Send>) {
+        self.fault_injector = Some(injector);
+    }
+
     pub fn get(&mut self, key: &DocumentKey) -> Result<RevisionState> {
         match self
             .apply_batch(&[BatchRequest::Get { key: key.clone() }])?
