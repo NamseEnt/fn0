@@ -29,6 +29,7 @@ enum BackendKind {
     Blink,
     RocksDb,
     RocksDbDirect,
+    MinimalNative,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -128,6 +129,7 @@ impl DriverService {
                 BackendKind::Blink => "blink",
                 BackendKind::RocksDb => "rocksdb-service",
                 BackendKind::RocksDbDirect => "core",
+                BackendKind::MinimalNative => "minimal-native",
             };
             let tenant_count = if matches!(options.scenario, Scenario::Multi | Scenario::Smoke) {
                 4
@@ -257,6 +259,15 @@ impl DriverService {
                         tenants,
                         admission: tokio::sync::Semaphore::new(options.shared_blocking_slots),
                     },
+                    None,
+                )
+            }
+            BackendKind::MinimalNative => {
+                let config = dodb_rocksdb::minimal_native::MinimalNativeConfig::new(data_dir);
+                (
+                    DriverBackend::Service(Box::new(
+                        dodb_rocksdb::minimal_native::MinimalNativeService::new(config)?,
+                    )),
                     None,
                 )
             }
@@ -991,6 +1002,7 @@ fn parse_options() -> Result<Options, String> {
         "blink" => BackendKind::Blink,
         "rocksdb" => BackendKind::RocksDb,
         "rocksdb-direct" => BackendKind::RocksDbDirect,
+        "minimal-native" => BackendKind::MinimalNative,
         other => return Err(format!("unsupported backend {other}")),
     };
     let client_executor = match values
@@ -1002,8 +1014,12 @@ fn parse_options() -> Result<Options, String> {
         "dedicated" => ClientExecutor::Dedicated,
         other => return Err(format!("unsupported client executor {other}")),
     };
-    if backend == BackendKind::RocksDbDirect && client_executor != ClientExecutor::Dedicated {
-        return Err("rocksdb-direct requires dedicated client threads".to_owned());
+    if matches!(
+        backend,
+        BackendKind::RocksDbDirect | BackendKind::MinimalNative
+    ) && client_executor != ClientExecutor::Dedicated
+    {
+        return Err("direct RocksDB backends require dedicated client threads".to_owned());
     }
     let revision_allocator = match values
         .get("--revision-allocator")
@@ -1014,6 +1030,11 @@ fn parse_options() -> Result<Options, String> {
         "reserved-ranges" => dodb_rocksdb::RevisionAllocatorMode::ReservedRanges,
         other => return Err(format!("unsupported revision allocator {other}")),
     };
+    if backend == BackendKind::MinimalNative
+        && revision_allocator != dodb_rocksdb::RevisionAllocatorMode::ReservedRanges
+    {
+        return Err("minimal-native requires reserved-range revisions".to_owned());
+    }
     let condition_key_lock_mode =
         parse_condition_key_lock_mode(values.get("--condition-key-lock-mode").map(String::as_str))?;
     let engine_health_interval_ms = values
@@ -2668,10 +2689,10 @@ async fn run(options: Options) -> Result<Value, String> {
         + latency_report_sort_copy_bytes;
     let mut report = json!({
         "schema": "dodb-service-workload-v1",
-        "backend": match options.backend { BackendKind::Blink => "blink", BackendKind::RocksDb => "rocksdb", BackendKind::RocksDbDirect => "rocksdb-direct" },
+        "backend": match options.backend { BackendKind::Blink => "blink", BackendKind::RocksDb => "rocksdb", BackendKind::RocksDbDirect => "rocksdb-direct", BackendKind::MinimalNative => "minimal-native" },
         "scenario": match options.scenario { Scenario::Single(profile) => profile_name(profile), Scenario::Multi => "mt-mix", Scenario::Smoke => "smoke" },
         "seed": options.seed,
-        "api_boundary": if options.backend == BackendKind::RocksDbDirect { "synchronous TenantDatabase core with shared Request/Response and ExecutionBudget; preopened tenant handles; same transaction and revision implementation" } else { "DodbService::execute with shared Request/Response and ExecutionBudget" },
+        "api_boundary": match options.backend { BackendKind::RocksDbDirect => "synchronous TenantDatabase core with shared Request/Response and ExecutionBudget; preopened tenant handles; same transaction and revision implementation", BackendKind::MinimalNative => "independent benchmark-only adapter using direct RocksDB TransactionDB operations; no TenantDatabase transaction delegation", _ => "DodbService::execute with shared Request/Response and ExecutionBudget" },
         "memory_diagnostic_execution": if options.memory_diagnostic { "parent workload uses DodbClient over loopback TLS to a separate backend worker; throughput and latency include transport and are memory-only evidence" } else { "disabled; existing in-process backend path" },
         "memory_worker_startup_timeout_ms": if options.memory_diagnostic { Some(options.memory_worker_startup_timeout_ms) } else { None },
         "configuration": {
@@ -2699,10 +2720,12 @@ async fn run(options: Options) -> Result<Value, String> {
             "query_limit": 16,
             "blink": {"database_cache_capacity_pages": 128, "coordinator_queue_capacity": 256, "coordinator_group_requests": 64, "coordinator_group_bytes": 4194304, "coordinator_collection_delay_ms": 0},
             "rocksdb": {
-                "blocking_operation_limit": if options.backend != BackendKind::Blink {
+                "blocking_operation_limit": if !matches!(options.backend, BackendKind::Blink | BackendKind::MinimalNative) {
                     options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(read_slots, write_slots)| read_slots + write_slots)
                 } else { 0 },
-                "blocking_admission": if options.backend == BackendKind::Blink {
+                "blocking_admission": if options.backend == BackendKind::MinimalNative {
+                    "none".to_owned()
+                } else if options.backend == BackendKind::Blink {
                     "not-applicable".to_owned()
                 } else {
                     match options.blocking_admission {
@@ -2711,8 +2734,8 @@ async fn run(options: Options) -> Result<Value, String> {
                         dodb_rocksdb::BlockingAdmissionMode::SplitRead2Write8 => "split-read-2-write-8".to_owned()
                     }
                 },
-                "read_blocking_slots": if options.backend == BackendKind::Blink { 0 } else { options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(read_slots, _)| read_slots) },
-                "write_blocking_slots": if options.backend == BackendKind::Blink { 0 } else { options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(_, write_slots)| write_slots) },
+                "read_blocking_slots": if matches!(options.backend, BackendKind::Blink | BackendKind::MinimalNative) { 0 } else { options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(read_slots, _)| read_slots) },
+                "write_blocking_slots": if matches!(options.backend, BackendKind::Blink | BackendKind::MinimalNative) { 0 } else { options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(_, write_slots)| write_slots) },
                 "revision_allocator": match options.revision_allocator { dodb_rocksdb::RevisionAllocatorMode::Serialized => "serialized", dodb_rocksdb::RevisionAllocatorMode::ReservedRanges => "reserved-ranges" },
                 "revision_range_size": if options.revision_allocator == dodb_rocksdb::RevisionAllocatorMode::ReservedRanges { Some(4_096) } else { None },
                 "condition_key_lock_mode": if options.backend == BackendKind::Blink { "not-applicable" } else { match options.condition_key_lock_mode { dodb_rocksdb::ConditionKeyLockMode::Exclusive => "exclusive", dodb_rocksdb::ConditionKeyLockMode::Shared => "shared" } },

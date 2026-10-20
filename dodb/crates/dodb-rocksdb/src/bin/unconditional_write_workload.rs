@@ -30,6 +30,7 @@ enum BackendKind {
     SynchronousCore,
     RocksDbService,
     Blink,
+    MinimalNative,
 }
 
 struct Options {
@@ -314,6 +315,7 @@ impl ProbeBackend {
                 BackendKind::SynchronousCore => "core",
                 BackendKind::RocksDbService => "rocksdb-service",
                 BackendKind::Blink => "blink",
+                BackendKind::MinimalNative => "minimal-native",
             };
             if options.source_revision.is_none() {
                 return Err("memory diagnostic requires --source-revision".to_owned());
@@ -402,6 +404,13 @@ impl ProbeBackend {
                     ),
                     runtime,
                 ))
+            }
+            BackendKind::MinimalNative => {
+                let service = dodb_rocksdb::minimal_native::MinimalNativeService::new(
+                    dodb_rocksdb::minimal_native::MinimalNativeConfig::new(&options.data_dir),
+                )
+                .map_err(|error| error.to_string())?;
+                Ok(Self::Service(Box::new(service), runtime))
             }
         }
     }
@@ -684,6 +693,7 @@ fn parse_options() -> Result<Options, String> {
                     "synchronous-core" => BackendKind::SynchronousCore,
                     "rocksdb-service" => BackendKind::RocksDbService,
                     "blink" => BackendKind::Blink,
+                    "minimal-native" => BackendKind::MinimalNative,
                     _ => return Err(format!("unknown backend: {value}")),
                 });
             }
@@ -799,6 +809,11 @@ fn parse_options() -> Result<Options, String> {
     }
     if ![16, 64].contains(&options.clients) {
         return Err("clients must be 16 or 64".to_owned());
+    }
+    if options.backend == BackendKind::MinimalNative
+        && options.revision_allocator != dodb_rocksdb::RevisionAllocatorMode::ReservedRanges
+    {
+        return Err("minimal-native requires reserved-range revisions".to_owned());
     }
     if options.value_size != INITIAL_VALUE_SIZE
         || options.measurement_ms == 0
@@ -1580,6 +1595,7 @@ fn build_report(
             "revision_allocator": if matches!(
                 options.backend,
                 BackendKind::SynchronousCore | BackendKind::RocksDbService
+                    | BackendKind::MinimalNative
             ) {
                 Some(format!("{:?}", options.revision_allocator))
             } else {
@@ -1598,6 +1614,7 @@ fn build_report(
                         dodb_rocksdb::ConditionKeyLockMode::Shared => "shared",
                     }
                 }
+                BackendKind::MinimalNative => "exclusive",
             },
             "engine_health_interval_ms": options.engine_health_interval_ms,
             "memory_worker_startup_timeout_ms": if options.memory_diagnostic { Some(options.memory_worker_startup_timeout_ms) } else { None },

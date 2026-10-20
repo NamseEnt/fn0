@@ -20,6 +20,7 @@ use tokio::sync::{Notify, OnceCell, Semaphore};
 
 mod engine_health;
 pub mod memory_diagnostic;
+pub mod minimal_native;
 pub mod raw_research;
 pub mod research;
 

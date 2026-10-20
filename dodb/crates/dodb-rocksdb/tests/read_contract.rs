@@ -5,6 +5,7 @@ use dodb_core::{
 use dodb_protocol::{ProtocolLimits, ResponseEnvelope, encode_response};
 use dodb_rocksdb::{
     ConditionKeyLockMode, RevisionAllocatorMode, RocksDbService, RocksDbServiceConfig,
+    minimal_native::{MinimalNativeConfig, MinimalNativeService},
 };
 use dodb_server::{BlinkTenantService, LocalTenantService, LocalTenantServiceConfig};
 use dodb_service::{Document, DodbService, ExecutionBudget, Request, Response};
@@ -763,4 +764,12 @@ async fn rocksdb_query_and_scan_survive_shutdown_and_reopen() {
     assert_eq!(after_query, before_query);
     assert_eq!(after_scan, before_scan);
     reopened.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn minimal_native_reads_satisfy_common_contract() {
+    let directory = temporary_db_directory();
+    let service = MinimalNativeService::new(MinimalNativeConfig::new(directory.path())).unwrap();
+    check_read_contract(&service, true).await;
+    service.shutdown().await;
 }

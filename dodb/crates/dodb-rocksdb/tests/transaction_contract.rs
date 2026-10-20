@@ -3,6 +3,7 @@ mod common;
 use common::check_transaction_contract;
 use dodb_rocksdb::{
     ConditionKeyLockMode, RevisionAllocatorMode, RocksDbService, RocksDbServiceConfig,
+    minimal_native::{MinimalNativeConfig, MinimalNativeService},
 };
 use dodb_server::{BlinkTenantService, LocalTenantService, LocalTenantServiceConfig};
 use tempfile::TempDir;
@@ -12,6 +13,14 @@ fn temporary_db_directory() -> TempDir {
         Some(path) => TempDir::new_in(path).unwrap(),
         None => TempDir::new().unwrap(),
     }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn minimal_native_transaction_path_satisfies_common_contract() {
+    let directory = temporary_db_directory();
+    let path = directory.path().to_path_buf();
+    let service = || MinimalNativeService::new(MinimalNativeConfig::new(path.clone())).unwrap();
+    check_transaction_contract(service(), service).await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
