@@ -1949,6 +1949,9 @@ mod tests {
             condition_key_lock_mode: dodb_rocksdb::ConditionKeyLockMode::Exclusive,
             engine_health_interval_ms: 0,
             shared_blocking_slots: 8,
+            memory_diagnostic: false,
+            source_revision: None,
+            memory_worker_startup_timeout_ms: 20_000,
             data_dir: std::path::PathBuf::from("unused-data"),
             report_path: std::path::PathBuf::from("unused-report"),
         };
