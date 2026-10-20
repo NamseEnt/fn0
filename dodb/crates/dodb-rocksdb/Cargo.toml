@@ -15,7 +15,7 @@ dodb-service.workspace = true
 dodb-server.workspace = true
 dodb-storage.workspace = true
 libc.workspace = true
-serde.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 rcgen.workspace = true
 sha2.workspace = true
