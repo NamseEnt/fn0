@@ -97,12 +97,21 @@ def process_sample(process_group, database_path):
 def wait_for_case(command, case_id, database_path, report_path):
     case_root = REPORTS / case_id
     case_root.mkdir(parents=True, exist_ok=False)
+    binary_digest = sha256_file(Path(command[0]))
+    source_revision = subprocess.check_output(
+        ["git", "-C", str(ROOT / "source"), "rev-parse", "HEAD"], text=True
+    ).strip()
+    process_environment = os.environ.copy()
+    process_environment["DODB_SOURCE_SHA"] = source_revision
+    process_environment["DODB_BINARY_SHA256"] = binary_digest
     command_record = {
         "argv": [str(argument) for argument in command],
         "cwd": str(ROOT / "source"),
         "case_id": case_id,
         "database_path": str(database_path),
         "report_path": str(report_path),
+        "source_sha": source_revision,
+        "binary_sha256": binary_digest,
         "limits": {
             "max_process_group_rss_bytes": MAX_PROCESS_GROUP_RSS_BYTES,
             "minimum_mem_available_bytes": MINIMUM_MEM_AVAILABLE_BYTES,
@@ -126,6 +135,7 @@ def wait_for_case(command, case_id, database_path, report_path):
         cwd=ROOT / "source",
         stdout=(case_root / "workload.stdout.log").open("wb"),
         stderr=(case_root / "workload.stderr.log").open("wb"),
+        env=process_environment,
         start_new_session=True,
     )
     samples = []
