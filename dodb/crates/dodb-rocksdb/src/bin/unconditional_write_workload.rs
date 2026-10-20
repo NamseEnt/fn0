@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 
 const INITIAL_VALUE_SIZE: usize = 512;
 const POOL_SLOTS_PER_CLIENT: usize = 256;
+const PREPOPULATE_BATCH_SIZE: usize = 1_024;
 const INPUT_PREFIX_BATCH_LIMIT: u64 = 100;
 const MEASUREMENT_PAYLOAD_SEQUENCE_BASE: u64 = 1_u64 << 56;
 const FNV1A64_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
@@ -348,7 +349,7 @@ impl ProbeBackend {
                 &worker_executable,
                 &worker_arguments,
                 RESPONSE_BUDGET_BYTES,
-                dodb_protocol::ProtocolLimits::default().max_mutations,
+                PREPOPULATE_BATCH_SIZE,
                 options.clients,
                 &options.data_dir,
                 Duration::from_millis(options.memory_worker_startup_timeout_ms),
@@ -1197,13 +1198,13 @@ fn run_client_phase(
 }
 
 fn prepopulate_pool(backend: &ProbeBackend, options: &Options) -> Result<(), String> {
-    let mut writes = Vec::with_capacity(1_024);
+    let mut writes = Vec::with_capacity(PREPOPULATE_BATCH_SIZE);
     for client_index in 0..options.clients {
         for slot_index in 0..POOL_SLOTS_PER_CLIENT {
             for width_index in 0..options.width {
                 let key = document_key(options.seed, client_index, slot_index, width_index);
                 writes.push((key, vec![0; options.value_size]));
-                if writes.len() == 1_024 {
+                if writes.len() == PREPOPULATE_BATCH_SIZE {
                     backend.write(&writes)?;
                     writes.clear();
                 }
