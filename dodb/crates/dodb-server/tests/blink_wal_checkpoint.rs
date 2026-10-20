@@ -1,5 +1,8 @@
+use std::os::unix::process::ExitStatusExt;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
 
 use dodb_core::{
     DocumentKey, Error, TenantId, TransactionCondition, TransactionMutation, TransactionRequest,
@@ -255,4 +258,89 @@ async fn checkpoint_failure_keeps_acknowledged_commit_and_fails_later_writes() {
         response => panic!("unexpected response: {response:?}"),
     }
     reopened.shutdown().await;
+}
+
+struct HoldCheckpointAtDataFlush {
+    marker_path: std::path::PathBuf,
+}
+
+impl FaultInjector for HoldCheckpointAtDataFlush {
+    fn hit(&mut self, point: &str) -> dodb_core::Result<()> {
+        if point == "before_checkpoint_data_flush" {
+            std::fs::write(&self.marker_path, b"paused").unwrap();
+            std::thread::sleep(Duration::from_secs(60));
+        }
+        Ok(())
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn process_kill_during_checkpoint_replays_acknowledged_commit() {
+    let Some(data_dir) = std::env::var_os("DODB_BLINK_CHECKPOINT_CRASH_CHILD_DIR") else {
+        let directory = TempDir::new().unwrap();
+        let marker_path = directory.path().join("checkpoint-paused");
+        let acknowledged_path = directory.path().join("commit-acknowledged");
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .arg("--exact")
+            .arg("process_kill_during_checkpoint_replays_acknowledged_commit")
+            .arg("--nocapture")
+            .env("DODB_BLINK_CHECKPOINT_CRASH_CHILD_DIR", directory.path())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while Instant::now() < deadline && (!marker_path.exists() || !acknowledged_path.exists()) {
+            if child.try_wait().unwrap().is_some() {
+                panic!("checkpoint crash child exited before reaching the pause point");
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert!(marker_path.exists(), "child did not reach checkpoint pause");
+        assert!(
+            acknowledged_path.exists(),
+            "child did not acknowledge the transaction before checkpoint"
+        );
+        child.kill().unwrap();
+        let child_status = child.wait().unwrap();
+        assert_eq!(child_status.signal(), Some(9));
+
+        let reopened = BlinkTenantService::new(service_config(
+            directory.path().to_path_buf(),
+            BlinkCheckpointPolicy::Disabled,
+        ))
+        .unwrap();
+        match reopened
+            .execute(
+                TenantId::new(1),
+                Request::Get { key: key(77) },
+                ExecutionBudget::new(64 * 1024),
+            )
+            .await
+            .unwrap()
+        {
+            Response::Get(state) => {
+                assert_eq!(state.value(), Some(&vec![77; 4_096][..]));
+            }
+            response => panic!("unexpected response after process kill: {response:?}"),
+        }
+        reopened.shutdown().await;
+        return;
+    };
+
+    let data_dir = std::path::PathBuf::from(data_dir);
+    let mut service = BlinkTenantService::new(service_config(
+        data_dir.clone(),
+        BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes: 1 },
+    ))
+    .unwrap();
+    let checkpoint_marker = data_dir.join("checkpoint-paused");
+    service.set_fault_injector_factory(Arc::new(move |_, _| {
+        Box::new(HoldCheckpointAtDataFlush {
+            marker_path: checkpoint_marker.clone(),
+        })
+    }));
+    write_value(&service, 77, vec![77; 4_096]).await;
+    std::fs::write(data_dir.join("commit-acknowledged"), b"acknowledged").unwrap();
+    std::future::pending::<()>().await;
 }
