@@ -9,6 +9,7 @@ build = "build.rs"
 
 [dependencies]
 dodb-core.workspace = true
+dodb-client.workspace = true
 dodb-protocol.workspace = true
 dodb-service.workspace = true
 dodb-server.workspace = true
@@ -16,9 +17,12 @@ dodb-storage.workspace = true
 libc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+rcgen.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
 dashmap.workspace = true
 futures.workspace = true
-tokio = { workspace = true, features = ["rt", "sync"] }
+tokio = { workspace = true, features = ["io-util", "net", "process", "rt", "rt-multi-thread", "sync", "time"] }
 
 [build-dependencies]
 cc.workspace = true

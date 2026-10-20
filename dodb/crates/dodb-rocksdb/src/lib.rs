@@ -19,6 +19,7 @@ use dodb_service::{
 use tokio::sync::{Notify, OnceCell, Semaphore};
 
 mod engine_health;
+pub mod memory_diagnostic;
 pub mod raw_research;
 pub mod research;
 
@@ -2796,6 +2797,23 @@ mod tests {
         assert!(observation["timestamp_unix_ms"].as_u64().unwrap() > 0);
         assert_eq!(observation["databases"][0]["status"], "open");
         assert!(observation["databases"][0]["properties"]["num-running-compactions"].is_object());
+        for property_name in [
+            "block-cache-capacity",
+            "live-sst-files-size",
+            "estimate-live-data-size",
+        ] {
+            let property = &observation["databases"][0]["properties"][property_name];
+            assert_eq!(property["unit"], "bytes");
+            assert!(matches!(
+                property["status"].as_str(),
+                Some(
+                    "value"
+                        | "unsupported"
+                        | "get_int_property_unavailable"
+                        | "native_property_error"
+                )
+            ));
+        }
         let sampler = observer
             .start_sampling(Duration::from_secs(1), Duration::from_secs(1))
             .unwrap();

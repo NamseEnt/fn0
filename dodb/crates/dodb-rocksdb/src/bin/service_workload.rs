@@ -101,6 +101,11 @@ struct WorkflowPlan {
 enum DriverBackend {
     Service(Box<dyn DodbService>),
     RocksDbService(Box<dodb_rocksdb::RocksDbService>),
+    Diagnostic {
+        worker: dodb_rocksdb::memory_diagnostic::MemoryDiagnosticWorker,
+        service: dodb_rocksdb::memory_diagnostic::RemoteDodbService,
+        admission: Option<tokio::sync::Semaphore>,
+    },
     Direct {
         tenants: BTreeMap<TenantId, dodb_rocksdb::research::SynchronousRocksDbTenant>,
         admission: tokio::sync::Semaphore,
@@ -113,7 +118,89 @@ struct DriverService {
 }
 
 impl DriverService {
-    fn new(options: &Options, data_dir: PathBuf) -> Result<Self, Error> {
+    async fn new(
+        options: &Options,
+        data_dir: PathBuf,
+        memory_session: Option<Arc<dodb_rocksdb::memory_diagnostic::MemoryDiagnosticSession>>,
+    ) -> Result<Self, Error> {
+        if let Some(memory_session) = memory_session {
+            let backend = match options.backend {
+                BackendKind::Blink => "blink",
+                BackendKind::RocksDb => "rocksdb-service",
+                BackendKind::RocksDbDirect => "core",
+            };
+            let tenant_count = if matches!(options.scenario, Scenario::Multi | Scenario::Smoke) {
+                4
+            } else {
+                1
+            };
+            let source_revision = options.source_revision.clone().ok_or_else(|| {
+                Error::invalid_request("memory diagnostic requires --source-revision")
+            })?;
+            let worker_arguments = vec![
+                "--backend".to_owned(),
+                backend.to_owned(),
+                "--revision-allocator".to_owned(),
+                match options.revision_allocator {
+                    dodb_rocksdb::RevisionAllocatorMode::Serialized => "serialized".to_owned(),
+                    dodb_rocksdb::RevisionAllocatorMode::ReservedRanges => {
+                        "reserved-ranges".to_owned()
+                    }
+                },
+                "--condition-key-lock-mode".to_owned(),
+                match options.condition_key_lock_mode {
+                    dodb_rocksdb::ConditionKeyLockMode::Exclusive => "exclusive".to_owned(),
+                    dodb_rocksdb::ConditionKeyLockMode::Shared => "shared".to_owned(),
+                },
+                "--shared-blocking-slots".to_owned(),
+                options.shared_blocking_slots.to_string(),
+                "--blocking-admission".to_owned(),
+                match options.blocking_admission {
+                    dodb_rocksdb::BlockingAdmissionMode::Shared => "shared".to_owned(),
+                    dodb_rocksdb::BlockingAdmissionMode::SplitReadWrite => {
+                        "split-read-write".to_owned()
+                    }
+                    dodb_rocksdb::BlockingAdmissionMode::SplitRead2Write8 => {
+                        "split-read-2-write-8".to_owned()
+                    }
+                },
+                "--memory-tenant-count".to_owned(),
+                tenant_count.to_string(),
+                "--memory-core-tenant-subdirectories".to_owned(),
+                "1".to_owned(),
+                "--memory-blink-max-open-shards".to_owned(),
+                "16".to_owned(),
+                "--memory-blink-cache-pages".to_owned(),
+                "128".to_owned(),
+                "--engine-health-interval-ms".to_owned(),
+                options.engine_health_interval_ms.to_string(),
+            ];
+            let worker_executable = std::env::current_exe()
+                .map_err(|error| Error::invariant(error.to_string()))?
+                .with_file_name("memory_diagnostic_worker");
+            let worker = memory_session
+                .spawn_worker(
+                    &worker_executable,
+                    &worker_arguments,
+                    RESPONSE_BUDGET,
+                    dodb_protocol::ProtocolLimits::default().max_mutations,
+                    &data_dir,
+                )
+                .await
+                .map_err(Error::invariant)?;
+            let service = dodb_rocksdb::memory_diagnostic::RemoteDodbService::new(
+                worker.connection().clone(),
+            );
+            return Ok(Self {
+                backend: DriverBackend::Diagnostic {
+                    worker,
+                    service,
+                    admission: (options.backend == BackendKind::RocksDbDirect)
+                        .then(|| tokio::sync::Semaphore::new(options.shared_blocking_slots)),
+                },
+                research_metrics: None,
+            });
+        }
         let (backend, research_metrics) = match options.backend {
             BackendKind::Blink => {
                 let mut config = LocalTenantServiceConfig::default();
@@ -183,6 +270,20 @@ impl DriverService {
             DriverBackend::RocksDbService(service) => {
                 service.execute(tenant, request, budget).await
             }
+            DriverBackend::Diagnostic {
+                service, admission, ..
+            } => {
+                let _permit = match admission {
+                    Some(admission) => Some(
+                        admission
+                            .acquire()
+                            .await
+                            .map_err(|_| Error::overloaded("direct admission closed"))?,
+                    ),
+                    None => None,
+                };
+                service.execute(tenant, request, budget).await
+            }
             DriverBackend::Direct { tenants, admission } => {
                 let _permit = admission
                     .acquire()
@@ -196,18 +297,23 @@ impl DriverService {
         }
     }
 
-    async fn shutdown(&self) {
+    async fn shutdown(&self) -> Result<(), String> {
         match &self.backend {
             DriverBackend::Service(service) => service.shutdown().await,
             DriverBackend::RocksDbService(service) => service.shutdown().await,
+            DriverBackend::Diagnostic { worker, .. } => {
+                worker.shutdown()?;
+            }
             DriverBackend::Direct { .. } => {}
         }
+        Ok(())
     }
 
     fn engine_health_observer(&self) -> Option<dodb_rocksdb::EngineHealthObserver> {
         match &self.backend {
             DriverBackend::Service(_) => None,
             DriverBackend::RocksDbService(service) => Some(service.engine_health_observer()),
+            DriverBackend::Diagnostic { .. } => None,
             DriverBackend::Direct { tenants, .. } => {
                 Some(dodb_rocksdb::EngineHealthObserver::combine(
                     tenants.iter().map(|(tenant, database)| {
@@ -235,6 +341,34 @@ impl DriverService {
             || json!({"enabled": false, "reason": "disabled"}),
             |metrics| metrics.snapshot(),
         )
+    }
+
+    fn start_measurement(&self) -> Result<(), String> {
+        if let DriverBackend::Diagnostic { worker, .. } = &self.backend {
+            worker.start_measurement()?;
+        }
+        Ok(())
+    }
+
+    fn stop_measurement(&self) -> Result<(), String> {
+        if let DriverBackend::Diagnostic { worker, .. } = &self.backend {
+            worker.stop_measurement()?;
+        }
+        Ok(())
+    }
+
+    async fn residency_scan(&self, tenant: TenantId) -> Result<serde_json::Value, String> {
+        match &self.backend {
+            DriverBackend::Diagnostic { worker, .. } => {
+                dodb_rocksdb::memory_diagnostic::bounded_scan_digest(
+                    worker.connection(),
+                    tenant,
+                    RESPONSE_BUDGET,
+                )
+                .await
+            }
+            _ => Err("residency scans require the opt-in diagnostic worker".to_owned()),
+        }
     }
 }
 
@@ -266,6 +400,8 @@ struct Options {
     max_write_ledger: usize,
     require_full_window: bool,
     include_width_16: bool,
+    memory_diagnostic: bool,
+    source_revision: Option<String>,
 }
 
 struct Latencies {
@@ -985,6 +1121,16 @@ fn parse_options() -> Result<Options, String> {
             _ => Err(format!("{name} must be 0 or 1")),
         }
     };
+    let memory_diagnostic = parse_switch("--memory-diagnostic")?;
+    let source_revision = values.get("--source-revision").cloned();
+    if memory_diagnostic && source_revision.is_none() {
+        return Err("--source-revision is required with --memory-diagnostic 1".to_owned());
+    }
+    if memory_diagnostic && (research_metrics || read_stage_metrics || detailed_write_metrics) {
+        return Err(
+            "memory-only diagnostics require research and detailed stage metrics OFF".to_owned(),
+        );
+    }
     Ok(Options {
         backend,
         client_executor,
@@ -1012,6 +1158,8 @@ fn parse_options() -> Result<Options, String> {
         max_write_ledger,
         require_full_window: parse_switch("--require-full-window")?,
         include_width_16: parse_switch("--include-width-16")?,
+        memory_diagnostic,
+        source_revision,
     })
 }
 
@@ -2207,8 +2355,20 @@ async fn run(options: Options) -> Result<Value, String> {
         return Err("data directory must be empty for an independent run".to_owned());
     }
     std::fs::create_dir_all(&options.data_dir).map_err(|error| error.to_string())?;
+    let memory_session = if options.memory_diagnostic {
+        let _ = quinn::rustls::crypto::aws_lc_rs::default_provider().install_default();
+        Some(
+            dodb_rocksdb::memory_diagnostic::MemoryDiagnosticSession::new(
+                options.source_revision.clone().unwrap_or_default(),
+            )
+            .map_err(|error| error.to_string())?,
+        )
+    } else {
+        None
+    };
     let service = Arc::new(
-        DriverService::new(&options, options.data_dir.clone())
+        DriverService::new(&options, options.data_dir.clone(), memory_session.clone())
+            .await
             .map_err(|error| error.to_string())?,
     );
     let seed_started = Instant::now();
@@ -2221,6 +2381,9 @@ async fn run(options: Options) -> Result<Value, String> {
     .await
     .map_err(|error| error.to_string())?;
     let seed_elapsed = seed_started.elapsed();
+    if let Some(memory_session) = &memory_session {
+        memory_session.set_phase("warmup");
+    }
     service.set_research_warmup_phase();
     let assignments = assignments(options.scenario, options.clients);
     let tenant_count = if matches!(options.scenario, Scenario::Multi | Scenario::Smoke) {
@@ -2250,6 +2413,9 @@ async fn run(options: Options) -> Result<Value, String> {
         )
         .await;
     }
+    if let Some(memory_session) = &memory_session {
+        memory_session.set_phase("measurement");
+    }
     service.set_research_measurement_phase();
     let counters = Arc::new(
         (0..tenant_count)
@@ -2276,7 +2442,10 @@ async fn run(options: Options) -> Result<Value, String> {
         }
     });
     let engine_health_interval = Duration::from_millis(options.engine_health_interval_ms);
-    let engine_health_sampler = if engine_health_interval.is_zero() {
+    service
+        .start_measurement()
+        .map_err(|error| error.to_string())?;
+    let engine_health_sampler = if engine_health_interval.is_zero() || options.memory_diagnostic {
         None
     } else {
         service
@@ -2294,8 +2463,15 @@ async fn run(options: Options) -> Result<Value, String> {
         1 << 56,
     )
     .await;
+    service
+        .stop_measurement()
+        .map_err(|error| error.to_string())?;
     let engine_health_metrics = match engine_health_sampler {
         Some(sampler) => sampler.finish()?,
+        None if options.memory_diagnostic => json!({
+            "enabled": options.engine_health_interval_ms > 0,
+            "scope": "backend worker process; detailed samples are nested in memory_only_diagnostic.engine_health_reports",
+        }),
         None if engine_health_interval.is_zero() => dodb_rocksdb::engine_health_disabled_report(),
         None => dodb_rocksdb::engine_health_unsupported_report(engine_health_interval),
     };
@@ -2378,13 +2554,24 @@ async fn run(options: Options) -> Result<Value, String> {
         );
         total_counters.merge(&measured);
     }
+    if let Some(memory_session) = &memory_session {
+        memory_session.set_phase("final-validation");
+    }
     let disk_bytes_before_shutdown = directory_bytes(&options.data_dir);
-    service.shutdown().await;
+    service.shutdown().await?;
     drop(service);
     let mut reopen_options = options.clone();
     reopen_options.research_metrics = false;
-    let reopened = DriverService::new(&reopen_options, options.data_dir.clone())
-        .map_err(|error| error.to_string())?;
+    if let Some(memory_session) = &memory_session {
+        memory_session.set_phase("reopen-validation");
+    }
+    let reopened = DriverService::new(
+        &reopen_options,
+        options.data_dir.clone(),
+        memory_session.clone(),
+    )
+    .await
+    .map_err(|error| error.to_string())?;
     let mut reopen_validation = BTreeMap::new();
     for tenant_index in 0..tenant_count {
         let mut replay_counters = Counters::default();
@@ -2413,7 +2600,43 @@ async fn run(options: Options) -> Result<Value, String> {
             .await,
         );
     }
-    reopened.shutdown().await;
+    if let Some(memory_session) = &memory_session {
+        memory_session.set_phase("residency-cache-warmup");
+        let mut residency_reports = Vec::new();
+        for tenant_index in 0..tenant_count {
+            let tenant = TenantId::new(tenant_index as u64 + 1);
+            let first_scan = reopened
+                .residency_scan(tenant)
+                .await
+                .map_err(Error::invariant)?;
+            let host_before = memory_session.boundary_snapshot();
+            let process_before = memory_session.process_boundary_snapshot();
+            memory_session.set_phase("residency-second-scan");
+            let second_scan = reopened
+                .residency_scan(tenant)
+                .await
+                .map_err(Error::invariant)?;
+            let process_after = memory_session.process_boundary_snapshot();
+            let host_after = memory_session.boundary_snapshot();
+            let reopen_oracle_passed = reopen_validation
+                .get(&format!("tenant_{}", tenant_index + 1))
+                .and_then(|value| value.get("passed"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let residency_report = dodb_rocksdb::memory_diagnostic::residency_scan_report(
+                &first_scan,
+                &second_scan,
+                &host_before,
+                &host_after,
+                &process_before,
+                &process_after,
+                reopen_oracle_passed,
+            );
+            residency_reports.push(json!({"tenant": tenant, "result": residency_report}));
+        }
+        memory_session.record_residency_report(json!(residency_reports));
+    }
+    reopened.shutdown().await?;
     drop(reopened);
     let disk_bytes_after_reopen = directory_bytes(&options.data_dir);
     let warmup_collector_capacity_bytes = warmup_counts
@@ -2433,12 +2656,13 @@ async fn run(options: Options) -> Result<Value, String> {
         + merged_collector_capacity_bytes
         + simultaneous_replay_ledger_clone_bytes
         + latency_report_sort_copy_bytes;
-    let report = json!({
+    let mut report = json!({
         "schema": "dodb-service-workload-v1",
         "backend": match options.backend { BackendKind::Blink => "blink", BackendKind::RocksDb => "rocksdb", BackendKind::RocksDbDirect => "rocksdb-direct" },
         "scenario": match options.scenario { Scenario::Single(profile) => profile_name(profile), Scenario::Multi => "mt-mix", Scenario::Smoke => "smoke" },
         "seed": options.seed,
         "api_boundary": if options.backend == BackendKind::RocksDbDirect { "synchronous TenantDatabase core with shared Request/Response and ExecutionBudget; preopened tenant handles; same transaction and revision implementation" } else { "DodbService::execute with shared Request/Response and ExecutionBudget" },
+        "memory_diagnostic_execution": if options.memory_diagnostic { "parent workload uses DodbClient over loopback TLS to a separate backend worker; throughput and latency include transport and are memory-only evidence" } else { "disabled; existing in-process backend path" },
         "configuration": {
             "clients": options.clients,
             "client_executor": match options.client_executor { ClientExecutor::Async => "async", ClientExecutor::Dedicated => "dedicated" },
@@ -2531,6 +2755,9 @@ async fn run(options: Options) -> Result<Value, String> {
         "sync_count_and_group_metrics": "unavailable from existing service interfaces",
         "compaction_observation": "not exposed by the service comparison driver",
     });
+    if let Some(memory_session) = memory_session {
+        report["memory_only_diagnostic"] = memory_session.finish_sampling();
+    }
     Ok(report)
 }
 

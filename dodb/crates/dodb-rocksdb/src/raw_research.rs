@@ -20,6 +20,11 @@ unsafe extern "C" {
     ) -> c_int;
     fn dodb_raw_rocksdb_iterator_new(database: *mut c_void, error: *mut *mut c_char)
     -> *mut c_void;
+    fn dodb_raw_rocksdb_iterator_seek(
+        iterator: *mut c_void,
+        key: *const c_uchar,
+        key_length: usize,
+    );
     fn dodb_raw_rocksdb_iterator_valid(iterator: *mut c_void) -> c_int;
     fn dodb_raw_rocksdb_iterator_key(
         iterator: *mut c_void,
@@ -129,6 +134,62 @@ impl RawRocksDb {
         let result = unsafe { self.scan_iterator(iterator) };
         unsafe { dodb_raw_rocksdb_iterator_destroy(iterator) };
         result
+    }
+
+    pub fn scan_page(
+        &self,
+        exclusive_after_key: Option<&[u8]>,
+        limit: usize,
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let mut error = ptr::null_mut();
+        let iterator = unsafe { dodb_raw_rocksdb_iterator_new(self.database, &mut error) };
+        if iterator.is_null() {
+            return Err(take_error(error));
+        }
+        if let Some(cursor_key) = exclusive_after_key {
+            unsafe {
+                dodb_raw_rocksdb_iterator_seek(iterator, cursor_key.as_ptr(), cursor_key.len())
+            };
+        }
+        let result = unsafe { self.scan_iterator_page(iterator, exclusive_after_key, limit) };
+        unsafe { dodb_raw_rocksdb_iterator_destroy(iterator) };
+        result
+    }
+
+    unsafe fn scan_iterator_page(
+        &self,
+        iterator: *mut c_void,
+        exclusive_after_key: Option<&[u8]>,
+        limit: usize,
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {
+        let mut entries = Vec::with_capacity(limit.min(1_024));
+        while unsafe { dodb_raw_rocksdb_iterator_valid(iterator) } != 0 {
+            let mut key_length = 0;
+            let key_pointer = unsafe { dodb_raw_rocksdb_iterator_key(iterator, &mut key_length) };
+            let key = unsafe { copy_iterator_bytes(key_pointer, key_length) }?;
+            if exclusive_after_key.is_some_and(|cursor_key| key.as_slice() <= cursor_key) {
+                unsafe { dodb_raw_rocksdb_iterator_next(iterator) };
+                continue;
+            }
+            let mut value_length = 0;
+            let value_pointer =
+                unsafe { dodb_raw_rocksdb_iterator_value(iterator, &mut value_length) };
+            let value = unsafe { copy_iterator_bytes(value_pointer, value_length) }?;
+            entries.push((key, value));
+            if entries.len() == limit {
+                return Ok(entries);
+            }
+            unsafe { dodb_raw_rocksdb_iterator_next(iterator) };
+        }
+        let mut error = ptr::null_mut();
+        if unsafe { dodb_raw_rocksdb_iterator_status(iterator, &mut error) } == 0 {
+            Ok(entries)
+        } else {
+            Err(take_error(error))
+        }
     }
 
     unsafe fn scan_iterator(

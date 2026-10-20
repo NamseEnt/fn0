@@ -1871,6 +1871,7 @@ version = "0.1.0"
 dependencies = [
  "cc",
  "dashmap",
+ "dodb-client",
  "dodb-core",
  "dodb-protocol",
  "dodb-server",
@@ -1878,8 +1879,10 @@ dependencies = [
  "dodb-storage",
  "futures",
  "libc",
+ "rcgen",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "tokio",
 ]

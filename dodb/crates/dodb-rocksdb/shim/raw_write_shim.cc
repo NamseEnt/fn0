@@ -77,6 +77,12 @@ void* dodb_raw_rocksdb_iterator_new(void* database, char** error) {
   return iterator;
 }
 
+void dodb_raw_rocksdb_iterator_seek(void* iterator, const unsigned char* key,
+                                   size_t key_length) {
+  static_cast<rocksdb::Iterator*>(iterator)->Seek(
+      rocksdb::Slice(reinterpret_cast<const char*>(key), key_length));
+}
+
 int dodb_raw_rocksdb_iterator_valid(void* iterator) {
   return static_cast<rocksdb::Iterator*>(iterator)->Valid() ? 1 : 0;
 }

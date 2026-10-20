@@ -47,6 +47,8 @@ struct Options {
     shared_blocking_slots: usize,
     data_dir: PathBuf,
     report_path: PathBuf,
+    memory_diagnostic: bool,
+    source_revision: Option<String>,
 }
 
 struct SampleHistogram {
@@ -61,6 +63,12 @@ enum ProbeBackend {
     Core(dodb_rocksdb::research::SynchronousRocksDbTenant),
     RocksDbService(Box<dodb_rocksdb::RocksDbService>, tokio::runtime::Handle),
     Service(Box<dyn DodbService>, tokio::runtime::Handle),
+    Diagnostic {
+        backend_kind: BackendKind,
+        worker: dodb_rocksdb::memory_diagnostic::MemoryDiagnosticWorker,
+        service: dodb_rocksdb::memory_diagnostic::RemoteDodbService,
+        runtime: tokio::runtime::Handle,
+    },
 }
 
 struct ClientResult {
@@ -293,7 +301,65 @@ fn read_process_sample() -> Option<(u64, u64)> {
 }
 
 impl ProbeBackend {
-    fn open(options: &Options, runtime: tokio::runtime::Handle) -> Result<Self, String> {
+    fn open(
+        options: &Options,
+        runtime: tokio::runtime::Handle,
+        memory_session: Option<Arc<dodb_rocksdb::memory_diagnostic::MemoryDiagnosticSession>>,
+    ) -> Result<Self, String> {
+        if let Some(memory_session) = memory_session {
+            let backend = match options.backend {
+                BackendKind::RawRocksDb => "raw",
+                BackendKind::SynchronousCore => "core",
+                BackendKind::RocksDbService => "rocksdb-service",
+                BackendKind::Blink => "blink",
+            };
+            if options.source_revision.is_none() {
+                return Err("memory diagnostic requires --source-revision".to_owned());
+            }
+            let worker_arguments = vec![
+                "--backend".to_owned(),
+                backend.to_owned(),
+                "--revision-allocator".to_owned(),
+                match options.revision_allocator {
+                    dodb_rocksdb::RevisionAllocatorMode::Serialized => "serialized".to_owned(),
+                    dodb_rocksdb::RevisionAllocatorMode::ReservedRanges => {
+                        "reserved-ranges".to_owned()
+                    }
+                },
+                "--condition-key-lock-mode".to_owned(),
+                match options.condition_key_lock_mode {
+                    dodb_rocksdb::ConditionKeyLockMode::Exclusive => "exclusive".to_owned(),
+                    dodb_rocksdb::ConditionKeyLockMode::Shared => "shared".to_owned(),
+                },
+                "--shared-blocking-slots".to_owned(),
+                options.shared_blocking_slots.to_string(),
+                "--engine-health-interval-ms".to_owned(),
+                options.engine_health_interval_ms.to_string(),
+                "--memory-tenant-count".to_owned(),
+                "1".to_owned(),
+                "--memory-core-tenant-subdirectories".to_owned(),
+                "0".to_owned(),
+            ];
+            let worker_executable = std::env::current_exe()
+                .map_err(|error| error.to_string())?
+                .with_file_name("memory_diagnostic_worker");
+            let worker = runtime.block_on(memory_session.spawn_worker(
+                &worker_executable,
+                &worker_arguments,
+                RESPONSE_BUDGET_BYTES,
+                dodb_protocol::ProtocolLimits::default().max_mutations,
+                &options.data_dir,
+            ))?;
+            let service = dodb_rocksdb::memory_diagnostic::RemoteDodbService::new(
+                worker.connection().clone(),
+            );
+            return Ok(Self::Diagnostic {
+                backend_kind: options.backend,
+                worker,
+                service,
+                runtime,
+            });
+        }
         match options.backend {
             BackendKind::RawRocksDb => RawRocksDb::open(&options.data_dir)
                 .map(Self::Raw)
@@ -421,6 +487,41 @@ impl ProbeBackend {
                     other => Err(format!("unexpected RocksDB service response: {other:?}")),
                 }
             }
+            Self::Diagnostic {
+                backend_kind,
+                service,
+                runtime,
+                ..
+            } => {
+                let mutations = writes
+                    .iter()
+                    .map(|(key, value)| TransactionMutation::Put {
+                        key: key.clone(),
+                        value: value.clone(),
+                    })
+                    .collect();
+                let request = Request::Transact {
+                    request: TransactionRequest::new(Vec::new(), mutations),
+                };
+                let response = runtime
+                    .block_on(service.execute(
+                        TenantId::new(TENANT_NUMBER),
+                        request,
+                        ExecutionBudget::new(RESPONSE_BUDGET_BYTES),
+                    ))
+                    .map_err(|error| error.to_string())?;
+                match (backend_kind, response) {
+                    (BackendKind::RawRocksDb, Response::Transact(outcome))
+                        if outcome.commit_lsn.is_none() =>
+                    {
+                        Ok(None)
+                    }
+                    (_, Response::Transact(outcome)) if outcome.commit_lsn.is_some() => {
+                        Ok(outcome.commit_lsn.map(Revision::from))
+                    }
+                    (_, other) => Err(format!("unexpected diagnostic worker response: {other:?}")),
+                }
+            }
         }
     }
 
@@ -444,15 +545,39 @@ impl ProbeBackend {
                 runtime.block_on(service.execute(TenantId::new(TENANT_NUMBER), request, budget))
             })
             .map_err(|error| error.to_string()),
+            Self::Diagnostic {
+                backend_kind,
+                service,
+                runtime,
+                ..
+            } => {
+                let mut rows = scan_service(|request, budget| {
+                    runtime.block_on(service.execute(TenantId::new(TENANT_NUMBER), request, budget))
+                })
+                .map_err(|error| error.to_string())?;
+                if *backend_kind == BackendKind::RawRocksDb {
+                    for (_, _, revision) in &mut rows {
+                        *revision = None;
+                    }
+                }
+                Ok(rows)
+            }
         }
     }
 
-    fn shutdown(&self) {
+    fn shutdown(&self) -> Result<(), String> {
         match self {
             Self::Service(service, runtime) => runtime.block_on(service.shutdown()),
             Self::RocksDbService(service, runtime) => runtime.block_on(service.shutdown()),
+            Self::Diagnostic {
+                worker, service, ..
+            } => {
+                service.connection().close();
+                worker.shutdown().map_err(|error| error.to_string())?;
+            }
             Self::Raw(_) | Self::Core(_) => {}
         }
+        Ok(())
     }
 
     fn engine_health_observer(&self) -> Option<dodb_rocksdb::EngineHealthObserver> {
@@ -460,7 +585,35 @@ impl ProbeBackend {
             Self::Raw(database) => Some(database.engine_health_observer()),
             Self::Core(database) => Some(database.engine_health_observer()),
             Self::RocksDbService(service, _) => Some(service.engine_health_observer()),
+            Self::Diagnostic { .. } => None,
             Self::Service(_, _) => None,
+        }
+    }
+
+    fn start_measurement(&self) -> Result<(), String> {
+        if let Self::Diagnostic { worker, .. } = self {
+            worker.start_measurement()?;
+        }
+        Ok(())
+    }
+
+    fn stop_measurement(&self) -> Result<(), String> {
+        if let Self::Diagnostic { worker, .. } = self {
+            worker.stop_measurement()?;
+        }
+        Ok(())
+    }
+
+    fn residency_scan(&self) -> Result<serde_json::Value, String> {
+        match self {
+            Self::Diagnostic {
+                worker, runtime, ..
+            } => runtime.block_on(dodb_rocksdb::memory_diagnostic::bounded_scan_digest(
+                worker.connection(),
+                TenantId::new(TENANT_NUMBER),
+                RESPONSE_BUDGET_BYTES,
+            )),
+            _ => Err("residency scans require the opt-in diagnostic worker".to_owned()),
         }
     }
 }
@@ -512,6 +665,8 @@ fn parse_options() -> Result<Options, String> {
     let mut shared_blocking_slots = 8;
     let mut data_dir = None;
     let mut report_path = None;
+    let mut memory_diagnostic = false;
+    let mut source_revision = None;
     while let Some(argument) = arguments.next() {
         let value = arguments
             .next()
@@ -595,6 +750,14 @@ fn parse_options() -> Result<Options, String> {
                     .parse()
                     .map_err(|error| format!("invalid shared blocking slots: {error}"))?
             }
+            "--memory-diagnostic" => {
+                memory_diagnostic = match value.as_str() {
+                    "0" => false,
+                    "1" => true,
+                    _ => return Err("--memory-diagnostic must be 0 or 1".to_owned()),
+                }
+            }
+            "--source-revision" => source_revision = Some(value),
             "--data-dir" => data_dir = Some(PathBuf::from(value)),
             "--report" => report_path = Some(PathBuf::from(value)),
             _ => return Err(format!("unknown argument: {argument}")),
@@ -616,6 +779,8 @@ fn parse_options() -> Result<Options, String> {
         shared_blocking_slots,
         data_dir: data_dir.ok_or_else(|| "--data-dir is required".to_owned())?,
         report_path: report_path.ok_or_else(|| "--report is required".to_owned())?,
+        memory_diagnostic,
+        source_revision,
     };
     if ![1, 16].contains(&options.width) {
         return Err("width must be 1 or 16".to_owned());
@@ -632,6 +797,9 @@ fn parse_options() -> Result<Options, String> {
             "value size must be 512; duration, call cap, and shared slots must be nonzero"
                 .to_owned(),
         );
+    }
+    if options.memory_diagnostic && options.source_revision.is_none() {
+        return Err("--source-revision is required with --memory-diagnostic 1".to_owned());
     }
     Ok(options)
 }
@@ -660,12 +828,30 @@ fn run() -> Result<(), String> {
         .enable_all()
         .build()
         .map_err(|error| error.to_string())?;
-    let tenant = Arc::new(ProbeBackend::open(&options, runtime.handle().clone())?);
+    let memory_session = if options.memory_diagnostic {
+        let _ = quinn::rustls::crypto::aws_lc_rs::default_provider().install_default();
+        Some(Arc::new(
+            dodb_rocksdb::memory_diagnostic::MemoryDiagnosticSession::new(
+                options.source_revision.clone().unwrap_or_default(),
+            )
+            .map_err(|error| error.to_string())?,
+        ))
+    } else {
+        None
+    };
+    let tenant = Arc::new(ProbeBackend::open(
+        &options,
+        runtime.handle().clone(),
+        memory_session.clone(),
+    )?);
     prepopulate_pool(&tenant, &options)?;
     let seeded_disk_bytes = directory_bytes(&options.data_dir)?;
     let baseline_rows = tenant.read_all()?;
     let baseline_revisions = collect_baseline_revisions(&baseline_rows, &options)?;
     drop(baseline_rows);
+    if let Some(memory_session) = &memory_session {
+        memory_session.set_phase("warmup");
+    }
     let warmup_phase = execute_phase(
         Arc::clone(&tenant),
         &options,
@@ -676,7 +862,11 @@ fn run() -> Result<(), String> {
     )?;
     let process_sampler = ProcessSampler::start()?;
     let engine_health_interval = Duration::from_millis(options.engine_health_interval_ms);
-    let engine_health_sampler = if engine_health_interval.is_zero() {
+    tenant.start_measurement()?;
+    if let Some(memory_session) = &memory_session {
+        memory_session.set_phase("measurement");
+    }
+    let engine_health_sampler = if engine_health_interval.is_zero() || options.memory_diagnostic {
         None
     } else {
         tenant
@@ -697,8 +887,13 @@ fn run() -> Result<(), String> {
         warmup_phase.client_results,
         &baseline_revisions,
     )?;
+    tenant.stop_measurement()?;
     let engine_health_metrics = match engine_health_sampler {
         Some(sampler) => sampler.finish()?,
+        None if options.memory_diagnostic => serde_json::json!({
+            "enabled": options.engine_health_interval_ms > 0,
+            "scope": "backend worker process; detailed samples are nested in memory_only_diagnostic.engine_health_reports",
+        }),
         None if engine_health_interval.is_zero() => dodb_rocksdb::engine_health_disabled_report(),
         None => dodb_rocksdb::engine_health_unsupported_report(engine_health_interval),
     };
@@ -718,9 +913,13 @@ fn run() -> Result<(), String> {
         return Err(format!("final state oracle failed: {final_validation}"));
     }
     drop(final_rows);
-    tenant.shutdown();
+    if let Some(memory_session) = &memory_session {
+        memory_session.set_phase("reopen-validation");
+    }
+    tenant.shutdown()?;
     drop(tenant);
-    let reopened_tenant = ProbeBackend::open(&options, runtime.handle().clone())?;
+    let reopened_tenant =
+        ProbeBackend::open(&options, runtime.handle().clone(), memory_session.clone())?;
     let observed_rows = reopened_tenant.read_all()?;
     let reopen_validation = validate_rows(
         &observed_rows,
@@ -729,8 +928,6 @@ fn run() -> Result<(), String> {
         &options,
     )?;
     drop(observed_rows);
-    reopened_tenant.shutdown();
-    drop(reopened_tenant);
     if !reopen_validation
         .get("passed")
         .and_then(Value::as_bool)
@@ -738,8 +935,35 @@ fn run() -> Result<(), String> {
     {
         return Err(format!("reopen state oracle failed: {reopen_validation}"));
     }
+    if let Some(memory_session) = &memory_session {
+        memory_session.set_phase("residency-cache-warmup");
+        let first_scan = reopened_tenant.residency_scan()?;
+        let host_before = memory_session.boundary_snapshot();
+        let process_before = memory_session.process_boundary_snapshot();
+        memory_session.set_phase("residency-second-scan");
+        let second_scan = reopened_tenant.residency_scan()?;
+        let process_after = memory_session.process_boundary_snapshot();
+        let host_after = memory_session.boundary_snapshot();
+        let reopen_oracle_passed = reopen_validation
+            .get("passed")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        memory_session.record_residency_report(
+            dodb_rocksdb::memory_diagnostic::residency_scan_report(
+                &first_scan,
+                &second_scan,
+                &host_before,
+                &host_after,
+                &process_before,
+                &process_after,
+                reopen_oracle_passed,
+            ),
+        );
+    }
+    reopened_tenant.shutdown()?;
+    drop(reopened_tenant);
     let disk_usage_bytes = directory_bytes(&options.data_dir)?;
-    let report = build_report(
+    let mut report = build_report(
         &options,
         &measured_phase.client_results,
         measured_phase.actual_duration_ms,
@@ -750,6 +974,9 @@ fn run() -> Result<(), String> {
         disk_usage_bytes,
         seeded_disk_bytes,
     );
+    if let Some(memory_session) = memory_session {
+        report["memory_only_diagnostic"] = memory_session.finish_sampling();
+    }
     let report_text = serde_json::to_string_pretty(&report).map_err(|error| error.to_string())?;
     std::fs::write(&options.report_path, format!("{report_text}\n"))
         .map_err(|error| error.to_string())?;

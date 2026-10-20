@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 
 const MAX_ENGINE_HEALTH_SAMPLES: usize = 1_024;
 
-const ENGINE_PROPERTIES: [(&str, &str); 9] = [
+const ENGINE_PROPERTIES: [(&str, &str); 12] = [
     (
         "estimate-pending-compaction-bytes",
         "rocksdb.estimate-pending-compaction-bytes",
@@ -23,6 +23,9 @@ const ENGINE_PROPERTIES: [(&str, &str); 9] = [
         "rocksdb.actual-delayed-write-rate",
     ),
     ("block-cache-usage", "rocksdb.block-cache-usage"),
+    ("block-cache-capacity", "rocksdb.block-cache-capacity"),
+    ("live-sst-files-size", "rocksdb.live-sst-files-size"),
+    ("estimate-live-data-size", "rocksdb.estimate-live-data-size"),
     ("cur-size-all-mem-tables", "rocksdb.cur-size-all-mem-tables"),
 ];
 
@@ -337,9 +340,12 @@ pub fn unsupported_report(interval: Duration) -> Value {
 
 fn property_unit(field_name: &str) -> &'static str {
     match field_name {
-        "estimate-pending-compaction-bytes" | "block-cache-usage" | "cur-size-all-mem-tables" => {
-            "bytes"
-        }
+        "estimate-pending-compaction-bytes"
+        | "block-cache-usage"
+        | "block-cache-capacity"
+        | "live-sst-files-size"
+        | "estimate-live-data-size"
+        | "cur-size-all-mem-tables" => "bytes",
         "actual-delayed-write-rate" => "bytes_per_second",
         "num-running-compactions" | "num-running-flushes" => "count",
         "mem-table-flush-pending" | "compaction-pending" | "is-write-stopped" => {
