@@ -12,6 +12,11 @@
 
 The first implementation artifact is the versioned, CRC32C-protected segmented-WAL manifest codec at `dodb/crates/dodb-storage/src/blink/segmented_wal.rs`. It encodes shard/database identity, checkpoint tree metadata, ordered segment LSN ranges, the active/next segment number, and metadata generation. Its atomic writer synchronizes the temporary file and parent directory. It is not yet connected to `BlinkStore`, WAL rotation, recovery, checkpoint execution, service configuration, or workload CLI.
 
+The code tested below is commit `0a57da5d3133081145f681ed96984b2893449462`, built with Rust/Cargo 1.97.1. Local debug test executable SHA-256 values are:
+
+- `dodb-storage` library tests: `edfcfd23bbdcf7b057acf80de36ddaccbf33dbe89daa987a9bb2a5555b13e25c`.
+- `dodb-server` `blink_wal_checkpoint`: `525c744eb6ae245c816e100e582c8f1ca2c1a12353cebd64db504cb1c44e63f8`.
+
 - `cargo +1.97.1 test --locked -p dodb-storage --lib blink::segmented_wal::tests -- --test-threads=1`: passed, 3 tests.
 - `cargo +1.97.1 fmt -p dodb-storage -- --check`: passed.
 - `git diff --check`: passed.
