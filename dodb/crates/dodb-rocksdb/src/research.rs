@@ -8,6 +8,15 @@ use super::{
     TenantDatabase, enforce_response_budget,
 };
 
+pub fn is_wal_file(path: &Path) -> bool {
+    path.extension().is_some_and(|extension| extension == "wal")
+        || (path.extension().is_some_and(|extension| extension == "log")
+            && path.file_stem().is_some_and(|stem| {
+                let stem = stem.as_encoded_bytes();
+                !stem.is_empty() && stem.iter().all(u8::is_ascii_digit)
+            }))
+}
+
 pub struct SynchronousRocksDbTenant {
     database: TenantDatabase,
 }

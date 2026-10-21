@@ -104,6 +104,8 @@ async fn threshold_checkpoints_repeat_and_reopen_keeps_latest_revision() {
     assert_eq!(metrics.checkpoints_failed, 0);
     assert_eq!(metrics.successful_mutation_transactions, 1);
     assert_eq!(metrics.mutation_commit_groups, 1);
+    assert_eq!(metrics.commit_wal_syncs, 1);
+    assert_eq!(metrics.checkpoint_wal_syncs, 2);
     assert_eq!(
         metrics.wal_syncs,
         metrics.commit_wal_syncs + metrics.checkpoint_wal_syncs

@@ -2486,11 +2486,7 @@ fn database_and_wal_bytes(path: &Path) -> (u64, u64) {
             };
             if metadata.is_dir() {
                 pending.push(entry.path());
-            } else if entry
-                .path()
-                .extension()
-                .is_some_and(|extension| extension == "wal")
-            {
+            } else if dodb_rocksdb::research::is_wal_file(&entry.path()) {
                 wal_bytes = wal_bytes.saturating_add(metadata.len());
             } else {
                 database_bytes = database_bytes.saturating_add(metadata.len());

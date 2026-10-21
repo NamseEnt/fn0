@@ -56,12 +56,21 @@ def directory_bytes(directory):
     return total_bytes
 
 
+def is_wal_file(file_path):
+    return file_path.suffix == ".wal" or (
+        file_path.suffix == ".log"
+        and bool(file_path.stem)
+        and file_path.stem.isascii()
+        and file_path.stem.isdecimal()
+    )
+
+
 def wal_bytes(directory):
     if not directory.exists():
         return 0
     total_bytes = 0
     for file_path in directory.rglob("*"):
-        if file_path.is_file() and "wal" in file_path.name.lower():
+        if file_path.is_file() and is_wal_file(file_path):
             try:
                 total_bytes += file_path.stat().st_size
             except FileNotFoundError:

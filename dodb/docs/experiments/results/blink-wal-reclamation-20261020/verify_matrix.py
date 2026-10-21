@@ -3,6 +3,8 @@ import json
 import statistics
 from pathlib import Path
 
+from run_short_matrix import is_wal_file
+
 
 ROOT = Path(__file__).resolve().parent
 OCI = ROOT / "oci"
@@ -101,6 +103,48 @@ def latency_summary(report, workload):
     }
 
 
+def corrected_write_timing(timing):
+    elapsed_ms = (
+        timing["actual_admission_drain_and_last_completion_ms"]
+        + timing["final_checkpoint_drain_ms"]
+    )
+    return elapsed_ms, timing["actual_write_batches"] / (elapsed_ms / 1_000)
+
+
+def corrected_checkpoint_syncs(metric):
+    events = metric.get("checkpoint_events", [])
+    completed = metric.get("checkpoints_completed", 0)
+    if metric.get("checkpoints_failed", 0) or metric.get("omitted_checkpoint_events", 0):
+        raise ValueError("historical sync correction requires complete successful checkpoint events")
+    if completed != len(events) or any(not event["succeeded"] for event in events):
+        raise ValueError("historical checkpoint completion count does not match successful events")
+    recorded_syncs = metric.get("checkpoint_wal_syncs", 0)
+    if recorded_syncs != completed:
+        raise ValueError("historical physical WAL reset counter does not match measurement source")
+    return recorded_syncs + completed
+
+
+def retained_wal_bytes(manifest):
+    return sum(entry["size_bytes"] for entry in manifest if is_wal_file(Path(entry["path"])))
+
+
+def median_if_available(values):
+    values = list(values)
+    if all(value is None for value in values):
+        return None
+    if any(value is None for value in values):
+        raise ValueError("cannot aggregate mixed available and unavailable measurements")
+    return statistics.median(values)
+
+
+def verify_preserved_evidence():
+    hashes = json.loads((ROOT / "corrections" / "original-evidence-sha256.json").read_text())
+    for relative_path, expected_hash in hashes.items():
+        if sha256_file(ROOT / relative_path) != expected_hash:
+            raise ValueError(f"preserved evidence changed: {relative_path}")
+    return len(hashes)
+
+
 def measurement_checkpoint_count(report, workload, events):
     if workload == "A":
         samples = report["process_metrics"]["resource_samples"]
@@ -115,9 +159,19 @@ def measurement_checkpoint_count(report, workload, events):
             and int(event["ended_unix_nanos"]) <= end_unix_nanos
         ]
         return len(completed_events), "checkpoint event timestamps within the sampled measurement window"
-    total_completed = sum(1 for event in events if event["succeeded"])
-    conservative_count = max(0, total_completed - 1)
-    return conservative_count, "completed events since the measurement reset minus one possible final coordinator group during drain"
+    timing = report["timing"]
+    drain_nanos = max(
+        0,
+        timing["actual_admission_drain_and_last_completion_ms"]
+        + timing["final_checkpoint_drain_ms"]
+        - timing["requested_measurement_ms"],
+    ) * 1_000_000
+    drain_nanos += 2_000_000
+    longer_than_drain = sum(
+        1 for event in events
+        if event["succeeded"] and event["duration_nanos"] > drain_nanos
+    )
+    return max(0, longer_than_drain - 1), "post-reset serial checkpoints longer than the entire drain bound (plus 2 ms rounding allowance), minus one possible boundary-crossing checkpoint"
 
 
 def summarize_case(case_id, workload, backend_key, repetition):
@@ -196,11 +250,10 @@ def summarize_case(case_id, workload, backend_key, repetition):
         process_peak_rss_bytes = (report["process_metrics"].get("peak_sampled_rss_kb") or 0) * 1024
         drain_ms = report.get("timing", {}).get("drain_ms")
     else:
-        throughput = report["timing"]["write_batches_per_second"]
+        total_elapsed_ms, throughput = corrected_write_timing(report["timing"])
         drain_ms = max(
             0,
-            report["timing"]["actual_admission_drain_and_last_completion_ms"]
-            - report["timing"]["requested_measurement_ms"],
+            total_elapsed_ms - report["timing"]["requested_measurement_ms"],
         )
         outcome = {
             "measurement_write_batches_acknowledged": report["counters"]["measurement_write_batches_acknowledged"],
@@ -216,6 +269,8 @@ def summarize_case(case_id, workload, backend_key, repetition):
     histogram_count = metric.get("transaction_group_count", 0)
     if histogram_count:
         average_group_size = sum(index * count for index, count in enumerate(histogram)) / histogram_count
+    checkpoint_syncs = corrected_checkpoint_syncs(metric) if backend_key != "minimal-native" else None
+    maximum_wal_bytes = controller["maximum_wal_bytes"] if backend_key != "minimal-native" else None
     result = {
         "case_id": case_id,
         "workload": workload,
@@ -234,7 +289,14 @@ def summarize_case(case_id, workload, backend_key, repetition):
         "process_peak_rss_bytes": process_peak_rss_bytes,
         "controller_peak_process_group_rss_bytes": controller["peak_process_group_rss_bytes"],
         "maximum_database_bytes": controller["maximum_database_bytes"],
-        "maximum_wal_bytes": controller["maximum_wal_bytes"],
+        "recorded_maximum_wal_bytes": controller["maximum_wal_bytes"],
+        "maximum_wal_bytes": maximum_wal_bytes,
+        "maximum_wal_bytes_scope": (
+            "controller samples throughout the complete run"
+            if maximum_wal_bytes is not None
+            else "unavailable: historical collectors omitted numeric RocksDB .log WAL files"
+        ),
+        "retained_wal_bytes_after_reopen": retained_wal_bytes(manifest),
         "database_bytes_at_end": controller["database_bytes_before_removal"],
         "database_manifest_file_count": len(manifest),
         "checkpoint_started": metric.get("checkpoints_started", 0),
@@ -253,9 +315,14 @@ def summarize_case(case_id, workload, backend_key, repetition):
         "mutation_commit_groups": metric.get("mutation_commit_groups"),
         "average_mutation_transactions_per_group": average_group_size,
         "transaction_group_histogram": histogram,
-        "wal_syncs": metric.get("wal_syncs"),
+        "recorded_wal_syncs": metric.get("wal_syncs"),
+        "wal_syncs": metric.get("commit_wal_syncs", 0) + checkpoint_syncs if checkpoint_syncs is not None else None,
         "commit_wal_syncs": metric.get("commit_wal_syncs"),
-        "checkpoint_wal_syncs": metric.get("checkpoint_wal_syncs"),
+        "recorded_checkpoint_wal_syncs": metric.get("checkpoint_wal_syncs"),
+        "checkpoint_wal_syncs": checkpoint_syncs,
+        "checkpoint_sync_correction_scope": "one omitted truncate sync per successful physical checkpoint on measurement source 876d5a1b4",
+        "recorded_throughput_per_second": report.get("throughput_per_second", {}).get("api_calls") if workload == "A" else report["timing"]["write_batches_per_second"],
+        "throughput_denominator_seconds": report["timing"]["throughput_denominator_seconds"] if workload == "A" else total_elapsed_ms / 1_000,
         "drain_ms": drain_ms,
         "final_checkpoint_drain_ms": report.get("timing", {}).get("final_checkpoint_drain_ms"),
         "errors": errors,
@@ -265,6 +332,7 @@ def summarize_case(case_id, workload, backend_key, repetition):
 
 
 def main():
+    preserved_evidence_count = verify_preserved_evidence()
     expected_cases = []
     for repetition, backends in PATH_ORDERS.items():
         for backend_key in backends:
@@ -307,9 +375,13 @@ def main():
                 "median_cpu_seconds": statistics.median(case["cpu_seconds"] or 0 for case in group),
                 "median_peak_process_group_rss_mib": statistics.median(case["controller_peak_process_group_rss_bytes"] for case in group) / 1024**2,
                 "median_maximum_database_mib": statistics.median(case["maximum_database_bytes"] for case in group) / 1024**2,
-                "median_maximum_wal_mib": statistics.median(case["wal_bytes_max"] or case["maximum_wal_bytes"] for case in group) / 1024**2,
+                "median_maximum_wal_mib": (
+                    statistics.median(case["wal_bytes_max"] or case["maximum_wal_bytes"] for case in group) / 1024**2
+                    if backend_key != "minimal-native" else None
+                ),
+                "median_retained_wal_after_reopen_mib": statistics.median(case["retained_wal_bytes_after_reopen"] for case in group) / 1024**2,
                 "median_commit_wal_syncs": statistics.median(case["commit_wal_syncs"] or 0 for case in group),
-                "median_checkpoint_wal_syncs": statistics.median(case["checkpoint_wal_syncs"] or 0 for case in group),
+                "median_checkpoint_wal_syncs": median_if_available(case["checkpoint_wal_syncs"] for case in group),
             }
     comparisons = {}
     for workload in ("A", "E"):
@@ -335,6 +407,17 @@ def main():
             }
     summary = {
         "source_sha": "876d5a1b4b7c0b2792efc27237fa3367cd8d1d9d",
+        "correction_version": 4,
+        "original_reports_modified": False,
+        "preserved_evidence_files_verified": preserved_evidence_count,
+        "correction_script_sha256": sha256_file(Path(__file__)),
+        "historical_summary": "oci/matrix-verification-final-v3.json",
+        "historical_summary_sha256": sha256_file(OCI / "matrix-verification-final-v3.json"),
+        "corrections": {
+            "rocksdb_peak_wal": "unavailable, not zero; retained WAL after reopen is derived separately from saved manifests",
+            "checkpoint_wal_syncs": "derived by adding one omitted truncate sync per successful physical checkpoint; original counters are retained alongside corrected values",
+            "E_throughput": "recomputed with recorded final checkpoint drain included; historical drain has integer millisecond precision and is zero in every E cell",
+        },
         "binary_hashes": json.loads((OCI / "binary-hashes.json").read_text()),
         "expected_cells": 24,
         "observed_cells": len(cases),
@@ -345,16 +428,16 @@ def main():
         "threshold_cells_insufficient": checkpoints_short,
         "threshold_measurement_checkpoint_method": {
             "A": "count checkpoint events whose start and end timestamps fall inside the first timestamped 30-second measurement sample window",
-            "E": "count post-reset checkpoint completions conservatively minus one possible final queued coordinator group during drain; the runner uses 64 clients, one in-flight transaction per dedicated client, and a 64-request coordinator group",
+            "E": "lower bound from post-reset serial checkpoints longer than the complete drain interval plus 2 ms rounding allowance, minus one possible boundary-crossing checkpoint",
         },
         "predeclared_path_orders": {str(key): value for key, value in PATH_ORDERS.items()},
         "aggregates": aggregates,
         "comparisons": comparisons,
         "cases": cases,
     }
-    (OCI / "matrix-verification-final-v3.json").write_text(json.dumps(summary, indent=2) + "\n")
+    (OCI / "matrix-verification-corrected-v4.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps({key: summary[key] for key in ("expected_cells", "observed_cells", "all_cells_passed_controller_and_reopen_validation", "cell_errors", "input_prefix_fingerprints_match_across_paths", "input_prefix_mismatch_cases", "threshold_cells_insufficient", "aggregates", "comparisons")}, indent=2))
-    if errors or failed_fingerprints:
+    if errors or failed_fingerprints or checkpoints_short:
         raise SystemExit(1)
 
 

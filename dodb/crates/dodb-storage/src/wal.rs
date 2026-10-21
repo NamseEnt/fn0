@@ -721,6 +721,10 @@ impl<F: DurableFile> WalLog<F> {
         self.file.sync_data().map_err(|error| {
             Error::checkpoint(format!("WAL reset truncation sync failed: {error}"))
         })?;
+        self.sync_count = self
+            .sync_count
+            .checked_add(1)
+            .ok_or_else(|| Error::invariant("WAL sync count overflow"))?;
         hit(&mut injector, "after_wal_reset_truncate_sync")?;
 
         self.history_start_lsn = checkpoint_lsn;
@@ -2420,6 +2424,7 @@ impl<F: DurableFile> LogicalWalLog<F> {
         self.file.sync_data().map_err(|error| {
             Error::checkpoint(format!("logical WAL truncation sync failed: {error}"))
         })?;
+        self.sync_count = self.sync_count.saturating_add(1);
         hit(&mut injector, "after_wal_reset_truncate_sync")?;
         self.history_start_lsn = checkpoint_lsn;
         self.history_start_sequence = checkpoint_sequence;
@@ -4473,6 +4478,61 @@ mod tests {
         reopened.reset(last_commit_lsn, None).unwrap();
         assert_eq!(reopened.last_commit_lsn(), None);
         assert_eq!(reopened.committed_batch_count(), 0);
+    }
+
+    #[test]
+    fn physical_wal_reset_counts_each_successful_sync() {
+        for fault_point in [None, Some("after_wal_reset_truncate_sync")] {
+            let mut wal = WalLog::open(CountingFile::new(None), identity()).unwrap();
+            let syncs_before = wal.metrics().unwrap().wal_syncs;
+            let calls_before = wal.file.sync_calls;
+            let mut injector = fault_point.map(FailAtPoint);
+            let result = wal.reset(
+                Lsn::ZERO,
+                injector
+                    .as_mut()
+                    .map(|injector| injector as &mut (dyn FaultInjector + Send)),
+            );
+            assert_eq!(result.is_err(), fault_point.is_some());
+            let expected_syncs = if fault_point.is_some() { 1 } else { 2 };
+            assert_eq!(wal.file.sync_calls - calls_before, expected_syncs);
+            assert_eq!(
+                wal.metrics().unwrap().wal_syncs - syncs_before,
+                expected_syncs
+            );
+            if result.is_ok() {
+                wal.reset(Lsn::ZERO, None).unwrap();
+                assert_eq!(wal.metrics().unwrap().wal_syncs - syncs_before, 4);
+                assert_eq!(wal.file.sync_calls - calls_before, 4);
+            }
+        }
+    }
+
+    #[test]
+    fn logical_wal_reset_counts_each_successful_sync() {
+        for fault_point in [None, Some("after_wal_reset_truncate_sync")] {
+            let mut wal =
+                LogicalWalLog::open(CountingFile::new(None), identity(), Lsn::ZERO, None).unwrap();
+            let syncs_before = wal.sync_count();
+            let calls_before = wal.file.sync_calls;
+            let mut injector = fault_point.map(FailAtPoint);
+            let result = wal.reset(
+                Lsn::ZERO,
+                0,
+                injector
+                    .as_mut()
+                    .map(|injector| injector as &mut (dyn FaultInjector + Send)),
+            );
+            assert_eq!(result.is_err(), fault_point.is_some());
+            let expected_syncs = if fault_point.is_some() { 1 } else { 2 };
+            assert_eq!(wal.file.sync_calls - calls_before, expected_syncs);
+            assert_eq!(wal.sync_count() - syncs_before, expected_syncs);
+            if result.is_ok() {
+                wal.reset(Lsn::ZERO, 0, None).unwrap();
+                assert_eq!(wal.sync_count() - syncs_before, 4);
+                assert_eq!(wal.file.sync_calls - calls_before, 4);
+            }
+        }
     }
 
     #[test]

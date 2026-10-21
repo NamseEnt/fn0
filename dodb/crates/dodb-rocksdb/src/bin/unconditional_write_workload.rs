@@ -1043,7 +1043,7 @@ fn run() -> Result<(), String> {
     )?;
     let checkpoint_drain_started = Instant::now();
     tenant.wait_for_blink_coordinators_idle();
-    let checkpoint_drain_ms = checkpoint_drain_started.elapsed().as_millis() as u64;
+    let checkpoint_drain_ms = checkpoint_drain_started.elapsed().as_secs_f64() * 1_000.0;
     tenant.stop_measurement()?;
     let storage_after_measurement = database_and_wal_bytes(&options.data_dir);
     let engine_health_metrics = match engine_health_sampler {
@@ -1658,6 +1658,28 @@ fn key_coordinates(key: &DocumentKey) -> Result<(usize, usize, usize), String> {
     Ok((client_index, slot_index, width_index))
 }
 
+fn measurement_timing(
+    measurement_writes: u64,
+    requested_measurement_ms: u64,
+    actual_measurement_duration_ms: u64,
+    checkpoint_drain_ms: f64,
+) -> Value {
+    let total_elapsed_ms = actual_measurement_duration_ms as f64 + checkpoint_drain_ms;
+    let denominator_seconds = total_elapsed_ms / 1_000.0;
+    json!({
+        "measurement_complete": true,
+        "accepted_as_full_window": true,
+        "termination_reason": "requested-duration",
+        "requested_measurement_ms": requested_measurement_ms,
+        "actual_admission_drain_and_last_completion_ms": actual_measurement_duration_ms,
+        "final_checkpoint_drain_ms": checkpoint_drain_ms,
+        "total_elapsed_ms": total_elapsed_ms,
+        "throughput_denominator_seconds": denominator_seconds,
+        "actual_write_batches": measurement_writes,
+        "write_batches_per_second": measurement_writes as f64 / denominator_seconds,
+    })
+}
+
 fn build_report(
     options: &Options,
     client_results: &[ClientResult],
@@ -1669,7 +1691,7 @@ fn build_report(
     disk_usage_bytes: u64,
     seeded_disk_bytes: u64,
     blink_checkpoint_metrics: Value,
-    checkpoint_drain_ms: u64,
+    checkpoint_drain_ms: f64,
     storage_before_measurement: (u64, u64),
     storage_after_measurement: (u64, u64),
 ) -> Value {
@@ -1780,16 +1802,10 @@ fn build_report(
             "measurement_payload_sequence_base": MEASUREMENT_PAYLOAD_SEQUENCE_BASE,
             "input_prefix_fingerprint": "FNV-1a 64-bit over the first 100 measurement batches per client, including physical canonical key bytes and payload bytes",
         },
-        "timing": {
-            "measurement_complete": true,
-            "accepted_as_full_window": true,
-            "termination_reason": "requested-duration",
-            "requested_measurement_ms": options.measurement_ms,
-            "actual_admission_drain_and_last_completion_ms": actual_measurement_duration_ms,
-            "final_checkpoint_drain_ms": checkpoint_drain_ms,
-            "actual_write_batches": measurement_writes,
-            "write_batches_per_second": measurement_writes as f64 / (actual_measurement_duration_ms as f64 / 1_000.0),
-        },
+        "timing": measurement_timing(
+            measurement_writes, options.measurement_ms,
+            actual_measurement_duration_ms, checkpoint_drain_ms,
+        ),
         "counters": {
             "measurement_write_batches_acknowledged": measurement_writes,
             "acknowledged_keys": acknowledged_keys,
@@ -1872,11 +1888,7 @@ fn database_and_wal_bytes(directory: &Path) -> (u64, u64) {
             };
             if metadata.is_dir() {
                 pending.push(entry.path());
-            } else if entry
-                .path()
-                .extension()
-                .is_some_and(|extension| extension == "wal")
-            {
+            } else if dodb_rocksdb::research::is_wal_file(&entry.path()) {
                 wal_bytes = wal_bytes.saturating_add(metadata.len());
             } else {
                 database_bytes = database_bytes.saturating_add(metadata.len());
@@ -2019,6 +2031,25 @@ mod tests {
         histogram_bucket_upper_bound, payload, physical_key, raw_envelope,
         sample_histogram_validation_report, update_input_prefix_fingerprint, validate_rows,
     };
+
+    #[test]
+    fn throughput_includes_final_checkpoint_drain() {
+        for (checkpoint_drain_ms, total_elapsed_ms) in
+            [(0.0, 30_000.0), (1_250.0, 31_250.0), (0.5, 30_000.5)]
+        {
+            let timing = super::measurement_timing(31_250, 30_000, 30_000, checkpoint_drain_ms);
+            assert_eq!(timing["total_elapsed_ms"], total_elapsed_ms);
+            assert_eq!(timing["final_checkpoint_drain_ms"], checkpoint_drain_ms);
+            assert_eq!(
+                timing["throughput_denominator_seconds"],
+                total_elapsed_ms / 1_000.0
+            );
+            assert_eq!(
+                timing["write_batches_per_second"],
+                31_250.0 / (total_elapsed_ms / 1_000.0)
+            );
+        }
+    }
 
     #[test]
     fn bounded_histogram_counts_all_observations_and_merges_buckets() {
