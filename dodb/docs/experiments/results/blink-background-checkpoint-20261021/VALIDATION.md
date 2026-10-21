@@ -1,5 +1,7 @@
 # Background Checkpoint Validation Record
 
+The early sections below preserve the codec-only milestone. The final section, "Segmented recovery corrections and synchronous checkpoint milestone", records the current source and validation.
+
 ## Worktree and starting state
 
 - Baseline: `39cdfe48a20fb6f381dbb461d721fd51fa8f9f0c`.
@@ -46,3 +48,41 @@ The environment matches the named host, filesystem, Rust toolchain availability,
 Not run: the sync/background contract suites; concurrent-write barrier tests; checkpoint state-preservation tests; segment transition and fault-boundary tests; format/model checks; required-file and corruption recovery cases; parent-oracle SIGKILL recovery; shutdown and resource-cap tests; OCI build/test; short or long performance matrices.
 
 The performance stage remains prohibited until implementation and every required functional/recovery validation pass.
+
+## Segmented recovery corrections and synchronous checkpoint milestone
+
+Source identity:
+
+- Starting reviewed source: `d73ff0d01018800fb68c49453bc17fcc44fa316d`.
+- Review corrections: `c13e86e6793b8cea69747338093338bde255bb1b`.
+- Checkpoint/reclamation implementation: `3d883db0c75b51f31463f197eefe53157974bf0a`.
+- Branch and worktree remain the ones named above. All Rust sources in the final test invocation match the implementation commit; `evidence/segmented-checkpoint/source-sha256.json` records seven relevant source files.
+- Local Rust/Cargo 1.97.1 on Darwin ARM64. No OCI build, execution, benchmark, or Git history rewrite was performed for this milestone.
+
+Validation and preserved evidence:
+
+| Command or check | Result | Evidence |
+| --- | --- | --- |
+| `cargo test --locked -p dodb-storage -p dodb-server` after review corrections | 292 passed, 4 ignored | `corrections-full-tests.log.gz` |
+| Initial full checkpoint test run | 300 passed, 4 ignored | `checkpoint-initial-full-tests.log.gz` |
+| Final `cargo test --locked -p dodb-storage -p dodb-server` | 301 passed, 0 failed, 4 ignored; storage library 202 passed | `checkpoint-final-full-tests.log.gz` |
+| Final `cargo check --locked -p dodb-storage -p dodb-server` | Passed; existing experiment-binary dead-code warnings remain | `cargo-final-check.log.gz` |
+| Final `cargo fmt -p dodb-storage -p dodb-server -- --check` | Passed | `cargo-final-format.log.gz` |
+| `git diff --check` | Passed | Rechecked before commits |
+| `cargo clippy --locked -p dodb-storage -p dodb-server --lib -- -D warnings` | Failed on 12 diagnostics in pre-existing code | `clippy-strict.log.gz`, `clippy-baseline.json` |
+
+Evidence files in this table are under `evidence/segmented-checkpoint/`. Gzip files preserve the original command output bytes. `SHA256SUMS`, `summary.json`, and test-executable hashes accompany them. No Clippy suppression was added. The remaining strict diagnostics include existing argument-count, nested-if, needless-deref, and redundant-slicing findings; their primary source lines are all present in the reviewed baseline. Strict Clippy is not reported as a passing check.
+
+The first checkpoint test fixture used too few overflow-backed entries to force a leaf split. Its split assertion failed, and the fixture was increased to 192 entries while retaining the assertion. The final run verifies an actual split; this was a fixture correction, not a removed invariant. A later review found that inspecting an obsolete torn INIT could mutate that unlisted file. Closed/read-only opening now refuses incomplete INIT instead, and the added preservation regression is included in the final 301-test run. Earlier passing runs are retained separately.
+
+Coverage specific to the implemented milestone:
+
+- Eight active-WAL truncation cases: partial page header, complete uncommitted page sequence, partial commit header, and partial commit tail, each before and after a nonzero checkpoint. Every case verifies acknowledged state, new successful writes, another recovery, later rotation, and another recovery.
+- Four successive writes across three rotations validate required WAL bytes against actual file lengths, cumulative batch/sync/page/write counters, and reopen counter semantics. Reclamation tests also verify cumulative counters do not reset when covered files are deleted.
+- Default service layout creates the legacy `.wal`; explicit segmented selection writes and reopens through the public transaction service. Zero segment size and use of the B-link layout by the B-tree service are rejected.
+- Repeated synchronous checkpoints force a new active file, durably advance C, remove only covered closed files, leave one required active file, preserve global next LSN/batch identifiers, and make an idle checkpoint a no-op.
+- Actual root growth, immutable pinned reads, overwrite/delete/recreate ABA, multi-key conditional transactions, tombstone revisions, post-reopen checkpointing, and stale WAL-superblock checkpoint fields are covered.
+- Twelve rotation fault-injection boundaries and 19 checkpoint fault-injection boundaries preserve acknowledged state and permit successful recovery, a later write, checkpoint, and another recovery. Failures make subsequent writes fail closed. Missing required files are rejected even when obsolete files are present. Unknown/torn unlisted files remain unchanged.
+- `segmented_checkpoint_sigkill.rs` has one child helper and one parent test which executes ten distinct real SIGKILL cases: after a page write; before/after data sync; after metadata sync; before/after checkpoint manifest publication; before/after unlink; and before/after reclamation-directory sync. The parent compares values derived independently from deterministic inputs and revisions from successful-return records, then performs another write, checkpoint, and reopen. This is ten crash scenarios, not ten separate Cargo test functions. The older segmented rotation SIGKILL test and existing legacy crash suites also pass.
+
+Implemented scope ends at synchronous checkpoint advancement and reclamation. Background worker snapshots, write/checkpoint overlap, concurrent manifest update coordination, retention-cap backpressure, workload CLI selection, the full background format/model gate, OCI validation, and performance matrices remain unimplemented or unrun. Existing legacy defaults and historical benchmark evidence are preserved. Process SIGKILL is not a power-loss test.

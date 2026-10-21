@@ -1,3 +1,25 @@
+# B-link Segmented WAL Checkpoint Results
+
+## Current milestone
+
+Implementation source: `3d883db0c75b51f31463f197eefe53157974bf0a`. Final local storage/server tests: **301 passed, 4 ignored**. Compile and formatting checks passed; strict Clippy remains blocked by 12 diagnostics on pre-existing code.
+
+The three review findings are corrected, and segmented WAL now supports synchronous checkpoint advancement and closed-file reclamation. The actual path is `BlinkTenantService` with explicit `BlinkWalLayout::Segmented` configuration, through planned `BlinkStore` transaction execution, to segmented WAL append/sync and `BlinkStore::checkpoint`. The existing coordinator awaits checkpoint completion between write groups.
+
+- Recovery removes complete uncommitted page frames and partial transaction tails through the last complete commit, then synchronizes truncation before writes resume. The regression covers recovery, a successful new write, another recovery, and later rotation, both before and after a nonzero checkpoint.
+- The default layout is restored to `Legacy`; checkpoint policy remains `Disabled`. Segmented mode is explicit, positive segment-size configuration is validated, and neither layout automatically converts the other.
+- WAL byte accounting includes all manifest-required files. Counters accumulate across rotation and reclamation; recovered history counters cover retained files and runtime sync/timing counters restart on open.
+- Checkpoint forces an active-file rotation at C, synchronizes data and alternate superblock metadata, durably commits the manifest checkpoint at C, and only then unlinks covered closed files and synchronizes their directory. The new active file remains intact.
+- Recovery repairs pages before loading the tree and restores the manifest checkpoint authority over older checkpoint fields in replayed superblocks. Missing required files are fatal; obsolete files cannot substitute for them.
+
+The implemented checkpoint is synchronous. Background write/checkpoint overlap, immutable worker snapshots, concurrent manifest update coordination, retention backpressure, workload CLI selection, format/model validation for the full background design, OCI validation of this new milestone, and performance matrices remain unimplemented or unrun. No performance, equal-memory, steady-state, or power-loss claim is made. SIGKILL evidence covers process termination only.
+
+See the appended milestone record in `VALIDATION.md` for source identity, commands, counts, failure boundaries, and preserved logs. `RECOVERY-PROTOCOL.md` distinguishes implemented behavior from the future background design. `PLAN.md` remains the larger background project plan.
+
+## Preserved initial report
+
+The following text records the earlier codec-only milestone at `c11f5a277`; its implementation status does not describe the current source.
+
 # Background B-link Checkpoint Results
 
 ## Status

@@ -1,5 +1,9 @@
 # Background B-link Checkpoint Plan
 
+## Current implementation boundary
+
+The larger background plan below remains incomplete. The current implemented milestone covers explicit segmented-mode selection, append/rotation/recovery, the three review corrections, and synchronous checkpoint boundary advancement with WAL reclamation. It does not implement the worker, concurrent write/checkpoint execution, bounded background retention, CLI selection, or performance matrices. See `RESULTS.md` and the milestone section in `VALIDATION.md` for current evidence. Future background execution must coordinate manifest publication with concurrent rotation; calling the synchronous checkpoint from a worker that owns the whole store does not establish write/checkpoint overlap.
+
 ## Scope and baseline
 
 The implementation starts at `39cdfe48a20fb6f381dbb461d721fd51fa8f9f0c` on branch `experiment/blink-background-checkpoint-20261021`. The current physical path is `BlinkStore::open_internal`, `BlinkStore::apply_serial_transaction_group`, and `BlinkStore::checkpoint` in `dodb/crates/dodb-storage/src/blink/mod.rs`, backed by one `WalLog` in `dodb/crates/dodb-storage/src/wal.rs`. `AsyncBlinkShard::start` in `dodb/crates/dodb-server/src/lib.rs` currently runs a whole checkpoint as coordinator work. The logical-WAL materializer is a separate path and is outside this change.

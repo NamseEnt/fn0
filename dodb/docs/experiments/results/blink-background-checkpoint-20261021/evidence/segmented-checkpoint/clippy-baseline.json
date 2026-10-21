@@ -1,0 +1,78 @@
+{
+  "baseline": "d73ff0d01018800fb68c49453bc17fcc44fa316d",
+  "check": "Primary diagnostic source lines already present in baseline; no lint suppression added",
+  "diagnostics": [
+    {
+      "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+      "line": 1413,
+      "diagnostic_source": "fn prepare_catalog_delta<F>(",
+      "present_in_d73ff0d": true
+    },
+    {
+      "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+      "line": 3970,
+      "diagnostic_source": "if let MaterializerState::Failed(failure) = &materializer.state {",
+      "present_in_d73ff0d": true
+    },
+    {
+      "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+      "line": 4014,
+      "diagnostic_source": "if let MaterializerState::Failed(failure) = &materializer.state {",
+      "present_in_d73ff0d": true
+    },
+    {
+      "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+      "line": 5766,
+      "diagnostic_source": "fn prepare_planned_serial_execution<'a>(",
+      "present_in_d73ff0d": true
+    },
+    {
+      "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+      "line": 6298,
+      "diagnostic_source": "if let Some(budget) = budget.as_deref_mut() {",
+      "present_in_d73ff0d": true
+    },
+    {
+      "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+      "line": 6413,
+      "diagnostic_source": ".is_some_and(|cursor| &entry.key[..] <= cursor)",
+      "present_in_d73ff0d": true
+    },
+    {
+      "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+      "line": 7609,
+      "diagnostic_source": "fn split_leaf<S: BlinkMutationState>(",
+      "present_in_d73ff0d": true
+    },
+    {
+      "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+      "line": 7651,
+      "diagnostic_source": "fn install_separator<S: BlinkMutationState>(",
+      "present_in_d73ff0d": true
+    },
+    {
+      "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+      "line": 7761,
+      "diagnostic_source": "fn split_internal<S: BlinkMutationState>(",
+      "present_in_d73ff0d": true
+    },
+    {
+      "file": "dodb/crates/dodb-storage/src/wal.rs",
+      "line": 561,
+      "diagnostic_source": "pub(crate) fn open_with_segment_boundary(",
+      "present_in_d73ff0d": true
+    },
+    {
+      "file": "dodb/crates/dodb-storage/src/wal.rs",
+      "line": 3080,
+      "diagnostic_source": "fn append_frame_direct(",
+      "present_in_d73ff0d": true
+    },
+    {
+      "file": "dodb/crates/dodb-storage/src/wal.rs",
+      "line": 3110,
+      "diagnostic_source": "fn append_frame_parts_direct(",
+      "present_in_d73ff0d": true
+    }
+  ]
+}

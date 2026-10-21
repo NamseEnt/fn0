@@ -1,0 +1,23 @@
+{
+  "source_commit": "3d883db0c75b51f31463f197eefe53157974bf0a",
+  "corrections_commit": "c13e86e6793b8cea69747338093338bde255bb1b",
+  "command": "cargo test --locked -p dodb-storage -p dodb-server",
+  "passed": 301,
+  "failed": 0,
+  "ignored": 4,
+  "reported_test_binaries": 19,
+  "storage_library": {
+    "passed": 202,
+    "ignored": 4
+  },
+  "incomplete_transaction_tail_cases": 8,
+  "checkpoint_fault_injection_boundaries": 19,
+  "rotation_fault_injection_boundaries": 12,
+  "new_checkpoint_sigkill_boundaries": 10,
+  "cargo_check": "passed",
+  "cargo_fmt_check": "passed",
+  "strict_clippy": "failed: 12 diagnostics on pre-existing code; see clippy-baseline.json",
+  "background_checkpoint": "not implemented",
+  "performance_measurements": "not run",
+  "power_loss_validation": "not run"
+}
