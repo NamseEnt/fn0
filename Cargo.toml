@@ -130,7 +130,7 @@ wasmparser = "=0.252.0"
 wasmtime = { version = "=47.0.2", default-features = false }
 wasmtime-wasi = "=47.0.2"
 wasmtime-wasi-http = "=47.0.2"
-webpki-roots = "=1.0.9"
+webpki-roots = "=1.0.10"
 wiremock = "=0.6.5"
 wit-bindgen = { version = "=0.60.0", features = ["default", "async-spawn", "inter-task-wakeup"] }
 zstd = "=0.13.3"
