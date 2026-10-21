@@ -933,6 +933,16 @@ pub struct LocalTenantServiceConfig {
     pub database_config: DatabaseConfig,
     pub coordinator_config: CoordinatorConfig,
     pub blink_checkpoint_policy: BlinkCheckpointPolicy,
+    pub blink_wal_layout: BlinkWalLayout,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BlinkWalLayout {
+    #[default]
+    Legacy,
+    Segmented {
+        max_segment_bytes: u64,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -1039,6 +1049,7 @@ impl Default for LocalTenantServiceConfig {
             database_config: DatabaseConfig::default(),
             coordinator_config: CoordinatorConfig::default(),
             blink_checkpoint_policy: BlinkCheckpointPolicy::Disabled,
+            blink_wal_layout: BlinkWalLayout::Legacy,
         }
     }
 }
@@ -1072,6 +1083,7 @@ pub struct BlinkTenantService {
     database_config: DatabaseConfig,
     coordinator_config: CoordinatorConfig,
     checkpoint_policy: BlinkCheckpointPolicy,
+    wal_layout: BlinkWalLayout,
     checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
     coordinator_activity: Arc<CoordinatorActivity>,
     shards: Mutex<BTreeMap<TenantId, Arc<AsyncBlinkShard>>>,
@@ -1147,6 +1159,16 @@ impl BlinkTenantService {
                 "B-link WAL checkpoint threshold must be positive",
             ));
         }
+        if matches!(
+            config.blink_wal_layout,
+            BlinkWalLayout::Segmented {
+                max_segment_bytes: 0
+            }
+        ) {
+            return Err(Error::invalid_request(
+                "B-link WAL segment size must be positive",
+            ));
+        }
         std::fs::create_dir_all(config.data_dir.join("blink"))?;
         let checkpoint_metrics = Arc::new(StdMutex::new(BlinkWalCheckpointMetrics {
             policy: config.blink_checkpoint_policy,
@@ -1165,6 +1187,7 @@ impl BlinkTenantService {
             database_config: config.database_config,
             coordinator_config: config.coordinator_config,
             checkpoint_policy: config.blink_checkpoint_policy,
+            wal_layout: config.blink_wal_layout,
             checkpoint_metrics,
             coordinator_activity,
             shards: Mutex::new(BTreeMap::new()),
@@ -1365,37 +1388,20 @@ impl BlinkTenantService {
         database_config.tenant_id = tenant;
         database_config.shard_id = shard_id;
         database_config.database_uuid = database_uuid(tenant, shard_id);
-        let legacy_wal_path = database_path.with_extension("wal");
-        let segmented_manifest_path = database_path.with_file_name(format!(
-            "{}.segments.manifest",
-            database_path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-        ));
-        let segmented_directory_path = database_path.with_file_name(format!(
-            "{}.segments",
-            database_path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-        ));
-        let mut store = if segmented_manifest_path.exists()
-            || segmented_directory_path.exists()
-            || !database_path.exists()
-                && !legacy_wal_path.exists()
-                && matches!(self.checkpoint_policy, BlinkCheckpointPolicy::Disabled)
-        {
-            dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_segmented_path(
-                &database_path,
-                database_config,
-                64 * 1024 * 1024,
-            )?
-        } else {
-            dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_path(
-                &database_path,
-                database_config,
-            )?
+        let mut store = match self.wal_layout {
+            BlinkWalLayout::Legacy => {
+                dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_path(
+                    &database_path,
+                    database_config,
+                )?
+            }
+            BlinkWalLayout::Segmented { max_segment_bytes } => {
+                dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_segmented_path(
+                    &database_path,
+                    database_config,
+                    max_segment_bytes,
+                )?
+            }
         };
         if let Some(factory) = self.fault_injector_factory.lock().await.clone() {
             store.set_boxed_fault_injector(factory(tenant, shard_id));
@@ -1843,6 +1849,11 @@ impl LocalTenantService {
     pub fn new(config: LocalTenantServiceConfig) -> Result<Self, Error> {
         if config.max_open_shards == 0 {
             return Err(Error::invalid_request("max_open_shards must be nonzero"));
+        }
+        if config.blink_wal_layout != BlinkWalLayout::Legacy {
+            return Err(Error::invalid_request(
+                "B-link WAL layout is unsupported by the B-tree service",
+            ));
         }
         if config.blink_checkpoint_policy != BlinkCheckpointPolicy::Disabled {
             return Err(Error::invalid_request(

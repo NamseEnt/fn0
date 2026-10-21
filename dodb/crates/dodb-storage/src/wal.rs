@@ -281,6 +281,83 @@ pub struct WalMetrics {
     pub physical_write_calls: u64,
 }
 
+impl WalMetrics {
+    pub(crate) fn accumulate_counters(&mut self, other: &Self) {
+        self.wal_syncs = self.wal_syncs.saturating_add(other.wal_syncs);
+        self.committed_batches = self
+            .committed_batches
+            .saturating_add(other.committed_batches);
+        self.page_images = self.page_images.saturating_add(other.page_images);
+        self.redo_plan_nanos = self.redo_plan_nanos.saturating_add(other.redo_plan_nanos);
+        self.append_nanos = self.append_nanos.saturating_add(other.append_nanos);
+        self.sync_nanos = self.sync_nanos.saturating_add(other.sync_nanos);
+        self.group_encode_nanos = self
+            .group_encode_nanos
+            .saturating_add(other.group_encode_nanos);
+        self.group_page_lsn_validate_nanos = self
+            .group_page_lsn_validate_nanos
+            .saturating_add(other.group_page_lsn_validate_nanos);
+        self.group_page_image_materialize_nanos = self
+            .group_page_image_materialize_nanos
+            .saturating_add(other.group_page_image_materialize_nanos);
+        self.group_page_image_validate_nanos = self
+            .group_page_image_validate_nanos
+            .saturating_add(other.group_page_image_validate_nanos);
+        self.group_digest_copy_nanos = self
+            .group_digest_copy_nanos
+            .saturating_add(other.group_digest_copy_nanos);
+        self.group_page_payload_crc_nanos = self
+            .group_page_payload_crc_nanos
+            .saturating_add(other.group_page_payload_crc_nanos);
+        self.group_page_header_crc_nanos = self
+            .group_page_header_crc_nanos
+            .saturating_add(other.group_page_header_crc_nanos);
+        self.group_page_frame_materialize_nanos = self
+            .group_page_frame_materialize_nanos
+            .saturating_add(other.group_page_frame_materialize_nanos);
+        self.group_page_frame_append_nanos = self
+            .group_page_frame_append_nanos
+            .saturating_add(other.group_page_frame_append_nanos);
+        self.group_page_direct_encode_nanos = self
+            .group_page_direct_encode_nanos
+            .saturating_add(other.group_page_direct_encode_nanos);
+        self.group_commit_digest_crc_nanos = self
+            .group_commit_digest_crc_nanos
+            .saturating_add(other.group_commit_digest_crc_nanos);
+        self.group_commit_payload_crc_nanos = self
+            .group_commit_payload_crc_nanos
+            .saturating_add(other.group_commit_payload_crc_nanos);
+        self.group_commit_header_crc_nanos = self
+            .group_commit_header_crc_nanos
+            .saturating_add(other.group_commit_header_crc_nanos);
+        self.group_commit_frame_materialize_nanos = self
+            .group_commit_frame_materialize_nanos
+            .saturating_add(other.group_commit_frame_materialize_nanos);
+        self.group_commit_frame_append_nanos = self
+            .group_commit_frame_append_nanos
+            .saturating_add(other.group_commit_frame_append_nanos);
+        self.group_commit_direct_encode_nanos = self
+            .group_commit_direct_encode_nanos
+            .saturating_add(other.group_commit_direct_encode_nanos);
+        self.group_page_frames = self
+            .group_page_frames
+            .saturating_add(other.group_page_frames);
+        self.group_commit_frames = self
+            .group_commit_frames
+            .saturating_add(other.group_commit_frames);
+        self.group_page_validations = self
+            .group_page_validations
+            .saturating_add(other.group_page_validations);
+        self.group_write_nanos = self
+            .group_write_nanos
+            .saturating_add(other.group_write_nanos);
+        self.physical_write_calls = self
+            .physical_write_calls
+            .saturating_add(other.physical_write_calls);
+        self.redo.add(&other.redo);
+    }
+}
+
 #[derive(Clone, Debug)]
 enum PendingRedo {
     Image(Box<WalPageImage>),
@@ -3128,6 +3205,7 @@ fn scan_wal<F: DurableFile>(
     let mut max_batch_id = initial_batch_id.saturating_sub(1);
     let mut last_commit_lsn = None;
     let mut last_commit_batch_id = None;
+    let mut committed_length = 0;
     let blink = page_image_format == WalPageImageFormat::ExperimentalBlink;
     let compact = page_image_format != WalPageImageFormat::Baseline;
     let keep_batches = !blink || materialization == ScanMaterialization::Batches;
@@ -3209,6 +3287,7 @@ fn scan_wal<F: DurableFile>(
                 format_version,
                 verify_identity(format_version, &payload, identity)?,
             ));
+            committed_length = offset;
             continue;
         };
         if record_lsn <= history_start_lsn {
@@ -3359,6 +3438,7 @@ fn scan_wal<F: DurableFile>(
                 report.committed_batches += 1;
                 last_commit_lsn = Some(record_lsn);
                 last_commit_batch_id = Some(batch_id);
+                committed_length = offset;
             }
             WalRecordType::LogicalPut | WalRecordType::LogicalDelete => {
                 return Err(Error::unsupported_format(
@@ -3397,7 +3477,11 @@ fn scan_wal<F: DurableFile>(
         pages,
         redo,
         report,
-        valid_length: offset,
+        valid_length: if start_batch_id.is_some() {
+            committed_length
+        } else {
+            offset
+        },
     })
 }
 

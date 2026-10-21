@@ -39,6 +39,7 @@ pub(crate) struct SegmentedWal {
     manifest: SegmentedWalManifest,
     active: WalLog<ProductionFile>,
     max_segment_bytes: u64,
+    closed_metrics: WalMetrics,
 }
 
 impl SegmentedWal {
@@ -100,6 +101,7 @@ impl SegmentedWal {
             manifest,
             active,
             max_segment_bytes,
+            closed_metrics: WalMetrics::default(),
         })
     }
 
@@ -116,6 +118,7 @@ impl SegmentedWal {
         }
         let mut recovered_pages = BTreeMap::new();
         let mut active = None;
+        let mut closed_metrics = WalMetrics::default();
         for segment in &manifest.segments {
             let path = segment_path(&segment_directory, segment.number);
             if !path.is_file() {
@@ -190,6 +193,8 @@ impl SegmentedWal {
             }
             if segment.number == manifest.active_segment {
                 active = Some(wal);
+            } else {
+                closed_metrics.accumulate_counters(&wal.metrics()?);
             }
         }
         let active = active.ok_or_else(|| Error::corruption("active WAL segment is missing"))?;
@@ -200,6 +205,7 @@ impl SegmentedWal {
                 manifest,
                 active,
                 max_segment_bytes,
+                closed_metrics,
             },
             recovered_pages,
         ))
@@ -214,11 +220,22 @@ impl SegmentedWal {
     }
 
     pub(crate) fn metrics(&self) -> Result<WalMetrics> {
-        self.active.metrics()
-    }
-
-    pub(crate) fn wal_bytes(&self) -> Result<u64> {
-        Ok(self.active.metrics()?.wal_bytes)
+        let mut metrics = self.active.metrics()?;
+        metrics.accumulate_counters(&self.closed_metrics);
+        for segment in self
+            .manifest
+            .segments
+            .iter()
+            .filter(|segment| segment.closed)
+        {
+            metrics.wal_bytes = metrics
+                .wal_bytes
+                .checked_add(
+                    fs::metadata(segment_path(&self.segment_directory, segment.number))?.len(),
+                )
+                .ok_or_else(|| Error::invariant("retained WAL byte count overflow"))?;
+        }
+        Ok(metrics)
     }
 
     pub(crate) fn append_group(
@@ -249,7 +266,9 @@ impl SegmentedWal {
         &mut self,
         mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
     ) -> Result<()> {
-        if self.wal_bytes()? < self.max_segment_bytes || self.active.last_commit_lsn().is_none() {
+        if self.active.metrics()?.wal_bytes < self.max_segment_bytes
+            || self.active.last_commit_lsn().is_none()
+        {
             return Ok(());
         }
         hit(&mut injector, "before_wal_segment_close")?;
@@ -335,6 +354,8 @@ impl SegmentedWal {
         next_manifest
             .write_atomic_with_fault_injector(&self.manifest_path, injector.as_deref_mut())?;
         hit(&mut injector, "after_wal_manifest_publish")?;
+        self.closed_metrics
+            .accumulate_counters(&self.active.metrics()?);
         self.manifest = next_manifest;
         self.active = new_active;
         Ok(())
@@ -1053,6 +1074,106 @@ mod storage_tests {
             fs::metadata(&active_file).unwrap().len(),
             active_length_before_tail
         );
+        drop(reopened);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn segmented_incomplete_transaction_recovery_accepts_writes_and_recovers_again() {
+        for tail_case in 0..4 {
+            let path = database_path(&format!("incomplete-transaction-{tail_case}"));
+            let mut store = open(&path, u64::MAX);
+            let acknowledged = store.put(key(b"acknowledged"), b"keep".to_vec()).unwrap();
+            let wal_path = segment_path(&sidecar_path(&path, SEGMENT_DIRECTORY_SUFFIX), 1);
+            let committed_length = fs::metadata(&wal_path).unwrap().len();
+            store.put(key(b"incomplete"), b"discard".to_vec()).unwrap();
+            drop(store);
+            let bytes = fs::read(&wal_path).unwrap();
+            let mut offset = committed_length as usize;
+            let mut commit_offset = offset;
+            while offset < bytes.len() {
+                commit_offset = offset;
+                offset += read_u32(&bytes, offset + 8).unwrap() as usize;
+            }
+            let cut = match tail_case {
+                0 => committed_length as usize + 1,
+                1 => commit_offset,
+                2 => commit_offset + crate::wal::WAL_HEADER_SIZE,
+                _ => bytes.len() - 1,
+            };
+            OpenOptions::new()
+                .write(true)
+                .open(&wal_path)
+                .unwrap()
+                .set_len(cut as u64)
+                .unwrap();
+            let mut recovered = open(&path, u64::MAX);
+            assert_present(&mut recovered, &key(b"acknowledged"), b"keep", acknowledged);
+            assert!(matches!(
+                recovered.get(&key(b"incomplete")).unwrap(),
+                RevisionState::Missing { .. }
+            ));
+            assert_eq!(fs::metadata(&wal_path).unwrap().len(), committed_length);
+            let next_revision = recovered
+                .put(key(b"after-recovery"), b"durable".to_vec())
+                .unwrap();
+            drop(recovered);
+            let mut verified = open(&path, 1);
+            assert_present(&mut verified, &key(b"acknowledged"), b"keep", acknowledged);
+            assert_present(
+                &mut verified,
+                &key(b"after-recovery"),
+                b"durable",
+                next_revision,
+            );
+            let rotated_revision = verified
+                .put(key(b"after-rotation"), b"rotated".to_vec())
+                .unwrap();
+            drop(verified);
+            let mut rotated = open(&path, 1);
+            assert_present(
+                &mut rotated,
+                &key(b"after-recovery"),
+                b"durable",
+                next_revision,
+            );
+            assert_present(
+                &mut rotated,
+                &key(b"after-rotation"),
+                b"rotated",
+                rotated_revision,
+            );
+            drop(rotated);
+            fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        }
+    }
+
+    #[test]
+    fn segmented_metrics_include_closed_files_and_counters_across_rotations() {
+        let path = database_path("metrics");
+        let mut store = open(&path, 1);
+        let mut previous = WalMetrics::default();
+        for sequence in 1..=4 {
+            store.put(key(&[sequence]), vec![sequence; 128]).unwrap();
+            let metrics = store.wal_metrics().unwrap().unwrap();
+            let actual_bytes: u64 = fs::read_dir(sidecar_path(&path, SEGMENT_DIRECTORY_SUFFIX))
+                .unwrap()
+                .map(|entry| entry.unwrap().metadata().unwrap().len())
+                .sum();
+            assert_eq!(metrics.wal_bytes, actual_bytes);
+            assert_eq!(metrics.committed_batches, usize::from(sequence));
+            assert_eq!(metrics.wal_syncs, u64::from(sequence) * 2);
+            assert!(metrics.page_images > previous.page_images);
+            assert!(metrics.physical_write_calls > previous.physical_write_calls);
+            assert!(metrics.redo.page_image_records > previous.redo.page_image_records);
+            previous = metrics;
+        }
+        drop(store);
+        let reopened = open(&path, 1);
+        let metrics = reopened.wal_metrics().unwrap().unwrap();
+        assert_eq!(metrics.wal_bytes, previous.wal_bytes);
+        assert_eq!(metrics.committed_batches, 4);
+        assert_eq!(metrics.wal_syncs, 0);
         drop(reopened);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }

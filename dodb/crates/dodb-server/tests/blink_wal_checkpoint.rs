@@ -7,7 +7,9 @@ use std::time::{Duration, Instant};
 use dodb_core::{
     DocumentKey, Error, TenantId, TransactionCondition, TransactionMutation, TransactionRequest,
 };
-use dodb_server::{BlinkCheckpointPolicy, BlinkTenantService, LocalTenantServiceConfig};
+use dodb_server::{
+    BlinkCheckpointPolicy, BlinkTenantService, BlinkWalLayout, LocalTenantServiceConfig,
+};
 use dodb_service::{DodbService, ExecutionBudget, Request, Response};
 use dodb_storage::FaultInjector;
 use tempfile::TempDir;
@@ -64,15 +66,29 @@ async fn disabled_policy_does_not_checkpoint_and_default_is_disabled() {
     assert_eq!(metrics.policy, BlinkCheckpointPolicy::Disabled);
     assert_eq!(metrics.checkpoints_started, 0);
     assert_eq!(metrics.checkpoints_completed, 0);
+    assert_eq!(
+        LocalTenantServiceConfig::default().blink_wal_layout,
+        BlinkWalLayout::Legacy
+    );
+    let database_path = directory.path().join("blink").join("tenant-1-shard-1.db");
+    assert!(database_path.with_extension("wal").is_file());
+    assert!(
+        !database_path
+            .with_file_name("tenant-1-shard-1.db.segments.manifest")
+            .exists()
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn disabled_policy_new_shard_uses_segmented_wal_through_service_transactions() {
+async fn explicit_segmented_layout_uses_segmented_wal_through_service_transactions() {
     let directory = TempDir::new().unwrap();
-    let config = service_config(
+    let mut config = service_config(
         directory.path().to_path_buf(),
         BlinkCheckpointPolicy::Disabled,
     );
+    config.blink_wal_layout = BlinkWalLayout::Segmented {
+        max_segment_bytes: 1,
+    };
     let service = BlinkTenantService::new(config.clone()).unwrap();
     write_value(&service, 1, b"segmented-service-value".to_vec()).await;
     let state = match service
