@@ -1,0 +1,29 @@
+{
+  "argv": [
+    "rustup",
+    "run",
+    "1.97.1",
+    "cargo",
+    "test",
+    "--locked",
+    "--release",
+    "-p",
+    "dodb-rocksdb",
+    "--bin",
+    "service_workload",
+    "--bin",
+    "unconditional_write_workload",
+    "--test",
+    "measurement_corrections",
+    "--test",
+    "transaction_contract",
+    "--test",
+    "read_contract",
+    "--test",
+    "contract_history",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/bench/zfs/db/blink-wal-reclamation-20261020/source-corrections-20261021",
+  "run_id": "corrections-20261021-tests"
+}

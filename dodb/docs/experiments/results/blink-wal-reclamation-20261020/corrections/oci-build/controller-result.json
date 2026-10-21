@@ -1,0 +1,9 @@
+{
+  "exit_code": 0,
+  "stop_reason": null,
+  "elapsed_seconds": 299.8312586240936,
+  "sample_count": 294,
+  "peak_process_group_rss_bytes": 1897218048,
+  "minimum_mem_available_bytes": 3181490176,
+  "minimum_filesystem_available_bytes": 46560485376
+}

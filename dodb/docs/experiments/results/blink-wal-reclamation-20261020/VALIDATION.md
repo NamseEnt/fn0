@@ -44,3 +44,24 @@ For A, checkpoint event wall timestamps were compared against the 30-second meas
 Full stdout, stderr, raw/enriched JSON, per-run commands and settings, process/resource time series, checkpoint events, database-file manifests and hashes, RocksDB LOG files, completion records, and controller failure artifacts are under `oci/`. The source SHA and executable hashes are in the matrix plan, commands, and reports.
 
 The 30-second results answer the short-run comparison only. They do not establish long-term steady state. The memory experiment remains a follow-up; these data do not show equal-memory performance or page-cache eviction/reload behavior.
+
+## Measurement correction validation (2026-10-21)
+
+Correction implementation source: `817f4173e90b9a6c0dbae0fde263ea3876915719`. Performance measurement provenance remains the original `876d5a1b4` source and original binaries.
+
+Local checks:
+
+- `cargo test --locked -p dodb-storage --lib wal::tests:: -- --test-threads=1`: 24 passed, including physical and logical WAL reset counters checked against actual file sync calls, repeated resets, and failure after the first sync.
+- `cargo test --locked -p dodb-server --test blink_wal_checkpoint -- --test-threads=1`: 6 passed, including SIGKILL recovery and the strengthened exact commit/checkpoint sync assertions.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s dodb/docs/experiments/results/blink-wal-reclamation-20261020 -p test_measurement_corrections.py -v`: 5 passed. These cover numeric RocksDB WAL classification, diagnostic-log exclusion, manifest accounting, nonzero/submillisecond checkpoint drain, validated historical sync correction, conservative measurement checkpoint counts, and unavailable peak WAL values.
+- `cargo test --locked -p dodb-storage --lib page_delta_checkpoint_fault_matrix_preserves_acknowledged_writes -- --test-threads=1`: 1 passed after the counter correction.
+- `cargo fmt -p dodb-storage -p dodb-server -p dodb-rocksdb -- --check`: passed.
+- The corrected verifier rechecked all 24 existing cells, their report hashes, fixed input fingerprints, and repeated checkpoint evidence. All 367 original OCI evidence hashes are unchanged. The new output is `oci/matrix-verification-corrected-v4.json`; prior summaries and original reports remain intact.
+
+OCI validation used the same approved AArch64 ZFS host, pinned Rust 1.97.1, RocksDB source/archive, and shared build cache as the original matrix. A clean detached worktree at correction source `817f4173e90b9a6c0dbae0fde263ea3876915719` was created separately from the original measurement checkout.
+
+- The monitored helper build used `CARGO_BUILD_JOBS=1` and `cargo test --locked --release -p dodb-rocksdb --bin service_workload --bin unconditional_write_workload --test measurement_corrections --test transaction_contract --test read_contract --test contract_history --no-run`. It passed in 299.8 seconds, with 1,897,218,048 bytes maximum process-group RSS, minimum 3,181,490,176 bytes host MemAvailable, and minimum 46,560,485,376 bytes filesystem free.
+- The same test targets then ran with `-- --test-threads=1`: 24 passed (9 service driver unit tests, 5 unconditional driver unit tests including final checkpoint drain, 4 history tests, 1 WAL classification regression, 3 read contracts, and 2 transaction contracts). The test controller passed with no stop condition; its process-group peak RSS was 126,529,536 bytes.
+- Build and test execution did not overlap. The helper's copied SHA256SUMS were independently checked after transfer.
+
+Complete build/controller logs, helper provenance and hashes, resource samples, test commands, and raw test output are recorded under `corrections/oci-build/`, `corrections/oci-helper-run/`, and `corrections/oci-tests/`. Local command results are summarized in `corrections/local-validation.json`. These records are separate from the original measurement evidence. No new performance matrix or memory-limit experiment was run.

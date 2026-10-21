@@ -1,0 +1,36 @@
+{
+  "source_sha": "817f4173e90b9a6c0dbae0fde263ea3876915719",
+  "kind": "recorded local command results, not raw process transcripts",
+  "checks": [
+    {
+      "command": "cargo test --locked -p dodb-storage --lib wal::tests:: -- --test-threads=1",
+      "passed": 24,
+      "failed": 0
+    },
+    {
+      "command": "cargo test --locked -p dodb-server --test blink_wal_checkpoint -- --test-threads=1",
+      "passed": 6,
+      "failed": 0
+    },
+    {
+      "command": "cargo test --locked -p dodb-storage --lib page_delta_checkpoint_fault_matrix_preserves_acknowledged_writes -- --test-threads=1",
+      "passed": 1,
+      "failed": 0
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s dodb/docs/experiments/results/blink-wal-reclamation-20261020 -p test_measurement_corrections.py -v",
+      "passed": 5,
+      "failed": 0
+    },
+    {
+      "command": "cargo fmt -p dodb-storage -p dodb-server -p dodb-rocksdb -- --check",
+      "exit_code": 0
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 dodb/docs/experiments/results/blink-wal-reclamation-20261020/verify_matrix.py",
+      "exit_code": 0,
+      "cells_verified": 24,
+      "original_evidence_hashes_verified": 367
+    }
+  ]
+}
