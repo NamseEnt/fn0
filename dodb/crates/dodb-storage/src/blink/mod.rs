@@ -26,6 +26,7 @@ use crate::btree::{
     StorageLimits, StorageMetrics,
 };
 mod leaf;
+pub mod segmented_wal;
 
 use crate::churn::{self, ChurnCounter, ChurnSite};
 use crate::durable_file::{DurableFile, ProductionFile};

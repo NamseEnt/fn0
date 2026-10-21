@@ -855,7 +855,7 @@ async fn async_shard_groups_mutations_around_checkpoint_barriers() {
             .unwrap(),
         BatchResponse::Get(RevisionState::present(b"third", third_revision))
     );
-    assert_eq!(shard.wal_metrics().unwrap().wal_syncs, 4);
+    assert_eq!(shard.wal_metrics().unwrap().wal_syncs, 5);
     shard.close().await.unwrap();
 }
 

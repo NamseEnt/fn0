@@ -1,0 +1,11 @@
+Command in the new worktree:
+
+`cargo +1.97.1 test --locked -p dodb-storage --lib -- --test-threads=1`
+
+Observed result before the test expectation correction:
+
+`btree::tests::async_shard_groups_mutations_around_checkpoint_barriers` failed at `dodb/crates/dodb-storage/src/btree/tests.rs:858`: observed `wal_syncs` was 5 and expected value was 4. The full library run reported 186 passed, 1 failed, and 4 ignored.
+
+The unchanged baseline checkout at `/Users/namse/fn0-dodb-wal-reclamation` ran the same focused test with the same Rust 1.97.1 command and reproduced observed 5 versus expected 4. This evidence is retained because it predates the assertion update.
+
+The new worktree expectation was updated to 5, consistent with counting both successful physical WAL reset sync calls. No baseline checkout file was changed.
