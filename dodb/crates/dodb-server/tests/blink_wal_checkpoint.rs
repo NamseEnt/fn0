@@ -67,6 +67,64 @@ async fn disabled_policy_does_not_checkpoint_and_default_is_disabled() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn disabled_policy_new_shard_uses_segmented_wal_through_service_transactions() {
+    let directory = TempDir::new().unwrap();
+    let config = service_config(
+        directory.path().to_path_buf(),
+        BlinkCheckpointPolicy::Disabled,
+    );
+    let service = BlinkTenantService::new(config.clone()).unwrap();
+    write_value(&service, 1, b"segmented-service-value".to_vec()).await;
+    let state = match service
+        .execute(
+            TenantId::new(1),
+            Request::Get { key: key(1) },
+            ExecutionBudget::new(64 * 1024),
+        )
+        .await
+        .unwrap()
+    {
+        Response::Get(state) => state,
+        response => panic!("unexpected response: {response:?}"),
+    };
+    service.shutdown().await;
+
+    let database_path = directory.path().join("blink").join("tenant-1-shard-1.db");
+    assert!(
+        database_path
+            .with_file_name("tenant-1-shard-1.db.segments.manifest")
+            .is_file()
+    );
+    assert!(!database_path.with_extension("wal").exists());
+    assert!(
+        database_path
+            .with_file_name("tenant-1-shard-1.db.segments")
+            .is_dir()
+    );
+
+    let reopened = BlinkTenantService::new(config).unwrap();
+    match reopened
+        .execute(
+            TenantId::new(1),
+            Request::Get { key: key(1) },
+            ExecutionBudget::new(64 * 1024),
+        )
+        .await
+        .unwrap()
+    {
+        Response::Get(recovered) => {
+            assert_eq!(
+                recovered.value(),
+                Some(b"segmented-service-value".as_slice())
+            );
+            assert_eq!(recovered.revision(), state.revision());
+        }
+        response => panic!("unexpected response: {response:?}"),
+    }
+    reopened.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn threshold_checkpoints_repeat_and_reopen_keeps_latest_revision() {
     let directory = TempDir::new().unwrap();
     let config = service_config(

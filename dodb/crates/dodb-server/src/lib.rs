@@ -1365,10 +1365,38 @@ impl BlinkTenantService {
         database_config.tenant_id = tenant;
         database_config.shard_id = shard_id;
         database_config.database_uuid = database_uuid(tenant, shard_id);
-        let mut store = dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_path(
-            &database_path,
-            database_config,
-        )?;
+        let legacy_wal_path = database_path.with_extension("wal");
+        let segmented_manifest_path = database_path.with_file_name(format!(
+            "{}.segments.manifest",
+            database_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+        ));
+        let segmented_directory_path = database_path.with_file_name(format!(
+            "{}.segments",
+            database_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+        ));
+        let mut store = if segmented_manifest_path.exists()
+            || segmented_directory_path.exists()
+            || !database_path.exists()
+                && !legacy_wal_path.exists()
+                && matches!(self.checkpoint_policy, BlinkCheckpointPolicy::Disabled)
+        {
+            dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_segmented_path(
+                &database_path,
+                database_config,
+                64 * 1024 * 1024,
+            )?
+        } else {
+            dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_path(
+                &database_path,
+                database_config,
+            )?
+        };
         if let Some(factory) = self.fault_injector_factory.lock().await.clone() {
             store.set_boxed_fault_injector(factory(tenant, shard_id));
         }

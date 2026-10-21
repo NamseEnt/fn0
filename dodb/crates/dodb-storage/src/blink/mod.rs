@@ -28,6 +28,7 @@ use crate::btree::{
 mod leaf;
 pub mod segmented_wal;
 
+use crate::blink::segmented_wal::SegmentedWal;
 use crate::churn::{self, ChurnCounter, ChurnSite};
 use crate::durable_file::{DurableFile, ProductionFile};
 use crate::fault::FaultInjector;
@@ -1811,6 +1812,7 @@ enum SuperblockSlot {
 pub struct BlinkStore<F: DurableFile, W: DurableFile = crate::btree::NoWal> {
     file: F,
     wal: Option<WalLog<W>>,
+    segmented_wal: Option<SegmentedWal>,
     logical_wal: Option<LogicalWalLog<W>>,
     state: BlinkState,
     publisher: Arc<GenerationPublisher>,
@@ -1916,11 +1918,82 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         config: DatabaseConfig,
     ) -> Result<BlinkStore<ProductionFile, ProductionFile>> {
         let path = path.as_ref();
+        if segmented_wal::artifacts_exist(path) {
+            return Err(Error::unsupported_format(
+                "segmented WAL database requires segmented path opening",
+            ));
+        }
         BlinkStore::<ProductionFile, ProductionFile>::open_with_wal(
             ProductionFile::open(path)?,
             ProductionFile::open(path.with_extension("wal"))?,
             config,
         )
+    }
+
+    pub fn open_segmented_path(
+        path: impl AsRef<Path>,
+        config: DatabaseConfig,
+        max_segment_bytes: u64,
+    ) -> Result<BlinkStore<ProductionFile, ProductionFile>> {
+        if max_segment_bytes == 0 {
+            return Err(Error::invalid_input("segmented WAL size limit is zero"));
+        }
+        let path = path.as_ref();
+        let identity = WalIdentity::new(
+            config.database_uuid,
+            config.tenant_id,
+            config.shard_id,
+            config.shard_epoch,
+        );
+        let mut file = ProductionFile::open(path)?;
+        if segmented_wal::manifest_exists(path) {
+            let (segmented_wal, recovery_pages) =
+                SegmentedWal::open(path, identity, max_segment_bytes)?;
+            validate_segmented_database_identity(&mut file, &recovery_pages, &config)?;
+            recover_data_file(&mut file, &recovery_pages, Lsn::ZERO)?;
+            drop(recovery_pages);
+            let (mut store, selected) =
+                BlinkStore::<ProductionFile, ProductionFile>::load_file(file, config)?;
+            if selected.checkpoint_lsn != Lsn::ZERO {
+                return Err(Error::corruption(
+                    "segmented WAL database has an advanced checkpoint boundary",
+                ));
+            }
+            store.next_lsn = segmented_wal.next_lsn();
+            store.next_batch_id = segmented_wal.next_batch_id();
+            store.next_revision = Revision::new(
+                store
+                    .check_invariants()?
+                    .max_revision
+                    .get()
+                    .max(store.next_lsn.get())
+                    .checked_add(1)
+                    .ok_or_else(|| Error::invariant("experimental revision exhausted"))?,
+            );
+            store.segmented_wal = Some(segmented_wal);
+            store.planned_execution = true;
+            return Ok(store);
+        }
+        if !file.is_empty()? || path.with_extension("wal").exists() {
+            return Err(Error::invalid_input(
+                "segmented WAL can only be enabled for a new Blink database",
+            ));
+        }
+        let mut store = BlinkStore::<ProductionFile, ProductionFile>::initialize(file, config)?;
+        let segmented_wal = SegmentedWal::create(
+            path,
+            identity,
+            store.current_superblock.root_page_id,
+            store.current_superblock.free_list_head,
+            store.current_superblock.high_water_page_id,
+            u32::from(BLINK_SUPERBLOCK_VERSION),
+            max_segment_bytes,
+        )?;
+        store.next_lsn = segmented_wal.next_lsn();
+        store.next_batch_id = segmented_wal.next_batch_id();
+        store.segmented_wal = Some(segmented_wal);
+        store.planned_execution = true;
+        Ok(store)
     }
 
     fn open_internal(
@@ -2001,6 +2074,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         Ok(Self {
             file,
             wal: None,
+            segmented_wal: None,
             logical_wal: None,
             state,
             publisher,
@@ -2086,6 +2160,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         let store = Self {
             file,
             wal: None,
+            segmented_wal: None,
             logical_wal: None,
             state,
             publisher,
@@ -2125,6 +2200,9 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
 
     pub fn wal_metrics(&self) -> Result<Option<WalMetrics>> {
         if let Some(wal) = self.wal.as_ref() {
+            return wal.metrics().map(Some);
+        }
+        if let Some(wal) = self.segmented_wal.as_ref() {
             return wal.metrics().map(Some);
         }
         self.logical_wal
@@ -2671,11 +2749,18 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         working.allow_page_reuse = self.publisher.can_reuse_pages();
         let mut working_sb = self.current_superblock.clone();
         let mut working_slot = self.active_slot;
-        let mut next_lsn = self.wal.as_ref().map_or(self.next_lsn, WalLog::next_lsn);
-        let mut next_batch = self
-            .wal
-            .as_ref()
-            .map_or(self.next_batch_id, WalLog::next_batch_id);
+        let mut next_lsn = self.segmented_wal.as_ref().map_or_else(
+            || self.wal.as_ref().map_or(self.next_lsn, WalLog::next_lsn),
+            SegmentedWal::next_lsn,
+        );
+        let mut next_batch = self.segmented_wal.as_ref().map_or_else(
+            || {
+                self.wal
+                    .as_ref()
+                    .map_or(self.next_batch_id, WalLog::next_batch_id)
+            },
+            SegmentedWal::next_batch_id,
+        );
         let mut next_revision = self.next_revision;
         let mut candidates = Vec::new();
         let mut results = Vec::with_capacity(requests.len());
@@ -2846,7 +2931,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                 },
                 image: sb_image,
             });
-            if self.wal.is_some() {
+            if self.wal.is_some() || self.segmented_wal.is_some() {
                 wal_commits.push(WalCommit {
                     batch_id: next_batch - (candidates.len() as u64) + wal_commits.len() as u64,
                     commit_lsn: candidate.result.commit_lsn.ok_or_else(|| {
@@ -2860,6 +2945,11 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             }
         }
         if let Some(wal) = self.wal.as_mut() {
+            if let Err(error) = wal.append_group(&wal_commits, self.fault_injector.as_deref_mut()) {
+                self.broken = Some(error.to_string());
+                return Err(error);
+            }
+        } else if let Some(wal) = self.segmented_wal.as_mut() {
             if let Err(error) = wal.append_group(&wal_commits, self.fault_injector.as_deref_mut()) {
                 self.broken = Some(error.to_string());
                 return Err(error);
@@ -3016,11 +3106,18 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             .planning_nanos
             .saturating_add(elapsed_nanos(planning_started));
 
-        let current_next_lsn = self.wal.as_ref().map_or(self.next_lsn, WalLog::next_lsn);
-        let current_next_batch_id = self
-            .wal
-            .as_ref()
-            .map_or(self.next_batch_id, WalLog::next_batch_id);
+        let current_next_lsn = self.segmented_wal.as_ref().map_or_else(
+            || self.wal.as_ref().map_or(self.next_lsn, WalLog::next_lsn),
+            SegmentedWal::next_lsn,
+        );
+        let current_next_batch_id = self.segmented_wal.as_ref().map_or_else(
+            || {
+                self.wal
+                    .as_ref()
+                    .map_or(self.next_batch_id, WalLog::next_batch_id)
+            },
+            SegmentedWal::next_batch_id,
+        );
         let physical_started = Instant::now();
         let parallel_preparation = match self.parallel_worker_pool.as_ref() {
             Some(worker_pool) => {
@@ -3253,6 +3350,42 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             };
             // Each WAL image above comes from this execution's successful
             // encode_blink_page or encode_blink_superblock call in this process.
+            let _wal_append_site = churn::enter(ChurnSite::WalAppend);
+            let reports = match wal.append_group_trusted_internal_with_page_deltas(
+                &wal_commits,
+                &mut delta_request,
+                self.fault_injector.as_deref_mut(),
+            ) {
+                Ok(reports) => reports,
+                Err(error) => {
+                    self.broken = Some(error.to_string());
+                    return Err(error);
+                }
+            };
+            wal_bytes = reports
+                .iter()
+                .map(|report| report.bytes_written as u64)
+                .sum();
+        } else if let Some(wal) = self.segmented_wal.as_mut() {
+            let eligible_commits = executed
+                .iter()
+                .map(|transaction| !transaction.superblock_image_emitted)
+                .collect::<Vec<_>>();
+            let dirty_pages = &self.dirty_pages;
+            let committed_pages = &self.state.pages;
+            let mut base_source = |page_id: PageId| -> Option<Cow<'_, [u8; PAGE_SIZE]>> {
+                if let Some(image) = dirty_pages.get(&page_id) {
+                    return Some(Cow::Borrowed(&**image));
+                }
+                committed_pages
+                    .get(&page_id)
+                    .and_then(|page| encode_blink_page(page_id, page).ok())
+                    .map(Cow::Owned)
+            };
+            let mut delta_request = WalDeltaRequest {
+                eligible_commits: &eligible_commits,
+                base_source: &mut base_source,
+            };
             let _wal_append_site = churn::enter(ChurnSite::WalAppend);
             let reports = match wal.append_group_trusted_internal_with_page_deltas(
                 &wal_commits,
@@ -3522,6 +3655,9 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             return Err(Error::checkpoint(format!(
                 "experimental storage shard is degraded: {message}"
             )));
+        }
+        if let Some(wal) = self.segmented_wal.as_ref() {
+            return Err(wal.reject_reset());
         }
         if self.logical_wal.is_some() {
             return self.checkpoint_logical_inner();
@@ -8959,6 +9095,49 @@ fn recover_data_file<F: DurableFile>(
         write_all_at(file, page_id.get() * PAGE_SIZE as u64, &image[..])?;
     }
     file.sync_data()
+}
+
+fn validate_segmented_database_identity<F: DurableFile>(
+    file: &mut F,
+    recovery_pages: &BTreeMap<PageId, RecoveredWalPage>,
+    config: &DatabaseConfig,
+) -> Result<()> {
+    let matches_config = |superblock: &BlinkSuperblock| {
+        superblock.database_uuid == config.database_uuid
+            && superblock.tenant_id == config.tenant_id
+            && superblock.shard_id == config.shard_id
+            && superblock.shard_epoch == config.shard_epoch
+    };
+    if file.len()? >= 2 * PAGE_SIZE as u64 {
+        let mut matching_superblock_found = false;
+        for superblock_page in [PageId::ZERO, PageId::new(1)] {
+            let offset = superblock_page.get() * PAGE_SIZE as u64;
+            if let Ok(bytes) = read_exact_at(file, offset, PAGE_SIZE)
+                && let Ok(superblock) = decode_blink_superblock_image(&bytes)
+            {
+                if !matches_config(&superblock) {
+                    return Err(Error::corruption(
+                        "experimental database identity differs from segmented WAL",
+                    ));
+                }
+                matching_superblock_found = true;
+            }
+        }
+        if matching_superblock_found {
+            return Ok(());
+        }
+    }
+    for superblock_page in [PageId::ZERO, PageId::new(1)] {
+        if let Some(page) = recovery_pages.get(&superblock_page)
+            && let Ok(superblock) = decode_blink_superblock_image(&page.image[..])
+            && matches_config(&superblock)
+        {
+            return Ok(());
+        }
+    }
+    Err(Error::corruption(
+        "segmented WAL cannot identify the experimental database",
+    ))
 }
 
 fn existing_checkpoint<F: DurableFile>(

@@ -401,6 +401,7 @@ pub struct WalLog<F: DurableFile> {
     next_lsn: Lsn,
     next_batch_id: u64,
     history_start_lsn: Lsn,
+    segment_start_batch_id: Option<u64>,
     last_commit_lsn: Option<Lsn>,
     recovery_batches: Vec<CommittedWalBatch>,
     recovery_pages: BTreeMap<PageId, RecoveredWalPage>,
@@ -462,15 +463,44 @@ impl<F: DurableFile> WalLog<F> {
     }
 
     pub fn open_with_page_image_format_and_fault_injector_and_start_lsn(
+        file: F,
+        identity: WalIdentity,
+        page_image_format: WalPageImageFormat,
+        start_after_lsn: Lsn,
+        injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+    ) -> Result<Self> {
+        Self::open_with_segment_boundary(
+            file,
+            identity,
+            page_image_format,
+            start_after_lsn,
+            None,
+            true,
+            false,
+            injector,
+        )
+    }
+
+    pub(crate) fn open_with_segment_boundary(
         mut file: F,
         identity: WalIdentity,
         page_image_format: WalPageImageFormat,
         start_after_lsn: Lsn,
+        start_batch_id: Option<u64>,
+        truncate_torn_tail: bool,
+        defer_initial_sync: bool,
         mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
     ) -> Result<Self> {
         let length = file.len()?;
         if length == 0 {
-            return Self::initialize_empty(file, identity, start_after_lsn, page_image_format);
+            return Self::initialize_empty(
+                file,
+                identity,
+                start_after_lsn,
+                start_batch_id.unwrap_or(1),
+                defer_initial_sync,
+                page_image_format,
+            );
         }
         if usize::try_from(length)
             .ok()
@@ -483,12 +513,24 @@ impl<F: DurableFile> WalLog<F> {
                 page_image_format,
             )?
         {
+            if start_batch_id.is_some() {
+                return Err(Error::corruption(
+                    "segmented WAL initialization record is incomplete",
+                ));
+            }
             file.set_len(0)
                 .map_err(|error| Error::recovery(format!("WAL torn INIT reset failed: {error}")))?;
             file.sync_data().map_err(|error| {
                 Error::durability(format!("WAL torn INIT reset sync failed: {error}"))
             })?;
-            return Self::initialize_empty(file, identity, start_after_lsn, page_image_format);
+            return Self::initialize_empty(
+                file,
+                identity,
+                start_after_lsn,
+                start_batch_id.unwrap_or(1),
+                defer_initial_sync,
+                page_image_format,
+            );
         }
 
         let WalScanOutput {
@@ -507,6 +549,7 @@ impl<F: DurableFile> WalLog<F> {
             &identity,
             page_image_format,
             ScanMaterialization::Recovery,
+            start_batch_id,
         )?;
         if format_version == WAL_LOGICAL_FORMAT_VERSION {
             return Err(Error::unsupported_format(
@@ -514,6 +557,11 @@ impl<F: DurableFile> WalLog<F> {
             ));
         }
         if valid_length < length {
+            if !truncate_torn_tail {
+                return Err(Error::corruption(
+                    "closed WAL segment has an incomplete tail",
+                ));
+            }
             hit(&mut injector, "before_wal_tail_truncate")?;
             file.set_len(valid_length)?;
             file.sync_data().map_err(|error| {
@@ -542,9 +590,19 @@ impl<F: DurableFile> WalLog<F> {
             file,
             identity,
             format_version,
-            next_lsn,
+            next_lsn: if start_batch_id.is_some() {
+                last_commit_lsn
+                    .unwrap_or(history_start_lsn)
+                    .get()
+                    .checked_add(1)
+                    .map(Lsn::new)
+                    .ok_or_else(|| Error::invariant("WAL LSN exhausted"))?
+            } else {
+                next_lsn
+            },
             next_batch_id,
             history_start_lsn,
+            segment_start_batch_id: start_batch_id,
             last_commit_lsn,
             recovery_batches: batches,
             recovery_pages: pages,
@@ -568,6 +626,8 @@ impl<F: DurableFile> WalLog<F> {
         file: F,
         identity: WalIdentity,
         start_after_lsn: Lsn,
+        start_batch_id: u64,
+        defer_sync: bool,
         page_image_format: WalPageImageFormat,
     ) -> Result<Self> {
         let next_lsn = start_after_lsn
@@ -580,8 +640,9 @@ impl<F: DurableFile> WalLog<F> {
             identity,
             format_version: write_format_version(page_image_format),
             next_lsn,
-            next_batch_id: 1,
+            next_batch_id: start_batch_id,
             history_start_lsn: start_after_lsn,
+            segment_start_batch_id: start_batch_id.checked_sub(1).map(|_| start_batch_id),
             last_commit_lsn: None,
             recovery_batches: Vec::new(),
             recovery_pages: BTreeMap::new(),
@@ -601,16 +662,27 @@ impl<F: DurableFile> WalLog<F> {
         };
         let payload = wal.identity_payload(start_after_lsn);
         wal.append_frame(WalRecordType::Init, Lsn::ZERO, 0, 0, &payload, &mut None)?;
-        wal.file
-            .sync_data()
-            .map_err(|error| Error::durability(format!("initial WAL sync failed: {error}")))?;
-        wal.sync_count = 1;
+        if !defer_sync {
+            wal.file
+                .sync_data()
+                .map_err(|error| Error::durability(format!("initial WAL sync failed: {error}")))?;
+            wal.sync_count = 1;
+        }
         wal.scan_report.records_scanned = 1;
         Ok(wal)
     }
 
     pub fn into_file(self) -> F {
         self.file
+    }
+
+    pub(crate) fn sync_all(&mut self) -> Result<()> {
+        self.file.sync_all()?;
+        self.sync_count = self
+            .sync_count
+            .checked_add(1)
+            .ok_or_else(|| Error::invariant("WAL sync count overflow"))?;
+        Ok(())
     }
 
     pub fn recovery_batches(&self) -> &[CommittedWalBatch] {
@@ -653,6 +725,7 @@ impl<F: DurableFile> WalLog<F> {
             &self.identity,
             self.page_image_format,
             ScanMaterialization::Batches,
+            self.segment_start_batch_id,
         )
         .expect("WAL on disk scans")
         .batches
@@ -687,6 +760,10 @@ impl<F: DurableFile> WalLog<F> {
 
     pub fn history_start_lsn(&self) -> Lsn {
         self.history_start_lsn
+    }
+
+    pub(crate) fn segment_start_batch_id(&self) -> Option<u64> {
+        self.segment_start_batch_id
     }
 
     pub fn resume_after(&mut self, checkpoint_lsn: Lsn) -> Result<()> {
@@ -3035,6 +3112,7 @@ fn scan_wal<F: DurableFile>(
     identity: &WalIdentity,
     page_image_format: WalPageImageFormat,
     materialization: ScanMaterialization,
+    start_batch_id: Option<u64>,
 ) -> Result<WalScanOutput> {
     let length = file.len()?;
     let mut offset = 0u64;
@@ -3045,9 +3123,11 @@ fn scan_wal<F: DurableFile>(
     let mut pages: BTreeMap<PageId, RecoveredWalPage> = BTreeMap::new();
     let mut redo = WalRedoStats::default();
     let mut pending: Option<PendingBatch> = None;
-    let mut highest_batch_id_seen = 0u64;
-    let mut max_batch_id = 0u64;
+    let initial_batch_id = start_batch_id.unwrap_or(1);
+    let mut highest_batch_id_seen = initial_batch_id.saturating_sub(1);
+    let mut max_batch_id = initial_batch_id.saturating_sub(1);
     let mut last_commit_lsn = None;
+    let mut last_commit_batch_id = None;
     let blink = page_image_format == WalPageImageFormat::ExperimentalBlink;
     let compact = page_image_format != WalPageImageFormat::Baseline;
     let keep_batches = !blink || materialization == ScanMaterialization::Batches;
@@ -3163,7 +3243,10 @@ fn scan_wal<F: DurableFile>(
                     .as_ref()
                     .is_none_or(|pending| pending.batch_id != batch_id)
                 {
-                    if batch_id <= highest_batch_id_seen {
+                    if batch_id <= highest_batch_id_seen
+                        || start_batch_id.is_some()
+                            && batch_id != highest_batch_id_seen.saturating_add(1)
+                    {
                         return Err(Error::corruption(
                             "WAL batch IDs are not strictly increasing",
                         ));
@@ -3275,6 +3358,7 @@ fn scan_wal<F: DurableFile>(
                 }
                 report.committed_batches += 1;
                 last_commit_lsn = Some(record_lsn);
+                last_commit_batch_id = Some(batch_id);
             }
             WalRecordType::LogicalPut | WalRecordType::LogicalDelete => {
                 return Err(Error::unsupported_format(
@@ -3292,10 +3376,17 @@ fn scan_wal<F: DurableFile>(
             .checked_add(1)
             .ok_or_else(|| Error::invariant("WAL LSN exhausted"))?,
     );
-    let next_batch_id = max_batch_id
-        .checked_add(1)
-        .ok_or_else(|| Error::invariant("WAL batch ID exhausted"))?
-        .max(1);
+    let next_batch_id = if start_batch_id.is_some() {
+        last_commit_batch_id
+            .unwrap_or(initial_batch_id.saturating_sub(1))
+            .checked_add(1)
+            .ok_or_else(|| Error::invariant("WAL batch ID exhausted"))?
+    } else {
+        max_batch_id
+            .checked_add(1)
+            .ok_or_else(|| Error::invariant("WAL batch ID exhausted"))?
+            .max(1)
+    };
     Ok(WalScanOutput {
         next_lsn,
         next_batch_id,
