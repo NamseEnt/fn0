@@ -141,6 +141,66 @@ async fn explicit_segmented_layout_uses_segmented_wal_through_service_transactio
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn segmented_threshold_checkpoints_reclaim_files_and_reopen() {
+    let directory = TempDir::new().unwrap();
+    let mut config = service_config(
+        directory.path().to_path_buf(),
+        BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes: 1 },
+    );
+    config.blink_wal_layout = BlinkWalLayout::Segmented {
+        max_segment_bytes: u64::MAX,
+    };
+    let service = BlinkTenantService::new(config.clone()).unwrap();
+    for slot in 1..=4 {
+        write_value(&service, slot, vec![slot as u8; 8192]).await;
+        service.wait_for_coordinators_idle().await;
+    }
+    let metrics = service.checkpoint_metrics_snapshot();
+    assert_eq!(metrics.checkpoints_completed, 4, "{metrics:?}");
+    assert_eq!(metrics.checkpoints_failed, 0);
+    assert_eq!(metrics.commit_wal_syncs, 4);
+    assert_eq!(metrics.checkpoint_wal_syncs, 4);
+    let segment_directory = directory.path().join("blink/tenant-1-shard-1.db.segments");
+    assert_eq!(std::fs::read_dir(&segment_directory).unwrap().count(), 1);
+    assert_eq!(
+        metrics.wal_bytes_current,
+        std::fs::read_dir(&segment_directory)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .metadata()
+            .unwrap()
+            .len()
+    );
+    service.shutdown().await;
+    let reopened = BlinkTenantService::new(config).unwrap();
+    for slot in 1..=4 {
+        match reopened
+            .execute(
+                TenantId::new(1),
+                Request::Get { key: key(slot) },
+                ExecutionBudget::new(64 * 1024),
+            )
+            .await
+            .unwrap()
+        {
+            Response::Get(state) => {
+                assert_eq!(state.value(), Some(vec![slot as u8; 8192].as_slice()))
+            }
+            response => panic!("unexpected response: {response:?}"),
+        }
+    }
+    write_value(&reopened, 5, b"after-reopen".to_vec()).await;
+    reopened.wait_for_coordinators_idle().await;
+    assert_eq!(
+        reopened.checkpoint_metrics_snapshot().checkpoints_completed,
+        1
+    );
+    reopened.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn threshold_checkpoints_repeat_and_reopen_keeps_latest_revision() {
     let directory = TempDir::new().unwrap();
     let config = service_config(
@@ -260,6 +320,22 @@ fn zero_threshold_and_btree_policy_are_rejected() {
         BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes: 1 },
     );
     assert!(dodb_server::LocalTenantService::new(unsupported_btree_policy).is_err());
+    let zero_segment = LocalTenantServiceConfig {
+        data_dir: directory.path().join("zero-segment"),
+        blink_wal_layout: BlinkWalLayout::Segmented {
+            max_segment_bytes: 0,
+        },
+        ..LocalTenantServiceConfig::default()
+    };
+    assert!(BlinkTenantService::new(zero_segment).is_err());
+    let unsupported_btree_layout = LocalTenantServiceConfig {
+        data_dir: directory.path().join("btree-layout"),
+        blink_wal_layout: BlinkWalLayout::Segmented {
+            max_segment_bytes: 1024,
+        },
+        ..LocalTenantServiceConfig::default()
+    };
+    assert!(dodb_server::LocalTenantService::new(unsupported_btree_layout).is_err());
 }
 
 struct FailCheckpointOnce(Arc<AtomicBool>);

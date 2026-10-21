@@ -284,7 +284,7 @@ fn record_histogram(histogram: &mut Vec<u64>, value: usize) {
     histogram[value.min(BLINK_LOCALITY_HISTOGRAM_BUCKETS - 1)] += 1;
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BlinkCheckpointReport {
     pub checkpoint_lsn: Lsn,
     pub checkpoint_sequence: u64,
@@ -1950,15 +1950,15 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             let (segmented_wal, recovery_pages) =
                 SegmentedWal::open(path, identity, max_segment_bytes)?;
             validate_segmented_database_identity(&mut file, &recovery_pages, &config)?;
-            recover_data_file(&mut file, &recovery_pages, Lsn::ZERO)?;
+            recover_segmented_data_file(
+                &mut file,
+                &recovery_pages,
+                segmented_wal.manifest(),
+                &config,
+            )?;
             drop(recovery_pages);
-            let (mut store, selected) =
+            let (mut store, _) =
                 BlinkStore::<ProductionFile, ProductionFile>::load_file(file, config)?;
-            if selected.checkpoint_lsn != Lsn::ZERO {
-                return Err(Error::corruption(
-                    "segmented WAL database has an advanced checkpoint boundary",
-                ));
-            }
             store.next_lsn = segmented_wal.next_lsn();
             store.next_batch_id = segmented_wal.next_batch_id();
             store.next_revision = Revision::new(
@@ -1970,6 +1970,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                     .checked_add(1)
                     .ok_or_else(|| Error::invariant("experimental revision exhausted"))?,
             );
+            segmented_wal.cleanup_obsolete_segments(None)?;
             store.segmented_wal = Some(segmented_wal);
             store.planned_execution = true;
             return Ok(store);
@@ -3624,7 +3625,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
     }
 
     fn flush_dirty(&mut self, checkpoint: bool) -> Result<()> {
-        if self.wal.is_none() {
+        if self.wal.is_none() && self.segmented_wal.is_none() {
             return self.file.sync_data();
         }
         self.hit_checkpoint_fault(checkpoint, "before_checkpoint_data_flush")?;
@@ -3633,6 +3634,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             self.hit_checkpoint_fault(checkpoint, "during_checkpoint_page_write")?;
             write_all_at(&mut self.file, page_id.get() * PAGE_SIZE as u64, &image[..])?;
             bytes = bytes.saturating_add(PAGE_SIZE as u64);
+            self.hit_checkpoint_fault(checkpoint, "after_checkpoint_page_write")?;
         }
         if let Some(image) = self.dirty_superblock.take() {
             let slot = match self.active_slot {
@@ -3656,17 +3658,83 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                 "experimental storage shard is degraded: {message}"
             )));
         }
-        if let Some(wal) = self.segmented_wal.as_ref() {
-            return Err(wal.reject_reset());
-        }
         if self.logical_wal.is_some() {
             return self.checkpoint_logical_inner();
         }
-        let result = self.checkpoint_inner();
+        let result = if self.segmented_wal.is_some() {
+            self.checkpoint_segmented_inner()
+        } else {
+            self.checkpoint_inner()
+        };
         if let Err(error) = &result {
             self.broken = Some(error.to_string());
         }
         result
+    }
+
+    fn checkpoint_segmented_inner(&mut self) -> Result<BlinkCheckpointReport> {
+        let started = Instant::now();
+        let wal = self.segmented_wal.as_ref().unwrap();
+        let checkpoint_lsn = wal.last_commit_lsn();
+        if checkpoint_lsn == wal.manifest().checkpoint_lsn {
+            return Ok(BlinkCheckpointReport {
+                checkpoint_lsn,
+                checkpoint_sequence: checkpoint_lsn.get(),
+                duration_nanos: elapsed_nanos(started),
+                ..BlinkCheckpointReport::default()
+            });
+        }
+        self.check_invariants()?;
+        self.segmented_wal
+            .as_mut()
+            .unwrap()
+            .rotate(self.fault_injector.as_deref_mut())?;
+        let pages_flushed = self.dirty_pages.len();
+        let mut bytes_written = (pages_flushed as u64 + u64::from(self.dirty_superblock.is_some()))
+            .saturating_mul(PAGE_SIZE as u64);
+        self.flush_dirty(true)?;
+        let superblock = BlinkSuperblock {
+            generation: self
+                .current_superblock
+                .generation
+                .checked_add(1)
+                .ok_or_else(|| Error::invariant("experimental superblock generation exhausted"))?,
+            checkpoint_lsn,
+            checkpoint_sequence: checkpoint_lsn.get(),
+            ..self.current_superblock.clone()
+        };
+        let slot = match self.active_slot {
+            SuperblockSlot::A => SuperblockSlot::B,
+            SuperblockSlot::B => SuperblockSlot::A,
+        };
+        let offset = match slot {
+            SuperblockSlot::A => 0,
+            SuperblockSlot::B => PAGE_SIZE as u64,
+        };
+        let image = encode_blink_superblock(&superblock)?;
+        self.hit_checkpoint_fault(true, "before_checkpoint_superblock_write")?;
+        write_all_at(&mut self.file, offset, &image)?;
+        bytes_written = bytes_written.saturating_add(PAGE_SIZE as u64);
+        self.hit_checkpoint_fault(true, "after_checkpoint_superblock_write")?;
+        self.hit_checkpoint_fault(true, "before_checkpoint_metadata_sync")?;
+        self.file.sync_data()?;
+        self.hit_checkpoint_fault(true, "after_checkpoint_metadata_sync")?;
+        let wal_bytes_reclaimed = self
+            .segmented_wal
+            .as_mut()
+            .unwrap()
+            .advance_checkpoint(&superblock, self.fault_injector.as_deref_mut())?;
+        self.current_superblock = superblock;
+        self.active_slot = slot;
+        Ok(BlinkCheckpointReport {
+            checkpoint_lsn,
+            checkpoint_sequence: checkpoint_lsn.get(),
+            pages_flushed,
+            bytes_written,
+            wal_bytes_reclaimed,
+            duration_nanos: elapsed_nanos(started),
+            ..BlinkCheckpointReport::default()
+        })
     }
 
     fn checkpoint_inner(&mut self) -> Result<BlinkCheckpointReport> {
@@ -9094,6 +9162,45 @@ fn recover_data_file<F: DurableFile>(
         }
         write_all_at(file, page_id.get() * PAGE_SIZE as u64, &image[..])?;
     }
+    file.sync_data()
+}
+
+fn recover_segmented_data_file<F: DurableFile>(
+    file: &mut F,
+    recovery_pages: &BTreeMap<PageId, RecoveredWalPage>,
+    manifest: &segmented_wal::SegmentedWalManifest,
+    config: &DatabaseConfig,
+) -> Result<()> {
+    let mut superblock = BlinkSuperblock::new(config, manifest.root_page_id);
+    superblock.free_list_head = manifest.free_list_head;
+    superblock.high_water_page_id = manifest.high_water_page_id;
+    let mut generation = 1u64;
+    let mut latest_slot = 0;
+    for slot in 0..2 {
+        if let Ok(bytes) = read_exact_at(file, slot * PAGE_SIZE as u64, PAGE_SIZE)
+            && let Ok(existing) = decode_blink_superblock_image(&bytes)
+            && existing.generation >= generation
+        {
+            generation = existing.generation;
+            latest_slot = slot;
+        }
+    }
+    if let Some(page) = [PageId::ZERO, PageId::new(1)]
+        .iter()
+        .filter_map(|page_id| recovery_pages.get(page_id))
+        .max_by_key(|page| page.commit_lsn)
+    {
+        superblock = decode_blink_superblock_image(&page.image[..])?;
+        generation = generation.max(superblock.generation);
+    }
+    superblock.generation = generation
+        .checked_add(1)
+        .ok_or_else(|| Error::invariant("experimental superblock generation exhausted"))?;
+    superblock.checkpoint_lsn = manifest.checkpoint_lsn;
+    superblock.checkpoint_sequence = manifest.checkpoint_lsn.get();
+    let image = encode_blink_superblock(&superblock)?;
+    recover_data_file(file, recovery_pages, manifest.checkpoint_lsn)?;
+    write_all_at(file, (1 - latest_slot) * PAGE_SIZE as u64, &image)?;
     file.sync_data()
 }
 

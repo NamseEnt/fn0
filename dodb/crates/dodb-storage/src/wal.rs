@@ -590,7 +590,7 @@ impl<F: DurableFile> WalLog<F> {
                 page_image_format,
             )?
         {
-            if start_batch_id.is_some() {
+            if start_batch_id.is_some() || !truncate_torn_tail {
                 return Err(Error::corruption(
                     "segmented WAL initialization record is incomplete",
                 ));

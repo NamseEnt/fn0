@@ -40,6 +40,7 @@ pub(crate) struct SegmentedWal {
     active: WalLog<ProductionFile>,
     max_segment_bytes: u64,
     closed_metrics: WalMetrics,
+    closed_wal_bytes: u64,
 }
 
 impl SegmentedWal {
@@ -102,6 +103,7 @@ impl SegmentedWal {
             active,
             max_segment_bytes,
             closed_metrics: WalMetrics::default(),
+            closed_wal_bytes: 0,
         })
     }
 
@@ -116,9 +118,15 @@ impl SegmentedWal {
         if manifest.identity != identity {
             return Err(Error::corruption("segmented WAL identity mismatch"));
         }
+        if manifest.format_version != u32::from(super::BLINK_SUPERBLOCK_VERSION) {
+            return Err(Error::unsupported_format(
+                "segmented WAL tree format is unsupported",
+            ));
+        }
         let mut recovered_pages = BTreeMap::new();
         let mut active = None;
         let mut closed_metrics = WalMetrics::default();
+        let mut closed_wal_bytes = 0u64;
         for segment in &manifest.segments {
             let path = segment_path(&segment_directory, segment.number);
             if !path.is_file() {
@@ -194,21 +202,24 @@ impl SegmentedWal {
             if segment.number == manifest.active_segment {
                 active = Some(wal);
             } else {
-                closed_metrics.accumulate_counters(&wal.metrics()?);
+                let metrics = wal.metrics()?;
+                closed_wal_bytes = closed_wal_bytes
+                    .checked_add(metrics.wal_bytes)
+                    .ok_or_else(|| Error::invariant("retained WAL byte count overflow"))?;
+                closed_metrics.accumulate_counters(&metrics);
             }
         }
         let active = active.ok_or_else(|| Error::corruption("active WAL segment is missing"))?;
-        Ok((
-            Self {
-                manifest_path,
-                segment_directory,
-                manifest,
-                active,
-                max_segment_bytes,
-                closed_metrics,
-            },
-            recovered_pages,
-        ))
+        let wal = Self {
+            manifest_path,
+            segment_directory,
+            manifest,
+            active,
+            max_segment_bytes,
+            closed_metrics,
+            closed_wal_bytes,
+        };
+        Ok((wal, recovered_pages))
     }
 
     pub(crate) fn next_lsn(&self) -> Lsn {
@@ -222,19 +233,10 @@ impl SegmentedWal {
     pub(crate) fn metrics(&self) -> Result<WalMetrics> {
         let mut metrics = self.active.metrics()?;
         metrics.accumulate_counters(&self.closed_metrics);
-        for segment in self
-            .manifest
-            .segments
-            .iter()
-            .filter(|segment| segment.closed)
-        {
-            metrics.wal_bytes = metrics
-                .wal_bytes
-                .checked_add(
-                    fs::metadata(segment_path(&self.segment_directory, segment.number))?.len(),
-                )
-                .ok_or_else(|| Error::invariant("retained WAL byte count overflow"))?;
-        }
+        metrics.wal_bytes = metrics
+            .wal_bytes
+            .checked_add(self.closed_wal_bytes)
+            .ok_or_else(|| Error::invariant("retained WAL byte count overflow"))?;
         Ok(metrics)
     }
 
@@ -258,17 +260,40 @@ impl SegmentedWal {
             .append_group_trusted_internal_with_page_deltas(commits, delta, injector)
     }
 
-    pub(crate) fn reject_reset(&self) -> Error {
-        Error::checkpoint("checkpoint and WAL reset are disabled for segmented WAL")
+    pub(crate) fn manifest(&self) -> &SegmentedWalManifest {
+        &self.manifest
+    }
+
+    pub(crate) fn last_commit_lsn(&self) -> Lsn {
+        self.active
+            .last_commit_lsn()
+            .or_else(|| {
+                self.manifest
+                    .segments
+                    .iter()
+                    .rev()
+                    .find_map(|segment| segment.end_lsn)
+            })
+            .unwrap_or(self.manifest.checkpoint_lsn)
     }
 
     fn rotate_if_needed(
         &mut self,
-        mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+        injector: Option<&mut (dyn FaultInjector + Send + '_)>,
     ) -> Result<()> {
         if self.active.metrics()?.wal_bytes < self.max_segment_bytes
             || self.active.last_commit_lsn().is_none()
         {
+            return Ok(());
+        }
+        self.rotate(injector)
+    }
+
+    pub(crate) fn rotate(
+        &mut self,
+        mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+    ) -> Result<()> {
+        if self.active.last_commit_lsn().is_none() {
             return Ok(());
         }
         hit(&mut injector, "before_wal_segment_close")?;
@@ -354,10 +379,138 @@ impl SegmentedWal {
         next_manifest
             .write_atomic_with_fault_injector(&self.manifest_path, injector.as_deref_mut())?;
         hit(&mut injector, "after_wal_manifest_publish")?;
-        self.closed_metrics
-            .accumulate_counters(&self.active.metrics()?);
+        let metrics = self.active.metrics()?;
+        self.closed_wal_bytes = self
+            .closed_wal_bytes
+            .checked_add(metrics.wal_bytes)
+            .ok_or_else(|| Error::invariant("retained WAL byte count overflow"))?;
+        self.closed_metrics.accumulate_counters(&metrics);
         self.manifest = next_manifest;
         self.active = new_active;
+        Ok(())
+    }
+
+    pub(crate) fn advance_checkpoint(
+        &mut self,
+        superblock: &super::BlinkSuperblock,
+        mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+    ) -> Result<u64> {
+        let checkpoint_lsn = superblock.checkpoint_lsn;
+        if checkpoint_lsn < self.manifest.checkpoint_lsn || checkpoint_lsn != self.last_commit_lsn()
+        {
+            return Err(Error::checkpoint("invalid segmented WAL checkpoint target"));
+        }
+        let mut next_manifest = self.manifest.clone();
+        next_manifest.generation = next_manifest
+            .generation
+            .checked_add(1)
+            .ok_or_else(|| Error::invariant("WAL manifest generation exhausted"))?;
+        next_manifest.checkpoint_lsn = checkpoint_lsn;
+        next_manifest.root_page_id = superblock.root_page_id;
+        next_manifest.free_list_head = superblock.free_list_head;
+        next_manifest.high_water_page_id = superblock.high_water_page_id;
+        let mut reclaimed_bytes = 0u64;
+        let mut obsolete_numbers = Vec::new();
+        for segment in &self.manifest.segments {
+            if segment.closed && segment.end_lsn.is_some_and(|end| end <= checkpoint_lsn) {
+                obsolete_numbers.push(segment.number);
+                reclaimed_bytes = reclaimed_bytes
+                    .checked_add(
+                        fs::metadata(segment_path(&self.segment_directory, segment.number))?.len(),
+                    )
+                    .ok_or_else(|| Error::invariant("reclaimed WAL byte count overflow"))?;
+            }
+        }
+        next_manifest.segments.retain(|segment| {
+            !segment.closed || segment.end_lsn.is_some_and(|end| end > checkpoint_lsn)
+        });
+        next_manifest.validate()?;
+        hit(&mut injector, "before_checkpoint_manifest_publish")?;
+        next_manifest
+            .write_atomic_with_fault_injector(&self.manifest_path, injector.as_deref_mut())?;
+        self.manifest = next_manifest;
+        self.closed_wal_bytes = self
+            .closed_wal_bytes
+            .checked_sub(reclaimed_bytes)
+            .ok_or_else(|| Error::invariant("retained WAL byte count underflow"))?;
+        hit(&mut injector, "after_checkpoint_manifest_publish")?;
+        for number in obsolete_numbers {
+            self.unlink_obsolete_segment(number, &mut injector)?;
+        }
+        self.sync_reclamation_directory(&mut injector)?;
+        Ok(reclaimed_bytes)
+    }
+
+    pub(crate) fn cleanup_obsolete_segments(
+        &self,
+        mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+    ) -> Result<()> {
+        let first_required = self.manifest.segments[0].number;
+        if first_required == 1 {
+            return Ok(());
+        }
+        for entry in fs::read_dir(&self.segment_directory)? {
+            let entry = entry?;
+            let name = entry.file_name();
+            let Some(name) = name.to_str() else { continue };
+            let Some(number) = name
+                .strip_prefix("segment-")
+                .and_then(|name| name.strip_suffix(".wal"))
+                .and_then(|number| number.parse::<u64>().ok())
+            else {
+                continue;
+            };
+            if number == 0
+                || number >= first_required
+                || entry.path() != segment_path(&self.segment_directory, number)
+            {
+                continue;
+            }
+            if !entry.file_type()?.is_file() || entry.metadata()?.len() == 0 {
+                continue;
+            }
+            let Ok(obsolete) = WalLog::open_with_segment_boundary(
+                ProductionFile::open(entry.path())?,
+                self.manifest.identity.clone(),
+                WalPageImageFormat::ExperimentalBlink,
+                Lsn::ZERO,
+                None,
+                false,
+                false,
+                None,
+            ) else {
+                continue;
+            };
+            if obsolete.history_start_lsn() >= self.manifest.checkpoint_lsn
+                || obsolete
+                    .last_commit_lsn()
+                    .is_none_or(|end| end > self.manifest.checkpoint_lsn)
+                || obsolete.next_lsn().get() > self.manifest.checkpoint_lsn.get().saturating_add(1)
+            {
+                continue;
+            }
+            self.unlink_obsolete_segment(number, &mut injector)?;
+        }
+        self.sync_reclamation_directory(&mut injector)
+    }
+
+    fn unlink_obsolete_segment(
+        &self,
+        number: u64,
+        injector: &mut Option<&mut (dyn FaultInjector + Send + '_)>,
+    ) -> Result<()> {
+        hit(injector, "before_checkpoint_wal_unlink")?;
+        fs::remove_file(segment_path(&self.segment_directory, number))?;
+        hit(injector, "after_checkpoint_wal_unlink")
+    }
+
+    fn sync_reclamation_directory(
+        &self,
+        injector: &mut Option<&mut (dyn FaultInjector + Send + '_)>,
+    ) -> Result<()> {
+        hit(injector, "before_checkpoint_wal_directory_sync")?;
+        sync_directory(&self.segment_directory)?;
+        hit(injector, "after_checkpoint_wal_directory_sync")?;
         Ok(())
     }
 }
@@ -567,11 +720,6 @@ impl SegmentedWalManifest {
                 "segmented WAL manifest generation or format is zero",
             ));
         }
-        if self.checkpoint_lsn != Lsn::ZERO {
-            return Err(Error::corruption(
-                "segmented WAL checkpoint boundary must remain at zero",
-            ));
-        }
         if self.segments.is_empty() || self.segments.len() > MAX_SEGMENTS {
             return Err(Error::corruption(
                 "segmented WAL manifest segment list is invalid",
@@ -587,9 +735,10 @@ impl SegmentedWalManifest {
         let mut previous_batch_id: Option<u64> = None;
         let mut active_count = 0usize;
         let first_segment = self.segments.first().unwrap();
-        if first_segment.number != 1
-            || first_segment.start_lsn != Lsn::new(1)
-            || first_segment.start_batch_id != 1
+        if first_segment.number == 0
+            || self.checkpoint_lsn.get().checked_add(1) != Some(first_segment.start_lsn.get())
+            || self.checkpoint_lsn == Lsn::ZERO
+                && (first_segment.number != 1 || first_segment.start_batch_id != 1)
         {
             return Err(Error::corruption(
                 "first WAL segment does not begin at the initial boundary",
@@ -624,17 +773,17 @@ impl SegmentedWalManifest {
                     "WAL segment range straddles the durable checkpoint boundary",
                 ));
             }
-            if let Some(number) = previous_number {
-                if segment.number != number.saturating_add(1) {
-                    return Err(Error::corruption("WAL segment numbers are not contiguous"));
-                }
+            if let Some(number) = previous_number
+                && segment.number != number.saturating_add(1)
+            {
+                return Err(Error::corruption("WAL segment numbers are not contiguous"));
             }
-            if let Some(end) = previous_end {
-                if segment.start_lsn.get() != end.get().saturating_add(1) {
-                    return Err(Error::corruption(
-                        "WAL segment LSN ranges are not contiguous",
-                    ));
-                }
+            if let Some(end) = previous_end
+                && segment.start_lsn.get() != end.get().saturating_add(1)
+            {
+                return Err(Error::corruption(
+                    "WAL segment LSN ranges are not contiguous",
+                ));
             }
             if let Some(end_batch_id) = previous_batch_id
                 && segment.start_batch_id != end_batch_id.saturating_add(1)
@@ -977,7 +1126,6 @@ mod storage_tests {
         assert!(second < conditional_revision);
         assert!(second < deleted);
         assert!(deleted < recreated);
-        assert!(store.checkpoint().is_err());
         drop(store);
 
         let mut reopened = open(&path, 1);
@@ -1080,11 +1228,22 @@ mod storage_tests {
 
     #[test]
     fn segmented_incomplete_transaction_recovery_accepts_writes_and_recovers_again() {
-        for tail_case in 0..4 {
+        for tail_case in 0..8 {
             let path = database_path(&format!("incomplete-transaction-{tail_case}"));
             let mut store = open(&path, u64::MAX);
             let acknowledged = store.put(key(b"acknowledged"), b"keep".to_vec()).unwrap();
-            let wal_path = segment_path(&sidecar_path(&path, SEGMENT_DIRECTORY_SUFFIX), 1);
+            if tail_case >= 4 {
+                store.checkpoint().unwrap();
+            }
+            let wal_path = segment_path(
+                &sidecar_path(&path, SEGMENT_DIRECTORY_SUFFIX),
+                store
+                    .segmented_wal
+                    .as_ref()
+                    .unwrap()
+                    .manifest
+                    .active_segment,
+            );
             let committed_length = fs::metadata(&wal_path).unwrap().len();
             store.put(key(b"incomplete"), b"discard".to_vec()).unwrap();
             drop(store);
@@ -1095,7 +1254,7 @@ mod storage_tests {
                 commit_offset = offset;
                 offset += read_u32(&bytes, offset + 8).unwrap() as usize;
             }
-            let cut = match tail_case {
+            let cut = match tail_case % 4 {
                 0 => committed_length as usize + 1,
                 1 => commit_offset,
                 2 => commit_offset + crate::wal::WAL_HEADER_SIZE,
@@ -1176,6 +1335,362 @@ mod storage_tests {
         assert_eq!(metrics.wal_syncs, 0);
         drop(reopened);
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn segmented_checkpoint_reclaims_closed_files_and_repeats_after_reopen() {
+        let path = database_path("checkpoint-reclamation");
+        let mut store = open(&path, 1);
+        let mut expected = Vec::new();
+        for sequence in 0..192u16 {
+            let document_key = key(&sequence.to_be_bytes());
+            let value = vec![sequence as u8; 1024];
+            let revision = store.put(document_key.clone(), value.clone()).unwrap();
+            expected.push((document_key, value, revision));
+        }
+        assert!(store.split_metrics().leaf_splits > 0);
+        let pinned = store.publisher.pin();
+        let mut corrections = 0;
+        let pinned_documents =
+            super::super::scan_state(&pinned, None, usize::MAX, &mut corrections).unwrap();
+        let metrics_before = store.wal_metrics().unwrap().unwrap();
+        let next_lsn = store.next_lsn;
+        let next_batch_id = store.next_batch_id;
+        let report = store.checkpoint().unwrap();
+        assert_eq!(report.checkpoint_lsn.get() + 1, next_lsn.get());
+        assert!(report.pages_flushed > 1);
+        assert!(report.bytes_written >= report.pages_flushed as u64 * PAGE_SIZE as u64);
+        assert_eq!(report.wal_bytes_reclaimed, metrics_before.wal_bytes);
+        let metrics_after = store.wal_metrics().unwrap().unwrap();
+        assert_eq!(
+            metrics_after.committed_batches,
+            metrics_before.committed_batches
+        );
+        assert_eq!(metrics_after.wal_syncs, metrics_before.wal_syncs + 1);
+        assert_eq!(store.next_lsn, next_lsn);
+        assert_eq!(store.next_batch_id, next_batch_id);
+        let manifest_path = sidecar_path(&path, SEGMENT_MANIFEST_SUFFIX);
+        let manifest = SegmentedWalManifest::read(&manifest_path).unwrap();
+        assert_eq!(manifest.checkpoint_lsn, report.checkpoint_lsn);
+        assert_eq!(manifest.segments.len(), 1);
+        assert!(!manifest.segments[0].closed);
+        assert_eq!(manifest.segments[0].start_lsn, next_lsn);
+        assert_eq!(manifest.segments[0].start_batch_id, next_batch_id);
+        assert_eq!(
+            fs::read_dir(sidecar_path(&path, SEGMENT_DIRECTORY_SUFFIX))
+                .unwrap()
+                .count(),
+            1
+        );
+        let idle_report = store.checkpoint().unwrap();
+        assert_eq!(idle_report.wal_bytes_reclaimed, 0);
+        assert_eq!(idle_report.bytes_written, 0);
+        assert_eq!(
+            SegmentedWalManifest::read(&manifest_path).unwrap(),
+            manifest
+        );
+        let stale_revision = expected[0].2;
+        let deleted = store.delete(expected[0].0.clone()).unwrap();
+        let recreated = store.put(expected[0].0.clone(), vec![99; 1024]).unwrap();
+        assert!(deleted > stale_revision && recreated > deleted);
+        assert!(
+            store
+                .transact(TransactionRequest::new(
+                    vec![TransactionCondition::RevisionEquals {
+                        key: expected[0].0.clone(),
+                        expected_revision: stale_revision
+                    }],
+                    vec![TransactionMutation::Put {
+                        key: expected[0].0.clone(),
+                        value: b"rejected".to_vec()
+                    }],
+                ))
+                .is_err()
+        );
+        expected[0] = (expected[0].0.clone(), vec![99; 1024], recreated);
+        let mut corrections = 0;
+        assert_eq!(
+            super::super::scan_state(&pinned, None, usize::MAX, &mut corrections).unwrap(),
+            pinned_documents
+        );
+        drop(pinned);
+        drop(store);
+        let mut reopened = open(&path, u64::MAX);
+        for (document_key, value, revision) in &expected {
+            assert_present(&mut reopened, document_key, value, *revision);
+        }
+        assert_eq!(
+            reopened.current_superblock.checkpoint_lsn,
+            manifest.checkpoint_lsn
+        );
+        let second_report = reopened.checkpoint().unwrap();
+        assert!(second_report.checkpoint_lsn > manifest.checkpoint_lsn);
+        assert!(second_report.wal_bytes_reclaimed > 0);
+        let persisted_boundary = second_report.checkpoint_lsn;
+        drop(reopened);
+        let mut verified = open(&path, u64::MAX);
+        assert_eq!(
+            verified.current_superblock.checkpoint_lsn,
+            persisted_boundary
+        );
+        for (document_key, value, revision) in &expected {
+            assert_present(&mut verified, document_key, value, *revision);
+        }
+        verified.check_invariants().unwrap();
+        drop(verified);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn segmented_obsolete_cleanup_leaves_unrecognized_files_unchanged() {
+        let path = database_path("checkpoint-obsolete-unknown");
+        let mut store = open(&path, 1);
+        store.put(key(b"durable"), b"value".to_vec()).unwrap();
+        let directory = sidecar_path(&path, SEGMENT_DIRECTORY_SUFFIX);
+        let obsolete_path = segment_path(&directory, 1);
+        let bytes = fs::read(&obsolete_path).unwrap();
+        store.checkpoint().unwrap();
+        drop(store);
+        let incomplete_init = &bytes[..8];
+        fs::write(&obsolete_path, incomplete_init).unwrap();
+        let mut reopened = open(&path, 1);
+        assert_eq!(fs::read(&obsolete_path).unwrap(), incomplete_init);
+        assert_eq!(
+            reopened.get(&key(b"durable")).unwrap().value(),
+            Some(b"value".as_slice())
+        );
+        reopened.put(key(b"later"), b"next".to_vec()).unwrap();
+        reopened.checkpoint().unwrap();
+        assert_eq!(fs::read(&obsolete_path).unwrap(), incomplete_init);
+        drop(reopened);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn segmented_checkpoint_recovery_rejects_missing_required_file_with_obsolete_files_present() {
+        let path = database_path("checkpoint-required-file");
+        let mut store = open(&path, 1);
+        store.put(key(b"before"), b"checkpointed".to_vec()).unwrap();
+        let directory = sidecar_path(&path, SEGMENT_DIRECTORY_SUFFIX);
+        let obsolete_path = segment_path(&directory, 1);
+        let obsolete_bytes = fs::read(&obsolete_path).unwrap();
+        store.checkpoint().unwrap();
+        store.put(key(b"after"), b"required".to_vec()).unwrap();
+        drop(store);
+        let manifest =
+            SegmentedWalManifest::read(&sidecar_path(&path, SEGMENT_MANIFEST_SUFFIX)).unwrap();
+        assert!(manifest.checkpoint_lsn > Lsn::ZERO);
+        fs::write(&obsolete_path, obsolete_bytes).unwrap();
+        let required_path = segment_path(&directory, manifest.active_segment);
+        fs::remove_file(&required_path).unwrap();
+        assert!(
+            BlinkStore::<ProductionFile, ProductionFile>::open_segmented_path(
+                &path,
+                DatabaseConfig::default(),
+                1
+            )
+            .is_err()
+        );
+        assert!(!required_path.exists());
+        assert!(obsolete_path.exists());
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn segmented_checkpoint_preserves_multikey_conditions_and_tombstone_revisions() {
+        let path = database_path("checkpoint-transaction-contract");
+        let mut store = open(&path, u64::MAX);
+        let initial = store.put(key(b"primary"), b"initial".to_vec()).unwrap();
+        store.checkpoint().unwrap();
+        let committed = store
+            .transact(TransactionRequest::new(
+                vec![TransactionCondition::RevisionEquals {
+                    key: key(b"primary"),
+                    expected_revision: initial,
+                }],
+                vec![
+                    TransactionMutation::Put {
+                        key: key(b"primary"),
+                        value: b"updated".to_vec(),
+                    },
+                    TransactionMutation::Put {
+                        key: key(b"secondary"),
+                        value: b"atomic".to_vec(),
+                    },
+                ],
+            ))
+            .unwrap()
+            .revision
+            .unwrap();
+        let deleted = store.delete(key(b"primary")).unwrap();
+        store.checkpoint().unwrap();
+        drop(store);
+        let mut reopened = open(&path, u64::MAX);
+        assert_eq!(
+            reopened.get(&key(b"primary")).unwrap(),
+            RevisionState::Missing { revision: deleted }
+        );
+        assert_present(&mut reopened, &key(b"secondary"), b"atomic", committed);
+        assert!(
+            reopened
+                .transact(TransactionRequest::new(
+                    vec![TransactionCondition::RevisionEquals {
+                        key: key(b"primary"),
+                        expected_revision: initial
+                    }],
+                    vec![TransactionMutation::Delete {
+                        key: key(b"secondary")
+                    }],
+                ))
+                .is_err()
+        );
+        let recreated = reopened
+            .transact(TransactionRequest::new(
+                vec![TransactionCondition::RevisionEquals {
+                    key: key(b"primary"),
+                    expected_revision: deleted,
+                }],
+                vec![
+                    TransactionMutation::Put {
+                        key: key(b"primary"),
+                        value: b"recreated".to_vec(),
+                    },
+                    TransactionMutation::Delete {
+                        key: key(b"secondary"),
+                    },
+                ],
+            ))
+            .unwrap()
+            .revision
+            .unwrap();
+        assert!(recreated > deleted);
+        reopened.checkpoint().unwrap();
+        drop(reopened);
+        let mut verified = open(&path, u64::MAX);
+        assert_present(&mut verified, &key(b"primary"), b"recreated", recreated);
+        assert_eq!(
+            verified.get(&key(b"secondary")).unwrap(),
+            RevisionState::Missing {
+                revision: recreated
+            }
+        );
+        drop(verified);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn segmented_recovery_uses_manifest_boundary_over_stale_wal_superblocks() {
+        let path = database_path("checkpoint-authority");
+        let mut store = open(&path, u64::MAX);
+        let first = store.put(key(b"first"), b"before".to_vec()).unwrap();
+        let checkpoint = store.checkpoint().unwrap();
+        let mut stale = store.current_superblock.clone();
+        stale.checkpoint_lsn = Lsn::ZERO;
+        stale.checkpoint_sequence = 0;
+        store.current_superblock = stale;
+        let second = store.put(key(b"overflow"), vec![42; 16_384]).unwrap();
+        drop(store);
+        let mut reopened = open(&path, u64::MAX);
+        assert_eq!(
+            reopened.current_superblock.checkpoint_lsn,
+            checkpoint.checkpoint_lsn
+        );
+        assert_present(&mut reopened, &key(b"first"), b"before", first);
+        assert_present(&mut reopened, &key(b"overflow"), &vec![42; 16_384], second);
+        let next = reopened.put(key(b"next"), b"after".to_vec()).unwrap();
+        let next_checkpoint = reopened.checkpoint().unwrap();
+        assert!(next_checkpoint.checkpoint_lsn > checkpoint.checkpoint_lsn);
+        drop(reopened);
+        let mut verified = open(&path, u64::MAX);
+        assert_present(&mut verified, &key(b"next"), b"after", next);
+        drop(verified);
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+    }
+
+    struct FailCheckpointAt {
+        point: &'static str,
+        metadata_ready: bool,
+    }
+
+    impl FaultInjector for FailCheckpointAt {
+        fn hit(&mut self, point: &str) -> Result<()> {
+            if point == "after_checkpoint_metadata_sync" {
+                self.metadata_ready = true;
+            }
+            if point == self.point
+                && (!point.starts_with("before_wal_manifest_")
+                    && !point.starts_with("after_wal_manifest_")
+                    || self.metadata_ready)
+            {
+                return Err(Error::durability(format!(
+                    "injected checkpoint failure at {point}"
+                )));
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn segmented_checkpoint_faults_recover_and_allow_later_checkpoints() {
+        let fault_points = [
+            "before_checkpoint_data_flush",
+            "during_checkpoint_page_write",
+            "after_checkpoint_page_write",
+            "before_checkpoint_data_sync",
+            "after_checkpoint_data_sync",
+            "before_checkpoint_superblock_write",
+            "after_checkpoint_superblock_write",
+            "before_checkpoint_metadata_sync",
+            "after_checkpoint_metadata_sync",
+            "before_checkpoint_manifest_publish",
+            "before_wal_manifest_file_sync",
+            "after_wal_manifest_file_sync",
+            "before_wal_manifest_directory_sync",
+            "after_wal_manifest_directory_sync",
+            "after_checkpoint_manifest_publish",
+            "before_checkpoint_wal_unlink",
+            "after_checkpoint_wal_unlink",
+            "before_checkpoint_wal_directory_sync",
+            "after_checkpoint_wal_directory_sync",
+        ];
+        for (fault_index, fault_point) in fault_points.iter().enumerate() {
+            let path = database_path(&format!("checkpoint-fault-{fault_index}"));
+            let mut store = open(&path, 1);
+            let first = store.put(key(b"first"), vec![1; 8192]).unwrap();
+            let baseline = store.checkpoint().unwrap();
+            let second = store.put(key(b"second"), vec![2; 8192]).unwrap();
+            store.set_boxed_fault_injector(Box::new(FailCheckpointAt {
+                point: fault_point,
+                metadata_ready: false,
+            }));
+            assert!(store.checkpoint().is_err(), "{fault_point}");
+            assert!(
+                store.put(key(b"rejected"), b"no".to_vec()).is_err(),
+                "{fault_point}"
+            );
+            drop(store);
+            let mut reopened = open(&path, 1);
+            assert!(
+                reopened.current_superblock.checkpoint_lsn >= baseline.checkpoint_lsn,
+                "{fault_point}"
+            );
+            assert_present(&mut reopened, &key(b"first"), &vec![1; 8192], first);
+            assert_present(&mut reopened, &key(b"second"), &vec![2; 8192], second);
+            let next = reopened.put(key(b"next"), b"recovered".to_vec()).unwrap();
+            reopened.checkpoint().unwrap();
+            drop(reopened);
+            let mut verified = open(&path, 1);
+            assert_present(&mut verified, &key(b"next"), b"recovered", next);
+            assert_present(&mut verified, &key(b"second"), &vec![2; 8192], second);
+            assert_eq!(
+                fs::read_dir(sidecar_path(&path, SEGMENT_DIRECTORY_SUFFIX))
+                    .unwrap()
+                    .count(),
+                1
+            );
+            drop(verified);
+            fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        }
     }
 
     #[test]
