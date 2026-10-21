@@ -35,3 +35,5 @@ Throughput and latency aggregates are unchanged. A's 32 MiB policy has a 0.6% hi
 ## Regression validation
 
 Local validation passed 24 WAL tests, 6 checkpoint integration tests including process termination, 1 checkpoint fault matrix, and 5 Python correction tests. OCI validation at the correction implementation commit passed 24 driver, classification, history, read-contract, and transaction-contract tests after a successful monitored release test build. See ../VALIDATION.md, local-validation.json, oci-build/, oci-helper-run/, and oci-tests/ for commands, results, provenance, and resource bounds.
+
+The helper environment transcript and test stdout/stderr retain their original whitespace and line endings in `oci-helper-run/environment.txt.gz` and `oci-tests/stdout-stderr.log.gz`. Decompress before checking the environment entry against the original helper SHA256SUMS. Compression changes neither transcript content nor the preserved input evidence.
