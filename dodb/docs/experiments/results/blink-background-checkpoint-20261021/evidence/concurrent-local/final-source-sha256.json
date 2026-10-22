@@ -1,0 +1,24 @@
+{
+  "source_commit": "58a197a1711a51f76188db4e9bc314fc89bbf5c1",
+  "files": {
+    "dodb/crates/dodb-rocksdb/build.rs": "623fb78c4fe89e54c37c3c9ca7d0fd4514f9e108a66c209accadcb1af386430a",
+    "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs": "89741985087292e9d491c1411470e5d7ced263868d2161a2e54c06371149bf21",
+    "dodb/crates/dodb-rocksdb/src/bin/support/blink_checkpoint.rs": "fdfddc53779bc24fae7268b0eba8bac06f58c9767952ef3340c53a1bd0df6111",
+    "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs": "dfb7b880a836e6fc08b491a90eb7c3286e47b06ef76fc34152d90eeac12c173d",
+    "dodb/crates/dodb-rocksdb/tests/contract_history.rs": "aafb9bc15eb515a20d32e0bad9d064cf9204b886ee4f79d594c9fc82d1540f2a",
+    "dodb/crates/dodb-rocksdb/tests/read_contract.rs": "5446a06f4ffce61f81a839351c4f00de3178b5e192e9badbd818d495ce36a685",
+    "dodb/crates/dodb-rocksdb/tests/transaction_contract.rs": "d8c879e9f884de569bb04528706de0fe9ef492429da8eafb8df3ef60db1e7b6b",
+    "dodb/crates/dodb-server/src/lib.rs": "c3d9bf01c1d4fe6b9799f88d68cf3cdf19eab5fa5263b525290fc888c99c500d",
+    "dodb/crates/dodb-server/src/physical_checkpoint.rs": "c5a504ba00f17c13fe084ef9c15c08152a028b66da0b9848ceaad58258e50320",
+    "dodb/crates/dodb-server/tests/background_checkpoint.rs": "a3858508f064eba33eaa98f61e88e33b5c18e811b7ae3e8688d7b89d8a0658b6",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "ee3547df02b09251741dafb1cce3ef1b9db34d00972b9d7432c7a4c1f275ba66",
+    "dodb/crates/dodb-storage/src/blink/physical_checkpoint.rs": "1aa590d007c28178f3fc47448c165f9a6ee19023b2a21165d31ff9fb1826cbdd",
+    "dodb/crates/dodb-storage/src/blink/segmented_wal.rs": "b9fa61424575708b257bc2761a10f20139b13a123e3b8a21b3a63bd55f41e947",
+    "dodb/crates/dodb-storage/src/lib.rs": "2bed5ae5ceec8c77c3ebbd606270c0fad54568025ea6396c0933113f366b66bf",
+    "dodb/crates/dodb-storage/tests/background_checkpoint_sigkill.rs": "31badae2e7360d6d3139a7a91e6cb91dd0bbd7e359c3e734d664e4e1f63c613a",
+    "dodb/docs/experiments/results/blink-background-checkpoint-20261021/run_matrix.py": "7ddd8081744c322ff213d7e5d5d9a6fac480cc6e0e4bb8653c2c306f498d7e45",
+    "dodb/formal/quint/background_checkpoint.qnt": "cceb5d1436241bf7deb6f23d6da6eea30af7de780676ceae6cc455c0c965ccf5"
+  },
+  "final_local_targeted_tests": 17,
+  "failed": 0
+}

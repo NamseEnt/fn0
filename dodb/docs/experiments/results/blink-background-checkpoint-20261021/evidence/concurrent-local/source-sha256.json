@@ -1,0 +1,26 @@
+{
+  "source_commit": "d8ef2cf533168de8501af7abf2a38eca89f7d554",
+  "files": {
+    "dodb/crates/dodb-rocksdb/build.rs": "623fb78c4fe89e54c37c3c9ca7d0fd4514f9e108a66c209accadcb1af386430a",
+    "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs": "bb0c3e1ef51782b40a3118cb118abb5738743acb43da6dcb1f257a5919a40cb9",
+    "dodb/crates/dodb-rocksdb/src/bin/support/blink_checkpoint.rs": "fdfddc53779bc24fae7268b0eba8bac06f58c9767952ef3340c53a1bd0df6111",
+    "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs": "8ac402408feb1d3ddb6dc573cd22840b79e3b16631e4ef301071623781cf9018",
+    "dodb/crates/dodb-rocksdb/tests/contract_history.rs": "aafb9bc15eb515a20d32e0bad9d064cf9204b886ee4f79d594c9fc82d1540f2a",
+    "dodb/crates/dodb-rocksdb/tests/read_contract.rs": "5446a06f4ffce61f81a839351c4f00de3178b5e192e9badbd818d495ce36a685",
+    "dodb/crates/dodb-rocksdb/tests/transaction_contract.rs": "d8c879e9f884de569bb04528706de0fe9ef492429da8eafb8df3ef60db1e7b6b",
+    "dodb/crates/dodb-server/src/lib.rs": "c3d9bf01c1d4fe6b9799f88d68cf3cdf19eab5fa5263b525290fc888c99c500d",
+    "dodb/crates/dodb-server/src/physical_checkpoint.rs": "48a4a7827734dc4a389e0fcc6ec91e522feddfaf495c57f37c1924148f176fe9",
+    "dodb/crates/dodb-server/tests/background_checkpoint.rs": "a3858508f064eba33eaa98f61e88e33b5c18e811b7ae3e8688d7b89d8a0658b6",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "ee3547df02b09251741dafb1cce3ef1b9db34d00972b9d7432c7a4c1f275ba66",
+    "dodb/crates/dodb-storage/src/blink/physical_checkpoint.rs": "973e9b15f22452aaa60d77f559d244d980e5ce55c97e3168732be76e5e89ad3a",
+    "dodb/crates/dodb-storage/src/blink/segmented_wal.rs": "b9fa61424575708b257bc2761a10f20139b13a123e3b8a21b3a63bd55f41e947",
+    "dodb/crates/dodb-storage/src/lib.rs": "2bed5ae5ceec8c77c3ebbd606270c0fad54568025ea6396c0933113f366b66bf",
+    "dodb/crates/dodb-storage/tests/background_checkpoint_sigkill.rs": "31badae2e7360d6d3139a7a91e6cb91dd0bbd7e359c3e734d664e4e1f63c613a",
+    "dodb/docs/experiments/results/blink-background-checkpoint-20261021/CONCURRENT-CHECKPOINT.md": "be8803a567bcf218340648f827237877073433b2d3824b52259f422a0d6a434d",
+    "dodb/docs/experiments/results/blink-background-checkpoint-20261021/PLAN.md": "0cffda05cb3375e6c3d059b1cffd057a7b0cc32d41ddb16b557a6b97a1f305e5",
+    "dodb/docs/experiments/results/blink-background-checkpoint-20261021/RECOVERY-PROTOCOL.md": "c357f40346e3983e7754faee311bbd55be44057d58dd76fad629d591630a895a",
+    "dodb/docs/experiments/results/blink-background-checkpoint-20261021/RESULTS.md": "32de33ceaa159277a68f14a31b3f961ed7291c214d9a51c91a608d3e0671f12f",
+    "dodb/docs/experiments/results/blink-background-checkpoint-20261021/run_matrix.py": "7ddd8081744c322ff213d7e5d5d9a6fac480cc6e0e4bb8653c2c306f498d7e45",
+    "dodb/formal/quint/background_checkpoint.qnt": "cceb5d1436241bf7deb6f23d6da6eea30af7de780676ceae6cc455c0c965ccf5"
+  }
+}

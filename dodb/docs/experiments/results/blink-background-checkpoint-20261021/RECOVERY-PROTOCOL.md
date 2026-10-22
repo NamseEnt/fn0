@@ -1,6 +1,6 @@
 # Concurrent checkpoint implementation update
 
-Background checkpoint execution is now implemented in the task-owned working tree. See [CONCURRENT-CHECKPOINT.md](CONCURRENT-CHECKPOINT.md) for the actual runtime and recovery path and [EXECUTION-PLAN.md](EXECUTION-PLAN.md) for the staged validation and measurement plan. The worker writes fixed images; the coordinator publishes into the latest manifest. Local overlap, failure, bounded-retention, recovery, and finite-model evidence is being archived. OCI validation and performance results are reported separately when complete.
+Background checkpoint execution is now implemented in the task-owned working tree. See [CONCURRENT-CHECKPOINT.md](CONCURRENT-CHECKPOINT.md) for the actual runtime and recovery path and [EXECUTION-PLAN.md](EXECUTION-PLAN.md) for the staged validation and measurement plan. The worker writes fixed images; the coordinator publishes into the latest manifest. Overlap, failure, bounded-retention, recovery, and finite-model evidence is recorded in [VALIDATION-CONCURRENT.md](VALIDATION-CONCURRENT.md). The final implementation is `d240416f0e0efafa7c08bb1e868387ebd0d894bc`; its OCI release suite passes 314 functions with four existing ignored probes. Complete initial and corrected performance matrices are reported in [RESULTS.md](RESULTS.md), with reproduction details in [REPRODUCE.md](REPRODUCE.md).
 
 ## Preserved earlier milestone
 

@@ -1,0 +1,137 @@
+[
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "line": 1415,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::collapsible_if",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "line": 3983,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::collapsible_if",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "line": 4027,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "line": 5779,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::needless_option_as_deref",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "line": 6311,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::redundant_slicing",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "line": 6426,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "line": 7622,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "line": 7664,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "line": 7774,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-storage/src/wal.rs",
+    "line": 561,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-storage/src/wal.rs",
+    "line": 3080,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::too_many_arguments",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-storage/src/wal.rs",
+    "line": 3110,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::collapsible_if",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-server/src/lib.rs",
+    "line": 1858,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::collapsible_if",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-server/src/lib.rs",
+    "line": 1875,
+    "primary_source_line_in_baseline": true
+  },
+  {
+    "code": {
+      "code": "clippy::collapsible_if",
+      "explanation": null
+    },
+    "file": "dodb/crates/dodb-server/src/lib.rs",
+    "line": 1876,
+    "primary_source_line_in_baseline": true
+  }
+]

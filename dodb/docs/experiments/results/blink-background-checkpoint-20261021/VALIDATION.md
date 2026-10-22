@@ -1,3 +1,7 @@
+# Final concurrent checkpoint validation
+
+The final implementation and 314-pass OCI validation are documented in [VALIDATION-CONCURRENT.md](VALIDATION-CONCURRENT.md). Complete initial/corrected performance results are in [RESULTS.md](RESULTS.md). The records below preserve earlier codec and synchronous segmented milestones; their implementation-status statements describe those historical sources.
+
 # Background Checkpoint Validation Record
 
 The early sections below preserve the codec-only milestone. The final section, "Segmented recovery corrections and synchronous checkpoint milestone", records the current source and validation.

@@ -1,0 +1,32 @@
+{
+  "initial_source": "58a197a1711a51f76188db4e9bc314fc89bbf5c1",
+  "corrected_source": "d240416f0e0efafa7c08bb1e868387ebd0d894bc",
+  "before_fixture": "Initial engine source plus the new regression test; the test failed with two checkpoints instead of one. The second event started at 4328 retained WAL bytes despite a 65536-byte threshold.",
+  "after_local_tests": {
+    "passed": 18,
+    "failed": 0
+  },
+  "initial_oci_completed_checkpoints": {
+    "A_sync_128m": [
+      4,
+      4,
+      4
+    ],
+    "A_background_128m": [
+      8,
+      8,
+      8
+    ],
+    "E_sync_128m": [
+      7,
+      7,
+      7
+    ],
+    "E_background_128m": [
+      14,
+      14,
+      14
+    ]
+  },
+  "controlled_variables": "Only stale coalesced threshold notification handling changed. Limits, defaults, workload, sync, locks, admission, and invariant validation are unchanged."
+}

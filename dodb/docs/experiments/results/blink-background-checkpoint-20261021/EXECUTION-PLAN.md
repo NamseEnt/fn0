@@ -21,3 +21,7 @@ Performance requires zero request/checkpoint errors, complete uncapped latency s
 ## Evidence ownership
 
 Worktree: `/Users/namse/fn0-dodb-background-checkpoint`, branch `experiment/blink-background-checkpoint-20261021`, starting source `72110449920b08cc10c6ebe67df6990e4705b315`. Existing worktrees and historical evidence remain intact. Repository artifacts use English; user reports use Korean. Commit and push only task-owned files without co-author trailers.
+
+## Completion record
+
+Steps 1-5 are complete at implementation commit `d240416f0e0efafa7c08bb1e868387ebd0d894bc`. Final OCI release validation passes 314 functions with zero failures and four existing ignored probes. Both the initial and corrected 30-cell matrices are preserved; the initial matrix exposed a coalesced-threshold scheduling bug, which has failing-before/passing-after regression evidence. The corrected matrix passes all correctness, overlap, sample-count, identity, fingerprint, recovery, and sampled resource gates. The conditional 300-second gate fails, so that follow-up is not run. Results do not support a throughput promotion; the default configuration remains unchanged. See `RESULTS.md`, `VALIDATION-CONCURRENT.md`, and `EVIDENCE.md`.

@@ -1,0 +1,24 @@
+{
+  "source_commit": "d8ef2cf533168de8501af7abf2a38eca89f7d554",
+  "local_full_tests": {
+    "passed": 309,
+    "failed": 0,
+    "ignored": 4
+  },
+  "additional_shutdown_and_overlap_suite": {
+    "passed": 6,
+    "failed": 0
+  },
+  "post_target_checkpoint_fault_boundaries": 19,
+  "post_target_sigkill_boundaries": 10,
+  "finite_model": {
+    "generated_states": 261,
+    "distinct_states": 150,
+    "depth": 13,
+    "violation": false
+  },
+  "clippy_diagnostics": 15,
+  "all_diagnostic_primary_lines_preexist": true,
+  "local_rocksdb_workload_compile": "not validated: pinned local archive is unavailable; OCI build is required",
+  "preserved_fixture_failure": "Initial 128 KiB capacity fixture did not force a wait. Budget tightened to 96 KiB while preserving the wait assertion; the corrected test passes."
+}

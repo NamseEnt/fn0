@@ -1,0 +1,14 @@
+Preserved tool-output excerpt from the first focused test attempt:
+
+---- checkpoint_capacity_waits_and_oversized_requests_are_rejected_without_a_commit stdout ----
+
+thread 'checkpoint_capacity_waits_and_oversized_requests_are_rejected_without_a_commit' (428111620) panicked at dodb/crates/dodb-server/tests/background_checkpoint.rs:188:5:
+assertion failed: tokio::time::timeout(Duration::from_millis(30), &mut next).await.is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    checkpoint_capacity_waits_and_oversized_requests_are_rejected_without_a_commit
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.26s
+
+The 128 KiB fixture admitted the request without exceeding the conservative bound. The final test uses a 96 KiB budget and retains the timeout/wait assertion. No production limit or assertion was relaxed.

@@ -1,0 +1,19 @@
+{
+  "workspace_format_exit_code": 1,
+  "workspace_differences": [
+    "/Users/namse/fn0-dodb-background-checkpoint/vendor/deno/ext/crypto/decrypt.rs",
+    "/Users/namse/fn0-dodb-background-checkpoint/vendor/deno/ext/crypto/ed25519.rs",
+    "/Users/namse/fn0-dodb-background-checkpoint/vendor/deno/ext/crypto/encrypt.rs",
+    "/Users/namse/fn0-dodb-background-checkpoint/vendor/deno/ext/crypto/export_key.rs",
+    "/Users/namse/fn0-dodb-background-checkpoint/vendor/deno/ext/crypto/generate_key.rs",
+    "/Users/namse/fn0-dodb-background-checkpoint/vendor/deno/ext/crypto/import_key.rs",
+    "/Users/namse/fn0-dodb-background-checkpoint/vendor/deno/ext/crypto/key.rs",
+    "/Users/namse/fn0-dodb-background-checkpoint/vendor/deno/ext/crypto/lib.rs",
+    "/Users/namse/fn0-dodb-background-checkpoint/vendor/deno/ext/crypto/shared.rs",
+    "/Users/namse/fn0-dodb-background-checkpoint/vendor/deno/ext/crypto/x25519.rs",
+    "/Users/namse/fn0-dodb-background-checkpoint/vendor/deno/ext/crypto/x448.rs"
+  ],
+  "task_command": "cargo fmt -p dodb-storage -p dodb-server -p dodb-rocksdb -- --check",
+  "task_exit_code": 0,
+  "unrelated_files_modified": false
+}

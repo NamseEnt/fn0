@@ -1,0 +1,7 @@
+{
+  "source_commit": "4600981d51489f0a4ee19acfa62a8ba00349a3bc",
+  "reason": "Count overlap only during actual worker execution, excluding time waiting for a blocking-pool thread; include the new active INIT in WAL gauges. Split report construction after the rejected OCI macro expansion.",
+  "local_checked_tests": 14,
+  "failed": 0,
+  "oci_build_pending": true
+}

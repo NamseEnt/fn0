@@ -1,0 +1,27 @@
+[
+  {
+    "archive": "blink-background-checkpoint-20261022-evidence.tar.gz",
+    "sha256_verified": true,
+    "files": 532,
+    "file_inventory_verified": true,
+    "offline_summary_exit_code": 0,
+    "offline_summary_matches": true,
+    "cells": 30,
+    "source_sha": "58a197a1711a51f76188db4e9bc314fc89bbf5c1"
+  },
+  {
+    "archive": "blink-background-checkpoint-20261022-threshold-evidence.tar.gz",
+    "sha256_verified": true,
+    "files": 380,
+    "file_inventory_verified": true,
+    "offline_summary_exit_code": 0,
+    "offline_summary_matches": true,
+    "cells": 30,
+    "source_sha": "d240416f0e0efafa7c08bb1e868387ebd0d894bc"
+  },
+  {
+    "archive": "blink-background-checkpoint-build-provenance.tar.gz",
+    "sha256_verified": true,
+    "files": 63
+  }
+]
