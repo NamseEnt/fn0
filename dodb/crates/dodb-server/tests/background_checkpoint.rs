@@ -348,3 +348,31 @@ async fn shutdown_joins_an_active_checkpoint_before_returning() {
     );
     reopened.shutdown_checked().await.unwrap();
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn completed_checkpoint_rechecks_coalesced_threshold_before_starting_more_work() {
+    let directory = TempDir::new().unwrap();
+    let mut configuration = config(&directory, BlinkCheckpointExecution::Background);
+    configuration.blink_wal_layout = BlinkWalLayout::Segmented {
+        max_segment_bytes: 16 * 1024 * 1024,
+    };
+    configuration.blink_checkpoint_policy = BlinkCheckpointPolicy::WalBytesThreshold {
+        threshold_bytes: 64 * 1024,
+    };
+    let gate = Arc::new(Gate::default());
+    let service = service(configuration.clone(), &gate);
+    put(&service, 1, 1, vec![1; 64 * 1024]).await.unwrap();
+    entered(&gate).await;
+    put(&service, 1, 2, vec![2; 64]).await.unwrap();
+    let expected = get(&service, 1, 2).await;
+    gate.released.store(true, Ordering::SeqCst);
+    idle(&service).await;
+    let metrics = service.checkpoint_metrics_snapshot();
+    assert_eq!(metrics.checkpoints_completed, 1, "{metrics:?}");
+    assert!(metrics.wal_bytes_current < 64 * 1024, "{metrics:?}");
+    assert_eq!(metrics.tasks_running, 0);
+    service.shutdown_checked().await.unwrap();
+    let reopened = BlinkTenantService::new(configuration).unwrap();
+    assert_eq!(get(&reopened, 1, 2).await, expected);
+    reopened.shutdown_checked().await.unwrap();
+}

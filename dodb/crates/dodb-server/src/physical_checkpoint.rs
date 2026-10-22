@@ -503,6 +503,14 @@ impl PhysicalCoordinator {
                 succeeded: result.is_ok(),
             });
         });
+        if self.requested
+            && let Ok((_, wal_bytes)) = &result
+            && matches!(self.settings.policy,
+                BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } if *wal_bytes < threshold_bytes)
+        {
+            self.requested = false;
+            self.requested_activity = None;
+        }
         result.map(|_: (BlinkCheckpointReport, u64)| ())
     }
 }
