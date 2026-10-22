@@ -1,0 +1,20 @@
+{
+  "archive_sha256_verified": true,
+  "files": 245,
+  "roots": [
+    {
+      "root": "blink-read80-write20-20261022",
+      "cells": 15,
+      "smoke": false,
+      "inventory_verified": true,
+      "offline_summary_matches": true
+    },
+    {
+      "root": "blink-read80-write20-20261022-smoke",
+      "cells": 3,
+      "smoke": true,
+      "inventory_verified": true,
+      "offline_summary_matches": true
+    }
+  ]
+}
