@@ -15,6 +15,7 @@ os.environ["DODB_CHECKPOINT_WARMUP_MS"] = "1000" if SMOKE else "10000"
 SPEC = importlib.util.spec_from_file_location("checkpoint_controller", BASE_PATH)
 BASE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(BASE)
+BASE.CHILD_TIMEOUT_SECONDS = 150
 EXPECTED_SOURCE = "d240416f0e0efafa7c08bb1e868387ebd0d894bc"
 EXPECTED_BINARIES = {
     "service_workload": "09bd505d77ce0bcbc61ca46f7389373e60bc1ab1bf6b80a90077bed328418e40",
