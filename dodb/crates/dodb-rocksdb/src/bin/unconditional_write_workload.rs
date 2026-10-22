@@ -1,3 +1,6 @@
+#[path = "support/blink_checkpoint.rs"]
+mod blink_checkpoint;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -36,6 +39,7 @@ enum BackendKind {
 struct Options {
     backend: BackendKind,
     blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy,
+    blink_checkpoint: blink_checkpoint::Options,
     width: usize,
     clients: usize,
     seed: u64,
@@ -425,6 +429,8 @@ impl ProbeBackend {
                 config.data_dir = options.data_dir.clone();
                 config.max_open_shards = 1_024;
                 config.blink_checkpoint_policy = options.blink_checkpoint_policy;
+                config.blink_wal_layout = options.blink_checkpoint.layout;
+                config.blink_checkpoint_execution = options.blink_checkpoint.execution;
                 let service = dodb_server::BlinkTenantService::new(config)
                     .map_err(|error| error.to_string())?;
                 let metrics = service.checkpoint_metrics_handle();
@@ -666,6 +672,16 @@ impl ProbeBackend {
                 dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { .. } => "wal_bytes_threshold",
             },
             "threshold_bytes": metrics.threshold_bytes,
+            "execution": match metrics.execution { dodb_server::BlinkCheckpointExecution::Sync => "sync", dodb_server::BlinkCheckpointExecution::Background => "background" },
+            "writes_during_checkpoint": metrics.writes_during_checkpoint,
+            "merged_checkpoint_requests": metrics.merged_checkpoint_requests,
+            "capacity_wait_count": metrics.capacity_wait_count,
+            "capacity_wait_nanos": metrics.capacity_wait_nanos,
+            "coordinator_pause_nanos": metrics.coordinator_pause_nanos,
+            "retained_image_bytes": metrics.retained_image_bytes,
+            "peak_retained_image_bytes": metrics.peak_retained_image_bytes,
+            "tasks_running": metrics.tasks_running,
+            "peak_tasks_running": metrics.peak_tasks_running,
             "checkpoints_started": metrics.checkpoints_started,
             "checkpoints_completed": metrics.checkpoints_completed,
             "checkpoints_failed": metrics.checkpoints_failed,
@@ -686,6 +702,14 @@ impl ProbeBackend {
             "omitted_checkpoint_events": metrics.omitted_checkpoint_events,
             "checkpoint_events": metrics.checkpoint_events.iter().map(|event| serde_json::json!({
                 "phase": event.phase,
+                    "task_id": event.task_id,
+                    "target_lsn": event.target_lsn,
+                    "writes_during_checkpoint": event.writes_during_checkpoint,
+                    "preparation_nanos": event.preparation_nanos,
+                    "page_write_nanos": event.page_write_nanos,
+                    "data_sync_nanos": event.data_sync_nanos,
+                    "metadata_sync_nanos": event.metadata_sync_nanos,
+                    "completion_nanos": event.completion_nanos,
                 "started_unix_nanos": event.started_unix_nanos.to_string(),
                 "ended_unix_nanos": event.ended_unix_nanos.to_string(),
                 "wal_bytes_before": event.wal_bytes_before,
@@ -747,6 +771,7 @@ fn parse_options() -> Result<Options, String> {
     let mut backend = None;
     let mut blink_checkpoint_policy = dodb_server::BlinkCheckpointPolicy::Disabled;
     let mut blink_checkpoint_option_seen = false;
+    let mut checkpoint_values = BTreeMap::new();
     let mut width = 1;
     let mut clients = 16;
     let mut seed = 20261013;
@@ -779,6 +804,9 @@ fn parse_options() -> Result<Options, String> {
                     "minimal-native" => BackendKind::MinimalNative,
                     _ => return Err(format!("unknown backend: {value}")),
                 });
+            }
+            "--blink-wal-layout" | "--blink-checkpoint-execution" | "--blink-wal-segment-bytes" => {
+                checkpoint_values.insert(argument, value);
             }
             "--blink-checkpoint-wal-bytes" => {
                 blink_checkpoint_option_seen = true;
@@ -885,9 +913,23 @@ fn parse_options() -> Result<Options, String> {
             _ => return Err(format!("unknown argument: {argument}")),
         }
     }
+    let backend = backend.ok_or_else(|| "--backend is required".to_owned())?;
+    let blink_checkpoint = blink_checkpoint::Options::parse(
+        checkpoint_values
+            .get("--blink-wal-layout")
+            .map(String::as_str),
+        checkpoint_values
+            .get("--blink-checkpoint-execution")
+            .map(String::as_str),
+        checkpoint_values
+            .get("--blink-wal-segment-bytes")
+            .map(String::as_str),
+        backend == BackendKind::Blink,
+    )?;
     let options = Options {
-        backend: backend.ok_or_else(|| "--backend is required".to_owned())?,
+        backend,
         blink_checkpoint_policy,
+        blink_checkpoint,
         width,
         clients,
         seed,
@@ -909,6 +951,13 @@ fn parse_options() -> Result<Options, String> {
     if blink_checkpoint_option_seen && options.backend != BackendKind::Blink {
         return Err(
             "--blink-checkpoint-wal-bytes is supported only with --backend blink".to_owned(),
+        );
+    }
+    if options.memory_diagnostic
+        && options.blink_checkpoint.layout != dodb_server::BlinkWalLayout::Legacy
+    {
+        return Err(
+            "segmented checkpoints are unavailable in the memory diagnostic worker".to_owned(),
         );
     }
     if options.memory_diagnostic
@@ -1033,6 +1082,10 @@ fn run() -> Result<(), String> {
             })
             .transpose()?
     };
+    let measurement_window_start = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
     let measured_phase = execute_phase(
         Arc::clone(&tenant),
         &options,
@@ -1041,6 +1094,10 @@ fn run() -> Result<(), String> {
         warmup_phase.client_results,
         &baseline_revisions,
     )?;
+    let measurement_window_end = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
     let checkpoint_drain_started = Instant::now();
     tenant.wait_for_blink_coordinators_idle();
     let checkpoint_drain_ms = checkpoint_drain_started.elapsed().as_secs_f64() * 1_000.0;
@@ -1137,6 +1194,7 @@ fn run() -> Result<(), String> {
         storage_before_measurement,
         storage_after_measurement,
     );
+    report["measurement_window_unix_nanos"] = json!({"start": measurement_window_start.to_string(), "last_client_completion": measurement_window_end.to_string()});
     if let Some(memory_session) = memory_session {
         report["memory_only_diagnostic"] = memory_session.finish_sampling();
     }
@@ -1739,10 +1797,11 @@ fn build_report(
         histogram.bucket_counts.capacity() * std::mem::size_of::<u64>();
     json!({
         "benchmark_kind": "unconditional_write_probe",
-        "run_status": if blink_checkpoint_metrics["checkpoints_failed"].as_u64().unwrap_or(0) > 0 { "failed_checkpoint" } else { "completed" },
+        "git_commit": env!("DODB_BUILD_GIT_COMMIT"),
+        "binary_sha256": std::env::var("DODB_BINARY_SHA256").unwrap_or_else(|_| "not-recorded".to_owned()),
+        "run_status": if blink_checkpoint_metrics["checkpoints_failed"].as_u64().unwrap_or(0) > 0 || blink_checkpoint_metrics["failed_message"].is_string() { "failed_checkpoint" } else { "completed" },
         "backend": format!("{:?}", options.backend),
         "source_sha": std::env::var("DODB_SOURCE_SHA").unwrap_or_else(|_| "not-recorded".to_owned()),
-        "binary_sha256": std::env::var("DODB_BINARY_SHA256").unwrap_or_else(|_| "not-recorded".to_owned()),
         "configuration": {
             "seed": options.seed,
             "clients": options.clients,
@@ -1815,6 +1874,7 @@ fn build_report(
             "request_limit_reached": false,
         },
         "latency": histogram.json(),
+        "blink_checkpoint_configuration": (options.backend == BackendKind::Blink).then(|| options.blink_checkpoint.configuration()),
         "blink_checkpoint_metrics": blink_checkpoint_metrics,
         "fairness": {
             "per_client_write_batch_counts": client_results.iter().map(|result| result.measurement_writes).collect::<Vec<_>>(),
@@ -2001,6 +2061,7 @@ impl Options {
         Self {
             backend: self.backend,
             blink_checkpoint_policy: self.blink_checkpoint_policy,
+            blink_checkpoint: self.blink_checkpoint,
             width: self.width,
             clients: self.clients,
             seed: self.seed,
@@ -2167,6 +2228,7 @@ mod tests {
         let options = Options {
             backend: BackendKind::SynchronousCore,
             blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy::Disabled,
+            blink_checkpoint: blink_checkpoint::Options::default(),
             width: 1,
             clients: 1,
             seed: 20261013,

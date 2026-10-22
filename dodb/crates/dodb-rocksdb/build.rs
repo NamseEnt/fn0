@@ -1,6 +1,44 @@
 use std::path::PathBuf;
 
 fn main() {
+    let checkout = std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .expect("git must identify the workload checkout");
+    assert!(
+        checkout.status.success(),
+        "workload source must be a git checkout"
+    );
+    let checkout_sha = String::from_utf8(checkout.stdout).expect("git output must be UTF-8");
+    println!(
+        "cargo:rustc-env=DODB_BUILD_GIT_COMMIT={}",
+        checkout_sha.trim()
+    );
+    let symbolic = std::process::Command::new("git")
+        .args(["symbolic-ref", "-q", "HEAD"])
+        .output()
+        .expect("git must resolve HEAD");
+    let symbolic = String::from_utf8(symbolic.stdout).unwrap();
+    let mut references = vec!["HEAD"];
+    if !symbolic.trim().is_empty() {
+        references.push(symbolic.trim());
+    }
+    for reference in references {
+        let path = std::process::Command::new("git")
+            .args([
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-path",
+                reference,
+            ])
+            .output()
+            .expect("git must resolve source references");
+        assert!(path.status.success());
+        println!(
+            "cargo:rerun-if-changed={}",
+            String::from_utf8(path.stdout).unwrap().trim()
+        );
+    }
     println!("cargo:rerun-if-env-changed=DODB_ROCKSDB_DIR");
     let rocksdb_dir = PathBuf::from(
         std::env::var("DODB_ROCKSDB_DIR")

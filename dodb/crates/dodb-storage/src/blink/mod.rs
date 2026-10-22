@@ -26,7 +26,9 @@ use crate::btree::{
     StorageLimits, StorageMetrics,
 };
 mod leaf;
+mod physical_checkpoint;
 pub mod segmented_wal;
+pub use physical_checkpoint::{BlinkCheckpointOutput, BlinkCheckpointSnapshot};
 
 use crate::blink::segmented_wal::SegmentedWal;
 use crate::churn::{self, ChurnCounter, ChurnSite};
@@ -1813,6 +1815,8 @@ pub struct BlinkStore<F: DurableFile, W: DurableFile = crate::btree::NoWal> {
     file: F,
     wal: Option<WalLog<W>>,
     segmented_wal: Option<SegmentedWal>,
+    physical_checkpoint: Option<physical_checkpoint::PendingCheckpoint>,
+    checkpoint_retention_limit: Option<u64>,
     logical_wal: Option<LogicalWalLog<W>>,
     state: BlinkState,
     publisher: Arc<GenerationPublisher>,
@@ -2076,6 +2080,8 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             file,
             wal: None,
             segmented_wal: None,
+            physical_checkpoint: None,
+            checkpoint_retention_limit: None,
             logical_wal: None,
             state,
             publisher,
@@ -2162,6 +2168,8 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             file,
             wal: None,
             segmented_wal: None,
+            physical_checkpoint: None,
+            checkpoint_retention_limit: None,
             logical_wal: None,
             state,
             publisher,
@@ -2304,7 +2312,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
     where
         I: FaultInjector + Send + 'static,
     {
-        self.fault_injector = Some(Box::new(injector));
+        self.set_boxed_fault_injector(Box::new(injector));
     }
 
     pub fn set_boxed_fault_injector(&mut self, injector: Box<dyn FaultInjector + Send>) {
@@ -2945,6 +2953,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                 final_images.insert(image.page_id, image.image);
             }
         }
+        self.check_segmented_group_capacity(&wal_commits)?;
         if let Some(wal) = self.wal.as_mut() {
             if let Err(error) = wal.append_group(&wal_commits, self.fault_injector.as_deref_mut()) {
                 self.broken = Some(error.to_string());
@@ -3258,6 +3267,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                 final_images.insert(image.page_id, &image.image);
             }
         }
+        self.check_segmented_group_capacity(&wal_commits)?;
         let mut wal_bytes = 0u64;
         self.batch_metrics.wal_assembly_nanos = self
             .batch_metrics
@@ -3653,6 +3663,9 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
     }
 
     pub fn checkpoint(&mut self) -> Result<BlinkCheckpointReport> {
+        if self.physical_checkpoint.is_some() {
+            return Err(Error::checkpoint("segmented checkpoint already running"));
+        }
         if let Some(message) = &self.broken {
             return Err(Error::checkpoint(format!(
                 "experimental storage shard is degraded: {message}"

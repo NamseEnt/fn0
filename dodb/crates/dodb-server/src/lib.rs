@@ -8,6 +8,8 @@ use std::sync::Mutex as StdMutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+mod physical_checkpoint;
+
 pub const REQUEST_LATENCY_BUCKETS_SECONDS: [f64; 18] = [
     0.000025, 0.00005, 0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25,
     0.5, 1.0, 2.5, 5.0, 10.0,
@@ -934,6 +936,15 @@ pub struct LocalTenantServiceConfig {
     pub coordinator_config: CoordinatorConfig,
     pub blink_checkpoint_policy: BlinkCheckpointPolicy,
     pub blink_wal_layout: BlinkWalLayout,
+    pub blink_checkpoint_execution: BlinkCheckpointExecution,
+    pub blink_checkpoint_retention_bytes: u64,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum BlinkCheckpointExecution {
+    #[default]
+    Sync,
+    Background,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -957,6 +968,14 @@ pub enum BlinkCheckpointPolicy {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BlinkCheckpointEvent {
     pub phase: String,
+    pub task_id: u64,
+    pub target_lsn: u64,
+    pub writes_during_checkpoint: u64,
+    pub preparation_nanos: u64,
+    pub page_write_nanos: u64,
+    pub data_sync_nanos: u64,
+    pub metadata_sync_nanos: u64,
+    pub completion_nanos: u64,
     pub started_unix_nanos: u128,
     pub ended_unix_nanos: u128,
     pub wal_bytes_before: u64,
@@ -990,6 +1009,16 @@ pub struct BlinkWalCheckpointMetrics {
     pub omitted_checkpoint_events: u64,
     pub checkpoint_events: Vec<BlinkCheckpointEvent>,
     pub failed_message: Option<String>,
+    pub execution: BlinkCheckpointExecution,
+    pub writes_during_checkpoint: u64,
+    pub merged_checkpoint_requests: u64,
+    pub capacity_wait_count: u64,
+    pub capacity_wait_nanos: u64,
+    pub coordinator_pause_nanos: u64,
+    pub retained_image_bytes: u64,
+    pub peak_retained_image_bytes: u64,
+    pub tasks_running: u64,
+    pub peak_tasks_running: u64,
 }
 
 #[derive(Clone)]
@@ -1020,8 +1049,16 @@ impl BlinkWalCheckpointMetricsHandle {
 impl BlinkWalCheckpointMetrics {
     fn reset(&mut self) {
         let policy = self.policy;
+        let execution = self.execution;
+        let retained_image_bytes = self.retained_image_bytes;
+        let tasks_running = self.tasks_running;
         *self = Self {
             policy,
+            execution,
+            retained_image_bytes,
+            peak_retained_image_bytes: retained_image_bytes,
+            tasks_running,
+            peak_tasks_running: tasks_running,
             threshold_bytes: match policy {
                 BlinkCheckpointPolicy::Disabled => None,
                 BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => {
@@ -1050,6 +1087,8 @@ impl Default for LocalTenantServiceConfig {
             coordinator_config: CoordinatorConfig::default(),
             blink_checkpoint_policy: BlinkCheckpointPolicy::Disabled,
             blink_wal_layout: BlinkWalLayout::Legacy,
+            blink_checkpoint_execution: BlinkCheckpointExecution::Sync,
+            blink_checkpoint_retention_bytes: 512 * 1024 * 1024,
         }
     }
 }
@@ -1084,6 +1123,8 @@ pub struct BlinkTenantService {
     coordinator_config: CoordinatorConfig,
     checkpoint_policy: BlinkCheckpointPolicy,
     wal_layout: BlinkWalLayout,
+    checkpoint_execution: BlinkCheckpointExecution,
+    checkpoint_retention_bytes: u64,
     checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
     coordinator_activity: Arc<CoordinatorActivity>,
     shards: Mutex<BTreeMap<TenantId, Arc<AsyncBlinkShard>>>,
@@ -1169,9 +1210,24 @@ impl BlinkTenantService {
                 "B-link WAL segment size must be positive",
             ));
         }
+        if config.blink_checkpoint_execution == BlinkCheckpointExecution::Background
+            && !matches!(config.blink_wal_layout, BlinkWalLayout::Segmented { .. })
+        {
+            return Err(Error::invalid_request(
+                "background checkpoints require segmented WAL",
+            ));
+        }
+        if !(4 * dodb_storage::PAGE_SIZE as u64..=512 * 1024 * 1024)
+            .contains(&config.blink_checkpoint_retention_bytes)
+        {
+            return Err(Error::invalid_request(
+                "checkpoint retention budget is too small",
+            ));
+        }
         std::fs::create_dir_all(config.data_dir.join("blink"))?;
         let checkpoint_metrics = Arc::new(StdMutex::new(BlinkWalCheckpointMetrics {
             policy: config.blink_checkpoint_policy,
+            execution: config.blink_checkpoint_execution,
             threshold_bytes: match config.blink_checkpoint_policy {
                 BlinkCheckpointPolicy::Disabled => None,
                 BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => {
@@ -1188,6 +1244,8 @@ impl BlinkTenantService {
             coordinator_config: config.coordinator_config,
             checkpoint_policy: config.blink_checkpoint_policy,
             wal_layout: config.blink_wal_layout,
+            checkpoint_execution: config.blink_checkpoint_execution,
+            checkpoint_retention_bytes: config.blink_checkpoint_retention_bytes,
             checkpoint_metrics,
             coordinator_activity,
             shards: Mutex::new(BTreeMap::new()),
@@ -1235,14 +1293,25 @@ impl BlinkTenantService {
     }
 
     pub async fn shutdown(&self) {
+        let _ = self.shutdown_checked().await;
+    }
+
+    pub async fn shutdown_checked(&self) -> Result<(), Error> {
         let shards = {
             let mut shards = self.shards.lock().await;
             let open_shards = shards.values().cloned().collect::<Vec<_>>();
             shards.clear();
             open_shards
         };
+        let mut failure = None;
         for shard in shards {
-            let _ = shard.shutdown().await;
+            if let Err(error) = shard.shutdown().await {
+                failure.get_or_insert(error);
+            }
+        }
+        match failure {
+            Some(error) => Err(error),
+            None => Ok(()),
         }
     }
 
@@ -1403,14 +1472,28 @@ impl BlinkTenantService {
                 )?
             }
         };
-        if let Some(factory) = self.fault_injector_factory.lock().await.clone() {
+        let factory = self.fault_injector_factory.lock().await.clone();
+        if let Some(factory) = &factory {
             store.set_boxed_fault_injector(factory(tenant, shard_id));
         }
+        let physical_config = match self.wal_layout {
+            BlinkWalLayout::Legacy => None,
+            BlinkWalLayout::Segmented { .. } => {
+                if self.checkpoint_policy != BlinkCheckpointPolicy::Disabled {
+                    store.set_checkpoint_retention_limit(self.checkpoint_retention_bytes)?;
+                }
+                Some(physical_checkpoint::PhysicalCheckpointConfig {
+                    execution: self.checkpoint_execution,
+                    injector_factory: factory.map(|factory| (factory, tenant, shard_id)),
+                })
+            }
+        };
         store.enable_planned_execution();
         let shard = Arc::new(AsyncBlinkShard::start(
             store,
             self.coordinator_config,
             self.checkpoint_policy,
+            physical_config,
             Arc::clone(&self.checkpoint_metrics),
             Arc::clone(&self.coordinator_activity),
         ));
@@ -1432,6 +1515,7 @@ impl AsyncBlinkShard {
         mut store: dodb_storage::BlinkStore<ProductionFile, ProductionFile>,
         config: CoordinatorConfig,
         checkpoint_policy: BlinkCheckpointPolicy,
+        physical_config: Option<physical_checkpoint::PhysicalCheckpointConfig>,
         checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
         activity: Arc<CoordinatorActivity>,
     ) -> Self {
@@ -1442,6 +1526,23 @@ impl AsyncBlinkShard {
         let coordinator_failed_message = Arc::clone(&failed_message);
         let coordinator_activity = Arc::clone(&activity);
         let coordinator_task = tokio::spawn(async move {
+            if let Some(physical_config) = physical_config {
+                physical_checkpoint::PhysicalCoordinator::new(
+                    store,
+                    physical_checkpoint::CoordinatorSettings {
+                        grouping: config,
+                        policy: checkpoint_policy,
+                        physical: physical_config,
+                        metrics: checkpoint_metrics,
+                        activity: coordinator_activity,
+                        failed_message: coordinator_failed_message,
+                    },
+                    request_rx,
+                )
+                .run()
+                .await;
+                return;
+            }
             let mut pending = None;
             loop {
                 let first = match pending.take() {
@@ -1631,6 +1732,7 @@ impl AsyncBlinkShard {
                                                 reclaimed_bytes: 0,
                                                 duration_nanos,
                                                 succeeded: false,
+                                                ..BlinkCheckpointEvent::default()
                                             });
                                         }
                                         if let Ok(mut failed) = coordinator_failed_message.lock() {
@@ -1691,6 +1793,7 @@ impl AsyncBlinkShard {
                                         .saturating_sub(wal_bytes_after),
                                     duration_nanos: checkpoint_duration_nanos,
                                     succeeded,
+                                    ..BlinkCheckpointEvent::default()
                                 });
                                 let syncs_after = store
                                     .wal_metrics()
@@ -1797,6 +1900,11 @@ impl AsyncBlinkShard {
                 Error::invariant(format!("Blink coordinator task failed: {error}"))
             })?;
         }
+        if let Ok(failed) = self.failed_message.lock()
+            && let Some(message) = failed.as_ref()
+        {
+            return Err(Error::durability(message.clone()));
+        }
         Ok(())
     }
 }
@@ -1850,7 +1958,9 @@ impl LocalTenantService {
         if config.max_open_shards == 0 {
             return Err(Error::invalid_request("max_open_shards must be nonzero"));
         }
-        if config.blink_wal_layout != BlinkWalLayout::Legacy {
+        if config.blink_wal_layout != BlinkWalLayout::Legacy
+            || config.blink_checkpoint_execution != BlinkCheckpointExecution::Sync
+        {
             return Err(Error::invalid_request(
                 "B-link WAL layout is unsupported by the B-tree service",
             ));

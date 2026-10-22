@@ -776,3 +776,28 @@ async fn minimal_native_reads_satisfy_common_contract() {
     check_read_contract(&service, true).await;
     service.shutdown().await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn segmented_sync_and_background_satisfy_common_read_contract() {
+    for execution in [
+        dodb_server::BlinkCheckpointExecution::Sync,
+        dodb_server::BlinkCheckpointExecution::Background,
+    ] {
+        let directory = temporary_db_directory();
+        let service = BlinkTenantService::new(LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            blink_wal_layout: dodb_server::BlinkWalLayout::Segmented {
+                max_segment_bytes: 1,
+            },
+            blink_checkpoint_execution: execution,
+            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                threshold_bytes: 1,
+            },
+            ..LocalTenantServiceConfig::default()
+        })
+        .unwrap();
+        check_read_contract(&service, false).await;
+        service.shutdown_checked().await.unwrap();
+        assert_eq!(service.checkpoint_metrics_snapshot().checkpoints_failed, 0);
+    }
+}

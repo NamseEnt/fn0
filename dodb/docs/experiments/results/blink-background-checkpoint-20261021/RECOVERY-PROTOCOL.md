@@ -1,3 +1,11 @@
+# Concurrent checkpoint implementation update
+
+Background checkpoint execution is now implemented in the task-owned working tree. See [CONCURRENT-CHECKPOINT.md](CONCURRENT-CHECKPOINT.md) for the actual runtime and recovery path and [EXECUTION-PLAN.md](EXECUTION-PLAN.md) for the staged validation and measurement plan. The worker writes fixed images; the coordinator publishes into the latest manifest. Local overlap, failure, bounded-retention, recovery, and finite-model evidence is being archived. OCI validation and performance results are reported separately when complete.
+
+## Preserved earlier milestone
+
+The following text records the earlier synchronous-only milestone and its original plan. Statements that background execution is unimplemented describe that earlier source, not the current implementation.
+
 # Segmented WAL Checkpoint Recovery Protocol
 
 ## Implementation status

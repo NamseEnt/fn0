@@ -72,3 +72,28 @@ async fn btree_blink_and_rocksdb_share_transaction_contract() {
         }
     }
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn segmented_sync_and_background_satisfy_common_transaction_contract() {
+    for execution in [
+        dodb_server::BlinkCheckpointExecution::Sync,
+        dodb_server::BlinkCheckpointExecution::Background,
+    ] {
+        let directory = temporary_db_directory();
+        let service = || {
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                blink_wal_layout: dodb_server::BlinkWalLayout::Segmented {
+                    max_segment_bytes: 1,
+                },
+                blink_checkpoint_execution: execution,
+                blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                    threshold_bytes: 1,
+                },
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap()
+        };
+        check_transaction_contract(service(), service).await;
+    }
+}

@@ -847,3 +847,36 @@ fn bounded_history_checker_accepts_reverse_global_revision_order_for_independent
     ];
     assert!(is_linearizable_history(&history, &BTreeMap::new()));
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn segmented_sync_and_background_preserve_conditional_and_linearizable_histories() {
+    for execution in [
+        dodb_server::BlinkCheckpointExecution::Sync,
+        dodb_server::BlinkCheckpointExecution::Background,
+    ] {
+        for conditional in [true, false] {
+            let directory = temporary_db_directory();
+            let service = Arc::new(
+                BlinkTenantService::new(LocalTenantServiceConfig {
+                    data_dir: directory.path().to_path_buf(),
+                    blink_wal_layout: dodb_server::BlinkWalLayout::Segmented {
+                        max_segment_bytes: 1,
+                    },
+                    blink_checkpoint_execution: execution,
+                    blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                        threshold_bytes: 1,
+                    },
+                    ..LocalTenantServiceConfig::default()
+                })
+                .unwrap(),
+            );
+            if conditional {
+                check_conditional_history(Arc::clone(&service)).await;
+            } else {
+                check_bounded_read_write_history(Arc::clone(&service)).await;
+            }
+            service.shutdown_checked().await.unwrap();
+            assert_eq!(service.checkpoint_metrics_snapshot().checkpoints_failed, 0);
+        }
+    }
+}

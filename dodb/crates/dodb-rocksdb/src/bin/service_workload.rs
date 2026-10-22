@@ -1,3 +1,6 @@
+#[path = "support/blink_checkpoint.rs"]
+mod blink_checkpoint;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -217,6 +220,8 @@ impl DriverService {
                 config.database_config = DatabaseConfig::default().with_cache_capacity(128);
                 config.coordinator_config = CoordinatorConfig::default();
                 config.blink_checkpoint_policy = options.blink_checkpoint_policy;
+                config.blink_wal_layout = options.blink_checkpoint.layout;
+                config.blink_checkpoint_execution = options.blink_checkpoint.execution;
                 let service = BlinkTenantService::new(config)?;
                 let checkpoint_metrics = service.checkpoint_metrics_handle();
                 (
@@ -408,6 +413,14 @@ impl DriverService {
             .map(|event| {
                 json!({
                     "phase": event.phase,
+                    "task_id": event.task_id,
+                    "target_lsn": event.target_lsn,
+                    "writes_during_checkpoint": event.writes_during_checkpoint,
+                    "preparation_nanos": event.preparation_nanos,
+                    "page_write_nanos": event.page_write_nanos,
+                    "data_sync_nanos": event.data_sync_nanos,
+                    "metadata_sync_nanos": event.metadata_sync_nanos,
+                    "completion_nanos": event.completion_nanos,
                     "started_unix_nanos": event.started_unix_nanos.to_string(),
                     "ended_unix_nanos": event.ended_unix_nanos.to_string(),
                     "wal_bytes_before": event.wal_bytes_before,
@@ -425,6 +438,16 @@ impl DriverService {
                 dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { .. } => "wal_bytes_threshold",
             },
             "threshold_bytes": metrics.threshold_bytes,
+            "execution": match metrics.execution { dodb_server::BlinkCheckpointExecution::Sync => "sync", dodb_server::BlinkCheckpointExecution::Background => "background" },
+            "writes_during_checkpoint": metrics.writes_during_checkpoint,
+            "merged_checkpoint_requests": metrics.merged_checkpoint_requests,
+            "capacity_wait_count": metrics.capacity_wait_count,
+            "capacity_wait_nanos": metrics.capacity_wait_nanos,
+            "coordinator_pause_nanos": metrics.coordinator_pause_nanos,
+            "retained_image_bytes": metrics.retained_image_bytes,
+            "peak_retained_image_bytes": metrics.peak_retained_image_bytes,
+            "tasks_running": metrics.tasks_running,
+            "peak_tasks_running": metrics.peak_tasks_running,
             "checkpoints_started": metrics.checkpoints_started,
             "checkpoints_completed": metrics.checkpoints_completed,
             "checkpoints_failed": metrics.checkpoints_failed,
@@ -467,6 +490,7 @@ impl DriverService {
 struct Options {
     backend: BackendKind,
     blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy,
+    blink_checkpoint: blink_checkpoint::Options,
     client_executor: ClientExecutor,
     scenario: Scenario,
     data_dir: PathBuf,
@@ -1082,6 +1106,14 @@ fn parse_options() -> Result<Options, String> {
         "minimal-native" => BackendKind::MinimalNative,
         other => return Err(format!("unsupported backend {other}")),
     };
+    let blink_checkpoint = blink_checkpoint::Options::parse(
+        values.get("--blink-wal-layout").map(String::as_str),
+        values
+            .get("--blink-checkpoint-execution")
+            .map(String::as_str),
+        values.get("--blink-wal-segment-bytes").map(String::as_str),
+        backend == BackendKind::Blink,
+    )?;
     let blink_checkpoint_policy = match values.get("--blink-checkpoint-wal-bytes") {
         Some(_) if backend != BackendKind::Blink => {
             return Err(
@@ -1245,6 +1277,11 @@ fn parse_options() -> Result<Options, String> {
         }
     };
     let memory_diagnostic = parse_switch("--memory-diagnostic")?;
+    if memory_diagnostic && blink_checkpoint.layout != dodb_server::BlinkWalLayout::Legacy {
+        return Err(
+            "segmented checkpoints are unavailable in the memory diagnostic worker".to_owned(),
+        );
+    }
     if memory_diagnostic
         && matches!(
             blink_checkpoint_policy,
@@ -1278,6 +1315,7 @@ fn parse_options() -> Result<Options, String> {
     Ok(Options {
         backend,
         blink_checkpoint_policy,
+        blink_checkpoint,
         client_executor,
         scenario,
         data_dir: PathBuf::from(values.get("--data-dir").ok_or("--data-dir is required")?),
@@ -2647,6 +2685,10 @@ async fn run(options: Options) -> Result<Value, String> {
             .map(|observer| observer.start_sampling(engine_health_interval, options.measurement))
             .transpose()?
     };
+    let measurement_window_start = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
     let (admission, mut drain, total_calls, call_cap_reached) = run_clients(
         Arc::clone(&service),
         assignments,
@@ -2657,6 +2699,10 @@ async fn run(options: Options) -> Result<Value, String> {
         1 << 56,
     )
     .await;
+    let measurement_window_end = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
     let checkpoint_drain_started = Instant::now();
     service.wait_for_blink_coordinators_idle().await;
     let checkpoint_drain = checkpoint_drain_started.elapsed();
@@ -2851,8 +2897,11 @@ async fn run(options: Options) -> Result<Value, String> {
         + simultaneous_replay_ledger_clone_bytes
         + latency_report_sort_copy_bytes;
     let mut report = json!({
+        "measurement_window_unix_nanos": {"start": measurement_window_start.to_string(), "last_client_completion": measurement_window_end.to_string()},
         "schema": "dodb-service-workload-v1",
-        "run_status": if blink_checkpoint_metrics["checkpoints_failed"].as_u64().unwrap_or(0) > 0 { "failed_checkpoint" } else { "completed" },
+        "git_commit": env!("DODB_BUILD_GIT_COMMIT"),
+        "binary_sha256": std::env::var("DODB_BINARY_SHA256").unwrap_or_else(|_| "not-recorded".to_owned()),
+        "run_status": if blink_checkpoint_metrics["checkpoints_failed"].as_u64().unwrap_or(0) > 0 || blink_checkpoint_metrics["failed_message"].is_string() { "failed_checkpoint" } else { "completed" },
         "backend": match options.backend { BackendKind::Blink => "blink", BackendKind::RocksDb => "rocksdb", BackendKind::RocksDbDirect => "rocksdb-direct", BackendKind::MinimalNative => "minimal-native" },
         "scenario": match options.scenario { Scenario::Single(profile) => profile_name(profile), Scenario::Multi => "mt-mix", Scenario::Smoke => "smoke" },
         "seed": options.seed,
@@ -2944,6 +2993,7 @@ async fn run(options: Options) -> Result<Value, String> {
             "estimated_simultaneous_collector_peak_bytes": estimated_collector_peak_bytes,
         },
         "rocksdb_research_metrics": research_metrics,
+        "blink_checkpoint_configuration": (options.backend == BackendKind::Blink).then(|| options.blink_checkpoint.configuration()),
         "blink_checkpoint_metrics": blink_checkpoint_metrics,
         "per_tenant": per_tenant,
         "validation": validation,
@@ -3213,6 +3263,7 @@ mod tests {
         let options = Options {
             backend: BackendKind::RocksDb,
             blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy::Disabled,
+            blink_checkpoint: blink_checkpoint::Options::default(),
             client_executor: ClientExecutor::Async,
             scenario: Scenario::Multi,
             data_dir: PathBuf::new(),
@@ -3259,6 +3310,7 @@ mod tests {
         let options = Options {
             backend: BackendKind::RocksDb,
             blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy::Disabled,
+            blink_checkpoint: blink_checkpoint::Options::default(),
             client_executor: ClientExecutor::Async,
             scenario: Scenario::Single(Profile::Rw50),
             data_dir: PathBuf::new(),

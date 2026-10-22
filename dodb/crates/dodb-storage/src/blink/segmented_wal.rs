@@ -396,7 +396,7 @@ impl SegmentedWal {
         mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
     ) -> Result<u64> {
         let checkpoint_lsn = superblock.checkpoint_lsn;
-        if checkpoint_lsn < self.manifest.checkpoint_lsn || checkpoint_lsn != self.last_commit_lsn()
+        if checkpoint_lsn < self.manifest.checkpoint_lsn || checkpoint_lsn > self.last_commit_lsn()
         {
             return Err(Error::checkpoint("invalid segmented WAL checkpoint target"));
         }
