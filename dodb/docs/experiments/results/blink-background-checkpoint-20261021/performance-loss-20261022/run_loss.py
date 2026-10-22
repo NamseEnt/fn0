@@ -10,7 +10,7 @@ SMOKE = os.environ.get("DODB_LOSS_SMOKE", "0") == "1"
 BASE_PATH = Path(os.environ["DODB_LOSS_BASE_RUNNER"])
 os.environ["DODB_CHECKPOINT_RUN_ROOT"] = str(ROOT)
 os.environ["DODB_CHECKPOINT_SMOKE"] = "1" if SMOKE else "0"
-os.environ["DODB_CHECKPOINT_MEASUREMENT_MS"] = "8000" if SMOKE else "30000"
+os.environ["DODB_CHECKPOINT_MEASUREMENT_MS"] = "8000" if SMOKE else "60000"
 os.environ["DODB_CHECKPOINT_WARMUP_MS"] = "1000" if SMOKE else "10000"
 SPEC = importlib.util.spec_from_file_location("checkpoint_controller", BASE_PATH)
 BASE = importlib.util.module_from_spec(SPEC)
