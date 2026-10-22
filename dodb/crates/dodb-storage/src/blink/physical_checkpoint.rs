@@ -137,6 +137,10 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         if target == wal.manifest().checkpoint_lsn {
             return Ok(None);
         }
+        if let Err(error) = self.check_invariants() {
+            self.broken = Some(error.to_string());
+            return Err(error);
+        }
         let file = self
             .file
             .try_clone_for_background()
