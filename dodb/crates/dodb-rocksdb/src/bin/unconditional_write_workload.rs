@@ -2237,7 +2237,7 @@ mod tests {
         let options = Options {
             backend: BackendKind::SynchronousCore,
             blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy::Disabled,
-            blink_checkpoint: blink_checkpoint::Options::default(),
+            blink_checkpoint: crate::blink_checkpoint::Options::default(),
             width: 1,
             clients: 1,
             seed: 20261013,

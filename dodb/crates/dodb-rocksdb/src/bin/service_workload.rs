@@ -3267,7 +3267,7 @@ mod tests {
         let options = Options {
             backend: BackendKind::RocksDb,
             blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy::Disabled,
-            blink_checkpoint: blink_checkpoint::Options::default(),
+            blink_checkpoint: crate::blink_checkpoint::Options::default(),
             client_executor: ClientExecutor::Async,
             scenario: Scenario::Multi,
             data_dir: PathBuf::new(),
@@ -3314,7 +3314,7 @@ mod tests {
         let options = Options {
             backend: BackendKind::RocksDb,
             blink_checkpoint_policy: dodb_server::BlinkCheckpointPolicy::Disabled,
-            blink_checkpoint: blink_checkpoint::Options::default(),
+            blink_checkpoint: crate::blink_checkpoint::Options::default(),
             client_executor: ClientExecutor::Async,
             scenario: Scenario::Single(Profile::Rw50),
             data_dir: PathBuf::new(),
