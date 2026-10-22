@@ -665,6 +665,30 @@ impl ProbeBackend {
             return serde_json::json!({"enabled": false});
         };
         let metrics = metrics.snapshot();
+        let events = metrics
+            .checkpoint_events
+            .iter()
+            .map(|event| {
+                serde_json::json!({
+                        "phase": event.phase,
+                        "task_id": event.task_id,
+                        "target_lsn": event.target_lsn,
+                        "writes_during_checkpoint": event.writes_during_checkpoint,
+                        "preparation_nanos": event.preparation_nanos,
+                        "page_write_nanos": event.page_write_nanos,
+                        "data_sync_nanos": event.data_sync_nanos,
+                        "metadata_sync_nanos": event.metadata_sync_nanos,
+                        "completion_nanos": event.completion_nanos,
+                        "started_unix_nanos": event.started_unix_nanos.to_string(),
+                        "ended_unix_nanos": event.ended_unix_nanos.to_string(),
+                        "wal_bytes_before": event.wal_bytes_before,
+                        "wal_bytes_after": event.wal_bytes_after,
+                        "reclaimed_bytes": event.reclaimed_bytes,
+                        "duration_nanos": event.duration_nanos,
+                        "succeeded": event.succeeded,
+                })
+            })
+            .collect::<Vec<_>>();
         serde_json::json!({
             "enabled": matches!(metrics.policy, dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { .. }),
             "policy": match metrics.policy {
@@ -700,24 +724,7 @@ impl ProbeBackend {
             "commit_wal_syncs": metrics.commit_wal_syncs,
             "checkpoint_wal_syncs": metrics.checkpoint_wal_syncs,
             "omitted_checkpoint_events": metrics.omitted_checkpoint_events,
-            "checkpoint_events": metrics.checkpoint_events.iter().map(|event| serde_json::json!({
-                "phase": event.phase,
-                    "task_id": event.task_id,
-                    "target_lsn": event.target_lsn,
-                    "writes_during_checkpoint": event.writes_during_checkpoint,
-                    "preparation_nanos": event.preparation_nanos,
-                    "page_write_nanos": event.page_write_nanos,
-                    "data_sync_nanos": event.data_sync_nanos,
-                    "metadata_sync_nanos": event.metadata_sync_nanos,
-                    "completion_nanos": event.completion_nanos,
-                "started_unix_nanos": event.started_unix_nanos.to_string(),
-                "ended_unix_nanos": event.ended_unix_nanos.to_string(),
-                "wal_bytes_before": event.wal_bytes_before,
-                "wal_bytes_after": event.wal_bytes_after,
-                "reclaimed_bytes": event.reclaimed_bytes,
-                "duration_nanos": event.duration_nanos,
-                "succeeded": event.succeeded,
-            })).collect::<Vec<_>>(),
+            "checkpoint_events": events,
             "failed_message": metrics.failed_message,
         })
     }
