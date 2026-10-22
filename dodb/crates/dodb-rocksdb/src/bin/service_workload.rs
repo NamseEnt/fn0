@@ -2896,11 +2896,9 @@ async fn run(options: Options) -> Result<Value, String> {
         + merged_collector_capacity_bytes
         + simultaneous_replay_ledger_clone_bytes
         + latency_report_sort_copy_bytes;
+    let blink_configuration = json!({"database_cache_capacity_pages": 128, "coordinator_queue_capacity": 256, "coordinator_group_requests": 64, "coordinator_group_bytes": 4194304, "coordinator_collection_delay_ms": 0, "wal_checkpoint_policy": match options.blink_checkpoint_policy { dodb_server::BlinkCheckpointPolicy::Disabled => json!({"mode": "disabled"}), dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => json!({"mode": "wal_bytes_threshold", "threshold_bytes": threshold_bytes}) }});
     let mut report = json!({
-        "measurement_window_unix_nanos": {"start": measurement_window_start.to_string(), "last_client_completion": measurement_window_end.to_string()},
         "schema": "dodb-service-workload-v1",
-        "git_commit": env!("DODB_BUILD_GIT_COMMIT"),
-        "binary_sha256": std::env::var("DODB_BINARY_SHA256").unwrap_or_else(|_| "not-recorded".to_owned()),
         "run_status": if blink_checkpoint_metrics["checkpoints_failed"].as_u64().unwrap_or(0) > 0 || blink_checkpoint_metrics["failed_message"].is_string() { "failed_checkpoint" } else { "completed" },
         "backend": match options.backend { BackendKind::Blink => "blink", BackendKind::RocksDb => "rocksdb", BackendKind::RocksDbDirect => "rocksdb-direct", BackendKind::MinimalNative => "minimal-native" },
         "scenario": match options.scenario { Scenario::Single(profile) => profile_name(profile), Scenario::Multi => "mt-mix", Scenario::Smoke => "smoke" },
@@ -2931,7 +2929,7 @@ async fn run(options: Options) -> Result<Value, String> {
             "require_full_window": options.require_full_window,
             "include_width_16": options.include_width_16,
             "query_limit": 16,
-            "blink": {"database_cache_capacity_pages": 128, "coordinator_queue_capacity": 256, "coordinator_group_requests": 64, "coordinator_group_bytes": 4194304, "coordinator_collection_delay_ms": 0, "wal_checkpoint_policy": match options.blink_checkpoint_policy { dodb_server::BlinkCheckpointPolicy::Disabled => json!({"mode": "disabled"}), dodb_server::BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => json!({"mode": "wal_bytes_threshold", "threshold_bytes": threshold_bytes}) }},
+            "blink": blink_configuration,
             "rocksdb": {
                 "blocking_operation_limit": if !matches!(options.backend, BackendKind::Blink | BackendKind::MinimalNative) {
                     options.blocking_admission.split_slot_limits().map_or(options.shared_blocking_slots, |(read_slots, write_slots)| read_slots + write_slots)
@@ -2993,7 +2991,6 @@ async fn run(options: Options) -> Result<Value, String> {
             "estimated_simultaneous_collector_peak_bytes": estimated_collector_peak_bytes,
         },
         "rocksdb_research_metrics": research_metrics,
-        "blink_checkpoint_configuration": (options.backend == BackendKind::Blink).then(|| options.blink_checkpoint.configuration()),
         "blink_checkpoint_metrics": blink_checkpoint_metrics,
         "per_tenant": per_tenant,
         "validation": validation,
@@ -3005,6 +3002,13 @@ async fn run(options: Options) -> Result<Value, String> {
         "sync_count_and_group_metrics": "unavailable from existing service interfaces",
         "compaction_observation": "not exposed by the service comparison driver",
     });
+    report["measurement_window_unix_nanos"] = json!({"start": measurement_window_start.to_string(), "last_client_completion": measurement_window_end.to_string()});
+    report["git_commit"] = json!(env!("DODB_BUILD_GIT_COMMIT"));
+    report["binary_sha256"] =
+        json!(std::env::var("DODB_BINARY_SHA256").unwrap_or_else(|_| "not-recorded".to_owned()));
+    report["blink_checkpoint_configuration"] = json!(
+        (options.backend == BackendKind::Blink).then(|| options.blink_checkpoint.configuration())
+    );
     if let Some(memory_session) = memory_session {
         report["memory_only_diagnostic"] = memory_session.finish_sampling();
     }

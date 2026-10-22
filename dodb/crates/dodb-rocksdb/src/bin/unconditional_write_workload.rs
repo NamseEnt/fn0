@@ -1194,6 +1194,10 @@ fn run() -> Result<(), String> {
         storage_before_measurement,
         storage_after_measurement,
     );
+    report["git_commit"] = json!(env!("DODB_BUILD_GIT_COMMIT"));
+    report["blink_checkpoint_configuration"] = json!(
+        (options.backend == BackendKind::Blink).then(|| options.blink_checkpoint.configuration())
+    );
     report["measurement_window_unix_nanos"] = json!({"start": measurement_window_start.to_string(), "last_client_completion": measurement_window_end.to_string()});
     if let Some(memory_session) = memory_session {
         report["memory_only_diagnostic"] = memory_session.finish_sampling();
@@ -1797,7 +1801,6 @@ fn build_report(
         histogram.bucket_counts.capacity() * std::mem::size_of::<u64>();
     json!({
         "benchmark_kind": "unconditional_write_probe",
-        "git_commit": env!("DODB_BUILD_GIT_COMMIT"),
         "binary_sha256": std::env::var("DODB_BINARY_SHA256").unwrap_or_else(|_| "not-recorded".to_owned()),
         "run_status": if blink_checkpoint_metrics["checkpoints_failed"].as_u64().unwrap_or(0) > 0 || blink_checkpoint_metrics["failed_message"].is_string() { "failed_checkpoint" } else { "completed" },
         "backend": format!("{:?}", options.backend),
@@ -1874,7 +1877,6 @@ fn build_report(
             "request_limit_reached": false,
         },
         "latency": histogram.json(),
-        "blink_checkpoint_configuration": (options.backend == BackendKind::Blink).then(|| options.blink_checkpoint.configuration()),
         "blink_checkpoint_metrics": blink_checkpoint_metrics,
         "fairness": {
             "per_client_write_batch_counts": client_results.iter().map(|result| result.measurement_writes).collect::<Vec<_>>(),

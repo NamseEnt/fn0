@@ -1,6 +1,7 @@
 use super::*;
 use dodb_storage::{BlinkCheckpointOutput, BlinkCheckpointReport, BlinkStore};
 use std::sync::OnceLock;
+use std::sync::atomic::AtomicBool;
 use tokio::sync::mpsc;
 use tokio::task::{JoinError, JoinHandle};
 
@@ -37,6 +38,7 @@ struct RunningCheckpoint {
     target_lsn: u64,
     completed_writes: u64,
     preparation_nanos: u64,
+    worker_active: Arc<AtomicBool>,
 }
 
 pub(super) struct PhysicalCoordinator {
@@ -287,10 +289,9 @@ impl PhysicalCoordinator {
                     .is_ok_and(|transaction| transaction.commit_lsn.is_some())
             })
             .count() as u64;
-        let overlap = self
-            .running
-            .as_ref()
-            .is_some_and(|running| !running.worker.is_finished());
+        let overlap = self.running.as_ref().is_some_and(|running| {
+            running.worker_active.load(Ordering::Acquire) && !running.worker.is_finished()
+        });
         if overlap && let Some(running) = self.running.as_mut() {
             running.completed_writes += successful;
         }
@@ -363,6 +364,11 @@ impl PhysicalCoordinator {
             metrics.wal_syncs = metrics
                 .commit_wal_syncs
                 .saturating_add(metrics.checkpoint_wal_syncs);
+            if let Some(wal) = &after {
+                metrics.wal_bytes_current = wal.wal_bytes;
+                metrics.wal_bytes_at_measurement_end = Some(wal.wal_bytes);
+                metrics.wal_bytes_max = metrics.wal_bytes_max.max(wal.wal_bytes);
+            }
         });
         let Some(mut snapshot) = snapshot else {
             self.requested_activity = None;
@@ -389,8 +395,15 @@ impl PhysicalCoordinator {
         });
         let target_lsn = snapshot.checkpoint_lsn().get();
         let preparation_nanos = nanos(started);
+        let worker_active = Arc::new(AtomicBool::new(false));
+        let worker_state = Arc::clone(&worker_active);
         self.running = Some(RunningCheckpoint {
-            worker: tokio::task::spawn_blocking(move || snapshot.run()),
+            worker: tokio::task::spawn_blocking(move || {
+                worker_state.store(true, Ordering::Release);
+                let result = snapshot.run();
+                worker_state.store(false, Ordering::Release);
+                result
+            }),
             _permit: permit,
             _activity: self.settings.activity.enter(),
             started,
@@ -401,6 +414,7 @@ impl PhysicalCoordinator {
             target_lsn,
             completed_writes: 0,
             preparation_nanos,
+            worker_active,
         });
         self.requested_activity = None;
         Ok(())
