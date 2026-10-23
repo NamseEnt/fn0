@@ -3,6 +3,7 @@ use super::*;
 pub(super) struct PendingCheckpoint {
     token: Arc<()>,
     retained_bytes: u64,
+    disk_bytes: u64,
 }
 
 pub struct BlinkCheckpointSnapshot {
@@ -13,7 +14,8 @@ pub struct BlinkCheckpointSnapshot {
     source_slot: SuperblockSlot,
     superblock: BlinkSuperblock,
     started: Instant,
-    injector: Option<Box<dyn FaultInjector + Send>>,
+    pub(super) injector: Option<Box<dyn FaultInjector + Send>>,
+    base_job: Option<durable_bases::BasePackJob>,
 }
 
 pub struct BlinkCheckpointOutput {
@@ -22,6 +24,8 @@ pub struct BlinkCheckpointOutput {
     report: BlinkCheckpointReport,
     phase_timings: [u64; 3],
     started: Instant,
+    base: Option<durable_bases::BasePackOutput>,
+    injector: Option<Box<dyn FaultInjector + Send>>,
 }
 
 impl BlinkCheckpointOutput {
@@ -46,6 +50,27 @@ impl BlinkCheckpointSnapshot {
 
     pub fn run(mut self) -> Result<BlinkCheckpointOutput> {
         let mut injector = self.injector.take();
+        if let Some(job) = self.base_job.take() {
+            let base = job.run(&self.pages, &mut injector)?;
+            return Ok(BlinkCheckpointOutput {
+                token: self.token,
+                superblock: self.superblock.clone(),
+                report: BlinkCheckpointReport {
+                    checkpoint_lsn: self.superblock.checkpoint_lsn,
+                    checkpoint_sequence: self.superblock.checkpoint_sequence,
+                    pages_flushed: self.pages.len(),
+                    bytes_written: base.entry.bytes,
+                    base_bytes_written: base.entry.bytes,
+                    full_base_snapshots: u64::from(base.complete),
+                    checkpoint_write_requests: base.write_calls,
+                    ..BlinkCheckpointReport::default()
+                },
+                phase_timings: base.phase_timings,
+                started: self.started,
+                base: Some(base),
+                injector,
+            });
+        }
         hit(&mut injector, "before_checkpoint_data_flush")?;
         let page_started = Instant::now();
         let mut bytes_written = 0u64;
@@ -96,11 +121,16 @@ impl BlinkCheckpointSnapshot {
                 checkpoint_sequence: self.superblock.checkpoint_sequence,
                 pages_flushed: self.pages.len(),
                 bytes_written,
+                checkpoint_write_requests: self.pages.len() as u64
+                    + u64::from(self.dirty_superblock.is_some())
+                    + 1,
                 ..BlinkCheckpointReport::default()
             },
             superblock: self.superblock,
             phase_timings: [page_nanos, data_sync_nanos, metadata_sync_nanos],
             started: self.started,
+            base: None,
+            injector,
         })
     }
 }
@@ -164,19 +194,62 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             self.broken = Some(error.to_string());
             return Err(error);
         }
+        let base_job = self
+            .segmented_wal
+            .as_ref()
+            .unwrap()
+            .base_job(self.dirty_pages.len(), self.state.pages.len())?;
+        let page_count = if base_job.as_ref().is_some_and(|job| job.complete) {
+            self.state.pages.len()
+        } else {
+            self.dirty_pages.len()
+        };
+        if base_job.is_some() {
+            let limit = self.checkpoint_retention_limit.unwrap_or(512 * 1024 * 1024);
+            let wal = self.segmented_wal.as_ref().unwrap();
+            if wal
+                .base_bytes()
+                .saturating_add(wal.metrics()?.wal_bytes)
+                .saturating_add(durable_bases::encoded_size(page_count as u64))
+                > limit
+                || (page_count as u64 + 2).saturating_mul(PAGE_SIZE as u64) > limit
+            {
+                return Err(Error::overloaded(
+                    "durable checkpoint base capacity exceeded",
+                ));
+            }
+        }
+        let mut pages = if base_job.as_ref().is_some_and(|job| job.complete) {
+            let mut images = self.dirty_pages.clone();
+            for (page_id, page) in &self.state.pages {
+                if !images.contains_key(page_id) {
+                    images.insert(*page_id, Arc::new(encode_blink_page(*page_id, page)?));
+                }
+            }
+            self.dirty_pages.clear();
+            images
+        } else {
+            std::mem::take(&mut self.dirty_pages)
+        };
         let snapshot = BlinkCheckpointSnapshot {
             token: Arc::new(()),
             file,
-            pages: std::mem::take(&mut self.dirty_pages),
+            pages: std::mem::take(&mut pages),
             dirty_superblock: self.dirty_superblock.take(),
             source_slot: self.active_slot,
             superblock,
             started: Instant::now(),
             injector: None,
+            base_job,
         };
         self.physical_checkpoint = Some(PendingCheckpoint {
             token: Arc::clone(&snapshot.token),
             retained_bytes: snapshot.retained_bytes(),
+            disk_bytes: if snapshot.base_job.is_some() {
+                durable_bases::encoded_size(snapshot.pages.len() as u64)
+            } else {
+                0
+            },
         });
         Ok(Some(snapshot))
     }
@@ -198,6 +271,9 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         output: Result<BlinkCheckpointOutput>,
     ) -> Result<BlinkCheckpointReport> {
         let mut output = output?;
+        if self.fault_injector.is_none() {
+            self.fault_injector = output.injector.take();
+        }
         let pending = self
             .physical_checkpoint
             .as_ref()
@@ -210,11 +286,23 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         if let Some(message) = &self.broken {
             return Err(Error::durability(message.clone()));
         }
-        output.report.wal_bytes_reclaimed = self
-            .segmented_wal
-            .as_mut()
-            .unwrap()
-            .advance_checkpoint(&output.superblock, self.fault_injector.as_deref_mut())?;
+        if output.base.is_some() {
+            let wal = self.segmented_wal.as_mut().unwrap();
+            let (wal_bytes, base_bytes) = wal.advance_checkpoint_with_base(
+                &output.superblock,
+                output.base.as_ref(),
+                self.fault_injector.as_deref_mut(),
+            )?;
+            output.report.wal_bytes_reclaimed = wal_bytes;
+            output.report.base_bytes_reclaimed = base_bytes;
+            output.report.base_bytes_retained = wal.base_bytes();
+        } else {
+            output.report.wal_bytes_reclaimed = self
+                .segmented_wal
+                .as_mut()
+                .unwrap()
+                .advance_checkpoint(&output.superblock, self.fault_injector.as_deref_mut())?;
+        }
         self.current_superblock.checkpoint_lsn = output.superblock.checkpoint_lsn;
         self.current_superblock.checkpoint_sequence = output.superblock.checkpoint_sequence;
         self.current_superblock.generation = self
@@ -226,11 +314,13 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
     }
 
     pub(super) fn check_segmented_group_capacity(&self, commits: &[WalCommit]) -> Result<()> {
-        let Some(limit) = self.checkpoint_retention_limit else {
-            return Ok(());
-        };
         let Some(wal) = &self.segmented_wal else {
             return Ok(());
+        };
+        let limit = match self.checkpoint_retention_limit {
+            Some(limit) => limit,
+            None if wal.has_durable_bases() => 512 * 1024 * 1024,
+            None => return Ok(()),
         };
         let image_count = commits
             .iter()
@@ -243,7 +333,31 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         let maximum_images = (self.dirty_pages.len() as u64 + image_count + 2)
             .saturating_mul(PAGE_SIZE as u64)
             .saturating_add(self.checkpoint_retained_image_bytes());
-        if wal.metrics()?.wal_bytes.saturating_add(maximum_append) > limit || maximum_images > limit
+        let base_reserve = if wal.has_durable_bases() {
+            let highest_page = commits
+                .iter()
+                .flat_map(|commit| &commit.pages)
+                .map(|page| page.page_id.get())
+                .max()
+                .unwrap_or(FIRST_DATA_PAGE)
+                .max(self.current_superblock.high_water_page_id.get());
+            wal.base_bytes()
+                .saturating_add(durable_bases::encoded_size(highest_page.saturating_sub(1)))
+                .saturating_add(
+                    self.physical_checkpoint
+                        .as_ref()
+                        .map_or(0, |pending| pending.disk_bytes),
+                )
+        } else {
+            0
+        };
+        if wal
+            .metrics()?
+            .wal_bytes
+            .saturating_add(maximum_append)
+            .saturating_add(base_reserve)
+            > limit
+            || maximum_images > limit
         {
             return Err(Error::overloaded("segmented checkpoint capacity exceeded"));
         }

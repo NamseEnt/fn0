@@ -954,6 +954,10 @@ pub enum BlinkWalLayout {
     Segmented {
         max_segment_bytes: u64,
     },
+    SegmentedBases {
+        max_segment_bytes: u64,
+        coalesce: bool,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -983,6 +987,12 @@ pub struct BlinkCheckpointEvent {
     pub reclaimed_bytes: u64,
     pub duration_nanos: u64,
     pub succeeded: bool,
+    pub checkpoint_bytes_written: u64,
+    pub base_bytes_written: u64,
+    pub base_bytes_retained: u64,
+    pub base_bytes_reclaimed: u64,
+    pub full_base_snapshots: u64,
+    pub checkpoint_write_requests: u64,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -1204,6 +1214,9 @@ impl BlinkTenantService {
             config.blink_wal_layout,
             BlinkWalLayout::Segmented {
                 max_segment_bytes: 0
+            } | BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 0,
+                ..
             }
         ) {
             return Err(Error::invalid_request(
@@ -1211,7 +1224,7 @@ impl BlinkTenantService {
             ));
         }
         if config.blink_checkpoint_execution == BlinkCheckpointExecution::Background
-            && !matches!(config.blink_wal_layout, BlinkWalLayout::Segmented { .. })
+            && config.blink_wal_layout == BlinkWalLayout::Legacy
         {
             return Err(Error::invalid_request(
                 "background checkpoints require segmented WAL",
@@ -1471,6 +1484,11 @@ impl BlinkTenantService {
                     max_segment_bytes,
                 )?
             }
+            BlinkWalLayout::SegmentedBases { max_segment_bytes, coalesce } => {
+                dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_segmented_base_path(
+                    &database_path, database_config, max_segment_bytes, coalesce,
+                )?
+            }
         };
         let factory = self.fault_injector_factory.lock().await.clone();
         if let Some(factory) = &factory {
@@ -1478,7 +1496,7 @@ impl BlinkTenantService {
         }
         let physical_config = match self.wal_layout {
             BlinkWalLayout::Legacy => None,
-            BlinkWalLayout::Segmented { .. } => {
+            BlinkWalLayout::Segmented { .. } | BlinkWalLayout::SegmentedBases { .. } => {
                 if self.checkpoint_policy != BlinkCheckpointPolicy::Disabled {
                     store.set_checkpoint_retention_limit(self.checkpoint_retention_bytes)?;
                 }

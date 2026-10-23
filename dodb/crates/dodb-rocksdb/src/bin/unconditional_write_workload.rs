@@ -684,6 +684,12 @@ impl ProbeBackend {
                         "wal_bytes_before": event.wal_bytes_before,
                         "wal_bytes_after": event.wal_bytes_after,
                         "reclaimed_bytes": event.reclaimed_bytes,
+                    "checkpoint_bytes_written": event.checkpoint_bytes_written,
+                    "base_bytes_written": event.base_bytes_written,
+                    "base_bytes_retained": event.base_bytes_retained,
+                    "base_bytes_reclaimed": event.base_bytes_reclaimed,
+                    "full_base_snapshots": event.full_base_snapshots,
+                    "checkpoint_write_requests": event.checkpoint_write_requests,
                         "duration_nanos": event.duration_nanos,
                         "succeeded": event.succeeded,
                 })
@@ -1070,6 +1076,7 @@ fn run() -> Result<(), String> {
     tenant.wait_for_blink_coordinators_idle();
     let process_sampler = ProcessSampler::start(options.data_dir.clone())?;
     let storage_before_measurement = database_and_wal_bytes(&options.data_dir);
+    let write_io_before = blink_checkpoint::process_write_io();
     let engine_health_interval = Duration::from_millis(options.engine_health_interval_ms);
     tenant.reset_blink_checkpoint_metrics();
     tenant.start_measurement()?;
@@ -1109,6 +1116,7 @@ fn run() -> Result<(), String> {
     tenant.wait_for_blink_coordinators_idle();
     let checkpoint_drain_ms = checkpoint_drain_started.elapsed().as_secs_f64() * 1_000.0;
     tenant.stop_measurement()?;
+    let write_io_after = blink_checkpoint::process_write_io();
     let storage_after_measurement = database_and_wal_bytes(&options.data_dir);
     let engine_health_metrics = match engine_health_sampler {
         Some(sampler) => sampler.finish()?,
@@ -1141,6 +1149,7 @@ fn run() -> Result<(), String> {
     tenant.shutdown()?;
     let blink_checkpoint_metrics = tenant.blink_checkpoint_metrics();
     drop(tenant);
+    let reopen_started = Instant::now();
     let reopened_tenant =
         ProbeBackend::open(&options, runtime.handle().clone(), memory_session.clone())?;
     let observed_rows = reopened_tenant.read_all()?;
@@ -1183,6 +1192,7 @@ fn run() -> Result<(), String> {
             ),
         );
     }
+    let reopen_and_validation_ms = reopen_started.elapsed().as_secs_f64() * 1000.0;
     reopened_tenant.shutdown()?;
     drop(reopened_tenant);
     let disk_usage_bytes = directory_bytes(&options.data_dir)?;
@@ -1201,6 +1211,8 @@ fn run() -> Result<(), String> {
         storage_before_measurement,
         storage_after_measurement,
     );
+    report["process_write_io"] = json!({ "before": write_io_before, "after": write_io_after });
+    report["reopen_and_validation_ms"] = json!(reopen_and_validation_ms);
     report["git_commit"] = json!(env!("DODB_BUILD_GIT_COMMIT"));
     report["blink_checkpoint_configuration"] = json!(
         (options.backend == BackendKind::Blink).then(|| options.blink_checkpoint.configuration())

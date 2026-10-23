@@ -191,6 +191,13 @@ struct PageChainEntry {
 pub(crate) type WalDeltaBaseSource<'source, 'base> =
     dyn FnMut(PageId) -> Option<Cow<'base, [u8; PAGE_SIZE]>> + 'source;
 
+pub(crate) struct WalSegmentBoundary {
+    pub start_after_lsn: Lsn,
+    pub start_batch_id: Option<u64>,
+    pub truncate_torn_tail: bool,
+    pub defer_initial_sync: bool,
+}
+
 pub(crate) struct WalDeltaRequest<'request, 'source, 'base> {
     pub eligible_commits: &'request [bool],
     pub base_source: &'request mut WalDeltaBaseSource<'source, 'base>,
@@ -438,6 +445,7 @@ struct WalScanOutput {
 enum ScanMaterialization {
     Recovery,
     Batches,
+    ValidateOnly,
 }
 
 struct EncodedWalGroup {
@@ -559,25 +567,57 @@ impl<F: DurableFile> WalLog<F> {
     }
 
     pub(crate) fn open_with_segment_boundary(
-        mut file: F,
+        file: F,
         identity: WalIdentity,
         page_image_format: WalPageImageFormat,
         start_after_lsn: Lsn,
         start_batch_id: Option<u64>,
         truncate_torn_tail: bool,
         defer_initial_sync: bool,
+        injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+    ) -> Result<Self> {
+        Self::open_with_segment_bases(
+            file,
+            identity,
+            page_image_format,
+            WalSegmentBoundary {
+                start_after_lsn,
+                start_batch_id,
+                truncate_torn_tail,
+                defer_initial_sync,
+            },
+            BTreeMap::new(),
+            injector,
+        )
+    }
+
+    pub(crate) fn open_with_segment_bases(
+        mut file: F,
+        identity: WalIdentity,
+        page_image_format: WalPageImageFormat,
+        boundary: WalSegmentBoundary,
+        bases: BTreeMap<PageId, RecoveredWalPage>,
         mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
     ) -> Result<Self> {
+        let WalSegmentBoundary {
+            start_after_lsn,
+            start_batch_id,
+            truncate_torn_tail,
+            defer_initial_sync,
+        } = boundary;
         let length = file.len()?;
         if length == 0 {
-            return Self::initialize_empty(
+            let mut wal = Self::initialize_empty(
                 file,
                 identity,
                 start_after_lsn,
                 start_batch_id.unwrap_or(1),
                 defer_initial_sync,
                 page_image_format,
-            );
+            )?;
+            wal.seed_page_chain(&bases);
+            wal.recovery_pages = bases;
+            return Ok(wal);
         }
         if usize::try_from(length)
             .ok()
@@ -627,6 +667,7 @@ impl<F: DurableFile> WalLog<F> {
             page_image_format,
             ScanMaterialization::Recovery,
             start_batch_id,
+            bases,
         )?;
         if format_version == WAL_LOGICAL_FORMAT_VERSION {
             return Err(Error::unsupported_format(
@@ -803,6 +844,7 @@ impl<F: DurableFile> WalLog<F> {
             self.page_image_format,
             ScanMaterialization::Batches,
             self.segment_start_batch_id,
+            BTreeMap::new(),
         )
         .expect("WAL on disk scans")
         .batches
@@ -1655,6 +1697,51 @@ impl<F: DurableFile> WalLog<F> {
                 .ok_or_else(|| Error::invariant("WAL batch id exhausted"))?;
         }
         Ok((reports, next_lsn, next_batch_id))
+    }
+
+    pub(crate) fn validate_retired_segment(
+        mut file: F,
+        identity: &WalIdentity,
+        checkpoint_lsn: Lsn,
+    ) -> Result<()> {
+        let scan = scan_wal(
+            &mut file,
+            identity,
+            WalPageImageFormat::ExperimentalBlink,
+            ScanMaterialization::ValidateOnly,
+            None,
+            BTreeMap::new(),
+        )?;
+        if scan.valid_length != file.len()?
+            || scan.history_start_lsn >= checkpoint_lsn
+            || scan.last_commit_lsn.is_none_or(|end| end > checkpoint_lsn)
+            || scan.next_lsn.get() > checkpoint_lsn.get().saturating_add(1)
+        {
+            return Err(Error::corruption(
+                "retired WAL does not have a complete covered history",
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn inherit_page_chain(&mut self, previous: &Self) {
+        self.page_chain.clone_from(&previous.page_chain);
+    }
+
+    fn seed_page_chain(&mut self, pages: &BTreeMap<PageId, RecoveredWalPage>) {
+        self.page_chain = pages
+            .iter()
+            .filter(|(page_id, _)| !is_superblock_page(**page_id))
+            .map(|(page_id, page)| {
+                (
+                    *page_id,
+                    PageChainEntry {
+                        page_lsn: page_lsn_of(&page.image),
+                        image_crc: crc32c::crc32c(&page.image[..]),
+                    },
+                )
+            })
+            .collect();
     }
 
     pub(crate) fn page_chain_entry(&self, page_id: PageId) -> Option<(Lsn, u32)> {
@@ -3190,6 +3277,7 @@ fn scan_wal<F: DurableFile>(
     page_image_format: WalPageImageFormat,
     materialization: ScanMaterialization,
     start_batch_id: Option<u64>,
+    mut pages: BTreeMap<PageId, RecoveredWalPage>,
 ) -> Result<WalScanOutput> {
     let length = file.len()?;
     let mut offset = 0u64;
@@ -3197,7 +3285,6 @@ fn scan_wal<F: DurableFile>(
     let mut report = WalScanReport::default();
     let mut header_state: Option<(u16, Lsn)> = None;
     let mut batches = Vec::new();
-    let mut pages: BTreeMap<PageId, RecoveredWalPage> = BTreeMap::new();
     let mut redo = WalRedoStats::default();
     let mut pending: Option<PendingBatch> = None;
     let initial_batch_id = start_batch_id.unwrap_or(1);
@@ -3377,6 +3464,23 @@ fn scan_wal<F: DurableFile>(
                 let mut batch_pages = Vec::new();
                 let mut batch_kinds = Vec::new();
                 for record in current.records {
+                    if materialization == ScanMaterialization::ValidateOnly {
+                        match record {
+                            PendingRedo::Image(page) => {
+                                validate_page_image_lsn(&page, record_lsn)?;
+                            }
+                            PendingRedo::Delta(payload) => {
+                                let view = decode_page_delta(&payload)?;
+                                if view.base_page_lsn >= record_lsn {
+                                    return Err(Error::corruption(
+                                        "retired delta base exceeds its commit",
+                                    ));
+                                }
+                            }
+                        }
+                        report.replayable_pages += 1;
+                        continue;
+                    }
                     let (page, kind) = match record {
                         PendingRedo::Image(page) => {
                             validate_page_image_lsn(&page, record_lsn)?;
@@ -3477,7 +3581,9 @@ fn scan_wal<F: DurableFile>(
         pages,
         redo,
         report,
-        valid_length: if start_batch_id.is_some() {
+        valid_length: if start_batch_id.is_some()
+            || materialization == ScanMaterialization::ValidateOnly
+        {
             committed_length
         } else {
             offset

@@ -25,7 +25,7 @@ impl Options {
         };
         let layout = match layout.unwrap_or("legacy") {
             "legacy" if segment_bytes.is_none() => BlinkWalLayout::Legacy,
-            "segmented" => {
+            value @ ("segmented" | "segmented-bases" | "segmented-bases-coalesced") => {
                 let bytes = segment_bytes
                     .unwrap_or("33554432")
                     .parse::<u64>()
@@ -33,8 +33,15 @@ impl Options {
                 if bytes == 0 {
                     return Err("--blink-wal-segment-bytes must be positive".to_owned());
                 }
-                BlinkWalLayout::Segmented {
-                    max_segment_bytes: bytes,
+                if value == "segmented" {
+                    BlinkWalLayout::Segmented {
+                        max_segment_bytes: bytes,
+                    }
+                } else {
+                    BlinkWalLayout::SegmentedBases {
+                        max_segment_bytes: bytes,
+                        coalesce: value == "segmented-bases-coalesced",
+                    }
                 }
             }
             value => {
@@ -51,11 +58,35 @@ impl Options {
 
     pub fn configuration(self) -> serde_json::Value {
         serde_json::json!({
-            "layout": match self.layout { BlinkWalLayout::Legacy => "legacy", BlinkWalLayout::Segmented { .. } => "segmented" },
-            "segment_bytes": match self.layout { BlinkWalLayout::Legacy => None, BlinkWalLayout::Segmented { max_segment_bytes } => Some(max_segment_bytes) },
+            "layout": match self.layout {
+                BlinkWalLayout::Legacy => "legacy", BlinkWalLayout::Segmented { .. } => "segmented",
+                BlinkWalLayout::SegmentedBases { coalesce: false, .. } => "segmented-bases",
+                BlinkWalLayout::SegmentedBases { coalesce: true, .. } => "segmented-bases-coalesced",
+            },
+            "segment_bytes": match self.layout { BlinkWalLayout::Legacy => None, BlinkWalLayout::Segmented { max_segment_bytes } | BlinkWalLayout::SegmentedBases { max_segment_bytes, .. } => Some(max_segment_bytes) },
             "execution": match self.execution { BlinkCheckpointExecution::Sync => "sync", BlinkCheckpointExecution::Background => "background" },
             "retained_wal_limit_bytes": 512 * 1024 * 1024_u64,
             "retained_image_limit_bytes": 512 * 1024 * 1024_u64,
         })
     }
+}
+
+pub fn process_write_io() -> serde_json::Value {
+    let Ok(contents) = std::fs::read_to_string("/proc/self/io") else {
+        return serde_json::json!({"available": false});
+    };
+    let mut counters = serde_json::Map::new();
+    counters.insert("available".to_owned(), serde_json::json!(true));
+    for line in contents.lines() {
+        if let Some((name, value)) = line.split_once(':')
+            && matches!(
+                name,
+                "wchar" | "syscw" | "write_bytes" | "cancelled_write_bytes"
+            )
+            && let Ok(value) = value.trim().parse::<u64>()
+        {
+            counters.insert(name.to_owned(), serde_json::json!(value));
+        }
+    }
+    serde_json::Value::Object(counters)
 }

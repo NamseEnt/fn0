@@ -500,6 +500,13 @@ impl PhysicalCoordinator {
                 wal_bytes_after: bytes,
                 reclaimed_bytes: report.map_or(0, |report| report.wal_bytes_reclaimed),
                 duration_nanos,
+                checkpoint_bytes_written: report.map_or(0, |report| report.bytes_written),
+                base_bytes_written: report.map_or(0, |report| report.base_bytes_written),
+                base_bytes_retained: report.map_or(0, |report| report.base_bytes_retained),
+                base_bytes_reclaimed: report.map_or(0, |report| report.base_bytes_reclaimed),
+                full_base_snapshots: report.map_or(0, |report| report.full_base_snapshots),
+                checkpoint_write_requests: report
+                    .map_or(0, |report| report.checkpoint_write_requests),
                 succeeded: result.is_ok(),
             });
         });

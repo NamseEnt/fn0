@@ -25,6 +25,7 @@ use crate::btree::{
     BatchRequest, BatchResponse, DatabaseConfig, Document, InvariantReport, ResponseBudget,
     StorageLimits, StorageMetrics,
 };
+pub mod durable_bases;
 mod leaf;
 mod physical_checkpoint;
 pub mod segmented_wal;
@@ -293,6 +294,11 @@ pub struct BlinkCheckpointReport {
     pub pages_flushed: usize,
     pub bytes_written: u64,
     pub wal_bytes_reclaimed: u64,
+    pub base_bytes_written: u64,
+    pub base_bytes_retained: u64,
+    pub base_bytes_reclaimed: u64,
+    pub full_base_snapshots: u64,
+    pub checkpoint_write_requests: u64,
     pub segments_materialized: usize,
     pub overlay_bytes_materialized: u64,
     pub materialization_lag_transactions: u64,
@@ -1939,10 +1945,28 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         config: DatabaseConfig,
         max_segment_bytes: u64,
     ) -> Result<BlinkStore<ProductionFile, ProductionFile>> {
+        Self::open_segmented_layout(path.as_ref(), config, max_segment_bytes, false, false)
+    }
+
+    pub fn open_segmented_base_path(
+        path: impl AsRef<Path>,
+        config: DatabaseConfig,
+        max_segment_bytes: u64,
+        coalesce: bool,
+    ) -> Result<BlinkStore<ProductionFile, ProductionFile>> {
+        Self::open_segmented_layout(path.as_ref(), config, max_segment_bytes, true, coalesce)
+    }
+
+    fn open_segmented_layout(
+        path: &Path,
+        config: DatabaseConfig,
+        max_segment_bytes: u64,
+        durable_bases: bool,
+        coalesce: bool,
+    ) -> Result<BlinkStore<ProductionFile, ProductionFile>> {
         if max_segment_bytes == 0 {
             return Err(Error::invalid_input("segmented WAL size limit is zero"));
         }
-        let path = path.as_ref();
         let identity = WalIdentity::new(
             config.database_uuid,
             config.tenant_id,
@@ -1951,18 +1975,34 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         );
         let mut file = ProductionFile::open(path)?;
         if segmented_wal::manifest_exists(path) {
-            let (segmented_wal, recovery_pages) =
-                SegmentedWal::open(path, identity, max_segment_bytes)?;
-            validate_segmented_database_identity(&mut file, &recovery_pages, &config)?;
+            let (mut segmented_wal, recovery_pages) =
+                SegmentedWal::open(path, identity, max_segment_bytes, durable_bases)?;
+            segmented_wal.set_base_coalescing(coalesce);
+            if !durable_bases {
+                validate_segmented_database_identity(&mut file, &recovery_pages, &config)?;
+            }
             recover_segmented_data_file(
                 &mut file,
                 &recovery_pages,
                 segmented_wal.manifest(),
                 &config,
             )?;
+            let recovered_dirty = if durable_bases {
+                recovery_pages
+                    .iter()
+                    .filter(|(page_id, page)| {
+                        page_id.get() >= FIRST_DATA_PAGE
+                            && page.commit_lsn > segmented_wal.manifest().checkpoint_lsn
+                    })
+                    .map(|(page_id, page)| (*page_id, Arc::new(*page.image)))
+                    .collect::<BTreeMap<_, _>>()
+            } else {
+                BTreeMap::new()
+            };
             drop(recovery_pages);
             let (mut store, _) =
                 BlinkStore::<ProductionFile, ProductionFile>::load_file(file, config)?;
+            store.dirty_pages = recovered_dirty;
             store.next_lsn = segmented_wal.next_lsn();
             store.next_batch_id = segmented_wal.next_batch_id();
             store.next_revision = Revision::new(
@@ -1985,15 +2025,16 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             ));
         }
         let mut store = BlinkStore::<ProductionFile, ProductionFile>::initialize(file, config)?;
-        let segmented_wal = SegmentedWal::create(
+        let mut segmented_wal = SegmentedWal::create(
             path,
             identity,
             store.current_superblock.root_page_id,
             store.current_superblock.free_list_head,
             store.current_superblock.high_water_page_id,
-            u32::from(BLINK_SUPERBLOCK_VERSION),
             max_segment_bytes,
+            durable_bases,
         )?;
+        segmented_wal.set_base_coalescing(coalesce);
         store.next_lsn = segmented_wal.next_lsn();
         store.next_batch_id = segmented_wal.next_batch_id();
         store.segmented_wal = Some(segmented_wal);
@@ -3624,6 +3665,13 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
     }
 
     pub fn flush(&mut self) -> Result<()> {
+        if self
+            .segmented_wal
+            .as_ref()
+            .is_some_and(|wal| wal.has_durable_bases())
+        {
+            return self.checkpoint().map(|_| ());
+        }
         self.flush_dirty(false)
     }
 
@@ -3686,6 +3734,18 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
     }
 
     fn checkpoint_segmented_inner(&mut self) -> Result<BlinkCheckpointReport> {
+        if self
+            .segmented_wal
+            .as_ref()
+            .is_some_and(|wal| wal.has_durable_bases())
+        {
+            let Some(mut snapshot) = self.prepare_segmented_checkpoint()? else {
+                return Ok(BlinkCheckpointReport::default());
+            };
+            snapshot.injector = self.fault_injector.take();
+            let output = snapshot.run();
+            return self.complete_segmented_checkpoint(output);
+        }
         let started = Instant::now();
         let wal = self.segmented_wal.as_ref().unwrap();
         let checkpoint_lsn = wal.last_commit_lsn();
@@ -3802,6 +3862,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             overlay_bytes_materialized: 0,
             materialization_lag_transactions: 0,
             duration_nanos: elapsed_nanos(started),
+            ..BlinkCheckpointReport::default()
         })
     }
 
@@ -3857,6 +3918,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                             .checkpoint_metrics
                             .total_nanos
                             .saturating_sub(metrics_before.total_nanos),
+                        ..BlinkCheckpointReport::default()
                     });
                 }
                 return Ok(result);
@@ -4255,6 +4317,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                 overlay_bytes_materialized: 0,
                 materialization_lag_transactions: 0,
                 duration_nanos: elapsed_nanos(started),
+                ..BlinkCheckpointReport::default()
             });
         };
         let checkpoint_sequence = logical_wal.checkpoint_sequence();
@@ -4284,6 +4347,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                 overlay_bytes_materialized: 0,
                 materialization_lag_transactions: 0,
                 duration_nanos: elapsed_nanos(started),
+                ..BlinkCheckpointReport::default()
             });
         }
         if overlay_count == 0 {
@@ -4445,6 +4509,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             overlay_bytes_materialized: overlay_bytes,
             materialization_lag_transactions,
             duration_nanos: elapsed_nanos(started),
+            ..BlinkCheckpointReport::default()
         })
     }
 
@@ -9189,13 +9254,17 @@ fn recover_segmented_data_file<F: DurableFile>(
     superblock.high_water_page_id = manifest.high_water_page_id;
     let mut generation = 1u64;
     let mut latest_slot = 0;
-    for slot in 0..2 {
-        if let Ok(bytes) = read_exact_at(file, slot * PAGE_SIZE as u64, PAGE_SIZE)
-            && let Ok(existing) = decode_blink_superblock_image(&bytes)
-            && existing.generation >= generation
-        {
-            generation = existing.generation;
-            latest_slot = slot;
+    if manifest.bases.is_some() {
+        generation = manifest.generation;
+    } else {
+        for slot in 0..2 {
+            if let Ok(bytes) = read_exact_at(file, slot * PAGE_SIZE as u64, PAGE_SIZE)
+                && let Ok(existing) = decode_blink_superblock_image(&bytes)
+                && existing.generation >= generation
+            {
+                generation = existing.generation;
+                latest_slot = slot;
+            }
         }
     }
     if let Some(page) = [PageId::ZERO, PageId::new(1)]
@@ -9212,8 +9281,19 @@ fn recover_segmented_data_file<F: DurableFile>(
     superblock.checkpoint_lsn = manifest.checkpoint_lsn;
     superblock.checkpoint_sequence = manifest.checkpoint_lsn.get();
     let image = encode_blink_superblock(&superblock)?;
-    recover_data_file(file, recovery_pages, manifest.checkpoint_lsn)?;
+    recover_data_file(
+        file,
+        recovery_pages,
+        if manifest.bases.is_some() {
+            Lsn::ZERO
+        } else {
+            manifest.checkpoint_lsn
+        },
+    )?;
     write_all_at(file, (1 - latest_slot) * PAGE_SIZE as u64, &image)?;
+    if manifest.bases.is_some() {
+        write_all_at(file, latest_slot * PAGE_SIZE as u64, &image)?;
+    }
     file.sync_data()
 }
 

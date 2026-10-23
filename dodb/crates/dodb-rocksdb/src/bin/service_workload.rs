@@ -426,6 +426,12 @@ impl DriverService {
                     "wal_bytes_before": event.wal_bytes_before,
                     "wal_bytes_after": event.wal_bytes_after,
                     "reclaimed_bytes": event.reclaimed_bytes,
+                    "checkpoint_bytes_written": event.checkpoint_bytes_written,
+                    "base_bytes_written": event.base_bytes_written,
+                    "base_bytes_retained": event.base_bytes_retained,
+                    "base_bytes_reclaimed": event.base_bytes_reclaimed,
+                    "full_base_snapshots": event.full_base_snapshots,
+                    "checkpoint_write_requests": event.checkpoint_write_requests,
                     "duration_nanos": event.duration_nanos,
                     "succeeded": event.succeeded,
                 })
@@ -2639,6 +2645,7 @@ async fn run(options: Options) -> Result<Value, String> {
     );
     let cpu_before = process_metrics();
     let storage_before = database_and_wal_bytes(&options.data_dir);
+    let write_io_before = blink_checkpoint::process_write_io();
     let metric_samples = Arc::new(Mutex::new(Vec::new()));
     let stop_metric_sampling = Arc::new(AtomicBool::new(false));
     let sampler_samples = Arc::clone(&metric_samples);
@@ -2738,6 +2745,7 @@ async fn run(options: Options) -> Result<Value, String> {
         "early-stop"
     };
     let cpu_after = process_metrics();
+    let write_io_after = blink_checkpoint::process_write_io();
     let storage_after = database_and_wal_bytes(&options.data_dir);
     let sample_values = metric_samples.lock().unwrap().clone();
     let peak_rss_kb = sample_values
@@ -2811,6 +2819,7 @@ async fn run(options: Options) -> Result<Value, String> {
     if let Some(memory_session) = &memory_session {
         memory_session.set_phase("reopen-validation");
     }
+    let reopen_started = Instant::now();
     let reopened = DriverService::new(
         &reopen_options,
         options.data_dir.clone(),
@@ -2846,6 +2855,7 @@ async fn run(options: Options) -> Result<Value, String> {
             .await,
         );
     }
+    let reopen_and_validation_ms = reopen_started.elapsed().as_secs_f64() * 1000.0;
     if let Some(memory_session) = &memory_session {
         memory_session.set_phase("residency-cache-warmup");
         let mut residency_reports = Vec::new();
@@ -2995,6 +3005,8 @@ async fn run(options: Options) -> Result<Value, String> {
         "per_tenant": per_tenant,
         "validation": validation,
         "reopen_validation": reopen_validation,
+        "reopen_and_validation_ms": reopen_and_validation_ms,
+        "process_write_io": { "before": write_io_before, "after": write_io_after },
         "process_metrics": {"before": cpu_before, "after": cpu_after, "cpu_ticks_delta": cpu_tick_delta, "cpu_seconds": cpu_seconds, "cpu_percent_of_one_core": cpu_core_percent, "cpu_percent_of_online_machine": cpu_machine_percent, "online_processors": online_processors, "peak_sampled_rss_kb": peak_rss_kb, "rss_sample_count": sample_values.len(), "storage_file_bytes_before": {"database": storage_before.0, "wal": storage_before.1}, "storage_file_bytes_after": {"database": storage_after.0, "wal": storage_after.1}, "resource_samples": sample_values, "omitted_resource_samples": omitted_metric_samples.load(Ordering::Relaxed), "sampling_interval_ms": 200, "sampling_completeness": if sample_values.len() >= 2 && peak_rss_kb.is_some() { "complete" } else { "incomplete" }},
         "engine_health": engine_health_metrics,
         "disk_usage_bytes": {"before_shutdown": disk_bytes_before_shutdown, "after_reopen_validation": disk_bytes_after_reopen},

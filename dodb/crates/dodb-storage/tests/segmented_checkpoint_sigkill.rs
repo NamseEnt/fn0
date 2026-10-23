@@ -40,7 +40,9 @@ struct PauseAt {
 impl FaultInjector for PauseAt {
     fn hit(&mut self, point: &str) -> dodb_core::Result<()> {
         if point == self.boundary {
-            fs::write(&self.ready_path, point)?;
+            let temporary = self.ready_path.with_extension("pending");
+            fs::write(&temporary, point)?;
+            fs::rename(temporary, &self.ready_path)?;
             loop {
                 thread::park();
             }

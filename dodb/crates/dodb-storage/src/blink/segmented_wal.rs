@@ -1,4 +1,5 @@
-use std::collections::BTreeMap;
+use super::durable_bases::{self, BasePackEntry, BasePackJob, BasePackOutput};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -12,7 +13,7 @@ use crate::fault::FaultInjector;
 use crate::page::PAGE_SIZE;
 use crate::wal::{
     RecoveredWalPage, WalAppendReport, WalCommit, WalDeltaRequest, WalIdentity, WalLog, WalMetrics,
-    WalPageImageFormat,
+    WalPageImageFormat, WalSegmentBoundary,
 };
 
 const MANIFEST_MAGIC: [u8; 8] = *b"DBLKSWM1";
@@ -41,6 +42,8 @@ pub(crate) struct SegmentedWal {
     max_segment_bytes: u64,
     closed_metrics: WalMetrics,
     closed_wal_bytes: u64,
+    base_owners: BTreeMap<PageId, u64>,
+    coalesce_bases: bool,
 }
 
 impl SegmentedWal {
@@ -50,8 +53,8 @@ impl SegmentedWal {
         root_page_id: PageId,
         free_list_head: Option<PageId>,
         high_water_page_id: PageId,
-        format_version: u32,
         max_segment_bytes: u64,
+        durable_bases: bool,
     ) -> Result<Self> {
         let manifest_path = sidecar_path(database_path, SEGMENT_MANIFEST_SUFFIX);
         let segment_directory = sidecar_path(database_path, SEGMENT_DIRECTORY_SUFFIX);
@@ -83,7 +86,7 @@ impl SegmentedWal {
             root_page_id,
             free_list_head,
             high_water_page_id,
-            format_version,
+            format_version: u32::from(super::BLINK_SUPERBLOCK_VERSION),
             segments: vec![WalSegmentEntry {
                 number: 1,
                 start_lsn: Lsn::new(1),
@@ -94,6 +97,7 @@ impl SegmentedWal {
             }],
             active_segment: 1,
             next_segment: 2,
+            bases: durable_bases.then(Vec::new),
         };
         manifest.write_atomic(&manifest_path)?;
         Ok(Self {
@@ -104,6 +108,8 @@ impl SegmentedWal {
             max_segment_bytes,
             closed_metrics: WalMetrics::default(),
             closed_wal_bytes: 0,
+            base_owners: BTreeMap::new(),
+            coalesce_bases: false,
         })
     }
 
@@ -111,10 +117,16 @@ impl SegmentedWal {
         database_path: &Path,
         identity: WalIdentity,
         max_segment_bytes: u64,
+        durable_bases: bool,
     ) -> Result<(Self, BTreeMap<PageId, RecoveredWalPage>)> {
         let manifest_path = sidecar_path(database_path, SEGMENT_MANIFEST_SUFFIX);
         let segment_directory = sidecar_path(database_path, SEGMENT_DIRECTORY_SUFFIX);
         let manifest = SegmentedWalManifest::read(&manifest_path)?;
+        if manifest.bases.is_some() != durable_bases {
+            return Err(Error::unsupported_format(
+                "segmented checkpoint layout mismatch",
+            ));
+        }
         if manifest.identity != identity {
             return Err(Error::corruption("segmented WAL identity mismatch"));
         }
@@ -124,6 +136,29 @@ impl SegmentedWal {
             ));
         }
         let mut recovered_pages = BTreeMap::new();
+        let mut base_owners = BTreeMap::new();
+        if let Some(bases) = &manifest.bases {
+            for base in bases {
+                durable_bases::read_pack(
+                    &segment_directory,
+                    base,
+                    &identity,
+                    manifest.high_water_page_id,
+                    &mut recovered_pages,
+                    &mut base_owners,
+                )?;
+            }
+            if manifest.checkpoint_lsn != Lsn::ZERO
+                && (recovered_pages.len() as u64
+                    != manifest.high_water_page_id.get() - super::FIRST_DATA_PAGE + 1
+                    || (super::FIRST_DATA_PAGE..=manifest.high_water_page_id.get())
+                        .any(|number| !recovered_pages.contains_key(&PageId::new(number))))
+            {
+                return Err(Error::corruption(
+                    "checkpoint page-base coverage is incomplete",
+                ));
+            }
+        }
         let mut active = None;
         let mut closed_metrics = WalMetrics::default();
         let mut closed_wal_bytes = 0u64;
@@ -147,14 +182,21 @@ impl SegmentedWal {
                 .checked_sub(1)
                 .map(Lsn::new)
                 .ok_or_else(|| Error::corruption("WAL segment starts at LSN zero"))?;
-            let mut wal = WalLog::open_with_segment_boundary(
+            let mut wal = WalLog::open_with_segment_bases(
                 ProductionFile::open(&path)?,
                 identity.clone(),
                 WalPageImageFormat::ExperimentalBlink,
-                start_after_lsn,
-                Some(segment.start_batch_id),
-                !segment.closed,
-                false,
+                WalSegmentBoundary {
+                    start_after_lsn,
+                    start_batch_id: Some(segment.start_batch_id),
+                    truncate_torn_tail: !segment.closed,
+                    defer_initial_sync: false,
+                },
+                if manifest.bases.is_some() {
+                    std::mem::take(&mut recovered_pages)
+                } else {
+                    BTreeMap::new()
+                },
                 None,
             )?;
             let scan = wal.scan_report();
@@ -218,8 +260,58 @@ impl SegmentedWal {
             max_segment_bytes,
             closed_metrics,
             closed_wal_bytes,
+            base_owners,
+            coalesce_bases: false,
         };
         Ok((wal, recovered_pages))
+    }
+
+    pub(crate) fn has_durable_bases(&self) -> bool {
+        self.manifest.bases.is_some()
+    }
+
+    pub(crate) fn set_base_coalescing(&mut self, coalesce: bool) {
+        self.coalesce_bases = coalesce;
+    }
+
+    pub(crate) fn base_bytes(&self) -> u64 {
+        self.manifest
+            .bases
+            .as_ref()
+            .map_or(0, |bases| bases.iter().map(|base| base.bytes).sum())
+    }
+
+    pub(super) fn base_job(
+        &self,
+        dirty_count: usize,
+        live_count: usize,
+    ) -> Result<Option<BasePackJob>> {
+        let Some(bases) = self.manifest.bases.as_ref() else {
+            return Ok(None);
+        };
+        let complete = bases.is_empty()
+            || bases.len() >= durable_bases::MAX_PACKS
+            || self
+                .base_bytes()
+                .saturating_add(durable_bases::encoded_size(dirty_count as u64))
+                > durable_bases::encoded_size(live_count as u64).saturating_mul(2);
+        let mut number = bases
+            .last()
+            .map_or(Some(1), |entry| entry.number.checked_add(1))
+            .ok_or_else(|| Error::invariant("page-base number exhausted"))?;
+        while durable_bases::pack_path(&self.segment_directory, number).exists() {
+            number = number
+                .checked_add(1)
+                .ok_or_else(|| Error::invariant("page-base number exhausted"))?;
+        }
+        Ok(Some(BasePackJob {
+            directory: self.segment_directory.clone(),
+            identity: self.manifest.identity.clone(),
+            number,
+            checkpoint_lsn: self.last_commit_lsn(),
+            complete,
+            coalesce: self.coalesce_bases,
+        }))
     }
 
     pub(crate) fn next_lsn(&self) -> Lsn {
@@ -379,6 +471,9 @@ impl SegmentedWal {
         next_manifest
             .write_atomic_with_fault_injector(&self.manifest_path, injector.as_deref_mut())?;
         hit(&mut injector, "after_wal_manifest_publish")?;
+        if self.manifest.bases.is_some() {
+            new_active.inherit_page_chain(&self.active);
+        }
         let metrics = self.active.metrics()?;
         self.closed_wal_bytes = self
             .closed_wal_bytes
@@ -393,8 +488,23 @@ impl SegmentedWal {
     pub(crate) fn advance_checkpoint(
         &mut self,
         superblock: &super::BlinkSuperblock,
-        mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+        injector: Option<&mut (dyn FaultInjector + Send + '_)>,
     ) -> Result<u64> {
+        self.advance_checkpoint_with_base(superblock, None, injector)
+            .map(|reclaimed| reclaimed.0)
+    }
+
+    pub(super) fn advance_checkpoint_with_base(
+        &mut self,
+        superblock: &super::BlinkSuperblock,
+        base: Option<&BasePackOutput>,
+        mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+    ) -> Result<(u64, u64)> {
+        if self.manifest.bases.is_some() != base.is_some() {
+            return Err(Error::invariant(
+                "checkpoint page-base output is missing or unexpected",
+            ));
+        }
         let checkpoint_lsn = superblock.checkpoint_lsn;
         if checkpoint_lsn < self.manifest.checkpoint_lsn || checkpoint_lsn > self.last_commit_lsn()
         {
@@ -424,11 +534,36 @@ impl SegmentedWal {
         next_manifest.segments.retain(|segment| {
             !segment.closed || segment.end_lsn.is_some_and(|end| end > checkpoint_lsn)
         });
+        let mut next_owners = self.base_owners.clone();
+        let mut obsolete_bases = Vec::new();
+        if let Some(base) = base {
+            if base.entry.checkpoint_lsn != checkpoint_lsn {
+                return Err(Error::invariant("page-base checkpoint target mismatch"));
+            }
+            if base.complete {
+                next_owners.clear();
+            }
+            for page_id in &base.page_ids {
+                next_owners.insert(*page_id, base.entry.number);
+            }
+            let live_numbers = next_owners.values().copied().collect::<BTreeSet<_>>();
+            let bases = next_manifest.bases.as_mut().unwrap();
+            bases.retain(|entry| {
+                if live_numbers.contains(&entry.number) && !base.complete {
+                    true
+                } else {
+                    obsolete_bases.push(entry.clone());
+                    false
+                }
+            });
+            bases.push(base.entry.clone());
+        }
         next_manifest.validate()?;
         hit(&mut injector, "before_checkpoint_manifest_publish")?;
         next_manifest
             .write_atomic_with_fault_injector(&self.manifest_path, injector.as_deref_mut())?;
         self.manifest = next_manifest;
+        self.base_owners = next_owners;
         self.closed_wal_bytes = self
             .closed_wal_bytes
             .checked_sub(reclaimed_bytes)
@@ -437,8 +572,18 @@ impl SegmentedWal {
         for number in obsolete_numbers {
             self.unlink_obsolete_segment(number, &mut injector)?;
         }
+        let mut base_reclaimed_bytes = 0u64;
+        for base in obsolete_bases {
+            hit(&mut injector, "before_base_pack_unlink")?;
+            fs::remove_file(durable_bases::pack_path(
+                &self.segment_directory,
+                base.number,
+            ))?;
+            base_reclaimed_bytes += base.bytes;
+            hit(&mut injector, "after_base_pack_unlink")?;
+        }
         self.sync_reclamation_directory(&mut injector)?;
-        Ok(reclaimed_bytes)
+        Ok((reclaimed_bytes, base_reclaimed_bytes))
     }
 
     pub(crate) fn cleanup_obsolete_segments(
@@ -469,6 +614,18 @@ impl SegmentedWal {
             if !entry.file_type()?.is_file() || entry.metadata()?.len() == 0 {
                 continue;
             }
+            if self.has_durable_bases() {
+                if WalLog::validate_retired_segment(
+                    ProductionFile::open(entry.path())?,
+                    &self.manifest.identity,
+                    self.manifest.checkpoint_lsn,
+                )
+                .is_ok()
+                {
+                    self.unlink_obsolete_segment(number, &mut injector)?;
+                }
+                continue;
+            }
             let Ok(obsolete) = WalLog::open_with_segment_boundary(
                 ProductionFile::open(entry.path())?,
                 self.manifest.identity.clone(),
@@ -490,6 +647,43 @@ impl SegmentedWal {
                 continue;
             }
             self.unlink_obsolete_segment(number, &mut injector)?;
+        }
+        if let Some(bases) = &self.manifest.bases {
+            let required = bases
+                .iter()
+                .map(|base| base.number)
+                .collect::<BTreeSet<_>>();
+            for entry in fs::read_dir(&self.segment_directory)? {
+                let entry = entry?;
+                let name = entry.file_name();
+                let Some(number) = name
+                    .to_str()
+                    .and_then(|name| name.strip_prefix("base-"))
+                    .and_then(|name| name.strip_suffix(".pages"))
+                    .and_then(|number| number.parse::<u64>().ok())
+                else {
+                    continue;
+                };
+                if required.contains(&number)
+                    || !entry.file_type()?.is_file()
+                    || entry.path() != durable_bases::pack_path(&self.segment_directory, number)
+                {
+                    continue;
+                }
+                if durable_bases::inspect_retired_pack(
+                    &self.segment_directory,
+                    number,
+                    &self.manifest.identity,
+                    self.manifest.checkpoint_lsn,
+                    self.manifest.high_water_page_id,
+                )
+                .is_ok()
+                {
+                    hit(&mut injector, "before_base_pack_unlink")?;
+                    fs::remove_file(entry.path())?;
+                    hit(&mut injector, "after_base_pack_unlink")?;
+                }
+            }
         }
         self.sync_reclamation_directory(&mut injector)
     }
@@ -569,6 +763,7 @@ pub struct SegmentedWalManifest {
     pub segments: Vec<WalSegmentEntry>,
     pub active_segment: u64,
     pub next_segment: u64,
+    pub bases: Option<Vec<BasePackEntry>>,
 }
 
 impl SegmentedWalManifest {
@@ -582,7 +777,14 @@ impl SegmentedWalManifest {
                 .saturating_add(CHECKSUM_SIZE),
         );
         bytes.extend_from_slice(&MANIFEST_MAGIC);
-        bytes.extend_from_slice(&MANIFEST_VERSION.to_le_bytes());
+        bytes.extend_from_slice(
+            &if self.bases.is_some() {
+                3u32
+            } else {
+                MANIFEST_VERSION
+            }
+            .to_le_bytes(),
+        );
         bytes.extend_from_slice(&(PAGE_SIZE as u32).to_le_bytes());
         bytes.extend_from_slice(&self.generation.to_le_bytes());
         bytes.extend_from_slice(&self.identity.database_uuid);
@@ -603,6 +805,10 @@ impl SegmentedWalManifest {
         bytes.extend_from_slice(&self.active_segment.to_le_bytes());
         bytes.extend_from_slice(&self.next_segment.to_le_bytes());
         bytes.resize(FIXED_SIZE, 0);
+        if let Some(bases) = &self.bases {
+            bytes.extend_from_slice(&(bases.len() as u32).to_le_bytes());
+            bytes.extend_from_slice(&0u32.to_le_bytes());
+        }
         for segment in &self.segments {
             bytes.extend_from_slice(&segment.number.to_le_bytes());
             bytes.extend_from_slice(&segment.start_lsn.get().to_le_bytes());
@@ -611,6 +817,16 @@ impl SegmentedWalManifest {
             bytes.extend_from_slice(&[0; 7]);
             bytes.extend_from_slice(&segment.start_batch_id.to_le_bytes());
             bytes.extend_from_slice(&segment.end_batch_id.unwrap_or(u64::MAX).to_le_bytes());
+        }
+        if let Some(bases) = &self.bases {
+            for base in bases {
+                bytes.extend_from_slice(&base.number.to_le_bytes());
+                bytes.extend_from_slice(&base.checkpoint_lsn.get().to_le_bytes());
+                bytes.extend_from_slice(&base.page_count.to_le_bytes());
+                bytes.extend_from_slice(&base.bytes.to_le_bytes());
+                bytes.extend_from_slice(&base.checksum.to_le_bytes());
+                bytes.extend_from_slice(&0u32.to_le_bytes());
+            }
         }
         let checksum = crc32c::crc32c(&bytes);
         bytes.extend_from_slice(&checksum.to_le_bytes());
@@ -624,7 +840,7 @@ impl SegmentedWalManifest {
             ));
         }
         let version = read_u32(bytes, 8)?;
-        if version != MANIFEST_VERSION {
+        if version != MANIFEST_VERSION && version != 3 {
             return Err(Error::unsupported_format(format!(
                 "segmented WAL manifest version {version} is unsupported"
             )));
@@ -634,18 +850,37 @@ impl SegmentedWalManifest {
                 "segmented WAL manifest page size is incompatible",
             ));
         }
+        let fixed_size = if version == 3 {
+            FIXED_SIZE + 8
+        } else {
+            FIXED_SIZE
+        };
+        let base_count = if version == 3 {
+            if read_u32(bytes, 124)? != 0 {
+                return Err(Error::corruption(
+                    "page-base manifest reserved bytes are nonzero",
+                ));
+            }
+            read_u32(bytes, 120)? as usize
+        } else {
+            0
+        };
+        if base_count > durable_bases::MAX_PACKS {
+            return Err(Error::corruption("too many checkpoint page-base files"));
+        }
         let segment_count = read_u32(bytes, 100)? as usize;
         if segment_count > MAX_SEGMENTS {
             return Err(Error::corruption(
                 "segmented WAL manifest has too many entries",
             ));
         }
-        let expected_length = FIXED_SIZE
+        let expected_length = fixed_size
             .checked_add(
                 segment_count
                     .checked_mul(SEGMENT_SIZE)
                     .ok_or_else(|| Error::corruption("segmented WAL manifest length overflow"))?,
             )
+            .and_then(|length| length.checked_add(base_count * 40))
             .and_then(|length| length.checked_add(CHECKSUM_SIZE))
             .ok_or_else(|| Error::corruption("segmented WAL manifest length overflow"))?;
         if bytes.len() != expected_length {
@@ -675,7 +910,7 @@ impl SegmentedWalManifest {
         let free_list_value = read_u64(bytes, 80)?;
         let mut segments = Vec::with_capacity(segment_count);
         for segment_index in 0..segment_count {
-            let offset = FIXED_SIZE + segment_index * SEGMENT_SIZE;
+            let offset = fixed_size + segment_index * SEGMENT_SIZE;
             let closed = match bytes[offset + 24] {
                 0 => false,
                 1 => true,
@@ -698,6 +933,27 @@ impl SegmentedWalManifest {
                 closed,
             });
         }
+        let bases = if version == 3 {
+            let mut entries = Vec::with_capacity(base_count);
+            for base_index in 0..base_count {
+                let offset = fixed_size + segment_count * SEGMENT_SIZE + base_index * 40;
+                if read_u32(bytes, offset + 36)? != 0 {
+                    return Err(Error::corruption(
+                        "page-base entry reserved bytes are nonzero",
+                    ));
+                }
+                entries.push(BasePackEntry {
+                    number: read_u64(bytes, offset)?,
+                    checkpoint_lsn: Lsn::new(read_u64(bytes, offset + 8)?),
+                    page_count: read_u64(bytes, offset + 16)?,
+                    bytes: read_u64(bytes, offset + 24)?,
+                    checksum: read_u32(bytes, offset + 32)?,
+                });
+            }
+            Some(entries)
+        } else {
+            None
+        };
         let manifest = Self {
             generation: read_u64(bytes, 16)?,
             identity,
@@ -709,12 +965,33 @@ impl SegmentedWalManifest {
             segments,
             active_segment: read_u64(bytes, 104)?,
             next_segment: read_u64(bytes, 112)?,
+            bases,
         };
         manifest.validate()?;
         Ok(manifest)
     }
 
     pub fn validate(&self) -> Result<()> {
+        if let Some(bases) = &self.bases
+            && (bases.len() > durable_bases::MAX_PACKS
+                || bases.last().map_or(Lsn::ZERO, |base| base.checkpoint_lsn)
+                    != self.checkpoint_lsn
+                || bases.windows(2).any(|pair| {
+                    pair[0].number >= pair[1].number
+                        || pair[0].checkpoint_lsn >= pair[1].checkpoint_lsn
+                })
+                || bases.iter().any(|base| {
+                    base.number == 0
+                        || base.page_count == 0
+                        || base.checkpoint_lsn == Lsn::ZERO
+                        || base.page_count > self.high_water_page_id.get().saturating_sub(1)
+                        || base.bytes != durable_bases::encoded_size(base.page_count)
+                }))
+        {
+            return Err(Error::corruption(
+                "checkpoint page-base manifest is invalid",
+            ));
+        }
         if self.generation == 0 || self.format_version == 0 {
             return Err(Error::corruption(
                 "segmented WAL manifest generation or format is zero",
@@ -955,6 +1232,7 @@ mod tests {
             ],
             active_segment: 2,
             next_segment: 3,
+            bases: None,
         }
     }
 
