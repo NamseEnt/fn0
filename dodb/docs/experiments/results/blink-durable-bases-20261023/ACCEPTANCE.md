@@ -1,0 +1,15 @@
+# Premeasurement acceptance and selection
+
+This refines the plan before any performance cell starts. Experimental defaults remain unchanged regardless of the result.
+
+Preflight: all four paths, RW80/E, one 8-second repetition after one-second warmup; eight correctness/resource/provenance cells, excluded from performance medians.
+
+Short matrix: all four paths, RW80/E, three 60-second repetitions after ten-second warmup; 24 cells. Each measured cell requires at least three completed checkpoints. Short-matrix candidate selection maximizes the geometric mean of its RW80 and E throughput ratios against ordinary segmented sync, among candidates passing correctness/resource gates. Ties within one percentage point prefer lower E p99.9. This selection is not adoption.
+
+Sustained matrix: baseline versus the selected candidate, RW80/E, three 300-second repetitions after ten-second warmup; twelve cells. Require at least ten completed checkpoints per cell. A shorter checkpoint count is preserved as incomplete sustained evidence; if resource and correctness gates remain satisfied, run a separate 900-second confirmation rather than replacing the original cell. Stop expanded measurements on correctness, resource, source/binary identity, or incomplete-latency failures.
+
+Adoption requirements on sustained medians: E throughput at least +10%, RW80 throughput no worse than -3%, E WAL bytes per mutation at least -30%, and process write-request bytes per mutation at least -20%. Both workloads' p99.9 and median per-run maximum must not exceed baseline by more than 10%. Report the worst individual maximum separately. Reopen plus final-state validation time must not regress by more than 25%; this is an operational reopen metric, not a pure recovery CPU timer. If these conditions do not jointly pass, report the result as an experimental trade-off and retain defaults.
+
+All rows require successful final/reopen state and exact revision checks, zero unintended errors or overloads, complete latency counts, fixed input-prefix equality, compile-time source identity, frozen executable hashes, and clean checkout identity. Actual overlap is required for background rows. The retained-recovery limit remains 512 MiB including required bases, WAL and in-flight base output, with a 128 MiB WAL trigger. Runtime samples additionally include obsolete/orphan files and the materialized database cache. Process-group RSS must remain below 3 GiB, total database-directory size below 4 GiB, available memory at least 1500 MiB, and filesystem free space at least 10 GiB.
+
+WAL byte conservation and checkpoint page-pack byte counters identify where bytes moved. Linux `wchar` differences include process-issued metadata writes and provide an independent aggregate write-request count. Do not call those counts physical device writes or claim equal complete-engine memory budgets from sampled guardrails. Profiling, failed attempts and prior accepted results stay separate and are never pooled with the new medians.

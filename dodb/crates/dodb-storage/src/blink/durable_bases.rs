@@ -92,13 +92,14 @@ impl BasePackJob {
                 file.write_all(&buffer)?;
                 buffer.clear();
                 write_calls += 1;
+                hit(injector, "after_checkpoint_page_write")?;
             }
-            hit(injector, "after_checkpoint_page_write")?;
         }
         if !buffer.is_empty() {
             checksum = crc32c::crc32c_append(checksum, &buffer);
             file.write_all(&buffer)?;
             write_calls += 1;
+            hit(injector, "after_checkpoint_page_write")?;
         }
         file.write_all(&checksum.to_le_bytes())?;
         write_calls += 1;
