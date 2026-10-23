@@ -1,0 +1,38 @@
+{
+  "archive_sha256_verified": true,
+  "files": 477,
+  "roots": [
+    {
+      "root": "blink-performance-loss-20261022",
+      "cells": 24,
+      "smoke": false,
+      "diagnostic_only": false,
+      "inventory_verified": true,
+      "offline_summary_matches": true
+    },
+    {
+      "root": "blink-performance-loss-20261022-profiles",
+      "cells": 2,
+      "smoke": false,
+      "diagnostic_only": true,
+      "inventory_verified": true,
+      "offline_summary_matches": true
+    },
+    {
+      "root": "blink-performance-loss-20261022-profiles-launch",
+      "cells": 1,
+      "smoke": false,
+      "diagnostic_only": true,
+      "inventory_verified": true,
+      "offline_summary_matches": true
+    },
+    {
+      "root": "blink-performance-loss-20261022-smoke",
+      "cells": 4,
+      "smoke": true,
+      "diagnostic_only": false,
+      "inventory_verified": true,
+      "offline_summary_matches": true
+    }
+  ]
+}

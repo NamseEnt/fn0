@@ -25,3 +25,9 @@ Require exact latency sample counts/histogram sums, matching fixed input prefixe
 Separate bytes written to WAL from retained WAL size. Report observed group size, checkpoint time/count, appended WAL bytes per successful transaction, and throughput/latency/resources. Distinguish direct accounting from causal claims. If needed, collect separately labeled syscall/CPU profiles of checkpoint-off versus 128 MiB; profiler runs do not enter performance medians.
 
 Explain the code path and measured costs in plain language. Identify improvements supported by results and distinguish an already available policy change from any unimplemented recovery-format or incremental-checkpoint design. Do not promise that B-link must beat RocksDB, or conclude that it cannot, from these measurements.
+
+## Diagnostic follow-up record
+
+The 24 uninstrumented cells completed. Both first attached-profile workloads passed their outcome and final/reopen gates, but the 128 MiB syscall trace captured fewer WAL bytes than the independently reconstructed writes. Absence of lost-event warnings did not establish complete process coverage. Preserve that failed attribution and all accepted workloads. One additional separately rooted E/128 MiB diagnostic launches the benchmark under inherited syscall tracing, executing the workload as opc, rather than attaching after process start. Accept its timing attribution only if syscall WAL bytes exactly match independently reconstructed physical WAL writes. This is diagnostic follow-up, not a rerun or replacement of an accepted headline cell.
+
+Legacy reclamation records net bytes removed (before minus after). Exact physical append accounting adds the replacement INIT frame bytes remaining after each reset, normally 104 bytes per checkpoint. This reporting correction is negligible for the original rounded ratios and requires no workload rerun.

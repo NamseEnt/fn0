@@ -1,0 +1,147 @@
+{
+  "source_sha": "d240416f0e0efafa7c08bb1e868387ebd0d894bc",
+  "plan": {
+    "source_sha": "d240416f0e0efafa7c08bb1e868387ebd0d894bc",
+    "controller_sha": "b6dc7544bce98e2f0cdc2c516b74aec5dbf42256",
+    "controller_sha256": "949e1ecc1f182e3648047074ed10f272a11aa3de5aec0dcf0fa95802f09fb55f",
+    "base_controller_sha256": "7ddd8081744c322ff213d7e5d5d9a6fac480cc6e0e4bb8653c2c306f498d7e45",
+    "profiler_controller_sha256": "18048fdcfb60eeb16c616fc8b4a4c72830a03fea5b8f1e6a64765d9d85eaf381",
+    "binary_hashes": {
+      "service_workload": "09bd505d77ce0bcbc61ca46f7389373e60bc1ab1bf6b80a90077bed328418e40",
+      "unconditional_write_workload": "a697a8c4479835e7fa54aaef4acd16025770193289dbaf63e5ada4fbec48e9cc"
+    },
+    "path_orders": {
+      "1": [
+        "legacy-off",
+        "legacy-sync-128m"
+      ]
+    },
+    "workloads": [
+      "E"
+    ],
+    "cells": 2,
+    "measurement_ms": 60000,
+    "warmup_ms": 10000,
+    "smoke": false,
+    "diagnostic_only": true,
+    "limits": {
+      "max_process_group_rss_bytes": 3221225472,
+      "minimum_mem_available_bytes": 1572864000,
+      "maximum_database_bytes": 4294967296,
+      "minimum_filesystem_available_bytes": 10737418240
+    }
+  },
+  "cells": [
+    {
+      "case": "E-legacy-off-r1",
+      "workload": "E",
+      "backend": "legacy-off",
+      "repetition": 1,
+      "throughput_per_second": 2501.4493002103495,
+      "p50_ms": 22.790143,
+      "p95_ms": 41.385983,
+      "p99_ms": 50.921471,
+      "p999_ms": 72.417279,
+      "maximum_ms": 113.486737,
+      "wal_appended_bytes": 1325342225,
+      "wal_bytes_per_transaction": 8826.964408213284,
+      "transactions_per_group": 53.66225875625447,
+      "checkpoint_seconds": 0.0,
+      "measured_checkpoint_count": 0,
+      "total_seconds": 60.02400288,
+      "checkpoint_fraction": 0.0,
+      "throughput_excluding_checkpoint_wall": 2501.4493002103495,
+      "cpu_seconds": 47.23,
+      "peak_rss_bytes": 1548918784,
+      "maximum_wal_bytes": 1938856032,
+      "maximum_database_bytes": 2311698528,
+      "read_fraction": null,
+      "overloads": 0,
+      "other_errors": 0
+    },
+    {
+      "case": "E-legacy-sync-128m-r1",
+      "workload": "E",
+      "backend": "legacy-sync-128m",
+      "repetition": 1,
+      "throughput_per_second": 1334.8216602620441,
+      "p50_ms": 29.868031,
+      "p95_ms": 56.688639,
+      "p99_ms": 1256.194047,
+      "p999_ms": 1495.269375,
+      "maximum_ms": 1680.67311,
+      "wal_appended_bytes": 1829235609,
+      "wal_bytes_per_transaction": 22832.338222077986,
+      "transactions_per_group": 52.9517514871117,
+      "checkpoint_seconds": 18.873838463,
+      "measured_checkpoint_count": 14,
+      "total_seconds": 60.02000296,
+      "checkpoint_fraction": 0.31445913915696344,
+      "throughput_excluding_checkpoint_wall": 1947.1073666135107,
+      "cpu_seconds": 35.37,
+      "peak_rss_bytes": 1236533248,
+      "maximum_wal_bytes": 135264745,
+      "maximum_database_bytes": 508107241,
+      "read_fraction": null,
+      "overloads": 0,
+      "other_errors": 0
+    }
+  ],
+  "medians": {
+    "E": {
+      "legacy-off": {
+        "throughput_per_second": 2501.4493002103495,
+        "p50_ms": 22.790143,
+        "p95_ms": 41.385983,
+        "p99_ms": 50.921471,
+        "p999_ms": 72.417279,
+        "maximum_ms": 113.486737,
+        "wal_appended_bytes": 1325342225,
+        "wal_bytes_per_transaction": 8826.964408213284,
+        "transactions_per_group": 53.66225875625447,
+        "checkpoint_seconds": 0.0,
+        "measured_checkpoint_count": 0,
+        "total_seconds": 60.02400288,
+        "checkpoint_fraction": 0.0,
+        "throughput_excluding_checkpoint_wall": 2501.4493002103495,
+        "cpu_seconds": 47.23,
+        "peak_rss_bytes": 1548918784,
+        "maximum_wal_bytes": 1938856032,
+        "maximum_database_bytes": 2311698528,
+        "overloads": 0,
+        "other_errors": 0,
+        "throughput_range": [
+          2501.4493002103495,
+          2501.4493002103495
+        ]
+      },
+      "legacy-sync-128m": {
+        "throughput_per_second": 1334.8216602620441,
+        "p50_ms": 29.868031,
+        "p95_ms": 56.688639,
+        "p99_ms": 1256.194047,
+        "p999_ms": 1495.269375,
+        "maximum_ms": 1680.67311,
+        "wal_appended_bytes": 1829235609,
+        "wal_bytes_per_transaction": 22832.338222077986,
+        "transactions_per_group": 52.9517514871117,
+        "checkpoint_seconds": 18.873838463,
+        "measured_checkpoint_count": 14,
+        "total_seconds": 60.02000296,
+        "checkpoint_fraction": 0.31445913915696344,
+        "throughput_excluding_checkpoint_wall": 1947.1073666135107,
+        "cpu_seconds": 35.37,
+        "peak_rss_bytes": 1236533248,
+        "maximum_wal_bytes": 135264745,
+        "maximum_database_bytes": 508107241,
+        "overloads": 0,
+        "other_errors": 0,
+        "throughput_range": [
+          1334.8216602620441,
+          1334.8216602620441
+        ]
+      }
+    }
+  },
+  "validation_passed": true
+}

@@ -1,0 +1,95 @@
+{
+  "source_sha": "d240416f0e0efafa7c08bb1e868387ebd0d894bc",
+  "plan": {
+    "source_sha": "d240416f0e0efafa7c08bb1e868387ebd0d894bc",
+    "controller_sha": "b6dc7544bce98e2f0cdc2c516b74aec5dbf42256",
+    "controller_sha256": "949e1ecc1f182e3648047074ed10f272a11aa3de5aec0dcf0fa95802f09fb55f",
+    "base_controller_sha256": "7ddd8081744c322ff213d7e5d5d9a6fac480cc6e0e4bb8653c2c306f498d7e45",
+    "profiler_controller_sha256": "83e609e4c7f7cc3b802f700dc9d81b86011da443578480edfa6cff6f28f41c7a",
+    "profiler_controller": "run_launch_profile.py",
+    "binary_hashes": {
+      "service_workload": "09bd505d77ce0bcbc61ca46f7389373e60bc1ab1bf6b80a90077bed328418e40",
+      "unconditional_write_workload": "a697a8c4479835e7fa54aaef4acd16025770193289dbaf63e5ada4fbec48e9cc"
+    },
+    "path_orders": {
+      "1": [
+        "legacy-sync-128m"
+      ]
+    },
+    "workloads": [
+      "E"
+    ],
+    "cells": 1,
+    "measurement_ms": 60000,
+    "warmup_ms": 10000,
+    "smoke": false,
+    "diagnostic_only": true,
+    "method": "launch under inherited syscall tracing; benchmark executes as opc",
+    "limits": {
+      "max_process_group_rss_bytes": 3221225472,
+      "minimum_mem_available_bytes": 1572864000,
+      "maximum_database_bytes": 4294967296,
+      "minimum_filesystem_available_bytes": 10737418240
+    }
+  },
+  "cells": [
+    {
+      "case": "E-legacy-sync-128m-r1",
+      "workload": "E",
+      "backend": "legacy-sync-128m",
+      "repetition": 1,
+      "throughput_per_second": 1332.0230068069068,
+      "p50_ms": 30.834687,
+      "p95_ms": 62.586879,
+      "p99_ms": 1195.376639,
+      "p999_ms": 1528.823807,
+      "maximum_ms": 1593.801656,
+      "wal_appended_bytes": 1825891189,
+      "wal_bytes_per_transaction": 22831.630933326665,
+      "transactions_per_group": 53.137541528239204,
+      "checkpoint_seconds": 16.501414174,
+      "measured_checkpoint_count": 13,
+      "total_seconds": 60.03800204,
+      "checkpoint_fraction": 0.27484948887882743,
+      "throughput_excluding_checkpoint_wall": 1836.891771264746,
+      "cpu_seconds": 34.97,
+      "peak_rss_bytes": 1232760832,
+      "maximum_wal_bytes": 135461214,
+      "maximum_database_bytes": 508303710,
+      "read_fraction": null,
+      "overloads": 0,
+      "other_errors": 0
+    }
+  ],
+  "medians": {
+    "E": {
+      "legacy-sync-128m": {
+        "throughput_per_second": 1332.0230068069068,
+        "p50_ms": 30.834687,
+        "p95_ms": 62.586879,
+        "p99_ms": 1195.376639,
+        "p999_ms": 1528.823807,
+        "maximum_ms": 1593.801656,
+        "wal_appended_bytes": 1825891189,
+        "wal_bytes_per_transaction": 22831.630933326665,
+        "transactions_per_group": 53.137541528239204,
+        "checkpoint_seconds": 16.501414174,
+        "measured_checkpoint_count": 13,
+        "total_seconds": 60.03800204,
+        "checkpoint_fraction": 0.27484948887882743,
+        "throughput_excluding_checkpoint_wall": 1836.891771264746,
+        "cpu_seconds": 34.97,
+        "peak_rss_bytes": 1232760832,
+        "maximum_wal_bytes": 135461214,
+        "maximum_database_bytes": 508303710,
+        "overloads": 0,
+        "other_errors": 0,
+        "throughput_range": [
+          1332.0230068069068,
+          1332.0230068069068
+        ]
+      }
+    }
+  },
+  "validation_passed": true
+}

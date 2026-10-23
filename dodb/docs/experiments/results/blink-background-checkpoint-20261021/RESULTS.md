@@ -78,6 +78,7 @@ The predeclared 300-second gate failed: neither workload improves throughput by 
 
 ## Reproduction and evidence
 
+- [Performance loss from the fastest checkpoint-off path: causes and measured recovery](performance-loss-20261022/RESULTS.md)
 - [Read-80/write-20 follow-up with the same frozen engine executable](read80-write20-20261022/RESULTS.md)
 - [Implementation and protocol](CONCURRENT-CHECKPOINT.md)
 - [Execution plan and acceptance criteria](EXECUTION-PLAN.md)

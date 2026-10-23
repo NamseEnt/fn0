@@ -1,0 +1,85 @@
+{
+  "diagnostic_only": true,
+  "all_attributions_accepted": false,
+  "cases": [
+    {
+      "case": "E-legacy-off-r1",
+      "diagnostic_only": true,
+      "measurement_seconds": 60.035108379,
+      "clock_offset_nanos": 1790738328576205960,
+      "clock_offset_spread_nanos": 33720,
+      "trace_spans_measurement_window": true,
+      "unpaired_measured_syscalls": 0,
+      "syscalls": {
+        "wal_pwrite64": {
+          "count": 2798,
+          "bytes": 1325342225,
+          "syscall_seconds_sum": 1.4268035480000012
+        },
+        "wal_fdatasync": {
+          "count": 2798,
+          "bytes": 0,
+          "syscall_seconds_sum": 19.318194091000002
+        }
+      },
+      "wal_append_conservation_verified": true,
+      "attribution_accepted": true,
+      "reported_wal_appended_bytes": 1325342225,
+      "traced_wal_bytes": 1325342225,
+      "wal_capture_fraction": 1.0,
+      "wal_bytes_per_transaction": 8826.964408213284,
+      "checkpoint_count": 0,
+      "checkpoint_wall_seconds": 0.0,
+      "checkpoint_syscall_union_seconds": 0.0,
+      "checkpoint_unattributed_wall_seconds": 0.0,
+      "checkpoint_syscall_seconds_by_category": {}
+    },
+    {
+      "case": "E-legacy-sync-128m-r1",
+      "diagnostic_only": true,
+      "measurement_seconds": 60.059701592,
+      "clock_offset_nanos": 1790738328576205760,
+      "clock_offset_spread_nanos": 480,
+      "trace_spans_measurement_window": true,
+      "unpaired_measured_syscalls": 0,
+      "syscalls": {
+        "wal_pwrite64": {
+          "count": 999,
+          "bytes": 1188746425,
+          "syscall_seconds_sum": 1.2888960039999982
+        },
+        "wal_fdatasync": {
+          "count": 991,
+          "bytes": 0,
+          "syscall_seconds_sum": 12.087917266999995
+        },
+        "database_pwrite64": {
+          "count": 252272,
+          "bytes": 1033306112,
+          "syscall_seconds_sum": 2.223976012999783
+        },
+        "database_fdatasync": {
+          "count": 16,
+          "bytes": 0,
+          "syscall_seconds_sum": 5.673859692000001
+        }
+      },
+      "wal_append_conservation_verified": false,
+      "attribution_accepted": false,
+      "reported_wal_appended_bytes": 1829235609,
+      "traced_wal_bytes": 1188746425,
+      "wal_capture_fraction": 0.6498596567611428,
+      "wal_bytes_per_transaction": 14837.815480053921,
+      "checkpoint_count": 14,
+      "checkpoint_wall_seconds": 18.873838463,
+      "checkpoint_syscall_union_seconds": 7.925494505,
+      "checkpoint_unattributed_wall_seconds": 10.948343958,
+      "checkpoint_syscall_seconds_by_category": {
+        "database_pwrite64": 2.223976013,
+        "database_fdatasync": 5.673859692,
+        "wal_fdatasync": 0.027251716,
+        "wal_pwrite64": 0.000407084
+      }
+    }
+  ]
+}
