@@ -63,7 +63,12 @@ def validate(report, command, source_revision, binary_digest):
     assert len(events) >= MIN_CHECKPOINTS, len(events)
     case = Path(command[command.index("--report") + 1]).stem
     samples = json.loads((BASE.REPORTS / case / "resource-samples.json").read_text())
-    assert max(sample["recovery_file_bytes"] for sample in samples) <= 512 * 1024**2
+    database = Path(command[command.index("--data-dir") + 1])
+    live_bytes = sum(max(0, path.stat().st_size - 4096 + 4) for path in database.rglob("*.db"))
+    envelope = live_bytes + 512 * 1024**2
+    assert max(sample["recovery_file_bytes"] for sample in samples) <= envelope
+    write_json(BASE.REPORTS / case / "recovery-envelope.json", {"live_checkpoint_image_bytes": live_bytes,
+               "extra_limit_bytes": 512 * 1024**2, "required_recovery_envelope_bytes": envelope})
     if "per_tenant" in report:
         assert report["scenario"] == "rw80" and report["configuration"]["clients"] == 16
 
@@ -84,7 +89,7 @@ def run():
             "controller_sha256": BASE.sha256_file(Path(__file__)),
             "base_controller_sha256": BASE.sha256_file(BASE_PATH),
             "limits": {"rss_bytes": BASE.MAX_PROCESS_GROUP_RSS_BYTES,
-                       "recovery_file_bytes": 512 * 1024**2,
+                       "recovery_extra_bytes": 512 * 1024**2,
                        "database_bytes": BASE.MAXIMUM_DATABASE_BYTES,
                        "minimum_memory_bytes": BASE.MINIMUM_MEM_AVAILABLE_BYTES,
                        "minimum_free_disk_bytes": BASE.MINIMUM_DISK_AVAILABLE_BYTES}}

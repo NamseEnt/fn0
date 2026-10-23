@@ -412,7 +412,7 @@ fn base_storage_and_pending_snapshot_are_reserved_before_accepting_more_writes()
     store.put(key(2), vec![2; 512]).unwrap();
     let snapshot = store.prepare_segmented_checkpoint().unwrap().unwrap();
     assert!(matches!(
-        store.put(key(3), vec![3; 64 * 1024]),
+        store.put(key(3), vec![3; 128 * 1024]),
         Err(Error::Overloaded(_))
     ));
     store.complete_segmented_checkpoint(snapshot.run()).unwrap();
@@ -464,4 +464,87 @@ fn interrupted_reclamation_removes_valid_obsolete_files_and_preserves_unknown_ar
     assert_eq!(fs::read(&unknown).unwrap(), b"preserved invalid orphan");
     drop(recovered);
     fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn live_primary_pages_and_extra_recovery_budget_are_accounted_separately() {
+    let directory = directory("primary-budget");
+    let path = directory.join("tenant.db");
+    let mut store = open(&path, true);
+    for number in 0..96 {
+        store.put(key(number), vec![number as u8; 512]).unwrap();
+    }
+    let first = store.checkpoint().unwrap();
+    let live_bytes = first.base_bytes_written;
+    let extra_limit = live_bytes * 3 / 2;
+    store.set_checkpoint_retention_limit(extra_limit).unwrap();
+    for generation in 0..6 {
+        store.put(key(50), vec![generation as u8; 512]).unwrap();
+        let snapshot = store.prepare_segmented_checkpoint().unwrap().unwrap();
+        store.put(key(51), vec![generation as u8; 512]).unwrap();
+        store.complete_segmented_checkpoint(snapshot.run()).unwrap();
+        let actual_bytes = fs::read_dir(path.with_file_name("tenant.db.segments"))
+            .unwrap()
+            .map(|entry| entry.unwrap().metadata().unwrap().len())
+            .sum::<u64>();
+        assert!(actual_bytes <= live_bytes + extra_limit);
+    }
+    store.checkpoint().unwrap();
+    drop(store);
+    let mut verified = open(&path, true);
+    assert_eq!(
+        verified.get(&key(50)).unwrap().value(),
+        Some(vec![5; 512].as_slice())
+    );
+    assert_eq!(
+        verified.get(&key(51)).unwrap().value(),
+        Some(vec![5; 512].as_slice())
+    );
+    verified.check_invariants().unwrap();
+    drop(verified);
+    fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn failed_public_write_leaves_an_incomplete_transaction_that_can_be_recovered_twice() {
+    for boundary in ["during_page_delta_payload_write", "before_commit_record"] {
+        let directory = directory(boundary);
+        let path = directory.join("tenant.db");
+        let mut store = open(&path, true);
+        let prior = store.put(key(0), vec![0; 512]).unwrap();
+        store.checkpoint().unwrap();
+        store.set_boxed_fault_injector(Box::new(FailAt(boundary)));
+        assert!(store.put(key(0), vec![1; 512]).is_err());
+        drop(store);
+        let mut recovered = open(&path, true);
+        assert_eq!(
+            recovered.get(&key(0)).unwrap(),
+            RevisionState::Present {
+                value: vec![0; 512],
+                revision: prior
+            }
+        );
+        let next = recovered.put(key(1), vec![2; 512]).unwrap();
+        assert!(next > prior);
+        recovered.checkpoint().unwrap();
+        drop(recovered);
+        let mut verified = open(&path, true);
+        assert_eq!(
+            verified.get(&key(0)).unwrap(),
+            RevisionState::Present {
+                value: vec![0; 512],
+                revision: prior
+            }
+        );
+        assert_eq!(
+            verified.get(&key(1)).unwrap(),
+            RevisionState::Present {
+                value: vec![2; 512],
+                revision: next
+            }
+        );
+        verified.check_invariants().unwrap();
+        drop(verified);
+        fs::remove_dir_all(directory).unwrap();
+    }
 }

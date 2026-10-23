@@ -285,16 +285,23 @@ impl SegmentedWal {
         &self,
         dirty_count: usize,
         live_count: usize,
+        extra_limit: u64,
     ) -> Result<Option<BasePackJob>> {
         let Some(bases) = self.manifest.bases.as_ref() else {
             return Ok(None);
         };
+        let live_bytes = durable_bases::encoded_size(live_count as u64);
+        let retained_limit = live_bytes.max(extra_limit.saturating_sub(extra_limit / 4));
+        let projected_bytes = self
+            .base_bytes()
+            .saturating_add(durable_bases::encoded_size(dirty_count as u64));
         let complete = bases.is_empty()
             || bases.len() >= durable_bases::MAX_PACKS
             || self
                 .base_bytes()
                 .saturating_add(durable_bases::encoded_size(dirty_count as u64))
-                > durable_bases::encoded_size(live_count as u64).saturating_mul(2);
+                > live_bytes.saturating_mul(2)
+            || projected_bytes > retained_limit;
         let mut number = bases
             .last()
             .map_or(Some(1), |entry| entry.number.checked_add(1))

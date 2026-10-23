@@ -66,6 +66,8 @@ impl Options {
             "segment_bytes": match self.layout { BlinkWalLayout::Legacy => None, BlinkWalLayout::Segmented { max_segment_bytes } | BlinkWalLayout::SegmentedBases { max_segment_bytes, .. } => Some(max_segment_bytes) },
             "execution": match self.execution { BlinkCheckpointExecution::Sync => "sync", BlinkCheckpointExecution::Background => "background" },
             "retained_wal_limit_bytes": 512 * 1024 * 1024_u64,
+            "recovery_extra_limit_bytes": if matches!(self.layout, BlinkWalLayout::SegmentedBases { .. }) { Some(512 * 1024 * 1024_u64) } else { None },
+            "primary_base_storage": if matches!(self.layout, BlinkWalLayout::SegmentedBases { .. }) { Some("live allocated checkpoint page image") } else { None },
             "retained_image_limit_bytes": 512 * 1024 * 1024_u64,
         })
     }

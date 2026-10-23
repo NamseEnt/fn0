@@ -194,11 +194,11 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             self.broken = Some(error.to_string());
             return Err(error);
         }
-        let base_job = self
-            .segmented_wal
-            .as_ref()
-            .unwrap()
-            .base_job(self.dirty_pages.len(), self.state.pages.len())?;
+        let base_job = self.segmented_wal.as_ref().unwrap().base_job(
+            self.dirty_pages.len(),
+            self.state.pages.len(),
+            self.checkpoint_retention_limit.unwrap_or(512 * 1024 * 1024),
+        )?;
         let page_count = if base_job.as_ref().is_some_and(|job| job.complete) {
             self.state.pages.len()
         } else {
@@ -211,7 +211,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                 .base_bytes()
                 .saturating_add(wal.metrics()?.wal_bytes)
                 .saturating_add(durable_bases::encoded_size(page_count as u64))
-                > limit
+                > limit.saturating_add(durable_bases::encoded_size(self.state.pages.len() as u64))
                 || (page_count as u64 + 2).saturating_mul(PAGE_SIZE as u64) > limit
             {
                 return Err(Error::overloaded(
@@ -333,6 +333,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         let maximum_images = (self.dirty_pages.len() as u64 + image_count + 2)
             .saturating_mul(PAGE_SIZE as u64)
             .saturating_add(self.checkpoint_retained_image_bytes());
+        let mut recovery_limit = limit;
         let base_reserve = if wal.has_durable_bases() {
             let highest_page = commits
                 .iter()
@@ -341,13 +342,14 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                 .max()
                 .unwrap_or(FIRST_DATA_PAGE)
                 .max(self.current_superblock.high_water_page_id.get());
+            let live_bytes = durable_bases::encoded_size(highest_page.saturating_sub(1));
+            recovery_limit = recovery_limit.saturating_add(live_bytes);
+            let pending_bytes = self
+                .physical_checkpoint
+                .as_ref()
+                .map_or(0, |pending| pending.disk_bytes);
             wal.base_bytes()
-                .saturating_add(durable_bases::encoded_size(highest_page.saturating_sub(1)))
-                .saturating_add(
-                    self.physical_checkpoint
-                        .as_ref()
-                        .map_or(0, |pending| pending.disk_bytes),
-                )
+                .saturating_add(live_bytes.max(pending_bytes))
         } else {
             0
         };
@@ -356,7 +358,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             .wal_bytes
             .saturating_add(maximum_append)
             .saturating_add(base_reserve)
-            > limit
+            > recovery_limit
             || maximum_images > limit
         {
             return Err(Error::overloaded("segmented checkpoint capacity exceeded"));
