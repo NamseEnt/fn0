@@ -1,0 +1,181 @@
+   Compiling futures-core v0.3.31
+   Compiling once_cell v1.21.3
+   Compiling stable_deref_trait v1.2.1
+   Compiling zeroize v1.8.2
+   Compiling itoa v1.0.17
+   Compiling futures-sink v0.3.31
+   Compiling jobserver v0.1.34
+   Compiling tokio v1.53.1
+   Compiling zerofrom v0.1.6
+   Compiling slab v0.4.11
+   Compiling http v1.4.0
+   Compiling percent-encoding v2.3.2
+   Compiling cc v1.2.55
+   Compiling tracing-core v0.1.36
+   Compiling yoke v0.8.2
+   Compiling rustls-pki-types v1.13.2
+   Compiling untrusted v0.9.0
+   Compiling memchr v2.7.6
+   Compiling futures-io v0.3.31
+   Compiling zerovec v0.11.6
+   Compiling pin-utils v0.1.0
+   Compiling futures-task v0.3.31
+   Compiling litemap v0.8.1
+   Compiling tracing v0.1.44
+   Compiling tinystr v0.8.3
+   Compiling cmake v0.1.57
+   Compiling futures-util v0.3.31
+   Compiling smallvec v1.15.1
+   Compiling tower-service v0.3.3
+   Compiling http-body v1.0.1
+   Compiling aws-lc-sys v0.39.0
+   Compiling writeable v0.6.2
+   Compiling base64 v0.22.1
+   Compiling potential_utf v0.1.4
+   Compiling zerotrie v0.2.4
+   Compiling log v0.4.29
+   Compiling icu_locale_core v2.2.0
+   Compiling utf8_iter v1.0.4
+   Compiling subtle v2.6.1
+   Compiling icu_collections v2.2.0
+   Compiling thiserror v2.0.18
+   Compiling futures-channel v0.3.31
+   Compiling sync_wrapper v1.0.2
+   Compiling tower-layer v0.3.3
+   Compiling rand_core v0.10.1
+   Compiling icu_normalizer_data v2.2.0
+   Compiling icu_properties_data v2.2.0
+   Compiling try-lock v0.2.5
+   Compiling httparse v1.10.1
+   Compiling want v0.3.1
+   Compiling serde_core v1.0.228
+   Compiling icu_provider v2.2.0
+   Compiling http-body-util v0.1.3
+   Compiling unicase v2.9.0
+   Compiling atomic-waker v1.1.2
+   Compiling tokio-stream v0.1.18
+   Compiling icu_normalizer v2.2.0
+   Compiling mime_guess v2.0.5
+   Compiling hyper v1.11.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling getrandom v0.4.2
+   Compiling icu_properties v2.2.0
+   Compiling form_urlencoded v1.2.2
+   Compiling ipnet v2.12.0
+   Compiling pin-project v1.1.10
+   Compiling rand_chacha v0.9.0
+   Compiling serde v1.0.228
+   Compiling zmij v1.0.12
+   Compiling tower v0.5.3
+   Compiling chacha20 v0.10.1
+   Compiling opentelemetry v0.31.0
+   Compiling libmimalloc-sys v0.1.49
+   Compiling hyper-util v0.1.20
+   Compiling webpki-roots v1.0.9
+   Compiling tinyvec_macros v0.1.1
+   Compiling utf8parse v0.2.2
+   Compiling ryu v1.0.23
+   Compiling iri-string v0.7.11
+   Compiling mime v0.3.17
+   Compiling anstyle-parse v0.2.7
+   Compiling serde_urlencoded v0.7.1
+   Compiling rand v0.10.2
+   Compiling tinyvec v1.11.0
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.1.0
+   Compiling serde_json v1.0.148
+   Compiling rand v0.9.2
+   Compiling prost v0.14.3
+   Compiling tonic v0.14.5
+   Compiling url v2.5.8
+   Compiling futures-executor v0.3.31
+   Compiling tokio-util v0.7.18
+   Compiling rand_pcg v0.10.2
+   Compiling lru-slab v0.1.2
+   Compiling rustc-hash v2.1.1
+   Compiling tower-http v0.6.8
+   Compiling anstyle v1.0.14
+   Compiling anstyle-query v1.1.5
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling colorchoice v1.0.5
+   Compiling tonic-prost v0.14.5
+   Compiling opentelemetry_sdk v0.31.0
+   Compiling quinn-udp v0.5.14
+   Compiling dodb-service v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-service)
+   Compiling anstream v0.6.21
+   Compiling clap_lex v1.1.0
+   Compiling strsim v0.11.1
+   Compiling powerfmt v0.2.0
+   Compiling dodb-protocol v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-protocol)
+   Compiling ring v0.17.14
+   Compiling clap_builder v4.5.60
+   Compiling rustls-pemfile v2.2.0
+   Compiling deranged v0.5.5
+   Compiling num-conv v0.1.0
+   Compiling mimalloc v0.1.52
+   Compiling time-core v0.1.6
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-storage)
+   Compiling getrandom v0.2.16
+   Compiling pem v3.0.6
+   Compiling tempfile v3.27.0
+   Compiling time v0.3.44
+   Compiling clap v4.5.60
+   Compiling opentelemetry-proto v0.31.0
+   Compiling yasna v0.5.2
+warning: type `BasePackJob` is more private than the item `SegmentedWal::base_job`
+   --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:283:5
+    |
+283 |     pub(crate) fn base_job(&self, dirty_count: usize, live_count: usize) -> Option<BasePackJob> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ method `SegmentedWal::base_job` is reachable at visibility `pub(crate)`
+    |
+note: but type `BasePackJob` is only usable at visibility `pub(in crate::blink)`
+   --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:20:1
+    |
+ 20 | pub(super) struct BasePackJob {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: type `BasePackOutput` is more private than the item `SegmentedWal::advance_checkpoint_with_base`
+   --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:487:5
+    |
+487 | /     pub(crate) fn advance_checkpoint_with_base(
+488 | |         &mut self,
+489 | |         superblock: &super::BlinkSuperblock,
+490 | |         base: Option<&BasePackOutput>,
+491 | |         mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+492 | |     ) -> Result<(u64, u64)> {
+    | |___________________________^ method `SegmentedWal::advance_checkpoint_with_base` is reachable at visibility `pub(crate)`
+    |
+note: but type `BasePackOutput` is only usable at visibility `pub(in crate::blink)`
+   --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:29:1
+    |
+ 29 | pub(super) struct BasePackOutput {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+   Compiling rcgen v0.14.7
+warning: `dodb-storage` (lib) generated 2 warnings
+   Compiling aws-lc-rs v1.16.2
+   Compiling rustls v0.23.28
+   Compiling rustls-webpki v0.103.10
+   Compiling tokio-rustls v0.26.4
+   Compiling quinn-proto v0.11.18
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.12.28
+   Compiling opentelemetry-http v0.31.0
+   Compiling quinn v0.11.11
+   Compiling opentelemetry-otlp v0.31.1
+   Compiling dodb-client v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-client)
+   Compiling dodb-server v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 41.43s
+     Running tests/durable_base_checkpoint.rs (/Users/namse/fn0-dodb-durable-bases/target/debug/deps/durable_base_checkpoint-e8d1b7c4ae480a28)
+
+running 6 tests
+test completed_checkpoint_rechecks_coalesced_threshold_before_starting_more_work ... ok
+test shutdown_joins_an_active_checkpoint_before_returning ... ok
+test pending_shards_keep_writing_with_only_one_process_checkpoint_worker ... ok
+test synchronous_execution_waits_for_the_identical_snapshot_worker ... ok
+test worker_failure_and_panic_fail_closed_preserve_acknowledged_writes_and_resolve_shutdown ... ok
+test background_checkpoint_preserves_newer_writes_rotations_tree_growth_and_reopen ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.30s
+

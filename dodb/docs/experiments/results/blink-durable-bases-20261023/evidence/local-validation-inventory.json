@@ -1,0 +1,221 @@
+[
+  {
+    "file": "actual-write-boundaries.log",
+    "test_summaries": [
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.05s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.53s"
+    ],
+    "contains_compile_error": false,
+    "bytes": 4775
+  },
+  {
+    "file": "aligned-pack-validation.log",
+    "test_summaries": [
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.83s",
+      "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s",
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.70s",
+      "test result: ok. 202 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 48.92s",
+      "test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.58s"
+    ],
+    "contains_compile_error": true,
+    "bytes": 25849
+  },
+  {
+    "file": "atomic-sigkill-markers.log",
+    "test_summaries": [
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.80s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.78s"
+    ],
+    "contains_compile_error": false,
+    "bytes": 4720
+  },
+  {
+    "file": "base-tests-initial.log",
+    "test_summaries": [],
+    "contains_compile_error": true,
+    "bytes": 8359
+  },
+  {
+    "file": "base-tests-second.log",
+    "test_summaries": [
+      "test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 52.58s"
+    ],
+    "contains_compile_error": true,
+    "bytes": 7064
+  },
+  {
+    "file": "base-tests-third.log",
+    "test_summaries": [
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 45.77s",
+      "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s"
+    ],
+    "contains_compile_error": true,
+    "bytes": 5388
+  },
+  {
+    "file": "cleanup-validation.log",
+    "test_summaries": [],
+    "contains_compile_error": true,
+    "bytes": 1675
+  },
+  {
+    "file": "clippy-final.log",
+    "test_summaries": [],
+    "contains_compile_error": false,
+    "bytes": 10394
+  },
+  {
+    "file": "clippy-initial.log",
+    "test_summaries": [],
+    "contains_compile_error": false,
+    "bytes": 12747
+  },
+  {
+    "file": "disposable-cache-validation.log",
+    "test_summaries": [
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.89s",
+      "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 49.48s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.89s"
+    ],
+    "contains_compile_error": false,
+    "bytes": 5783
+  },
+  {
+    "file": "final-local-validation.log",
+    "test_summaries": [
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.64s",
+      "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s",
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.33s",
+      "test result: ok. 202 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 47.90s",
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.35s",
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.31s",
+      "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 48.49s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.40s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.76s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s"
+    ],
+    "contains_compile_error": false,
+    "bytes": 28510
+  },
+  {
+    "file": "final-primary-budget-tests.log",
+    "test_summaries": [
+      "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 53.21s"
+    ],
+    "contains_compile_error": false,
+    "bytes": 4708
+  },
+  {
+    "file": "full-local-validation.log",
+    "test_summaries": [
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.53s",
+      "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s",
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.28s",
+      "test result: ok. 202 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 48.74s",
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.80s",
+      "test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.42s"
+    ],
+    "contains_compile_error": true,
+    "bytes": 26984
+  },
+  {
+    "file": "initial-check.log",
+    "test_summaries": [],
+    "contains_compile_error": true,
+    "bytes": 3082
+  },
+  {
+    "file": "library-check.log",
+    "test_summaries": [],
+    "contains_compile_error": true,
+    "bytes": 2896
+  },
+  {
+    "file": "local-release-gate.log",
+    "test_summaries": [
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.55s",
+      "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s",
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s",
+      "test result: ok. 202 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 48.24s",
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.28s",
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.78s",
+      "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 61.46s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.86s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.80s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s"
+    ],
+    "contains_compile_error": false,
+    "bytes": 28615
+  },
+  {
+    "file": "obsolete-cleanup-regression.log",
+    "test_summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.77s"
+    ],
+    "contains_compile_error": false,
+    "bytes": 3873
+  },
+  {
+    "file": "primary-budget-clippy.log",
+    "test_summaries": [],
+    "contains_compile_error": false,
+    "bytes": 10394
+  },
+  {
+    "file": "primary-budget-validation.log",
+    "test_summaries": [
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.48s",
+      "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s",
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.33s",
+      "test result: ok. 202 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 48.06s",
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.84s",
+      "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 51.98s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.93s"
+    ],
+    "contains_compile_error": false,
+    "bytes": 27101
+  },
+  {
+    "file": "real-incomplete-transaction.log",
+    "test_summaries": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 1.29s"
+    ],
+    "contains_compile_error": false,
+    "bytes": 3871
+  },
+  {
+    "file": "recovery-growth-validation.log",
+    "test_summaries": [
+      "test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.71s"
+    ],
+    "contains_compile_error": true,
+    "bytes": 4669
+  },
+  {
+    "file": "service-check.log",
+    "test_summaries": [],
+    "contains_compile_error": true,
+    "bytes": 11155
+  },
+  {
+    "file": "service-tests-initial.log",
+    "test_summaries": [
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.30s"
+    ],
+    "contains_compile_error": false,
+    "bytes": 7021
+  },
+  {
+    "file": "service-tests-second.log",
+    "test_summaries": [
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.13s"
+    ],
+    "contains_compile_error": false,
+    "bytes": 2494
+  }
+]

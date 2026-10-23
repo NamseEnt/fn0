@@ -105,6 +105,8 @@ def summarize(root):
                 "checkpoint_write_requests": sum(event["checkpoint_write_requests"] for event in metrics["checkpoint_events"]),
                 "checkpoint_seconds": metrics["checkpoint_total_nanos"] / 1000000000,
                 "coordinator_pause_seconds": metrics["coordinator_pause_nanos"] / 1000000000,
+                **{f"checkpoint_{phase}_seconds": sum(event[f"{phase}_nanos"] for event in metrics["checkpoint_events"]) / 1000000000
+                   for phase in ["preparation", "page_write", "data_sync", "metadata_sync", "completion"]},
                 "measured_checkpoint_count": len(events),
                 "checkpoint_overlap_writes": sum(event["writes_during_checkpoint"] for event in events),
                 "transactions_per_group": transactions / metrics["mutation_commit_groups"],
@@ -116,7 +118,18 @@ def summarize(root):
                 "live_checkpoint_image_bytes": envelope["live_checkpoint_image_bytes"],
                 "required_recovery_envelope_bytes": envelope["required_recovery_envelope_bytes"],
                 "maximum_database_bytes": controller["maximum_database_bytes"],
-                "reopen_and_validation_ms": report["reopen_and_validation_ms"]}
+                "minimum_available_memory_bytes": controller["minimum_mem_available_bytes"],
+                "minimum_filesystem_available_bytes": controller["minimum_filesystem_available_bytes"],
+                "reopen_and_validation_ms": report["reopen_and_validation_ms"],
+                "cpu_seconds": report["process_metrics"]["cpu_seconds"],
+                "external_resource_samples": len(samples),
+                "external_resource_maximum_gap_seconds": max(later["elapsed_seconds"] - earlier["elapsed_seconds"] for earlier, later in zip(samples, samples[1:])),
+                "internal_omitted_resource_samples": report["process_metrics"].get("omitted_resource_samples", 0)}
+        if workload == "RW80":
+            for category in ["get", "query16", "write_transaction_success"]:
+                selected_latency = counters["latency"][category]
+                cell[f"{category}_p99_ms"] = HELPERS.latency_ms(selected_latency, "p99")
+                cell[f"{category}_p999_ms"] = HELPERS.histogram_percentile_ms(selected_latency, 999, 1000)
         cells.append(cell)
     medians = {}
     excluded = {"case", "workload", "policy", "repetition"}

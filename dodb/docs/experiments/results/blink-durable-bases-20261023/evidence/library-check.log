@@ -1,0 +1,56 @@
+warning: type `BasePackJob` is more private than the item `SegmentedWal::base_job`
+   --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:263:5
+    |
+263 |     pub(crate) fn base_job(&self, dirty_count: usize, live_count: usize) -> Option<BasePackJob> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ method `SegmentedWal::base_job` is reachable at visibility `pub(crate)`
+    |
+note: but type `BasePackJob` is only usable at visibility `pub(in crate::blink)`
+   --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:20:1
+    |
+ 20 | pub(super) struct BasePackJob {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: type `BasePackOutput` is more private than the item `SegmentedWal::advance_checkpoint_with_base`
+   --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:458:5
+    |
+458 | /     pub(crate) fn advance_checkpoint_with_base(
+459 | |         &mut self,
+460 | |         superblock: &super::BlinkSuperblock,
+461 | |         base: Option<&BasePackOutput>,
+462 | |         mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+463 | |     ) -> Result<(u64, u64)> {
+    | |___________________________^ method `SegmentedWal::advance_checkpoint_with_base` is reachable at visibility `pub(crate)`
+    |
+note: but type `BasePackOutput` is only usable at visibility `pub(in crate::blink)`
+   --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:29:1
+    |
+ 29 | pub(super) struct BasePackOutput {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `dodb-storage` (lib) generated 2 warnings
+    Checking dodb-server v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-server)
+error[E0308]: mismatched types
+    --> dodb/crates/dodb-server/src/lib.rs:1748:51
+     |
+1748 |   ...                       ..BlinkCheckpointEvent::default()
+     |  _____________________________^
+1749 | | ...                   ..BlinkCheckpointEvent::default()
+     | |_______________________________________________________^ expected `BlinkCheckpointEvent`, found `Range<BlinkCheckpointEvent>`
+     |
+     = note: expected struct `BlinkCheckpointEvent`
+                found struct `std::ops::Range<BlinkCheckpointEvent>`
+
+error[E0308]: mismatched types
+    --> dodb/crates/dodb-server/src/lib.rs:1810:39
+     |
+1810 |   ...                       ..BlinkCheckpointEvent::default()
+     |  _____________________________^
+1811 | | ...                   ..BlinkCheckpointEvent::default()
+     | |_______________________________________________________^ expected `BlinkCheckpointEvent`, found `Range<BlinkCheckpointEvent>`
+     |
+     = note: expected struct `BlinkCheckpointEvent`
+                found struct `std::ops::Range<BlinkCheckpointEvent>`
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `dodb-server` (lib) due to 2 previous errors

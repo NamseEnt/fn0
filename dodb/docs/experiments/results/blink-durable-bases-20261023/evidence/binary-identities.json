@@ -1,0 +1,12 @@
+{
+  "service_workload": {
+    "sha256": "871fabe5af312a855702233c0c1e2a9deeb8b80b434979d3b620daec216ef676",
+    "source_sha": "400ad0ac6b7d8e6306bcb2ab7946747bddcb06c4",
+    "build_path": "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/service_workload"
+  },
+  "unconditional_write_workload": {
+    "sha256": "7fd42953e6e4721612315066b4f6c61f6c1b2b654d311f0ac0ea6b188fe51b8c",
+    "source_sha": "400ad0ac6b7d8e6306bcb2ab7946747bddcb06c4",
+    "build_path": "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/target/release/unconditional_write_workload"
+  }
+}

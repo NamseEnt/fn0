@@ -1,0 +1,45 @@
+    Blocking waiting for file lock on build directory
+warning: type `BasePackJob` is more private than the item `SegmentedWal::base_job`
+   --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:283:5
+    |
+283 |     pub(crate) fn base_job(&self, dirty_count: usize, live_count: usize) -> Option<BasePackJob> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ method `SegmentedWal::base_job` is reachable at visibility `pub(crate)`
+    |
+note: but type `BasePackJob` is only usable at visibility `pub(in crate::blink)`
+   --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:20:1
+    |
+ 20 | pub(super) struct BasePackJob {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: type `BasePackOutput` is more private than the item `SegmentedWal::advance_checkpoint_with_base`
+   --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:487:5
+    |
+487 | /     pub(crate) fn advance_checkpoint_with_base(
+488 | |         &mut self,
+489 | |         superblock: &super::BlinkSuperblock,
+490 | |         base: Option<&BasePackOutput>,
+491 | |         mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+492 | |     ) -> Result<(u64, u64)> {
+    | |___________________________^ method `SegmentedWal::advance_checkpoint_with_base` is reachable at visibility `pub(crate)`
+    |
+note: but type `BasePackOutput` is only usable at visibility `pub(in crate::blink)`
+   --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:29:1
+    |
+ 29 | pub(super) struct BasePackOutput {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `dodb-storage` (lib) generated 2 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 24.76s
+     Running tests/durable_base_checkpoint.rs (/Users/namse/fn0-dodb-durable-bases/target/debug/deps/durable_base_checkpoint-e8d1b7c4ae480a28)
+
+running 6 tests
+test completed_checkpoint_rechecks_coalesced_threshold_before_starting_more_work ... ok
+test synchronous_execution_waits_for_the_identical_snapshot_worker ... ok
+test worker_failure_and_panic_fail_closed_preserve_acknowledged_writes_and_resolve_shutdown ... ok
+test pending_shards_keep_writing_with_only_one_process_checkpoint_worker ... ok
+test shutdown_joins_an_active_checkpoint_before_returning ... ok
+test background_checkpoint_preserves_newer_writes_rotations_tree_growth_and_reopen ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.13s
+

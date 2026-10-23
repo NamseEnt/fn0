@@ -1,0 +1,276 @@
+{
+  "directories": 6,
+  "files": [
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/acknowledged.csv",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/acknowledged.csv",
+      "bytes": 51,
+      "sha256": "d0de60ebf6d5037efdd4fde7c287cddcabba4238653a4c4ddc1206f4b84a2ff2"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/ready",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/ready",
+      "bytes": 27,
+      "sha256": "e7f50a10981ca0df877f1184ba4174c35744cfc0f852c4287d444cd29866ecbf"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/tenant.db",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/tenant.db",
+      "bytes": 176128,
+      "sha256": "32601a307b9e56b8212ec55e31423732b678596f0b64a462d3a9b7ef8e2ae90f"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000001.pages",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000001.pages",
+      "bytes": 45244,
+      "sha256": "37080a2eb4dd1a2243cf0c3eeb82f3044a45c09100899745976f40fc08735614"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000002.pages",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000002.pages",
+      "bytes": 96,
+      "sha256": "46163c3f2667a102a80ec54d01ec79b9d8aab1412aa2288eceb2f92259d9282e"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000003.pages",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000003.pages",
+      "bytes": 16516,
+      "sha256": "bc2fee623680f7536b5a9a96707453a3548a88c5c7b56ee6de687ef9ae999d18"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000017.wal",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000017.wal",
+      "bytes": 104,
+      "sha256": "911b786673535686e240a1db77d7dc0e76d6d3e99513d054124a451f0d082bd6"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/tenant.db.segments.manifest",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5351-1792722031940511000/after_checkpoint_page_write/tenant.db.segments.manifest",
+      "bytes": 260,
+      "sha256": "9214263360cfd4d0a61fac22856c5a47161945cdc48b7e0132901685e51dc9a3"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/acknowledged.csv",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/acknowledged.csv",
+      "bytes": 51,
+      "sha256": "d0de60ebf6d5037efdd4fde7c287cddcabba4238653a4c4ddc1206f4b84a2ff2"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/ready",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/ready",
+      "bytes": 27,
+      "sha256": "e7f50a10981ca0df877f1184ba4174c35744cfc0f852c4287d444cd29866ecbf"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db",
+      "bytes": 12288,
+      "sha256": "f8ae931062201225103db7abdf9ea38c2a7e0414d99840020f6d5f83f507f1d3"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000001.pages",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000001.pages",
+      "bytes": 45244,
+      "sha256": "37080a2eb4dd1a2243cf0c3eeb82f3044a45c09100899745976f40fc08735614"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000002.pages",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000002.pages",
+      "bytes": 96,
+      "sha256": "46163c3f2667a102a80ec54d01ec79b9d8aab1412aa2288eceb2f92259d9282e"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000006.wal",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000006.wal",
+      "bytes": 29264,
+      "sha256": "3a69410032beda0b3c69d1c327500315ab2c61b9192819881eed20ce3f20ee06"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000007.wal",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000007.wal",
+      "bytes": 29264,
+      "sha256": "a3c71893d2be03168ea062429c97cd2f42d6527be9cb2c3e91c9f504506d8d1f"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000008.wal",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000008.wal",
+      "bytes": 29264,
+      "sha256": "c4c08b60e53852ca0e3a861e6dfad011962744f4beb91aa6db8819c75a8841ac"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000009.wal",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000009.wal",
+      "bytes": 29264,
+      "sha256": "14ecc0f5457ecc4363a2ae5758246ba5470950c77e8225f472c149a2a58d67e3"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000010.wal",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000010.wal",
+      "bytes": 29264,
+      "sha256": "073e577c68db91868f7aa99e1bd71371bfeb2b88efbf7b49a9bacf12afb39da8"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000011.wal",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000011.wal",
+      "bytes": 20952,
+      "sha256": "33b849a0b7d2a5f416a28720f7d6e8594ee0737d21a0183f42f0cac0075202c1"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000012.wal",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000012.wal",
+      "bytes": 20952,
+      "sha256": "97413f9f9b736a71f5c9903af8188ec865bc848ed130bf7c9d4c13e63a546547"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000013.wal",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000013.wal",
+      "bytes": 20952,
+      "sha256": "ffaaf741f12e6e34c869f1585850d08fb5b68acb5f246bb6ecbf26cf663f5b0a"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000014.wal",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000014.wal",
+      "bytes": 20952,
+      "sha256": "76c2ba48a0f6f67042c6f7512ae859db186240c75520c8065c344a0f7350eb14"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000015.wal",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000015.wal",
+      "bytes": 20952,
+      "sha256": "03c4e567279743d2c4121502e053f6c8538574932b8dfe9fdc4e4b180f70ac67"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments.manifest",
+      "archive_path": "dodb-base-background-checkpoint-sigkill-5573-1792722120023562000/after_checkpoint_page_write/tenant.db.segments.manifest",
+      "bytes": 652,
+      "sha256": "cb1ac1db780b9b73cdb6b621c21cf12fbdacf8fe7014599817e7e4ae07ad9621"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-faults-5351-1792722031940491000/before_wal_manifest_directory_sync/tenant.db",
+      "archive_path": "dodb-base-background-faults-5351-1792722031940491000/before_wal_manifest_directory_sync/tenant.db",
+      "bytes": 49152,
+      "sha256": "85cb59378c2d46643e0a6f58c4093ad3b74203da902b3d607b7051a89c36f4c3"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-faults-5351-1792722031940491000/before_wal_manifest_directory_sync/tenant.db.segments/base-00000000000000000001.pages",
+      "archive_path": "dodb-base-background-faults-5351-1792722031940491000/before_wal_manifest_directory_sync/tenant.db.segments/base-00000000000000000001.pages",
+      "bytes": 16516,
+      "sha256": "7b2bb3bd45876b140ad8cf133d65d40189c20864ddc4e20e6107ad3f48b715fd"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-faults-5351-1792722031940491000/before_wal_manifest_directory_sync/tenant.db.segments/base-00000000000000000002.pages",
+      "archive_path": "dodb-base-background-faults-5351-1792722031940491000/before_wal_manifest_directory_sync/tenant.db.segments/base-00000000000000000002.pages",
+      "bytes": 16516,
+      "sha256": "1982097ddd0421c81cfb9ec40cccd7d60c02e20855ec8b3dc55c8af5cba5bc8d"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-faults-5351-1792722031940491000/before_wal_manifest_directory_sync/tenant.db.segments/segment-00000000000000000005.wal",
+      "archive_path": "dodb-base-background-faults-5351-1792722031940491000/before_wal_manifest_directory_sync/tenant.db.segments/segment-00000000000000000005.wal",
+      "bytes": 104,
+      "sha256": "ae9c328470092b4b24d2fd5a55afccd6dfc80704190e7992b6a615c6a718bcc4"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-base-background-faults-5351-1792722031940491000/before_wal_manifest_directory_sync/tenant.db.segments.manifest",
+      "archive_path": "dodb-base-background-faults-5351-1792722031940491000/before_wal_manifest_directory_sync/tenant.db.segments.manifest",
+      "bytes": 260,
+      "sha256": "1320a3054799659096259c7e8d54d44baa25009a7f21b3172a2f271f24d86b20"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-bases-before_checkpoint_manifest_publish-2973-1792721766285115000/tenant.db",
+      "archive_path": "dodb-bases-before_checkpoint_manifest_publish-2973-1792721766285115000/tenant.db",
+      "bytes": 12288,
+      "sha256": "f8ae931062201225103db7abdf9ea38c2a7e0414d99840020f6d5f83f507f1d3"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-bases-before_checkpoint_manifest_publish-2973-1792721766285115000/tenant.db.segments/base-00000000000000000002.pages",
+      "archive_path": "dodb-bases-before_checkpoint_manifest_publish-2973-1792721766285115000/tenant.db.segments/base-00000000000000000002.pages",
+      "bytes": 4204,
+      "sha256": "5998c37140f23fe0bb82047809869fd08c07065b55bdfc582cc409bdc3117e4d"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-bases-before_checkpoint_manifest_publish-2973-1792721766285115000/tenant.db.segments/segment-00000000000000000003.wal",
+      "archive_path": "dodb-bases-before_checkpoint_manifest_publish-2973-1792721766285115000/tenant.db.segments/segment-00000000000000000003.wal",
+      "bytes": 104,
+      "sha256": "f2ebbcda9d7059a744be301e32de669dc5c77e33dd70a45210987d33c2e771a9"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-bases-before_checkpoint_manifest_publish-2973-1792721766285115000/tenant.db.segments.manifest",
+      "archive_path": "dodb-bases-before_checkpoint_manifest_publish-2973-1792721766285115000/tenant.db.segments.manifest",
+      "bytes": 220,
+      "sha256": "94cf2e931859d84f7296944f75f321b4b8fcf70969c8dab1b839ebba23860b1b"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-bases-before_checkpoint_manifest_publish-4736-1792721805010968000/tenant.db",
+      "archive_path": "dodb-bases-before_checkpoint_manifest_publish-4736-1792721805010968000/tenant.db",
+      "bytes": 12288,
+      "sha256": "f8ae931062201225103db7abdf9ea38c2a7e0414d99840020f6d5f83f507f1d3"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-bases-before_checkpoint_manifest_publish-4736-1792721805010968000/tenant.db.segments/base-00000000000000000002.pages",
+      "archive_path": "dodb-bases-before_checkpoint_manifest_publish-4736-1792721805010968000/tenant.db.segments/base-00000000000000000002.pages",
+      "bytes": 4204,
+      "sha256": "5998c37140f23fe0bb82047809869fd08c07065b55bdfc582cc409bdc3117e4d"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-bases-before_checkpoint_manifest_publish-4736-1792721805010968000/tenant.db.segments/segment-00000000000000000003.wal",
+      "archive_path": "dodb-bases-before_checkpoint_manifest_publish-4736-1792721805010968000/tenant.db.segments/segment-00000000000000000003.wal",
+      "bytes": 104,
+      "sha256": "f2ebbcda9d7059a744be301e32de669dc5c77e33dd70a45210987d33c2e771a9"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-bases-before_checkpoint_manifest_publish-4736-1792721805010968000/tenant.db.segments.manifest",
+      "archive_path": "dodb-bases-before_checkpoint_manifest_publish-4736-1792721805010968000/tenant.db.segments.manifest",
+      "bytes": 220,
+      "sha256": "94cf2e931859d84f7296944f75f321b4b8fcf70969c8dab1b839ebba23860b1b"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/acknowledged.csv",
+      "archive_path": "dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/acknowledged.csv",
+      "bytes": 25,
+      "sha256": "8bf5606084981fea32820c08c2a4081f11057b7ee1f2ff97e72a8a9536b1a6fd"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/ready",
+      "archive_path": "dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/ready",
+      "bytes": 27,
+      "sha256": "e7f50a10981ca0df877f1184ba4174c35744cfc0f852c4287d444cd29866ecbf"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/tenant.db",
+      "archive_path": "dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/tenant.db",
+      "bytes": 114688,
+      "sha256": "1cfede00d694cca33291b0b2398f6537119ab34d548e6349afa6b465354b553a"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000001.pages",
+      "archive_path": "dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000001.pages",
+      "bytes": 45244,
+      "sha256": "37080a2eb4dd1a2243cf0c3eeb82f3044a45c09100899745976f40fc08735614"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000002.pages",
+      "archive_path": "dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000002.pages",
+      "bytes": 96,
+      "sha256": "46163c3f2667a102a80ec54d01ec79b9d8aab1412aa2288eceb2f92259d9282e"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000003.pages",
+      "archive_path": "dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/tenant.db.segments/base-00000000000000000003.pages",
+      "bytes": 16516,
+      "sha256": "fc328cd5bb7c15e0f339d31d92d0dba5676e18ce69fc4a26e9e45e638e48a575"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000012.wal",
+      "archive_path": "dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/tenant.db.segments/segment-00000000000000000012.wal",
+      "bytes": 104,
+      "sha256": "144b3cf0f8f42c3fb5933dcc14b0b18c4b56f10ce3ba51e1d9ded1b4d697b791"
+    },
+    {
+      "original_path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/tenant.db.segments.manifest",
+      "archive_path": "dodb-durable-base-sigkill-4987-1792721903828090000/after_checkpoint_page_write/tenant.db.segments.manifest",
+      "bytes": 260,
+      "sha256": "dd2547327e5bb844af3e3376f82c8ada3259c921a18a815e129d94f7c6a75623"
+    }
+  ],
+  "archive_sha256": "027569f2c581ad3e01e8795f6dea8038d42e1511bfc68cde17b4e2e8a7318cd2"
+}

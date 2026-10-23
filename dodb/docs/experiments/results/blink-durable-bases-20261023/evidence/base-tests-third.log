@@ -1,0 +1,126 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-storage)
+warning: constant `BASE_SEED` is never used
+ --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:4:11
+  |
+4 | pub const BASE_SEED: u64 = 979_000_000;
+  |           ^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `SEED_STRIDE` is never used
+ --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:5:11
+  |
+5 | pub const SEED_STRIDE: u64 = 1_009;
+  |           ^^^^^^^^^^^
+
+warning: variants `SameLeafHeavy`, `DifferentLeafHeavy`, and `Hotspot` are never constructed
+  --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:14:5
+   |
+12 | pub enum Distribution {
+   |          ------------ variants in this enum
+13 |     Uniform,
+14 |     SameLeafHeavy,
+   |     ^^^^^^^^^^^^^
+15 |     DifferentLeafHeavy,
+   |     ^^^^^^^^^^^^^^^^^^
+16 |     Hotspot,
+   |     ^^^^^^^
+   |
+   = note: `Distribution` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: associated items `parse`, `as_str`, and `report_name` are never used
+  --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:51:12
+   |
+50 | impl Distribution {
+   | ----------------- associated items in this implementation
+51 |     pub fn parse(value: &str) -> Self {
+   |            ^^^^^
+...
+61 |     pub fn as_str(self) -> &'static str {
+   |            ^^^^^^
+...
+70 |     pub fn report_name(self) -> &'static str {
+   |            ^^^^^^^^^^^
+
+warning: method `next_read_key` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:163:12
+    |
+112 | impl WorkloadGenerator {
+    | ---------------------- method in this implementation
+...
+163 |     pub fn next_read_key(&mut self) -> Vec<u8> {
+    |            ^^^^^^^^^^^^^
+
+warning: function `invocation_seed` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:258:8
+    |
+258 | pub fn invocation_seed(scenario_index: u64, repetition_index: u64) -> u64 {
+    |        ^^^^^^^^^^^^^^^
+
+warning: struct `TraceHash` is never constructed
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:566:12
+    |
+566 | pub struct TraceHash {
+    |            ^^^^^^^^^
+
+warning: associated items `new`, `absorb`, and `push_transaction` are never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:572:12
+    |
+571 | impl TraceHash {
+    | -------------- associated items in this implementation
+572 |     pub fn new() -> Self {
+    |            ^^^
+...
+579 |     fn absorb(&mut self, bytes: &[u8]) {
+    |        ^^^^^^
+...
+586 |     pub fn push_transaction<'a>(
+    |            ^^^^^^^^^^^^^^^^
+
+warning: method `merge` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:638:12
+    |
+616 | impl LatencySamples {
+    | ------------------- method in this implementation
+...
+638 |     pub fn merge(&mut self, other: Self) {
+    |            ^^^^^
+
+warning: `dodb-storage` (bin "blink-fixed-group-bench") generated 9 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.87s
+     Running tests/durable_base_checkpoint.rs (/Users/namse/fn0-dodb-durable-bases/target/debug/deps/durable_base_checkpoint-0624cfc94597167f)
+
+running 7 tests
+test experimental_and_existing_layouts_never_convert_implicitly ... ok
+test checkpoint_failures_preserve_acknowledged_writes_and_allow_write_then_second_recovery ... ok
+test incomplete_transaction_tail_can_be_recovered_written_and_recovered_again ... ok
+test conditional_multikey_deletes_and_reuse_survive_base_replacement ... ok
+test immutable_packs_reuse_cold_pages_and_consolidate_with_bounded_generation_count ... ok
+test checkpoints_rotations_and_reopen_preserve_page_delta_bases ... ok
+test listed_base_loss_corruption_identity_and_truncation_are_rejected ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 45.77s
+
+     Running tests/durable_base_sigkill.rs (/Users/namse/fn0-dodb-durable-bases/target/debug/deps/durable_base_sigkill-b9d858ed77cdecf5)
+
+running 2 tests
+test durable_base_checkpoint_child ... ok
+
+running 1 test
+test sigkill_checkpoint_boundaries_recover_acknowledged_state_and_checkpoint_again ... FAILED
+
+failures:
+
+---- sigkill_checkpoint_boundaries_recover_acknowledged_state_and_checkpoint_again stdout ----
+
+thread 'sigkill_checkpoint_boundaries_recover_acknowledged_state_and_checkpoint_again' (429655847) panicked at dodb/crates/dodb-storage/tests/durable_base_sigkill.rs:33:6:
+called `Result::unwrap()` on an `Err` value: Corruption("checkpoint page-base coverage is incomplete")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    sigkill_checkpoint_boundaries_recover_acknowledged_state_and_checkpoint_again
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+error: test failed, to rerun pass `-p dodb-storage --test durable_base_sigkill`

@@ -1,0 +1,16 @@
+{
+  "source_sha": "7c048e2595b21b0597ca0477760fa56649f2521e",
+  "files": 113,
+  "uncompressed_bytes": 14212675,
+  "archive": "blink-durable-bases-20261023-evidence.tar.gz",
+  "archive_bytes": 874348,
+  "sha256": "808de61f7318d8493db8d6bfdf7627c3c7829a188242c570ed723dce6d70ced6",
+  "inventory_verified": true,
+  "excluded": [
+    "bin",
+    "databases",
+    "source",
+    "test-databases"
+  ],
+  "failed_databases_remain_on_host": true
+}

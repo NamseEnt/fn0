@@ -1,0 +1,299 @@
+    Checking dodb-core v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-core)
+    Checking dodb-service v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-service)
+    Checking dodb-storage v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-storage)
+    Checking dodb-protocol v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-protocol)
+warning: this function has too many arguments (8/7)
+  --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:50:5
+   |
+50 | /     pub(crate) fn create(
+51 | |         database_path: &Path,
+52 | |         identity: WalIdentity,
+53 | |         root_page_id: PageId,
+...  |
+58 | |         durable_bases: bool,
+59 | |     ) -> Result<Self> {
+   | |_____________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+   = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: this `if` statement can be collapsed
+   --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:974:9
+    |
+974 | /         if let Some(bases) = &self.bases {
+975 | |             if bases.len() > durable_bases::MAX_PACKS
+976 | |                 || bases.last().map_or(Lsn::ZERO, |base| base.checkpoint_lsn) != self.checkpoint_lsn
+977 | |                 || bases.windows(2).any(|pair| {
+...   |
+993 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+    = note: `#[warn(clippy::collapsible_if)]` on by default
+help: collapse nested if block
+    |
+974 ~         if let Some(bases) = &self.bases
+975 ~             && (bases.len() > durable_bases::MAX_PACKS
+976 |                 || bases.last().map_or(Lsn::ZERO, |base| base.checkpoint_lsn) != self.checkpoint_lsn
+...
+986 |                         || base.bytes != durable_bases::encoded_size(base.page_count)
+987 ~                 }))
+988 |             {
+...
+991 |                 ));
+992 ~             }
+    |
+
+warning: this function has too many arguments (8/7)
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:1421:5
+     |
+1421 | /     fn prepare_catalog_delta<F>(
+1422 | |         &self,
+1423 | |         base: &PageCatalog,
+1424 | |         base_high_water_page_id: PageId,
+...    |
+1431 | |     where
+1432 | |         F: FnMut(PageId) -> Option<Arc<BlinkPage>>,
+     | |___________________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+warning: this `if` statement can be collapsed
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:4046:21
+     |
+4046 | /                     if let MaterializerState::Failed(failure) = &materializer.state {
+4047 | |                         if materializer
+4048 | |                             .checkpoint_may_be_durable
+4049 | |                             .load(Ordering::Acquire)
+...    |
+4053 | |                     }
+     | |_____________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+help: collapse nested if block
+     |
+4046 ~                     if let MaterializerState::Failed(failure) = &materializer.state
+4047 ~                         && materializer
+4048 |                             .checkpoint_may_be_durable
+ ...
+4051 |                             self.broken = Some(failure.clone());
+4052 ~                         }
+     |
+
+warning: this `if` statement can be collapsed
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:4090:21
+     |
+4090 | /                     if let MaterializerState::Failed(failure) = &materializer.state {
+4091 | |                         if materializer
+4092 | |                             .checkpoint_may_be_durable
+4093 | |                             .load(Ordering::Acquire)
+...    |
+4097 | |                     }
+     | |_____________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+help: collapse nested if block
+     |
+4090 ~                     if let MaterializerState::Failed(failure) = &materializer.state
+4091 ~                         && materializer
+4092 |                             .checkpoint_may_be_durable
+ ...
+4095 |                             self.broken = Some(failure.clone());
+4096 ~                         }
+     |
+
+warning: this function has too many arguments (9/7)
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:5845:1
+     |
+5845 | / fn prepare_planned_serial_execution<'a>(
+5846 | |     state: &'a BlinkState,
+5847 | |     plan: &BatchPlan,
+5848 | |     allow_page_reuse: bool,
+...    |
+5854 | |     batch_metrics: &mut BlinkBatchMetrics,
+5855 | | ) -> Result<PlannedExecutionPreparation<'a>> {
+     | |____________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+warning: derefed type is same as origin
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:6377:35
+     |
+6377 |             if let Some(budget) = budget.as_deref_mut() {
+     |                                   ^^^^^^^^^^^^^^^^^^^^^ help: try: `budget`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_option_as_deref
+     = note: `#[warn(clippy::needless_option_as_deref)]` on by default
+
+warning: redundant slicing of the whole range
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:6492:43
+     |
+6492 |                     .is_some_and(|cursor| &entry.key[..] <= cursor)
+     |                                           ^^^^^^^^^^^^^^ help: use the original value instead: `entry.key`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#redundant_slicing
+     = note: `#[warn(clippy::redundant_slicing)]` on by default
+
+warning: this function has too many arguments (9/7)
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:7688:1
+     |
+7688 | / fn split_leaf<S: BlinkMutationState>(
+7689 | |     state: &mut S,
+7690 | |     dirty: &mut BTreeSet<PageId>,
+7691 | |     metrics: &mut BlinkSplitMetrics,
+...    |
+7697 | |     revision: Revision,
+7698 | | ) -> Result<()> {
+     | |_______________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+warning: this function has too many arguments (8/7)
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:7730:1
+     |
+7730 | / fn install_separator<S: BlinkMutationState>(
+7731 | |     state: &mut S,
+7732 | |     dirty: &mut BTreeSet<PageId>,
+7733 | |     metrics: &mut BlinkSplitMetrics,
+...    |
+7738 | |     revision: Revision,
+7739 | | ) -> Result<()> {
+     | |_______________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+warning: this function has too many arguments (10/7)
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:7840:1
+     |
+7840 | / fn split_internal<S: BlinkMutationState>(
+7841 | |     state: &mut S,
+7842 | |     dirty: &mut BTreeSet<PageId>,
+7843 | |     metrics: &mut BlinkSplitMetrics,
+...    |
+7850 | |     revision: Revision,
+7851 | | ) -> Result<(Vec<u8>, PageId)> {
+     | |______________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+warning: this function has too many arguments (8/7)
+   --> dodb/crates/dodb-storage/src/wal.rs:562:5
+    |
+562 | /     pub(crate) fn open_with_segment_boundary(
+563 | |         file: F,
+564 | |         identity: WalIdentity,
+565 | |         page_image_format: WalPageImageFormat,
+...   |
+570 | |         injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+571 | |     ) -> Result<Self> {
+    | |_____________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+warning: this function has too many arguments (9/7)
+   --> dodb/crates/dodb-storage/src/wal.rs:585:5
+    |
+585 | /     pub(crate) fn open_with_segment_bases(
+586 | |         mut file: F,
+587 | |         identity: WalIdentity,
+588 | |         page_image_format: WalPageImageFormat,
+...   |
+594 | |         mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+595 | |     ) -> Result<Self> {
+    | |_____________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+warning: this function has too many arguments (8/7)
+    --> dodb/crates/dodb-storage/src/wal.rs:3155:1
+     |
+3155 | / fn append_frame_direct(
+3156 | |     output: &mut Vec<u8>,
+3157 | |     format_version: u16,
+3158 | |     record_type: WalRecordType,
+...    |
+3163 | |     attribution: &mut WalEncodeAttribution,
+3164 | | ) -> Result<usize> {
+     | |__________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+warning: this function has too many arguments (10/7)
+    --> dodb/crates/dodb-storage/src/wal.rs:3185:1
+     |
+3185 | / fn append_frame_parts_direct(
+3186 | |     output: &mut Vec<u8>,
+3187 | |     format_version: u16,
+3188 | |     record_type: WalRecordType,
+...    |
+3195 | |     attribution: &mut WalEncodeAttribution,
+3196 | | ) -> Result<usize> {
+     | |__________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+warning: `dodb-storage` (lib) generated 15 warnings (run `cargo clippy --fix --lib -p dodb-storage -- ` to apply 5 suggestions)
+    Checking dodb-server v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-server)
+warning: this `if` statement can be collapsed
+    --> dodb/crates/dodb-server/src/lib.rs:1876:9
+     |
+1876 | /         if let Ok(failed) = self.failed_message.lock() {
+1877 | |             if let Some(message) = failed.as_ref() {
+1878 | |                 return Err(Error::durability(message.clone()));
+1879 | |             }
+1880 | |         }
+     | |_________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+     = note: `#[warn(clippy::collapsible_if)]` on by default
+help: collapse nested if block
+     |
+1876 ~         if let Ok(failed) = self.failed_message.lock()
+1877 ~             && let Some(message) = failed.as_ref() {
+1878 |                 return Err(Error::durability(message.clone()));
+1879 ~             }
+     |
+
+warning: this `if` statement can be collapsed
+    --> dodb/crates/dodb-server/src/lib.rs:1893:13
+     |
+1893 | /             if matches!(error, tokio::sync::mpsc::error::TrySendError::Closed(_)) {
+1894 | |                 if let Ok(failed) = self.failed_message.lock() {
+1895 | |                     if let Some(message) = failed.as_ref() {
+1896 | |                         return Err(Error::durability(message.clone()));
+...    |
+1899 | |             }
+     | |_____________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+help: collapse nested if block
+     |
+1893 ~             if matches!(error, tokio::sync::mpsc::error::TrySendError::Closed(_))
+1894 ~                 && let Ok(failed) = self.failed_message.lock() {
+1895 |                     if let Some(message) = failed.as_ref() {
+1896 |                         return Err(Error::durability(message.clone()));
+1897 |                     }
+1898 ~                 }
+     |
+
+warning: this `if` statement can be collapsed
+    --> dodb/crates/dodb-server/src/lib.rs:1894:17
+     |
+1894 | /                 if let Ok(failed) = self.failed_message.lock() {
+1895 | |                     if let Some(message) = failed.as_ref() {
+1896 | |                         return Err(Error::durability(message.clone()));
+1897 | |                     }
+1898 | |                 }
+     | |_________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+help: collapse nested if block
+     |
+1894 ~                 if let Ok(failed) = self.failed_message.lock()
+1895 ~                     && let Some(message) = failed.as_ref() {
+1896 |                         return Err(Error::durability(message.clone()));
+1897 ~                     }
+     |
+
+warning: `dodb-server` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p dodb-server -- ` to apply 3 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.82s

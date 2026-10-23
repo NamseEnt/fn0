@@ -1,0 +1,195 @@
+   Compiling pin-project-lite v0.2.16
+   Compiling libc v0.2.185
+   Compiling cfg-if v1.0.4
+   Compiling bytes v1.11.1
+   Compiling dodb-core v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-core)
+   Compiling libmimalloc-sys v0.1.49
+   Compiling crc32c v0.6.8
+   Compiling rustix v1.1.4
+   Compiling getrandom v0.4.2
+   Compiling bitflags v2.13.1
+   Compiling autocfg v1.5.0
+   Compiling mimalloc v0.1.52
+   Compiling zerocopy v0.8.31
+   Compiling errno v0.3.14
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.2
+   Compiling signal-hook-registry v1.4.8
+   Compiling getrandom v0.3.4
+   Compiling num-traits v0.2.19
+   Compiling once_cell v1.21.3
+   Compiling tokio v1.53.1
+   Compiling rand_core v0.9.5
+   Compiling fastrand v2.3.0
+   Compiling wait-timeout v0.2.1
+   Compiling bit-vec v0.8.0
+   Compiling fnv v1.0.7
+   Compiling ppv-lite86 v0.2.21
+   Compiling quick-error v1.2.3
+   Compiling bit-set v0.8.0
+   Compiling rand v0.9.2
+   Compiling rand_chacha v0.9.0
+   Compiling rand_xorshift v0.4.0
+   Compiling unarray v0.1.4
+   Compiling regex-syntax v0.8.8
+   Compiling tempfile v3.27.0
+   Compiling rusty-fork v0.3.1
+   Compiling proptest v1.11.0
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-storage)
+warning: type `BasePackJob` is more private than the item `SegmentedWal::base_job`
+   --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:263:5
+    |
+263 |     pub(crate) fn base_job(&self, dirty_count: usize, live_count: usize) -> Option<BasePackJob> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ method `SegmentedWal::base_job` is reachable at visibility `pub(crate)`
+    |
+note: but type `BasePackJob` is only usable at visibility `pub(in crate::blink)`
+   --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:20:1
+    |
+ 20 | pub(super) struct BasePackJob {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: type `BasePackOutput` is more private than the item `SegmentedWal::advance_checkpoint_with_base`
+   --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:458:5
+    |
+458 | /     pub(crate) fn advance_checkpoint_with_base(
+459 | |         &mut self,
+460 | |         superblock: &super::BlinkSuperblock,
+461 | |         base: Option<&BasePackOutput>,
+462 | |         mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+463 | |     ) -> Result<(u64, u64)> {
+    | |___________________________^ method `SegmentedWal::advance_checkpoint_with_base` is reachable at visibility `pub(crate)`
+    |
+note: but type `BasePackOutput` is only usable at visibility `pub(in crate::blink)`
+   --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:29:1
+    |
+ 29 | pub(super) struct BasePackOutput {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `dodb-storage` (lib) generated 2 warnings
+error[E0599]: no method named `unwrap` found for struct `Revision` in the current scope
+   --> dodb/crates/dodb-storage/tests/durable_base_checkpoint.rs:239:56
+    |
+239 |     let prior = store.get(&key(1)).unwrap().revision().unwrap();
+    |                       ------------                     ^^^^^^ method not found in `Revision`
+    |                       |
+    |                       method `unwrap` is available on `Result<RevisionState, dodb_core::Error>`
+
+error[E0308]: mismatched types
+   --> dodb/crates/dodb-storage/tests/durable_base_checkpoint.rs:247:43
+    |
+247 |     assert_eq!(expected_first.revision(), transaction.revision);
+    |                                           ^^^^^^^^^^^^^^^^^^^^ expected `Revision`, found `Option<Revision>`
+    |
+    = note: expected struct `Revision`
+                 found enum `Option<Revision>`
+help: consider using `Option::expect` to unwrap the `Option<Revision>` value, panicking if the value is an `Option::None`
+    |
+247 |     assert_eq!(expected_first.revision(), transaction.revision.expect("REASON"));
+    |                                                               +++++++++++++++++
+
+error[E0308]: mismatched types
+   --> dodb/crates/dodb-storage/tests/durable_base_checkpoint.rs:248:44
+    |
+248 |     assert_eq!(expected_second.revision(), transaction.revision);
+    |                                            ^^^^^^^^^^^^^^^^^^^^ expected `Revision`, found `Option<Revision>`
+    |
+    = note: expected struct `Revision`
+                 found enum `Option<Revision>`
+help: consider using `Option::expect` to unwrap the `Option<Revision>` value, panicking if the value is an `Option::None`
+    |
+248 |     assert_eq!(expected_second.revision(), transaction.revision.expect("REASON"));
+    |                                                                +++++++++++++++++
+
+Some errors have detailed explanations: E0308, E0599.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `dodb-storage` (test "durable_base_checkpoint") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+warning: constant `BASE_SEED` is never used
+ --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:4:11
+  |
+4 | pub const BASE_SEED: u64 = 979_000_000;
+  |           ^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `SEED_STRIDE` is never used
+ --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:5:11
+  |
+5 | pub const SEED_STRIDE: u64 = 1_009;
+  |           ^^^^^^^^^^^
+
+warning: variants `SameLeafHeavy`, `DifferentLeafHeavy`, and `Hotspot` are never constructed
+  --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:14:5
+   |
+12 | pub enum Distribution {
+   |          ------------ variants in this enum
+13 |     Uniform,
+14 |     SameLeafHeavy,
+   |     ^^^^^^^^^^^^^
+15 |     DifferentLeafHeavy,
+   |     ^^^^^^^^^^^^^^^^^^
+16 |     Hotspot,
+   |     ^^^^^^^
+   |
+   = note: `Distribution` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: associated items `parse`, `as_str`, and `report_name` are never used
+  --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:51:12
+   |
+50 | impl Distribution {
+   | ----------------- associated items in this implementation
+51 |     pub fn parse(value: &str) -> Self {
+   |            ^^^^^
+...
+61 |     pub fn as_str(self) -> &'static str {
+   |            ^^^^^^
+...
+70 |     pub fn report_name(self) -> &'static str {
+   |            ^^^^^^^^^^^
+
+warning: method `next_read_key` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:163:12
+    |
+112 | impl WorkloadGenerator {
+    | ---------------------- method in this implementation
+...
+163 |     pub fn next_read_key(&mut self) -> Vec<u8> {
+    |            ^^^^^^^^^^^^^
+
+warning: function `invocation_seed` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:258:8
+    |
+258 | pub fn invocation_seed(scenario_index: u64, repetition_index: u64) -> u64 {
+    |        ^^^^^^^^^^^^^^^
+
+warning: struct `TraceHash` is never constructed
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:566:12
+    |
+566 | pub struct TraceHash {
+    |            ^^^^^^^^^
+
+warning: associated items `new`, `absorb`, and `push_transaction` are never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:572:12
+    |
+571 | impl TraceHash {
+    | -------------- associated items in this implementation
+572 |     pub fn new() -> Self {
+    |            ^^^
+...
+579 |     fn absorb(&mut self, bytes: &[u8]) {
+    |        ^^^^^^
+...
+586 |     pub fn push_transaction<'a>(
+    |            ^^^^^^^^^^^^^^^^
+
+warning: method `merge` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:638:12
+    |
+616 | impl LatencySamples {
+    | ------------------- method in this implementation
+...
+638 |     pub fn merge(&mut self, other: Self) {
+    |            ^^^^^
+
+warning: `dodb-storage` (bin "blink-fixed-group-bench") generated 9 warnings

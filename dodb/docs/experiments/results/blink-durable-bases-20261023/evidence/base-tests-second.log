@@ -1,0 +1,158 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-storage)
+warning: type `BasePackJob` is more private than the item `SegmentedWal::base_job`
+   --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:283:5
+    |
+283 |     pub(crate) fn base_job(&self, dirty_count: usize, live_count: usize) -> Option<BasePackJob> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ method `SegmentedWal::base_job` is reachable at visibility `pub(crate)`
+    |
+note: but type `BasePackJob` is only usable at visibility `pub(in crate::blink)`
+   --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:20:1
+    |
+ 20 | pub(super) struct BasePackJob {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: type `BasePackOutput` is more private than the item `SegmentedWal::advance_checkpoint_with_base`
+   --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:487:5
+    |
+487 | /     pub(crate) fn advance_checkpoint_with_base(
+488 | |         &mut self,
+489 | |         superblock: &super::BlinkSuperblock,
+490 | |         base: Option<&BasePackOutput>,
+491 | |         mut injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+492 | |     ) -> Result<(u64, u64)> {
+    | |___________________________^ method `SegmentedWal::advance_checkpoint_with_base` is reachable at visibility `pub(crate)`
+    |
+note: but type `BasePackOutput` is only usable at visibility `pub(in crate::blink)`
+   --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:29:1
+    |
+ 29 | pub(super) struct BasePackOutput {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `dodb-storage` (lib) generated 2 warnings
+warning: variable does not need to be mutable
+   --> dodb/crates/dodb-storage/tests/durable_base_checkpoint.rs:271:9
+    |
+271 |     let mut file = fs::OpenOptions::new()
+    |         ----^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `BASE_SEED` is never used
+ --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:4:11
+  |
+4 | pub const BASE_SEED: u64 = 979_000_000;
+  |           ^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `SEED_STRIDE` is never used
+ --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:5:11
+  |
+5 | pub const SEED_STRIDE: u64 = 1_009;
+  |           ^^^^^^^^^^^
+
+warning: variants `SameLeafHeavy`, `DifferentLeafHeavy`, and `Hotspot` are never constructed
+  --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:14:5
+   |
+12 | pub enum Distribution {
+   |          ------------ variants in this enum
+13 |     Uniform,
+14 |     SameLeafHeavy,
+   |     ^^^^^^^^^^^^^
+15 |     DifferentLeafHeavy,
+   |     ^^^^^^^^^^^^^^^^^^
+16 |     Hotspot,
+   |     ^^^^^^^
+   |
+   = note: `Distribution` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: associated items `parse`, `as_str`, and `report_name` are never used
+  --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:51:12
+   |
+50 | impl Distribution {
+   | ----------------- associated items in this implementation
+51 |     pub fn parse(value: &str) -> Self {
+   |            ^^^^^
+...
+61 |     pub fn as_str(self) -> &'static str {
+   |            ^^^^^^
+...
+70 |     pub fn report_name(self) -> &'static str {
+   |            ^^^^^^^^^^^
+
+warning: method `next_read_key` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:163:12
+    |
+112 | impl WorkloadGenerator {
+    | ---------------------- method in this implementation
+...
+163 |     pub fn next_read_key(&mut self) -> Vec<u8> {
+    |            ^^^^^^^^^^^^^
+
+warning: function `invocation_seed` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:258:8
+    |
+258 | pub fn invocation_seed(scenario_index: u64, repetition_index: u64) -> u64 {
+    |        ^^^^^^^^^^^^^^^
+
+warning: struct `TraceHash` is never constructed
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:566:12
+    |
+566 | pub struct TraceHash {
+    |            ^^^^^^^^^
+
+warning: associated items `new`, `absorb`, and `push_transaction` are never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:572:12
+    |
+571 | impl TraceHash {
+    | -------------- associated items in this implementation
+572 |     pub fn new() -> Self {
+    |            ^^^
+...
+579 |     fn absorb(&mut self, bytes: &[u8]) {
+    |        ^^^^^^
+...
+586 |     pub fn push_transaction<'a>(
+    |            ^^^^^^^^^^^^^^^^
+
+warning: method `merge` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:638:12
+    |
+616 | impl LatencySamples {
+    | ------------------- method in this implementation
+...
+638 |     pub fn merge(&mut self, other: Self) {
+    |            ^^^^^
+
+warning: `dodb-storage` (bin "blink-fixed-group-bench") generated 9 warnings
+warning: `dodb-storage` (test "durable_base_checkpoint") generated 1 warning (run `cargo fix --test "durable_base_checkpoint" -p dodb-storage` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.21s
+     Running tests/durable_base_checkpoint.rs (/Users/namse/fn0-dodb-durable-bases/target/debug/deps/durable_base_checkpoint-0624cfc94597167f)
+
+running 7 tests
+test experimental_and_existing_layouts_never_convert_implicitly ... ok
+test checkpoint_failures_preserve_acknowledged_writes_and_allow_write_then_second_recovery ... FAILED
+test incomplete_transaction_tail_can_be_recovered_written_and_recovered_again ... ok
+test conditional_multikey_deletes_and_reuse_survive_base_replacement ... ok
+test immutable_packs_reuse_cold_pages_and_consolidate_with_bounded_generation_count ... ok
+test checkpoints_rotations_and_reopen_preserve_page_delta_bases ... ok
+test listed_base_loss_corruption_identity_and_truncation_are_rejected ... ok
+
+failures:
+
+---- checkpoint_failures_preserve_acknowledged_writes_and_allow_write_then_second_recovery stdout ----
+
+thread 'checkpoint_failures_preserve_acknowledged_writes_and_allow_write_then_second_recovery' (429646601) panicked at dodb/crates/dodb-storage/tests/durable_base_checkpoint.rs:168:9:
+before_checkpoint_manifest_publish
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    checkpoint_failures_preserve_acknowledged_writes_and_allow_write_then_second_recovery
+
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 52.58s
+
+error: test failed, to rerun pass `-p dodb-storage --test durable_base_checkpoint`

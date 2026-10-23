@@ -1,0 +1,36 @@
+{
+  "root": "/bench/zfs/db/blink-durable-bases-20261023",
+  "files": [
+    {
+      "path": "preflight/databases/E-bases-sync-r1/blink/tenant-1-shard-1.db",
+      "size_bytes": 12288,
+      "sha256": "2db9b05c33cda645c2aa41caf1b4e131251e094f47a542ea24f005373f1a9558"
+    },
+    {
+      "path": "preflight/databases/E-bases-sync-r1/blink/tenant-1-shard-1.db.segments/base-00000000000000000001.pages",
+      "size_bytes": 131084292,
+      "sha256": "2df666a06b897db63609ec208a8767e5cf692ea625f0b4d488f445f17b68c382"
+    },
+    {
+      "path": "preflight/databases/E-bases-sync-r1/blink/tenant-1-shard-1.db.segments/base-00000000000000000002.pages",
+      "size_bytes": 131088388,
+      "sha256": "9f443a26f453e7d3450f10cc1d6367d0472a842e6d311d2e978184f2e81200e3"
+    },
+    {
+      "path": "preflight/databases/E-bases-sync-r1/blink/tenant-1-shard-1.db.segments/base-00000000000000000003.pages",
+      "size_bytes": 5857284,
+      "sha256": "092767fbbb489c81157953f566d24c36ab69867e96f11c865f43f5429a4cdd3c"
+    },
+    {
+      "path": "preflight/databases/E-bases-sync-r1/blink/tenant-1-shard-1.db.segments/segment-00000000000000000010.wal",
+      "size_bytes": 104,
+      "sha256": "b08defe4eb03ca8c5286aa82b9211e71c246d915eb3694ea7119946cca212d27"
+    },
+    {
+      "path": "preflight/databases/E-bases-sync-r1/blink/tenant-1-shard-1.db.segments.manifest",
+      "size_bytes": 300,
+      "sha256": "d66dccbac52210d152626c8489e64d3f6a7d0956dad345e7bfe571389f2ea583"
+    }
+  ],
+  "unchanged_during_hashing": true
+}

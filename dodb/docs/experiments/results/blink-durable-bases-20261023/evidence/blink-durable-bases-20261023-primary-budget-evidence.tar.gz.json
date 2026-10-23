@@ -1,0 +1,16 @@
+{
+  "source_sha": "400ad0ac6b7d8e6306bcb2ab7946747bddcb06c4",
+  "files": 608,
+  "uncompressed_bytes": 321275178,
+  "archive": "blink-durable-bases-20261023-primary-budget-evidence.tar.gz",
+  "archive_bytes": 20543113,
+  "sha256": "2960f164a80361c5bb6b295434b6d76b817085d0548ac5751bf5c9549742cfae",
+  "inventory_verified": true,
+  "excluded": [
+    "bin",
+    "databases",
+    "source",
+    "test-databases"
+  ],
+  "failed_databases_remain_on_host": true
+}

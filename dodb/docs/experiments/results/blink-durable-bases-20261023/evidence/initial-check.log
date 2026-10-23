@@ -1,0 +1,55 @@
+   Compiling libc v0.2.185
+   Compiling proc-macro2 v1.0.105
+   Compiling shlex v1.3.0
+   Compiling find-msvc-tools v0.1.14
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.45
+   Compiling semver v1.0.27
+    Checking pin-project-lite v0.2.16
+   Compiling cc v1.2.55
+   Compiling rustc_version v0.4.1
+    Checking bytes v1.11.1
+    Checking dodb-core v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-core)
+   Compiling crc32c v0.6.8
+   Compiling libmimalloc-sys v0.1.49
+   Compiling syn v3.0.3
+    Checking errno v0.3.14
+    Checking socket2 v0.6.5
+    Checking mio v1.2.2
+   Compiling tokio-macros v2.7.2
+    Checking signal-hook-registry v1.4.8
+    Checking tokio v1.53.1
+    Checking mimalloc v0.1.52
+    Checking dodb-storage v0.1.0 (/Users/namse/fn0-dodb-durable-bases/dodb/crates/dodb-storage)
+error[E0063]: missing fields `base_bytes_reclaimed`, `base_bytes_retained`, `base_bytes_written` and 2 other fields in initializer of `blink::BlinkCheckpointReport`
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:3833:12
+     |
+3833 |         Ok(BlinkCheckpointReport {
+     |            ^^^^^^^^^^^^^^^^^^^^^ missing `base_bytes_reclaimed`, `base_bytes_retained`, `base_bytes_written` and 2 other fields
+
+error[E0063]: missing fields `base_bytes_reclaimed`, `base_bytes_retained`, `base_bytes_written` and 2 other fields in initializer of `blink::BlinkCheckpointReport`
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:3873:31
+     |
+3873 |                     return Ok(BlinkCheckpointReport {
+     |                               ^^^^^^^^^^^^^^^^^^^^^ missing `base_bytes_reclaimed`, `base_bytes_retained`, `base_bytes_written` and 2 other fields
+
+error[E0063]: missing fields `base_bytes_reclaimed`, `base_bytes_retained`, `base_bytes_written` and 2 other fields in initializer of `blink::BlinkCheckpointReport`
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:4286:23
+     |
+4286 |             return Ok(BlinkCheckpointReport {
+     |                       ^^^^^^^^^^^^^^^^^^^^^ missing `base_bytes_reclaimed`, `base_bytes_retained`, `base_bytes_written` and 2 other fields
+
+error[E0063]: missing fields `base_bytes_reclaimed`, `base_bytes_retained`, `base_bytes_written` and 2 other fields in initializer of `blink::BlinkCheckpointReport`
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:4315:23
+     |
+4315 |             return Ok(BlinkCheckpointReport {
+     |                       ^^^^^^^^^^^^^^^^^^^^^ missing `base_bytes_reclaimed`, `base_bytes_retained`, `base_bytes_written` and 2 other fields
+
+error[E0063]: missing fields `base_bytes_reclaimed`, `base_bytes_retained`, `base_bytes_written` and 2 other fields in initializer of `blink::BlinkCheckpointReport`
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:4476:12
+     |
+4476 |         Ok(BlinkCheckpointReport {
+     |            ^^^^^^^^^^^^^^^^^^^^^ missing `base_bytes_reclaimed`, `base_bytes_retained`, `base_bytes_written` and 2 other fields
+
+For more information about this error, try `rustc --explain E0063`.
+error: could not compile `dodb-storage` (lib) due to 5 previous errors

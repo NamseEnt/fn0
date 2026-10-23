@@ -1,0 +1,11 @@
+{
+  "source_sha": "400ad0ac6b7d8e6306bcb2ab7946747bddcb06c4",
+  "candidate": "coalesced-background",
+  "scores": {
+    "bases-sync": 1.109535356175515,
+    "coalesced-background": 1.1785738284420832,
+    "coalesced-sync": 1.170663368390663
+  },
+  "short_summary_sha256": "c1c220de169f27db8db78a7e136fac28f903406bf014c5175f6de6090df540c1",
+  "selection": "maximum throughput-ratio geometric mean; ties within one percentage point prefer lower E p99.9"
+}
