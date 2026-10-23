@@ -102,12 +102,24 @@ fn immutable_packs_reuse_cold_pages_and_consolidate_with_bounded_generation_coun
     store.checkpoint().unwrap();
     let initial_base = manifest(&path).bases.unwrap()[0].number;
     let mut consolidations = 0;
+    let mut clean_page_overlap_checked = false;
     for generation in 0..24 {
         let number = (generation * 7) % 192;
         let value = vec![(generation + 1) as u8; 512];
         let revision = store.put(key(number), value.clone()).unwrap();
         expected.insert(number, RevisionState::Present { value, revision });
-        let report = store.checkpoint().unwrap();
+        let report = if !clean_page_overlap_checked && manifest(&path).bases.unwrap().len() == 8 {
+            let snapshot = store.prepare_segmented_checkpoint().unwrap().unwrap();
+            let value = vec![99; 512];
+            let revision = store.put(key(191), value.clone()).unwrap();
+            expected.insert(191, RevisionState::Present { value, revision });
+            let report = store.complete_segmented_checkpoint(snapshot.run()).unwrap();
+            assert_eq!(report.full_base_snapshots, 1);
+            clean_page_overlap_checked = true;
+            report
+        } else {
+            store.checkpoint().unwrap()
+        };
         consolidations += report.full_base_snapshots;
         let current = manifest(&path);
         let bases = current.bases.unwrap();
@@ -123,6 +135,7 @@ fn immutable_packs_reuse_cold_pages_and_consolidate_with_bounded_generation_coun
         assert!(actual_bytes <= 512 * 1024 * 1024);
     }
     assert!(consolidations > 0);
+    assert!(clean_page_overlap_checked);
     drop(store);
     let mut reopened = open(&path, true);
     verify(&mut reopened, &expected);

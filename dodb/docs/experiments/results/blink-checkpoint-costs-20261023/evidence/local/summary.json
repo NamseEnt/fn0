@@ -1,0 +1,54 @@
+{
+  "implementation_sha": "cc80d1fdc",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--release",
+    "-p",
+    "dodb-storage",
+    "-p",
+    "dodb-server",
+    "--lib",
+    "--test",
+    "durable_base_checkpoint",
+    "--test",
+    "durable_base_sigkill",
+    "--test",
+    "durable_base_background_sigkill",
+    "--test",
+    "background_checkpoint",
+    "--test",
+    "background_checkpoint_sigkill",
+    "--test",
+    "segmented_checkpoint_sigkill",
+    "--test",
+    "segmented_wal_sigkill",
+    "--",
+    "--test-threads=1"
+  ],
+  "suites": 10,
+  "passed": 248,
+  "failed": 0,
+  "ignored": 4,
+  "clippy_existing_baseline_errors": 12,
+  "clippy_candidate_errors": 12,
+  "files": {
+    "dodb-checkpoint-costs-focused.log": "c58f70e80507846456a443c30cf54b512105d40813b0f261f5f265e1108fa191",
+    "dodb-checkpoint-costs-clippy.log": "53e3b1caf6bc2eaae185f2102e0ecaadc61b77ff6dc981c28a70e4a0aea17804",
+    "dodb-checkpoint-costs-clean-page-overlap.log": "67fe9a1fcf72f0d6492658cf12efa2d62da8d0c4fdc6c05de7566a718c6f8ec2",
+    "dodb-checkpoint-costs-baseline-clippy.log": "8657bf85227a642ec25324d6d515b48f5eabb350ed2a7e5985047f63121fad2f",
+    "dodb-checkpoint-costs-release-validation.log": "a67a318487aaa6c6c5c5b678f6c0a3ec545e56523f7315c17eaeb8d534a0e3e4"
+  },
+  "additional_clean_page_overlap_regression": {
+    "passed": 1,
+    "failed": 0,
+    "measured_engine_code_changed": false
+  },
+  "archive": {
+    "name": "local-validation-logs.tar.gz",
+    "sha256": "c0ce3883bf152d706aec2d605cd470268ec9f38ddf52e9b0ec986b0a42e38b2e",
+    "files": 5,
+    "verified": true
+  }
+}

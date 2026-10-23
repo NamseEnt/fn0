@@ -1,0 +1,28 @@
+{
+  "verified": true,
+  "archive_sha256": "1769daa047eee863a7656365e870fb88ec324c59d594642e7e43a38ae4945795",
+  "inventoried_files": 539,
+  "stages": {
+    "preflight": {
+      "cells": 6,
+      "summary_exactly_reproduced": true
+    },
+    "short": {
+      "cells": 18,
+      "summary_exactly_reproduced": true
+    },
+    "sustained": {
+      "cells": 12,
+      "summary_exactly_reproduced": true
+    }
+  },
+  "functional_binaries": 20,
+  "functional_counts": {
+    "passed": 339,
+    "failed": 0,
+    "ignored": 4
+  },
+  "cross_stage_input_prefixes_equal": true,
+  "final_source_and_binary_identities_match": true,
+  "local_raw_logs_verified": 5
+}

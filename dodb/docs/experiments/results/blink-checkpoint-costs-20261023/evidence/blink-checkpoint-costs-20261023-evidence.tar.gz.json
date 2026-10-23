@@ -1,0 +1,16 @@
+{
+  "source_sha": "cc80d1fdc7a98792be1a739056a3013debf39268",
+  "files": 539,
+  "uncompressed_bytes": 292945693,
+  "archive": "blink-checkpoint-costs-20261023-evidence.tar.gz",
+  "archive_bytes": 18647192,
+  "sha256": "1769daa047eee863a7656365e870fb88ec324c59d594642e7e43a38ae4945795",
+  "inventory_verified": true,
+  "excluded": [
+    "bin",
+    "databases",
+    "source",
+    "test-databases"
+  ],
+  "failed_databases_remain_on_host": true
+}
