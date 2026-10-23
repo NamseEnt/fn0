@@ -10,6 +10,7 @@ pub struct BlinkCheckpointSnapshot {
     token: Arc<()>,
     file: Box<dyn DurableFile + Send>,
     pages: BTreeMap<PageId, Arc<[u8; PAGE_SIZE]>>,
+    decoded_pages: BTreeMap<PageId, Arc<BlinkPage>>,
     dirty_superblock: Option<[u8; PAGE_SIZE]>,
     source_slot: SuperblockSlot,
     superblock: BlinkSuperblock,
@@ -36,8 +37,11 @@ impl BlinkCheckpointOutput {
 
 impl BlinkCheckpointSnapshot {
     pub fn retained_bytes(&self) -> u64 {
-        (self.pages.len() as u64 + u64::from(self.dirty_superblock.is_some()) + 1)
-            .saturating_mul(PAGE_SIZE as u64)
+        (self.pages.len() as u64
+            + self.decoded_pages.len() as u64
+            + u64::from(self.dirty_superblock.is_some())
+            + 1)
+        .saturating_mul(PAGE_SIZE as u64)
     }
 
     pub fn checkpoint_lsn(&self) -> Lsn {
@@ -51,7 +55,14 @@ impl BlinkCheckpointSnapshot {
     pub fn run(mut self) -> Result<BlinkCheckpointOutput> {
         let mut injector = self.injector.take();
         if let Some(job) = self.base_job.take() {
-            let base = job.run(&self.pages, &mut injector)?;
+            let encoding_started = Instant::now();
+            for (page_id, page) in std::mem::take(&mut self.decoded_pages) {
+                self.pages
+                    .insert(page_id, Arc::new(encode_blink_page(page_id, &page)?));
+            }
+            let encoding_nanos = elapsed_nanos(encoding_started);
+            let mut base = job.run(&self.pages, &mut injector)?;
+            base.phase_timings[0] = base.phase_timings[0].saturating_add(encoding_nanos);
             return Ok(BlinkCheckpointOutput {
                 token: self.token,
                 superblock: self.superblock.clone(),
@@ -219,22 +230,19 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                 ));
             }
         }
-        let mut pages = if base_job.as_ref().is_some_and(|job| job.complete) {
-            let mut images = self.dirty_pages.clone();
+        let mut decoded_pages = BTreeMap::new();
+        if base_job.as_ref().is_some_and(|job| job.complete) {
             for (page_id, page) in &self.state.pages {
-                if !images.contains_key(page_id) {
-                    images.insert(*page_id, Arc::new(encode_blink_page(*page_id, page)?));
+                if !self.dirty_pages.contains_key(page_id) {
+                    decoded_pages.insert(*page_id, Arc::clone(page));
                 }
             }
-            self.dirty_pages.clear();
-            images
-        } else {
-            std::mem::take(&mut self.dirty_pages)
-        };
+        }
         let snapshot = BlinkCheckpointSnapshot {
             token: Arc::new(()),
             file,
-            pages: std::mem::take(&mut pages),
+            pages: std::mem::take(&mut self.dirty_pages),
+            decoded_pages,
             dirty_superblock: self.dirty_superblock.take(),
             source_slot: self.active_slot,
             superblock,
@@ -246,7 +254,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             token: Arc::clone(&snapshot.token),
             retained_bytes: snapshot.retained_bytes(),
             disk_bytes: if snapshot.base_job.is_some() {
-                durable_bases::encoded_size(snapshot.pages.len() as u64)
+                durable_bases::encoded_size(page_count as u64)
             } else {
                 0
             },

@@ -77,6 +77,7 @@ fn checkpoints_rotations_and_reopen_preserve_page_delta_bases() {
         drop(store);
         let mut reopened = open(&path, coalesce);
         verify(&mut reopened, &expected);
+        assert_eq!(fs::read(&path).unwrap(), cache_before);
         let before = reopened.wal_metrics().unwrap().unwrap().redo;
         let value = vec![44; 512];
         let revision = reopened.put(key(90), value.clone()).unwrap();
@@ -228,9 +229,82 @@ fn listed_base_loss_corruption_identity_and_truncation_are_rejected() {
         if variant == "cache" {
             let mut recovered = result.unwrap();
             verify(&mut recovered, &expected);
+            assert_eq!(fs::read(&path).unwrap(), vec![0xaa; 4096]);
         } else {
             assert!(result.is_err(), "{variant}");
         }
+        fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+#[test]
+fn empty_immutable_database_reopens_without_trusting_or_rewriting_the_cache() {
+    let directory = directory("empty-cache");
+    let path = directory.join("tenant.db");
+    drop(open(&path, true));
+    fs::write(&path, [0xaa]).unwrap();
+    let mut store = open(&path, true);
+    assert!(store.get(&key(0)).unwrap().is_missing());
+    assert_eq!(fs::read(&path).unwrap(), [0xaa]);
+    let revision = store.put(key(0), vec![1; 512]).unwrap();
+    drop(store);
+    let mut recovered = open(&path, true);
+    assert_eq!(
+        recovered.get(&key(0)).unwrap(),
+        RevisionState::Present {
+            value: vec![1; 512],
+            revision,
+        }
+    );
+    recovered.checkpoint().unwrap();
+    drop(recovered);
+    drop(open(&path, true));
+    assert_eq!(fs::read(&path).unwrap(), [0xaa]);
+    fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn intermediate_pack_sync_failures_preserve_post_target_writes_and_allow_second_recovery() {
+    for boundary in ["before_base_pack_chunk_sync", "after_base_pack_chunk_sync"] {
+        let directory = directory(boundary);
+        let path = directory.join("tenant.db");
+        let mut store = open(&path, true);
+        let value = vec![7; 9 * 1024 * 1024];
+        let original = store.put(key(0), value.clone()).unwrap();
+        let mut snapshot = store.prepare_segmented_checkpoint().unwrap().unwrap();
+        let latest = store.put(key(1), vec![8; 512]).unwrap();
+        snapshot.set_boxed_fault_injector(Box::new(FailAt(boundary)));
+        assert!(store.complete_segmented_checkpoint(snapshot.run()).is_err());
+        assert!(store.put(key(2), vec![9; 512]).is_err());
+        drop(store);
+        let mut recovered = open(&path, true);
+        assert_eq!(
+            recovered.get(&key(0)).unwrap(),
+            RevisionState::Present {
+                value,
+                revision: original,
+            }
+        );
+        assert_eq!(
+            recovered.get(&key(1)).unwrap(),
+            RevisionState::Present {
+                value: vec![8; 512],
+                revision: latest,
+            }
+        );
+        let last = recovered.put(key(2), vec![9; 512]).unwrap();
+        recovered.checkpoint().unwrap();
+        drop(recovered);
+        let mut verified = open(&path, true);
+        assert_eq!(
+            verified.get(&key(2)).unwrap(),
+            RevisionState::Present {
+                value: vec![9; 512],
+                revision: last,
+            }
+        );
+        verified.check_invariants().unwrap();
+        drop(verified);
         fs::remove_dir_all(directory).unwrap();
     }
 }

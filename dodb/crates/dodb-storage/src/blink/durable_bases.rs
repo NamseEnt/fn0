@@ -7,6 +7,7 @@ const MAGIC: [u8; 8] = *b"DBLKBASE";
 const HEADER_SIZE: usize = PAGE_SIZE;
 const RECORD_SIZE: usize = PAGE_SIZE;
 pub(super) const MAX_PACKS: usize = 8;
+const SYNC_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BasePackEntry {
@@ -81,6 +82,8 @@ impl BasePackJob {
         file.write_all(&header)?;
         let mut checksum = crc32c::crc32c(&header);
         let mut write_calls = 1;
+        let mut unsynced_bytes = HEADER_SIZE;
+        let mut sync_nanos = 0u64;
         let capacity = RECORD_SIZE * if self.coalesce { 64 } else { 1 };
         let mut buffer = Vec::with_capacity(capacity);
         for image in pages.values() {
@@ -90,9 +93,18 @@ impl BasePackJob {
             if buffer.len() == capacity {
                 checksum = crc32c::crc32c_append(checksum, &buffer);
                 file.write_all(&buffer)?;
+                unsynced_bytes += buffer.len();
                 buffer.clear();
                 write_calls += 1;
                 hit(injector, "after_checkpoint_page_write")?;
+                if unsynced_bytes >= SYNC_BYTES {
+                    hit(injector, "before_base_pack_chunk_sync")?;
+                    let sync_started = Instant::now();
+                    file.sync_data()?;
+                    sync_nanos = sync_nanos.saturating_add(elapsed_nanos(sync_started));
+                    unsynced_bytes = 0;
+                    hit(injector, "after_base_pack_chunk_sync")?;
+                }
             }
         }
         if !buffer.is_empty() {
@@ -103,12 +115,12 @@ impl BasePackJob {
         }
         file.write_all(&checksum.to_le_bytes())?;
         write_calls += 1;
-        let page_nanos = elapsed_nanos(page_started);
+        let page_nanos = elapsed_nanos(page_started).saturating_sub(sync_nanos);
         hit(injector, "before_checkpoint_data_sync")?;
         hit(injector, "before_base_pack_sync")?;
         let sync_started = Instant::now();
         file.sync_all()?;
-        let sync_nanos = elapsed_nanos(sync_started);
+        sync_nanos = sync_nanos.saturating_add(elapsed_nanos(sync_started));
         hit(injector, "after_base_pack_sync")?;
         hit(injector, "after_checkpoint_data_sync")?;
         let directory_started = Instant::now();

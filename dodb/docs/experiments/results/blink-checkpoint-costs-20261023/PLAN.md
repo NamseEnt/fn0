@@ -13,7 +13,7 @@ Start from `e13910390` (measured implementation `400ad0ac6`). Keep that checkout
 1. Load the validated checkpoint/WAL recovery images directly into the existing in-memory tree. Preserve manifest-selected metadata, superblock identity checks, complete allocated-page coverage, normal page decoding, invariant checks, revision allocation, and post-checkpoint dirty tracking. Do not rewrite and reread the disposable primary cache on immutable-base reopen. Ordinary segmented and legacy recovery stay on their existing paths.
 2. Retain immutable decoded page references for full checkpoint snapshots and perform missing page-image encoding in the checkpoint worker. Dirty images and the fixed target remain authoritative; later mutations cannot alter captured pages. Preserve snapshot-memory admission and terminal error behavior.
 3. Bound the amount written between immutable-pack synchronization calls. Intermediate syncs affect only an unpublished new file; the final pack checksum, file sync, directory sync, manifest publication, and reclamation ordering remain intact. Initially evaluate an 8 MiB write quantum. Add fault coverage at intermediate sync boundaries.
-4. Add separate opening and final-state-oracle timings if the current drivers combine them, while retaining the combined metric and complete latency accounting.
+4. Retain combined reopen plus final-state-oracle timing. Inspection shows that the service opens shards lazily during reads; constructor timing alone would incorrectly exclude recovery. Do not label the combined metric as pure redo time or change oracle traffic just to separate it.
 
 ## Correctness gates
 

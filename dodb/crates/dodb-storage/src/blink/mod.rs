@@ -1981,12 +1981,6 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             if !durable_bases {
                 validate_segmented_database_identity(&mut file, &recovery_pages, &config)?;
             }
-            recover_segmented_data_file(
-                &mut file,
-                &recovery_pages,
-                segmented_wal.manifest(),
-                &config,
-            )?;
             let recovered_dirty = if durable_bases {
                 recovery_pages
                     .iter()
@@ -1999,9 +1993,23 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             } else {
                 BTreeMap::new()
             };
-            drop(recovery_pages);
-            let (mut store, _) =
-                BlinkStore::<ProductionFile, ProductionFile>::load_file(file, config)?;
+            let mut store = if durable_bases {
+                BlinkStore::<ProductionFile, ProductionFile>::load_base_images(
+                    file,
+                    config,
+                    segmented_wal.manifest(),
+                    recovery_pages,
+                )?
+            } else {
+                recover_segmented_data_file(
+                    &mut file,
+                    &recovery_pages,
+                    segmented_wal.manifest(),
+                    &config,
+                )?;
+                drop(recovery_pages);
+                BlinkStore::<ProductionFile, ProductionFile>::load_file(file, config)?.0
+            };
             store.dirty_pages = recovered_dirty;
             store.next_lsn = segmented_wal.next_lsn();
             store.next_batch_id = segmented_wal.next_batch_id();
@@ -2040,6 +2048,74 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         store.segmented_wal = Some(segmented_wal);
         store.planned_execution = true;
         Ok(store)
+    }
+
+    fn load_base_images(
+        file: F,
+        config: DatabaseConfig,
+        manifest: &segmented_wal::SegmentedWalManifest,
+        mut images: BTreeMap<PageId, RecoveredWalPage>,
+    ) -> Result<Self> {
+        let mut superblock = BlinkSuperblock::new(&config, manifest.root_page_id);
+        superblock.free_list_head = manifest.free_list_head;
+        superblock.high_water_page_id = manifest.high_water_page_id;
+        if let Some(page) = [PageId::ZERO, PageId::new(1)]
+            .iter()
+            .filter_map(|page_id| images.get(page_id))
+            .max_by_key(|page| page.commit_lsn)
+        {
+            superblock = decode_blink_superblock_image(&page.image[..])?;
+        }
+        superblock.generation = superblock
+            .generation
+            .max(manifest.generation)
+            .checked_add(1)
+            .ok_or_else(|| Error::invariant("experimental superblock generation exhausted"))?;
+        superblock.checkpoint_lsn = manifest.checkpoint_lsn;
+        superblock.checkpoint_sequence = manifest.checkpoint_lsn.get();
+        if superblock.database_uuid != config.database_uuid
+            || superblock.tenant_id != config.tenant_id
+            || superblock.shard_id != config.shard_id
+            || superblock.shard_epoch != config.shard_epoch
+        {
+            return Err(Error::corruption(
+                "experimental superblock identity mismatch",
+            ));
+        }
+        let mut pages = BTreeMap::new();
+        for page_number in FIRST_DATA_PAGE..=superblock.high_water_page_id.get() {
+            let page_id = PageId::new(page_number);
+            let page = match images.remove(&page_id) {
+                Some(page) => decode_blink_page(&page.image[..], page_id)?,
+                None if manifest.checkpoint_lsn == Lsn::ZERO
+                    && page_number == FIRST_DATA_PAGE
+                    && superblock.high_water_page_id.get() == FIRST_DATA_PAGE =>
+                {
+                    BlinkPage::Leaf {
+                        lsn: Lsn::ZERO,
+                        high_key: None,
+                        right_sibling: None,
+                        entries: LeafEntries::default(),
+                    }
+                }
+                None => {
+                    return Err(Error::corruption(
+                        "recovered page-base coverage is incomplete",
+                    ));
+                }
+            };
+            pages.insert(page_id, Arc::new(page));
+        }
+        if images
+            .keys()
+            .any(|page_id| page_id.get() >= FIRST_DATA_PAGE)
+        {
+            return Err(Error::corruption(
+                "recovered page exceeds the allocated range",
+            ));
+        }
+        Self::load_decoded_pages(file, config, superblock, SuperblockSlot::A, pages, true)
+            .map(|loaded| loaded.0)
     }
 
     fn open_internal(
@@ -2197,6 +2273,17 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             let bytes = read_exact_at(&mut file, id * PAGE_SIZE as u64, PAGE_SIZE)?;
             pages.insert(page_id, Arc::new(decode_blink_page(&bytes, page_id)?));
         }
+        Self::load_decoded_pages(file, config, sb, active_slot, pages, validate)
+    }
+
+    fn load_decoded_pages(
+        file: F,
+        config: DatabaseConfig,
+        sb: BlinkSuperblock,
+        active_slot: SuperblockSlot,
+        pages: BTreeMap<PageId, Arc<BlinkPage>>,
+        validate: bool,
+    ) -> Result<(Self, BlinkSuperblock)> {
         let state = BlinkState {
             pages,
             root_page_id: sb.root_page_id,

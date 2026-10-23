@@ -20,7 +20,14 @@ fn key(sequence: u64) -> DocumentKey {
 }
 
 fn expected_value(sequence: u64) -> Vec<u8> {
-    vec![sequence as u8; 8192]
+    vec![
+        sequence as u8;
+        if sequence == 20 {
+            9 * 1024 * 1024
+        } else {
+            8192
+        }
+    ]
 }
 
 fn open(path: &Path) -> BlinkStore<ProductionFile, ProductionFile> {
@@ -78,6 +85,11 @@ fn durable_base_checkpoint_child() {
         writeln!(acknowledgements, "{sequence},{revision}").unwrap();
         acknowledgements.sync_all().unwrap();
     }
+    if boundary.contains("chunk_sync") {
+        let revision = store.put(key(20), expected_value(20)).unwrap();
+        writeln!(acknowledgements, "20,{revision}").unwrap();
+        acknowledgements.sync_all().unwrap();
+    }
     store.set_boxed_fault_injector(Box::new(PauseAt {
         boundary,
         ready_path: directory.join("ready"),
@@ -89,6 +101,8 @@ fn durable_base_checkpoint_child() {
 #[test]
 fn sigkill_checkpoint_boundaries_recover_acknowledged_state_and_checkpoint_again() {
     let boundaries = [
+        "before_base_pack_chunk_sync",
+        "after_base_pack_chunk_sync",
         "after_checkpoint_page_write",
         "before_checkpoint_data_sync",
         "after_checkpoint_data_sync",
@@ -150,7 +164,10 @@ fn sigkill_checkpoint_boundaries_recover_acknowledged_state_and_checkpoint_again
                 )
             })
             .collect::<Vec<_>>();
-        assert_eq!(expected.len(), 5);
+        assert_eq!(
+            expected.len(),
+            5 + usize::from(boundary.contains("chunk_sync"))
+        );
         let path = directory.join("tenant.db");
         let mut recovered = open(&path);
         for (sequence, revision) in &expected {
