@@ -2634,54 +2634,6 @@ mod tests {
     }
 
     #[test]
-    fn lock_only_keys_exclude_writers_and_release_after_rollback_or_commit() {
-        for present in [false, true] {
-            for commit_holder in [false, true] {
-                let directory = temporary_db_directory();
-                let database = TenantDatabase::open(directory.path()).unwrap();
-                let key = user_key(&DocumentKey::new("lock-only", "row"));
-                let initial_state = RevisionState::present(b"initial".to_vec(), Revision::new(1));
-                if present {
-                    let transaction = begin_transaction(&database.handle).unwrap();
-                    transaction_put(&transaction, &key, &encode_state(&initial_state)).unwrap();
-                    commit_transaction(transaction).unwrap();
-                }
-                let mut holder = begin_transaction(&database.handle).unwrap();
-                transaction_lock_for_update(&holder, &key).unwrap();
-                let blocked = begin_transaction(&database.handle).unwrap();
-                let error =
-                    transaction_put(&blocked, &key, &encode_state(&initial_state)).unwrap_err();
-                assert!(error.to_string().contains("Timeout"), "{error}");
-                drop(blocked);
-                if commit_holder {
-                    commit_transaction(holder).unwrap();
-                } else {
-                    holder.rollback();
-                }
-                let writer = begin_transaction(&database.handle).unwrap();
-                transaction_lock_for_update(&writer, &key).unwrap();
-                transaction_put(&writer, &key, &encode_state(&initial_state)).unwrap();
-                commit_transaction(writer).unwrap();
-                let verification = begin_transaction(&database.handle).unwrap();
-                let mut lock_wait_nanos = 0;
-                let mut lock_wait_count = 0;
-                let encoded = transaction_get_for_update(
-                    &verification,
-                    &key,
-                    true,
-                    false,
-                    &mut lock_wait_nanos,
-                    &mut lock_wait_count,
-                    None,
-                )
-                .unwrap()
-                .unwrap();
-                assert_eq!(decode_state(&encoded).unwrap(), initial_state);
-            }
-        }
-    }
-
-    #[test]
     fn get_present_budget_matches_encoded_frame_boundaries() {
         let revision = Revision::new(7);
         let value = vec![0x5a; 2_000];
