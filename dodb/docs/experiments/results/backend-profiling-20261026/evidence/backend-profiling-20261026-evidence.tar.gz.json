@@ -1,0 +1,9 @@
+{
+  "archive": "backend-profiling-20261026-evidence.tar.gz",
+  "sha256": "c83050a51e2fd8c045215c7cf5dd0518344fe981e597a32eed84fb89d71277da",
+  "bytes": 83131493,
+  "inventoried_files": 654,
+  "uncompressed_inventoried_bytes": 739263206,
+  "excluded_database_files": 107,
+  "excluded_database_bytes": 2798455178
+}

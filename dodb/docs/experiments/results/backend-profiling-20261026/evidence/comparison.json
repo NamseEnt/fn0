@@ -1,0 +1,3150 @@
+{
+  "flamegraph_revision": "41fee1f99f9276008b7cd112fca19dc3ea84ac32",
+  "inclusive_percentages_overlap": true,
+  "cases": {
+    "E-blink-control": {
+      "run": {
+        "case_id": "E-blink-control",
+        "stage": "main",
+        "source_sha": "cc80d1fdc7a98792be1a739056a3013debf39268",
+        "binary_sha256": "dd37ec860d3cd6c2bb24abde48f903cd7e87c06842e3a7651589f370cae15828",
+        "throughput_per_second": 1736.0083114129102,
+        "release_epoch_ns": 1792974565810276247,
+        "exit_epoch_ns": 1792974656162659082,
+        "peak_workload_rss_bytes": 1643892736,
+        "peak_profiler_rss_bytes": 0,
+        "maximum_database_bytes": 904752645,
+        "minimum_host_available_bytes": 3684577280,
+        "sample_count": 175,
+        "elapsed_seconds": 90.44128103973344
+      },
+      "reopen_and_validation_ms": 2665.767663,
+      "measurement_window_unix_nanos": {
+        "last_client_completion": "1792974649820018613",
+        "start": "1792974589779623783"
+      },
+      "latency": {
+        "count": 107344,
+        "maximum_nanos": 336639378,
+        "p50_nanos": 24412159,
+        "p95_nanos": 81330175,
+        "p99_nanos": 142606335,
+        "sample_count": 107344
+      },
+      "fully_in_window_checkpoints": 6
+    },
+    "E-blink-profile": {
+      "run": {
+        "case_id": "E-blink-profile",
+        "stage": "main",
+        "source_sha": "cc80d1fdc7a98792be1a739056a3013debf39268",
+        "binary_sha256": "dd37ec860d3cd6c2bb24abde48f903cd7e87c06842e3a7651589f370cae15828",
+        "throughput_per_second": 1718.7679195432681,
+        "release_epoch_ns": 1792975060940193397,
+        "exit_epoch_ns": 1792975152230161461,
+        "peak_workload_rss_bytes": 1643909120,
+        "peak_profiler_rss_bytes": 233930752,
+        "maximum_database_bytes": 906088739,
+        "minimum_host_available_bytes": 3557187584,
+        "sample_count": 167,
+        "elapsed_seconds": 94.20600492181256
+      },
+      "reopen_and_validation_ms": 2700.608404,
+      "measurement_window_unix_nanos": {
+        "last_client_completion": "1792975145262917057",
+        "start": "1792975085206744852"
+      },
+      "cpu": {
+        "measurement": {
+          "samples": 4543,
+          "sampled_cpu_seconds": 45.88888843,
+          "first_sample_epoch_ns": 1792975085235416738,
+          "last_sample_epoch_ns": 1792975145246059471,
+          "unknown_leaf_percent": 0.9244992295839753,
+          "median_frame_depth": 21,
+          "allocator_nearest_project_caller": {
+            "dodb_storage": {
+              "samples": 634,
+              "percent": 13.955535989434294
+            },
+            "unconditional_write_workload": {
+              "samples": 379,
+              "percent": 8.342504952674444
+            },
+            "dodb_core": {
+              "samples": 189,
+              "percent": 4.160246533127889
+            },
+            "dodb_server": {
+              "samples": 115,
+              "percent": 2.5313669381465993
+            },
+            "runtime_or_other": {
+              "samples": 1,
+              "percent": 0.02201188641866608
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 164,
+              "percent": 3.6099493726612373
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 168,
+              "percent": 3.6979969183359014
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 697,
+              "percent": 15.342284833810258
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 196,
+              "percent": 4.314329738058552
+            },
+            "blink_materialization": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_transaction_group": {
+              "samples": 1214,
+              "percent": 26.72243011226062
+            },
+            "crc": {
+              "samples": 141,
+              "percent": 3.1036759850319173
+            },
+            "allocator": {
+              "samples": 1318,
+              "percent": 29.01166629980189
+            },
+            "memory_copy": {
+              "samples": 384,
+              "percent": 8.452564384767774
+            },
+            "bpf_execution": {
+              "samples": 37,
+              "percent": 0.814439797490645
+            },
+            "futex": {
+              "samples": 117,
+              "percent": 2.5753907109839314
+            },
+            "rocks_write": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_try_lock": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_db_get": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_memtable": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_compaction": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_work": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 112,
+              "percent": 2.4653312788906008
+            },
+            "driver_mutation_construction": {
+              "samples": 379,
+              "percent": 8.342504952674444
+            }
+          }
+        },
+        "measurement-checkpoint-overlap": {
+          "samples": 1735,
+          "sampled_cpu_seconds": 17.52525235,
+          "first_sample_epoch_ns": 1792975091191034837,
+          "last_sample_epoch_ns": 1792975145246059471,
+          "unknown_leaf_percent": 0.5187319884726225,
+          "median_frame_depth": 24,
+          "allocator_nearest_project_caller": {
+            "dodb_storage": {
+              "samples": 172,
+              "percent": 9.913544668587896
+            },
+            "unconditional_write_workload": {
+              "samples": 91,
+              "percent": 5.244956772334294
+            },
+            "dodb_core": {
+              "samples": 36,
+              "percent": 2.07492795389049
+            },
+            "dodb_server": {
+              "samples": 17,
+              "percent": 0.9798270893371758
+            },
+            "runtime_or_other": {
+              "samples": 1,
+              "percent": 0.05763688760806916
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 52,
+              "percent": 2.9971181556195967
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 168,
+              "percent": 9.682997118155619
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 697,
+              "percent": 40.17291066282421
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 196,
+              "percent": 11.296829971181555
+            },
+            "blink_materialization": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_transaction_group": {
+              "samples": 261,
+              "percent": 15.043227665706052
+            },
+            "crc": {
+              "samples": 52,
+              "percent": 2.9971181556195967
+            },
+            "allocator": {
+              "samples": 317,
+              "percent": 18.270893371757925
+            },
+            "memory_copy": {
+              "samples": 119,
+              "percent": 6.858789625360231
+            },
+            "bpf_execution": {
+              "samples": 9,
+              "percent": 0.5187319884726225
+            },
+            "futex": {
+              "samples": 35,
+              "percent": 2.0172910662824206
+            },
+            "rocks_write": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_try_lock": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_db_get": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_memtable": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_compaction": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_work": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 25,
+              "percent": 1.440922190201729
+            },
+            "driver_mutation_construction": {
+              "samples": 85,
+              "percent": 4.899135446685879
+            }
+          }
+        },
+        "measurement-outside-checkpoints": {
+          "samples": 2808,
+          "sampled_cpu_seconds": 28.36363608,
+          "first_sample_epoch_ns": 1792975085235416738,
+          "last_sample_epoch_ns": 1792975144032549067,
+          "unknown_leaf_percent": 1.1752136752136753,
+          "median_frame_depth": 18,
+          "allocator_nearest_project_caller": {
+            "dodb_storage": {
+              "samples": 462,
+              "percent": 16.45299145299145
+            },
+            "unconditional_write_workload": {
+              "samples": 288,
+              "percent": 10.256410256410257
+            },
+            "dodb_core": {
+              "samples": 153,
+              "percent": 5.448717948717949
+            },
+            "dodb_server": {
+              "samples": 98,
+              "percent": 3.49002849002849
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 112,
+              "percent": 3.988603988603989
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_materialization": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_transaction_group": {
+              "samples": 953,
+              "percent": 33.93874643874644
+            },
+            "crc": {
+              "samples": 89,
+              "percent": 3.1695156695156697
+            },
+            "allocator": {
+              "samples": 1001,
+              "percent": 35.648148148148145
+            },
+            "memory_copy": {
+              "samples": 265,
+              "percent": 9.437321937321938
+            },
+            "bpf_execution": {
+              "samples": 28,
+              "percent": 0.9971509971509972
+            },
+            "futex": {
+              "samples": 82,
+              "percent": 2.92022792022792
+            },
+            "rocks_write": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_try_lock": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_db_get": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_memtable": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_compaction": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_work": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 87,
+              "percent": 3.0982905982905984
+            },
+            "driver_mutation_construction": {
+              "samples": 294,
+              "percent": 10.47008547008547
+            }
+          }
+        },
+        "before-measurement": {
+          "samples": 1546,
+          "sampled_cpu_seconds": 15.61616146,
+          "first_sample_epoch_ns": 1792975060971120983,
+          "last_sample_epoch_ns": 1792975085199292467,
+          "unknown_leaf_percent": 0.9702457956015524,
+          "median_frame_depth": 21,
+          "allocator_nearest_project_caller": {
+            "dodb_storage": {
+              "samples": 205,
+              "percent": 13.260025873221217
+            },
+            "unconditional_write_workload": {
+              "samples": 55,
+              "percent": 3.557567917205692
+            },
+            "dodb_core": {
+              "samples": 53,
+              "percent": 3.428201811125485
+            },
+            "dodb_server": {
+              "samples": 34,
+              "percent": 2.1992238033635187
+            },
+            "runtime_or_other": {
+              "samples": 1,
+              "percent": 0.0646830530401035
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 54,
+              "percent": 3.4928848641655885
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 58,
+              "percent": 3.7516170763260024
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 310,
+              "percent": 20.051746442432083
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 77,
+              "percent": 4.980595084087969
+            },
+            "blink_materialization": {
+              "samples": 1,
+              "percent": 0.0646830530401035
+            },
+            "blink_transaction_group": {
+              "samples": 283,
+              "percent": 18.30530401034929
+            },
+            "crc": {
+              "samples": 38,
+              "percent": 2.4579560155239326
+            },
+            "allocator": {
+              "samples": 348,
+              "percent": 22.509702457956017
+            },
+            "memory_copy": {
+              "samples": 120,
+              "percent": 7.7619663648124195
+            },
+            "bpf_execution": {
+              "samples": 8,
+              "percent": 0.517464424320828
+            },
+            "futex": {
+              "samples": 19,
+              "percent": 1.2289780077619663
+            },
+            "rocks_write": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_try_lock": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_db_get": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_memtable": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_compaction": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_work": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 4,
+              "percent": 0.258732212160414
+            },
+            "driver_mutation_construction": {
+              "samples": 26,
+              "percent": 1.6817593790426908
+            }
+          }
+        },
+        "after-measurement": {
+          "samples": 486,
+          "sampled_cpu_seconds": 4.90909086,
+          "first_sample_epoch_ns": 1792975145264596311,
+          "last_sample_epoch_ns": 1792975152026995473,
+          "unknown_leaf_percent": 0.0,
+          "median_frame_depth": 26,
+          "allocator_nearest_project_caller": {
+            "unconditional_write_workload": {
+              "samples": 71,
+              "percent": 14.609053497942387
+            },
+            "dodb_server": {
+              "samples": 36,
+              "percent": 7.407407407407407
+            },
+            "dodb_storage": {
+              "samples": 18,
+              "percent": 3.7037037037037037
+            },
+            "dodb_core": {
+              "samples": 15,
+              "percent": 3.0864197530864197
+            },
+            "runtime_or_other": {
+              "samples": 3,
+              "percent": 0.6172839506172839
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "page_decoding": {
+              "samples": 24,
+              "percent": 4.938271604938271
+            },
+            "tree_invariants": {
+              "samples": 32,
+              "percent": 6.584362139917696
+            },
+            "immutable_base_loading": {
+              "samples": 102,
+              "percent": 20.987654320987655
+            },
+            "checkpoint_worker": {
+              "samples": 63,
+              "percent": 12.962962962962964
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 3,
+              "percent": 0.6172839506172839
+            },
+            "blink_materialization": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_transaction_group": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "crc": {
+              "samples": 12,
+              "percent": 2.4691358024691357
+            },
+            "allocator": {
+              "samples": 143,
+              "percent": 29.4238683127572
+            },
+            "memory_copy": {
+              "samples": 33,
+              "percent": 6.790123456790123
+            },
+            "bpf_execution": {
+              "samples": 1,
+              "percent": 0.205761316872428
+            },
+            "futex": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_write": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_try_lock": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_db_get": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_memtable": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_compaction": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_work": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_validation": {
+              "samples": 172,
+              "percent": 35.390946502057616
+            },
+            "driver_payload": {
+              "samples": 38,
+              "percent": 7.818930041152264
+            },
+            "driver_mutation_construction": {
+              "samples": 0,
+              "percent": 0.0
+            }
+          }
+        }
+      },
+      "selected_functions": {
+        "append_group_inner": {
+          "samples": 964,
+          "percent": 21.2194585075941
+        },
+        "plan_redo": {
+          "samples": 493,
+          "percent": 10.851860004402377
+        },
+        "read_shard": null,
+        "BasePackJob>::run": {
+          "samples": 647,
+          "percent": 14.241690512876954
+        },
+        "BlinkCheckpointSnapshot>::run": {
+          "samples": 697,
+          "percent": 15.342284833810258
+        },
+        "TransactionBaseImpl::GetForUpdate": null,
+        "PessimisticTransaction::Commit": null,
+        "PessimisticTransaction::TryLock": null
+      },
+      "waits": {
+        "bucket_start_monotonic_second": 2236757,
+        "bucket_end_monotonic_second": 2236816,
+        "included_start_bucket_seconds": 59,
+        "boundary_policy": "Full start-second buckets; intervals can finish beyond a bucket/window. Long idle parks must not be attributed to request latency.",
+        "state_policy": "All switch-out intervals pooled. The raw runnable flag means tracepoint prev_state == 0 and is not a complete runnable/sleep classification on this kernel, which also encodes preemption as R+.",
+        "realtime_offset_change_ns": -680,
+        "stack_capture_failure_ns": 37994568,
+        "total_offcpu_ns": 4085982263365,
+        "aggregate_ns_in_buckets_with_wait_at_least_one_second": 0,
+        "syscalls": {
+          "futex": {
+            "count": 448761,
+            "total_ns": 3983618100872,
+            "max_ns": 411863825,
+            "errors": 57286,
+            "bytes": 0
+          },
+          "fdatasync": {
+            "count": 2260,
+            "total_ns": 38190418524,
+            "max_ns": 96679792,
+            "errors": 0,
+            "bytes": 0
+          },
+          "fsync": {
+            "count": 142,
+            "total_ns": 364291045,
+            "max_ns": 49571946,
+            "errors": 0,
+            "bytes": 0
+          },
+          "pwrite64": {
+            "count": 2076,
+            "total_ns": 1197757925,
+            "max_ns": 13784639,
+            "errors": 0,
+            "bytes": 934198467
+          }
+        },
+        "syscalls_by_thread_name": {
+          "futex:unconditional_w": {
+            "count": 217394,
+            "total_ns": 3767142717235,
+            "max_ns": 411863825,
+            "errors": 28174,
+            "bytes": 0
+          },
+          "fdatasync:tokio-rt-worker": {
+            "count": 2260,
+            "total_ns": 38190418524,
+            "max_ns": 96679792,
+            "errors": 0,
+            "bytes": 0
+          },
+          "fsync:tokio-rt-worker": {
+            "count": 142,
+            "total_ns": 364291045,
+            "max_ns": 49571946,
+            "errors": 0,
+            "bytes": 0
+          },
+          "futex:tokio-rt-worker": {
+            "count": 231367,
+            "total_ns": 216475383637,
+            "max_ns": 351888188,
+            "errors": 29112,
+            "bytes": 0
+          },
+          "pwrite64:tokio-rt-worker": {
+            "count": 2076,
+            "total_ns": 1197757925,
+            "max_ns": 13784639,
+            "errors": 0,
+            "bytes": 934198467
+          }
+        },
+        "offcpu_totals_ns": {
+          "offcpu": 4085982263365
+        }
+      },
+      "shard_lookup": {
+        "total_samples": 0,
+        "metadata_samples": 0,
+        "database_path_samples": 0
+      },
+      "latency": {
+        "count": 107167,
+        "maximum_nanos": 411877625,
+        "p50_nanos": 24313855,
+        "p95_nanos": 81592319,
+        "p99_nanos": 144572415,
+        "sample_count": 107167
+      },
+      "fully_in_window_checkpoints": 6
+    },
+    "E-minimal-native-control": {
+      "run": {
+        "case_id": "E-minimal-native-control",
+        "stage": "main",
+        "source_sha": "cc80d1fdc7a98792be1a739056a3013debf39268",
+        "binary_sha256": "dd37ec860d3cd6c2bb24abde48f903cd7e87c06842e3a7651589f370cae15828",
+        "throughput_per_second": 1693.791856796988,
+        "release_epoch_ns": 1792974733056899647,
+        "exit_epoch_ns": 1792974815503785761,
+        "peak_workload_rss_bytes": 1032642560,
+        "peak_profiler_rss_bytes": 0,
+        "maximum_database_bytes": 577559361,
+        "minimum_host_available_bytes": 3807531008,
+        "sample_count": 159,
+        "elapsed_seconds": 82.53361086081713
+      },
+      "reopen_and_validation_ms": 3899.832204,
+      "measurement_window_unix_nanos": {
+        "last_client_completion": "1792974808777728752",
+        "start": "1792974748749773550"
+      },
+      "latency": {
+        "count": 101658,
+        "maximum_nanos": 483769964,
+        "p50_nanos": 31031295,
+        "p95_nanos": 57212927,
+        "p99_nanos": 332398591,
+        "sample_count": 101658
+      },
+      "fully_in_window_checkpoints": 0
+    },
+    "E-minimal-native-profile": {
+      "run": {
+        "case_id": "E-minimal-native-profile",
+        "stage": "main",
+        "source_sha": "cc80d1fdc7a98792be1a739056a3013debf39268",
+        "binary_sha256": "dd37ec860d3cd6c2bb24abde48f903cd7e87c06842e3a7651589f370cae15828",
+        "throughput_per_second": 1522.1483614968317,
+        "release_epoch_ns": 1792974896213195442,
+        "exit_epoch_ns": 1792974977894630329,
+        "peak_workload_rss_bytes": 1015431168,
+        "peak_profiler_rss_bytes": 234237952,
+        "maximum_database_bytes": 567192387,
+        "minimum_host_available_bytes": 4047712256,
+        "sample_count": 147,
+        "elapsed_seconds": 85.20503021311015
+      },
+      "reopen_and_validation_ms": 3118.892884,
+      "measurement_window_unix_nanos": {
+        "last_client_completion": "1792974972202473139",
+        "start": "1792974912166450147"
+      },
+      "cpu": {
+        "measurement": {
+          "samples": 5578,
+          "sampled_cpu_seconds": 56.34343378,
+          "first_sample_epoch_ns": 1792974912982038687,
+          "last_sample_epoch_ns": 1792974972202345458,
+          "unknown_leaf_percent": 0.23305844388669775,
+          "median_frame_depth": 41,
+          "allocator_nearest_project_caller": {
+            "rocksdb": {
+              "samples": 323,
+              "percent": 5.790605951954105
+            },
+            "dodb_rocksdb": {
+              "samples": 271,
+              "percent": 4.858372176407315
+            },
+            "unconditional_write_workload": {
+              "samples": 157,
+              "percent": 2.814628899247042
+            },
+            "dodb_core": {
+              "samples": 106,
+              "percent": 1.90032269630692
+            },
+            "runtime_or_other": {
+              "samples": 2,
+              "percent": 0.035855145213338116
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_materialization": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_transaction_group": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "crc": {
+              "samples": 7,
+              "percent": 0.1254930082466834
+            },
+            "allocator": {
+              "samples": 859,
+              "percent": 15.39978486912872
+            },
+            "memory_copy": {
+              "samples": 225,
+              "percent": 4.033703836500538
+            },
+            "bpf_execution": {
+              "samples": 115,
+              "percent": 2.0616708497669416
+            },
+            "futex": {
+              "samples": 188,
+              "percent": 3.3703836500537827
+            },
+            "rocks_write": {
+              "samples": 1503,
+              "percent": 26.945141627823592
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 2191,
+              "percent": 39.27931158121191
+            },
+            "rocks_get_for_update": {
+              "samples": 1742,
+              "percent": 31.2298314808175
+            },
+            "rocks_try_lock": {
+              "samples": 288,
+              "percent": 5.1631409107206885
+            },
+            "rocks_db_get": {
+              "samples": 1444,
+              "percent": 25.88741484403012
+            },
+            "rocks_memtable": {
+              "samples": 1556,
+              "percent": 27.895302975977053
+            },
+            "rocks_compaction": {
+              "samples": 1042,
+              "percent": 18.68053065614916
+            },
+            "driver_work": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 80,
+              "percent": 1.4342058085335245
+            },
+            "driver_mutation_construction": {
+              "samples": 196,
+              "percent": 3.513804230907135
+            }
+          }
+        },
+        "measurement-outside-checkpoints": {
+          "samples": 5578,
+          "sampled_cpu_seconds": 56.34343378,
+          "first_sample_epoch_ns": 1792974912982038687,
+          "last_sample_epoch_ns": 1792974972202345458,
+          "unknown_leaf_percent": 0.23305844388669775,
+          "median_frame_depth": 41,
+          "allocator_nearest_project_caller": {
+            "rocksdb": {
+              "samples": 323,
+              "percent": 5.790605951954105
+            },
+            "dodb_rocksdb": {
+              "samples": 271,
+              "percent": 4.858372176407315
+            },
+            "unconditional_write_workload": {
+              "samples": 157,
+              "percent": 2.814628899247042
+            },
+            "dodb_core": {
+              "samples": 106,
+              "percent": 1.90032269630692
+            },
+            "runtime_or_other": {
+              "samples": 2,
+              "percent": 0.035855145213338116
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_materialization": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_transaction_group": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "crc": {
+              "samples": 7,
+              "percent": 0.1254930082466834
+            },
+            "allocator": {
+              "samples": 859,
+              "percent": 15.39978486912872
+            },
+            "memory_copy": {
+              "samples": 225,
+              "percent": 4.033703836500538
+            },
+            "bpf_execution": {
+              "samples": 115,
+              "percent": 2.0616708497669416
+            },
+            "futex": {
+              "samples": 188,
+              "percent": 3.3703836500537827
+            },
+            "rocks_write": {
+              "samples": 1503,
+              "percent": 26.945141627823592
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 2191,
+              "percent": 39.27931158121191
+            },
+            "rocks_get_for_update": {
+              "samples": 1742,
+              "percent": 31.2298314808175
+            },
+            "rocks_try_lock": {
+              "samples": 288,
+              "percent": 5.1631409107206885
+            },
+            "rocks_db_get": {
+              "samples": 1444,
+              "percent": 25.88741484403012
+            },
+            "rocks_memtable": {
+              "samples": 1556,
+              "percent": 27.895302975977053
+            },
+            "rocks_compaction": {
+              "samples": 1042,
+              "percent": 18.68053065614916
+            },
+            "driver_work": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 80,
+              "percent": 1.4342058085335245
+            },
+            "driver_mutation_construction": {
+              "samples": 196,
+              "percent": 3.513804230907135
+            }
+          }
+        },
+        "before-measurement": {
+          "samples": 1278,
+          "sampled_cpu_seconds": 12.90909078,
+          "first_sample_epoch_ns": 1792974896259451720,
+          "last_sample_epoch_ns": 1792974912148590793,
+          "unknown_leaf_percent": 0.3129890453834116,
+          "median_frame_depth": 42,
+          "allocator_nearest_project_caller": {
+            "rocksdb": {
+              "samples": 93,
+              "percent": 7.276995305164319
+            },
+            "dodb_rocksdb": {
+              "samples": 61,
+              "percent": 4.773082942097027
+            },
+            "unconditional_write_workload": {
+              "samples": 49,
+              "percent": 3.8341158059467917
+            },
+            "dodb_core": {
+              "samples": 38,
+              "percent": 2.97339593114241
+            },
+            "runtime_or_other": {
+              "samples": 1,
+              "percent": 0.0782472613458529
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_materialization": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_transaction_group": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "crc": {
+              "samples": 5,
+              "percent": 0.39123630672926446
+            },
+            "allocator": {
+              "samples": 242,
+              "percent": 18.9358372456964
+            },
+            "memory_copy": {
+              "samples": 62,
+              "percent": 4.851330203442879
+            },
+            "bpf_execution": {
+              "samples": 19,
+              "percent": 1.486697965571205
+            },
+            "futex": {
+              "samples": 33,
+              "percent": 2.5821596244131455
+            },
+            "rocks_write": {
+              "samples": 312,
+              "percent": 24.413145539906104
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 343,
+              "percent": 26.838810641627543
+            },
+            "rocks_get_for_update": {
+              "samples": 271,
+              "percent": 21.205007824726135
+            },
+            "rocks_try_lock": {
+              "samples": 69,
+              "percent": 5.39906103286385
+            },
+            "rocks_db_get": {
+              "samples": 199,
+              "percent": 15.571205007824727
+            },
+            "rocks_memtable": {
+              "samples": 380,
+              "percent": 29.7339593114241
+            },
+            "rocks_compaction": {
+              "samples": 287,
+              "percent": 22.45696400625978
+            },
+            "driver_work": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 11,
+              "percent": 0.8607198748043818
+            },
+            "driver_mutation_construction": {
+              "samples": 30,
+              "percent": 2.347417840375587
+            }
+          }
+        },
+        "after-measurement": {
+          "samples": 514,
+          "sampled_cpu_seconds": 5.19191914,
+          "first_sample_epoch_ns": 1792974972237554761,
+          "last_sample_epoch_ns": 1792974977764768772,
+          "unknown_leaf_percent": 0.0,
+          "median_frame_depth": 44,
+          "allocator_nearest_project_caller": {
+            "unconditional_write_workload": {
+              "samples": 74,
+              "percent": 14.396887159533074
+            },
+            "rocksdb": {
+              "samples": 13,
+              "percent": 2.529182879377432
+            },
+            "dodb_core": {
+              "samples": 13,
+              "percent": 2.529182879377432
+            },
+            "dodb_rocksdb": {
+              "samples": 7,
+              "percent": 1.3618677042801557
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_materialization": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_transaction_group": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "crc": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "allocator": {
+              "samples": 107,
+              "percent": 20.817120622568094
+            },
+            "memory_copy": {
+              "samples": 27,
+              "percent": 5.252918287937743
+            },
+            "bpf_execution": {
+              "samples": 5,
+              "percent": 0.9727626459143969
+            },
+            "futex": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_write": {
+              "samples": 18,
+              "percent": 3.501945525291829
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_try_lock": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_db_get": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_memtable": {
+              "samples": 24,
+              "percent": 4.669260700389105
+            },
+            "rocks_compaction": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_work": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_validation": {
+              "samples": 173,
+              "percent": 33.65758754863813
+            },
+            "driver_payload": {
+              "samples": 45,
+              "percent": 8.754863813229573
+            },
+            "driver_mutation_construction": {
+              "samples": 0,
+              "percent": 0.0
+            }
+          }
+        }
+      },
+      "selected_functions": {
+        "append_group_inner": null,
+        "plan_redo": null,
+        "read_shard": null,
+        "BasePackJob>::run": null,
+        "BlinkCheckpointSnapshot>::run": null,
+        "TransactionBaseImpl::GetForUpdate": {
+          "samples": 1742,
+          "percent": 31.2298314808175
+        },
+        "PessimisticTransaction::Commit": {
+          "samples": 1500,
+          "percent": 26.891358910003586
+        },
+        "PessimisticTransaction::TryLock": null
+      },
+      "waits": {
+        "bucket_start_monotonic_second": 2236584,
+        "bucket_end_monotonic_second": 2236643,
+        "included_start_bucket_seconds": 59,
+        "boundary_policy": "Full start-second buckets; intervals can finish beyond a bucket/window. Long idle parks must not be attributed to request latency.",
+        "state_policy": "All switch-out intervals pooled. The raw runnable flag means tracepoint prev_state == 0 and is not a complete runnable/sleep classification on this kernel, which also encodes preemption as R+.",
+        "realtime_offset_change_ns": 960,
+        "stack_capture_failure_ns": 43878773,
+        "total_offcpu_ns": 3950675368641,
+        "aggregate_ns_in_buckets_with_wait_at_least_one_second": 151780582447,
+        "syscalls": {
+          "fdatasync": {
+            "count": 6427,
+            "total_ns": 52111143161,
+            "max_ns": 451393965,
+            "errors": 0,
+            "bytes": 0
+          },
+          "futex": {
+            "count": 604096,
+            "total_ns": 3808467785880,
+            "max_ns": 14196078462,
+            "errors": 13926,
+            "bytes": 0
+          },
+          "pread64": {
+            "count": 482328,
+            "total_ns": 13227094942,
+            "max_ns": 19540488,
+            "errors": 0,
+            "bytes": 1872759794
+          },
+          "fsync": {
+            "count": 29,
+            "total_ns": 40148867,
+            "max_ns": 21060861,
+            "errors": 0,
+            "bytes": 0
+          }
+        },
+        "syscalls_by_thread_name": {
+          "fdatasync:unconditional_w": {
+            "count": 6389,
+            "total_ns": 45336139972,
+            "max_ns": 420201257,
+            "errors": 0,
+            "bytes": 0
+          },
+          "futex:unconditional_w": {
+            "count": 599657,
+            "total_ns": 3712960731657,
+            "max_ns": 10003006573,
+            "errors": 12684,
+            "bytes": 0
+          },
+          "pread64:unconditional_w": {
+            "count": 205569,
+            "total_ns": 8532342399,
+            "max_ns": 19540488,
+            "errors": 0,
+            "bytes": 788791679
+          },
+          "pread64:rocksdb:high": {
+            "count": 52,
+            "total_ns": 6444054,
+            "max_ns": 713886,
+            "errors": 0,
+            "bytes": 14382392
+          },
+          "pread64:rocksdb:low": {
+            "count": 276707,
+            "total_ns": 4688308489,
+            "max_ns": 14603286,
+            "errors": 0,
+            "bytes": 1069585723
+          },
+          "fdatasync:rocksdb:high": {
+            "count": 26,
+            "total_ns": 4366864502,
+            "max_ns": 378933621,
+            "errors": 0,
+            "bytes": 0
+          },
+          "fsync:rocksdb:high": {
+            "count": 13,
+            "total_ns": 39974665,
+            "max_ns": 21060861,
+            "errors": 0,
+            "bytes": 0
+          },
+          "futex:rocksdb:high": {
+            "count": 70,
+            "total_ns": 56597838280,
+            "max_ns": 8847680990,
+            "errors": 1,
+            "bytes": 0
+          },
+          "fdatasync:rocksdb:low": {
+            "count": 12,
+            "total_ns": 2408138687,
+            "max_ns": 451393965,
+            "errors": 0,
+            "bytes": 0
+          },
+          "fsync:unconditional_w": {
+            "count": 13,
+            "total_ns": 146322,
+            "max_ns": 13240,
+            "errors": 0,
+            "bytes": 0
+          },
+          "futex:rocksdb:low": {
+            "count": 4369,
+            "total_ns": 38909215943,
+            "max_ns": 14196078462,
+            "errors": 1241,
+            "bytes": 0
+          },
+          "fsync:rocksdb:low": {
+            "count": 3,
+            "total_ns": 27880,
+            "max_ns": 10040,
+            "errors": 0,
+            "bytes": 0
+          }
+        },
+        "offcpu_totals_ns": {
+          "offcpu": 3950675368641
+        }
+      },
+      "shard_lookup": {
+        "total_samples": 1,
+        "metadata_samples": 0,
+        "database_path_samples": 0
+      },
+      "latency": {
+        "count": 91370,
+        "maximum_nanos": 555069097,
+        "p50_nanos": 34865151,
+        "p95_nanos": 63569919,
+        "p99_nanos": 348913663,
+        "sample_count": 91370
+      },
+      "fully_in_window_checkpoints": 0
+    },
+    "RW80-blink-control": {
+      "run": {
+        "case_id": "RW80-blink-control",
+        "stage": "main",
+        "source_sha": "cc80d1fdc7a98792be1a739056a3013debf39268",
+        "binary_sha256": "25128f9be2f9c1ddeeb3b663be299c3798d892ac82aa4ba9a2fcd7377b5a4187",
+        "throughput_per_second": 15390.243344559414,
+        "release_epoch_ns": 1792974489799713607,
+        "exit_epoch_ns": 1792974565359930851,
+        "peak_workload_rss_bytes": 735244288,
+        "peak_profiler_rss_bytes": 0,
+        "maximum_database_bytes": 580569712,
+        "minimum_host_available_bytes": 4410859520,
+        "sample_count": 147,
+        "elapsed_seconds": 75.70929252589121
+      },
+      "reopen_and_validation_ms": 2403.455286,
+      "measurement_window_unix_nanos": {
+        "last_client_completion": "1792974560511397641",
+        "start": "1792974500460324040"
+      },
+      "per_tenant_latency": {
+        "tenant_1": {
+          "condition_rejection": {
+            "count": 13062,
+            "sample_count": 13062
+          },
+          "get": {
+            "count": 565185,
+            "sample_count": 565185
+          },
+          "preparatory_get": {
+            "count": 32697,
+            "sample_count": 32697
+          },
+          "query16": {
+            "count": 149498,
+            "sample_count": 149498
+          },
+          "workflow": {
+            "count": 901406,
+            "sample_count": 901406
+          },
+          "write_transaction_success": {
+            "count": 173661,
+            "sample_count": 173661
+          }
+        }
+      },
+      "fully_in_window_checkpoints": 4
+    },
+    "RW80-blink-profile": {
+      "run": {
+        "case_id": "RW80-blink-profile",
+        "stage": "main",
+        "source_sha": "cc80d1fdc7a98792be1a739056a3013debf39268",
+        "binary_sha256": "25128f9be2f9c1ddeeb3b663be299c3798d892ac82aa4ba9a2fcd7377b5a4187",
+        "throughput_per_second": 14815.324359831211,
+        "release_epoch_ns": 1792974982111988707,
+        "exit_epoch_ns": 1792975057832298968,
+        "peak_workload_rss_bytes": 743559168,
+        "peak_profiler_rss_bytes": 234254336,
+        "maximum_database_bytes": 548961188,
+        "minimum_host_available_bytes": 4260577280,
+        "sample_count": 140,
+        "elapsed_seconds": 78.40857911854982
+      },
+      "reopen_and_validation_ms": 3324.633174,
+      "measurement_window_unix_nanos": {
+        "last_client_completion": "1792975052854602167",
+        "start": "1792974992851322937"
+      },
+      "cpu": {
+        "measurement": {
+          "samples": 3664,
+          "sampled_cpu_seconds": 37.01010064,
+          "first_sample_epoch_ns": 1792974992861716266,
+          "last_sample_epoch_ns": 1792975052837559580,
+          "unknown_leaf_percent": 1.064410480349345,
+          "median_frame_depth": 30,
+          "allocator_nearest_project_caller": {
+            "dodb_storage": {
+              "samples": 364,
+              "percent": 9.934497816593886
+            },
+            "dodb_server": {
+              "samples": 303,
+              "percent": 8.269650655021834
+            },
+            "dodb_core": {
+              "samples": 130,
+              "percent": 3.5480349344978164
+            },
+            "service_workload": {
+              "samples": 69,
+              "percent": 1.8831877729257642
+            },
+            "runtime_or_other": {
+              "samples": 5,
+              "percent": 0.13646288209606988
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 44,
+              "percent": 1.2008733624454149
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 37,
+              "percent": 1.009825327510917
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 115,
+              "percent": 3.138646288209607
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 63,
+              "percent": 1.7194323144104804
+            },
+            "blink_materialization": {
+              "samples": 34,
+              "percent": 0.9279475982532751
+            },
+            "blink_transaction_group": {
+              "samples": 647,
+              "percent": 17.65829694323144
+            },
+            "crc": {
+              "samples": 56,
+              "percent": 1.5283842794759825
+            },
+            "allocator": {
+              "samples": 871,
+              "percent": 23.771834061135372
+            },
+            "memory_copy": {
+              "samples": 226,
+              "percent": 6.168122270742358
+            },
+            "bpf_execution": {
+              "samples": 73,
+              "percent": 1.99235807860262
+            },
+            "futex": {
+              "samples": 280,
+              "percent": 7.641921397379913
+            },
+            "rocks_write": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_try_lock": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_db_get": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_memtable": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_compaction": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_work": {
+              "samples": 1388,
+              "percent": 37.88209606986899
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_mutation_construction": {
+              "samples": 1388,
+              "percent": 37.88209606986899
+            }
+          }
+        },
+        "measurement-checkpoint-overlap": {
+          "samples": 236,
+          "sampled_cpu_seconds": 2.38383836,
+          "first_sample_epoch_ns": 1792975001243325524,
+          "last_sample_epoch_ns": 1792975041527757480,
+          "unknown_leaf_percent": 0.0,
+          "median_frame_depth": 26,
+          "allocator_nearest_project_caller": {
+            "dodb_storage": {
+              "samples": 17,
+              "percent": 7.203389830508475
+            },
+            "dodb_server": {
+              "samples": 6,
+              "percent": 2.542372881355932
+            },
+            "service_workload": {
+              "samples": 2,
+              "percent": 0.847457627118644
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 3,
+              "percent": 1.271186440677966
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 37,
+              "percent": 15.677966101694915
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 115,
+              "percent": 48.728813559322035
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 63,
+              "percent": 26.694915254237287
+            },
+            "blink_materialization": {
+              "samples": 2,
+              "percent": 0.847457627118644
+            },
+            "blink_transaction_group": {
+              "samples": 9,
+              "percent": 3.8135593220338984
+            },
+            "crc": {
+              "samples": 4,
+              "percent": 1.694915254237288
+            },
+            "allocator": {
+              "samples": 25,
+              "percent": 10.59322033898305
+            },
+            "memory_copy": {
+              "samples": 10,
+              "percent": 4.237288135593221
+            },
+            "bpf_execution": {
+              "samples": 4,
+              "percent": 1.694915254237288
+            },
+            "futex": {
+              "samples": 6,
+              "percent": 2.542372881355932
+            },
+            "rocks_write": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_try_lock": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_db_get": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_memtable": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_compaction": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_work": {
+              "samples": 15,
+              "percent": 6.3559322033898304
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_mutation_construction": {
+              "samples": 15,
+              "percent": 6.3559322033898304
+            }
+          }
+        },
+        "measurement-outside-checkpoints": {
+          "samples": 3428,
+          "sampled_cpu_seconds": 34.62626228,
+          "first_sample_epoch_ns": 1792974992861716266,
+          "last_sample_epoch_ns": 1792975052837559580,
+          "unknown_leaf_percent": 1.1376896149358227,
+          "median_frame_depth": 31,
+          "allocator_nearest_project_caller": {
+            "dodb_storage": {
+              "samples": 347,
+              "percent": 10.122520420070012
+            },
+            "dodb_server": {
+              "samples": 297,
+              "percent": 8.66394399066511
+            },
+            "dodb_core": {
+              "samples": 130,
+              "percent": 3.792298716452742
+            },
+            "service_workload": {
+              "samples": 67,
+              "percent": 1.9544924154025671
+            },
+            "runtime_or_other": {
+              "samples": 5,
+              "percent": 0.14585764294049008
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 41,
+              "percent": 1.1960326721120187
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_materialization": {
+              "samples": 32,
+              "percent": 0.9334889148191365
+            },
+            "blink_transaction_group": {
+              "samples": 638,
+              "percent": 18.611435239206536
+            },
+            "crc": {
+              "samples": 52,
+              "percent": 1.5169194865810969
+            },
+            "allocator": {
+              "samples": 846,
+              "percent": 24.679113185530923
+            },
+            "memory_copy": {
+              "samples": 216,
+              "percent": 6.301050175029172
+            },
+            "bpf_execution": {
+              "samples": 69,
+              "percent": 2.012835472578763
+            },
+            "futex": {
+              "samples": 274,
+              "percent": 7.992998833138857
+            },
+            "rocks_write": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_try_lock": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_db_get": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_memtable": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_compaction": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_work": {
+              "samples": 1373,
+              "percent": 40.052508751458575
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_mutation_construction": {
+              "samples": 1373,
+              "percent": 40.052508751458575
+            }
+          }
+        },
+        "before-measurement": {
+          "samples": 533,
+          "sampled_cpu_seconds": 5.38383833,
+          "first_sample_epoch_ns": 1792974982222376817,
+          "last_sample_epoch_ns": 1792974992840378443,
+          "unknown_leaf_percent": 1.5009380863039399,
+          "median_frame_depth": 29,
+          "allocator_nearest_project_caller": {
+            "dodb_storage": {
+              "samples": 48,
+              "percent": 9.00562851782364
+            },
+            "dodb_server": {
+              "samples": 40,
+              "percent": 7.5046904315197
+            },
+            "dodb_core": {
+              "samples": 16,
+              "percent": 3.0018761726078798
+            },
+            "service_workload": {
+              "samples": 8,
+              "percent": 1.5009380863039399
+            },
+            "runtime_or_other": {
+              "samples": 3,
+              "percent": 0.5628517823639775
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 2,
+              "percent": 0.37523452157598497
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 3,
+              "percent": 0.5628517823639775
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 13,
+              "percent": 2.4390243902439024
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 9,
+              "percent": 1.6885553470919326
+            },
+            "blink_materialization": {
+              "samples": 2,
+              "percent": 0.37523452157598497
+            },
+            "blink_transaction_group": {
+              "samples": 70,
+              "percent": 13.133208255159476
+            },
+            "crc": {
+              "samples": 7,
+              "percent": 1.3133208255159474
+            },
+            "allocator": {
+              "samples": 115,
+              "percent": 21.575984990619137
+            },
+            "memory_copy": {
+              "samples": 33,
+              "percent": 6.191369606003752
+            },
+            "bpf_execution": {
+              "samples": 12,
+              "percent": 2.25140712945591
+            },
+            "futex": {
+              "samples": 46,
+              "percent": 8.630393996247655
+            },
+            "rocks_write": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_try_lock": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_db_get": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_memtable": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_compaction": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_work": {
+              "samples": 157,
+              "percent": 29.455909943714822
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_mutation_construction": {
+              "samples": 157,
+              "percent": 29.455909943714822
+            }
+          }
+        },
+        "after-measurement": {
+          "samples": 472,
+          "sampled_cpu_seconds": 4.76767672,
+          "first_sample_epoch_ns": 1792975052891861847,
+          "last_sample_epoch_ns": 1792975057696766762,
+          "unknown_leaf_percent": 0.0,
+          "median_frame_depth": 20,
+          "allocator_nearest_project_caller": {
+            "service_workload": {
+              "samples": 47,
+              "percent": 9.957627118644067
+            },
+            "dodb_storage": {
+              "samples": 22,
+              "percent": 4.661016949152542
+            },
+            "dodb_server": {
+              "samples": 17,
+              "percent": 3.6016949152542375
+            },
+            "dodb_core": {
+              "samples": 6,
+              "percent": 1.271186440677966
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "page_decoding": {
+              "samples": 36,
+              "percent": 7.627118644067797
+            },
+            "tree_invariants": {
+              "samples": 23,
+              "percent": 4.872881355932203
+            },
+            "immutable_base_loading": {
+              "samples": 61,
+              "percent": 12.923728813559322
+            },
+            "checkpoint_worker": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_materialization": {
+              "samples": 1,
+              "percent": 0.211864406779661
+            },
+            "blink_transaction_group": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "crc": {
+              "samples": 19,
+              "percent": 4.02542372881356
+            },
+            "allocator": {
+              "samples": 92,
+              "percent": 19.491525423728813
+            },
+            "memory_copy": {
+              "samples": 29,
+              "percent": 6.1440677966101696
+            },
+            "bpf_execution": {
+              "samples": 12,
+              "percent": 2.542372881355932
+            },
+            "futex": {
+              "samples": 1,
+              "percent": 0.211864406779661
+            },
+            "rocks_write": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_try_lock": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_db_get": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_memtable": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_compaction": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_work": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_mutation_construction": {
+              "samples": 0,
+              "percent": 0.0
+            }
+          }
+        }
+      },
+      "selected_functions": {
+        "append_group_inner": {
+          "samples": 643,
+          "percent": 17.549126637554586
+        },
+        "plan_redo": null,
+        "read_shard": {
+          "samples": 399,
+          "percent": 10.889737991266376
+        },
+        "BasePackJob>::run": null,
+        "BlinkCheckpointSnapshot>::run": null,
+        "TransactionBaseImpl::GetForUpdate": null,
+        "PessimisticTransaction::Commit": null,
+        "PessimisticTransaction::TryLock": null
+      },
+      "waits": {
+        "bucket_start_monotonic_second": 2236665,
+        "bucket_end_monotonic_second": 2236724,
+        "included_start_bucket_seconds": 59,
+        "boundary_policy": "Full start-second buckets; intervals can finish beyond a bucket/window. Long idle parks must not be attributed to request latency.",
+        "state_policy": "All switch-out intervals pooled. The raw runnable flag means tracepoint prev_state == 0 and is not a complete runnable/sleep classification on this kernel, which also encodes preemption as R+.",
+        "realtime_offset_change_ns": 600,
+        "stack_capture_failure_ns": 3420710,
+        "total_offcpu_ns": 1324900413643,
+        "aggregate_ns_in_buckets_with_wait_at_least_one_second": 56657142635,
+        "syscalls": {
+          "futex": {
+            "count": 653088,
+            "total_ns": 1226898027466,
+            "max_ns": 5414502041,
+            "errors": 42624,
+            "bytes": 0
+          },
+          "pwrite64": {
+            "count": 18461,
+            "total_ns": 1424541899,
+            "max_ns": 18316037,
+            "errors": 0,
+            "bytes": 579603575
+          },
+          "fdatasync": {
+            "count": 18454,
+            "total_ns": 38671152209,
+            "max_ns": 77585228,
+            "errors": 0,
+            "bytes": 0
+          },
+          "fsync": {
+            "count": 92,
+            "total_ns": 215416285,
+            "max_ns": 48575818,
+            "errors": 0,
+            "bytes": 0
+          }
+        },
+        "syscalls_by_thread_name": {
+          "futex:tokio-rt-worker": {
+            "count": 633057,
+            "total_ns": 1168423764874,
+            "max_ns": 5414502041,
+            "errors": 42624,
+            "bytes": 0
+          },
+          "pwrite64:tokio-rt-worker": {
+            "count": 18461,
+            "total_ns": 1424541899,
+            "max_ns": 18316037,
+            "errors": 0,
+            "bytes": 579603575
+          },
+          "futex:service_workloa": {
+            "count": 20031,
+            "total_ns": 58474262592,
+            "max_ns": 26594549,
+            "errors": 0,
+            "bytes": 0
+          },
+          "fdatasync:tokio-rt-worker": {
+            "count": 18454,
+            "total_ns": 38671152209,
+            "max_ns": 77585228,
+            "errors": 0,
+            "bytes": 0
+          },
+          "fsync:tokio-rt-worker": {
+            "count": 92,
+            "total_ns": 215416285,
+            "max_ns": 48575818,
+            "errors": 0,
+            "bytes": 0
+          }
+        },
+        "offcpu_totals_ns": {
+          "offcpu": 1324900413643
+        }
+      },
+      "shard_lookup": {
+        "total_samples": 399,
+        "metadata_samples": 289,
+        "database_path_samples": 77
+      },
+      "per_tenant_latency": {
+        "tenant_1": {
+          "condition_rejection": {
+            "count": 12434,
+            "sample_count": 12434
+          },
+          "get": {
+            "count": 537866,
+            "sample_count": 537866
+          },
+          "preparatory_get": {
+            "count": 31112,
+            "sample_count": 31112
+          },
+          "query16": {
+            "count": 142272,
+            "sample_count": 142272
+          },
+          "workflow": {
+            "count": 857856,
+            "sample_count": 857856
+          },
+          "write_transaction_success": {
+            "count": 165284,
+            "sample_count": 165284
+          }
+        }
+      },
+      "fully_in_window_checkpoints": 4
+    },
+    "RW80-minimal-native-control": {
+      "run": {
+        "case_id": "RW80-minimal-native-control",
+        "stage": "main",
+        "source_sha": "cc80d1fdc7a98792be1a739056a3013debf39268",
+        "binary_sha256": "25128f9be2f9c1ddeeb3b663be299c3798d892ac82aa4ba9a2fcd7377b5a4187",
+        "throughput_per_second": 12886.96033589435,
+        "release_epoch_ns": 1792974658767524701,
+        "exit_epoch_ns": 1792974732501129383,
+        "peak_workload_rss_bytes": 436428800,
+        "peak_profiler_rss_bytes": 0,
+        "maximum_database_bytes": 227302641,
+        "minimum_host_available_bytes": 5018341376,
+        "sample_count": 144,
+        "elapsed_seconds": 73.89577547786757
+      },
+      "reopen_and_validation_ms": 1372.890776,
+      "measurement_window_unix_nanos": {
+        "last_client_completion": "1792974729242536898",
+        "start": "1792974669229623265"
+      },
+      "per_tenant_latency": {
+        "tenant_1": {
+          "condition_rejection": {
+            "count": 10816,
+            "sample_count": 10816
+          },
+          "get": {
+            "count": 467970,
+            "sample_count": 467970
+          },
+          "preparatory_get": {
+            "count": 27063,
+            "sample_count": 27063
+          },
+          "query16": {
+            "count": 123770,
+            "sample_count": 123770
+          },
+          "workflow": {
+            "count": 746321,
+            "sample_count": 746321
+          },
+          "write_transaction_success": {
+            "count": 143765,
+            "sample_count": 143765
+          }
+        }
+      },
+      "fully_in_window_checkpoints": 0
+    },
+    "RW80-minimal-native-profile": {
+      "run": {
+        "case_id": "RW80-minimal-native-profile",
+        "stage": "main",
+        "source_sha": "cc80d1fdc7a98792be1a739056a3013debf39268",
+        "binary_sha256": "25128f9be2f9c1ddeeb3b663be299c3798d892ac82aa4ba9a2fcd7377b5a4187",
+        "throughput_per_second": 11622.551660158533,
+        "release_epoch_ns": 1792974817788019261,
+        "exit_epoch_ns": 1792974893073490140,
+        "peak_workload_rss_bytes": 410886144,
+        "peak_profiler_rss_bytes": 235438080,
+        "maximum_database_bytes": 256071310,
+        "minimum_host_available_bytes": 4480495616,
+        "sample_count": 140,
+        "elapsed_seconds": 78.23383873468265
+      },
+      "reopen_and_validation_ms": 2529.616491,
+      "measurement_window_unix_nanos": {
+        "last_client_completion": "1792974888246619116",
+        "start": "1792974828228986643"
+      },
+      "cpu": {
+        "measurement": {
+          "samples": 3724,
+          "sampled_cpu_seconds": 37.61616124,
+          "first_sample_epoch_ns": 1792974828237362075,
+          "last_sample_epoch_ns": 1792974888202585337,
+          "unknown_leaf_percent": 0.7250268528464017,
+          "median_frame_depth": 50,
+          "allocator_nearest_project_caller": {
+            "rocksdb": {
+              "samples": 217,
+              "percent": 5.827067669172933
+            },
+            "dodb_rocksdb": {
+              "samples": 108,
+              "percent": 2.9001074113856067
+            },
+            "dodb_core": {
+              "samples": 62,
+              "percent": 1.664876476906552
+            },
+            "service_workload": {
+              "samples": 51,
+              "percent": 1.3694951664876478
+            },
+            "runtime_or_other": {
+              "samples": 6,
+              "percent": 0.1611170784103115
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_materialization": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_transaction_group": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "crc": {
+              "samples": 8,
+              "percent": 0.21482277121374865
+            },
+            "allocator": {
+              "samples": 444,
+              "percent": 11.92266380236305
+            },
+            "memory_copy": {
+              "samples": 133,
+              "percent": 3.5714285714285716
+            },
+            "bpf_execution": {
+              "samples": 132,
+              "percent": 3.544575725026853
+            },
+            "futex": {
+              "samples": 537,
+              "percent": 14.419978517722878
+            },
+            "rocks_write": {
+              "samples": 1213,
+              "percent": 32.57250268528464
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 1236,
+              "percent": 33.19011815252417
+            },
+            "rocks_get_for_update": {
+              "samples": 986,
+              "percent": 26.476906552094523
+            },
+            "rocks_try_lock": {
+              "samples": 476,
+              "percent": 12.781954887218046
+            },
+            "rocks_db_get": {
+              "samples": 757,
+              "percent": 20.327604726100965
+            },
+            "rocks_memtable": {
+              "samples": 1164,
+              "percent": 31.25671321160043
+            },
+            "rocks_compaction": {
+              "samples": 65,
+              "percent": 1.7454350161117078
+            },
+            "driver_work": {
+              "samples": 3344,
+              "percent": 89.79591836734694
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_mutation_construction": {
+              "samples": 3344,
+              "percent": 89.79591836734694
+            }
+          }
+        },
+        "measurement-outside-checkpoints": {
+          "samples": 3724,
+          "sampled_cpu_seconds": 37.61616124,
+          "first_sample_epoch_ns": 1792974828237362075,
+          "last_sample_epoch_ns": 1792974888202585337,
+          "unknown_leaf_percent": 0.7250268528464017,
+          "median_frame_depth": 50,
+          "allocator_nearest_project_caller": {
+            "rocksdb": {
+              "samples": 217,
+              "percent": 5.827067669172933
+            },
+            "dodb_rocksdb": {
+              "samples": 108,
+              "percent": 2.9001074113856067
+            },
+            "dodb_core": {
+              "samples": 62,
+              "percent": 1.664876476906552
+            },
+            "service_workload": {
+              "samples": 51,
+              "percent": 1.3694951664876478
+            },
+            "runtime_or_other": {
+              "samples": 6,
+              "percent": 0.1611170784103115
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_materialization": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_transaction_group": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "crc": {
+              "samples": 8,
+              "percent": 0.21482277121374865
+            },
+            "allocator": {
+              "samples": 444,
+              "percent": 11.92266380236305
+            },
+            "memory_copy": {
+              "samples": 133,
+              "percent": 3.5714285714285716
+            },
+            "bpf_execution": {
+              "samples": 132,
+              "percent": 3.544575725026853
+            },
+            "futex": {
+              "samples": 537,
+              "percent": 14.419978517722878
+            },
+            "rocks_write": {
+              "samples": 1213,
+              "percent": 32.57250268528464
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 1236,
+              "percent": 33.19011815252417
+            },
+            "rocks_get_for_update": {
+              "samples": 986,
+              "percent": 26.476906552094523
+            },
+            "rocks_try_lock": {
+              "samples": 476,
+              "percent": 12.781954887218046
+            },
+            "rocks_db_get": {
+              "samples": 757,
+              "percent": 20.327604726100965
+            },
+            "rocks_memtable": {
+              "samples": 1164,
+              "percent": 31.25671321160043
+            },
+            "rocks_compaction": {
+              "samples": 65,
+              "percent": 1.7454350161117078
+            },
+            "driver_work": {
+              "samples": 3344,
+              "percent": 89.79591836734694
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_mutation_construction": {
+              "samples": 3344,
+              "percent": 89.79591836734694
+            }
+          }
+        },
+        "before-measurement": {
+          "samples": 497,
+          "sampled_cpu_seconds": 5.02020197,
+          "first_sample_epoch_ns": 1792974817817265793,
+          "last_sample_epoch_ns": 1792974828207506978,
+          "unknown_leaf_percent": 1.408450704225352,
+          "median_frame_depth": 51,
+          "allocator_nearest_project_caller": {
+            "rocksdb": {
+              "samples": 30,
+              "percent": 6.036217303822937
+            },
+            "dodb_rocksdb": {
+              "samples": 16,
+              "percent": 3.2193158953722336
+            },
+            "service_workload": {
+              "samples": 9,
+              "percent": 1.8108651911468814
+            },
+            "dodb_core": {
+              "samples": 9,
+              "percent": 1.8108651911468814
+            },
+            "runtime_or_other": {
+              "samples": 2,
+              "percent": 0.4024144869215292
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_materialization": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_transaction_group": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "crc": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "allocator": {
+              "samples": 66,
+              "percent": 13.279678068410464
+            },
+            "memory_copy": {
+              "samples": 15,
+              "percent": 3.0181086519114686
+            },
+            "bpf_execution": {
+              "samples": 24,
+              "percent": 4.82897384305835
+            },
+            "futex": {
+              "samples": 96,
+              "percent": 19.3158953722334
+            },
+            "rocks_write": {
+              "samples": 214,
+              "percent": 43.05835010060362
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 139,
+              "percent": 27.96780684104628
+            },
+            "rocks_get_for_update": {
+              "samples": 101,
+              "percent": 20.321931589537222
+            },
+            "rocks_try_lock": {
+              "samples": 78,
+              "percent": 15.694164989939638
+            },
+            "rocks_db_get": {
+              "samples": 39,
+              "percent": 7.847082494969819
+            },
+            "rocks_memtable": {
+              "samples": 216,
+              "percent": 43.46076458752515
+            },
+            "rocks_compaction": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_work": {
+              "samples": 456,
+              "percent": 91.75050301810865
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_mutation_construction": {
+              "samples": 456,
+              "percent": 91.75050301810865
+            }
+          }
+        },
+        "after-measurement": {
+          "samples": 472,
+          "sampled_cpu_seconds": 4.76767672,
+          "first_sample_epoch_ns": 1792974888259571548,
+          "last_sample_epoch_ns": 1792974892484585511,
+          "unknown_leaf_percent": 0.0,
+          "median_frame_depth": 28,
+          "allocator_nearest_project_caller": {
+            "service_workload": {
+              "samples": 40,
+              "percent": 8.474576271186441
+            },
+            "dodb_core": {
+              "samples": 12,
+              "percent": 2.542372881355932
+            },
+            "dodb_rocksdb": {
+              "samples": 8,
+              "percent": 1.694915254237288
+            },
+            "rocksdb": {
+              "samples": 5,
+              "percent": 1.0593220338983051
+            }
+          },
+          "inclusive_patterns": {
+            "page_encoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "page_decoding": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "tree_invariants": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "immutable_base_loading": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_worker": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "checkpoint_prepare_complete": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_materialization": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "blink_transaction_group": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "crc": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "allocator": {
+              "samples": 65,
+              "percent": 13.771186440677965
+            },
+            "memory_copy": {
+              "samples": 17,
+              "percent": 3.6016949152542375
+            },
+            "bpf_execution": {
+              "samples": 4,
+              "percent": 0.847457627118644
+            },
+            "futex": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_write": {
+              "samples": 9,
+              "percent": 1.9067796610169492
+            },
+            "rocks_lock_or_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_get_for_update": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_try_lock": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "rocks_db_get": {
+              "samples": 2,
+              "percent": 0.423728813559322
+            },
+            "rocks_memtable": {
+              "samples": 21,
+              "percent": 4.4491525423728815
+            },
+            "rocks_compaction": {
+              "samples": 93,
+              "percent": 19.703389830508474
+            },
+            "driver_work": {
+              "samples": 3,
+              "percent": 0.635593220338983
+            },
+            "driver_validation": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_payload": {
+              "samples": 0,
+              "percent": 0.0
+            },
+            "driver_mutation_construction": {
+              "samples": 0,
+              "percent": 0.0
+            }
+          }
+        }
+      },
+      "selected_functions": {
+        "append_group_inner": null,
+        "plan_redo": null,
+        "read_shard": null,
+        "BasePackJob>::run": null,
+        "BlinkCheckpointSnapshot>::run": null,
+        "TransactionBaseImpl::GetForUpdate": {
+          "samples": 986,
+          "percent": 26.476906552094523
+        },
+        "PessimisticTransaction::Commit": {
+          "samples": 1206,
+          "percent": 32.38453276047261
+        },
+        "PessimisticTransaction::TryLock": {
+          "samples": 476,
+          "percent": 12.781954887218046
+        }
+      },
+      "waits": {
+        "bucket_start_monotonic_second": 2236500,
+        "bucket_end_monotonic_second": 2236559,
+        "included_start_bucket_seconds": 59,
+        "boundary_policy": "Full start-second buckets; intervals can finish beyond a bucket/window. Long idle parks must not be attributed to request latency.",
+        "state_policy": "All switch-out intervals pooled. The raw runnable flag means tracepoint prev_state == 0 and is not a complete runnable/sleep classification on this kernel, which also encodes preemption as R+.",
+        "realtime_offset_change_ns": -280,
+        "stack_capture_failure_ns": 5495047,
+        "total_offcpu_ns": 1197240032383,
+        "aggregate_ns_in_buckets_with_wait_at_least_one_second": 172121773678,
+        "syscalls": {
+          "futex": {
+            "count": 1638366,
+            "total_ns": 1078420336521,
+            "max_ns": 55358954537,
+            "errors": 8960,
+            "bytes": 0
+          },
+          "pread64": {
+            "count": 57087,
+            "total_ns": 1370951317,
+            "max_ns": 3819633,
+            "errors": 0,
+            "bytes": 220186796
+          },
+          "fdatasync": {
+            "count": 43678,
+            "total_ns": 50824969549,
+            "max_ns": 224662094,
+            "errors": 0,
+            "bytes": 0
+          },
+          "fsync": {
+            "count": 7,
+            "total_ns": 23352561,
+            "max_ns": 12152745,
+            "errors": 0,
+            "bytes": 0
+          }
+        },
+        "syscalls_by_thread_name": {
+          "futex:service_workloa": {
+            "count": 21540,
+            "total_ns": 118552223179,
+            "max_ns": 10003838300,
+            "errors": 6,
+            "bytes": 0
+          },
+          "pread64:tokio-rt-worker": {
+            "count": 48995,
+            "total_ns": 1288860247,
+            "max_ns": 3819633,
+            "errors": 0,
+            "bytes": 187929461
+          },
+          "futex:tokio-rt-worker": {
+            "count": 1616756,
+            "total_ns": 847750270897,
+            "max_ns": 235791309,
+            "errors": 8942,
+            "bytes": 0
+          },
+          "fdatasync:tokio-rt-worker": {
+            "count": 43670,
+            "total_ns": 49993915155,
+            "max_ns": 223555324,
+            "errors": 0,
+            "bytes": 0
+          },
+          "fsync:rocksdb:high": {
+            "count": 3,
+            "total_ns": 18944563,
+            "max_ns": 12152745,
+            "errors": 0,
+            "bytes": 0
+          },
+          "fdatasync:rocksdb:low": {
+            "count": 2,
+            "total_ns": 182197168,
+            "max_ns": 178634738,
+            "errors": 0,
+            "bytes": 0
+          },
+          "futex:rocksdb:high": {
+            "count": 16,
+            "total_ns": 56757746457,
+            "max_ns": 19959263023,
+            "errors": 0,
+            "bytes": 0
+          },
+          "fsync:tokio-rt-worker": {
+            "count": 3,
+            "total_ns": 27960,
+            "max_ns": 11840,
+            "errors": 0,
+            "bytes": 0
+          },
+          "fsync:rocksdb:low": {
+            "count": 1,
+            "total_ns": 4380038,
+            "max_ns": 4380038,
+            "errors": 0,
+            "bytes": 0
+          },
+          "pread64:rocksdb:high": {
+            "count": 12,
+            "total_ns": 509244,
+            "max_ns": 154601,
+            "errors": 0,
+            "bytes": 1026088
+          },
+          "fdatasync:rocksdb:high": {
+            "count": 6,
+            "total_ns": 648857226,
+            "max_ns": 224662094,
+            "errors": 0,
+            "bytes": 0
+          },
+          "pread64:rocksdb:low": {
+            "count": 8080,
+            "total_ns": 81581826,
+            "max_ns": 2284700,
+            "errors": 0,
+            "bytes": 31231247
+          },
+          "futex:rocksdb:low": {
+            "count": 54,
+            "total_ns": 55360095988,
+            "max_ns": 55358954537,
+            "errors": 12,
+            "bytes": 0
+          }
+        },
+        "offcpu_totals_ns": {
+          "offcpu": 1197240032383
+        }
+      },
+      "shard_lookup": {
+        "total_samples": 1,
+        "metadata_samples": 0,
+        "database_path_samples": 0
+      },
+      "per_tenant_latency": {
+        "tenant_1": {
+          "condition_rejection": {
+            "count": 9756,
+            "sample_count": 9756
+          },
+          "get": {
+            "count": 422088,
+            "sample_count": 422088
+          },
+          "preparatory_get": {
+            "count": 24406,
+            "sample_count": 24406
+          },
+          "query16": {
+            "count": 111636,
+            "sample_count": 111636
+          },
+          "workflow": {
+            "count": 673152,
+            "sample_count": 673152
+          },
+          "write_transaction_success": {
+            "count": 129672,
+            "sample_count": 129672
+          }
+        }
+      },
+      "fully_in_window_checkpoints": 0
+    }
+  },
+  "profiling_perturbation": {
+    "RW80-blink": -3.7356068507613416,
+    "RW80-minimal-native": -9.811535403069637,
+    "E-blink": -0.9931053760687591,
+    "E-minimal-native": -10.133682873215566
+  }
+}
