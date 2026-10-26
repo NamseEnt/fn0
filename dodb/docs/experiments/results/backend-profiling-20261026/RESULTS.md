@@ -93,6 +93,8 @@ Each percentage compares one cell to one same-session control. These numbers dem
 
 All twelve workload cells pass source/binary identity, zero unintended request errors, full latency counts, fixed per-client input-prefix equality within each workload/stage, full admission, final/reopen state and resource guards. Each main B-link cell completes at least three in-window checkpoints with acknowledged-write overlap and drains all checkpoint work. BPF maps report zero insertion failures. Main CPU windows contain 3,664–5,578 samples; unknown leaf shares are 0.23–1.06%. Existing databases and evidence were preserved. Engine tests were not rerun because the measured source and executables were unchanged.
 
+No lost-event warnings were emitted. Each RocksDB profile emitted two retained `addr2line ... could not read first record` warnings during inline symbolization; both B-link symbolization logs are empty. Function symbols remain available with the leaf-resolution coverage above, but complete inline/source-location attribution is not claimed. The warnings and original traces are preserved in the archive.
+
 ## Artifacts
 
 | Workload / backend | Measurement CPU | Off-CPU kernel stacks | Post-measurement CPU |
