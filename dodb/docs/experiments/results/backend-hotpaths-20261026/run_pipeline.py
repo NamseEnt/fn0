@@ -21,6 +21,7 @@ if (ROOT / "pipeline-steps.json").is_file():
 
 def build():
     assert not subprocess.check_output(["git", "-C", str(SOURCE), "status", "--porcelain"], text=True).strip()
+    build_helper.build("typecheck", ["check", "--locked", "--release", "-j", "1", "-p", "dodb-server", "-p", "dodb-rocksdb", "--tests"])
     arguments = ["test", "--locked", "--release", "-j", "1", "-p", "dodb-storage", "-p", "dodb-server", "-p", "dodb-rocksdb",
                  "--lib", "--bin", "service_workload", "--bin", "unconditional_write_workload"]
     for name in ["background_checkpoint", "blink_wal_checkpoint", "background_checkpoint_sigkill", "segmented_checkpoint_sigkill",

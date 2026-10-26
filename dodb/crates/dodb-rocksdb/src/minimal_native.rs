@@ -541,6 +541,25 @@ fn commit_transaction(mut transaction: TransactionGuard) -> Result<(), Error> {
     Ok(())
 }
 
+fn decode_document_key(encoded_key: &[u8]) -> Result<DocumentKey, Error> {
+    DocumentKey::decode(&encoded_key[1..])
+        .map_err(|error| Error::corruption(format!("RocksDB document key decode failed: {error}")))
+}
+
+fn decode_present_record(
+    encoded_pointer: *const u8,
+    encoded_length: usize,
+) -> Result<Option<(Revision, usize)>, Error> {
+    if encoded_length < 10 || encoded_pointer.is_null() {
+        return Err(Error::corruption(
+            "unsupported RocksDB logical value format",
+        ));
+    }
+    let encoded = unsafe { std::slice::from_raw_parts(encoded_pointer, encoded_length) };
+    let (revision, value_length) = decode_value_header(encoded)?;
+    Ok(value_length.map(|value_length| (revision, value_length)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -597,23 +616,4 @@ mod tests {
             }
         }
     }
-}
-
-fn decode_document_key(encoded_key: &[u8]) -> Result<DocumentKey, Error> {
-    DocumentKey::decode(&encoded_key[1..])
-        .map_err(|error| Error::corruption(format!("RocksDB document key decode failed: {error}")))
-}
-
-fn decode_present_record(
-    encoded_pointer: *const u8,
-    encoded_length: usize,
-) -> Result<Option<(Revision, usize)>, Error> {
-    if encoded_length < 10 || encoded_pointer.is_null() {
-        return Err(Error::corruption(
-            "unsupported RocksDB logical value format",
-        ));
-    }
-    let encoded = unsafe { std::slice::from_raw_parts(encoded_pointer, encoded_length) };
-    let (revision, value_length) = decode_value_header(encoded)?;
-    Ok(value_length.map(|value_length| (revision, value_length)))
 }

@@ -33,7 +33,8 @@ def main():
     (ROOT / "final-identities.json").write_text(json.dumps(identities, indent=2) + "\n")
     build_directory = ROOT / "build-provenance"
     build_directory.mkdir(exist_ok=True)
-    for revision in ["e3dfd3601", identities["candidate"]["source_sha"][:9]]:
+    revisions = {record["source_sha"][:9] for record in json.loads((ROOT / "pipeline-steps.json").read_text())}
+    for revision in sorted(revisions):
         for source in Path("/bench/zfs/db/dodb-rocksdb-build-runs").glob(f"durable-bases-{revision}-*"):
             destination = build_directory / source.name
             if not destination.exists():
