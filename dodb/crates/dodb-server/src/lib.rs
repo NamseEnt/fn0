@@ -2418,6 +2418,7 @@ fn condition_matches(condition: &TransactionCondition, actual: &ObservedState) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dodb_core::DocumentKey;
 
     fn blink_test_directory() -> tempfile::TempDir {
         match std::env::var_os("DODB_TEST_DATA_DIR") {
