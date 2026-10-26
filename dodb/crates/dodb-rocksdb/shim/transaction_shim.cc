@@ -360,6 +360,20 @@ int dodb_rocksdb_transaction_get_for_update(
   return 0;
 }
 
+int dodb_rocksdb_transaction_lock_for_update(
+    void* transaction, const unsigned char* key, size_t key_length,
+    char** error) {
+  const auto status = static_cast<rocksdb::Transaction*>(transaction)->GetForUpdate(
+      rocksdb::ReadOptions(),
+      rocksdb::Slice(reinterpret_cast<const char*>(key), key_length),
+      static_cast<std::string*>(nullptr), true, true);
+  if (!status.ok()) {
+    set_error(error, status);
+    return 1;
+  }
+  return 0;
+}
+
 void dodb_rocksdb_set_research_metrics(bool enabled) {
   rocksdb::SetPerfLevel(enabled ? rocksdb::PerfLevel::kEnableTimeExceptForMutex
                                 : rocksdb::PerfLevel::kDisable);

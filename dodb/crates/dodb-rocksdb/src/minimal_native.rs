@@ -18,8 +18,8 @@ use crate::{
     RocksDbHandle, TransactionGuard, USER_KEY_PREFIX, condition_matches, counter_bytes_to_u64,
     decode_and_free_get_value, decode_state, decode_value_header, dodb_rocksdb_begin,
     dodb_rocksdb_get, dodb_rocksdb_iterator_new, encode_state, enforce_response_budget,
-    evaluate_uncreated, ffi_error, transaction_get_for_update, transaction_put, user_key,
-    user_partition_prefix, validate_encoded_key,
+    evaluate_uncreated, ffi_error, transaction_get_for_update, transaction_lock_for_update,
+    transaction_put, user_key, user_partition_prefix, validate_encoded_key,
 };
 
 const REVISION_RANGE_SIZE: u64 = DEFAULT_REVISION_RANGE_SIZE;
@@ -251,14 +251,18 @@ impl MinimalNativeTenant {
         let mut locked_states = std::collections::BTreeMap::new();
         let mut transaction_keys = std::collections::BTreeMap::new();
         for condition in &request.conditions {
-            transaction_keys
-                .entry(user_key(condition.key()))
-                .or_insert(());
+            transaction_keys.insert(user_key(condition.key()), true);
         }
         for mutation in &request.mutations {
-            transaction_keys.insert(user_key(mutation.key()), ());
+            transaction_keys
+                .entry(user_key(mutation.key()))
+                .or_insert(false);
         }
-        for encoded_key in transaction_keys.keys() {
+        for (encoded_key, read_existing_state) in &transaction_keys {
+            if !read_existing_state {
+                transaction_lock_for_update(&transaction, encoded_key)?;
+                continue;
+            }
             let mut lock_wait_nanos = 0;
             let mut lock_wait_count = 0;
             let encoded = transaction_get_for_update(

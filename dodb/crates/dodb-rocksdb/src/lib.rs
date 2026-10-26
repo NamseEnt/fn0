@@ -489,6 +489,12 @@ unsafe extern "C" {
         timings: *mut NativeReadTimings,
         error: *mut *mut c_char,
     ) -> i32;
+    fn dodb_rocksdb_transaction_lock_for_update(
+        transaction: *mut c_void,
+        key: *const u8,
+        key_length: usize,
+        error: *mut *mut c_char,
+    ) -> i32;
     fn dodb_rocksdb_transaction_put(
         transaction: *mut c_void,
         key: *const u8,
@@ -2443,6 +2449,23 @@ fn evaluate_uncreated(request: &TransactionRequest) -> Result<LogicalTransaction
     })
 }
 
+fn transaction_lock_for_update(transaction: &TransactionGuard, key: &[u8]) -> Result<(), Error> {
+    let mut error = std::ptr::null_mut();
+    let result = unsafe {
+        dodb_rocksdb_transaction_lock_for_update(
+            transaction.handle.as_ptr(),
+            key.as_ptr(),
+            key.len(),
+            &mut error,
+        )
+    };
+    if result == 0 {
+        Ok(())
+    } else {
+        Err(ffi_error(error, "RocksDB transaction key lock failed"))
+    }
+}
+
 fn transaction_put(transaction: &TransactionGuard, key: &[u8], value: &[u8]) -> Result<(), Error> {
     let mut error = std::ptr::null_mut();
     let result = unsafe {
@@ -2607,6 +2630,54 @@ mod tests {
         match std::env::var_os("DODB_TEST_DATA_DIR") {
             Some(path) => TempDir::new_in(path).unwrap(),
             None => TempDir::new().unwrap(),
+        }
+    }
+
+    #[test]
+    fn lock_only_keys_exclude_writers_and_release_after_rollback_or_commit() {
+        for present in [false, true] {
+            for commit_holder in [false, true] {
+                let directory = temporary_db_directory();
+                let database = TenantDatabase::open(directory.path()).unwrap();
+                let key = user_key(&DocumentKey::new("lock-only", "row"));
+                let initial_state = RevisionState::present(b"initial".to_vec(), Revision::new(1));
+                if present {
+                    let transaction = begin_transaction(&database.handle).unwrap();
+                    transaction_put(&transaction, &key, &encode_state(&initial_state)).unwrap();
+                    commit_transaction(transaction).unwrap();
+                }
+                let mut holder = begin_transaction(&database.handle).unwrap();
+                transaction_lock_for_update(&holder, &key).unwrap();
+                let blocked = begin_transaction(&database.handle).unwrap();
+                let error =
+                    transaction_put(&blocked, &key, &encode_state(&initial_state)).unwrap_err();
+                assert!(error.to_string().contains("Timeout"), "{error}");
+                drop(blocked);
+                if commit_holder {
+                    commit_transaction(holder).unwrap();
+                } else {
+                    holder.rollback();
+                }
+                let writer = begin_transaction(&database.handle).unwrap();
+                transaction_lock_for_update(&writer, &key).unwrap();
+                transaction_put(&writer, &key, &encode_state(&initial_state)).unwrap();
+                commit_transaction(writer).unwrap();
+                let verification = begin_transaction(&database.handle).unwrap();
+                let mut lock_wait_nanos = 0;
+                let mut lock_wait_count = 0;
+                let encoded = transaction_get_for_update(
+                    &verification,
+                    &key,
+                    true,
+                    false,
+                    &mut lock_wait_nanos,
+                    &mut lock_wait_count,
+                    None,
+                )
+                .unwrap()
+                .unwrap();
+                assert_eq!(decode_state(&encoded).unwrap(), initial_state);
+            }
         }
     }
 
