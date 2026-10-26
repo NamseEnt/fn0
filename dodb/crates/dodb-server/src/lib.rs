@@ -1449,6 +1449,9 @@ impl BlinkTenantService {
     }
 
     async fn read_shard(&self, tenant: TenantId) -> Result<Option<Arc<AsyncBlinkShard>>, Error> {
+        if let Some(shard) = self.shards.lock().await.get(&tenant).cloned() {
+            return Ok(Some(shard));
+        }
         let path = self.database_path(tenant);
         if !path.exists() && !path.with_extension("wal").exists() {
             return Ok(None);
@@ -2415,6 +2418,165 @@ fn condition_matches(condition: &TransactionCondition, actual: &ObservedState) -
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn blink_test_directory() -> tempfile::TempDir {
+        match std::env::var_os("DODB_TEST_DATA_DIR") {
+            Some(path) => tempfile::TempDir::new_in(path).unwrap(),
+            None => tempfile::TempDir::new().unwrap(),
+        }
+    }
+
+    #[tokio::test]
+    async fn cached_blink_reads_do_not_depend_on_repeated_path_checks() {
+        for wal_layout in [
+            BlinkWalLayout::Legacy,
+            BlinkWalLayout::Segmented {
+                max_segment_bytes: 1_048_576,
+            },
+            BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce: true,
+            },
+        ] {
+            let directory = blink_test_directory();
+            let service = BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                blink_wal_layout: wal_layout,
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap();
+            let tenant = TenantId::new(7);
+            let key = DocumentKey::new("cached", "row");
+            let budget = ExecutionBudget::new(4096);
+            service
+                .execute_request(
+                    tenant,
+                    Request::Put {
+                        key: key.clone(),
+                        value: b"cached-value".to_vec(),
+                    },
+                    budget,
+                )
+                .await
+                .unwrap();
+            let original_path = directory.path().join("blink");
+            let moved_path = directory.path().join("temporarily-moved");
+            std::fs::rename(&original_path, &moved_path).unwrap();
+            for request in [
+                Request::Get { key: key.clone() },
+                Request::Query {
+                    pk: key.pk.clone(),
+                    exclusive_after_sk: None,
+                    limit: 16,
+                },
+                Request::Scan {
+                    exclusive_after_key: None,
+                    limit: 16,
+                },
+                Request::Transact {
+                    request: TransactionRequest::new(
+                        vec![TransactionCondition::Exists { key: key.clone() }],
+                        Vec::new(),
+                    ),
+                },
+            ] {
+                match service
+                    .execute_request(tenant, request, budget)
+                    .await
+                    .unwrap()
+                {
+                    Response::Get(state) => {
+                        assert_eq!(state.value(), Some(b"cached-value".as_slice()))
+                    }
+                    Response::Query(rows) | Response::Scan(rows) => {
+                        assert_eq!(rows.len(), 1);
+                        assert_eq!(rows[0].value, b"cached-value");
+                    }
+                    Response::Transact(outcome) => assert!(outcome.commit_lsn.is_none()),
+                    response => panic!("unexpected response: {response:?}"),
+                }
+            }
+            std::fs::rename(&moved_path, &original_path).unwrap();
+            service.shutdown_checked().await.unwrap();
+            match service
+                .execute_request(tenant, Request::Get { key }, budget)
+                .await
+                .unwrap()
+            {
+                Response::Get(state) => assert_eq!(state.value(), Some(b"cached-value".as_slice())),
+                response => panic!("unexpected response: {response:?}"),
+            }
+            service.shutdown_checked().await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn absent_blink_reads_preserve_capacity_and_do_not_cache_absence() {
+        let directory = blink_test_directory();
+        let service = BlinkTenantService::new(LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            max_open_shards: 1,
+            ..LocalTenantServiceConfig::default()
+        })
+        .unwrap();
+        let tenant = TenantId::new(1);
+        assert!(service.read_shard(tenant).await.unwrap().is_none());
+        assert_eq!(
+            std::fs::read_dir(directory.path().join("blink"))
+                .unwrap()
+                .count(),
+            0
+        );
+        let opened = service.open_shard(tenant).await.unwrap();
+        assert!(Arc::ptr_eq(
+            &opened,
+            &service.read_shard(tenant).await.unwrap().unwrap()
+        ));
+        assert!(
+            service
+                .read_shard(TenantId::new(2))
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(matches!(
+            service.open_shard(TenantId::new(2)).await,
+            Err(Error::Overloaded(_))
+        ));
+        service.shutdown_checked().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn racing_blink_read_and_open_share_one_shard() {
+        let directory = blink_test_directory();
+        let service = Arc::new(
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap(),
+        );
+        let tenant = TenantId::new(3);
+        let barrier = Arc::new(tokio::sync::Barrier::new(9));
+        let mut readers = Vec::new();
+        for _reader_number in 0..8 {
+            let reader_service = Arc::clone(&service);
+            let reader_barrier = Arc::clone(&barrier);
+            readers.push(tokio::spawn(async move {
+                reader_barrier.wait().await;
+                reader_service.read_shard(tenant).await.unwrap()
+            }));
+        }
+        barrier.wait().await;
+        let opened = service.open_shard(tenant).await.unwrap();
+        for reader in readers {
+            if let Some(shard) = reader.await.unwrap() {
+                assert!(Arc::ptr_eq(&opened, &shard));
+            }
+        }
+        assert_eq!(service.shards.lock().await.len(), 1);
+        service.shutdown_checked().await.unwrap();
+    }
 
     #[test]
     fn database_uuid_includes_all_shard_bits() {
