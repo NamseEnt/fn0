@@ -18,6 +18,7 @@ churn-counters = []
 phase-i-instrumentation = []
 blink-read-metrics-disabled = []
 blink-borrowed-page-views = []
+blink-writer-pin-reuse = []
 
 [dev-dependencies]
 proptest.workspace = true

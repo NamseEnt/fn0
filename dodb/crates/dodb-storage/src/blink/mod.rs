@@ -1112,6 +1112,8 @@ impl ImmutableOverlaySegment {
 struct PublicationMetrics {
     generation_pins: AtomicU64,
     active_generation_pins: AtomicU64,
+    #[cfg(test)]
+    last_reuse_decision_pins: AtomicU64,
     max_concurrent_pins: AtomicU64,
     page_version_installs: AtomicU64,
     versions_reclaimed: AtomicU64,
@@ -1536,7 +1538,12 @@ impl GenerationPublisher {
     }
 
     fn can_reuse_pages(&self) -> bool {
-        self.metrics.active_generation_pins.load(Ordering::Acquire) == 0
+        let active_pins = self.metrics.active_generation_pins.load(Ordering::Acquire);
+        #[cfg(test)]
+        self.metrics
+            .last_reuse_decision_pins
+            .store(active_pins, Ordering::Relaxed);
+        active_pins == 0
     }
 
     fn metrics(&self, retired_page_ids: u64, reusable_page_ids: u64) -> BlinkVersionedReadMetrics {
@@ -3231,6 +3238,8 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             .saturating_add(admission_nanos);
         drop(overlay);
         drop(admission_site);
+        #[cfg(feature = "blink-writer-pin-reuse")]
+        drop(committed_view);
         if admitted.is_empty() {
             return Ok(results);
         }
@@ -3264,11 +3273,16 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                     || plan.transactions.iter().fold(0usize, |total, transaction| {
                         total.saturating_add(transaction.mutations.len())
                     }) >= self.parallel_min_background_worker_operations;
+                #[cfg(feature = "blink-writer-pin-reuse")]
+                let allow_page_reuse = self.publisher.can_reuse_pages();
+                let preparation_view = self.publisher.pin();
+                #[cfg(not(feature = "blink-writer-pin-reuse"))]
+                let allow_page_reuse = self.publisher.can_reuse_pages();
                 prepare_leaf_parallel_execution(
                     self.parallel_min_group_mutations,
                     dispatch_background_workers,
                     &self.state,
-                    &self.publisher.pin(),
+                    &preparation_view,
                     &plan,
                     worker_pool,
                     self.wal.as_ref(),
@@ -3277,7 +3291,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
                     self.active_slot,
                     current_next_lsn,
                     current_next_batch_id,
-                    self.publisher.can_reuse_pages(),
+                    allow_page_reuse,
                     &mut self.batch_metrics,
                     &mut self.fault_injector,
                     #[cfg(test)]
@@ -15350,6 +15364,350 @@ mod tests {
             _ => panic!("expected overflow value"),
         };
         assert_eq!(after_head, old_head);
+    }
+
+    fn test_free_page_ids(state: &BlinkState) -> HashSet<PageId> {
+        state
+            .pages
+            .iter()
+            .filter_map(|(page_id, page)| {
+                matches!(page.as_ref(), BlinkPage::Free { .. }).then_some(*page_id)
+            })
+            .collect()
+    }
+
+    fn test_overflow_page_ids(state: &BlinkState, key: &DocumentKey) -> HashSet<PageId> {
+        let Some(OwnedValue::Overflow { head, .. }) = find_entry(state, &key.encode())
+            .unwrap()
+            .and_then(|entry| entry.value)
+        else {
+            return HashSet::new();
+        };
+        let mut page_ids = HashSet::new();
+        let mut next_page_id = Some(head);
+        while let Some(page_id) = next_page_id {
+            assert!(page_ids.insert(page_id));
+            next_page_id = match state.pages.get(&page_id).map(AsRef::as_ref) {
+                Some(BlinkPage::Overflow { next, .. }) => *next,
+                _ => panic!("expected overflow page in current state"),
+            };
+        }
+        page_ids
+    }
+
+    #[test]
+    fn writer_pin_reuse_bounds_overflow_churn_and_preserves_pinned_generations() {
+        for value_size in [512usize, 513, 4_096] {
+            let config = DatabaseConfig::default();
+            let mut store = BlinkStore::<MemoryFile, MemoryFile>::open_with_wal(
+                MemoryFile::default(),
+                MemoryFile::default(),
+                config,
+            )
+            .unwrap();
+            if value_size == 4_096 {
+                store.enable_parallel_execution(2).unwrap();
+            } else {
+                store.enable_planned_execution();
+            }
+            let key = DocumentKey::new(b"density".to_vec(), value_size.to_be_bytes().to_vec());
+            let initial_value = vec![3; value_size];
+            store.put(key.clone(), initial_value.clone()).unwrap();
+            let high_water_after_initial = store.state.high_water_page_id;
+            let mut fresh_allocations = 0u64;
+            let mut successful_reuses = 0u64;
+            let mut denied_reuse_decisions = 0u64;
+            let mut no_reader_reuses = 0u64;
+            let mut pinned_reuses = 0u64;
+            let mut post_release_reuses = 0u64;
+            let mut pinned_fresh_allocations = 0u64;
+            let mut post_release_fresh_allocations = 0u64;
+            let mut high_water_after_warmup = high_water_after_initial;
+            for overwrite_number in 0..16u8 {
+                let free_before_write = test_free_page_ids(&store.state);
+                let high_water_before_write = store.state.high_water_page_id;
+                store
+                    .put(key.clone(), vec![overwrite_number; value_size])
+                    .unwrap();
+                let high_water_after_write = store.state.high_water_page_id;
+                fresh_allocations = fresh_allocations.saturating_add(
+                    high_water_after_write
+                        .get()
+                        .saturating_sub(high_water_before_write.get()),
+                );
+                let allocated_overflow_pages = test_overflow_page_ids(&store.state, &key);
+                let reused_pages = allocated_overflow_pages
+                    .intersection(&free_before_write)
+                    .count() as u64;
+                successful_reuses = successful_reuses.saturating_add(reused_pages);
+                no_reader_reuses = no_reader_reuses.saturating_add(reused_pages);
+                if !free_before_write.is_empty() && reused_pages == 0 {
+                    denied_reuse_decisions = denied_reuse_decisions.saturating_add(1);
+                }
+                if overwrite_number == 7 {
+                    high_water_after_warmup = high_water_after_write;
+                }
+            }
+            let no_reader_decision_pins = store
+                .publisher
+                .metrics
+                .last_reuse_decision_pins
+                .load(Ordering::Relaxed);
+            assert_eq!(
+                no_reader_decision_pins,
+                u64::from(!cfg!(feature = "blink-writer-pin-reuse"))
+            );
+            if cfg!(feature = "blink-writer-pin-reuse") {
+                assert_eq!(store.state.high_water_page_id, high_water_after_warmup);
+            } else if value_size > 512 {
+                assert!(store.state.high_water_page_id > high_water_after_warmup);
+            }
+            if value_size == 512 {
+                assert_eq!(high_water_after_warmup, high_water_after_initial);
+            } else {
+                assert!(high_water_after_warmup > high_water_after_initial);
+            }
+            let pinned_value = vec![15; value_size];
+            let old_pin = store.publisher.pin();
+            for overwrite_number in 16..24u8 {
+                let free_before_write = test_free_page_ids(&store.state);
+                let high_water_before_write = store.state.high_water_page_id;
+                store
+                    .put(key.clone(), vec![overwrite_number; value_size])
+                    .unwrap();
+                let high_water_after_write = store.state.high_water_page_id;
+                let fresh_pages = high_water_after_write
+                    .get()
+                    .saturating_sub(high_water_before_write.get());
+                fresh_allocations = fresh_allocations.saturating_add(fresh_pages);
+                pinned_fresh_allocations = pinned_fresh_allocations.saturating_add(fresh_pages);
+                let allocated_overflow_pages = test_overflow_page_ids(&store.state, &key);
+                let reused_pages = allocated_overflow_pages
+                    .intersection(&free_before_write)
+                    .count();
+                if !free_before_write.is_empty() && reused_pages == 0 {
+                    denied_reuse_decisions = denied_reuse_decisions.saturating_add(1);
+                }
+                successful_reuses = successful_reuses.saturating_add(reused_pages as u64);
+                pinned_reuses = pinned_reuses.saturating_add(reused_pages as u64);
+            }
+            let external_reader_decision_pins = store
+                .publisher
+                .metrics
+                .last_reuse_decision_pins
+                .load(Ordering::Relaxed);
+            assert_eq!(
+                external_reader_decision_pins,
+                u64::from(!cfg!(feature = "blink-writer-pin-reuse")) + 1
+            );
+            let mut corrections = 0;
+            assert_eq!(
+                read_state(&old_pin, &key, &mut corrections)
+                    .unwrap()
+                    .value(),
+                Some(&pinned_value[..])
+            );
+            let high_water_while_pinned = store.state.high_water_page_id;
+            assert!(high_water_while_pinned >= high_water_after_warmup);
+            if value_size > 512 {
+                assert!(high_water_while_pinned > high_water_after_warmup);
+                assert_eq!(pinned_reuses, 0);
+            }
+            drop(old_pin);
+            for overwrite_number in 24..56u8 {
+                let free_before_write = test_free_page_ids(&store.state);
+                let high_water_before_write = store.state.high_water_page_id;
+                store
+                    .put(key.clone(), vec![overwrite_number; value_size])
+                    .unwrap();
+                let high_water_after_write = store.state.high_water_page_id;
+                let fresh_pages = high_water_after_write
+                    .get()
+                    .saturating_sub(high_water_before_write.get());
+                fresh_allocations = fresh_allocations.saturating_add(fresh_pages);
+                post_release_fresh_allocations =
+                    post_release_fresh_allocations.saturating_add(fresh_pages);
+                let allocated_overflow_pages = test_overflow_page_ids(&store.state, &key);
+                let reused_pages = allocated_overflow_pages
+                    .intersection(&free_before_write)
+                    .count() as u64;
+                successful_reuses = successful_reuses.saturating_add(reused_pages);
+                post_release_reuses = post_release_reuses.saturating_add(reused_pages);
+                if !free_before_write.is_empty() && reused_pages == 0 {
+                    denied_reuse_decisions = denied_reuse_decisions.saturating_add(1);
+                }
+            }
+            let post_release_decision_pins = store
+                .publisher
+                .metrics
+                .last_reuse_decision_pins
+                .load(Ordering::Relaxed);
+            assert_eq!(
+                post_release_decision_pins,
+                u64::from(!cfg!(feature = "blink-writer-pin-reuse"))
+            );
+            let high_water_after_release = store.state.high_water_page_id;
+            for overwrite_number in 56..88u8 {
+                let free_before_write = test_free_page_ids(&store.state);
+                let high_water_before_write = store.state.high_water_page_id;
+                store
+                    .put(key.clone(), vec![overwrite_number; value_size])
+                    .unwrap();
+                let high_water_after_write = store.state.high_water_page_id;
+                let fresh_pages = high_water_after_write
+                    .get()
+                    .saturating_sub(high_water_before_write.get());
+                fresh_allocations = fresh_allocations.saturating_add(fresh_pages);
+                post_release_fresh_allocations =
+                    post_release_fresh_allocations.saturating_add(fresh_pages);
+                let allocated_overflow_pages = test_overflow_page_ids(&store.state, &key);
+                let reused_pages = allocated_overflow_pages
+                    .intersection(&free_before_write)
+                    .count() as u64;
+                successful_reuses = successful_reuses.saturating_add(reused_pages);
+                post_release_reuses = post_release_reuses.saturating_add(reused_pages);
+                if !free_before_write.is_empty() && reused_pages == 0 {
+                    denied_reuse_decisions = denied_reuse_decisions.saturating_add(1);
+                }
+            }
+            if value_size > 512 && cfg!(feature = "blink-writer-pin-reuse") {
+                assert!(no_reader_reuses > 0);
+                assert_eq!(pinned_reuses, 0);
+                assert!(post_release_reuses > 0);
+                assert_eq!(post_release_fresh_allocations, 0);
+            }
+            if cfg!(feature = "blink-writer-pin-reuse") || value_size == 512 {
+                assert_eq!(store.state.high_water_page_id, high_water_after_release);
+            } else {
+                assert!(store.state.high_water_page_id > high_water_after_release);
+            }
+            eprintln!(
+                "writer_pin_reuse_diagnostic value_size={value_size} initial_high_water={} warmup_high_water={} pinned_high_water={} released_high_water={} final_high_water={} fresh_allocations_total={fresh_allocations} successful_reuses_total={successful_reuses} no_reader_reuses={no_reader_reuses} pinned_reuses={pinned_reuses} post_release_reuses={post_release_reuses} pinned_fresh_allocations={pinned_fresh_allocations} post_release_fresh_allocations={post_release_fresh_allocations} unavailable_reuse_opportunities={denied_reuse_decisions} no_reader_decision_pins={no_reader_decision_pins} external_reader_decision_pins={external_reader_decision_pins} post_release_decision_pins={post_release_decision_pins} free_pages_final={} active_pins_final={} feature_enabled={}",
+                high_water_after_initial.get(),
+                high_water_after_warmup.get(),
+                high_water_while_pinned.get(),
+                high_water_after_release.get(),
+                store.state.high_water_page_id.get(),
+                test_free_page_ids(&store.state).len(),
+                store.versioned_read_metrics().active_generation_pins,
+                cfg!(feature = "blink-writer-pin-reuse")
+            );
+            assert!(store.publisher.can_reuse_pages());
+            store.check_invariants().unwrap();
+            assert_eq!(
+                store
+                    .state
+                    .high_water_page_id
+                    .get()
+                    .saturating_sub(high_water_after_initial.get()),
+                fresh_allocations
+            );
+            if value_size == 4_096 {
+                assert!(store.batch_metrics().parallel_skipped_single_leaf > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn planned_reuse_preserves_ordered_group_revisions_and_reopen() {
+        let mut store = planned_store();
+        let key = DocumentKey::new(b"density-group".to_vec(), b"fixed-key".to_vec());
+        let first_value = vec![4; 4_096];
+        store.put(key.clone(), first_value).unwrap();
+        let overflow_pages_before_group = test_overflow_page_ids(&store.state, &key);
+        let high_water_before_group = store.state.high_water_page_id;
+        let requests = [
+            TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Delete { key: key.clone() }],
+            ),
+            TransactionRequest::new(
+                vec![TransactionCondition::NotExists { key: key.clone() }],
+                vec![TransactionMutation::Put {
+                    key: key.clone(),
+                    value: vec![9; 4_096],
+                }],
+            ),
+        ];
+        let results = store.apply_transaction_group(&requests).unwrap();
+        assert_eq!(results.len(), 2);
+        let first_revision = results[0].as_ref().unwrap().revision.unwrap();
+        let second_revision = results[1].as_ref().unwrap().revision.unwrap();
+        assert!(first_revision < second_revision);
+        let reused_group_pages = test_overflow_page_ids(&store.state, &key)
+            .intersection(&overflow_pages_before_group)
+            .count();
+        if cfg!(feature = "blink-writer-pin-reuse") {
+            assert!(reused_group_pages > 0);
+            assert_eq!(store.state.high_water_page_id, high_water_before_group);
+        } else {
+            assert_eq!(reused_group_pages, 0);
+            assert!(store.state.high_water_page_id > high_water_before_group);
+        }
+        assert_eq!(store.get(&key).unwrap().value(), Some(&vec![9; 4_096][..]));
+        let (data_file, wal_file) = store.into_files();
+        let mut reopened =
+            BlinkStore::open_with_wal(data_file, wal_file.unwrap(), DatabaseConfig::default())
+                .unwrap();
+        reopened.enable_planned_execution();
+        assert_eq!(
+            reopened.get(&key).unwrap().value(),
+            Some(&vec![9; 4_096][..])
+        );
+        assert_eq!(reopened.get(&key).unwrap().revision(), second_revision);
+        reopened.check_invariants().unwrap();
+    }
+
+    #[test]
+    fn reader_arriving_after_reuse_decision_keeps_immutable_page_view() {
+        let mut store = planned_store();
+        let key = DocumentKey::new(b"density-interleave".to_vec(), b"fixed-key".to_vec());
+        let old_value = vec![5; 4_096];
+        store.put(key.clone(), old_value.clone()).unwrap();
+        let old_overflow_head = match find_entry(&store.state, &key.encode())
+            .unwrap()
+            .unwrap()
+            .value
+        {
+            Some(OwnedValue::Overflow { head, .. }) => head,
+            _ => panic!("expected overflow value"),
+        };
+        let allow_page_reuse = store.publisher.can_reuse_pages();
+        assert!(allow_page_reuse);
+        let raced_reader = store.publisher.pin();
+        assert!(!store.publisher.can_reuse_pages());
+        let mut working = WorkingBlinkState::new(&store.state, allow_page_reuse);
+        let mut dirty = BTreeSet::new();
+        let mut split_metrics = BlinkSplitMetrics::default();
+        apply_mutation(
+            &mut working,
+            &mut dirty,
+            &mut split_metrics,
+            &TransactionMutation::Delete { key: key.clone() },
+            Revision::new(2),
+        )
+        .unwrap();
+        apply_mutation(
+            &mut working,
+            &mut dirty,
+            &mut split_metrics,
+            &TransactionMutation::Put {
+                key: key.clone(),
+                value: vec![8; 4_096],
+            },
+            Revision::new(3),
+        )
+        .unwrap();
+        let mut corrections = 0;
+        assert_eq!(
+            read_state(&raced_reader, &key, &mut corrections)
+                .unwrap()
+                .value(),
+            Some(&old_value[..])
+        );
+        assert!(dirty.contains(&old_overflow_head));
+        assert_eq!(working.high_water_page_id, store.state.high_water_page_id);
+        drop(raced_reader);
     }
 
     #[test]

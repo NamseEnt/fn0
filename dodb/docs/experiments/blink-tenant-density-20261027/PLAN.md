@@ -2,7 +2,7 @@
 
 Tracking issue: [NamseEnt/fn0#126](https://github.com/NamseEnt/fn0/issues/126). Start with [HANDOFF.md](HANDOFF.md) when continuing in a new session.
 
-Status: analysis and continuation foundation only. No engine changes, new benchmarks, default promotion, merge, or deployment are included in this preparation.
+Status: A1 implementation and local correctness validation are tracked in [A1-IMPLEMENTATION.md](A1-IMPLEMENTATION.md) and [A1-RESULTS.md](A1-RESULTS.md). The original analysis below is the frozen preparation baseline. Density measurements, default promotion, merge, and deployment remain outside this increment.
 
 ## Objective and decision criteria
 
@@ -391,7 +391,7 @@ Include torn active WAL tails, invalid deltas/bases, missing/corrupt pages, cras
 
 ## Recommended order and decision gates
 
-1. Prepare the issue, plan, and continuation worktree only. This preparation is the current authorized task.
+1. Prepare the issue, plan, and continuation worktree. This preparation was completed before A1 implementation was authorized.
 2. When implementation is requested, first add narrowly scoped A1 allocation/reuse/pin accounting and a fixed-key overflow diagnostic. Validate the source-confirmed self-pin condition before broad optimization.
 3. Add resource accounting and a fair shared-cache/WBM minimal-native reference.
 4. Establish E2/E3 active-density boundaries and E4 maintenance stability.
@@ -407,7 +407,7 @@ If shared-resource minimal-native meets the service objective with no meaningful
 - [x] Recheck the frozen source branch/commit and preserve previous worktrees.
 - [x] Create an isolated branch and worktree under the fn0 checkout.
 - [x] Preserve this analysis and plan in English.
-- [ ] A1 instrumentation, implementation, and recovery checks.
+- [x] A1 opt-in implementation, test-scoped allocation/reuse/pin diagnostics, and real-service recovery checks; see [A1-RESULTS.md](A1-RESULTS.md). No density or production resource-accounting completion is claimed.
 - [ ] Resource accounting and density harness preparation.
 - [ ] Shared-cache/WBM minimal-native reference.
 - [ ] Live host sizing and an explicit frozen experiment matrix.

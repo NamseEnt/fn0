@@ -1,0 +1,247 @@
+{
+  "source_base_commit": "f9a9c0889c36d4c0ba360ff779648b9ac459fffa",
+  "platform": "Darwin arm64",
+  "toolchain": [
+    "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "binary: rustc",
+    "commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452",
+    "commit-date: 2026-07-14",
+    "host: aarch64-apple-darwin",
+    "release: 1.97.1",
+    "LLVM version: 22.1.6"
+  ],
+  "source_sha256": {
+    "dodb/crates/dodb-storage/Cargo.toml": "1b24d12a49838e2d34787a4ef8da9dfcb65c5e35c0d0f901f4362105e55202a2",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "00c52fa66be8c3281263c68b583ae7711952f2e15844ac2f44e166a74275b39e",
+    "dodb/crates/dodb-server/tests/blink_writer_pin_reuse.rs": "c76389fabf3d1a1f0469c8ead2f5af0a88d32bf32233c5696193a32c0d836ef6"
+  },
+  "final_storage_suites": {
+    "default": {
+      "exit_code": 0,
+      "passed": 205,
+      "failed": 0,
+      "ignored": 4
+    },
+    "feature": {
+      "exit_code": 0,
+      "passed": 205,
+      "failed": 0,
+      "ignored": 4
+    }
+  },
+  "new_service_integration_worker_report": {
+    "default_passed": 2,
+    "feature_passed": 2,
+    "raw_stdout_captured": false,
+    "includes": [
+      "legacy WAL and actual segmented durable bases",
+      "pre-commit SIGKILL -> recovery -> service write -> pre-commit SIGKILL -> recovery"
+    ]
+  },
+  "existing_candidate_server_tests": {
+    "blink_wal_checkpoint": 8,
+    "durable_base_checkpoint": 6,
+    "background_checkpoint": 7
+  },
+  "format_exit_codes": {
+    "storage": 0,
+    "server": 0,
+    "workspace": 1
+  },
+  "clippy": {
+    "strict_worker_exit_code": 101,
+    "final_advisory_exit_code": 0,
+    "primary_source_location_count": 59,
+    "diagnostics_on_added_lines": [],
+    "baseline_attribution": "Primary diagnostic locations do not overlap added source lines; no fresh full baseline lint run is claimed."
+  },
+  "interrupted_worker_suite": {
+    "file": "a1-storage-default-final.log.gz",
+    "exit_code": 130,
+    "accepted": false
+  },
+  "diagnostics": {
+    "default": [
+      {
+        "value_size": 512,
+        "initial_high_water": 2,
+        "warmup_high_water": 2,
+        "pinned_high_water": 2,
+        "released_high_water": 2,
+        "final_high_water": 2,
+        "fresh_allocations_total": 0,
+        "successful_reuses_total": 0,
+        "no_reader_reuses": 0,
+        "pinned_reuses": 0,
+        "post_release_reuses": 0,
+        "pinned_fresh_allocations": 0,
+        "post_release_fresh_allocations": 0,
+        "unavailable_reuse_opportunities": 0,
+        "no_reader_decision_pins": 1,
+        "external_reader_decision_pins": 2,
+        "post_release_decision_pins": 1,
+        "free_pages_final": 0,
+        "active_pins_final": 0,
+        "feature_enabled": false
+      },
+      {
+        "value_size": 513,
+        "initial_high_water": 3,
+        "warmup_high_water": 11,
+        "pinned_high_water": 27,
+        "released_high_water": 59,
+        "final_high_water": 91,
+        "fresh_allocations_total": 88,
+        "successful_reuses_total": 0,
+        "no_reader_reuses": 0,
+        "pinned_reuses": 0,
+        "post_release_reuses": 0,
+        "pinned_fresh_allocations": 8,
+        "post_release_fresh_allocations": 64,
+        "unavailable_reuse_opportunities": 87,
+        "no_reader_decision_pins": 1,
+        "external_reader_decision_pins": 2,
+        "post_release_decision_pins": 1,
+        "free_pages_final": 88,
+        "active_pins_final": 0,
+        "feature_enabled": false
+      },
+      {
+        "value_size": 4096,
+        "initial_high_water": 4,
+        "warmup_high_water": 20,
+        "pinned_high_water": 52,
+        "released_high_water": 116,
+        "final_high_water": 180,
+        "fresh_allocations_total": 176,
+        "successful_reuses_total": 0,
+        "no_reader_reuses": 0,
+        "pinned_reuses": 0,
+        "post_release_reuses": 0,
+        "pinned_fresh_allocations": 16,
+        "post_release_fresh_allocations": 128,
+        "unavailable_reuse_opportunities": 87,
+        "no_reader_decision_pins": 1,
+        "external_reader_decision_pins": 2,
+        "post_release_decision_pins": 1,
+        "free_pages_final": 176,
+        "active_pins_final": 0,
+        "feature_enabled": false
+      }
+    ],
+    "feature": [
+      {
+        "value_size": 512,
+        "initial_high_water": 2,
+        "warmup_high_water": 2,
+        "pinned_high_water": 2,
+        "released_high_water": 2,
+        "final_high_water": 2,
+        "fresh_allocations_total": 0,
+        "successful_reuses_total": 0,
+        "no_reader_reuses": 0,
+        "pinned_reuses": 0,
+        "post_release_reuses": 0,
+        "pinned_fresh_allocations": 0,
+        "post_release_fresh_allocations": 0,
+        "unavailable_reuse_opportunities": 0,
+        "no_reader_decision_pins": 0,
+        "external_reader_decision_pins": 1,
+        "post_release_decision_pins": 0,
+        "free_pages_final": 0,
+        "active_pins_final": 0,
+        "feature_enabled": true
+      },
+      {
+        "value_size": 513,
+        "initial_high_water": 3,
+        "warmup_high_water": 4,
+        "pinned_high_water": 12,
+        "released_high_water": 12,
+        "final_high_water": 12,
+        "fresh_allocations_total": 9,
+        "successful_reuses_total": 79,
+        "no_reader_reuses": 15,
+        "pinned_reuses": 0,
+        "post_release_reuses": 64,
+        "pinned_fresh_allocations": 8,
+        "post_release_fresh_allocations": 0,
+        "unavailable_reuse_opportunities": 8,
+        "no_reader_decision_pins": 0,
+        "external_reader_decision_pins": 1,
+        "post_release_decision_pins": 0,
+        "free_pages_final": 9,
+        "active_pins_final": 0,
+        "feature_enabled": true
+      },
+      {
+        "value_size": 4096,
+        "initial_high_water": 4,
+        "warmup_high_water": 6,
+        "pinned_high_water": 22,
+        "released_high_water": 22,
+        "final_high_water": 22,
+        "fresh_allocations_total": 18,
+        "successful_reuses_total": 158,
+        "no_reader_reuses": 30,
+        "pinned_reuses": 0,
+        "post_release_reuses": 128,
+        "pinned_fresh_allocations": 16,
+        "post_release_fresh_allocations": 0,
+        "unavailable_reuse_opportunities": 8,
+        "no_reader_decision_pins": 0,
+        "external_reader_decision_pins": 1,
+        "post_release_decision_pins": 0,
+        "free_pages_final": 18,
+        "active_pins_final": 0,
+        "feature_enabled": true
+      }
+    ]
+  },
+  "raw_log_sha256": {
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/A1-diagnostic-pins-default.log.gz": "4238861cc5fb1044a1e8e29cffdc750704bf8b0d6345e50f8e77426b0e0a096d",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/A1-diagnostic-pins-feature.log.gz": "ef86c3c9e8543de4fa219373aeaa5d6c22176ae69d30fafc9af3738a8b23e850",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-clippy-advisory-final.log.gz": "787dce73720c9e847c0118b4ae81f7ec18bf32388cc5c9ccd108f751d03c8845",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-clippy-advisory.log.gz": "b1db01b8d9a1bad36442ea876122e768c837f467f19406d41c27ac7446b1c762",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-clippy.log.gz": "89c198027e43ac5faa3239627c8ade8a308e12ed21383ea6803b9fc3972e3f73",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-diagnostic-default.log.gz": "4a134f9ec67362d2e948ee49ff1a3efc65a4431347227d426c2e8c1ddc859013",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-diagnostic-feature.log.gz": "9273b7e7472c849b68a731cc78ca2a1a5fd00d75217ae8026f4e24b2bea51b08",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-server-existing.log.gz": "f75422e6625010ee420b036536fc664ac23cf0f1dd279de9e7f313b247f80060",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-storage-default-final.log.gz": "99b92daa86f88c12b4f2499438aef27c10cb05c1ae099bf72773cae0af01cd72",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-storage-default.log.gz": "614738e8ba07997ba88741a6fe6bd996affed6917261e4ce5ab1747a31355e9f",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-storage-feature.log.gz": "2e4b7c4a9dd971aaab6ed04a8fd957a28b94594bb6c5b5b2897305c1d51e64d5",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/final-clippy-advisory.log.gz": "1a91de90d868e497815b7dae319d3649d6266e5c1146009e8de390a2069b3753",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/final-storage-default.log.gz": "c019e6f247e23f386b219614086021b0a44a33f5b5fad85992872aeb07aaf9a2",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/final-storage-feature.log.gz": "debbd12441b02cbc010641eebeb2f3dadb14fa346dea17500e75ff21b418c41d",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/fmt-server.log.gz": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/fmt-storage.log.gz": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/fmt-workspace.log.gz": "eb026c4ef797d3f3c2a0ad904390bfde58436458ae9c8b8ccc9ca6823ac3db29",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/review-storage-default.log.gz": "fcf79e18afa4b5a54fe1236877fcd04b3462811f9ab86c3e035f6364f65add5e"
+  },
+  "limits": [
+    "Local deterministic correctness evidence, not OCI performance",
+    "No retained-heap/RSS, disk-return, or tenant-density conclusion",
+    "No default promotion or deployment"
+  ],
+  "compressed_log_sha256": {
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/A1-diagnostic-pins-default.log.gz": "db073df26796467a0b80678f3047da92efdd18eb7880f8f3f73831139e8b4ec1",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/A1-diagnostic-pins-feature.log.gz": "a7ea6f77c4101a64cd7707ea9af5d7ab716b396a9bb91b9d41081a3e0c7728f4",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-clippy-advisory-final.log.gz": "67209a58faf3e8b275f46cfdf91bb9277f68014271ea72061712113fdc0bd32c",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-clippy-advisory.log.gz": "c8effca4779e61e2a9645b419c7494e19eed65049902792cad47d665302ac605",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-clippy.log.gz": "e2619746ffd84d80068ec66ed623a2d5d20c1897a5a7f9072bbd12cf9de128cc",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-diagnostic-default.log.gz": "305b842ad71d05c3b0bc1c942dfe0a8a7b7f13fe4c6e9d19809a3a5eea3216e2",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-diagnostic-feature.log.gz": "b6c96c86f24ddb49c7b6b8f418d718a47a8e2a7a15aa2ce9ded4f7f17f1a179b",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-server-existing.log.gz": "aee06ecd5461cf0b715b8592c82207d352cd902de4a1acceef1eec1170133db2",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-storage-default-final.log.gz": "d7cf7480ea0da4ea0fa4a2c3f14b501de046cb44684beb4abf997727a69cad0b",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-storage-default.log.gz": "01022ed9101a6278193ec472f567d4b22ebc35f4767beee2c57ec47488a956bc",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/a1-storage-feature.log.gz": "a9d602d7df7e4658e4a31fd1ecd1362fef85294935829d70ef0f41552e9fdcd7",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/final-clippy-advisory.log.gz": "173fa41ba8e294fc95d6d4f3029ad2517dc7a02427813a7611e1f0404bb78d42",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/final-storage-default.log.gz": "f57bfe4cb2f0196bf86f80f496bf05de581e232db9478632393fd885c51293ff",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/final-storage-feature.log.gz": "f133e94cb9c6fd41261bffaf8e7ac3057c44b609dd7ab91f8f5edceaddf177e5",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/fmt-server.log.gz": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/fmt-storage.log.gz": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/fmt-workspace.log.gz": "e75c65318f8a354aadae701f7ada00e57802b362b38722e328f604a1c6736eff",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/a1/review-storage-default.log.gz": "76e15f10775b8adf9ebfaa1f7f6358fc679dfd74fc384c7c9ceb448140d9b465"
+  },
+  "log_encoding": "Lossless gzip; raw_log_sha256 hashes the decompressed original bytes, compressed_log_sha256 hashes the stored file bytes."
+}
