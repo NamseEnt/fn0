@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(os.environ["DODB_QUERYMIX_ROOT"])
 SOURCE = ROOT / "source"
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 os.environ["DODB_BASE_RUN_ROOT"] = str(ROOT)
 OLD_DOCS = SOURCE / "dodb/docs/experiments/results/blink-durable-bases-20261023"
 SPEC = importlib.util.spec_from_file_location("querymix_base_pipeline", OLD_DOCS / "run_pipeline.py")
