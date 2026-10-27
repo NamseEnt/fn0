@@ -123,7 +123,21 @@ def validate_mix(report, case):
 
 
 def run_case(backend, repetition):
-    case = f"{backend}-r{repetition}"
+    base_case = f"{backend}-r{repetition}"
+    case = base_case
+    attempt = 1
+    while any(
+        path.exists()
+        for path in (
+            BASE.DATABASES / case,
+            BASE.REPORTS / case,
+            BASE.REPORTS / f"{case}.json",
+            ROOT / "database-archives" / f"{case}.tar.gz",
+            ROOT / "database-archives" / f"{case}.json",
+        )
+    ):
+        attempt += 1
+        case = f"{base_case}-attempt{attempt}"
     database = BASE.DATABASES / case
     report_path = BASE.REPORTS / f"{case}.json"
     command = BASE.service_command(backend, database, report_path, "134217728")
@@ -147,8 +161,8 @@ def run_case(backend, repetition):
 
 
 def main():
-    BASE.REPORTS.mkdir(exist_ok=False)
-    BASE.DATABASES.mkdir(exist_ok=False)
+    BASE.REPORTS.mkdir(exist_ok=True)
+    BASE.DATABASES.mkdir(exist_ok=True)
     binaries = {"service_workload": BASE.sha256_file(BASE.SERVICE_BINARY)}
     source_sha = subprocess.check_output(["git", "-C", str(BASE.SOURCE), "rev-parse", "HEAD"], text=True).strip()
     repetitions = 1 if SMOKE else 3
@@ -167,12 +181,25 @@ def main():
         "controller_sha256": BASE.sha256_file(Path(__file__)),
         "helper_sha256": BASE.sha256_file(HELPER),
     }
-    write_json(ROOT / "matrix-plan.json", plan)
-    completed = []
-    prefixes = []
-    reference_signature = None
+    plan_path = ROOT / "matrix-plan.json"
+    if plan_path.exists():
+        existing_plan = json.loads(plan_path.read_text())
+        for key in ("stage", "duration_ms", "warmup_ms", "backends", "order_by_repetition", "expected_api_shares"):
+            if existing_plan.get(key) != plan.get(key):
+                raise RuntimeError(f"resumed matrix plan differs for {key}")
+        plan = existing_plan
+    else:
+        write_json(plan_path, plan)
+    completed_path = ROOT / "completed-cases.txt"
+    completed = completed_path.read_text().splitlines() if completed_path.exists() else []
+    prefix_path = ROOT / "input-prefix-fingerprints.json"
+    prefixes = json.loads(prefix_path.read_text()) if prefix_path.exists() else []
+    reference_signature = prefixes[0]["fingerprint"] if prefixes else None
     for repetition, backends in ((rep, plan["order_by_repetition"][str(rep)]) for rep in range(1, repetitions + 1)):
         for backend in backends:
+            base_case = f"{backend}-r{repetition}"
+            if any(completed_case == base_case or completed_case.startswith(base_case + "-attempt") for completed_case in completed):
+                continue
             case, report, attempts, shares, signature = run_case(backend, repetition)
             if reference_signature is None:
                 reference_signature = signature
@@ -181,9 +208,12 @@ def main():
             prefixes.append({"case": case, "fingerprint": signature, "attempts": attempts, "shares": shares})
             archive_database(case)
             completed.append(case)
-            write_json(ROOT / "input-prefix-fingerprints.json", prefixes)
-            (ROOT / "completed-cases.txt").write_text("\n".join(completed) + "\n")
+            write_json(prefix_path, prefixes)
+            completed_path.write_text("\n".join(completed) + "\n")
             print(json.dumps({"completed": case, "throughput": report["throughput_per_second"]["api_calls"], "shares": shares}), flush=True)
+    expected_cells = repetitions * len(plan["backends"])
+    if len(completed) != expected_cells:
+        raise RuntimeError(f"matrix ended with {len(completed)} accepted cells; expected {expected_cells}")
     (ROOT / "matrix-complete.txt").write_text(f"{len(completed)} accepted cells\n")
 
 
