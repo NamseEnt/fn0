@@ -1,0 +1,603 @@
+{
+  "stage": "sustained",
+  "cases": [
+    {
+      "case": "blink-r1",
+      "backend": "blink",
+      "api_calls_per_second": 18831.67266767453,
+      "operations_per_second": {
+        "query16": 7533.263060740363,
+        "get": 5649.019805438378,
+        "put": 2824.7765665443517,
+        "conditional_put": 2824.6132349514396
+      },
+      "operation_counts": {
+        "query16": 2260003,
+        "get": 1694724,
+        "put": 847442,
+        "conditional_put": 847393
+      },
+      "query_rows_per_call": 4.9999668142033435,
+      "shares": {
+        "query16": 0.40003154226823245,
+        "get": 0.2999744050954747,
+        "put": 0.15000136293751623,
+        "conditional_put": 0.14999268969877666
+      },
+      "latencies_ms": {
+        "conditional_put_success": {
+          "p50_ms": 2.887679,
+          "p95_ms": 3.799039,
+          "p99_ms": 5.271551
+        },
+        "get": {
+          "p50_ms": 0.004323,
+          "p95_ms": 0.013447,
+          "p99_ms": 0.339967
+        },
+        "put_success": {
+          "p50_ms": 2.883583,
+          "p95_ms": 3.788799,
+          "p99_ms": 5.246975
+        },
+        "query16": {
+          "p50_ms": 0.014327,
+          "p95_ms": 0.036351,
+          "p99_ms": 0.408831
+        },
+        "workflow": {
+          "p50_ms": 0.016127,
+          "p95_ms": 3.334143,
+          "p99_ms": 4.061183
+        },
+        "write_transaction_success": {
+          "p50_ms": 2.885631,
+          "p95_ms": 3.792895,
+          "p99_ms": 5.263359
+        }
+      },
+      "peak_process_group_rss_bytes": 308785152,
+      "minimum_mem_available_bytes": 4729442304,
+      "maximum_database_bytes": 153767369,
+      "reopen_and_validation_ms": 4840.102348,
+      "database_archive": {
+        "case": "blink-r1",
+        "path": "/bench/zfs/db/query-get-put-mix-20261027/sustained/database-archives/blink-r1.tar.gz",
+        "sha256": "97b61420352536903e3f5d005796d67823f062247a07296e6f01905a56e638ca",
+        "compressed_bytes": 107360634,
+        "database_bytes": 138296546,
+        "file_count": 8,
+        "verified": true
+      },
+      "source_sha": "54812222e95e1335a5e9409d3fddbabf38c0f876",
+      "binary_sha256": "6837cc7f6691337ef0794e177db7a1a082474607c3e5595a78067679456c57ad",
+      "resource_sample_count": 315
+    },
+    {
+      "case": "minimal-native-r1",
+      "backend": "minimal-native",
+      "api_calls_per_second": 20739.16543679898,
+      "operations_per_second": {
+        "query16": 8296.07417279369,
+        "get": 6221.3872994166995,
+        "put": 3110.8619822470914,
+        "conditional_put": 3110.8419823414984
+      },
+      "operation_counts": {
+        "query16": 2488834,
+        "get": 1866425,
+        "put": 933263,
+        "conditional_put": 933257
+      },
+      "query_rows_per_call": 5.00000683050778,
+      "shares": {
+        "query16": 0.40001967282990925,
+        "get": 0.2999825291126541,
+        "put": 0.14999938120592196,
+        "conditional_put": 0.14999841685151466
+      },
+      "latencies_ms": {
+        "conditional_put_success": {
+          "p50_ms": 2.383871,
+          "p95_ms": 3.858431,
+          "p99_ms": 5.271551
+        },
+        "get": {
+          "p50_ms": 0.006563,
+          "p95_ms": 0.021215,
+          "p99_ms": 0.043615
+        },
+        "put_success": {
+          "p50_ms": 2.377727,
+          "p95_ms": 3.817471,
+          "p99_ms": 5.230591
+        },
+        "query16": {
+          "p50_ms": 0.020927,
+          "p95_ms": 0.086975,
+          "p99_ms": 0.437759
+        },
+        "workflow": {
+          "p50_ms": 0.023775,
+          "p95_ms": 3.084287,
+          "p99_ms": 4.165631
+        },
+        "write_transaction_success": {
+          "p50_ms": 2.381823,
+          "p95_ms": 3.837951,
+          "p99_ms": 5.251071
+        }
+      },
+      "peak_process_group_rss_bytes": 548806656,
+      "minimum_mem_available_bytes": 4555747328,
+      "maximum_database_bytes": 72535705,
+      "reopen_and_validation_ms": 2411.9152449999997,
+      "database_archive": {
+        "case": "minimal-native-r1",
+        "path": "/bench/zfs/db/query-get-put-mix-20261027/sustained/database-archives/minimal-native-r1.tar.gz",
+        "sha256": "2886f7c7a0caa49679d65809699381149b8b12097256aaf28756fb5400e74f79",
+        "compressed_bytes": 57621450,
+        "database_bytes": 66174918,
+        "file_count": 12,
+        "verified": true
+      },
+      "source_sha": "54812222e95e1335a5e9409d3fddbabf38c0f876",
+      "binary_sha256": "6837cc7f6691337ef0794e177db7a1a082474607c3e5595a78067679456c57ad",
+      "resource_sample_count": 312
+    },
+    {
+      "case": "minimal-native-r2",
+      "backend": "minimal-native",
+      "api_calls_per_second": 20685.799181047638,
+      "operations_per_second": {
+        "query16": 8274.890336120492,
+        "get": 6205.324423139063,
+        "put": 3102.863877188322,
+        "conditional_put": 3102.72054459976
+      },
+      "operation_counts": {
+        "query16": 2482480,
+        "get": 1861607,
+        "put": 930864,
+        "conditional_put": 930821
+      },
+      "query_rows_per_call": 4.999938770906513,
+      "shares": {
+        "query16": 0.40002758722041354,
+        "get": 0.2999799219178533,
+        "put": 0.14999970994744893,
+        "conditional_put": 0.1499927809142843
+      },
+      "latencies_ms": {
+        "conditional_put_success": {
+          "p50_ms": 2.383871,
+          "p95_ms": 3.909631,
+          "p99_ms": 5.349375
+        },
+        "get": {
+          "p50_ms": 0.006803,
+          "p95_ms": 0.021407,
+          "p99_ms": 0.044543
+        },
+        "put_success": {
+          "p50_ms": 2.373631,
+          "p95_ms": 3.876863,
+          "p99_ms": 5.316607
+        },
+        "query16": {
+          "p50_ms": 0.021807,
+          "p95_ms": 0.089087,
+          "p99_ms": 0.441087
+        },
+        "workflow": {
+          "p50_ms": 0.024495,
+          "p95_ms": 3.104767,
+          "p99_ms": 4.231167
+        },
+        "write_transaction_success": {
+          "p50_ms": 2.379775,
+          "p95_ms": 3.891199,
+          "p99_ms": 5.332991
+        }
+      },
+      "peak_process_group_rss_bytes": 569360384,
+      "minimum_mem_available_bytes": 4458463232,
+      "maximum_database_bytes": 76730130,
+      "reopen_and_validation_ms": 2431.573253,
+      "database_archive": {
+        "case": "minimal-native-r2",
+        "path": "/bench/zfs/db/query-get-put-mix-20261027/sustained/database-archives/minimal-native-r2.tar.gz",
+        "sha256": "ea7bb4e56a29a441bf3e589a3a5aef46620ded905011e146770a4d8b1bf3bfdb",
+        "compressed_bytes": 54515130,
+        "database_bytes": 62820603,
+        "file_count": 12,
+        "verified": true
+      },
+      "source_sha": "54812222e95e1335a5e9409d3fddbabf38c0f876",
+      "binary_sha256": "6837cc7f6691337ef0794e177db7a1a082474607c3e5595a78067679456c57ad",
+      "resource_sample_count": 312
+    },
+    {
+      "case": "blink-r2-attempt3",
+      "backend": "blink",
+      "api_calls_per_second": 19077.80659173597,
+      "operations_per_second": {
+        "query16": 7631.667969644451,
+        "get": 5722.885977841277,
+        "put": 2861.7413220442972,
+        "conditional_put": 2861.511322205946
+      },
+      "operation_counts": {
+        "query16": 2289502,
+        "get": 1716867,
+        "put": 858523,
+        "conditional_put": 858454
+      },
+      "query_rows_per_call": 4.999880760095427,
+      "shares": {
+        "query16": 0.40002858467756447,
+        "get": 0.29997609789797786,
+        "put": 0.15000368665462477,
+        "conditional_put": 0.14999163076983288
+      },
+      "latencies_ms": {
+        "conditional_put_success": {
+          "p50_ms": 2.834431,
+          "p95_ms": 3.774463,
+          "p99_ms": 5.292031
+        },
+        "get": {
+          "p50_ms": 0.004283,
+          "p95_ms": 0.013607,
+          "p99_ms": 0.347647
+        },
+        "put_success": {
+          "p50_ms": 2.832383,
+          "p95_ms": 3.776511,
+          "p99_ms": 5.316607
+        },
+        "query16": {
+          "p50_ms": 0.013767,
+          "p95_ms": 0.036351,
+          "p99_ms": 0.403711
+        },
+        "workflow": {
+          "p50_ms": 0.015567,
+          "p95_ms": 3.291135,
+          "p99_ms": 4.044799
+        },
+        "write_transaction_success": {
+          "p50_ms": 2.832383,
+          "p95_ms": 3.776511,
+          "p99_ms": 5.304319
+        }
+      },
+      "peak_process_group_rss_bytes": 283308032,
+      "minimum_mem_available_bytes": 5294800896,
+      "maximum_database_bytes": 150909873,
+      "reopen_and_validation_ms": 1996.467072,
+      "database_archive": {
+        "case": "blink-r2-attempt3",
+        "path": "/bench/zfs/db/query-get-put-mix-20261027/sustained/database-archives/blink-r2-attempt3.tar.gz",
+        "sha256": "d9151cfa43685edb62674ee82aacd58f2624945eeef4785c6ef3ef3f1a4d31bd",
+        "compressed_bytes": 3545396,
+        "database_bytes": 18063582,
+        "file_count": 5,
+        "verified": true
+      },
+      "source_sha": "54812222e95e1335a5e9409d3fddbabf38c0f876",
+      "binary_sha256": "6837cc7f6691337ef0794e177db7a1a082474607c3e5595a78067679456c57ad",
+      "resource_sample_count": 312
+    },
+    {
+      "case": "blink-r3",
+      "backend": "blink",
+      "api_calls_per_second": 19068.131964623863,
+      "operations_per_second": {
+        "query16": 7627.681449038416,
+        "get": 5720.050259212508,
+        "put": 2860.2701276185558,
+        "conditional_put": 2860.1301287543833
+      },
+      "operation_counts": {
+        "query16": 2288323,
+        "get": 1716029,
+        "put": 858088,
+        "conditional_put": 858046
+      },
+      "query_rows_per_call": 4.999929205798307,
+      "shares": {
+        "query16": 0.4000224806074169,
+        "get": 0.29997958215438336,
+        "put": 0.1500026396358631,
+        "conditional_put": 0.1499952976023366
+      },
+      "latencies_ms": {
+        "conditional_put_success": {
+          "p50_ms": 2.838527,
+          "p95_ms": 3.770367,
+          "p99_ms": 5.349375
+        },
+        "get": {
+          "p50_ms": 0.004283,
+          "p95_ms": 0.013487,
+          "p99_ms": 0.346879
+        },
+        "put_success": {
+          "p50_ms": 2.836479,
+          "p95_ms": 3.760127,
+          "p99_ms": 5.324799
+        },
+        "query16": {
+          "p50_ms": 0.014047,
+          "p95_ms": 0.036447,
+          "p99_ms": 0.402943
+        },
+        "workflow": {
+          "p50_ms": 0.015847,
+          "p95_ms": 3.287039,
+          "p99_ms": 4.034559
+        },
+        "write_transaction_success": {
+          "p50_ms": 2.836479,
+          "p95_ms": 3.766271,
+          "p99_ms": 5.337087
+        }
+      },
+      "peak_process_group_rss_bytes": 279085056,
+      "minimum_mem_available_bytes": 5163798528,
+      "maximum_database_bytes": 150312023,
+      "reopen_and_validation_ms": 1997.519842,
+      "database_archive": {
+        "case": "blink-r3",
+        "path": "/bench/zfs/db/query-get-put-mix-20261027/sustained/database-archives/blink-r3.tar.gz",
+        "sha256": "b96a0eeb6e0a27db9396403820f4c4d586ad2ae8d58f5972169776207dd3d39c",
+        "compressed_bytes": 3409427,
+        "database_bytes": 17905510,
+        "file_count": 5,
+        "verified": true
+      },
+      "source_sha": "54812222e95e1335a5e9409d3fddbabf38c0f876",
+      "binary_sha256": "6837cc7f6691337ef0794e177db7a1a082474607c3e5595a78067679456c57ad",
+      "resource_sample_count": 312
+    },
+    {
+      "case": "minimal-native-r3",
+      "backend": "minimal-native",
+      "api_calls_per_second": 21043.0914823989,
+      "operations_per_second": {
+        "query16": 8417.921257288464,
+        "get": 6312.455112999098,
+        "put": 3156.379222648357,
+        "conditional_put": 3156.3358894629832
+      },
+      "operation_counts": {
+        "query16": 2525385,
+        "get": 1893743,
+        "put": 946917,
+        "conditional_put": 946904
+      },
+      "query_rows_per_call": 4.9999794090802,
+      "shares": {
+        "query16": 0.4000325362995963,
+        "get": 0.2999775540717975,
+        "put": 0.14999598444403717,
+        "conditional_put": 0.14999392518456905
+      },
+      "latencies_ms": {
+        "conditional_put_success": {
+          "p50_ms": 2.353151,
+          "p95_ms": 3.796991,
+          "p99_ms": 5.140479
+        },
+        "get": {
+          "p50_ms": 0.006483,
+          "p95_ms": 0.020047,
+          "p99_ms": 0.043135
+        },
+        "put_success": {
+          "p50_ms": 2.347007,
+          "p95_ms": 3.774463,
+          "p99_ms": 5.132287
+        },
+        "query16": {
+          "p50_ms": 0.021215,
+          "p95_ms": 0.086463,
+          "p99_ms": 0.426239
+        },
+        "workflow": {
+          "p50_ms": 0.023775,
+          "p95_ms": 3.047423,
+          "p99_ms": 4.104191
+        },
+        "write_transaction_success": {
+          "p50_ms": 2.349055,
+          "p95_ms": 3.786751,
+          "p99_ms": 5.136383
+        }
+      },
+      "peak_process_group_rss_bytes": 528072704,
+      "minimum_mem_available_bytes": 5017808896,
+      "maximum_database_bytes": 72608029,
+      "reopen_and_validation_ms": 2209.315145,
+      "database_archive": {
+        "case": "minimal-native-r3",
+        "path": "/bench/zfs/db/query-get-put-mix-20261027/sustained/database-archives/minimal-native-r3.tar.gz",
+        "sha256": "037c24d0d33efc78887079cfc4c135cc932e48d7a2adc0381bf6ac12ab1d5788",
+        "compressed_bytes": 11870047,
+        "database_bytes": 17097740,
+        "file_count": 13,
+        "verified": true
+      },
+      "source_sha": "54812222e95e1335a5e9409d3fddbabf38c0f876",
+      "binary_sha256": "6837cc7f6691337ef0794e177db7a1a082474607c3e5595a78067679456c57ad",
+      "resource_sample_count": 312
+    }
+  ],
+  "medians": {
+    "blink": {
+      "api_calls_per_second": {
+        "median": 19068.131964623863,
+        "range": [
+          18831.67266767453,
+          19077.80659173597
+        ]
+      },
+      "peak_process_group_rss_bytes": {
+        "median": 283308032,
+        "range": [
+          279085056,
+          308785152
+        ]
+      },
+      "maximum_database_bytes": {
+        "median": 150909873,
+        "range": [
+          150312023,
+          153767369
+        ]
+      },
+      "reopen_and_validation_ms": {
+        "median": 1997.519842,
+        "range": [
+          1996.467072,
+          4840.102348
+        ]
+      },
+      "operations_per_second": {
+        "query16": {
+          "median": 7627.681449038416,
+          "range": [
+            7533.263060740363,
+            7631.667969644451
+          ]
+        },
+        "get": {
+          "median": 5720.050259212508,
+          "range": [
+            5649.019805438378,
+            5722.885977841277
+          ]
+        },
+        "put": {
+          "median": 2860.2701276185558,
+          "range": [
+            2824.7765665443517,
+            2861.7413220442972
+          ]
+        },
+        "conditional_put": {
+          "median": 2860.1301287543833,
+          "range": [
+            2824.6132349514396,
+            2861.511322205946
+          ]
+        }
+      },
+      "latency_medians_ms": {
+        "query16": {
+          "p50_ms": 0.014047,
+          "p95_ms": 0.036351,
+          "p99_ms": 0.403711
+        },
+        "get": {
+          "p50_ms": 0.004283,
+          "p95_ms": 0.013487,
+          "p99_ms": 0.346879
+        },
+        "put": {
+          "p50_ms": 2.836479,
+          "p95_ms": 3.776511,
+          "p99_ms": 5.316607
+        },
+        "conditional_put": {
+          "p50_ms": 2.838527,
+          "p95_ms": 3.774463,
+          "p99_ms": 5.292031
+        }
+      }
+    },
+    "minimal-native": {
+      "api_calls_per_second": {
+        "median": 20739.16543679898,
+        "range": [
+          20685.799181047638,
+          21043.0914823989
+        ]
+      },
+      "peak_process_group_rss_bytes": {
+        "median": 548806656,
+        "range": [
+          528072704,
+          569360384
+        ]
+      },
+      "maximum_database_bytes": {
+        "median": 72608029,
+        "range": [
+          72535705,
+          76730130
+        ]
+      },
+      "reopen_and_validation_ms": {
+        "median": 2411.9152449999997,
+        "range": [
+          2209.315145,
+          2431.573253
+        ]
+      },
+      "operations_per_second": {
+        "query16": {
+          "median": 8296.07417279369,
+          "range": [
+            8274.890336120492,
+            8417.921257288464
+          ]
+        },
+        "get": {
+          "median": 6221.3872994166995,
+          "range": [
+            6205.324423139063,
+            6312.455112999098
+          ]
+        },
+        "put": {
+          "median": 3110.8619822470914,
+          "range": [
+            3102.863877188322,
+            3156.379222648357
+          ]
+        },
+        "conditional_put": {
+          "median": 3110.8419823414984,
+          "range": [
+            3102.72054459976,
+            3156.3358894629832
+          ]
+        }
+      },
+      "latency_medians_ms": {
+        "query16": {
+          "p50_ms": 0.021215,
+          "p95_ms": 0.086975,
+          "p99_ms": 0.437759
+        },
+        "get": {
+          "p50_ms": 0.006563,
+          "p95_ms": 0.021215,
+          "p99_ms": 0.043615
+        },
+        "put": {
+          "p50_ms": 2.373631,
+          "p95_ms": 3.817471,
+          "p99_ms": 5.230591
+        },
+        "conditional_put": {
+          "p50_ms": 2.383871,
+          "p95_ms": 3.858431,
+          "p99_ms": 5.271551
+        }
+      }
+    }
+  }
+}

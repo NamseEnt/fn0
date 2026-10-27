@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "/bench/zfs/db/query-get-put-mix-20261027/source/dodb/docs/experiments/results/query-get-put-mix-20261027/run_matrix.py", line 221, in <module>
+    main()
+  File "/bench/zfs/db/query-get-put-mix-20261027/source/dodb/docs/experiments/results/query-get-put-mix-20261027/run_matrix.py", line 203, in main
+    case, report, attempts, shares, signature = run_case(backend, repetition)
+  File "/bench/zfs/db/query-get-put-mix-20261027/source/dodb/docs/experiments/results/query-get-put-mix-20261027/run_matrix.py", line 156, in run_case
+    BASE.wait_for_case(command, case, database, report_path, "A", backend, "134217728")
+  File "/bench/zfs/db/query-get-put-mix-20261027/source/dodb/docs/experiments/results/blink-background-checkpoint-20261021/run_matrix.py", line 278, in wait_for_case
+    validate_checkpoint_report(report_value, command, source_revision, binary_digest)
+  File "/bench/zfs/db/query-get-put-mix-20261027/source/dodb/docs/experiments/results/blink-background-checkpoint-20261021/run_matrix.py", line 312, in validate_checkpoint_report
+    raise RuntimeError("raw build Git commit differs from the measurement checkout")
+RuntimeError: raw build Git commit differs from the measurement checkout
+{"database_preserved": "blink-r2-attempt3", "case": "blink-r2-attempt3", "path": "/bench/zfs/db/query-get-put-mix-20261027/sustained/database-archives/blink-r2-attempt3.tar.gz", "sha256": "d9151cfa43685edb62674ee82aacd58f2624945eeef4785c6ef3ef3f1a4d31bd", "compressed_bytes": 3545396, "database_bytes": 18063582, "file_count": 5, "verified": true}
+{"completed": "blink-r2-attempt3", "throughput": 19077.679553747887, "shares": {"query16": 0.40002858467756447, "get": 0.29997609789797786, "put": 0.15000368665462477, "conditional_put": 0.14999163076983288}}
+{"database_preserved": "blink-r3", "case": "blink-r3", "path": "/bench/zfs/db/query-get-put-mix-20261027/sustained/database-archives/blink-r3.tar.gz", "sha256": "b96a0eeb6e0a27db9396403820f4c4d586ad2ae8d58f5972169776207dd3d39c", "compressed_bytes": 3409427, "database_bytes": 17905510, "file_count": 5, "verified": true}
+{"completed": "blink-r3", "throughput": 19068.13114851447, "shares": {"query16": 0.4000224806074169, "get": 0.29997958215438336, "put": 0.1500026396358631, "conditional_put": 0.1499952976023366}}
+{"database_preserved": "minimal-native-r3", "case": "minimal-native-r3", "path": "/bench/zfs/db/query-get-put-mix-20261027/sustained/database-archives/minimal-native-r3.tar.gz", "sha256": "037c24d0d33efc78887079cfc4c135cc932e48d7a2adc0381bf6ac12ab1d5788", "compressed_bytes": 11870047, "database_bytes": 17097740, "file_count": 13, "verified": true}
+{"completed": "minimal-native-r3", "throughput": 21043.064227234605, "shares": {"query16": 0.4000325362995963, "get": 0.2999775540717975, "put": 0.14999598444403717, "conditional_put": 0.14999392518456905}}

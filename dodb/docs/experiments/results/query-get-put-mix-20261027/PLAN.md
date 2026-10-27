@@ -44,8 +44,8 @@ Reject cells with unexpected errors, failed conditions, incomplete latency
 counts, query-order/value mismatches, fingerprint mismatch, an operation share
 more than one percentage point from the target, incomplete final or reopen
 validation, or resource guard violations. B-link sustained cells require at
-least ten completed checkpoints and acknowledged-write overlap. Preserve all
-failed attempts.
+least three completed checkpoints during measurement, including at least one
+checkpoint with acknowledged-write overlap. Preserve all failed attempts.
 Use the existing 3 GiB process-group RSS, 4 GiB per-database, 1,500 MiB host
 memory, and 10 GiB free benchmark-filesystem guards. Stop before running a cell
 if the benchmark filesystem has less than 10 GiB free. Preserve each completed

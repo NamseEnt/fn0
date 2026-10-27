@@ -1,0 +1,16 @@
+{"database_preserved": "blink-r1", "case": "blink-r1", "path": "/bench/zfs/db/query-get-put-mix-20261027/sustained/database-archives/blink-r1.tar.gz", "sha256": "97b61420352536903e3f5d005796d67823f062247a07296e6f01905a56e638ca", "compressed_bytes": 107360634, "database_bytes": 138296546, "file_count": 8, "verified": true}
+{"completed": "blink-r1", "throughput": 18831.671937013445, "shares": {"query16": 0.40003154226823245, "get": 0.2999744050954747, "put": 0.15000136293751623, "conditional_put": 0.14999268969877666}}
+{"database_preserved": "minimal-native-r1", "case": "minimal-native-r1", "path": "/bench/zfs/db/query-get-put-mix-20261027/sustained/database-archives/minimal-native-r1.tar.gz", "sha256": "2886f7c7a0caa49679d65809699381149b8b12097256aaf28756fb5400e74f79", "compressed_bytes": 57621450, "database_bytes": 66174918, "file_count": 12, "verified": true}
+{"completed": "minimal-native-r1", "throughput": 20739.16454363651, "shares": {"query16": 0.40001967282990925, "get": 0.2999825291126541, "put": 0.14999938120592196, "conditional_put": 0.14999841685151466}}
+{"database_preserved": "minimal-native-r2", "case": "minimal-native-r2", "path": "/bench/zfs/db/query-get-put-mix-20261027/sustained/database-archives/minimal-native-r2.tar.gz", "sha256": "ea7bb4e56a29a441bf3e589a3a5aef46620ded905011e146770a4d8b1bf3bfdb", "compressed_bytes": 54515130, "database_bytes": 62820603, "file_count": 12, "verified": true}
+{"completed": "minimal-native-r2", "throughput": 20685.793113177566, "shares": {"query16": 0.40002758722041354, "get": 0.2999799219178533, "put": 0.14999970994744893, "conditional_put": 0.1499927809142843}}
+Traceback (most recent call last):
+  File "/bench/zfs/db/query-get-put-mix-20261027/source/dodb/docs/experiments/results/query-get-put-mix-20261027/run_matrix.py", line 191, in <module>
+    main()
+  File "/bench/zfs/db/query-get-put-mix-20261027/source/dodb/docs/experiments/results/query-get-put-mix-20261027/run_matrix.py", line 176, in main
+    case, report, attempts, shares, signature = run_case(backend, repetition)
+  File "/bench/zfs/db/query-get-put-mix-20261027/source/dodb/docs/experiments/results/query-get-put-mix-20261027/run_matrix.py", line 142, in run_case
+    BASE.wait_for_case(command, case, database, report_path, "A", backend, "134217728")
+  File "/bench/zfs/db/query-get-put-mix-20261027/source/dodb/docs/experiments/results/blink-background-checkpoint-20261021/run_matrix.py", line 210, in wait_for_case
+    raise RuntimeError("benchmark filesystem is below the configured free-space reserve")
+RuntimeError: benchmark filesystem is below the configured free-space reserve

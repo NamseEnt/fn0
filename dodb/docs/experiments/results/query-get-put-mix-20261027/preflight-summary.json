@@ -1,0 +1,315 @@
+{
+  "stage": "preflight",
+  "cases": [
+    {
+      "case": "blink-r1",
+      "backend": "blink",
+      "api_calls_per_second": 18956.70460558637,
+      "operations_per_second": {
+        "query16": 7606.278829368281,
+        "get": 5668.901193986939,
+        "put": 2849.3861900150855,
+        "conditional_put": 2832.1383922160644
+      },
+      "operation_counts": {
+        "query16": 60858,
+        "get": 45357,
+        "put": 22798,
+        "conditional_put": 22660
+      },
+      "query_rows_per_call": 4.998701896217424,
+      "shares": {
+        "query16": 0.401244783184878,
+        "get": 0.29904465527813123,
+        "put": 0.15031020682652813,
+        "conditional_put": 0.14940035471046265
+      },
+      "latencies_ms": {
+        "conditional_put_success": {
+          "p50_ms": 2.875391,
+          "p95_ms": 3.735551,
+          "p99_ms": 5.312511
+        },
+        "get": {
+          "p50_ms": 0.003961,
+          "p95_ms": 0.017295,
+          "p99_ms": 0.372735
+        },
+        "put_success": {
+          "p50_ms": 2.854911,
+          "p95_ms": 3.667967,
+          "p99_ms": 4.763647
+        },
+        "query16": {
+          "p50_ms": 0.013607,
+          "p95_ms": 0.041375,
+          "p99_ms": 0.420351
+        },
+        "workflow": {
+          "p50_ms": 0.015447,
+          "p95_ms": 3.307519,
+          "p99_ms": 3.960831
+        },
+        "write_transaction_success": {
+          "p50_ms": 2.865151,
+          "p95_ms": 3.700735,
+          "p99_ms": 5.095423
+        }
+      },
+      "peak_process_group_rss_bytes": 76120064,
+      "minimum_mem_available_bytes": 5041713152,
+      "maximum_database_bytes": 51150500,
+      "reopen_and_validation_ms": 966.905164,
+      "database_archive": {
+        "case": "blink-r1",
+        "path": "/bench/zfs/db/query-get-put-mix-20261027/preflight/database-archives/blink-r1.tar.gz",
+        "sha256": "338935823d860ece430921a78ed043379163b48a332bbccca3898fc8cf3eb939",
+        "compressed_bytes": 30540516,
+        "database_bytes": 51150500,
+        "file_count": 4,
+        "verified": true
+      },
+      "source_sha": "54812222e95e1335a5e9409d3fddbabf38c0f876",
+      "binary_sha256": "6837cc7f6691337ef0794e177db7a1a082474607c3e5595a78067679456c57ad",
+      "resource_sample_count": 12
+    },
+    {
+      "case": "minimal-native-r1",
+      "backend": "minimal-native",
+      "api_calls_per_second": 22065.380645216566,
+      "operations_per_second": {
+        "query16": 8831.402199948114,
+        "get": 6611.551782849114,
+        "put": 3312.7133145986654,
+        "conditional_put": 3309.7133478206724
+      },
+      "operation_counts": {
+        "query16": 70652,
+        "get": 52893,
+        "put": 26502,
+        "conditional_put": 26478
+      },
+      "query_rows_per_call": 4.999023382211402,
+      "shares": {
+        "query16": 0.4002379266392862,
+        "get": 0.29963461266109614,
+        "put": 0.15013170938960488,
+        "conditional_put": 0.14999575131001275
+      },
+      "latencies_ms": {
+        "conditional_put_success": {
+          "p50_ms": 2.258943,
+          "p95_ms": 3.631103,
+          "p99_ms": 5.160959
+        },
+        "get": {
+          "p50_ms": 0.002481,
+          "p95_ms": 0.007723,
+          "p99_ms": 0.012047
+        },
+        "put_success": {
+          "p50_ms": 2.248703,
+          "p95_ms": 3.657727,
+          "p99_ms": 5.054463
+        },
+        "query16": {
+          "p50_ms": 0.011127,
+          "p95_ms": 0.036991,
+          "p99_ms": 0.280063
+        },
+        "workflow": {
+          "p50_ms": 0.012367,
+          "p95_ms": 2.793471,
+          "p99_ms": 4.038655
+        },
+        "write_transaction_success": {
+          "p50_ms": 2.254847,
+          "p95_ms": 3.645439,
+          "p99_ms": 5.111807
+        }
+      },
+      "peak_process_group_rss_bytes": 56078336,
+      "minimum_mem_available_bytes": 4990038016,
+      "maximum_database_bytes": 45033783,
+      "reopen_and_validation_ms": 360.272942,
+      "database_archive": {
+        "case": "minimal-native-r1",
+        "path": "/bench/zfs/db/query-get-put-mix-20261027/preflight/database-archives/minimal-native-r1.tar.gz",
+        "sha256": "45e6d12c28c89b9fc43f778abb9b63a317f8b304feaff66f61e74b1dbda42978",
+        "compressed_bytes": 32825901,
+        "database_bytes": 45033783,
+        "file_count": 11,
+        "verified": true
+      },
+      "source_sha": "54812222e95e1335a5e9409d3fddbabf38c0f876",
+      "binary_sha256": "6837cc7f6691337ef0794e177db7a1a082474607c3e5595a78067679456c57ad",
+      "resource_sample_count": 11
+    }
+  ],
+  "medians": {
+    "blink": {
+      "api_calls_per_second": {
+        "median": 18956.70460558637,
+        "range": [
+          18956.70460558637,
+          18956.70460558637
+        ]
+      },
+      "peak_process_group_rss_bytes": {
+        "median": 76120064,
+        "range": [
+          76120064,
+          76120064
+        ]
+      },
+      "maximum_database_bytes": {
+        "median": 51150500,
+        "range": [
+          51150500,
+          51150500
+        ]
+      },
+      "reopen_and_validation_ms": {
+        "median": 966.905164,
+        "range": [
+          966.905164,
+          966.905164
+        ]
+      },
+      "operations_per_second": {
+        "query16": {
+          "median": 7606.278829368281,
+          "range": [
+            7606.278829368281,
+            7606.278829368281
+          ]
+        },
+        "get": {
+          "median": 5668.901193986939,
+          "range": [
+            5668.901193986939,
+            5668.901193986939
+          ]
+        },
+        "put": {
+          "median": 2849.3861900150855,
+          "range": [
+            2849.3861900150855,
+            2849.3861900150855
+          ]
+        },
+        "conditional_put": {
+          "median": 2832.1383922160644,
+          "range": [
+            2832.1383922160644,
+            2832.1383922160644
+          ]
+        }
+      },
+      "latency_medians_ms": {
+        "query16": {
+          "p50_ms": 0.013607,
+          "p95_ms": 0.041375,
+          "p99_ms": 0.420351
+        },
+        "get": {
+          "p50_ms": 0.003961,
+          "p95_ms": 0.017295,
+          "p99_ms": 0.372735
+        },
+        "put": {
+          "p50_ms": 2.854911,
+          "p95_ms": 3.667967,
+          "p99_ms": 4.763647
+        },
+        "conditional_put": {
+          "p50_ms": 2.875391,
+          "p95_ms": 3.735551,
+          "p99_ms": 5.312511
+        }
+      }
+    },
+    "minimal-native": {
+      "api_calls_per_second": {
+        "median": 22065.380645216566,
+        "range": [
+          22065.380645216566,
+          22065.380645216566
+        ]
+      },
+      "peak_process_group_rss_bytes": {
+        "median": 56078336,
+        "range": [
+          56078336,
+          56078336
+        ]
+      },
+      "maximum_database_bytes": {
+        "median": 45033783,
+        "range": [
+          45033783,
+          45033783
+        ]
+      },
+      "reopen_and_validation_ms": {
+        "median": 360.272942,
+        "range": [
+          360.272942,
+          360.272942
+        ]
+      },
+      "operations_per_second": {
+        "query16": {
+          "median": 8831.402199948114,
+          "range": [
+            8831.402199948114,
+            8831.402199948114
+          ]
+        },
+        "get": {
+          "median": 6611.551782849114,
+          "range": [
+            6611.551782849114,
+            6611.551782849114
+          ]
+        },
+        "put": {
+          "median": 3312.7133145986654,
+          "range": [
+            3312.7133145986654,
+            3312.7133145986654
+          ]
+        },
+        "conditional_put": {
+          "median": 3309.7133478206724,
+          "range": [
+            3309.7133478206724,
+            3309.7133478206724
+          ]
+        }
+      },
+      "latency_medians_ms": {
+        "query16": {
+          "p50_ms": 0.011127,
+          "p95_ms": 0.036991,
+          "p99_ms": 0.280063
+        },
+        "get": {
+          "p50_ms": 0.002481,
+          "p95_ms": 0.007723,
+          "p99_ms": 0.012047
+        },
+        "put": {
+          "p50_ms": 2.248703,
+          "p95_ms": 3.657727,
+          "p99_ms": 5.054463
+        },
+        "conditional_put": {
+          "p50_ms": 2.258943,
+          "p95_ms": 3.631103,
+          "p99_ms": 5.160959
+        }
+      }
+    }
+  }
+}

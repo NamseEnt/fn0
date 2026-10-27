@@ -32,3 +32,9 @@ completed database and checks each archived file's size and SHA256 against the
 original database manifest before reclaiming only that run's database
 directory. Archive work runs between cells. Failed and incomplete attempts
 remain in place and are never overwritten.
+
+The accepted sustained cells used DODB source commit
+`54812222e95e1335a5e9409d3fddbabf38c0f876` and the optimized workload binary
+SHA256 recorded in `RESULTS.md`. The controller was resumed with the
+resume-safe runner from commit `f1cbf5608b7a6e0c6075abf14fe7fa323273d52e`;
+that change affects runner recovery and does not change the workload binary.
