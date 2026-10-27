@@ -47,6 +47,7 @@ enum Profile {
     Rw80,
     Rw50,
     Rw20,
+    QueryMix,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1216,6 +1217,7 @@ fn parse_options() -> Result<Options, String> {
         "rw80" => Scenario::Single(Profile::Rw80),
         "rw50" => Scenario::Single(Profile::Rw50),
         "rw20" => Scenario::Single(Profile::Rw20),
+        "querymix" => Scenario::Single(Profile::QueryMix),
         "mt-mix" => Scenario::Multi,
         "smoke" => Scenario::Smoke,
         other => return Err(format!("unsupported scenario {other}")),
@@ -1369,6 +1371,7 @@ fn profile_name(profile: Profile) -> &'static str {
         Profile::Rw80 => "rw80",
         Profile::Rw50 => "rw50",
         Profile::Rw20 => "rw20",
+        Profile::QueryMix => "querymix",
     }
 }
 
@@ -1378,6 +1381,7 @@ fn profile_read_percentage(profile: Profile) -> usize {
         Profile::Rw80 => 80,
         Profile::Rw50 => 50,
         Profile::Rw20 => 20,
+        Profile::QueryMix => 70,
     }
 }
 
@@ -1401,6 +1405,43 @@ fn condition_name(kind: usize) -> &'static str {
 }
 
 fn make_plan(profile: Profile, seed: u64, include_width_16: bool) -> Vec<WorkflowPlan> {
+    if profile == Profile::QueryMix {
+        let mut plans = Vec::with_capacity(1_000);
+        for ordinal in 0..400 {
+            plans.push(WorkflowPlan {
+                kind: WorkflowKind::Read(ReadKind::Query16),
+                key_ordinal: (ordinal * 37) as u64,
+            });
+        }
+        for ordinal in 0..300 {
+            plans.push(WorkflowPlan {
+                kind: WorkflowKind::Read(ReadKind::Get),
+                key_ordinal: 500 + (ordinal % 7_500) as u64,
+            });
+        }
+        for ordinal in 0..150 {
+            plans.push(WorkflowPlan {
+                kind: WorkflowKind::Write {
+                    kind: WriteKind::Put,
+                    revision_get: false,
+                    intended_rejection: false,
+                    condition_kind: 1,
+                },
+                key_ordinal: ordinal as u64,
+            });
+            plans.push(WorkflowPlan {
+                kind: WorkflowKind::Write {
+                    kind: WriteKind::ConditionalOne,
+                    revision_get: false,
+                    intended_rejection: false,
+                    condition_kind: 1,
+                },
+                key_ordinal: ordinal as u64,
+            });
+        }
+        shuffle(&mut plans, seed ^ 0x9e37_79b9_7f4a_7c15);
+        return plans;
+    }
     let read_calls = profile_read_percentage(profile) * 10;
     let write_calls = 1_000 - read_calls;
     let put_count = write_calls * 20 / 100;
@@ -1635,6 +1676,9 @@ fn mutation_key(
     mutation_index: usize,
     kind: WriteKind,
 ) -> DocumentKey {
+    if options.scenario == Scenario::Single(Profile::QueryMix) {
+        return query_mix_mutation_key(client_index, client_sequence);
+    }
     if options.mutation_workload == MutationWorkload::Overwrite {
         let slot = client_sequence % options.overwrite_slots_per_client as u64;
         let ordinal = 1_u64 << 60
@@ -1651,6 +1695,12 @@ fn mutation_key(
         .wrapping_add((tenant_index as u64) << 52)
         .wrapping_add(workflow_id.wrapping_mul(if options.include_width_16 { 16 } else { 8 }))
         .wrapping_add(mutation_index as u64);
+    key_from_ordinal(ordinal)
+}
+
+fn query_mix_mutation_key(client_index: usize, client_sequence: u64) -> DocumentKey {
+    let client_slot = client_sequence % 125;
+    let ordinal = 8_000 + (client_index as u64 * 125) + client_slot;
     key_from_ordinal(ordinal)
 }
 
@@ -1814,9 +1864,9 @@ async fn execute_workflow(
             condition_kind,
         } => {
             let mut observed_revision = None;
-            let condition_key =
-                key_from_ordinal(plan.key_ordinal % options.initial_rows.max(1) as u64);
             if revision_get {
+                let condition_key =
+                    key_from_ordinal(plan.key_ordinal % options.initial_rows.max(1) as u64);
                 let started = Instant::now();
                 let result = dodb_rocksdb::with_research_read_kind(
                     dodb_rocksdb::ResearchReadKind::PreparatoryGet,
@@ -1883,6 +1933,11 @@ async fn execute_workflow(
                     });
                 }
             }
+            let condition_key = if options.scenario == Scenario::Single(Profile::QueryMix) {
+                mutations[0].key().clone()
+            } else {
+                key_from_ordinal(plan.key_ordinal % options.initial_rows.max(1) as u64)
+            };
             let mut conditions = Vec::new();
             if !matches!(kind, WriteKind::Put | WriteKind::Delete) {
                 let expectation = match condition_kind % 4 {
@@ -1965,6 +2020,16 @@ async fn execute_workflow(
                 },
                 elapsed,
             );
+            if success {
+                match kind {
+                    WriteKind::Put => state.latency("put_success", elapsed),
+                    WriteKind::ConditionalOne => state.latency("conditional_put_success", elapsed),
+                    WriteKind::Delete
+                    | WriteKind::TransactionFour
+                    | WriteKind::TransactionEight
+                    | WriteKind::TransactionSixteen => {}
+                }
+            }
             if !matches!(kind, WriteKind::Put | WriteKind::Delete) {
                 state.conditional_attempts += 1;
                 *state
@@ -3180,6 +3245,63 @@ mod tests {
                 }
             )));
         }
+    }
+
+    #[test]
+    fn query_mix_has_exact_api_shares_and_client_local_write_keys() {
+        let plan = make_plan(Profile::QueryMix, 2_026_101_3, false);
+        let count_kind = |target: &WorkflowKind| {
+            plan.iter()
+                .filter(|entry| match (&entry.kind, target) {
+                    (WorkflowKind::Read(actual), WorkflowKind::Read(expected)) => {
+                        actual == expected
+                    }
+                    (
+                        WorkflowKind::Write { kind: actual, .. },
+                        WorkflowKind::Write { kind: expected, .. },
+                    ) => actual == expected,
+                    _ => false,
+                })
+                .count()
+        };
+        assert_eq!(plan.len(), 1_000);
+        assert_eq!(count_kind(&WorkflowKind::Read(ReadKind::Query16)), 400);
+        assert_eq!(count_kind(&WorkflowKind::Read(ReadKind::Get)), 300);
+        assert_eq!(
+            count_kind(&WorkflowKind::Write {
+                kind: WriteKind::Put,
+                revision_get: false,
+                intended_rejection: false,
+                condition_kind: 0,
+            }),
+            150
+        );
+        assert_eq!(
+            count_kind(&WorkflowKind::Write {
+                kind: WriteKind::ConditionalOne,
+                revision_get: false,
+                intended_rejection: false,
+                condition_kind: 0,
+            }),
+            150
+        );
+        assert!(plan.iter().all(|entry| match entry.kind {
+            WorkflowKind::Read(_) => true,
+            WorkflowKind::Write {
+                kind,
+                revision_get,
+                intended_rejection,
+                ..
+            } => {
+                matches!(kind, WriteKind::Put | WriteKind::ConditionalOne)
+                    && !revision_get
+                    && !intended_rejection
+            }
+        }));
+        assert_eq!(query_mix_mutation_key(0, 0), key_from_ordinal(8_000));
+        assert_eq!(query_mix_mutation_key(0, 125), key_from_ordinal(8_000));
+        assert_eq!(query_mix_mutation_key(1, 0), key_from_ordinal(8_125));
+        assert_ne!(query_mix_mutation_key(0, 0), query_mix_mutation_key(1, 0));
     }
 
     #[test]
