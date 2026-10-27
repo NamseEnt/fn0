@@ -1,0 +1,37 @@
+{
+  "path": "/bench/zfs/db/backend-hotpaths-20261026-evidence.tar.gz",
+  "sha256": "48725c654511878504655086f8347051c41ea9f763d1b2e03b8b23b92a4e9871",
+  "size_bytes": 32889958,
+  "inventoried_files": 956,
+  "inventoried_bytes": 464191250,
+  "database_archives": 52,
+  "database_archive_bytes": 9734587949,
+  "identities": {
+    "control": {
+      "source_sha": "cc80d1fdc7a98792be1a739056a3013debf39268",
+      "binaries": {
+        "service_workload": {
+          "sha256": "25128f9be2f9c1ddeeb3b663be299c3798d892ac82aa4ba9a2fcd7377b5a4187",
+          "source_sha": "cc80d1fdc7a98792be1a739056a3013debf39268"
+        },
+        "unconditional_write_workload": {
+          "sha256": "dd37ec860d3cd6c2bb24abde48f903cd7e87c06842e3a7651589f370cae15828",
+          "source_sha": "cc80d1fdc7a98792be1a739056a3013debf39268"
+        }
+      }
+    },
+    "candidate": {
+      "source_sha": "3b94ee88eb4e7c02416cde14d3ac48c55e45b991",
+      "binaries": {
+        "service_workload": {
+          "sha256": "70c5a3642f0e3a8bda6f74170613326e5eef70a386594ffeb6d7f080c08eb702",
+          "source_sha": "3b94ee88eb4e7c02416cde14d3ac48c55e45b991"
+        },
+        "unconditional_write_workload": {
+          "sha256": "249c03659a54ff18b4fa0cac14aa5fc03a1eb059f188bdf21e373388943161e7",
+          "source_sha": "3b94ee88eb4e7c02416cde14d3ac48c55e45b991"
+        }
+      }
+    }
+  }
+}

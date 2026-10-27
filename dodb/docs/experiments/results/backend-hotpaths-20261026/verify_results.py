@@ -1,4 +1,6 @@
 import contextlib
+import collections
+import gzip
 import hashlib
 import importlib.util
 import io
@@ -72,8 +74,48 @@ def main():
             counts = re.findall(r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;",
                                 (root / "validation" / record["log"]).read_text())
             assert counts and list(map(int, counts[-1])) == [record["counts"][key] for key in ["passed", "failed", "ignored"]]
+        lints = json.loads((root / "lint-comparison.json").read_text())
+        diagnostic_counts = {}
+        for label in ["candidate", "control"]:
+            command = json.loads((root / f"lint-command-{label}-json.json").read_text())
+            build = root / "build-provenance" / command["build_run_id"]
+            environment = (build / "environment.txt").read_text()
+            assert f"source_sha={sidecar['identities'][label]['source_sha']}\n" in environment
+            entries = []
+            for line in (build / "cargo.log").read_text().splitlines():
+                if not line.startswith("{"):
+                    continue
+                message = json.loads(line)
+                if message.get("reason") != "compiler-message":
+                    continue
+                diagnostic = message["message"]
+                assert diagnostic["level"] != "error"
+                if diagnostic["level"] == "warning" and diagnostic.get("code") is not None:
+                    entries.append({"code": diagnostic["code"]["code"], "message": diagnostic["message"],
+                        "locations": [{"file": span["file_name"], "text": [entry["text"] for entry in span["text"]]}
+                                      for span in diagnostic["spans"] if span["is_primary"]]})
+            assert entries == lints["diagnostics"][label]
+            diagnostic_counts[label] = collections.Counter(json.dumps(entry, sort_keys=True) for entry in entries)
+        assert not diagnostic_counts["candidate"] - diagnostic_counts["control"]
+        assert lints["no_new_diagnostics"] and not lints["new_diagnostics"]
+        library = json.loads((root / "native-library-identity.json").read_text())
+        for label, directory in [("control", "control-provenance"), ("candidate", "build-provenance")]:
+            revision = sidecar["identities"][label]["source_sha"]
+            environment = (root / directory / f"durable-bases-{revision[:9]}-workloads/environment.txt").read_text()
+            actual = re.search(r"^([0-9a-f]{64})\s+\S*/librocksdb\.a$", environment, re.MULTILINE).group(1)
+            assert actual == library["archive_sha256"] and library["same_control_candidate_archive"]
+        if (root / "local-validation/summary.json").is_file():
+            local = root / "local-validation"
+            checks = json.loads((local / "summary.json").read_text())
+            for check in checks["commands"]:
+                assert check["exit_code"] == 0 and digest(local / check["log"]) == check["sha256"]
+            probe = checks["workspace_format_probe"]
+            assert digest(local / probe["compressed_log"]) == probe["compressed_sha256"]
+            assert hashlib.sha256(gzip.decompress((local / probe["compressed_log"]).read_bytes())).hexdigest() == probe["raw_sha256"]
         result = {"verified": True, "inventoried_files": len(inventory["files"]), "accepted_cells": accepted_cells,
-                  "functional_validation": validation, "database_archives_preserved_on_host": len(inventory["database_archives_preserved_on_host"])}
+                  "functional_validation": validation, "no_new_lint_diagnostics": True,
+                  "same_control_candidate_rocksdb_archive": True,
+                  "database_archives_preserved_on_host": len(inventory["database_archives_preserved_on_host"])}
         print(json.dumps(result, indent=2))
 
 

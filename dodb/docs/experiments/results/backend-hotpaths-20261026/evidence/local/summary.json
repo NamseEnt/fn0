@@ -1,0 +1,60 @@
+{
+  "source_sha": "3b94ee88eb4e7c02416cde14d3ac48c55e45b991",
+  "commands": [
+    {
+      "name": "format",
+      "argv": [
+        "cargo",
+        "fmt",
+        "-p",
+        "dodb-server",
+        "-p",
+        "dodb-rocksdb",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "whitespace",
+      "argv": [
+        "git",
+        "diff",
+        "--check",
+        "79e6b71d09b6c1c1e0e5179c9d41f980341cb6b7",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "log": "whitespace.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "python_syntax": "passed",
+  "workspace_format_probe": {
+    "argv": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 1,
+    "scope": "existing vendored Deno formatting differences",
+    "compressed_log": "workspace-format-existing.log.gz",
+    "compressed_sha256": "4f63dea41127661f78886263928fb4c5ab1daec1e48f5bf66a72371a4daae2e6",
+    "raw_sha256": "e34d3a8fed34353b176435a598140ec2b95ea7a6ca3fd6486ef19173282577da",
+    "raw_bytes": 248993
+  },
+  "script_syntax_checked": {
+    "verify_results.py": "d399dd3facfa3417c211863d26398c4c418032fbd8a388ee989f7b5938f04225",
+    "relocate_archives.py": "27e16ba8348b6e03b251ea9cb98ba4271f4cf39f001837309689457c649ca659",
+    "compare_lints.py": "7f6a7c77a9eb87db4220f245489402f6ce1c0891c6d4965d5a6ae02fd5082b7c",
+    "summarize.py": "fc14f15cb3af313afb833542b859be86d9cafb2f0b5afe0fbf616ac9f1b4fea3",
+    "run_pipeline.py": "d13ae53882c8a1eb93f18deb93caf408a3a036309cca253e191cb0fb76a17757",
+    "archive_evidence.py": "b673bc03d92233429c9622e3f67b7184e5a40b2e6424b1a4aebfe76289a9b035",
+    "status.py": "92959ff9770a3f21d28f4e3a5f2e3fd8b804b88a42e23b26b2169386a6d74f77",
+    "run_matrix.py": "35b53299923b3e2cf5f669c4985f9e1b4e471bb6e8f40c97b8b9bae1673983a5"
+  }
+}

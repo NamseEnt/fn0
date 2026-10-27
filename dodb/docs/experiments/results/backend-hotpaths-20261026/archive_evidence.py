@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tarfile
@@ -39,9 +40,36 @@ def main():
             destination = build_directory / source.name
             if not destination.exists():
                 shutil.copytree(source, destination)
+    for command_path in ROOT.glob("lint-command*.json"):
+        lint = json.loads(command_path.read_text())
+        source = Path("/bench/zfs/db/dodb-rocksdb-build-runs") / lint["build_run_id"]
+        destination = build_directory / source.name
+        if not destination.exists():
+            shutil.copytree(source, destination)
+    control_provenance = ROOT / "control-provenance"
+    if not control_provenance.exists():
+        shutil.copytree(control / "build-provenance", control_provenance)
+    environments = {
+        "control": control_provenance / f"durable-bases-{identities['control']['source_sha'][:9]}-workloads/environment.txt",
+        "candidate": build_directory / f"durable-bases-{identities['candidate']['source_sha'][:9]}-workloads/environment.txt",
+    }
+    library_hashes = {}
+    for label, environment_path in environments.items():
+        environment = environment_path.read_text()
+        assert "rustc 1.97.1 " in environment
+        assert "rocksdb_source_sha=abeebd9630f11bd08c28b7bd43c7bdfc62050654\n" in environment
+        library_hashes[label] = re.search(r"^([0-9a-f]{64})\s+\S*/librocksdb\.a$", environment, re.MULTILINE).group(1)
+    assert library_hashes["control"] == library_hashes["candidate"]
+    (ROOT / "native-library-identity.json").write_text(json.dumps({"rocksdb_source_sha": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+        "archive_sha256": library_hashes["candidate"], "same_control_candidate_archive": True}, indent=2) + "\n")
     archive_path = ROOT.parent / f"{ROOT.name}-evidence.tar.gz"
     assert not archive_path.exists()
     included, databases = [], []
+    for metadata_path in sorted(ROOT.glob("*/database-archives/*.json")):
+        metadata = json.loads(metadata_path.read_text())
+        payload = Path(metadata["path"])
+        assert metadata["verified"] and metadata["sha256"] == digest(payload)
+        databases.append(metadata)
     for path in sorted(ROOT.rglob("*")):
         relative = path.relative_to(ROOT)
         if relative.as_posix() == "evidence-inventory.json":
@@ -51,9 +79,6 @@ def main():
         if path.is_symlink() or not path.is_file():
             continue
         if "database-archives" in relative.parts and path.suffix != ".json":
-            metadata = json.loads(path.with_suffix("").with_suffix(".json").read_text())
-            assert metadata["verified"] and metadata["sha256"] == digest(path)
-            databases.append(metadata)
             continue
         included.append({"path": relative.as_posix(), "size_bytes": path.stat().st_size, "sha256": digest(path)})
     inventory = {"files": included, "database_archives_preserved_on_host": databases}

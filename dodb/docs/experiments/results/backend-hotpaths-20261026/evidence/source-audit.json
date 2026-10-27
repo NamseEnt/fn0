@@ -1,0 +1,19 @@
+{
+  "control_sha": "cc80d1fdc7a98792be1a739056a3013debf39268",
+  "candidate_sha": "3b94ee88eb4e7c02416cde14d3ac48c55e45b991",
+  "changed_paths": [
+    "dodb/crates/dodb-rocksdb/shim/transaction_shim.cc",
+    "dodb/crates/dodb-rocksdb/src/lib.rs",
+    "dodb/crates/dodb-rocksdb/src/minimal_native.rs",
+    "dodb/crates/dodb-server/src/lib.rs",
+    "dodb/crates/dodb-storage/tests/durable_base_checkpoint.rs"
+  ],
+  "inherited_test_only_change": "dodb/crates/dodb-storage/tests/durable_base_checkpoint.rs",
+  "source_files": {
+    "dodb/crates/dodb-rocksdb/shim/transaction_shim.cc": "54bef0ed4b92df4f8a64ad9bba4ffc56b467b67f419c9494f977eb7163a5cadf",
+    "dodb/crates/dodb-rocksdb/src/lib.rs": "5479072389f1458772dc3dbd1f854c356dd1f64b5895e0a9238c5287faff7500",
+    "dodb/crates/dodb-rocksdb/src/minimal_native.rs": "0423dab2a2aac1f6461110a08ecfba5cb3a7d6c06571b04aa4d0ba5c92e997b1",
+    "dodb/crates/dodb-server/src/lib.rs": "d0b22ee4d80de1bdd0b0298c0653d245e85ef05e864f62385c11ab3974faf997",
+    "dodb/crates/dodb-storage/tests/durable_base_checkpoint.rs": "69536af2b36919de6ed6dc91dd844d8ee9c5e5e5b9dae2b2f6ae180b2e452ddc"
+  }
+}

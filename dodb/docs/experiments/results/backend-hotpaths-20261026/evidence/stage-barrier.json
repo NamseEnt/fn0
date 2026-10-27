@@ -1,0 +1,9 @@
+{
+  "pipeline_pid": 2128739,
+  "stopped_at_unix_seconds": 1792982318.0829773,
+  "scope": "Parent pipeline only; the active short matrix and its workload processes continue normally",
+  "reason": "After the short matrix exits, relocate only new verified database archives to the same host boot filesystem before sustained measurements",
+  "resumed_at_unix_seconds": 1793059875.3078005,
+  "relocated_archives": 28,
+  "relocated_bytes": 4447320976
+}

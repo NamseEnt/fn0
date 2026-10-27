@@ -1,0 +1,2197 @@
+{
+  "new_diagnostics": [],
+  "candidate_count": 62,
+  "control_count": 62,
+  "diagnostics": {
+    "candidate": [
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-server/src/lib.rs",
+            "text": [
+              "        if let Ok(failed) = self.failed_message.lock() {",
+              "            if let Some(message) = failed.as_ref() {",
+              "                return Err(Error::durability(message.clone()));",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-server/src/lib.rs",
+            "text": [
+              "            if matches!(error, tokio::sync::mpsc::error::TrySendError::Closed(_)) {",
+              "                if let Ok(failed) = self.failed_message.lock() {",
+              "                    if let Some(message) = failed.as_ref() {",
+              "                        return Err(Error::durability(message.clone()));",
+              "                    }",
+              "                }",
+              "            }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-server/src/lib.rs",
+            "text": [
+              "                if let Ok(failed) = self.failed_message.lock() {",
+              "                    if let Some(message) = failed.as_ref() {",
+              "                        return Err(Error::durability(message.clone()));",
+              "                    }",
+              "                }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (8/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs",
+            "text": [
+              "    pub async fn spawn_worker(",
+              "        self: &Arc<Self>,",
+              "        worker_executable: &Path,",
+              "        worker_arguments: &[String],",
+              "        response_budget_bytes: usize,",
+              "        maximum_mutations: usize,",
+              "        maximum_concurrent_requests: usize,",
+              "        data_dir: &Path,",
+              "        startup_timeout: Duration,",
+              "    ) -> Result<MemoryDiagnosticWorker, String> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs",
+            "text": [
+              "        if let Ok(mut child) = self.child.lock() {",
+              "            if child.try_wait().ok().flatten().is_none() {",
+              "                self.connection.close();",
+              "                terminate_child(&mut child);",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/minimal_native.rs",
+            "text": [
+              "    fn current(&self) -> Result<Option<(Vec<u8>, *const u8, usize)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    pub fn scan(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "        if let (Some(context), Some(metrics)) = (&read_context, &self.research_metrics) {",
+              "            if context.first_permit.swap(false, Ordering::AcqRel) {",
+              "                metrics.record_read(",
+              "                    tenant,",
+              "                    context.kind,",
+              "                    ReadMetric::PrePermit,",
+              "                    semaphore_started.saturating_duration_since(context.started),",
+              "                );",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "        if let Some(metrics) = &self.research_metrics {",
+              "            if let Some(tenant_metrics) = metrics.tenant(tenant) {",
+              "                let stage = metrics.stage.load(Ordering::Acquire);",
+              "                metrics.record(tenant, Metric::RequestDuration, started.elapsed());",
+              "                if let Some(context) = &read_context {",
+              "                    for (metric, nanos) in [",
+              "                        (",
+              "                            ReadMetric::SemaphoreWait,",
+              "                            context.semaphore_wait_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                        (",
+              "                            ReadMetric::BlockingDispatch,",
+              "                            context.blocking_dispatch_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                        (",
+              "                            ReadMetric::BlockingClosure,",
+              "                            context.blocking_closure_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                        (",
+              "                            ReadMetric::CompletionHandoff,",
+              "                            context.completion_handoff_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                    ] {",
+              "                        metrics.record_read(",
+              "                            tenant,",
+              "                            context.kind,",
+              "                            metric,",
+              "                            Duration::from_nanos(nanos),",
+              "                        );",
+              "                    }",
+              "                    metrics.record_read(",
+              "                        tenant,",
+              "                        context.kind,",
+              "                        ReadMetric::ServiceRequestTotal,",
+              "                        started.elapsed(),",
+              "                    );",
+              "                }",
+              "                let outcomes = if stage == 2 {",
+              "                    &tenant_metrics.measurement_outcomes",
+              "                } else {",
+              "                    &tenant_metrics.warmup_outcomes",
+              "                };",
+              "                if stage > 0 {",
+              "                    match &result {",
+              "                        Ok(_) if is_mutation => {",
+              "                            outcomes.successful_writes.fetch_add(1, Ordering::Relaxed)",
+              "                        }",
+              "                        Err(Error::Conflict(_)) => outcomes",
+              "                            .condition_rejections",
+              "                            .fetch_add(1, Ordering::Relaxed),",
+              "                        Err(_) => outcomes.other_errors.fetch_add(1, Ordering::Relaxed),",
+              "                        Ok(_) => 0,",
+              "                    };",
+              "                }",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                if let Some(metrics) = &self.research_metrics {",
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()",
+              "                    {",
+              "                        metrics.record_read(",
+              "                            tenant,",
+              "                            kind,",
+              "                            ReadMetric::TenantDatabaseLookup,",
+              "                            database_started.map_or(Duration::ZERO, |started| started.elapsed()),",
+              "                        );",
+              "                    }",
+              "                }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::match_result_ok",
+        "message": "matching on `Some` with `ok()` is redundant",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                if let Some(metrics) = &self.research_metrics {",
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()",
+              "                    {",
+              "                        metrics.record_read(",
+              "                            tenant,",
+              "                            kind,",
+              "                            ReadMetric::TenantDatabaseLookup,",
+              "                            database_started.map_or(Duration::ZERO, |started| started.elapsed()),",
+              "                        );",
+              "                    }",
+              "                }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::match_result_ok",
+        "message": "matching on `Some` with `ok()` is redundant",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (8/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "    fn query_with_metrics(",
+              "        &self,",
+              "        tenant: TenantId,",
+              "        pk: &PrimaryKey,",
+              "        exclusive_after_sk: Option<&SortKey>,",
+              "        limit: usize,",
+              "        maximum_response_bytes: ExecutionBudget,",
+              "        metrics: Option<Arc<ResearchMetrics>>,",
+              "        kind: Option<ResearchReadKind>,",
+              "    ) -> Result<Vec<dodb_service::Document>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "            if let Some(metrics) = &metrics {",
+              "                if stage > 0 {",
+              "                    let outcomes = if stage == 2 {",
+              "                        &metrics.measurement_outcomes",
+              "                    } else {",
+              "                        &metrics.warmup_outcomes",
+              "                    };",
+              "                    outcomes",
+              "                        .user_transaction_counter_accesses",
+              "                        .fetch_add(1, Ordering::Relaxed);",
+              "                }",
+              "            }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "    fn current(&self) -> Result<Option<(Vec<u8>, *const u8, usize)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::unnecessary_cast",
+        "message": "casting to the same type is unnecessary (`u64` -> `u64`)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/tests/research_metrics.rs",
+            "text": [
+              "        (concurrent_writes + 5) as u64"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::large_enum_variant",
+        "message": "large size difference between variants",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "enum ProbeBackend {",
+              "    Raw(RawRocksDb),",
+              "    Core(dodb_rocksdb::research::SynchronousRocksDbTenant),",
+              "    RocksDbService(Box<dodb_rocksdb::RocksDbService>, tokio::runtime::Handle),",
+              "    Service(",
+              "        Box<dyn DodbService>,",
+              "        tokio::runtime::Handle,",
+              "        Option<dodb_server::BlinkWalCheckpointMetricsHandle>,",
+              "    ),",
+              "    Diagnostic {",
+              "        backend_kind: BackendKind,",
+              "        worker: dodb_rocksdb::memory_diagnostic::MemoryDiagnosticWorker,",
+              "        service: dodb_rocksdb::memory_diagnostic::RemoteDodbService,",
+              "        runtime: tokio::runtime::Handle,",
+              "    },",
+              "}"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::field_reassign_with_default",
+        "message": "field assignment outside of initializer for an instance created with Default::default()",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "                config.data_dir = options.data_dir.clone();"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "    fn read_all(&self) -> Result<Vec<(DocumentKey, Vec<u8>, Option<Revision>)>, String> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "fn scan_service<F>(mut execute: F) -> Result<Vec<(DocumentKey, Vec<u8>, Option<Revision>)>, String>"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::needless_range_loop",
+        "message": "the loop variable `client_index` is used to index `baseline_revisions`",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "    for client_index in 0..options.clients {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (14/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "fn run_client_phase(",
+              "    backend: Arc<ProbeBackend>,",
+              "    options: Options,",
+              "    client_index: usize,",
+              "    mut slot_write_counts: Vec<u64>,",
+              "    mut latest_payload_sequences: Vec<u64>,",
+              "    mut latest_ack_revisions: Vec<u64>,",
+              "    duration_ms: u64,",
+              "    ready_barrier: Arc<Barrier>,",
+              "    start_barrier: Arc<Barrier>,",
+              "    shared_start: Arc<Mutex<Option<Instant>>>,",
+              "    acknowledged_calls: Arc<AtomicU64>,",
+              "    call_limit_reached: Arc<AtomicBool>,",
+              "    warmup_phase: bool,",
+              "    prior_writes: u64,",
+              ") -> Result<ClientResult, String> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (13/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "fn build_report(",
+              "    options: &Options,",
+              "    client_results: &[ClientResult],",
+              "    actual_measurement_duration_ms: u64,",
+              "    final_validation: Value,",
+              "    reopen_validation: Value,",
+              "    process_metrics: Value,",
+              "    engine_health_metrics: Value,",
+              "    disk_usage_bytes: u64,",
+              "    seeded_disk_bytes: u64,",
+              "    blink_checkpoint_metrics: Value,",
+              "    checkpoint_drain_ms: f64,",
+              "    storage_before_measurement: (u64, u64),",
+              "    storage_after_measurement: (u64, u64),",
+              ") -> Value {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::inconsistent_digit_grouping",
+        "message": "digits grouped inconsistently by underscores",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "        seed: parse(\"--seed\", 2_026_101_3)?,"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::precedence",
+        "message": "operator precedence might not be obvious",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "        let ordinal = 1_u64 << 60",
+              "            | (tenant_index as u64) << 52",
+              "            | (client_index as u64) << 36",
+              "            | slot * 16"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::inconsistent_digit_grouping",
+        "message": "digits grouped inconsistently by underscores",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "            let plan = make_plan(profile, 2_026_101_3, false);"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::inconsistent_digit_grouping",
+        "message": "digits grouped inconsistently by underscores",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "            let plan = make_plan(profile, 2_026_101_3, true);"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::large_enum_variant",
+        "message": "large size difference between variants",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "enum DriverBackend {",
+              "    Service(Box<dyn DodbService>),",
+              "    RocksDbService(Box<dodb_rocksdb::RocksDbService>),",
+              "    Diagnostic {",
+              "        worker: dodb_rocksdb::memory_diagnostic::MemoryDiagnosticWorker,",
+              "        service: dodb_rocksdb::memory_diagnostic::RemoteDodbService,",
+              "        admission: Option<tokio::sync::Semaphore>,",
+              "    },",
+              "    Direct {",
+              "        tenants: BTreeMap<TenantId, dodb_rocksdb::research::SynchronousRocksDbTenant>,",
+              "        admission: tokio::sync::Semaphore,",
+              "    },",
+              "}"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::field_reassign_with_default",
+        "message": "field assignment outside of initializer for an instance created with Default::default()",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "                config.data_dir = data_dir;"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::manual_div_ceil",
+        "message": "manually reimplementing `div_ceil`",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "    let revision_get_count = (conditional_count + 3) / 4;"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (9/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "fn input_workflow_fingerprint(",
+              "    profile: Profile,",
+              "    seed: u64,",
+              "    client_index: usize,",
+              "    tenant_index: usize,",
+              "    workflow_id: u64,",
+              "    client_sequence: u64,",
+              "    value_size: usize,",
+              "    options: &Options,",
+              "    plan: &WorkflowPlan,",
+              ") -> u64 {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::manual_is_multiple_of",
+        "message": "manual implementation of `.is_multiple_of()`",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "    if kind == WriteKind::Delete && mutation_index == 0 && workflow_id % 2 == 0 {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (9/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "async fn execute_workflow(",
+              "    service: &DriverService,",
+              "    tenant: TenantId,",
+              "    tenant_index: usize,",
+              "    plan: WorkflowPlan,",
+              "    workflow_id: u64,",
+              "    client_index: usize,",
+              "    client_sequence: u64,",
+              "    options: &Options,",
+              "    counters: &Mutex<Counters>,",
+              ") {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::manual_is_multiple_of",
+        "message": "manual implementation of `.is_multiple_of()`",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "                if width >= 4 && workflow_id % 3 == 0 {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::needless_return",
+        "message": "unneeded `return` statement",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "        return json!({\"rss_kb\": rss_kb, \"cpu_ticks_total\": cpu_ticks, \"sample_source\": \"/proc/self/status and /proc/self/stat\", \"complete\": rss_kb.is_some()});"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::await_holding_lock",
+        "message": "this `MutexGuard` is held across an await point",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "        let warmup = warmup_counts[tenant_index].lock().unwrap();"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "            if let Some(path) = report_path {",
+              "                if let Err(error) = std::fs::write(path, format!(\"{encoded}\\n\")) {",
+              "                    eprintln!(\"failed to write report: {error}\");",
+              "                    std::process::exit(1);",
+              "                }",
+              "            }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::needless_borrow",
+        "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/tests/common/transaction_contract.rs",
+            "text": [
+              "                &expected_value"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (8/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs",
+            "text": [
+              "    pub async fn spawn_worker(",
+              "        self: &Arc<Self>,",
+              "        worker_executable: &Path,",
+              "        worker_arguments: &[String],",
+              "        response_budget_bytes: usize,",
+              "        maximum_mutations: usize,",
+              "        maximum_concurrent_requests: usize,",
+              "        data_dir: &Path,",
+              "        startup_timeout: Duration,",
+              "    ) -> Result<MemoryDiagnosticWorker, String> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs",
+            "text": [
+              "        if let Ok(mut child) = self.child.lock() {",
+              "            if child.try_wait().ok().flatten().is_none() {",
+              "                self.connection.close();",
+              "                terminate_child(&mut child);",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/minimal_native.rs",
+            "text": [
+              "    fn current(&self) -> Result<Option<(Vec<u8>, *const u8, usize)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    pub fn scan(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "    before_commit_hook: Mutex<Option<Arc<dyn Fn() -> Result<(), Error> + Send + Sync>>>,"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "        if let (Some(context), Some(metrics)) = (&read_context, &self.research_metrics) {",
+              "            if context.first_permit.swap(false, Ordering::AcqRel) {",
+              "                metrics.record_read(",
+              "                    tenant,",
+              "                    context.kind,",
+              "                    ReadMetric::PrePermit,",
+              "                    semaphore_started.saturating_duration_since(context.started),",
+              "                );",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "        if let Some(metrics) = &self.research_metrics {",
+              "            if let Some(tenant_metrics) = metrics.tenant(tenant) {",
+              "                let stage = metrics.stage.load(Ordering::Acquire);",
+              "                metrics.record(tenant, Metric::RequestDuration, started.elapsed());",
+              "                if let Some(context) = &read_context {",
+              "                    for (metric, nanos) in [",
+              "                        (",
+              "                            ReadMetric::SemaphoreWait,",
+              "                            context.semaphore_wait_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                        (",
+              "                            ReadMetric::BlockingDispatch,",
+              "                            context.blocking_dispatch_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                        (",
+              "                            ReadMetric::BlockingClosure,",
+              "                            context.blocking_closure_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                        (",
+              "                            ReadMetric::CompletionHandoff,",
+              "                            context.completion_handoff_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                    ] {",
+              "                        metrics.record_read(",
+              "                            tenant,",
+              "                            context.kind,",
+              "                            metric,",
+              "                            Duration::from_nanos(nanos),",
+              "                        );",
+              "                    }",
+              "                    metrics.record_read(",
+              "                        tenant,",
+              "                        context.kind,",
+              "                        ReadMetric::ServiceRequestTotal,",
+              "                        started.elapsed(),",
+              "                    );",
+              "                }",
+              "                let outcomes = if stage == 2 {",
+              "                    &tenant_metrics.measurement_outcomes",
+              "                } else {",
+              "                    &tenant_metrics.warmup_outcomes",
+              "                };",
+              "                if stage > 0 {",
+              "                    match &result {",
+              "                        Ok(_) if is_mutation => {",
+              "                            outcomes.successful_writes.fetch_add(1, Ordering::Relaxed)",
+              "                        }",
+              "                        Err(Error::Conflict(_)) => outcomes",
+              "                            .condition_rejections",
+              "                            .fetch_add(1, Ordering::Relaxed),",
+              "                        Err(_) => outcomes.other_errors.fetch_add(1, Ordering::Relaxed),",
+              "                        Ok(_) => 0,",
+              "                    };",
+              "                }",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                if let Some(metrics) = &self.research_metrics {",
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()",
+              "                    {",
+              "                        metrics.record_read(",
+              "                            tenant,",
+              "                            kind,",
+              "                            ReadMetric::TenantDatabaseLookup,",
+              "                            database_started.map_or(Duration::ZERO, |started| started.elapsed()),",
+              "                        );",
+              "                    }",
+              "                }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::match_result_ok",
+        "message": "matching on `Some` with `ok()` is redundant",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                if let Some(metrics) = &self.research_metrics {",
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()",
+              "                    {",
+              "                        metrics.record_read(",
+              "                            tenant,",
+              "                            kind,",
+              "                            ReadMetric::TenantDatabaseLookup,",
+              "                            database_started.map_or(Duration::ZERO, |started| started.elapsed()),",
+              "                        );",
+              "                    }",
+              "                }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::match_result_ok",
+        "message": "matching on `Some` with `ok()` is redundant",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (8/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "    fn query_with_metrics(",
+              "        &self,",
+              "        tenant: TenantId,",
+              "        pk: &PrimaryKey,",
+              "        exclusive_after_sk: Option<&SortKey>,",
+              "        limit: usize,",
+              "        maximum_response_bytes: ExecutionBudget,",
+              "        metrics: Option<Arc<ResearchMetrics>>,",
+              "        kind: Option<ResearchReadKind>,",
+              "    ) -> Result<Vec<dodb_service::Document>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "            if let Some(metrics) = &metrics {",
+              "                if stage > 0 {",
+              "                    let outcomes = if stage == 2 {",
+              "                        &metrics.measurement_outcomes",
+              "                    } else {",
+              "                        &metrics.warmup_outcomes",
+              "                    };",
+              "                    outcomes",
+              "                        .user_transaction_counter_accesses",
+              "                        .fetch_add(1, Ordering::Relaxed);",
+              "                }",
+              "            }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "    fn current(&self) -> Result<Option<(Vec<u8>, *const u8, usize)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-server/src/lib.rs",
+            "text": [
+              "        if let Ok(failed) = self.failed_message.lock() {",
+              "            if let Some(message) = failed.as_ref() {",
+              "                return Err(Error::durability(message.clone()));",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-server/src/lib.rs",
+            "text": [
+              "            if matches!(error, tokio::sync::mpsc::error::TrySendError::Closed(_)) {",
+              "                if let Ok(failed) = self.failed_message.lock() {",
+              "                    if let Some(message) = failed.as_ref() {",
+              "                        return Err(Error::durability(message.clone()));",
+              "                    }",
+              "                }",
+              "            }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-server/src/lib.rs",
+            "text": [
+              "                if let Ok(failed) = self.failed_message.lock() {",
+              "                    if let Some(message) = failed.as_ref() {",
+              "                        return Err(Error::durability(message.clone()));",
+              "                    }",
+              "                }"
+            ]
+          }
+        ]
+      }
+    ],
+    "control": [
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-server/src/lib.rs",
+            "text": [
+              "        if let Ok(failed) = self.failed_message.lock() {",
+              "            if let Some(message) = failed.as_ref() {",
+              "                return Err(Error::durability(message.clone()));",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-server/src/lib.rs",
+            "text": [
+              "            if matches!(error, tokio::sync::mpsc::error::TrySendError::Closed(_)) {",
+              "                if let Ok(failed) = self.failed_message.lock() {",
+              "                    if let Some(message) = failed.as_ref() {",
+              "                        return Err(Error::durability(message.clone()));",
+              "                    }",
+              "                }",
+              "            }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-server/src/lib.rs",
+            "text": [
+              "                if let Ok(failed) = self.failed_message.lock() {",
+              "                    if let Some(message) = failed.as_ref() {",
+              "                        return Err(Error::durability(message.clone()));",
+              "                    }",
+              "                }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (8/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs",
+            "text": [
+              "    pub async fn spawn_worker(",
+              "        self: &Arc<Self>,",
+              "        worker_executable: &Path,",
+              "        worker_arguments: &[String],",
+              "        response_budget_bytes: usize,",
+              "        maximum_mutations: usize,",
+              "        maximum_concurrent_requests: usize,",
+              "        data_dir: &Path,",
+              "        startup_timeout: Duration,",
+              "    ) -> Result<MemoryDiagnosticWorker, String> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs",
+            "text": [
+              "        if let Ok(mut child) = self.child.lock() {",
+              "            if child.try_wait().ok().flatten().is_none() {",
+              "                self.connection.close();",
+              "                terminate_child(&mut child);",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/minimal_native.rs",
+            "text": [
+              "    fn current(&self) -> Result<Option<(Vec<u8>, *const u8, usize)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    pub fn scan(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "        if let (Some(context), Some(metrics)) = (&read_context, &self.research_metrics) {",
+              "            if context.first_permit.swap(false, Ordering::AcqRel) {",
+              "                metrics.record_read(",
+              "                    tenant,",
+              "                    context.kind,",
+              "                    ReadMetric::PrePermit,",
+              "                    semaphore_started.saturating_duration_since(context.started),",
+              "                );",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "        if let Some(metrics) = &self.research_metrics {",
+              "            if let Some(tenant_metrics) = metrics.tenant(tenant) {",
+              "                let stage = metrics.stage.load(Ordering::Acquire);",
+              "                metrics.record(tenant, Metric::RequestDuration, started.elapsed());",
+              "                if let Some(context) = &read_context {",
+              "                    for (metric, nanos) in [",
+              "                        (",
+              "                            ReadMetric::SemaphoreWait,",
+              "                            context.semaphore_wait_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                        (",
+              "                            ReadMetric::BlockingDispatch,",
+              "                            context.blocking_dispatch_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                        (",
+              "                            ReadMetric::BlockingClosure,",
+              "                            context.blocking_closure_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                        (",
+              "                            ReadMetric::CompletionHandoff,",
+              "                            context.completion_handoff_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                    ] {",
+              "                        metrics.record_read(",
+              "                            tenant,",
+              "                            context.kind,",
+              "                            metric,",
+              "                            Duration::from_nanos(nanos),",
+              "                        );",
+              "                    }",
+              "                    metrics.record_read(",
+              "                        tenant,",
+              "                        context.kind,",
+              "                        ReadMetric::ServiceRequestTotal,",
+              "                        started.elapsed(),",
+              "                    );",
+              "                }",
+              "                let outcomes = if stage == 2 {",
+              "                    &tenant_metrics.measurement_outcomes",
+              "                } else {",
+              "                    &tenant_metrics.warmup_outcomes",
+              "                };",
+              "                if stage > 0 {",
+              "                    match &result {",
+              "                        Ok(_) if is_mutation => {",
+              "                            outcomes.successful_writes.fetch_add(1, Ordering::Relaxed)",
+              "                        }",
+              "                        Err(Error::Conflict(_)) => outcomes",
+              "                            .condition_rejections",
+              "                            .fetch_add(1, Ordering::Relaxed),",
+              "                        Err(_) => outcomes.other_errors.fetch_add(1, Ordering::Relaxed),",
+              "                        Ok(_) => 0,",
+              "                    };",
+              "                }",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                if let Some(metrics) = &self.research_metrics {",
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()",
+              "                    {",
+              "                        metrics.record_read(",
+              "                            tenant,",
+              "                            kind,",
+              "                            ReadMetric::TenantDatabaseLookup,",
+              "                            database_started.map_or(Duration::ZERO, |started| started.elapsed()),",
+              "                        );",
+              "                    }",
+              "                }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::match_result_ok",
+        "message": "matching on `Some` with `ok()` is redundant",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                if let Some(metrics) = &self.research_metrics {",
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()",
+              "                    {",
+              "                        metrics.record_read(",
+              "                            tenant,",
+              "                            kind,",
+              "                            ReadMetric::TenantDatabaseLookup,",
+              "                            database_started.map_or(Duration::ZERO, |started| started.elapsed()),",
+              "                        );",
+              "                    }",
+              "                }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::match_result_ok",
+        "message": "matching on `Some` with `ok()` is redundant",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (8/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "    fn query_with_metrics(",
+              "        &self,",
+              "        tenant: TenantId,",
+              "        pk: &PrimaryKey,",
+              "        exclusive_after_sk: Option<&SortKey>,",
+              "        limit: usize,",
+              "        maximum_response_bytes: ExecutionBudget,",
+              "        metrics: Option<Arc<ResearchMetrics>>,",
+              "        kind: Option<ResearchReadKind>,",
+              "    ) -> Result<Vec<dodb_service::Document>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "            if let Some(metrics) = &metrics {",
+              "                if stage > 0 {",
+              "                    let outcomes = if stage == 2 {",
+              "                        &metrics.measurement_outcomes",
+              "                    } else {",
+              "                        &metrics.warmup_outcomes",
+              "                    };",
+              "                    outcomes",
+              "                        .user_transaction_counter_accesses",
+              "                        .fetch_add(1, Ordering::Relaxed);",
+              "                }",
+              "            }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "    fn current(&self) -> Result<Option<(Vec<u8>, *const u8, usize)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::needless_borrow",
+        "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/tests/common/transaction_contract.rs",
+            "text": [
+              "                &expected_value"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::large_enum_variant",
+        "message": "large size difference between variants",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "enum ProbeBackend {",
+              "    Raw(RawRocksDb),",
+              "    Core(dodb_rocksdb::research::SynchronousRocksDbTenant),",
+              "    RocksDbService(Box<dodb_rocksdb::RocksDbService>, tokio::runtime::Handle),",
+              "    Service(",
+              "        Box<dyn DodbService>,",
+              "        tokio::runtime::Handle,",
+              "        Option<dodb_server::BlinkWalCheckpointMetricsHandle>,",
+              "    ),",
+              "    Diagnostic {",
+              "        backend_kind: BackendKind,",
+              "        worker: dodb_rocksdb::memory_diagnostic::MemoryDiagnosticWorker,",
+              "        service: dodb_rocksdb::memory_diagnostic::RemoteDodbService,",
+              "        runtime: tokio::runtime::Handle,",
+              "    },",
+              "}"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::field_reassign_with_default",
+        "message": "field assignment outside of initializer for an instance created with Default::default()",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "                config.data_dir = options.data_dir.clone();"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "    fn read_all(&self) -> Result<Vec<(DocumentKey, Vec<u8>, Option<Revision>)>, String> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "fn scan_service<F>(mut execute: F) -> Result<Vec<(DocumentKey, Vec<u8>, Option<Revision>)>, String>"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::needless_range_loop",
+        "message": "the loop variable `client_index` is used to index `baseline_revisions`",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "    for client_index in 0..options.clients {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (14/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "fn run_client_phase(",
+              "    backend: Arc<ProbeBackend>,",
+              "    options: Options,",
+              "    client_index: usize,",
+              "    mut slot_write_counts: Vec<u64>,",
+              "    mut latest_payload_sequences: Vec<u64>,",
+              "    mut latest_ack_revisions: Vec<u64>,",
+              "    duration_ms: u64,",
+              "    ready_barrier: Arc<Barrier>,",
+              "    start_barrier: Arc<Barrier>,",
+              "    shared_start: Arc<Mutex<Option<Instant>>>,",
+              "    acknowledged_calls: Arc<AtomicU64>,",
+              "    call_limit_reached: Arc<AtomicBool>,",
+              "    warmup_phase: bool,",
+              "    prior_writes: u64,",
+              ") -> Result<ClientResult, String> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (13/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs",
+            "text": [
+              "fn build_report(",
+              "    options: &Options,",
+              "    client_results: &[ClientResult],",
+              "    actual_measurement_duration_ms: u64,",
+              "    final_validation: Value,",
+              "    reopen_validation: Value,",
+              "    process_metrics: Value,",
+              "    engine_health_metrics: Value,",
+              "    disk_usage_bytes: u64,",
+              "    seeded_disk_bytes: u64,",
+              "    blink_checkpoint_metrics: Value,",
+              "    checkpoint_drain_ms: f64,",
+              "    storage_before_measurement: (u64, u64),",
+              "    storage_after_measurement: (u64, u64),",
+              ") -> Value {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::unnecessary_cast",
+        "message": "casting to the same type is unnecessary (`u64` -> `u64`)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/tests/research_metrics.rs",
+            "text": [
+              "        (concurrent_writes + 5) as u64"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::inconsistent_digit_grouping",
+        "message": "digits grouped inconsistently by underscores",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "        seed: parse(\"--seed\", 2_026_101_3)?,"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::precedence",
+        "message": "operator precedence might not be obvious",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "        let ordinal = 1_u64 << 60",
+              "            | (tenant_index as u64) << 52",
+              "            | (client_index as u64) << 36",
+              "            | slot * 16"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::inconsistent_digit_grouping",
+        "message": "digits grouped inconsistently by underscores",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "            let plan = make_plan(profile, 2_026_101_3, false);"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::inconsistent_digit_grouping",
+        "message": "digits grouped inconsistently by underscores",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "            let plan = make_plan(profile, 2_026_101_3, true);"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::large_enum_variant",
+        "message": "large size difference between variants",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "enum DriverBackend {",
+              "    Service(Box<dyn DodbService>),",
+              "    RocksDbService(Box<dodb_rocksdb::RocksDbService>),",
+              "    Diagnostic {",
+              "        worker: dodb_rocksdb::memory_diagnostic::MemoryDiagnosticWorker,",
+              "        service: dodb_rocksdb::memory_diagnostic::RemoteDodbService,",
+              "        admission: Option<tokio::sync::Semaphore>,",
+              "    },",
+              "    Direct {",
+              "        tenants: BTreeMap<TenantId, dodb_rocksdb::research::SynchronousRocksDbTenant>,",
+              "        admission: tokio::sync::Semaphore,",
+              "    },",
+              "}"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::field_reassign_with_default",
+        "message": "field assignment outside of initializer for an instance created with Default::default()",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "                config.data_dir = data_dir;"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::manual_div_ceil",
+        "message": "manually reimplementing `div_ceil`",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "    let revision_get_count = (conditional_count + 3) / 4;"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (9/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "fn input_workflow_fingerprint(",
+              "    profile: Profile,",
+              "    seed: u64,",
+              "    client_index: usize,",
+              "    tenant_index: usize,",
+              "    workflow_id: u64,",
+              "    client_sequence: u64,",
+              "    value_size: usize,",
+              "    options: &Options,",
+              "    plan: &WorkflowPlan,",
+              ") -> u64 {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::manual_is_multiple_of",
+        "message": "manual implementation of `.is_multiple_of()`",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "    if kind == WriteKind::Delete && mutation_index == 0 && workflow_id % 2 == 0 {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (9/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "async fn execute_workflow(",
+              "    service: &DriverService,",
+              "    tenant: TenantId,",
+              "    tenant_index: usize,",
+              "    plan: WorkflowPlan,",
+              "    workflow_id: u64,",
+              "    client_index: usize,",
+              "    client_sequence: u64,",
+              "    options: &Options,",
+              "    counters: &Mutex<Counters>,",
+              ") {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::manual_is_multiple_of",
+        "message": "manual implementation of `.is_multiple_of()`",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "                if width >= 4 && workflow_id % 3 == 0 {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::needless_return",
+        "message": "unneeded `return` statement",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "        return json!({\"rss_kb\": rss_kb, \"cpu_ticks_total\": cpu_ticks, \"sample_source\": \"/proc/self/status and /proc/self/stat\", \"complete\": rss_kb.is_some()});"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::await_holding_lock",
+        "message": "this `MutexGuard` is held across an await point",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "        let warmup = warmup_counts[tenant_index].lock().unwrap();"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+            "text": [
+              "            if let Some(path) = report_path {",
+              "                if let Err(error) = std::fs::write(path, format!(\"{encoded}\\n\")) {",
+              "                    eprintln!(\"failed to write report: {error}\");",
+              "                    std::process::exit(1);",
+              "                }",
+              "            }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (8/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs",
+            "text": [
+              "    pub async fn spawn_worker(",
+              "        self: &Arc<Self>,",
+              "        worker_executable: &Path,",
+              "        worker_arguments: &[String],",
+              "        response_budget_bytes: usize,",
+              "        maximum_mutations: usize,",
+              "        maximum_concurrent_requests: usize,",
+              "        data_dir: &Path,",
+              "        startup_timeout: Duration,",
+              "    ) -> Result<MemoryDiagnosticWorker, String> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs",
+            "text": [
+              "        if let Ok(mut child) = self.child.lock() {",
+              "            if child.try_wait().ok().flatten().is_none() {",
+              "                self.connection.close();",
+              "                terminate_child(&mut child);",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/minimal_native.rs",
+            "text": [
+              "    fn current(&self) -> Result<Option<(Vec<u8>, *const u8, usize)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    pub fn scan(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/raw_research.rs",
+            "text": [
+              "    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "    before_commit_hook: Mutex<Option<Arc<dyn Fn() -> Result<(), Error> + Send + Sync>>>,"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "        if let (Some(context), Some(metrics)) = (&read_context, &self.research_metrics) {",
+              "            if context.first_permit.swap(false, Ordering::AcqRel) {",
+              "                metrics.record_read(",
+              "                    tenant,",
+              "                    context.kind,",
+              "                    ReadMetric::PrePermit,",
+              "                    semaphore_started.saturating_duration_since(context.started),",
+              "                );",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "        if let Some(metrics) = &self.research_metrics {",
+              "            if let Some(tenant_metrics) = metrics.tenant(tenant) {",
+              "                let stage = metrics.stage.load(Ordering::Acquire);",
+              "                metrics.record(tenant, Metric::RequestDuration, started.elapsed());",
+              "                if let Some(context) = &read_context {",
+              "                    for (metric, nanos) in [",
+              "                        (",
+              "                            ReadMetric::SemaphoreWait,",
+              "                            context.semaphore_wait_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                        (",
+              "                            ReadMetric::BlockingDispatch,",
+              "                            context.blocking_dispatch_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                        (",
+              "                            ReadMetric::BlockingClosure,",
+              "                            context.blocking_closure_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                        (",
+              "                            ReadMetric::CompletionHandoff,",
+              "                            context.completion_handoff_nanos.load(Ordering::Relaxed),",
+              "                        ),",
+              "                    ] {",
+              "                        metrics.record_read(",
+              "                            tenant,",
+              "                            context.kind,",
+              "                            metric,",
+              "                            Duration::from_nanos(nanos),",
+              "                        );",
+              "                    }",
+              "                    metrics.record_read(",
+              "                        tenant,",
+              "                        context.kind,",
+              "                        ReadMetric::ServiceRequestTotal,",
+              "                        started.elapsed(),",
+              "                    );",
+              "                }",
+              "                let outcomes = if stage == 2 {",
+              "                    &tenant_metrics.measurement_outcomes",
+              "                } else {",
+              "                    &tenant_metrics.warmup_outcomes",
+              "                };",
+              "                if stage > 0 {",
+              "                    match &result {",
+              "                        Ok(_) if is_mutation => {",
+              "                            outcomes.successful_writes.fetch_add(1, Ordering::Relaxed)",
+              "                        }",
+              "                        Err(Error::Conflict(_)) => outcomes",
+              "                            .condition_rejections",
+              "                            .fetch_add(1, Ordering::Relaxed),",
+              "                        Err(_) => outcomes.other_errors.fetch_add(1, Ordering::Relaxed),",
+              "                        Ok(_) => 0,",
+              "                    };",
+              "                }",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                if let Some(metrics) = &self.research_metrics {",
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()",
+              "                    {",
+              "                        metrics.record_read(",
+              "                            tenant,",
+              "                            kind,",
+              "                            ReadMetric::TenantDatabaseLookup,",
+              "                            database_started.map_or(Duration::ZERO, |started| started.elapsed()),",
+              "                        );",
+              "                    }",
+              "                }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::match_result_ok",
+        "message": "matching on `Some` with `ok()` is redundant",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                if let Some(metrics) = &self.research_metrics {",
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()",
+              "                    {",
+              "                        metrics.record_read(",
+              "                            tenant,",
+              "                            kind,",
+              "                            ReadMetric::TenantDatabaseLookup,",
+              "                            database_started.map_or(Duration::ZERO, |started| started.elapsed()),",
+              "                        );",
+              "                    }",
+              "                }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::match_result_ok",
+        "message": "matching on `Some` with `ok()` is redundant",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "                    if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::too_many_arguments",
+        "message": "this function has too many arguments (8/7)",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "    fn query_with_metrics(",
+              "        &self,",
+              "        tenant: TenantId,",
+              "        pk: &PrimaryKey,",
+              "        exclusive_after_sk: Option<&SortKey>,",
+              "        limit: usize,",
+              "        maximum_response_bytes: ExecutionBudget,",
+              "        metrics: Option<Arc<ResearchMetrics>>,",
+              "        kind: Option<ResearchReadKind>,",
+              "    ) -> Result<Vec<dodb_service::Document>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "            if let Some(metrics) = &metrics {",
+              "                if stage > 0 {",
+              "                    let outcomes = if stage == 2 {",
+              "                        &metrics.measurement_outcomes",
+              "                    } else {",
+              "                        &metrics.warmup_outcomes",
+              "                    };",
+              "                    outcomes",
+              "                        .user_transaction_counter_accesses",
+              "                        .fetch_add(1, Ordering::Relaxed);",
+              "                }",
+              "            }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::type_complexity",
+        "message": "very complex type used. Consider factoring parts into `type` definitions",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-rocksdb/src/lib.rs",
+            "text": [
+              "    fn current(&self) -> Result<Option<(Vec<u8>, *const u8, usize)>, Error> {"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-server/src/lib.rs",
+            "text": [
+              "        if let Ok(failed) = self.failed_message.lock() {",
+              "            if let Some(message) = failed.as_ref() {",
+              "                return Err(Error::durability(message.clone()));",
+              "            }",
+              "        }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-server/src/lib.rs",
+            "text": [
+              "            if matches!(error, tokio::sync::mpsc::error::TrySendError::Closed(_)) {",
+              "                if let Ok(failed) = self.failed_message.lock() {",
+              "                    if let Some(message) = failed.as_ref() {",
+              "                        return Err(Error::durability(message.clone()));",
+              "                    }",
+              "                }",
+              "            }"
+            ]
+          }
+        ]
+      },
+      {
+        "code": "clippy::collapsible_if",
+        "message": "this `if` statement can be collapsed",
+        "locations": [
+          {
+            "file": "dodb/crates/dodb-server/src/lib.rs",
+            "text": [
+              "                if let Ok(failed) = self.failed_message.lock() {",
+              "                    if let Some(message) = failed.as_ref() {",
+              "                        return Err(Error::durability(message.clone()));",
+              "                    }",
+              "                }"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "no_new_diagnostics": true,
+  "strict_result": "existing diagnostics remain; no lint suppressions or unrelated fixes"
+}
