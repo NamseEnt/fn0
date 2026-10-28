@@ -6,6 +6,9 @@ These artifacts belong to the tenant-density harness preparation increment. Read
 - `probe*-source.json` identifies the preserved dirty source snapshots used by the first compile probes. Archive hashes and individual member hashes are recorded separately from Git HEAD.
 - `oci/host-pre-smoke-review.json` records the designated host, filesystem, memory/ARC, pinned native source, and toolchain observation before real smokes.
 - `oci/builds/` preserves raw commands/provenance, output, and exit status. The clean A1 prewarm build is separate from new harness acceptance. Failed or interrupted probes are retained and are not passing runs.
+- `oci/source-snapshots/` and both source-snapshot manifests preserve the actual dirty probe archives and their member hashes.
+- `oci/smokes/correctness-99932ec33-r1/` contains the four accepted real correctness cells and `acceptance-review.json`, which compares actual request fingerprints, oracle coverage, process identities, and the space reserve. Its frozen runtime source is `99932ec33419214a7ee1cc542e937d31ef733a7c`.
+- `oci/builds/accepted-*` contains clean-source default/A1-feature link builds, final unit tests, and final advisory Clippy. The earlier `clean-*` builds used superseded source `f0e602ce5` and were not used for any database cell.
 
 The task-owned remote root is `/home/opc/tenant-density-harness-20261027`. Source snapshot archives, launcher logs, build output, and frozen smoke binaries remain there. Preserved databases live in uniquely named directories under `/bench/zfs/db/tenant-density-harness-20261027`. Historical host artifacts are not removed or reused as new results.
 

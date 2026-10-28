@@ -1,0 +1,12 @@
+{
+  "command": [
+    "cargo",
+    "fmt",
+    "-p",
+    "dodb-rocksdb",
+    "--check"
+  ],
+  "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+  "source_commit": "99932ec33419214a7ee1cc542e937d31ef733a7c",
+  "exit_code": 0
+}

@@ -1,0 +1,11 @@
+{
+  "timestamp_unix_seconds": 1793148165.4983034,
+  "before_head": "a6fc9db7b15b4c1845381989c3f5cd5be6c9f87c",
+  "before_status": "M dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs\n?? dodb/crates/dodb-rocksdb/src/bin/._memory_diagnostic_worker.rs\n?? dodb/crates/dodb-rocksdb/src/bin/._tenant_density_workload.rs\n?? dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/\n?? dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs",
+  "stash_output": "Saved working directory and index state On (no branch): Preserve final dirty tenant-density probe before clean acceptance",
+  "stash_commit": "a9aa4eec7d1701bf8817a8db11f2640e3542aaa2",
+  "fetch_output": "From /home/opc/tenant-density-harness-20261027/fn0-density-harness-accepted-source-20261028.bundle\n * branch              HEAD       -> FETCH_HEAD",
+  "checkout_output": "Previous HEAD position was a6fc9db7 Fix planned B-link page reuse behind an opt-in feature\nHEAD is now at f0e602ce Add isolated tenant-density workload and process accounting",
+  "accepted_head": "f0e602ce5e0fb53a8b601aaa4e4338c58f92811b",
+  "accepted_status": ""
+}

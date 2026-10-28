@@ -1,0 +1,18 @@
+{
+  "case": "blink-sparse",
+  "exit_code": 0,
+  "validation": {
+    "passed": true,
+    "failures": []
+  },
+  "ended_unix_seconds": 1793148628.5604706,
+  "capacity_after": {
+    "zfs_free_bytes": 11115614208,
+    "memory_bytes": {
+      "MemAvailable": 6724530176,
+      "SwapFree": 3834564608
+    }
+  },
+  "report_exists": true,
+  "report_sha256": "8986c5ea6d2b6975c20d9d907ada430e92ab26979485a0e027e70ec145bf76df"
+}

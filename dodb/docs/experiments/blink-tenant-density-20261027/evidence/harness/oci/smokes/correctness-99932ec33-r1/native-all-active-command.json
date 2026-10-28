@@ -1,0 +1,52 @@
+{
+  "source_commit": "99932ec33419214a7ee1cc542e937d31ef733a7c",
+  "controller_sha256": "f002c6935e09ca0bee0e965a137e06516767bbd584201b2df947c2051f01fef7",
+  "command": [
+    "/home/opc/tenant-density-harness-20261027/smokes/correctness-99932ec33-r1/bin/tenant_density_workload",
+    "--backend",
+    "minimal-native",
+    "--data-dir",
+    "/bench/zfs/db/tenant-density-harness-20261027/correctness-99932ec33-r1/native-all-active",
+    "--report",
+    "/home/opc/tenant-density-harness-20261027/smokes/correctness-99932ec33-r1/native-all-active.json",
+    "--seed",
+    "20261027",
+    "--registered-tenants",
+    "17",
+    "--active-tenants",
+    "17",
+    "--opened-idle-tenants",
+    "0",
+    "--client-count",
+    "4",
+    "--initial-rows",
+    "256",
+    "--value-bytes",
+    "512",
+    "--topology",
+    "fixed-total",
+    "--queue-bound",
+    "8",
+    "--max-in-flight",
+    "8",
+    "--request-timeout-ms",
+    "5000",
+    "--drain-timeout-ms",
+    "15000",
+    "--profile",
+    "mixed",
+    "--width",
+    "mixed",
+    "--operation-count",
+    "1700"
+  ],
+  "preflight": {
+    "zfs_free_bytes": 11149152256,
+    "memory_bytes": {
+      "MemAvailable": 6788345856,
+      "SwapFree": 3834564608
+    }
+  },
+  "started_unix_seconds": 1793148606.6825666,
+  "scope": "Correctness/accounting smoke only; no throughput, SLO, or density ranking."
+}

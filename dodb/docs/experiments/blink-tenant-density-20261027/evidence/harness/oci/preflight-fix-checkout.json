@@ -1,0 +1,9 @@
+{
+  "before": "f0e602ce5e0fb53a8b601aaa4e4338c58f92811b",
+  "timestamp_unix_seconds": 1793148377.2986658,
+  "reason": "Correct preflight Delete response acceptance before real smoke execution",
+  "fetch": "From /home/opc/tenant-density-harness-20261027/fn0-density-harness-preflight-fix-20261028.bundle\n * branch              HEAD       -> FETCH_HEAD",
+  "checkout": "Previous HEAD position was f0e602ce Add isolated tenant-density workload and process accounting\nHEAD is now at 99932ec3 Accept successful Delete replies in density preflight",
+  "after": "99932ec33419214a7ee1cc542e937d31ef733a7c",
+  "status": ""
+}

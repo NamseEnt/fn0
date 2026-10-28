@@ -1,0 +1,204 @@
+{
+  "scope": "Correctness/accounting acceptance only; no performance, SLO, or density ranking",
+  "source_commit": "99932ec33419214a7ee1cc542e937d31ef733a7c",
+  "reviewed_unix_seconds": 1793148765.1312482,
+  "cases": {
+    "blink-all-active": {
+      "scheduled": 1700,
+      "completed": 1700,
+      "completed_at_offer_end": 1700,
+      "drain_completions": 0,
+      "request_fingerprint": "fnv1a64:4b3b8c9a7410d587",
+      "scheduled_fingerprint": "fnv1a64:93a0287ff7782865",
+      "per_tenant_completions": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "verified_seed_rows_per_oracle": 4352,
+      "verified_extra_keys_per_oracle": 596,
+      "checkpoint_completed_worker_lifetime": 58,
+      "measurement_process_sampling_status": "sampled",
+      "periodic_offer_sample_count": 1,
+      "process_samples_truncated": false,
+      "same_backend_identity": true,
+      "recorded_processes_still_live": [],
+      "filesystem_after_measurement": {
+        "allocated_directory_bytes": 157184,
+        "allocated_file_bytes": 6083072,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 19,
+        "distinct_files": 129,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 8129604,
+        "regular_file_paths": 129,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      }
+    },
+    "native-all-active": {
+      "scheduled": 1700,
+      "completed": 1700,
+      "completed_at_offer_end": 1700,
+      "drain_completions": 0,
+      "request_fingerprint": "fnv1a64:4b3b8c9a7410d587",
+      "scheduled_fingerprint": "fnv1a64:93a0287ff7782865",
+      "per_tenant_completions": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "verified_seed_rows_per_oracle": 4352,
+      "verified_extra_keys_per_oracle": 596,
+      "checkpoint_completed_worker_lifetime": null,
+      "measurement_process_sampling_status": "sampled",
+      "periodic_offer_sample_count": 1,
+      "process_samples_truncated": false,
+      "same_backend_identity": true,
+      "recorded_processes_still_live": [],
+      "filesystem_after_measurement": {
+        "allocated_directory_bytes": 140288,
+        "allocated_file_bytes": 7890432,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 18,
+        "distinct_files": 187,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 7652483,
+        "regular_file_paths": 187,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      }
+    },
+    "native-sparse": {
+      "scheduled": 90,
+      "completed": 90,
+      "completed_at_offer_end": 90,
+      "drain_completions": 0,
+      "request_fingerprint": "fnv1a64:741f5d1cb7d6c644",
+      "scheduled_fingerprint": "fnv1a64:2face046d6c83cdf",
+      "per_tenant_completions": [
+        30,
+        30,
+        30
+      ],
+      "verified_seed_rows_per_oracle": 4352,
+      "verified_extra_keys_per_oracle": 51,
+      "checkpoint_completed_worker_lifetime": null,
+      "measurement_process_sampling_status": "sampled",
+      "periodic_offer_sample_count": 3,
+      "process_samples_truncated": false,
+      "same_backend_identity": true,
+      "recorded_processes_still_live": [],
+      "filesystem_after_measurement": {
+        "allocated_directory_bytes": 156672,
+        "allocated_file_bytes": 5201408,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 18,
+        "distinct_files": 151,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 4600680,
+        "regular_file_paths": 151,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      }
+    },
+    "blink-sparse": {
+      "scheduled": 90,
+      "completed": 90,
+      "completed_at_offer_end": 90,
+      "drain_completions": 0,
+      "request_fingerprint": "fnv1a64:741f5d1cb7d6c644",
+      "scheduled_fingerprint": "fnv1a64:2face046d6c83cdf",
+      "per_tenant_completions": [
+        30,
+        30,
+        30
+      ],
+      "verified_seed_rows_per_oracle": 4352,
+      "verified_extra_keys_per_oracle": 51,
+      "checkpoint_completed_worker_lifetime": 7,
+      "measurement_process_sampling_status": "sampled",
+      "periodic_offer_sample_count": 3,
+      "process_samples_truncated": false,
+      "same_backend_identity": true,
+      "recorded_processes_still_live": [],
+      "filesystem_after_measurement": {
+        "allocated_directory_bytes": 173568,
+        "allocated_file_bytes": 8629760,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 19,
+        "distinct_files": 151,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 7627741,
+        "regular_file_paths": 151,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      }
+    }
+  },
+  "matched_workloads": {
+    "all-active": {
+      "scheduled": true,
+      "admitted": true,
+      "completed": true,
+      "request_count": true,
+      "request_fingerprint": true,
+      "scheduled_fingerprint": true,
+      "deterministic_fingerprints": true
+    },
+    "sparse": {
+      "scheduled": true,
+      "admitted": true,
+      "completed": true,
+      "request_count": true,
+      "request_fingerprint": true,
+      "scheduled_fingerprint": true,
+      "deterministic_fingerprints": true
+    }
+  },
+  "minimum_benchmark_free_bytes": 11115614208
+}

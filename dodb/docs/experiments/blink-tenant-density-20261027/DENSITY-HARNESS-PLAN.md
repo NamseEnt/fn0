@@ -1,6 +1,6 @@
 # Density harness preparation after A1
 
-Status: implementation plan, recorded before code changes.
+Status: completed preparation increment. This implementation plan was recorded before code changes; see [DENSITY-HARNESS-RESULTS.md](DENSITY-HARNESS-RESULTS.md) for acceptance evidence and limits.
 
 Tracking issue: https://github.com/NamseEnt/fn0/issues/126
 

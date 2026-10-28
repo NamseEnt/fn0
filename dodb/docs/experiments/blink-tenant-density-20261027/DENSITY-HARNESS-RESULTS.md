@@ -2,7 +2,7 @@
 
 Tracking issue: https://github.com/NamseEnt/fn0/issues/126
 
-Status: implementation and focused checks complete; clean-source link builds and real Linux smoke acceptance pending. This is not a passing performance experiment record.
+Status: executable harness preparation, focused checks, clean-source link builds, and four Linux correctness/accounting smokes complete. This is not a performance or density experiment result.
 
 ## Decision and scope
 
@@ -15,6 +15,8 @@ The diagnostic worker now accepts explicit B-link WAL layout, segment size, chec
 ## Workload and correctness boundaries
 
 Registered tenants are the seeded on-disk population, not a registration API. Setup, measurement, full-population oracle, and reopened oracle run in separate backend processes. Only active and explicitly opened-idle tenants are opened during the measurement epoch. Full-population validation occurs after that epoch and must not be included in its resource accounting.
+
+The oracle covers every seeded row, every acknowledged mutation key, and the preflight keys across all registered tenants. It does not enumerate arbitrary keys outside those sets. Reopen checks use clean worker shutdown; this increment adds no new crash-recovery claim.
 
 Get/Query/write profile weights are 80/15/5, 40/20/40, and 10/10/80. Keys use 16-byte PK and SK. Each tenant's initial partition has at least 256 rows; Query reads its first 16 rows and validates ordered keys and full deterministic values. Get selects deterministic seeded rows. This is a synthetic workload, and Query does not rotate its range across the partition. Seeded data stays separate from bounded mutation lanes. The separate correctness preflight checks intended conditional rejection, revision progression, multi-key rejection atomicity, and delete/reinsert behavior; it is outside the offered-load window.
 
@@ -40,19 +42,47 @@ The initial live capacity check found about 10.39 GiB free on the benchmark file
 
 `oci_harness_build.py` records source state, native archive hash, toolchain, command, environment, capacity, raw output, and exit status. Dirty compile probes are explicitly probes. Accepted real smoke binaries must come from a clean committed source and are frozen with hashes beside each run. `oci_harness_smoke.py` checks report validity and both oracles in addition to the process exit code. It stops on a failed cell and retains that cell's database and evidence.
 
+## Accepted source and real smoke
+
+Accepted source is clean commit `99932ec33419214a7ee1cc542e937d31ef733a7c`, following implementation commit `f0e602ce5e0fb53a8b601aaa4e4338c58f92811b`. Final review found that the preflight response helper incorrectly rejected a successful Delete response. The small follow-up commit fixes that response classification before any real smoke was launched. The earlier clean link builds at `f0e602ce5` are preserved as superseded builds; no database cell used them.
+
+The previous dirty probe checkout, including incidental archive metadata files, is preserved in remote stash `a9aa4eec7d1701bf8817a8db11f2640e3542aaa2` and the source snapshot archives. The clean checkout transitions are recorded in `evidence/harness/oci/clean-acceptance-checkout.json` and `preflight-fix-checkout.json`. Neither the historical source checkout nor the shared native archive was changed.
+
+Run namespace: `correctness-99932ec33-r1`. Raw commands, status, reports, binary hashes, and the post-run review are in `evidence/harness/oci/smokes/correctness-99932ec33-r1/`. Frozen binaries remain beside the remote reports under the same run namespace; all four databases remain on ZFS. No cell was rerun.
+
+All cells used seed 20261027, 17 registered tenants, 256 initial rows per tenant, 512-byte values, mixed write widths, queue bound 8, common in-flight cap 8, a 5-second request timeout, and a 15-second drain timeout. Fixed-total used four client streams and 1,700 operations with the mixed profile. Fixed-per-tenant used the write-heavy profile and 10 arrivals/s per tenant for 3 seconds. B-link explicitly used segmented coalesced bases, 8,192-byte WAL segments, a 16,384-byte checkpoint trigger, and background execution. These smokes used default Cargo features; A1 pin reuse remained disabled.
+
+| Cell | Active / opened-idle / never-opened in measurement epoch | Completed requests | Seed rows + extra expected keys verified in each of two oracle epochs | Completed checkpoints in measurement-worker lifetime |
+| --- | --- | --- | --- | --- |
+| B-link, fixed-total | 17 / 0 / 0 | 1,700; 100 per tenant | 4,352 + 596 | 58 |
+| Minimal-native, fixed-total | 17 / 0 / 0 | 1,700; 100 per tenant | 4,352 + 596 | Not applicable |
+| Minimal-native, fixed-per-tenant | 3 / 2 / 12 | 90; 30 per active tenant | 4,352 + 51 | Not applicable |
+| B-link, fixed-per-tenant | 3 / 2 / 12 | 90; 30 per active tenant | 4,352 + 51 | 7 |
+
+Every request completed successfully, with zero drops, conflicts, other errors, timeouts, or final backlog. All admitted work finished within the offer window in these low-load cells. The two B-link workers completed background checkpoints without failures or remaining tasks. Those checkpoint counts include preflight, drain, and shutdown work and are not offered-window-only counts. The raw oracle field `verified_mutated_keys` counts the expected extra-key map, including the three preflight keys and intended missing states; it is not a count of distinct keys changed by successful workload writes alone.
+
+Both backend pairs have identical input/schedule recipe fingerprints, actual admitted-request fingerprints, scheduled/admission fingerprints, request counts, and per-tenant request fingerprints. All accounting identities and total/per-kind/per-tenant latency observation counts passed. `acceptance-review.json` records the comparison without using throughput or latency as a ranking.
+
+Every offer boundary retained the same measurement backend PID/start-time identity. All-active cells each retained one periodic offer sample and sparse-active cells each retained three, in addition to boundary observations. None were truncated. This is sparse sampled evidence, not continuous peak memory. Every recorded backend and driver process had stopped at post-run review. The minimum observed benchmark-filesystem free space was 11,115,614,208 bytes, above the 10 GiB reserve.
+
+Each cell ran once. There was no real 512-tenant run, no real 4 KiB-value cell, no memory-pressure matrix, and no SLO/capacity acceptance. The parser covers 512 tenants and 4 KiB values; the read-heavy schedule is unit-tested, while the real cells exercised mixed and write-heavy profiles. The A1 feature combination was link-built but was not exercised by these runtime cells.
+
 ## Validation
 
 | Check | Status | Evidence |
 | --- | --- | --- |
 | Local filesystem/process accounting tests | Passed, 4 tests | `evidence/harness/local-resource-tests.log` |
-| Default-feature new binary and worker tests | Passed, 15 workload tests; worker has no unit tests | `evidence/harness/oci/builds/worker19-final-bin-tests/` |
-| A1 feature compatibility | Typecheck passed; clean-source link build pending | `evidence/harness/oci/builds/worker15-a1-feature-check/` |
+| Default-feature new binary and worker tests | Passed, 15 workload tests on accepted clean source; worker has no unit tests | `evidence/harness/oci/builds/accepted-default-bin-tests/` |
+| Default-feature runtime link build | Passed on accepted clean source | `evidence/harness/oci/builds/accepted-default-link/` |
+| A1 feature compatibility | Typecheck and clean-source link build passed | `evidence/harness/oci/builds/worker15-a1-feature-check/`, `accepted-a1-feature-link/` |
 | Existing affected contract/session checks | Passed, 1 memory diagnostic + 1 native locking + 3 transaction + 4 read tests | `evidence/harness/oci/builds/worker11-memory-diagnostic/` through `worker14-read-contract/` |
-| Formatting and changed-target Clippy audit | Package formatting passed; advisory Clippy passed with existing dependency/library findings and no new binary findings | `evidence/harness/local-package-format.log`, `evidence/harness/oci/builds/worker18-advisory-clippy/` |
-| B-link and minimal-native, 17 all-active tenants | Pending | Tiny fixed-total correctness smoke only |
-| B-link and minimal-native, 17 registered / 3 active / 2 opened-idle | Pending | Tiny fixed-per-tenant correctness smoke only |
+| Formatting and changed-target Clippy audit | Package formatting passed; advisory Clippy passed on accepted source with existing dependency/library findings and no new binary findings | `evidence/harness/local-final-package-format.log`, `evidence/harness/oci/builds/accepted-advisory-clippy/` |
+| B-link and minimal-native, 17 all-active tenants | Both passed | Tiny fixed-total correctness smoke only |
+| B-link and minimal-native, 17 registered / 3 active / 2 opened-idle | Both passed | Tiny fixed-per-tenant correctness smoke only |
 
-Preserved rejected attempts include `probe01-typecheck`, `probe02-typecheck`, and `worker04/05/06/08/09-typecheck`. They failed compilation or harness unit tests and are not database-performance observations. `worker03-typecheck` has no completion status and is not counted as passing. `worker07` and `worker10` are earlier passing checkpoints; final source is frozen in `sources/worker17-source.tar.gz` with SHA-256 `dfa3bf29d71e2134fa9db2b59a6483c11e9f30b2918e407beb1897caea4cd5f3` and passes `worker19-final-bin-tests`. The archive and member hashes are preserved in `evidence/harness/oci/source-snapshot-manifest-final-worker.json`. The initial clean A1 worker prewarm build passed; it does not validate this new harness.
+Preserved rejected attempts include `probe01-typecheck`, `probe02-typecheck`, and `worker04/05/06/08/09-typecheck`. They failed compilation or harness unit tests and are not database-performance observations. `worker03-typecheck` has no completion status and is not counted as passing. `worker07` and `worker10` are earlier passing checkpoints; the final worker-owned snapshot is frozen in `sources/worker17-source.tar.gz` with SHA-256 `dfa3bf29d71e2134fa9db2b59a6483c11e9f30b2918e407beb1897caea4cd5f3` and passes `worker19-final-bin-tests`. The archive and member hashes are preserved in `evidence/harness/oci/source-snapshot-manifest-final-worker.json`. The initial clean A1 worker prewarm build passed; it does not validate this new harness.
+
+The worker snapshot predates the small Delete-response follow-up; accepted runtime source and final unit checks use `99932ec33` as recorded above. Raw test logs retain their original trailing blank lines. Source/document whitespace checks exclude raw `.log` artifacts rather than rewriting the evidence.
 
 ## Continuation
 

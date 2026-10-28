@@ -2,7 +2,7 @@
 
 Tracking issue: [NamseEnt/fn0#126](https://github.com/NamseEnt/fn0/issues/126). Start with [HANDOFF.md](HANDOFF.md) when continuing in a new session.
 
-Status: A1 implementation and local correctness validation are tracked in [A1-IMPLEMENTATION.md](A1-IMPLEMENTATION.md) and [A1-RESULTS.md](A1-RESULTS.md). The original analysis below is the frozen preparation baseline. Density measurements, default promotion, merge, and deployment remain outside this increment.
+Status: A1 implementation and local correctness validation are tracked in [A1-IMPLEMENTATION.md](A1-IMPLEMENTATION.md) and [A1-RESULTS.md](A1-RESULTS.md). Executable harness/process-accounting preparation and four Linux correctness smokes are complete; see [DENSITY-HARNESS-RESULTS.md](DENSITY-HARNESS-RESULTS.md). The original analysis below is the frozen preparation baseline. Density measurements, shared-resource RocksDB reference, default promotion, merge, and deployment remain future work.
 
 ## Objective and decision criteria
 
@@ -408,7 +408,7 @@ If shared-resource minimal-native meets the service objective with no meaningful
 - [x] Create an isolated branch and worktree under the fn0 checkout.
 - [x] Preserve this analysis and plan in English.
 - [x] A1 opt-in implementation, test-scoped allocation/reuse/pin diagnostics, and real-service recovery checks; see [A1-RESULTS.md](A1-RESULTS.md). No density or production resource-accounting completion is claimed.
-- [ ] Resource accounting and density harness preparation.
+- [x] Process/disk accounting and executable density harness preparation, with four Linux correctness smokes; see [DENSITY-HARNESS-RESULTS.md](DENSITY-HARNESS-RESULTS.md). Retained-heap/pin-age instrumentation and enforced common memory budgets remain incomplete.
 - [ ] Shared-cache/WBM minimal-native reference.
 - [ ] Live host sizing and an explicit frozen experiment matrix.
 - [ ] Density/maintenance experiments and evidence reduction.
