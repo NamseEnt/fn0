@@ -64,6 +64,10 @@ def main(run_directory):
     assert digest(scripts / 'capacity_review.py') == provenance['reducer_sha256']
     review = review_directory(run_directory)
     summary = json.loads((run_directory / 'summary.json').read_text())
+    completion = json.loads((run_directory / 'completion.json').read_text())
+    assert completion['completed'] and completion['source_commit'] == provenance['source_commit']
+    assert completion['cases'] == len(summary)
+    assert all(not identity['same_live_process'] for identity in completion['processes'])
     assert len(summary) == len(review['cases'])
     compact = []
     maintenance = {}
@@ -112,7 +116,7 @@ def main(run_directory):
                     'worst_p99_upper_exclusive_ms_across_repetitions': {name: max(row['worst_tenant_p99_upper_exclusive_ms'][name] for row in completed) for name in ['Get', 'Query', 'Write']} if completed else None})
     output = {'source_commit': provenance['source_commit'], 'plan_commit': provenance['plan_commit'],
               'runtime_script_hashes_verified': True, 'cohorts': cohorts, 'cells': compact,
-              'confirmation_groups': confirmations,
+              'confirmation_groups': confirmations, 'completion': completion,
               'maintenance': maintenance, 'scope': 'Frozen modest capacity bracket; cohorts and memory/SLO outcomes remain separate'}
     (run_directory / 'frontier.json').write_text(json.dumps(output, indent=2) + '\n')
     print(json.dumps({'cohorts': cohorts, 'reviewed_pairs': len(review['pairs'])}, indent=2))
