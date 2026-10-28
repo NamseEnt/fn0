@@ -702,7 +702,9 @@ fn make_value(length: usize, seed: u64) -> Vec<u8> {
 
 fn expect_response(response: Response, context: &str) -> Result<(), Box<dyn std::error::Error>> {
     match response {
-        Response::Transact(_) | Response::Get(_) | Response::Query(_) => Ok(()),
+        Response::Transact(_) | Response::Get(_) | Response::Query(_) | Response::Delete(_) => {
+            Ok(())
+        }
         other => Err(Box::new(std::io::Error::other(format!(
             "unexpected response for {context}: {other:?}"
         )))),
