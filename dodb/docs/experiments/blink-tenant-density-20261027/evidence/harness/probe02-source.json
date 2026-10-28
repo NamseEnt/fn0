@@ -1,0 +1,20 @@
+{
+  "source_base": "a6fc9db7b15b4c1845381989c3f5cd5be6c9f87c",
+  "scope": "Uncommitted compile/test probe, not a smoke/performance result",
+  "source_sha256": {
+    "dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs": "43e46ae50de07cff5cd3db45292d50eb8d23b48247ec766c71c5722df04504e1",
+    "dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs": "735091c62ddb22ef27420a8dcc0346f897ca94fc621d565604be271ae92188cb",
+    "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/config.rs": "705db13df49db6b0340362c6294d91493d6cf9fc02952d08e3bf4a26edc4ad74",
+    "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/resources.rs": "5b3888f9c602a97a8a892302593a7a21bea6e8d1ce92a4843208a0d34b7ef0e5",
+    "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs": "7567ea2900d16df1bff4638e941df6f66b835b9273df458578664618b6f129e9"
+  },
+  "archive_sha256": "930aea95ff38c1c808815ed32b44f00b84697501a3f2b9e8e68e4eca1596aaf6",
+  "verified_archive_member_sha256": {
+    "dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs": "43e46ae50de07cff5cd3db45292d50eb8d23b48247ec766c71c5722df04504e1",
+    "dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs": "735091c62ddb22ef27420a8dcc0346f897ca94fc621d565604be271ae92188cb",
+    "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/config.rs": "705db13df49db6b0340362c6294d91493d6cf9fc02952d08e3bf4a26edc4ad74",
+    "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/resources.rs": "5b3888f9c602a97a8a892302593a7a21bea6e8d1ce92a4843208a0d34b7ef0e5",
+    "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs": "7567ea2900d16df1bff4638e941df6f66b835b9273df458578664618b6f129e9"
+  },
+  "archive_matches_original_source_hashes": true
+}

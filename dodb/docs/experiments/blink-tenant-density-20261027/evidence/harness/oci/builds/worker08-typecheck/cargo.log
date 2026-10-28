@@ -1,0 +1,39 @@
+   Compiling dodb-rocksdb v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-rocksdb)
+error[E0277]: the trait bound `[u64; 64]: serde::Serialize` is not satisfied
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1400:13
+     |
+1400 | /             json!({
+1401 | |                 "bucket_counts": counters.operation_latency_histograms[operation_index],
+1402 | |                 "observation_count": observation_count,
+1403 | |                 "maximum_nanos": counters.operation_maximum_latency_nanos[operation_index]
+1404 | |             }),
+     | |              ^
+     | |              |
+     | |______________the trait `serde_core::ser::Serialize` is not implemented for `[u64; 64]`
+     |                required by a bound introduced by this call
+     |
+     = note: for local types consider adding `#[derive(serde::Serialize)]` to your `[u64; 64]` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `serde_core::ser::Serialize`:
+               [T; 0]
+               [T]
+               [T; 1]
+               [T; 2]
+               [T; 3]
+               [T; 4]
+               [T; 5]
+               [T; 6]
+             and 26 others
+     = note: required for `&[u64; 64]` to implement `serde_core::ser::Serialize`
+note: required by a bound in `to_value`
+    --> /home/opc/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.148/src/value/mod.rs:997:8
+     |
+ 995 | pub fn to_value<T>(value: T) -> Result<Value, Error>
+     |        -------- required by a bound in this function
+ 996 | where
+ 997 |     T: Serialize,
+     |        ^^^^^^^^^ required by this bound in `to_value`
+     = note: this error originates in the macro `$crate::json_internal` which comes from the expansion of the macro `json` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `dodb-rocksdb` (bin "tenant_density_workload" test) due to 1 previous error

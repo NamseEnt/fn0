@@ -1,0 +1,11 @@
+   Compiling dodb-rocksdb v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-rocksdb)
+    Finished `release` profile [optimized] target(s) in 59.91s
+     Running tests/transaction_contract.rs (/home/opc/tenant-density-harness-20261027/target/release/deps/transaction_contract-c7874cebbdd4f67e)
+
+running 3 tests
+test minimal_native_transaction_path_satisfies_common_contract ... ok
+test btree_blink_and_rocksdb_share_transaction_contract ... ok
+test segmented_sync_and_background_satisfy_common_transaction_contract ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.01s
+

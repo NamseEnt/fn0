@@ -1,0 +1,54 @@
+{
+  "command": [
+    "/home/opc/.cargo/bin/rustup",
+    "run",
+    "1.97.1",
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "--release",
+    "-p",
+    "dodb-rocksdb",
+    "--bin",
+    "tenant_density_workload",
+    "--bin",
+    "memory_diagnostic_worker"
+  ],
+  "cwd": "/home/opc/tenant-density-harness-20261027/source",
+  "source_commit": "a6fc9db7b15b4c1845381989c3f5cd5be6c9f87c",
+  "source_status": "M dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs\n?? dodb/crates/dodb-rocksdb/src/bin/._memory_diagnostic_worker.rs\n?? dodb/crates/dodb-rocksdb/src/bin/._tenant_density_workload.rs\n?? dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/\n?? dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs",
+  "native_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+  "native_archive_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+  "toolchain": [
+    "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "binary: rustc",
+    "commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452",
+    "commit-date: 2026-07-14",
+    "host: aarch64-unknown-linux-gnu",
+    "release: 1.97.1",
+    "LLVM version: 22.1.6"
+  ],
+  "environment": {
+    "DODB_ROCKSDB_DIR": "/bench/zfs/db/product-build/rocksdb-source",
+    "CARGO_TARGET_DIR": "/home/opc/tenant-density-harness-20261027/target",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_RELEASE_STRIP": "debuginfo",
+    "TMPDIR": "/home/opc/tenant-density-harness-20261027/tmp"
+  },
+  "preflight": {
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5325586432,
+      "SwapFree": 3851988992
+    },
+    "filesystem_free_bytes": {
+      "boot": 3977584640,
+      "benchmark": 11160842240
+    }
+  },
+  "started_unix_seconds": 1793087194.3916023,
+  "scope": "Build and correctness validation only; no performance comparison."
+}

@@ -1,0 +1,8 @@
+    Finished `release` profile [optimized] target(s) in 0.34s
+     Running unittests src/lib.rs (/home/opc/tenant-density-harness-20261027/target/release/deps/dodb_rocksdb-a6251970cf086f7c)
+
+running 1 test
+test minimal_native::tests::lock_only_keys_exclude_writers_and_release_after_rollback_or_commit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out; finished in 4.14s
+

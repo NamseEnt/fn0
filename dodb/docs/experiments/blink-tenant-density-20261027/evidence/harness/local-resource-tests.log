@@ -1,0 +1,9 @@
+
+running 4 tests
+test tests::short_offer_reports_boundary_only_sampling ... ok
+test tests::measurement_summary_excludes_setup_and_reused_pids_and_keeps_unknown_pss ... ok
+test tests::missing_data_directory_is_not_reported_as_zero_bytes ... ok
+test tests::hardlinked_file_allocation_is_counted_once_and_symlinks_are_rejected ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

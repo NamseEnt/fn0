@@ -1,0 +1,68 @@
+{
+  "timestamp_unix_seconds": 1793146467.505471,
+  "platform": "Linux-6.12.0-206.104.4.4.el9uek.aarch64-aarch64-with-glibc2.34",
+  "cpus": 2,
+  "meminfo": "MemTotal:       11159744 kB\nMemFree:         1009180 kB\nMemAvailable:    4867088 kB\nBuffers:              20 kB\nCached:          3103856 kB\nSwapCached:        42976 kB\nActive:          1314676 kB\nInactive:        1875764 kB\nActive(anon):     106936 kB\nInactive(anon):    13724 kB\nActive(file):    1207740 kB\nInactive(file):  1862040 kB\nUnevictable:       16068 kB\nMlocked:           12068 kB\nSwapTotal:       4194300 kB\nSwapFree:        3789940 kB\nZswap:                 0 kB\nZswapped:              0 kB\nDirty:               256 kB\nWriteback:             0 kB\nAnonPages:         92976 kB\nMapped:           137052 kB\nShmem:             23892 kB\nKReclaimable:    1169400 kB\nSlab:            2976992 kB\nSReclaimable:    1169400 kB\nSUnreclaim:      1807592 kB\nKernelStack:        5760 kB\nPageTables:         7608 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:     9774172 kB\nCommitted_AS:    2997228 kB\nVmallocTotal:   135288315904 kB\nVmallocUsed:      195896 kB\nVmallocChunk:          0 kB\nPercpu:             1016 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:     10240 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:     73728 kB\nFilePmdMapped:     10240 kB\nCmaTotal:              0 kB\nCmaFree:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\n",
+  "arcstats": "10 1 0x01 147 39984 7562802017800 2408118425796880\nname                            type data\nhits                            4    2829989535\niohits                          4    13052413\nmisses                          4    55252827\ndemand_data_hits                4    1190320568\ndemand_data_iohits              4    7544667\ndemand_data_misses              4    11367330\ndemand_metadata_hits            4    1532438664\ndemand_metadata_iohits          4    2539117\ndemand_metadata_misses          4    966653\nprefetch_data_hits              4    105665113\nprefetch_data_iohits            4    1185419\nprefetch_data_misses            4    42564520\nprefetch_metadata_hits          4    1565190\nprefetch_metadata_iohits        4    1783210\nprefetch_metadata_misses        4    354324\nmru_hits                        4    334859094\nmru_ghost_hits                  4    6929199\nmfu_hits                        4    2495130441\nmfu_ghost_hits                  4    9157453\nuncached_hits                   4    0\ndeleted                         4    131000515\nmutex_miss                      4    40718\naccess_skip                     4    75\nevict_skip                      4    145167\nevict_not_enough                4    681\nevict_l2_cached                 4    0\nevict_l2_eligible               4    736149841920\nevict_l2_eligible_mfu           4    352865715200\nevict_l2_eligible_mru           4    383284126720\nevict_l2_ineligible             4    9188282368\nevict_l2_skip                   4    0\nhash_elements                   4    1341369\nhash_elements_max               4    2310120\nhash_collisions                 4    294940533\nhash_chains                     4    282828\nhash_chain_max                  4    10\nmeta                            4    693117886\npd                              4    2144373095\npm                              4    427599595\nc                               4    5713788928\nc_min                           4    357111808\nc_max                           4    5713788928\nsize                            4    5730918480\ncompressed_size                 4    3778477568\nuncompressed_size               4    4564601856\noverhead_size                   4    992322560\nhdr_size                        4    327438576\ndata_size                       4    3527442432\nmetadata_size                   4    1243357696\ndbuf_size                       4    189504000\ndnode_size                      4    328518240\nbonus_size                      4    106190080\nanon_size                       4    0\nanon_data                       4    0\nanon_metadata                   4    0\nanon_evictable_data             4    0\nanon_evictable_metadata         4    0\nmru_size                        4    721990144\nmru_data                        4    698631168\nmru_metadata                    4    23358976\nmru_evictable_data              4    650717696\nmru_evictable_metadata          4    10474496\nmru_ghost_size                  4    1655569408\nmru_ghost_data                  4    133184000\nmru_ghost_metadata              4    1522385408\nmru_ghost_evictable_data        4    133184000\nmru_ghost_evictable_metadata    4    1522385408\nmfu_size                        4    4048809984\nmfu_data                        4    2828811264\nmfu_metadata                    4    1219998720\nmfu_evictable_data              4    2803617280\nmfu_evictable_metadata          4    0\nmfu_ghost_size                  4    2693075968\nmfu_ghost_data                  4    964687360\nmfu_ghost_metadata              4    1728388608\nmfu_ghost_evictable_data        4    964687360\nmfu_ghost_evictable_metadata    4    1728388608\nuncached_size                   4    0\nuncached_data                   4    0\nuncached_metadata               4    0\nuncached_evictable_data         4    0\nuncached_evictable_metadata     4    0\nl2_hits                         4    0\nl2_misses                       4    0\nl2_prefetch_asize               4    0\nl2_mru_asize                    4    0\nl2_mfu_asize                    4    0\nl2_bufc_data_asize              4    0\nl2_bufc_metadata_asize          4    0\nl2_feeds                        4    0\nl2_rw_clash                     4    0\nl2_read_bytes                   4    0\nl2_write_bytes                  4    0\nl2_writes_sent                  4    0\nl2_writes_done                  4    0\nl2_writes_error                 4    0\nl2_writes_lock_retry            4    0\nl2_evict_lock_retry             4    0\nl2_evict_reading                4    0\nl2_evict_l1cached               4    0\nl2_free_on_write                4    0\nl2_abort_lowmem                 4    0\nl2_cksum_bad                    4    0\nl2_io_error                     4    0\nl2_size                         4    0\nl2_asize                        4    0\nl2_hdr_size                     4    0\nl2_log_blk_writes               4    0\nl2_log_blk_avg_asize            4    0\nl2_log_blk_asize                4    0\nl2_log_blk_count                4    0\nl2_data_to_meta_ratio           4    0\nl2_rebuild_success              4    0\nl2_rebuild_unsupported          4    0\nl2_rebuild_io_errors            4    0\nl2_rebuild_dh_errors            4    0\nl2_rebuild_cksum_lb_errors      4    0\nl2_rebuild_lowmem               4    0\nl2_rebuild_size                 4    0\nl2_rebuild_asize                4    0\nl2_rebuild_bufs                 4    0\nl2_rebuild_bufs_precached       4    0\nl2_rebuild_log_blks             4    0\nmemory_throttle_count           4    0\nmemory_direct_count             4    0\nmemory_indirect_count           4    2052\nmemory_all_bytes                4    11427577856\nmemory_free_bytes               4    2940129280\nmemory_available_bytes          3    2480397312\narc_no_grow                     4    0\narc_tempreserve                 4    0\narc_loaned_bytes                4    0\narc_prune                       4    117129\narc_meta_used                   4    2195008592\narc_dnode_limit                 4    571378892\nasync_upgrade_sync              4    8051672\npredictive_prefetch             4    153117776\ndemand_hit_predictive_prefetch  4    123794206\ndemand_iohit_predictive_prefetch 4    7840678\nprescient_prefetch              4    0\ndemand_hit_prescient_prefetch   4    0\ndemand_iohit_prescient_prefetch 4    0\narc_need_free                   4    0\narc_sys_free                    4    459731968\narc_raw_size                    4    0\ncached_only_in_progress         4    0\nabd_chunk_waste_size            4    8467456\n",
+  "filesystems": {
+    "boot": {
+      "path": "/home/opc/tenant-density-harness-20261027",
+      "available_bytes": 3974463488,
+      "total_bytes": 31608274944
+    },
+    "benchmark": {
+      "path": "/bench/zfs/db",
+      "available_bytes": 11160842240,
+      "total_bytes": 159129620480
+    }
+  },
+  "commands": [
+    {
+      "command": [
+        "findmnt",
+        "-T",
+        "/bench/zfs/db",
+        "-o",
+        "TARGET,SOURCE,FSTYPE,OPTIONS"
+      ],
+      "exit_code": 0,
+      "stdout": "TARGET        SOURCE       FSTYPE OPTIONS\n/bench/zfs/db dodbbench/db zfs    rw,noatime,seclabel,xattr,noacl,casesensitive\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "zfs",
+        "get",
+        "sync,recordsize,compression,atime",
+        "dodbbench/db"
+      ],
+      "exit_code": 0,
+      "stdout": "NAME          PROPERTY     VALUE           SOURCE\ndodbbench/db  sync         standard        local\ndodbbench/db  recordsize   4K              local\ndodbbench/db  compression  off             inherited from dodbbench\ndodbbench/db  atime        off             inherited from dodbbench\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/bench/zfs/db/product-build/rocksdb-source",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "stdout": "abeebd9630f11bd08c28b7bd43c7bdfc62050654\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/home/opc/.cargo/bin/rustup",
+        "run",
+        "1.97.1",
+        "rustc",
+        "-Vv"
+      ],
+      "exit_code": 0,
+      "stdout": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: aarch64-unknown-linux-gnu\nrelease: 1.97.1\nLLVM version: 22.1.6\n",
+      "stderr": ""
+    }
+  ]
+}

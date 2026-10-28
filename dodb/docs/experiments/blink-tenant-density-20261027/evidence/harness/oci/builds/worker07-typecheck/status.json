@@ -1,0 +1,15 @@
+{
+  "exit_code": 0,
+  "ended_unix_seconds": 1793147275.2569616,
+  "capacity": {
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5868011520,
+      "SwapFree": 3880898560
+    },
+    "filesystem_free_bytes": {
+      "boot": 3968831488,
+      "benchmark": 11160842240
+    }
+  }
+}

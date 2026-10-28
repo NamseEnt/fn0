@@ -1,0 +1,164 @@
+{
+  "scope": "Preserved dirty compile/test source snapshots, not clean-source workload results",
+  "source_base": "a6fc9db7b15b4c1845381989c3f5cd5be6c9f87c",
+  "archives": [
+    {
+      "remote_path": "/home/opc/tenant-density-harness-20261027/probe01-source.tar.gz",
+      "sha256": "66d3f0dea061b05d7f228663f8f69f77a5abdaa7fed2b4063acfcec674ad114d",
+      "member_sha256": {
+        "dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs": "482b62a8489a55f5030c70762753e16142d458c1f9ec7efede330a83fcb165ad",
+        "dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs": "0ac30f1aa88e0f8cef1481c766537122c3a574939c31fe17fb2c3fd527f633b4",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/config.rs": "bfdf35286ccc1ee57e4d4406680ffe51ce5f7cdf9f663ae95bd6aa86d81c7a5b",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/resources.rs": "5b3888f9c602a97a8a892302593a7a21bea6e8d1ce92a4843208a0d34b7ef0e5",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs": "85b92a1310eb3e61a712a7e077839cc2289b8c0a5139dc2240487d79710cace6"
+      }
+    },
+    {
+      "remote_path": "/home/opc/tenant-density-harness-20261027/probe02-source.tar.gz",
+      "sha256": "930aea95ff38c1c808815ed32b44f00b84697501a3f2b9e8e68e4eca1596aaf6",
+      "member_sha256": {
+        "dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs": "43e46ae50de07cff5cd3db45292d50eb8d23b48247ec766c71c5722df04504e1",
+        "dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs": "735091c62ddb22ef27420a8dcc0346f897ca94fc621d565604be271ae92188cb",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/config.rs": "705db13df49db6b0340362c6294d91493d6cf9fc02952d08e3bf4a26edc4ad74",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/resources.rs": "5b3888f9c602a97a8a892302593a7a21bea6e8d1ce92a4843208a0d34b7ef0e5",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs": "7567ea2900d16df1bff4638e941df6f66b835b9273df458578664618b6f129e9"
+      }
+    },
+    {
+      "remote_path": "/home/opc/tenant-density-harness-20261027/worker03-source.tar.gz",
+      "sha256": "b9990a541f1b67b8f6978ac73b5f08e00a6323db3001f9c55df6a444e2e9be75",
+      "member_sha256": {
+        "src/bin/._memory_diagnostic_worker.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/memory_diagnostic_worker.rs": "43e46ae50de07cff5cd3db45292d50eb8d23b48247ec766c71c5722df04504e1",
+        "src/bin/._tenant_density_workload.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/tenant_density_workload.rs": "3c6808c4768f9346be8f0b2e085da971576a4444157e4b8bd6e5d657c6e974fe",
+        "src/bin/support/tenant_density/._config.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/support/tenant_density/config.rs": "705db13df49db6b0340362c6294d91493d6cf9fc02952d08e3bf4a26edc4ad74",
+        "src/bin/support/tenant_density/._scheduler.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/support/tenant_density/scheduler.rs": "2ce969207bd91d51b1d9d5899d6c077247ca6ee41ed30d59209098365ac995c2",
+        "src/bin/support/tenant_density/._resources.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/support/tenant_density/resources.rs": "5b3888f9c602a97a8a892302593a7a21bea6e8d1ce92a4843208a0d34b7ef0e5"
+      }
+    },
+    {
+      "remote_path": "/home/opc/tenant-density-harness-20261027/worker04-source.tar.gz",
+      "sha256": "e7d340f3a1cde7be4851737702a43d0129fe4ff44992be7fa42c6d795755af3e",
+      "member_sha256": {
+        "src/bin/._memory_diagnostic_worker.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/memory_diagnostic_worker.rs": "43e46ae50de07cff5cd3db45292d50eb8d23b48247ec766c71c5722df04504e1",
+        "src/bin/._tenant_density_workload.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/tenant_density_workload.rs": "3c6808c4768f9346be8f0b2e085da971576a4444157e4b8bd6e5d657c6e974fe",
+        "src/bin/support/tenant_density/._config.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/support/tenant_density/config.rs": "705db13df49db6b0340362c6294d91493d6cf9fc02952d08e3bf4a26edc4ad74",
+        "src/bin/support/tenant_density/._scheduler.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/support/tenant_density/scheduler.rs": "2ce969207bd91d51b1d9d5899d6c077247ca6ee41ed30d59209098365ac995c2",
+        "src/bin/support/tenant_density/._resources.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/support/tenant_density/resources.rs": "5b3888f9c602a97a8a892302593a7a21bea6e8d1ce92a4843208a0d34b7ef0e5"
+      }
+    },
+    {
+      "remote_path": "/home/opc/tenant-density-harness-20261027/sources/worker03-source.tar.gz",
+      "sha256": "b9990a541f1b67b8f6978ac73b5f08e00a6323db3001f9c55df6a444e2e9be75",
+      "member_sha256": {
+        "src/bin/._memory_diagnostic_worker.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/memory_diagnostic_worker.rs": "43e46ae50de07cff5cd3db45292d50eb8d23b48247ec766c71c5722df04504e1",
+        "src/bin/._tenant_density_workload.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/tenant_density_workload.rs": "3c6808c4768f9346be8f0b2e085da971576a4444157e4b8bd6e5d657c6e974fe",
+        "src/bin/support/tenant_density/._config.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/support/tenant_density/config.rs": "705db13df49db6b0340362c6294d91493d6cf9fc02952d08e3bf4a26edc4ad74",
+        "src/bin/support/tenant_density/._scheduler.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/support/tenant_density/scheduler.rs": "2ce969207bd91d51b1d9d5899d6c077247ca6ee41ed30d59209098365ac995c2",
+        "src/bin/support/tenant_density/._resources.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/support/tenant_density/resources.rs": "5b3888f9c602a97a8a892302593a7a21bea6e8d1ce92a4843208a0d34b7ef0e5"
+      }
+    },
+    {
+      "remote_path": "/home/opc/tenant-density-harness-20261027/sources/worker04-source.tar.gz",
+      "sha256": "e7d340f3a1cde7be4851737702a43d0129fe4ff44992be7fa42c6d795755af3e",
+      "member_sha256": {
+        "src/bin/._memory_diagnostic_worker.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/memory_diagnostic_worker.rs": "43e46ae50de07cff5cd3db45292d50eb8d23b48247ec766c71c5722df04504e1",
+        "src/bin/._tenant_density_workload.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/tenant_density_workload.rs": "3c6808c4768f9346be8f0b2e085da971576a4444157e4b8bd6e5d657c6e974fe",
+        "src/bin/support/tenant_density/._config.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/support/tenant_density/config.rs": "705db13df49db6b0340362c6294d91493d6cf9fc02952d08e3bf4a26edc4ad74",
+        "src/bin/support/tenant_density/._scheduler.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/support/tenant_density/scheduler.rs": "2ce969207bd91d51b1d9d5899d6c077247ca6ee41ed30d59209098365ac995c2",
+        "src/bin/support/tenant_density/._resources.rs": "e16173b2ed73dde4c02e640f07ea78ab95abddbdfd5f52bbb4b5bade567671a7",
+        "src/bin/support/tenant_density/resources.rs": "5b3888f9c602a97a8a892302593a7a21bea6e8d1ce92a4843208a0d34b7ef0e5"
+      }
+    },
+    {
+      "remote_path": "/home/opc/tenant-density-harness-20261027/sources/worker05-source.tar.gz",
+      "sha256": "f186e5875d5f65e965ace7f96dbe5cd425b8fa0d8137d285425b744546709001",
+      "member_sha256": {
+        "dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs": "1f670d457cc83883eaba9b900003c267fce40584e8859a08cbfcc24d9bfe2858",
+        "dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs": "27bf5701b25853dc70ae06f15693f49697fdad3a4da74ec6d13324f80df10208",
+        "dodb/crates/dodb-rocksdb/src/bin/support/blink_checkpoint.rs": "69d6618508794436076c9d1aeb16862b5cadd78641fd217659accc7fcb3a0c1d",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/config.rs": "4b165e46e766923cf8d635fce9208662bcb59ea538badedf144442df0e429658",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs": "e906bc8a81019a650cf76c38b9c09fc6b2302f23cd3f8b33ef4202749da7b238",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/resources.rs": "00ae5091e908b9ed0556bd18fa06120a4802077a2a6aef97929b6e2e1673e654"
+      }
+    },
+    {
+      "remote_path": "/home/opc/tenant-density-harness-20261027/sources/worker06-source.tar.gz",
+      "sha256": "9ba6670b80a1c153d8897683acb3e390e991542e84852b6fa648ac07ff78708d",
+      "member_sha256": {
+        "dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs": "1f670d457cc83883eaba9b900003c267fce40584e8859a08cbfcc24d9bfe2858",
+        "dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs": "1949df1a89d2134fdedb57946e5861790eed8960fe6f9abbd363c4c8b1e1330f",
+        "dodb/crates/dodb-rocksdb/src/bin/support/blink_checkpoint.rs": "69d6618508794436076c9d1aeb16862b5cadd78641fd217659accc7fcb3a0c1d",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/config.rs": "4b165e46e766923cf8d635fce9208662bcb59ea538badedf144442df0e429658",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs": "065819d86d0c5c1684c819e07b4704060d5b1f7dc3425ce8f3092c787d4f32db",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/resources.rs": "00ae5091e908b9ed0556bd18fa06120a4802077a2a6aef97929b6e2e1673e654"
+      }
+    },
+    {
+      "remote_path": "/home/opc/tenant-density-harness-20261027/sources/worker07-source.tar.gz",
+      "sha256": "6e889927f0f33165bf986064118e90cafd6e26c35763b0f16d6854665f4f1e04",
+      "member_sha256": {
+        "dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs": "1f670d457cc83883eaba9b900003c267fce40584e8859a08cbfcc24d9bfe2858",
+        "dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs": "025cac82b4eec3e76ec6933463dfba6361595357ef2498a07a6026ef2639f36b",
+        "dodb/crates/dodb-rocksdb/src/bin/support/blink_checkpoint.rs": "69d6618508794436076c9d1aeb16862b5cadd78641fd217659accc7fcb3a0c1d",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/config.rs": "4b165e46e766923cf8d635fce9208662bcb59ea538badedf144442df0e429658",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs": "3e98b21dfc35d5b7d57d22dd4b4e8e9cdf4536897ad77e353b6eba3c8a0c540b",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/resources.rs": "00ae5091e908b9ed0556bd18fa06120a4802077a2a6aef97929b6e2e1673e654"
+      }
+    },
+    {
+      "remote_path": "/home/opc/tenant-density-harness-20261027/sources/worker08-source.tar.gz",
+      "sha256": "ab7ea9e3fa2798430bea3b5902aa8374f8b7928de5111071b7b9daef57f5c3c8",
+      "member_sha256": {
+        "dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs": "1f670d457cc83883eaba9b900003c267fce40584e8859a08cbfcc24d9bfe2858",
+        "dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs": "35403c5e4b948914c4c4b1baf860a4fd4447f062eb04c0ea9ebd1d515544849a",
+        "dodb/crates/dodb-rocksdb/src/bin/support/blink_checkpoint.rs": "69d6618508794436076c9d1aeb16862b5cadd78641fd217659accc7fcb3a0c1d",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/config.rs": "4b165e46e766923cf8d635fce9208662bcb59ea538badedf144442df0e429658",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs": "d28bec89d853991d8714af0423664e6a7f0b41a132734a01c6c734e7d215f82e",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/resources.rs": "00ae5091e908b9ed0556bd18fa06120a4802077a2a6aef97929b6e2e1673e654"
+      }
+    },
+    {
+      "remote_path": "/home/opc/tenant-density-harness-20261027/sources/worker09-source.tar.gz",
+      "sha256": "e63e5e8cb4df998936821e5d31cc875cab49bca94e570323ff0ed42ff73690c0",
+      "member_sha256": {
+        "dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs": "1f670d457cc83883eaba9b900003c267fce40584e8859a08cbfcc24d9bfe2858",
+        "dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs": "35403c5e4b948914c4c4b1baf860a4fd4447f062eb04c0ea9ebd1d515544849a",
+        "dodb/crates/dodb-rocksdb/src/bin/support/blink_checkpoint.rs": "69d6618508794436076c9d1aeb16862b5cadd78641fd217659accc7fcb3a0c1d",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/config.rs": "4b165e46e766923cf8d635fce9208662bcb59ea538badedf144442df0e429658",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs": "67d934e9bef0ac5f80cc7087ce811f6971181634d554b79bfe0e30346e4da5c3",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/resources.rs": "00ae5091e908b9ed0556bd18fa06120a4802077a2a6aef97929b6e2e1673e654"
+      }
+    },
+    {
+      "remote_path": "/home/opc/tenant-density-harness-20261027/sources/worker10-source.tar.gz",
+      "sha256": "ba8a082213f1aea93c0915ba64d1196f88addb065697a04d0c703a186332b9e0",
+      "member_sha256": {
+        "dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs": "1f670d457cc83883eaba9b900003c267fce40584e8859a08cbfcc24d9bfe2858",
+        "dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs": "a6eee63a62ab463709e73f20049cce3b66b4b8fdf55b6670929c40ad00fe36ea",
+        "dodb/crates/dodb-rocksdb/src/bin/support/blink_checkpoint.rs": "69d6618508794436076c9d1aeb16862b5cadd78641fd217659accc7fcb3a0c1d",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/config.rs": "4b165e46e766923cf8d635fce9208662bcb59ea538badedf144442df0e429658",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs": "49618ed44da0cdc0b2231f97fbb95531e4bd896c0323f1ea779c88fee5e32b9e",
+        "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/resources.rs": "00ae5091e908b9ed0556bd18fa06120a4802077a2a6aef97929b6e2e1673e654"
+      }
+    }
+  ]
+}

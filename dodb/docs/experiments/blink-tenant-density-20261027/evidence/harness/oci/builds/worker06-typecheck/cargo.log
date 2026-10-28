@@ -1,0 +1,97 @@
+   Compiling dodb-rocksdb v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-rocksdb)
+error[E0310]: the parameter type `T` may not live long enough
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1330:5
+     |
+1330 |     tasks.abort_all();
+     |     ^^^^^^^^^^^^^^^^^
+     |     |
+     |     the parameter type `T` must be valid for the static lifetime...
+     |     ...so that the type `T` will meet its required lifetime bounds
+     |
+help: consider adding an explicit lifetime bound
+     |
+1329 | async fn abort_and_reap<T: 'static>(tasks: &mut JoinSet<T>) {
+     |                          +++++++++
+
+error[E0310]: the parameter type `T` may not live long enough
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1331:11
+     |
+1331 |     while tasks.join_next().await.is_some() {}
+     |           ^^^^^^^^^^^^^^^^^
+     |           |
+     |           the parameter type `T` must be valid for the static lifetime...
+     |           ...so that the type `T` will meet its required lifetime bounds
+     |
+help: consider adding an explicit lifetime bound
+     |
+1329 | async fn abort_and_reap<T: 'static>(tasks: &mut JoinSet<T>) {
+     |                          +++++++++
+
+error[E0310]: the parameter type `T` may not live long enough
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1331:29
+     |
+1331 |     while tasks.join_next().await.is_some() {}
+     |                             ^^^^^
+     |                             |
+     |                             the parameter type `T` must be valid for the static lifetime...
+     |                             ...so that the type `T` will meet its required lifetime bounds
+     |
+help: consider adding an explicit lifetime bound
+     |
+1329 | async fn abort_and_reap<T: 'static>(tasks: &mut JoinSet<T>) {
+     |                          +++++++++
+
+warning: variable `succeeded` is assigned to, but never used
+   --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:280:21
+    |
+280 |                 let mut succeeded = false;
+    |                     ^^^^^^^^^^^^^
+    |
+    = note: consider using `_succeeded` instead
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `succeeded` is never read
+   --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:291:25
+    |
+291 |                         succeeded = true;
+    |                         ^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+error[E0382]: borrow of moved value: `acknowledgements`
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1172:13
+     |
+1123 |     let mut acknowledgements = Vec::new();
+     |         -------------------- move occurs because `acknowledgements` has type `Vec<(usize, Option<Vec<u8>>)>`, which does not implement the `Copy` trait
+...
+1156 |         acknowledgements,
+     |         ---------------- value moved here
+...
+1172 |             &acknowledgements,
+     |             ^^^^^^^^^^^^^^^^^ value borrowed here after move
+     |
+     = note: borrow occurs due to deref coercion to `[(usize, Option<Vec<u8>>)]`
+help: consider cloning the value if the performance cost is acceptable
+     |
+1156 |         acknowledgements: acknowledgements.clone(),
+     |                         ++++++++++++++++++++++++++
+
+error[E0384]: cannot assign twice to immutable variable `cell_is_valid`
+   --> dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs:127:5
+    |
+103 |     let cell_is_valid = workload["cell_valid"].as_bool().unwrap_or(false) && boundary_fields_present;
+    |         ------------- first assignment to `cell_is_valid`
+...
+127 |     cell_is_valid &= oracle["passed"] == true && reopened_oracle["passed"] == true;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot assign twice to immutable variable
+    |
+help: consider making this binding mutable
+    |
+103 |     let mut cell_is_valid = workload["cell_valid"].as_bool().unwrap_or(false) && boundary_fields_present;
+    |         +++
+
+Some errors have detailed explanations: E0310, E0382, E0384.
+For more information about an error, try `rustc --explain E0310`.
+warning: `dodb-rocksdb` (bin "tenant_density_workload" test) generated 2 warnings
+error: could not compile `dodb-rocksdb` (bin "tenant_density_workload" test) due to 5 previous errors; 2 warnings emitted

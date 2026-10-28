@@ -1,0 +1,29 @@
+   Compiling dodb-rocksdb v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-rocksdb)
+    Finished `release` profile [optimized] target(s) in 9.81s
+     Running unittests src/bin/memory_diagnostic_worker.rs (/home/opc/tenant-density-harness-20261027/target/release/deps/memory_diagnostic_worker-499ef997f9e4d59c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/tenant_density_workload.rs (/home/opc/tenant-density-harness-20261027/target/release/deps/tenant_density_workload-b513574b69a13d61)
+
+running 15 tests
+test config::tests::mixed_widths_follow_fixed_eighty_fifteen_five_schedule ... ok
+test config::tests::fixed_total_allows_sixteen_lanes_with_minimum_seed_rows ... ok
+test config::tests::parses_512_all_active_tenants_and_supported_value_sizes ... ok
+test config::tests::rejects_partial_query_partition ... ok
+test config::tests::requires_a_rate_for_fixed_per_tenant_and_rejects_rate_for_fixed_total ... ok
+test config::tests::rejects_unknown_duplicate_and_incompatible_configuration ... ok
+test resources::tests::hardlinked_file_allocation_is_counted_once_and_symlinks_are_rejected ... ok
+test resources::tests::measurement_summary_excludes_setup_and_reused_pids_and_keeps_unknown_pss ... ok
+test resources::tests::missing_data_directory_is_not_reported_as_zero_bytes ... ok
+test resources::tests::short_offer_reports_boundary_only_sampling ... ok
+test scheduler::tests::fingerprints_are_deterministic_and_include_schedule_inputs ... ok
+test scheduler::tests::fixed_total_drain_timeout_cancels_and_reaps_service_futures ... ok
+test scheduler::tests::fixed_total_runs_concurrent_lanes_and_timeout_marks_mutation_uncertain ... ok
+test scheduler::tests::write_schedule_keeps_profile_width_condition_and_delete_selectors_independent ... ok
+test scheduler::tests::fixed_per_tenant_accounts_queue_drops_and_scheduled_latency ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+

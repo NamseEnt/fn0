@@ -1,0 +1,528 @@
+   Compiling dodb-rocksdb v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-rocksdb)
+error: cannot find macro `json` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1580:60
+     |
+1580 |         let result = run_fixed_total(service, &options, || json!({"captured": true})).await;
+     |                                                            ^^^^
+
+error: cannot find macro `json` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1562:65
+     |
+1562 |         let (report, _) = run_fixed_total(service, &options, || json!({"captured": true}))
+     |                                                                 ^^^^
+
+error: cannot find macro `json` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1550:64
+     |
+1550 |             run_fixed_total(Arc::clone(&service), &options, || json!({"captured": true}))
+     |                                                                ^^^^
+
+error: cannot find macro `json` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1525:69
+     |
+1525 |             run_fixed_per_tenant(Arc::clone(&service), &options, || json!({"captured": true}))
+     |                                                                     ^^^^
+
+error[E0422]: cannot find struct, variant or union type `RequestAddress` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1387:17
+     |
+1387 |                 RequestAddress {
+     |                 ^^^^^^^^^^^^^^ not found in this scope
+     |
+help: consider importing this struct
+     |
+1342 +     use crate::scheduler::RequestAddress;
+     |
+
+error[E0425]: cannot find type `Duration` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1440:16
+     |
+1440 |         delay: Duration,
+     |                ^^^^^^^^ not found in this scope
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Duration;
+     |
+1342 +     use std::time::Duration;
+     |
+
+error[E0425]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1441:17
+     |
+1441 |         active: Arc<AtomicU64>,
+     |                 ^^^ not found in this scope
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0425]: cannot find type `AtomicU64` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1441:21
+     |
+1441 |         active: Arc<AtomicU64>,
+     |                     ^^^^^^^^^ not found in this scope
+     |
+help: consider importing one of these type aliases
+     |
+1342 +     use crate::scheduler::AtomicU64;
+     |
+1342 +     use std::sync::atomic::AtomicU64;
+     |
+
+error[E0425]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1442:28
+     |
+1442 |         active_high_water: Arc<AtomicU64>,
+     |                            ^^^ not found in this scope
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0425]: cannot find type `AtomicU64` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1442:32
+     |
+1442 |         active_high_water: Arc<AtomicU64>,
+     |                                ^^^^^^^^^ not found in this scope
+     |
+help: consider importing one of these type aliases
+     |
+1342 +     use crate::scheduler::AtomicU64;
+     |
+1342 +     use std::sync::atomic::AtomicU64;
+     |
+
+error[E0425]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1445:26
+     |
+1445 |     struct ActiveRequest(Arc<AtomicU64>);
+     |                          ^^^ not found in this scope
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0425]: cannot find type `AtomicU64` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1445:30
+     |
+1445 |     struct ActiveRequest(Arc<AtomicU64>);
+     |                              ^^^^^^^^^ not found in this scope
+     |
+help: consider importing one of these type aliases
+     |
+1342 +     use crate::scheduler::AtomicU64;
+     |
+1342 +     use std::sync::atomic::AtomicU64;
+     |
+
+error[E0433]: cannot find type `Ordering` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1449:33
+     |
+1449 |             self.0.fetch_sub(1, Ordering::Relaxed);
+     |                                 ^^^^^^^^ use of undeclared type `Ordering`
+     |
+help: consider importing one of these enums
+     |
+1342 +     use crate::scheduler::Ordering;
+     |
+1342 +     use std::cmp::Ordering;
+     |
+1342 +     use std::sync::atomic::Ordering;
+     |
+
+error[E0405]: cannot find trait `DodbService` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1453:10
+     |
+1453 |     impl DodbService for DelayedService {
+     |          ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `TenantId` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1456:21
+     |
+1456 |             tenant: TenantId,
+     |                     ^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `Request` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1457:22
+     |
+1457 |             request: Request,
+     |                      ^^^^^^^ not found in this scope
+
+error[E0425]: cannot find type `ExecutionBudget` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1458:22
+     |
+1458 |             _budget: ExecutionBudget,
+     |                      ^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0433]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1462:26
+     |
+1462 |             let active = Arc::clone(&self.active);
+     |                          ^^^ use of undeclared type `Arc`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0433]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1463:30
+     |
+1463 |             let high_water = Arc::clone(&self.active_high_water);
+     |                              ^^^ use of undeclared type `Arc`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0433]: cannot find type `Ordering` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1465:51
+     |
+1465 |                 let running = active.fetch_add(1, Ordering::Relaxed) + 1;
+     |                                                   ^^^^^^^^ use of undeclared type `Ordering`
+     |
+help: consider importing one of these enums
+     |
+1342 +     use crate::scheduler::Ordering;
+     |
+1342 +     use std::cmp::Ordering;
+     |
+1342 +     use std::sync::atomic::Ordering;
+     |
+
+error[E0433]: cannot find type `Ordering` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1466:47
+     |
+1466 |                 high_water.fetch_max(running, Ordering::Relaxed);
+     |                                               ^^^^^^^^ use of undeclared type `Ordering`
+     |
+help: consider importing one of these enums
+     |
+1342 +     use crate::scheduler::Ordering;
+     |
+1342 +     use std::cmp::Ordering;
+     |
+1342 +     use std::sync::atomic::Ordering;
+     |
+
+error[E0433]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1467:53
+     |
+1467 |                 let _active_request = ActiveRequest(Arc::clone(&active));
+     |                                                     ^^^ use of undeclared type `Arc`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0425]: cannot find type `Duration` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1502:50
+     |
+1502 |     fn delayed_service(options: &Options, delay: Duration) -> Arc<DelayedService> {
+     |                                                  ^^^^^^^^ not found in this scope
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Duration;
+     |
+1342 +     use std::time::Duration;
+     |
+
+error[E0425]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1502:63
+     |
+1502 |     fn delayed_service(options: &Options, delay: Duration) -> Arc<DelayedService> {
+     |                                                               ^^^ not found in this scope
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0433]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1503:9
+     |
+1503 |         Arc::new(DelayedService {
+     |         ^^^ use of undeclared type `Arc`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0433]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1506:21
+     |
+1506 |             active: Arc::new(AtomicU64::new(0)),
+     |                     ^^^ use of undeclared type `Arc`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0433]: cannot find type `AtomicU64` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1506:30
+     |
+1506 |             active: Arc::new(AtomicU64::new(0)),
+     |                              ^^^^^^^^^ use of undeclared type `AtomicU64`
+     |
+help: consider importing one of these type aliases
+     |
+1342 +     use crate::scheduler::AtomicU64;
+     |
+1342 +     use std::sync::atomic::AtomicU64;
+     |
+
+error[E0433]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1507:32
+     |
+1507 |             active_high_water: Arc::new(AtomicU64::new(0)),
+     |                                ^^^ use of undeclared type `Arc`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0433]: cannot find type `AtomicU64` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1507:41
+     |
+1507 |             active_high_water: Arc::new(AtomicU64::new(0)),
+     |                                         ^^^^^^^^^ use of undeclared type `AtomicU64`
+     |
+help: consider importing one of these type aliases
+     |
+1342 +     use crate::scheduler::AtomicU64;
+     |
+1342 +     use std::sync::atomic::AtomicU64;
+     |
+
+error[E0433]: cannot find type `Duration` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1523:49
+     |
+1523 |         let service = delayed_service(&options, Duration::from_millis(80));
+     |                                                 ^^^^^^^^ use of undeclared type `Duration`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Duration;
+     |
+1342 +     use std::time::Duration;
+     |
+
+error[E0425]: cannot find function `run_fixed_per_tenant` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1525:13
+     |
+1525 |             run_fixed_per_tenant(Arc::clone(&service), &options, || json!({"captured": true}))
+     |             ^^^^^^^^^^^^^^^^^^^^ not found in this scope
+     |
+help: consider importing this function
+     |
+1342 +     use crate::scheduler::run_fixed_per_tenant;
+     |
+
+error[E0433]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1525:34
+     |
+1525 |             run_fixed_per_tenant(Arc::clone(&service), &options, || json!({"captured": true}))
+     |                                  ^^^ use of undeclared type `Arc`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0433]: cannot find type `Duration` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1548:49
+     |
+1548 |         let service = delayed_service(&options, Duration::from_millis(5));
+     |                                                 ^^^^^^^^ use of undeclared type `Duration`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Duration;
+     |
+1342 +     use std::time::Duration;
+     |
+
+error[E0425]: cannot find function `run_fixed_total` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1550:13
+     |
+1550 |             run_fixed_total(Arc::clone(&service), &options, || json!({"captured": true}))
+     |             ^^^^^^^^^^^^^^^ not found in this scope
+     |
+help: consider importing this function
+     |
+1342 +     use crate::scheduler::run_fixed_total;
+     |
+
+error[E0433]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1550:29
+     |
+1550 |             run_fixed_total(Arc::clone(&service), &options, || json!({"captured": true}))
+     |                             ^^^ use of undeclared type `Arc`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0433]: cannot find type `Duration` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1561:49
+     |
+1561 |         let service = delayed_service(&options, Duration::from_millis(50));
+     |                                                 ^^^^^^^^ use of undeclared type `Duration`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Duration;
+     |
+1342 +     use std::time::Duration;
+     |
+
+error[E0425]: cannot find function `run_fixed_total` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1562:27
+     |
+1562 |         let (report, _) = run_fixed_total(service, &options, || json!({"captured": true}))
+     |                           ^^^^^^^^^^^^^^^ not found in this scope
+     |
+help: consider importing this function
+     |
+1342 +     use crate::scheduler::run_fixed_total;
+     |
+
+error[E0433]: cannot find type `Duration` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1578:49
+     |
+1578 |         let service = delayed_service(&options, Duration::from_secs(1));
+     |                                                 ^^^^^^^^ use of undeclared type `Duration`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Duration;
+     |
+1342 +     use std::time::Duration;
+     |
+
+error[E0433]: cannot find type `Arc` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1579:22
+     |
+1579 |         let active = Arc::clone(&service.active);
+     |                      ^^^ use of undeclared type `Arc`
+     |
+help: consider importing one of these structs
+     |
+1342 +     use crate::Arc;
+     |
+1342 +     use std::sync::Arc;
+     |
+
+error[E0425]: cannot find function `run_fixed_total` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1580:22
+     |
+1580 |         let result = run_fixed_total(service, &options, || json!({"captured": true})).await;
+     |                      ^^^^^^^^^^^^^^^ not found in this scope
+     |
+help: consider importing this function
+     |
+1342 +     use crate::scheduler::run_fixed_total;
+     |
+
+error[E0433]: cannot find type `Ordering` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1585:32
+     |
+1585 |         assert_eq!(active.load(Ordering::Relaxed), 0);
+     |                                ^^^^^^^^ use of undeclared type `Ordering`
+     |
+help: consider importing one of these enums
+     |
+1342 +     use crate::scheduler::Ordering;
+     |
+1342 +     use std::cmp::Ordering;
+     |
+1342 +     use std::sync::atomic::Ordering;
+     |
+
+error[E0433]: cannot find type `CoreError` in this scope
+   --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:311:28
+    |
+311 |                     Ok(Err(CoreError::Conflict(_))) => {
+    |                            ^^^^^^^^^ use of undeclared type `CoreError`
+
+error[E0433]: cannot find type `CoreError` in this scope
+   --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:742:28
+    |
+742 |                     Ok(Err(CoreError::Conflict(_))) => {
+    |                            ^^^^^^^^^ use of undeclared type `CoreError`
+
+error[E0433]: cannot find type `Request` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1470:21
+     |
+1470 |                     Request::Get { key } => {
+     |                     ^^^^^^^ use of undeclared type `Request`
+
+error[E0433]: cannot find type `Response` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1473:28
+     |
+1473 |                         Ok(Response::Get(dodb_core::RevisionState::present(
+     |                            ^^^^^^^^ use of undeclared type `Response`
+
+error[E0433]: cannot find type `Request` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1478:21
+     |
+1478 |                     Request::Query { .. } => Ok(Response::Query(
+     |                     ^^^^^^^ use of undeclared type `Request`
+
+error[E0433]: cannot find type `Response` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1478:49
+     |
+1478 |                     Request::Query { .. } => Ok(Response::Query(
+     |                                                 ^^^^^^^^ use of undeclared type `Response`
+
+error[E0433]: cannot find type `Request` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1491:21
+     |
+1491 |                     Request::Transact { .. } => Ok(Response::Transact(
+     |                     ^^^^^^^ use of undeclared type `Request`
+
+error[E0433]: cannot find type `Response` in this scope
+    --> dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs:1491:52
+     |
+1491 |                     Request::Transact { .. } => Ok(Response::Transact(
+     |                                                    ^^^^^^^^ use of undeclared type `Response`
+
+Some errors have detailed explanations: E0405, E0422, E0425, E0433.
+For more information about an error, try `rustc --explain E0405`.
+error: could not compile `dodb-rocksdb` (bin "tenant_density_workload" test) due to 49 previous errors
+warning: build failed, waiting for other jobs to finish...

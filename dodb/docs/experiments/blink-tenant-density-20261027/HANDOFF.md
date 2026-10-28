@@ -57,9 +57,15 @@ At the reviewed source, `apply_planned_transaction_group` pins `committed_view` 
 5. Preserve the page-reuse safety proof and real-service recovery sequence: incomplete transaction recovery -> write succeeds -> another recovery.
 6. Keep any experimental behavior opt-in/default-disabled. Do not promote settings or run the broader density matrix based on one small diagnostic.
 
-## Next implementation scope
+## Density harness increment
 
-After A1 acceptance, prepare separated backend-memory accounting, the configurable density harness, and the shared-cache/WBM minimal-native reference. Production-wide pin ages, representation-specific heap accounting, queue/snapshot budgets, and active-density instrumentation are not supplied by the A1 unit diagnostic. The current memory diagnostic worker cannot measure segmented checkpoints unchanged. Current service_workload settings are not already a general many-tenant offered-load harness.
+After A1, the user authorized the next preparation increment using the same single GPT-6 Luna worker at high reasoning effort, with planning/review and real smoke execution owned by the primary. Read [DENSITY-HARNESS-PLAN.md](DENSITY-HARNESS-PLAN.md) and [DENSITY-HARNESS-RESULTS.md](DENSITY-HARNESS-RESULTS.md) for its current acceptance status, commands, source provenance, and limits.
+
+The increment adds a dedicated `tenant_density_workload` binary and extends the diagnostic worker for minimal-native and explicit segmented checkpoint settings. The historical `service_workload` is preserved. Separate setup, measurement, oracle, and reopened-oracle processes distinguish the measurement epoch's active, opened-idle, and never-opened population. Memory summaries filter the measurement backend by PID/start-time and exclude setup/oracle observations. Workload schedules and failure accounting must be accepted before any capacity claim.
+
+The isolated OCI build root is `/home/opc/tenant-density-harness-20261027`; build output is on the boot filesystem. Preserve source probe archives, failed logs, databases, and previously accepted cells. Real smoke databases are under `/bench/zfs/db/tenant-density-harness-20261027`. The benchmark filesystem had only about 0.39 GiB above the required 10 GiB free reserve during preparation, so this increment permits only tiny correctness/accounting smokes. Recheck live capacity before future work.
+
+The next separate implementation scope is the shared-cache/WBM minimal-native reference. Production-wide pin ages, allocator/representation retained bytes, queue/snapshot byte budgets, and enforced common memory pressure remain absent. The density/maintenance matrix and adoption decision are not completed by making the harness executable.
 
 ## Read existing evidence in order
 
@@ -87,4 +93,4 @@ The full issue describes A1-A5, B1-B4, E0-E4, all-active versus sparse-active ca
 
 ## Completion boundary for this issue
 
-The issue remains open because the A1 increment does not complete the density comparison or structural objective. Use the checklist in PLAN.md and the acceptance status in A1-RESULTS.md without rewriting failed or historical evidence. Do not promote defaults or close the issue based on the local overwrite/recovery diagnostic.
+The issue remains open because the A1 and harness increments do not complete the density comparison or structural objective. Use the checklist in PLAN.md and the acceptance status in A1-RESULTS.md and DENSITY-HARNESS-RESULTS.md without rewriting failed or historical evidence. Do not promote defaults or close the issue based on local overwrite/recovery diagnostics or tiny harness smokes.

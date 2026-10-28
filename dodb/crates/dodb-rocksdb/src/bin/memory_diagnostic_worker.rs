@@ -1,3 +1,6 @@
+#[path = "support/blink_checkpoint.rs"]
+mod blink_checkpoint;
+
 use std::collections::BTreeMap;
 use std::io::{BufRead, Write};
 use std::net::SocketAddr;
@@ -13,7 +16,8 @@ use dodb_rocksdb::{
     engine_health_disabled_report,
 };
 use dodb_server::{
-    BlinkTenantService, DodbServer, DodbServerConfig, LocalTenantServiceConfig, ServerTlsConfig,
+    BlinkCheckpointPolicy, BlinkTenantService, DodbServer, DodbServerConfig,
+    LocalTenantServiceConfig, ServerTlsConfig,
 };
 use dodb_service::{
     Document, DodbService, ExecutionBudget, Request, Response, ServiceFuture, ShutdownFuture,
@@ -48,11 +52,14 @@ struct Arguments {
     core_tenant_subdirectories: bool,
     blink_max_open_shards: usize,
     blink_cache_pages: Option<usize>,
+    blink_checkpoint_policy: BlinkCheckpointPolicy,
+    blink_checkpoint: blink_checkpoint::Options,
 }
 
 enum BackendService {
     Blink(BlinkTenantService),
     RocksDb(RocksDbService),
+    MinimalNative(Arc<dodb_rocksdb::minimal_native::MinimalNativeService>),
     Core(BTreeMap<TenantId, Arc<dodb_rocksdb::research::SynchronousRocksDbTenant>>),
     Raw(Arc<RawRocksDb>),
 }
@@ -70,9 +77,21 @@ impl BackendService {
                             DatabaseConfig::default().with_cache_capacity(capacity)
                         }),
                     coordinator_config: CoordinatorConfig::default(),
+                    blink_checkpoint_policy: arguments.blink_checkpoint_policy,
+                    blink_wal_layout: arguments.blink_checkpoint.layout,
+                    blink_checkpoint_execution: arguments.blink_checkpoint.execution,
                     ..LocalTenantServiceConfig::default()
                 };
                 Ok(Self::Blink(BlinkTenantService::new(config)?))
+            }
+            "minimal-native" => {
+                let mut config = dodb_rocksdb::minimal_native::MinimalNativeConfig::new(
+                    arguments.data_dir.clone(),
+                );
+                config.revision_allocator = arguments.revision_allocator;
+                Ok(Self::MinimalNative(Arc::new(
+                    dodb_rocksdb::minimal_native::MinimalNativeService::new(config)?,
+                )))
             }
             "rocksdb-service" => {
                 let mut config = RocksDbServiceConfig::new(&arguments.data_dir);
@@ -109,6 +128,7 @@ impl BackendService {
     fn engine_health_observer(&self) -> Option<dodb_rocksdb::EngineHealthObserver> {
         match self {
             Self::Blink(_) => None,
+            Self::MinimalNative(_) => None,
             Self::RocksDb(service) => Some(service.engine_health_observer()),
             Self::Core(tenants) => Some(dodb_rocksdb::EngineHealthObserver::combine(
                 tenants.iter().map(|(tenant, database)| {
@@ -158,6 +178,114 @@ impl BackendService {
     }
 }
 
+fn blink_checkpoint_metrics_json(
+    metrics: &dodb_server::BlinkWalCheckpointMetrics,
+) -> serde_json::Value {
+    let checkpoint_events = metrics
+        .checkpoint_events
+        .iter()
+        .map(|event| {
+            json!({
+                "phase": event.phase,
+                "task_id": event.task_id,
+                "target_lsn": event.target_lsn,
+                "writes_during_checkpoint": event.writes_during_checkpoint,
+                "preparation_nanos": event.preparation_nanos,
+                "page_write_nanos": event.page_write_nanos,
+                "data_sync_nanos": event.data_sync_nanos,
+                "metadata_sync_nanos": event.metadata_sync_nanos,
+                "completion_nanos": event.completion_nanos,
+                "started_unix_nanos": event.started_unix_nanos,
+                "ended_unix_nanos": event.ended_unix_nanos,
+                "wal_bytes_before": event.wal_bytes_before,
+                "wal_bytes_after": event.wal_bytes_after,
+                "reclaimed_bytes": event.reclaimed_bytes,
+                "duration_nanos": event.duration_nanos,
+                "succeeded": event.succeeded,
+                "checkpoint_bytes_written": event.checkpoint_bytes_written,
+                "base_bytes_written": event.base_bytes_written,
+                "base_bytes_retained": event.base_bytes_retained,
+                "base_bytes_reclaimed": event.base_bytes_reclaimed,
+                "full_base_snapshots": event.full_base_snapshots,
+                "checkpoint_write_requests": event.checkpoint_write_requests,
+            })
+        })
+        .collect::<Vec<_>>();
+    json!({
+        "status": "sampled",
+        "policy": match metrics.policy {
+            BlinkCheckpointPolicy::Disabled => json!({"mode": "disabled"}),
+            BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => json!({
+                "mode": "wal_bytes_threshold",
+                "threshold_bytes": threshold_bytes,
+            }),
+        },
+        "execution": match metrics.execution {
+            dodb_server::BlinkCheckpointExecution::Sync => "sync",
+            dodb_server::BlinkCheckpointExecution::Background => "background",
+        },
+        "threshold_bytes": metrics.threshold_bytes,
+        "checkpoints_started": metrics.checkpoints_started,
+        "checkpoints_completed": metrics.checkpoints_completed,
+        "checkpoints_failed": metrics.checkpoints_failed,
+        "checkpoint_total_nanos": metrics.checkpoint_total_nanos,
+        "checkpoint_max_nanos": metrics.checkpoint_max_nanos,
+        "wal_bytes_current": metrics.wal_bytes_current,
+        "wal_bytes_at_measurement_start": metrics.wal_bytes_at_measurement_start,
+        "wal_bytes_at_measurement_end": metrics.wal_bytes_at_measurement_end,
+        "wal_bytes_max": metrics.wal_bytes_max,
+        "threshold_excess_max_bytes": metrics.threshold_excess_max_bytes,
+        "successful_mutation_transactions": metrics.successful_mutation_transactions,
+        "mutation_commit_groups": metrics.mutation_commit_groups,
+        "transaction_group_histogram": metrics.transaction_group_histogram,
+        "transaction_group_count": metrics.transaction_group_count,
+        "wal_syncs": metrics.wal_syncs,
+        "commit_wal_syncs": metrics.commit_wal_syncs,
+        "checkpoint_wal_syncs": metrics.checkpoint_wal_syncs,
+        "omitted_checkpoint_events": metrics.omitted_checkpoint_events,
+        "checkpoint_events": checkpoint_events,
+        "failed_message": metrics.failed_message,
+        "writes_during_checkpoint": metrics.writes_during_checkpoint,
+        "merged_checkpoint_requests": metrics.merged_checkpoint_requests,
+        "capacity_wait_count": metrics.capacity_wait_count,
+        "capacity_wait_nanos": metrics.capacity_wait_nanos,
+        "coordinator_pause_nanos": metrics.coordinator_pause_nanos,
+        "retained_image_bytes_normalized_page_images": metrics.retained_image_bytes,
+        "peak_retained_image_bytes_normalized_page_images": metrics.peak_retained_image_bytes,
+        "tasks_running": metrics.tasks_running,
+        "peak_tasks_running": metrics.peak_tasks_running,
+    })
+}
+
+fn backend_configuration_json(arguments: &Arguments) -> serde_json::Value {
+    match arguments.backend.as_str() {
+        "blink" => json!({
+            "max_open_shards": arguments.blink_max_open_shards,
+            "max_concurrent_requests": arguments.max_concurrent_requests,
+            "cache_capacity_pages": arguments.blink_cache_pages.unwrap_or_else(|| DatabaseConfig::default().cache_capacity),
+            "coordinator_config": "default",
+            "wal_layout": arguments.blink_checkpoint.configuration(),
+            "checkpoint_policy": match arguments.blink_checkpoint_policy {
+                BlinkCheckpointPolicy::Disabled => json!({"mode": "disabled"}),
+                BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => json!({
+                    "mode": "wal_bytes_threshold",
+                    "threshold_bytes": threshold_bytes,
+                }),
+            },
+            "cache_capacity_is_blink_memory_limit": false,
+        }),
+        "minimal-native" => json!({
+            "revision_allocator": "reserved-ranges",
+            "condition_key_lock_mode": "exclusive",
+            "compression": "disabled",
+            "request_adapter": "tokio spawn_blocking around synchronous MinimalNativeService execution",
+            "max_concurrent_requests": arguments.max_concurrent_requests,
+            "blocking_semaphore_added_by_worker": false,
+        }),
+        _ => serde_json::Value::Null,
+    }
+}
+
 impl DodbService for BackendService {
     fn execute<'service>(
         &'service self,
@@ -169,6 +297,14 @@ impl DodbService for BackendService {
             match self {
                 Self::Blink(service) => service.execute(tenant, request, budget).await,
                 Self::RocksDb(service) => service.execute(tenant, request, budget).await,
+                Self::MinimalNative(service) => {
+                    let service = Arc::clone(service);
+                    tokio::task::spawn_blocking(move || {
+                        futures::executor::block_on(service.execute(tenant, request, budget))
+                    })
+                    .await
+                    .map_err(|error| Error::invariant(error.to_string()))?
+                }
                 Self::Core(tenants) => {
                     let service = Arc::clone(tenants.get(&tenant).ok_or_else(|| {
                         Error::invalid_request(format!("tenant {tenant} was not preopened"))
@@ -192,9 +328,27 @@ impl DodbService for BackendService {
             match self {
                 Self::Blink(service) => service.shutdown().await,
                 Self::RocksDb(service) => service.shutdown().await,
+                Self::MinimalNative(service) => service.shutdown().await,
                 Self::Core(_) | Self::Raw(_) => {}
             }
         })
+    }
+}
+
+impl BackendService {
+    fn blink_checkpoint_metrics(&self) -> serde_json::Value {
+        match self {
+            Self::Blink(service) => {
+                blink_checkpoint_metrics_json(&service.checkpoint_metrics_snapshot())
+            }
+            Self::MinimalNative(_) | Self::RocksDb(_) | Self::Core(_) | Self::Raw(_) => {
+                serde_json::json!({
+                    "value": null,
+                    "status": "unsupported",
+                    "reason": "backend does not expose B-link checkpoint metrics",
+                })
+            }
+        }
     }
 }
 
@@ -249,6 +403,7 @@ async fn main() -> WorkerResult<()> {
             "started_unix_ms": readiness.started_unix_ms,
             "process_start_time_ticks": readiness.process_start_time_ticks,
             "source_revision": readiness.source_revision,
+            "compiled_source_revision": env!("DODB_BUILD_GIT_COMMIT"),
             "worker_binary_sha256": readiness.worker_binary_sha256,
             "parent_binary_sha256": arguments.parent_binary_sha256,
             "backend": arguments.backend,
@@ -321,6 +476,7 @@ async fn main() -> WorkerResult<()> {
             return Err("diagnostic worker shutdown exceeded 15 seconds".into());
         }
     }
+    let blink_checkpoint_metrics = backend.blink_checkpoint_metrics();
     drop(server);
     drop(backend);
     let worker_process_high_water_kb =
@@ -337,15 +493,19 @@ async fn main() -> WorkerResult<()> {
     std::fs::write(
         &arguments.health_path,
         serde_json::to_vec_pretty(&json!({
-            "backend": arguments.backend,
+            "backend": arguments.backend.clone(),
             "blink_configuration": if arguments.backend == "blink" {
-                json!({
-                    "max_open_shards": arguments.blink_max_open_shards,
-                    "cache_capacity_pages": arguments.blink_cache_pages.unwrap_or_else(|| DatabaseConfig::default().cache_capacity),
-                    "coordinator_config": "default",
-                })
+                backend_configuration_json(&arguments)
             } else {
                 serde_json::Value::Null
+            },
+            "effective_backend_configuration": backend_configuration_json(&arguments),
+            "blink_checkpoint_metrics": blink_checkpoint_metrics,
+            "blink_checkpoint_metrics_scope": "worker_lifetime_including setup/preflight, offered load, measurement drain, and shutdown; measurement start/stop controls the RocksDB sampler only and does not reset or snapshot B-link checkpoint counters at offer boundaries",
+            "retained_heap_bytes": {
+                "value": null,
+                "status": "unsupported",
+                "reason": "worker does not expose allocator retained heap or representation-specific retained bytes",
             },
             "response_budget_bytes": arguments.response_budget,
             "max_mutations": arguments.max_mutations,
@@ -353,9 +513,11 @@ async fn main() -> WorkerResult<()> {
             "engine_health_interval_ms": arguments.engine_health_interval_ms,
             "engine_health": health_report,
             "shutdown_property_snapshot": shutdown_property_snapshot,
+            "worker_process_write_io_at_shutdown": blink_checkpoint::process_write_io(),
             "worker_pid": readiness.pid,
             "worker_process_start_time_ticks": readiness.process_start_time_ticks,
             "worker_epoch_id": format!("{}:{}", readiness.pid, readiness.process_start_time_ticks),
+            "compiled_source_revision": env!("DODB_BUILD_GIT_COMMIT"),
             "worker_process_high_water_rss_kb_after_backend_shutdown": worker_process_high_water_kb,
             "shutdown_complete": true,
         }))?,
@@ -366,11 +528,21 @@ async fn main() -> WorkerResult<()> {
 fn parse_arguments() -> WorkerResult<Arguments> {
     let values = std::env::args().skip(1).collect::<Vec<_>>();
     let backend = argument_value(&values, "--backend")?;
+    if !["raw", "core", "rocksdb-service", "blink", "minimal-native"].contains(&backend.as_str()) {
+        return Err(format!("unsupported diagnostic worker backend {backend}").into());
+    }
     let data_dir = PathBuf::from(argument_value(&values, "--memory-data-dir")?);
     let certificate_path = PathBuf::from(argument_value(&values, "--memory-certificate")?);
     let private_key_path = PathBuf::from(argument_value(&values, "--memory-private-key")?);
     let health_path = PathBuf::from(argument_value(&values, "--memory-health-report")?);
     let source_revision = argument_value(&values, "--memory-source-revision")?;
+    if source_revision != env!("DODB_BUILD_GIT_COMMIT") {
+        return Err(format!(
+            "worker source revision {source_revision} does not match compiled revision {}",
+            env!("DODB_BUILD_GIT_COMMIT")
+        )
+        .into());
+    }
     let worker_binary_sha256 = argument_value(&values, "--memory-worker-binary-sha256")?;
     let parent_binary_sha256 = argument_value(&values, "--memory-parent-binary-sha256")?;
     let parent_pid = argument_value(&values, "--memory-parent-pid")?.parse()?;
@@ -412,6 +584,29 @@ fn parse_arguments() -> WorkerResult<Arguments> {
     let blink_cache_pages = option_value(&values, "--memory-blink-cache-pages")
         .map(|value| value.parse())
         .transpose()?;
+    if blink_max_open_shards == 0 {
+        return Err("B-link maximum open shards must be nonzero".into());
+    }
+    let blink_checkpoint_policy =
+        match option_value(&values, "--blink-checkpoint-wal-bytes").as_deref() {
+            None | Some("off") => BlinkCheckpointPolicy::Disabled,
+            Some(value) => {
+                let threshold_bytes = value.parse::<u64>()?;
+                if threshold_bytes == 0 {
+                    return Err("B-link checkpoint threshold must be positive".into());
+                }
+                BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes }
+            }
+        };
+    let blink_checkpoint = blink_checkpoint::Options::parse(
+        option_value(&values, "--blink-wal-layout").as_deref(),
+        option_value(&values, "--blink-checkpoint-execution").as_deref(),
+        option_value(&values, "--blink-wal-segment-bytes").as_deref(),
+        backend == "blink",
+    )?;
+    if backend != "blink" && option_value(&values, "--blink-checkpoint-wal-bytes").is_some() {
+        return Err("B-link checkpoint policy requires the blink backend".into());
+    }
     if tenant_count == 0 {
         return Err("memory tenant count must be nonzero".into());
     }
@@ -431,6 +626,15 @@ fn parse_arguments() -> WorkerResult<Arguments> {
         "shared" => ConditionKeyLockMode::Shared,
         other => return Err(format!("unknown condition key lock mode {other}").into()),
     };
+    if backend == "minimal-native"
+        && (revision_allocator != RevisionAllocatorMode::ReservedRanges
+            || condition_key_lock_mode != ConditionKeyLockMode::Exclusive)
+    {
+        return Err(
+            "minimal-native requires reserved-range revisions and exclusive condition-key locks"
+                .into(),
+        );
+    }
     Ok(Arguments {
         backend,
         data_dir,
@@ -453,6 +657,8 @@ fn parse_arguments() -> WorkerResult<Arguments> {
         core_tenant_subdirectories,
         blink_max_open_shards,
         blink_cache_pages,
+        blink_checkpoint_policy,
+        blink_checkpoint,
     })
 }
 

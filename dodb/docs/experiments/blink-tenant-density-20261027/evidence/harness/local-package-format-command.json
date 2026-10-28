@@ -1,0 +1,12 @@
+{
+  "command": [
+    "cargo",
+    "fmt",
+    "-p",
+    "dodb-rocksdb",
+    "--check"
+  ],
+  "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+  "exit_code": 0,
+  "scope": "Targeted package formatting; whole-workspace vendor metadata is outside this check"
+}

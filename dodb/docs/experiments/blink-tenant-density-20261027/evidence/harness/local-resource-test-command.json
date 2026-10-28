@@ -1,0 +1,14 @@
+[
+  "rustc",
+  "--test",
+  "--edition=2024",
+  "dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/resources.rs",
+  "-L",
+  "dependency=/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps",
+  "--extern",
+  "serde_json=/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/libserde_json-0326860bb84e99e9.rlib",
+  "--extern",
+  "tempfile=/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/libtempfile-f028620bc1eae782.rlib",
+  "-o",
+  "/tmp/fn0-density-resources-tests-20261027"
+]
