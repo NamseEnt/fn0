@@ -1,0 +1,23 @@
+{
+  "case": "shared-all-active",
+  "exit_code": 0,
+  "capacity_after": {
+    "zfs_free_bytes": 42878464000,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 7052455936,
+      "SwapFree": 3823587328
+    }
+  },
+  "ended_unix_seconds": 1793171174.961421,
+  "report_exists": true,
+  "validation": {
+    "passed": true,
+    "successful_requests": 510,
+    "cell_kernel_peak_bytes": 42266624,
+    "measurement_kernel_peak_bytes": 41271296,
+    "cgroup_samples": 117,
+    "worker_measurement_samples": 35
+  },
+  "report_sha256": "1fa46341f989c7e03bd9dfb085c984dde336319275b621137396bfbc8957eb59"
+}

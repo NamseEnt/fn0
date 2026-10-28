@@ -1,0 +1,42 @@
+{
+  "all-active": {
+    "request_count": true,
+    "request_fingerprint": true,
+    "scheduled_fingerprint": true,
+    "scheduled": true,
+    "admitted": true,
+    "completed": true,
+    "successful": true,
+    "per_tenant_tenant": true,
+    "per_tenant_request_count": true,
+    "per_tenant_request_fingerprint": true,
+    "per_tenant_scheduled_fingerprint": true,
+    "per_tenant_scheduled": true,
+    "per_tenant_admitted": true,
+    "per_tenant_completed": true,
+    "per_tenant_successful": true,
+    "per_tenant_operation_counts": true,
+    "per_tenant_transaction_counts": true,
+    "per_tenant_width_counts": true
+  },
+  "sparse": {
+    "request_count": true,
+    "request_fingerprint": true,
+    "scheduled_fingerprint": true,
+    "scheduled": true,
+    "admitted": true,
+    "completed": true,
+    "successful": true,
+    "per_tenant_tenant": true,
+    "per_tenant_request_count": true,
+    "per_tenant_request_fingerprint": true,
+    "per_tenant_scheduled_fingerprint": true,
+    "per_tenant_scheduled": true,
+    "per_tenant_admitted": true,
+    "per_tenant_completed": true,
+    "per_tenant_successful": true,
+    "per_tenant_operation_counts": true,
+    "per_tenant_transaction_counts": true,
+    "per_tenant_width_counts": true
+  }
+}

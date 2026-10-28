@@ -1,0 +1,13 @@
+{
+  "capacity_before": {
+    "boot": 2378113024,
+    "benchmark": 11071692800
+  },
+  "capacity_after": {
+    "boot": 3196702720,
+    "benchmark": 34373455872
+  },
+  "preserved_files_unchanged": true,
+  "deleted_paths": 13,
+  "ended_unix_seconds": 1793169829.432167
+}

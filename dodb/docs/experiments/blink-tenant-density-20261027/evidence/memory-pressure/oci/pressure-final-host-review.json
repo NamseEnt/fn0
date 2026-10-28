@@ -1,0 +1,144 @@
+{
+  "processes": [
+    {
+      "case": "blink-all-active",
+      "role": "harness-process",
+      "pid": 2308656,
+      "same_live_process": false
+    },
+    {
+      "case": "blink-all-active",
+      "role": "backend-process",
+      "pid": 2308661,
+      "same_live_process": false
+    },
+    {
+      "case": "blink-all-active",
+      "role": "backend-process",
+      "pid": 2308675,
+      "same_live_process": false
+    },
+    {
+      "case": "blink-all-active",
+      "role": "backend-process",
+      "pid": 2308690,
+      "same_live_process": false
+    },
+    {
+      "case": "blink-all-active",
+      "role": "backend-process",
+      "pid": 2308695,
+      "same_live_process": false
+    },
+    {
+      "case": "shared-all-active",
+      "role": "harness-process",
+      "pid": 2308700,
+      "same_live_process": false
+    },
+    {
+      "case": "shared-all-active",
+      "role": "backend-process",
+      "pid": 2308705,
+      "same_live_process": false
+    },
+    {
+      "case": "shared-all-active",
+      "role": "backend-process",
+      "pid": 2308972,
+      "same_live_process": false
+    },
+    {
+      "case": "shared-all-active",
+      "role": "backend-process",
+      "pid": 2309245,
+      "same_live_process": false
+    },
+    {
+      "case": "shared-all-active",
+      "role": "backend-process",
+      "pid": 2309510,
+      "same_live_process": false
+    },
+    {
+      "case": "blink-sparse",
+      "role": "harness-process",
+      "pid": 2309776,
+      "same_live_process": false
+    },
+    {
+      "case": "blink-sparse",
+      "role": "backend-process",
+      "pid": 2309781,
+      "same_live_process": false
+    },
+    {
+      "case": "blink-sparse",
+      "role": "backend-process",
+      "pid": 2309790,
+      "same_live_process": false
+    },
+    {
+      "case": "blink-sparse",
+      "role": "backend-process",
+      "pid": 2309798,
+      "same_live_process": false
+    },
+    {
+      "case": "blink-sparse",
+      "role": "backend-process",
+      "pid": 2309803,
+      "same_live_process": false
+    },
+    {
+      "case": "shared-sparse",
+      "role": "harness-process",
+      "pid": 2309808,
+      "same_live_process": false
+    },
+    {
+      "case": "shared-sparse",
+      "role": "backend-process",
+      "pid": 2309813,
+      "same_live_process": false
+    },
+    {
+      "case": "shared-sparse",
+      "role": "backend-process",
+      "pid": 2310079,
+      "same_live_process": false
+    },
+    {
+      "case": "shared-sparse",
+      "role": "backend-process",
+      "pid": 2310167,
+      "same_live_process": false
+    },
+    {
+      "case": "shared-sparse",
+      "role": "backend-process",
+      "pid": 2310432,
+      "same_live_process": false
+    },
+    {
+      "case": "expected-worker-oom",
+      "role": "harness-process",
+      "pid": 2310696,
+      "same_live_process": false
+    },
+    {
+      "case": "expected-worker-oom",
+      "role": "backend-process",
+      "pid": 2310701,
+      "same_live_process": false
+    }
+  ],
+  "all_recorded_processes_exited": true,
+  "source_clean": true,
+  "host_psi_available": false,
+  "capacity_after": {
+    "boot": 3062747136,
+    "benchmark": 42801176576
+  },
+  "reviewed_unix_seconds": 1793171556.4831302
+}

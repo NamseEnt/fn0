@@ -1,0 +1,61 @@
+{
+  "source_commit": "d506d00dd1f6324bf0074ba2ec0fd0f84792a1f8",
+  "cases": {
+    "blink-all-active": {
+      "successful": 510,
+      "verified_seed_rows_per_oracle": 4352,
+      "verified_mutated_keys_raw_field_per_oracle": 275,
+      "cell_kernel_peak_bytes": 71962624,
+      "measurement_kernel_peak_bytes": 60559360,
+      "measurement_periodic_cgroup_samples": 36,
+      "maximum_measurement_periodic_gap_ms": 104,
+      "psi_status": "unavailable"
+    },
+    "shared-all-active": {
+      "successful": 510,
+      "verified_seed_rows_per_oracle": 4352,
+      "verified_mutated_keys_raw_field_per_oracle": 275,
+      "cell_kernel_peak_bytes": 42266624,
+      "measurement_kernel_peak_bytes": 41271296,
+      "measurement_periodic_cgroup_samples": 38,
+      "maximum_measurement_periodic_gap_ms": 101,
+      "psi_status": "unavailable"
+    },
+    "blink-sparse": {
+      "successful": 90,
+      "verified_seed_rows_per_oracle": 4352,
+      "verified_mutated_keys_raw_field_per_oracle": 51,
+      "cell_kernel_peak_bytes": 72220672,
+      "measurement_kernel_peak_bytes": 22691840,
+      "measurement_periodic_cgroup_samples": 34,
+      "maximum_measurement_periodic_gap_ms": 101,
+      "psi_status": "unavailable"
+    },
+    "shared-sparse": {
+      "successful": 90,
+      "verified_seed_rows_per_oracle": 4352,
+      "verified_mutated_keys_raw_field_per_oracle": 51,
+      "cell_kernel_peak_bytes": 26353664,
+      "measurement_kernel_peak_bytes": 12619776,
+      "measurement_periodic_cgroup_samples": 34,
+      "maximum_measurement_periodic_gap_ms": 101,
+      "psi_status": "unavailable"
+    }
+  },
+  "kernel_probes": {
+    "high-probe": {
+      "passed": true,
+      "events": "low 0\nhigh 20\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n",
+      "kernel_peak_bytes": 51175424
+    },
+    "allocation-probe": {
+      "passed": true,
+      "events": "low 0\nhigh 0\nmax 35\noom 1\noom_kill 2\noom_group_kill 1\n",
+      "kernel_peak_bytes": 67108864
+    }
+  },
+  "passing_tests": 68,
+  "successful_requests": 1200,
+  "matched_inputs": true,
+  "scope": "Accounting/provenance review only; positive correctness cells did not reach high/max; no density or performance ranking"
+}

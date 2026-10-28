@@ -1,0 +1,280 @@
+    PID COMMAND         COMMAND
+      1 systemd         /usr/lib/systemd/systemd --switched-root --system --deserialize 28
+      2 kthreadd        [kthreadd]
+      3 pool_workqueue_ [pool_workqueue_release]
+      4 kworker/R-kvfre [kworker/R-kvfree_rcu_reclaim]
+      5 kworker/R-rcu_g [kworker/R-rcu_gp]
+      6 kworker/R-sync_ [kworker/R-sync_wq]
+      7 kworker/R-slub_ [kworker/R-slub_flushwq]
+      8 kworker/R-netns [kworker/R-netns]
+     10 kworker/0:0H-ev [kworker/0:0H-events_highpri]
+     13 kworker/R-mm_pe [kworker/R-mm_percpu_wq]
+     14 rcu_tasks_rude_ [rcu_tasks_rude_kthread]
+     15 rcu_tasks_trace [rcu_tasks_trace_kthread]
+     16 ksoftirqd/0     [ksoftirqd/0]
+     17 rcu_sched       [rcu_sched]
+     18 rcu_exp_par_gp_ [rcu_exp_par_gp_kthread_worker/0]
+     19 rcu_exp_gp_kthr [rcu_exp_gp_kthread_worker]
+     20 migration/0     [migration/0]
+     21 cpuhp/0         [cpuhp/0]
+     22 cpuhp/1         [cpuhp/1]
+     23 migration/1     [migration/1]
+     24 ksoftirqd/1     [ksoftirqd/1]
+     26 kworker/1:0H-ev [kworker/1:0H-events_highpri]
+     28 kdevtmpfs       [kdevtmpfs]
+     29 kworker/R-inet_ [kworker/R-inet_frag_wq]
+     30 kauditd         [kauditd]
+     31 khungtaskd      [khungtaskd]
+     33 oom_reaper      [oom_reaper]
+     34 kworker/R-write [kworker/R-writeback]
+     35 kcompactd0      [kcompactd0]
+     36 ksmd            [ksmd]
+     37 khugepaged      [khugepaged]
+     38 kworker/R-crypt [kworker/R-cryptd]
+     39 kworker/R-kinte [kworker/R-kintegrityd]
+     40 kworker/R-kbloc [kworker/R-kblockd]
+     41 kworker/R-blkcg [kworker/R-blkcg_punt_bio]
+     42 kworker/R-tpm_d [kworker/R-tpm_dev_wq]
+     43 kworker/R-ata_s [kworker/R-ata_sff]
+     44 kworker/R-md    [kworker/R-md]
+     45 kworker/R-md_bi [kworker/R-md_bitmap]
+     46 kworker/R-edac- [kworker/R-edac-poller]
+     47 kworker/R-devfr [kworker/R-devfreq_wq]
+     48 watchdogd       [watchdogd]
+     49 kworker/R-quota [kworker/R-quota_events_unbound]
+     50 kworker/0:1H-kb [kworker/0:1H-kblockd]
+     51 kswapd0         [kswapd0]
+     69 kworker/R-kthro [kworker/R-kthrotld]
+     74 irq/50-aerdrv   [irq/50-aerdrv]
+     75 irq/50-pciehp   [irq/50-pciehp]
+     76 irq/51-aerdrv   [irq/51-aerdrv]
+     77 irq/51-pciehp   [irq/51-pciehp]
+     78 irq/52-aerdrv   [irq/52-aerdrv]
+     79 irq/52-pciehp   [irq/52-pciehp]
+     80 irq/53-aerdrv   [irq/53-aerdrv]
+     81 irq/53-pciehp   [irq/53-pciehp]
+     82 irq/54-aerdrv   [irq/54-aerdrv]
+     83 irq/54-pciehp   [irq/54-pciehp]
+     84 irq/55-aerdrv   [irq/55-aerdrv]
+     85 irq/55-pciehp   [irq/55-pciehp]
+     86 irq/56-aerdrv   [irq/56-aerdrv]
+     87 irq/56-pciehp   [irq/56-pciehp]
+     88 irq/57-aerdrv   [irq/57-aerdrv]
+     89 irq/57-pciehp   [irq/57-pciehp]
+     90 irq/58-aerdrv   [irq/58-aerdrv]
+     91 irq/58-pciehp   [irq/58-pciehp]
+     92 irq/59-aerdrv   [irq/59-aerdrv]
+     93 irq/59-pciehp   [irq/59-pciehp]
+     94 irq/60-aerdrv   [irq/60-aerdrv]
+     95 irq/60-pciehp   [irq/60-pciehp]
+     96 irq/61-aerdrv   [irq/61-aerdrv]
+     97 irq/61-pciehp   [irq/61-pciehp]
+     98 irq/62-aerdrv   [irq/62-aerdrv]
+     99 irq/62-pciehp   [irq/62-pciehp]
+    100 irq/63-aerdrv   [irq/63-aerdrv]
+    101 irq/63-pciehp   [irq/63-pciehp]
+    102 irq/64-aerdrv   [irq/64-aerdrv]
+    103 irq/64-pciehp   [irq/64-pciehp]
+    104 irq/65-aerdrv   [irq/65-aerdrv]
+    105 irq/65-pciehp   [irq/65-pciehp]
+    106 irq/66-aerdrv   [irq/66-aerdrv]
+    107 irq/66-pciehp   [irq/66-pciehp]
+    108 irq/67-aerdrv   [irq/67-aerdrv]
+    109 irq/67-pciehp   [irq/67-pciehp]
+    110 irq/68-aerdrv   [irq/68-aerdrv]
+    111 irq/68-pciehp   [irq/68-pciehp]
+    112 irq/69-aerdrv   [irq/69-aerdrv]
+    113 irq/69-pciehp   [irq/69-pciehp]
+    114 irq/70-aerdrv   [irq/70-aerdrv]
+    115 irq/70-pciehp   [irq/70-pciehp]
+    116 irq/71-aerdrv   [irq/71-aerdrv]
+    117 irq/71-pciehp   [irq/71-pciehp]
+    118 irq/72-aerdrv   [irq/72-aerdrv]
+    119 irq/72-pciehp   [irq/72-pciehp]
+    120 irq/73-aerdrv   [irq/73-aerdrv]
+    121 irq/73-pciehp   [irq/73-pciehp]
+    122 irq/49-ACPI:Ged [irq/49-ACPI:Ged]
+    123 kworker/R-acpi_ [kworker/R-acpi_thermal_pm]
+    124 kworker/R-vfio- [kworker/R-vfio-irqfd-cleanup]
+    125 kworker/R-bch_b [kworker/R-bch_btree_io]
+    126 kworker/R-bcach [kworker/R-bcache]
+    127 kworker/R-bch_j [kworker/R-bch_journal]
+    128 hwrng           [hwrng]
+    129 kworker/R-mld   [kworker/R-mld]
+    130 kworker/1:1H-kb [kworker/1:1H-kblockd]
+    131 kworker/R-ipv6_ [kworker/R-ipv6_addrconf]
+    132 kworker/R-dsa_o [kworker/R-dsa_ordered]
+    133 kworker/R-kstrp [kworker/R-kstrp]
+    139 kworker/u9:0    [kworker/u9:0]
+    375 kworker/R-iscsi [kworker/R-iscsi_conn_cleanup]
+    377 kworker/R-tls-s [kworker/R-tls-strp]
+    378 kworker/R-cnic_ [kworker/R-cnic_wq]
+    379 bnx2i_thread/0  [bnx2i_thread/0]
+    380 bnx2i_thread/1  [bnx2i_thread/1]
+    461 kworker/R-rpcio [kworker/R-rpciod]
+    462 kworker/R-xprti [kworker/R-xprtiod]
+    566 scsi_eh_0       [scsi_eh_0]
+    570 kworker/R-scsi_ [kworker/R-scsi_tmf_0]
+    625 kworker/R-nvme- [kworker/R-nvme-wq]
+    626 kworker/R-nvme- [kworker/R-nvme-reset-wq]
+    627 kworker/R-nvme- [kworker/R-nvme-delete-wq]
+    628 kworker/R-nvme- [kworker/R-nvme-auth-wq]
+    629 kworker/R-nvme_ [kworker/R-nvme_tcp_wq]
+    931 kworker/R-kdmfl [kworker/R-kdmflush/252:0]
+    940 kworker/R-kdmfl [kworker/R-kdmflush/252:1]
+    964 kworker/R-xfsal [kworker/R-xfsalloc]
+    965 kworker/R-xfs_m [kworker/R-xfs_mru_cache]
+    966 kworker/R-xfs-b [kworker/R-xfs-buf/dm-0]
+    967 kworker/R-xfs-c [kworker/R-xfs-conv/dm-0]
+    968 kworker/R-xfs-r [kworker/R-xfs-reclaim/dm-0]
+    969 kworker/R-xfs-b [kworker/R-xfs-blockgc/dm-0]
+    970 kworker/R-xfs-i [kworker/R-xfs-inodegc/dm-0]
+    971 kworker/R-xfs-l [kworker/R-xfs-log/dm-0]
+    972 kworker/R-xfs-c [kworker/R-xfs-cil/dm-0]
+    973 xfsaild/dm-0    [xfsaild/dm-0]
+   1080 systemd-journal /usr/lib/systemd/systemd-journald
+   1108 systemd-udevd   /usr/lib/systemd/systemd-udevd
+   1454 kworker/R-xfs-b [kworker/R-xfs-buf/sda2]
+   1455 kworker/R-xfs-c [kworker/R-xfs-conv/sda2]
+   1457 kworker/R-xfs-r [kworker/R-xfs-reclaim/sda2]
+   1458 kworker/R-xfs-b [kworker/R-xfs-blockgc/sda2]
+   1459 kworker/R-xfs-i [kworker/R-xfs-inodegc/sda2]
+   1461 kworker/R-xfs-l [kworker/R-xfs-log/sda2]
+   1462 kworker/R-xfs-c [kworker/R-xfs-cil/sda2]
+   1463 xfsaild/sda2    [xfsaild/sda2]
+   1464 kworker/R-xfs-b [kworker/R-xfs-buf/dm-1]
+   1465 kworker/R-xfs-c [kworker/R-xfs-conv/dm-1]
+   1466 kworker/R-xfs-r [kworker/R-xfs-reclaim/dm-1]
+   1467 kworker/R-xfs-b [kworker/R-xfs-blockgc/dm-1]
+   1468 kworker/R-xfs-i [kworker/R-xfs-inodegc/dm-1]
+   1469 kworker/R-xfs-l [kworker/R-xfs-log/dm-1]
+   1470 kworker/R-xfs-c [kworker/R-xfs-cil/dm-1]
+   1471 xfsaild/dm-1    [xfsaild/dm-1]
+   1505 rpcbind         /usr/bin/rpcbind -w -f
+   1506 auditd          /sbin/auditd
+   1508 sedispatch      /usr/sbin/sedispatch
+   1535 dbus-broker-lau /usr/bin/dbus-broker-launch --scope system --audit
+   1536 dtprobed        /usr/sbin/dtprobed -F
+   1541 dtprobed        /usr/sbin/dtprobed -F
+   1543 dbus-broker     dbus-broker --log 4 --controller 9 --machine-id 17531f2fd367415ca1173d370692f492 --max-bytes 536870912 --max-fds 4096 --max-matches 131072 --audit
+   1546 firewalld       /usr/bin/python3 -s /usr/sbin/firewalld --nofork --nopid
+   1548 irqbalance      /usr/sbin/irqbalance
+   1549 lsmd            /usr/bin/lsmd -d
+   1551 systemd-logind  /usr/lib/systemd/systemd-logind
+   1687 NetworkManager  /usr/sbin/NetworkManager --no-daemon
+   1688 polkitd         /usr/lib/polkit-1/polkitd --no-debug
+   1705 nm-dispatcher   /usr/libexec/nm-dispatcher --persist
+   1712 tuned           /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+   1720 gssproxy        /usr/sbin/gssproxy -D
+   2198 iscsid          /usr/sbin/iscsid -f -d2
+   2220 rsyslogd        /usr/sbin/rsyslogd -n
+   2224 sshd            sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups
+   2228 chronyd         /usr/sbin/chronyd -F 2
+   2292 atd             /usr/sbin/atd -f
+   2297 crond           /usr/sbin/crond -n
+   2299 agetty          /sbin/agetty -o -p -- \u --noclear - linux
+   2301 agetty          /sbin/agetty -o -p -- \u --keep-baud 115200,57600,38400,9600 - vt220
+   2434 pmcd            /usr/libexec/pcp/bin/pmcd -A
+   2450 pmdaroot        /var/lib/pcp/pmdas/root/pmdaroot
+   2466 pmdaxfs         /var/lib/pcp/pmdas/xfs/pmdaxfs -d 11
+   2470 pmdalinux       /var/lib/pcp/pmdas/linux/pmdalinux -A
+   2475 python3         /usr/bin/python3 /var/lib/pcp/pmdas/nfsclient/pmdanfsclient.python
+   2532 pmdakvm         /var/lib/pcp/pmdas/kvm/pmdakvm -d 95
+   2536 pmdadm          /var/lib/pcp/pmdas/dm/pmdadm -d 129
+   2543 python3         /usr/bin/python3 /var/lib/pcp/pmdas/openmetrics/pmdaopenmetrics.python
+   2642 systemd         /usr/lib/systemd/systemd --user
+   2644 (sd-pam)        (sd-pam)
+   2710 runcommand      /usr/libexec/oracle-cloud-agent/plugins/runcommand/runcommand
+   3338 pmie            /usr/bin/pmie -b -m pmie_check -F -P -l /var/oled/pcp/pmie/instance-20260923-1013/pmie.log -c config.default
+   3348 pmlogger        /usr/libexec/pcp/bin/pmlogger -N -P -d "/var/oled/pcp/pmlogger/LOCALHOSTNAME" -r -T24h10m -c config.ora -v 100mb -mreexec %Y%m%d.%H.%M
+   3357 pmpause         /usr/libexec/pcp/bin/pmpause
+   3480 pmpause         /usr/libexec/pcp/bin/pmpause
+  13365 spl_system_task [spl_system_task]
+  13366 spl_delay_taskq [spl_delay_taskq]
+  13367 spl_dynamic_tas [spl_dynamic_tas]
+  13368 spl_kmem_cache  [spl_kmem_cache]
+  13371 zvol_tq-0       [zvol_tq-0]
+  13372 arc_prune       [arc_prune]
+  13373 arc_evict       [arc_evict]
+  13374 arc_reap        [arc_reap]
+  13375 dbu_evict       [dbu_evict]
+  13376 dbuf_evict      [dbuf_evict]
+  13377 z_vdev_file     [z_vdev_file]
+  13378 l2arc_feed      [l2arc_feed]
+  30822 z_null_iss      [z_null_iss]
+  30823 z_null_int      [z_null_int]
+  30824 z_rd_iss        [z_rd_iss]
+  30825 z_rd_int        [z_rd_int]
+  30826 z_wr_iss        [z_wr_iss]
+  30827 z_wr_iss_h      [z_wr_iss_h]
+  30828 z_wr_int        [z_wr_int]
+  30829 z_wr_int_h      [z_wr_int_h]
+  30830 z_fr_iss        [z_fr_iss]
+  30831 z_fr_int        [z_fr_int]
+  30832 z_cl_iss        [z_cl_iss]
+  30833 z_cl_int        [z_cl_int]
+  30834 z_ioctl_iss     [z_ioctl_iss]
+  30835 z_ioctl_int     [z_ioctl_int]
+  30836 z_trim_iss      [z_trim_iss]
+  30837 z_trim_int      [z_trim_int]
+  30838 z_zvol          [z_zvol]
+  30839 z_metaslab      [z_metaslab]
+  30840 z_prefetch      [z_prefetch]
+  30841 z_upgrade       [z_upgrade]
+  30844 dp_sync_taskq   [dp_sync_taskq]
+  30845 dp_zil_clean_ta [dp_zil_clean_ta]
+  30846 dp_zil_clean_ta [dp_zil_clean_ta]
+  30847 z_zrele         [z_zrele]
+  30848 z_unlinked_drai [z_unlinked_drai]
+  30849 txg_quiesce     [txg_quiesce]
+  30850 txg_sync        [txg_sync]
+  30851 mmp             [mmp]
+  30862 z_indirect_cond [z_indirect_cond]
+  30863 z_livelist_dest [z_livelist_dest]
+  30864 z_livelist_cond [z_livelist_cond]
+  30865 z_checkpoint_di [z_checkpoint_di]
+ 122339 agent           /usr/libexec/oracle-cloud-agent/agent
+ 122376 gomon           /usr/libexec/oracle-cloud-agent/plugins/gomon/gomon
+ 122390 oci-wlp         /usr/libexec/oracle-cloud-agent/plugins/oci-wlp/oci-wlp
+ 122398 updater         /usr/libexec/oracle-cloud-agent/updater/updater
+ 122496 sudo            /usr/bin/sudo -u ocarun /usr/libexec/oracle-cloud-agent/plugins/runcommand/runcommand
+ 122498 runcommand      /usr/libexec/oracle-cloud-agent/plugins/runcommand/runcommand
+ 122507 unifiedmonitori /usr/libexec/oracle-cloud-agent/plugins/unifiedmonitoring/unifiedmonitoring
+ 122643 fluentd         /opt/unified-monitoring-agent/embedded/bin/ruby /opt/unified-monitoring-agent/embedded/bin/fluentd --log /var/log/unified-monitoring-agent/unified-monitoring-agent.log --log-rotate-size 1048576 --log-rotate-age 10
+ 122657 ruby            /opt/unified-monitoring-agent/embedded/bin/ruby -Eascii-8bit:ascii-8bit /opt/unified-monitoring-agent/embedded/bin/fluentd --log /var/log/unified-monitoring-agent/unified-monitoring-agent.log --log-rotate-size 1048576 --log-rotate-age 10 --under-supervisor
+2199063 z_rd_iss        [z_rd_iss]
+2205141 z_rd_iss        [z_rd_iss]
+2212142 z_wr_int_h      [z_wr_int_h]
+2212149 z_wr_iss_h      [z_wr_iss_h]
+2212191 z_wr_iss_h      [z_wr_iss_h]
+2212194 z_wr_int_h      [z_wr_int_h]
+2212195 z_wr_int_h      [z_wr_int_h]
+2217736 z_rd_iss        [z_rd_iss]
+2217738 z_rd_iss        [z_rd_iss]
+2223140 pmdaproc        /var/lib/pcp/pmdas/proc/pmdaproc -d 3
+2272667 z_wr_iss_h      [z_wr_iss_h]
+2278827 z_rd_iss        [z_rd_iss]
+2278828 z_rd_iss        [z_rd_iss]
+2278829 z_rd_iss        [z_rd_iss]
+2285978 z_wr_iss_h      [z_wr_iss_h]
+2285979 z_wr_int_h      [z_wr_int_h]
+2289085 z_zrele         [z_zrele]
+2294548 kworker/u8:3-ev [kworker/u8:3-events_unbound]
+2296677 kworker/u8:2-ev [kworker/u8:2-events_unbound]
+2297936 kworker/0:4-eve [kworker/0:4-events]
+2298151 kworker/1:2-eve [kworker/1:2-events]
+2298645 kworker/0:0-cgr [kworker/0:0-cgroup_free]
+2298882 kworker/1:1-eve [kworker/1:1-events]
+2298898 kworker/u8:0-kv [kworker/u8:0-kvfree_rcu_reclaim]
+2299072 kworker/0:2-eve [kworker/0:2-events]
+2299201 kworker/1:0-mm_ [kworker/1:0-mm_percpu_wq]
+2299256 kworker/1:3-eve [kworker/1:3-events]
+2299479 kworker/0:1-eve [kworker/0:1-events]
+2299598 kworker/u8:1    [kworker/u8:1]
+2299604 systemd         /usr/lib/systemd/systemd --user
+2299606 (sd-pam)        (sd-pam)
+2299645 sshd-session    sshd-session: opc [priv]
+2299648 sshd-session    sshd-session: opc@notty
+2299649 bash            bash -c python3 /home/opc/tenant-density-harness-20261027/oci_disk_prepare.py > /home/opc/tenant-density-harness-20261027/disk-preparation-20261028-launcher.log 2>&1
+2299680 python3         python3 /home/opc/tenant-density-harness-20261027/oci_disk_prepare.py
+2299681 ps              ps -eo pid,comm,args

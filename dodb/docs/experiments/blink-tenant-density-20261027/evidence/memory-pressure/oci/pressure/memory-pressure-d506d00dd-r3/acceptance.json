@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "source_commit": "d506d00dd1f6324bf0074ba2ec0fd0f84792a1f8",
+  "correctness_cells": 4,
+  "successful_requests": 1200,
+  "expected_worker_oom_verified": true,
+  "anonymous_probe_verified": true,
+  "high_probe_verified": true,
+  "capacity_after": {
+    "zfs_free_bytes": 42801176576,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 6917083136,
+      "SwapFree": 3823587328
+    }
+  },
+  "scope": "Enforced-budget correctness and instrumentation; no density or performance result"
+}

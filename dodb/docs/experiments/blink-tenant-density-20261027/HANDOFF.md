@@ -67,7 +67,7 @@ This preparation increment is complete. Accepted runtime source is `99932ec33419
 
 The isolated OCI build root is `/home/opc/tenant-density-harness-20261027`; build output is on the boot filesystem. Preserve source probe archives, failed logs, databases, and previously accepted cells. Real smoke databases are under `/bench/zfs/db/tenant-density-harness-20261027`. The benchmark filesystem had only about 0.39 GiB above the required 10 GiB free reserve during preparation, so this increment permits only tiny correctness/accounting smokes. Recheck live capacity before future work.
 
-The shared-cache/WBM reference is now implemented and validated separately; see the following section. Production-wide pin ages, allocator/representation retained bytes, queue/snapshot byte budgets, and enforced common memory pressure remain absent. The density/maintenance matrix and adoption decision are not completed by making the harness executable.
+The shared-cache/WBM reference and common cgroup budget increments are implemented separately; see the following sections. Production-wide pin ages, allocator/representation retained bytes, and queue/snapshot byte budgets remain absent. The density/maintenance matrix and adoption decision are not completed by making the harness executable.
 
 ## Shared-resource RocksDB increment
 
@@ -77,7 +77,19 @@ Read [SHARED-ROCKSDB-PLAN.md](SHARED-ROCKSDB-PLAN.md) and [SHARED-ROCKSDB-RESULT
 
 All 37 clean-source tests passed, including seven new checks; default and A1 feature links passed. Four default-feature OCI correctness cells completed 3,580 successful requests, both full-population oracles, exact matched-input review, actual resource-sharing checks, and complete process shutdown. Evidence is in `evidence/shared-rocksdb/oci/`. The remote namespace is `shared-correctness-b67484d02-r1`; frozen binaries and all databases remain preserved. No performance/density or new crash-recovery claim is made.
 
-Next complete the missing retained-memory/pressure accounting, establish a common enforced process/OS budget, recheck host capacity, and freeze a safe matrix before density/maintenance experiments. The lowest observed benchmark free space in this increment was 11,074,265,088 bytes; keep the 10 GiB reserve. Do not infer headroom for a broad matrix from these tiny cells. Issue #126 remains open.
+At the shared-reference increment's completion, common enforcement and further pressure accounting were still missing. The following increment adds cgroup enforcement and periodic native/kernel observations. The historical shared-reference free-space observation remains 11,074,265,088 bytes; use the later cleanup/capacity evidence for continuation and keep the 10 GiB reserve. Issue #126 remains open.
+
+## Common memory budget and disk preparation increment
+
+Read [MEMORY-PRESSURE-PLAN.md](MEMORY-PRESSURE-PLAN.md) and [MEMORY-PRESSURE-RESULTS.md](MEMORY-PRESSURE-RESULTS.md). Runtime source is `d506d00dd1f6324bf0074ba2ec0fd0f84792a1f8`; controller corrections and evidence are recorded separately without changing those binaries. The primary executes this increment without delegation.
+
+The density driver can enforce one common cgroup v2 parent budget across all backend epochs, with identical child limits, zero swap allowance, verified worker membership before runtime/backend construction, periodic native/kernel observations, and preserved partial reports after worker failure. The driver and uncharged ARC/host caches remain outside the budget. This is opt-in harness enforcement, not an engine eviction or application admission feature. The host exposes no PSI files; these observations remain explicitly unavailable.
+
+All 68 clean-source tests and both default/A1 compatibility links passed. Four OCI correctness cells in `memory-pressure-d506d00dd-r3` completed 1,200 requests with 4 KiB values under identical 256/192 MiB maximum/high limits, both full-population oracles, and exact matched-input review. Separate high and anonymous-OOM probes passed. A real-driver 4 MiB expected-failure cell verified worker OOM, driver survival, and preserved partial diagnostics. The 22 recorded driver/backend identities had exited at final review. No successful cell was rerun, and these results do not establish a capacity boundary or performance ranking.
+
+Cleanup removed only 13 explicit obsolete compiler/intermediate paths while preserving source, result logs/reports, databases, frozen runtime binaries, and the pinned native archive. Settled benchmark free space increased from about 10.3 GiB to 40.0 GiB before the new small cells. Recheck live free space, RAM, ARC, and competing processes before continuation; preserved databases and build outputs still occupy both filesystems.
+
+The next decision work is to size and freeze a modest paired E2/E3 capacity bracket under the same explicit budget and per-tenant service objective, then examine E4 maintenance near that boundary. Keep sampling gaps and instrumentation perturbation explicit. Unsupported retained-heap/pin/queue representations prevent exact causal attribution; they must not be presented as zero or silently substituted with normalized checkpoint bytes. No density/performance winner or default promotion follows from the correctness cells.
 
 ## Read existing evidence in order
 

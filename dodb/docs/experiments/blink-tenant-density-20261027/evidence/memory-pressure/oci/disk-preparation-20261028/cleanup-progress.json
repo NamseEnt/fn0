@@ -1,0 +1,119 @@
+[
+  {
+    "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/deps",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 2378084352,
+      "benchmark": 11071692800
+    },
+    "ended_unix_seconds": 1793169822.6415255
+  },
+  {
+    "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/build",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 2378035200,
+      "benchmark": 11397517312
+    },
+    "ended_unix_seconds": 1793169823.0680494
+  },
+  {
+    "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/.fingerprint",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 2378055680,
+      "benchmark": 11839639552
+    },
+    "ended_unix_seconds": 1793169823.1808178
+  },
+  {
+    "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/incremental",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 2378055680,
+      "benchmark": 11844304896
+    },
+    "ended_unix_seconds": 1793169823.1818805
+  },
+  {
+    "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/deps",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 2378055680,
+      "benchmark": 19496181760
+    },
+    "ended_unix_seconds": 1793169825.3181622
+  },
+  {
+    "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/build",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 2378055680,
+      "benchmark": 22252294144
+    },
+    "ended_unix_seconds": 1793169826.1007855
+  },
+  {
+    "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/.fingerprint",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 2378055680,
+      "benchmark": 22663979008
+    },
+    "ended_unix_seconds": 1793169826.355639
+  },
+  {
+    "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/incremental",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 2378055680,
+      "benchmark": 22663979008
+    },
+    "ended_unix_seconds": 1793169826.3563077
+  },
+  {
+    "path": "/home/opc/dodb/target/debug/deps",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 2749374464,
+      "benchmark": 22682480640
+    },
+    "ended_unix_seconds": 1793169826.3688607
+  },
+  {
+    "path": "/home/opc/dodb/target/debug/build",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 2977431552,
+      "benchmark": 22689763328
+    },
+    "ended_unix_seconds": 1793169826.3729274
+  },
+  {
+    "path": "/home/opc/dodb/target/debug/.fingerprint",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 3017920512,
+      "benchmark": 22747643904
+    },
+    "ended_unix_seconds": 1793169826.3881571
+  },
+  {
+    "path": "/home/opc/dodb/target/debug/incremental",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 3171622912,
+      "benchmark": 22836334592
+    },
+    "ended_unix_seconds": 1793169826.4094172
+  },
+  {
+    "path": "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/sccache",
+    "absent_after": true,
+    "capacity_after": {
+      "boot": 3196682240,
+      "benchmark": 34224037888
+    },
+    "ended_unix_seconds": 1793169829.3940072
+  }
+]

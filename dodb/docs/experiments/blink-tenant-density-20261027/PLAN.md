@@ -408,8 +408,9 @@ If shared-resource minimal-native meets the service objective with no meaningful
 - [x] Create an isolated branch and worktree under the fn0 checkout.
 - [x] Preserve this analysis and plan in English.
 - [x] A1 opt-in implementation, test-scoped allocation/reuse/pin diagnostics, and real-service recovery checks; see [A1-RESULTS.md](A1-RESULTS.md). No density or production resource-accounting completion is claimed.
-- [x] Process/disk accounting and executable density harness preparation, with four Linux correctness smokes; see [DENSITY-HARNESS-RESULTS.md](DENSITY-HARNESS-RESULTS.md). Retained-heap/pin-age instrumentation and enforced common memory budgets remain incomplete.
-- [x] Opt-in shared-cache/WBM minimal-native reference with explicit soft limits and native accounting; see [SHARED-ROCKSDB-RESULTS.md](SHARED-ROCKSDB-RESULTS.md). Common enforced process/OS budgets remain incomplete.
+- [x] Process/disk accounting and executable density harness preparation, with four Linux correctness smokes; see [DENSITY-HARNESS-RESULTS.md](DENSITY-HARNESS-RESULTS.md). Retained-heap/pin-age instrumentation remains incomplete.
+- [x] Opt-in shared-cache/WBM minimal-native reference with explicit soft limits and native accounting; see [SHARED-ROCKSDB-RESULTS.md](SHARED-ROCKSDB-RESULTS.md).
+- [x] Common opt-in Linux cgroup v2 backend budgets, periodic pressure observations, explicit unsupported metrics, and disk preparation; see [MEMORY-PRESSURE-RESULTS.md](MEMORY-PRESSURE-RESULTS.md). This excludes uncharged ARC/host memory and does not supply application byte admission or eviction.
 - [ ] Live host sizing and an explicit frozen experiment matrix.
 - [ ] Density/maintenance experiments and evidence reduction.
 - [ ] Decision on B1/B2/B3/B4 implementation and adoption.

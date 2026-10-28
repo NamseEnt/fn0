@@ -1,0 +1,23 @@
+{
+  "case": "blink-sparse",
+  "exit_code": 0,
+  "capacity_after": {
+    "zfs_free_bytes": 42834595840,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 6975971328,
+      "SwapFree": 3823587328
+    }
+  },
+  "ended_unix_seconds": 1793171185.2593005,
+  "report_exists": true,
+  "validation": {
+    "passed": true,
+    "successful_requests": 90,
+    "cell_kernel_peak_bytes": 72220672,
+    "measurement_kernel_peak_bytes": 22691840,
+    "cgroup_samples": 110,
+    "worker_measurement_samples": 32
+  },
+  "report_sha256": "590b226acf6032d5a0d663d67535cf3587df32009a4d6bf086bc58a99442313f"
+}

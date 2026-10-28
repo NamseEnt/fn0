@@ -1,0 +1,8 @@
+{
+  "status": "rejected_reporting_attempt",
+  "error": "KeyError: verified_expected_keys",
+  "cause": "The first ad-hoc review used a nonexistent oracle field; the raw report uses verified_mutated_keys",
+  "corrected_by": "review_evidence.py",
+  "workload_rerun": false,
+  "scope": "Reporting-only error; raw cells unchanged"
+}

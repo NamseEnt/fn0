@@ -87,12 +87,7 @@ def run_bounded(invocation, environment, log_path, timeout):
             return 'controller_timeout'
 
 
-def probe_kernel(run_directory, group_root):
-    path = group_root / 'allocation-probe'
-    prepare_group(path)
-    for name, value in [('memory.max', 64 * 1024**2), ('memory.high', 48 * 1024**2),
-                        ('memory.swap.max', 0), ('memory.oom.group', 1)]:
-        (path / name).write_text(str(value))
+def allocation_command(path):
     probe = '\n'.join([
         'import os, pathlib, time',
         f'pathlib.Path({str(path / "cgroup.procs")!r}).write_text(str(os.getpid()))',
@@ -101,14 +96,59 @@ def probe_kernel(run_directory, group_root):
         '    values.append(bytearray(1024 * 1024))',
         '    time.sleep(0.001)',
     ])
+    return ['/usr/bin/python3', '-c', probe]
+
+
+def probe_high(run_directory, group_root):
+    path = group_root / 'high-probe'
+    path.mkdir(exist_ok=False)
+    for name, value in [('memory.max', 64 * 1024**2), ('memory.high', 48 * 1024**2),
+                        ('memory.swap.max', 0), ('memory.oom.group', 1)]:
+        (path / name).write_text(str(value))
     before = group_snapshot(path)
-    exit_code = run_bounded(['/usr/bin/python3', '-c', probe], os.environ.copy(),
+    started = time.monotonic()
+    high_observed = False
+    with (run_directory / 'high-probe.log').open('x') as output:
+        child = subprocess.Popen(allocation_command(path), cwd=SOURCE, stdout=output,
+                                 stderr=subprocess.STDOUT, start_new_session=True)
+        while time.monotonic() - started < 10 and child.poll() is None:
+            events = dict(line.split() for line in (path / 'memory.events.local').read_text().splitlines())
+            if int(events.get('high', 0)) > 0:
+                high_observed = True
+                break
+            time.sleep(0.02)
+        if child.poll() is None:
+            os.killpg(child.pid, signal.SIGTERM)
+        try:
+            exit_code = child.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            os.killpg(child.pid, signal.SIGKILL)
+            exit_code = child.wait(timeout=5)
+    after = group_snapshot(path)
+    events = dict(line.split() for line in after['memory.events.local'].splitlines())
+    result = {'exit_code': exit_code, 'before': before, 'after': after,
+              'elapsed_seconds': time.monotonic() - started,
+              'passed': high_observed and int(events.get('oom_kill', 0)) == 0 and not after['cgroup.procs'].strip(),
+              'scope': 'Anonymous high-boundary probe; controller stops allocation after observing a high event; not an OOM or latency benchmark'}
+    write_json(run_directory / 'high-probe.json', result)
+    assert result['passed'], result
+
+
+def probe_kernel(run_directory, group_root):
+    probe_high(run_directory, group_root)
+    path = group_root / 'allocation-probe'
+    path.mkdir(exist_ok=False)
+    for name, value in [('memory.max', 64 * 1024**2), ('memory.high', 'max'),
+                        ('memory.swap.max', 0), ('memory.oom.group', 1)]:
+        (path / name).write_text(str(value))
+    before = group_snapshot(path)
+    exit_code = run_bounded(allocation_command(path), os.environ.copy(),
                             run_directory / 'allocation-probe.log', 30)
     after = group_snapshot(path)
     events = dict(line.split() for line in after['memory.events.local'].splitlines())
     result = {'exit_code': exit_code, 'before': before, 'after': after,
               'passed': exit_code == -signal.SIGKILL and int(events.get('oom_kill', 0)) > 0
-                        and int(events.get('high', 0)) > 0 and not after['cgroup.procs'].strip(),
+                        and not after['cgroup.procs'].strip(),
               'scope': 'Isolated anonymous-allocation probe; not a database workload or density result'}
     write_json(run_directory / 'allocation-probe.json', result)
     assert result['passed'], result
@@ -257,7 +297,7 @@ def run(run_name, source_commit):
     assert all(all(pair.values()) for pair in pairs.values())
     write_json(run_directory / 'acceptance.json', {'passed': True, 'source_commit': source_commit,
         'correctness_cells': 4, 'successful_requests': sum(outcome['validation'].get('successful_requests', 0) for outcome in outcomes),
-        'expected_worker_oom_verified': True, 'anonymous_probe_verified': True,
+        'expected_worker_oom_verified': True, 'anonymous_probe_verified': True, 'high_probe_verified': True,
         'capacity_after': capacity(), 'scope': 'Enforced-budget correctness and instrumentation; no density or performance result'})
     return 0
 

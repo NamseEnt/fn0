@@ -1,0 +1,26 @@
+{
+  "source_commit": "d506d00dd1f6324bf0074ba2ec0fd0f84792a1f8",
+  "binaries": {
+    "tenant_density_workload": {
+      "sha256": "00318595290b5f6431bffc4a9f187140c4fae42fea8cc365c2e3174c4d2cece5",
+      "bytes": 16634904
+    },
+    "memory_diagnostic_worker": {
+      "sha256": "cb062a6dc0fd0e068840bea3d3f08877d1ea6f5ed420f0f6faee8545c88dd121",
+      "bytes": 17150360
+    }
+  },
+  "controller_sha256": "436f77eb49a03e9b08f58bc322a51f2ea715d4f92d53f73f8c904da3802494cb",
+  "capacity_before": {
+    "zfs_free_bytes": 42959200256,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 7239602176,
+      "SwapFree": 3822014464
+    }
+  },
+  "runtime_uid": 0,
+  "scope": "Memory enforcement and correctness only; no density, SLO, or performance ranking",
+  "cgroup_root": "/sys/fs/cgroup/dodb-density-memory-pressure-d506d00dd-r2",
+  "kernel": "6.12.0-206.104.4.4.el9uek.aarch64"
+}

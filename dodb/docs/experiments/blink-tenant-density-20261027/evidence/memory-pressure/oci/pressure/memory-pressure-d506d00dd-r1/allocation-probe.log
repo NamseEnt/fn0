@@ -1,0 +1,9 @@
+OSError: [Errno 16] Device or resource busy
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+  File "/usr/lib64/python3.9/pathlib.py", line 1214, in write_text
+    return f.write(data)
+OSError: [Errno 16] Device or resource busy

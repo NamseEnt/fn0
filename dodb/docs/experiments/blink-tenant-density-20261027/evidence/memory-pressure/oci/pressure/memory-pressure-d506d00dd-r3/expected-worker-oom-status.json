@@ -1,0 +1,20 @@
+{
+  "case": "expected-worker-oom",
+  "exit_code": 1,
+  "capacity_after": {
+    "zfs_free_bytes": 42801176576,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 6920695808,
+      "SwapFree": 3823587328
+    }
+  },
+  "ended_unix_seconds": 1793171226.326835,
+  "report_exists": true,
+  "validation": {
+    "passed": true,
+    "scope": "Expected worker OOM; driver survived and preserved partial diagnostics",
+    "oom_kills": 2
+  },
+  "report_sha256": "399fc18bea5c962dfc834ec3e6bd366ce6fc4578c95c969b5bdb8edfd23d59d7"
+}

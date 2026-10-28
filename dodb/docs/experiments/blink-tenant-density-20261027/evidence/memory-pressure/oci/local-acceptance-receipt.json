@@ -1,0 +1,48 @@
+{
+  "source_commit": "d506d00dd1f6324bf0074ba2ec0fd0f84792a1f8",
+  "archive_sha256": "51f160c69193f6133c034d4adfee83b4d7684ce3895239568ec9f12d0819c18f",
+  "archive_bytes": 1570433,
+  "passing_tests": 68,
+  "new_tests": 4,
+  "correctness_cells": 4,
+  "successful_requests": 1200,
+  "high_probe": "passed",
+  "anonymous_oom_probe": "passed",
+  "actual_worker_oom_diagnostics": "passed",
+  "source_archives_and_controllers": {
+    "dodb-memory-pressure-probe01.tar.gz": {
+      "sha256": "62fd565758d81516d666730caeb526694e910b8114420d0b6eee0dda883ba50b",
+      "bytes": 66875
+    },
+    "dodb-memory-pressure-probe02.tar.gz": {
+      "sha256": "80f6759670c51bb616cda4163e821ab9bb8fee3aa3fdd2fb4d31f5d077345d5f",
+      "bytes": 67125
+    },
+    "dodb-memory-pressure-probe03.tar.gz": {
+      "sha256": "2f86eafb77186b7d8080669a1fea06de698181b16c1581c37904b53b76688851",
+      "bytes": 67280
+    },
+    "oci_memory_pressure_smoke.py": {
+      "sha256": "b9b3be804b2a8659c3b1451895ee9ec5b6250a14ae3a88fcd3c72808b6d9b195",
+      "bytes": 14629
+    },
+    "oci_memory_pressure_smoke-r2.py": {
+      "sha256": "436f77eb49a03e9b08f58bc322a51f2ea715d4f92d53f73f8c904da3802494cb",
+      "bytes": 14636
+    },
+    "oci_memory_pressure_smoke-r3.py": {
+      "sha256": "706695cc46a102ff30bdea0cf77a912e6fe61403ccdb41b40133bd79fe9dad8d",
+      "bytes": 16578
+    },
+    "oci_memory_pressure_validate.py": {
+      "sha256": "7934950ac94d7e87a89e1f4567308f7c1e390eba80ab9c8559a70ab5f9cbd9c9",
+      "bytes": 1200
+    },
+    "oci_disk_prepare.py": {
+      "sha256": "ccb6bc5e20c671d8acdae9ec662178db7ba188d1b9b112e4510fabe3f79713cc",
+      "bytes": 3915
+    }
+  },
+  "all_recorded_processes_exited": true,
+  "scope": "Enforced backend-budget correctness/accounting only; no density, SLO, or performance ranking"
+}

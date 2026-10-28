@@ -1,0 +1,11 @@
+   Compiling dodb-rocksdb v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-rocksdb)
+    Finished `release` profile [optimized] target(s) in 19.85s
+     Running unittests src/lib.rs (/home/opc/tenant-density-harness-20261027/target/release/deps/dodb_rocksdb-a6251970cf086f7c)
+
+running 3 tests
+test memory_pressure::tests::pressure_keeps_microsecond_totals_as_integers ... ok
+test memory_pressure::tests::missing_or_reset_events_are_not_reported_as_zero ... ok
+test memory_pressure::tests::rejects_regular_directories_instead_of_simulating_enforcement ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 39 filtered out; finished in 0.00s
+

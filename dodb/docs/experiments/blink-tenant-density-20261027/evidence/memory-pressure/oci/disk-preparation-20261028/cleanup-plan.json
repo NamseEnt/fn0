@@ -1,0 +1,231 @@
+{
+  "started_unix_seconds": 1793169821.9534218,
+  "capacity_before": {
+    "boot": 2378113024,
+    "benchmark": 11071692800
+  },
+  "targets": [
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/deps",
+      "allocated_bytes_before": 5447536128,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/build",
+      "allocated_bytes_before": 174927360,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/.fingerprint",
+      "allocated_bytes_before": 6228480,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/incremental",
+      "allocated_bytes_before": 512,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/deps",
+      "allocated_bytes_before": 19390174720,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/build",
+      "allocated_bytes_before": 283411968,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/.fingerprint",
+      "allocated_bytes_before": 18214912,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/incremental",
+      "allocated_bytes_before": 512,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    },
+    {
+      "path": "/home/opc/dodb/target/debug/deps",
+      "allocated_bytes_before": 557973504,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    },
+    {
+      "path": "/home/opc/dodb/target/debug/build",
+      "allocated_bytes_before": 80846848,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    },
+    {
+      "path": "/home/opc/dodb/target/debug/.fingerprint",
+      "allocated_bytes_before": 2048000,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    },
+    {
+      "path": "/home/opc/dodb/target/debug/incremental",
+      "allocated_bytes_before": 178110464,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-shared-cache/linux-aarch64-gnu/rust-1.97.1/release-crc/sccache",
+      "allocated_bytes_before": 10956677120,
+      "reason": "Regenerable compiler cache or standard Cargo intermediate directory"
+    }
+  ],
+  "preserved_runtime_and_native_files": [
+    {
+      "path": "/bench/zfs/db/product-build/rocksdb-source/librocksdb.a",
+      "bytes": 1199825562,
+      "inode": 61565,
+      "device": 42,
+      "mtime_ns": 1790759535435688990
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/response_size_probe",
+      "bytes": 7627008,
+      "inode": 2891318,
+      "device": 42,
+      "mtime_ns": 1792384069592056110
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/wrapper_overwrite_probe",
+      "bytes": 311694520,
+      "inode": 2891933,
+      "device": 42,
+      "mtime_ns": 1792384145096705607
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/unconditional_write_workload",
+      "bytes": 356765424,
+      "inode": 2891963,
+      "device": 42,
+      "mtime_ns": 1792384159092826003
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/service_workload",
+      "bytes": 359776520,
+      "inode": 2891491,
+      "device": 42,
+      "mtime_ns": 1792384093996266037
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/transaction_header_probe",
+      "bytes": 303521384,
+      "inode": 2891748,
+      "device": 42,
+      "mtime_ns": 1792384129120568179
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/debug/get_copy_probe",
+      "bytes": 311950928,
+      "inode": 2891739,
+      "device": 42,
+      "mtime_ns": 1792384129672572928
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/phase5-bench",
+      "bytes": 36143288,
+      "inode": 4357479,
+      "device": 42,
+      "mtime_ns": 1792981164967628022
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/phase4-bench",
+      "bytes": 37010672,
+      "inode": 4357277,
+      "device": 42,
+      "mtime_ns": 1792981127727307527
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/dodb-server",
+      "bytes": 161420136,
+      "inode": 4357107,
+      "device": 42,
+      "mtime_ns": 1792981116751213066
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/unconditional_write_workload",
+      "bytes": 402758752,
+      "inode": 4356545,
+      "device": 42,
+      "mtime_ns": 1792980962609886508
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/wrapper_overwrite_probe",
+      "bytes": 353413616,
+      "inode": 4356717,
+      "device": 42,
+      "mtime_ns": 1792981007774275198
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/service_workload",
+      "bytes": 411568576,
+      "inode": 4486120,
+      "device": 42,
+      "mtime_ns": 1793075625432790380
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/blink-fixed-group-bench",
+      "bytes": 38876568,
+      "inode": 4357361,
+      "device": 42,
+      "mtime_ns": 1792981150675505022
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/process-crash-recovery-child",
+      "bytes": 37485272,
+      "inode": 4357386,
+      "device": 42,
+      "mtime_ns": 1792981139231406533
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/phase1-bench",
+      "bytes": 36683808,
+      "inode": 4357685,
+      "device": 42,
+      "mtime_ns": 1792981201951946313
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/response_size_probe",
+      "bytes": 8076968,
+      "inode": 4356258,
+      "device": 42,
+      "mtime_ns": 1792980852720940792
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/phase0-bench",
+      "bytes": 53239208,
+      "inode": 4357564,
+      "device": 42,
+      "mtime_ns": 1792981191711858185
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/memory_diagnostic_worker",
+      "bytes": 390476632,
+      "inode": 4356687,
+      "device": 42,
+      "mtime_ns": 1792980989942121733
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/get_copy_probe",
+      "bytes": 353636120,
+      "inode": 4356243,
+      "device": 42,
+      "mtime_ns": 1792980851240928055
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/phase2-crash-child",
+      "bytes": 31918056,
+      "inode": 4357440,
+      "device": 42,
+      "mtime_ns": 1792981155807549189
+    },
+    {
+      "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target/release/transaction_header_probe",
+      "bytes": 346733488,
+      "inode": 4356081,
+      "device": 42,
+      "mtime_ns": 1792980833536775691
+    }
+  ],
+  "scope": "Only explicit regenerable caches/intermediates; source, databases, raw reports/logs, runtime binaries and pinned native archive retained"
+}
