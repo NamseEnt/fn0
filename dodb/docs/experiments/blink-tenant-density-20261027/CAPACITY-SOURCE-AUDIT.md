@@ -26,6 +26,8 @@ Offer-end completed counts are captured before the diagnostic callback. The repo
 
 The preparation amendment in `memory_diagnostic_worker.rs` removes checkpoint-event details and the group histogram from periodic JSON samples, retaining cumulative counters and the unchanged final detailed worker report. It still constructs a cumulative checkpoint snapshot before removing those fields, so transient allocation/copy and CPU costs remain possible. The 100/1,000 ms sensitivity cannot prove zero instrumentation overhead.
 
+Native periodic observations retain per-database property objects, while B-link's periodic checkpoint counters are service-wide. Their CPU and retained observation representations therefore differ even at the same cadence. The 8 MiB native limit bounds serialized observation size, not exact heap. A one-tenant cadence sensitivity does not quantify this effect at the capacity boundary. Reported memory is the instrumented backend worker/cgroup, not an isolated engine-heap comparison.
+
 The final checkpoint-event vector has an existing 1,024-event limit and an explicit omitted-event counter. Final cumulative counters can remain usable when detailed events are omitted; any event-derived maintenance analysis must retain that limitation. The bounded comparison requires no omitted events in accepted cells and stops for review if that gate is crossed.
 
 Kernel memory peaks cover the complete cell or worker epoch, including opening/preflight/drain. Periodic memory and native samples are non-atomic. Process RSS sampling is separate and slower. Neither is retained engine heap. Linux charging leaves the driver and uncharged host ARC outside the common backend cgroup limit; previously charged shared pages are not retroactively migrated.

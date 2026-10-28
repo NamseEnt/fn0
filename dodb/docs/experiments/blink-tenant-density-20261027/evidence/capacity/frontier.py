@@ -62,6 +62,16 @@ def main(run_directory):
     scripts = Path(__file__).resolve().parent
     assert digest(scripts / 'oci_capacity.py') == provenance['controller_sha256']
     assert digest(scripts / 'capacity_review.py') == provenance['reducer_sha256']
+    if 'continuation_controller_sha256' in provenance:
+        import capacity_review
+        from operational_review import reduce_report
+        assert digest(scripts / 'oci_capacity_continue.py') == provenance['continuation_controller_sha256']
+        assert digest(scripts / 'operational_review.py') == provenance['operational_failure_reducer_sha256']
+        capacity_review.reduce_report = lambda report, source_commit: reduce_report(
+            report, source_commit,
+            (run_directory / (Path(report['effective_configuration']['backend_memory_budget']['cgroup_root']).name + '.log')).read_text())
+    if 'supplement_controller_sha256' in provenance:
+        assert digest(scripts / 'oci_capacity_supplement.py') == provenance['supplement_controller_sha256']
     review = review_directory(run_directory)
     summary = json.loads((run_directory / 'summary.json').read_text())
     completion = json.loads((run_directory / 'completion.json').read_text())
