@@ -103,6 +103,8 @@ The live controller is on the designated OCI host under `/home/opc/tenant-densit
 
 After the main sequence finishes, collect and review its original/composite evidence, then run the separately frozen supplement without overlapping workloads. The supplement confirms the surviving eight-tenant E3 route three times and, when applicable, adds a 180-second maintenance pair at the actual confirmed E2 boundary with 2,000 ms sampling. Main and supplemental cohorts remain separate. Preserve the backend budget's exclusions, finite-window scope, instrumentation differences, ten-GiB reserve, and all previous data. Issue #126 remains open.
 
+The completed one-tenant cadence sensitivity exposed material observation-retention cost: shared RocksDB's epoch peak was 8,351,744 bytes at 1,000 ms and 35,336,192 bytes at 100 ms. [OBSERVATION-RETENTION-PLAN.md](OBSERVATION-RETENTION-PLAN.md) preserves a follow-up to retain serialized frames and stream health reports instead of retaining all JSON DOM objects. That plan is not implemented. Finish and archive the current frozen main/supplemental cohorts before changing runtime source; do not present their worker memory as isolated engine heap or silently replace the baseline evidence.
+
 ## Read existing evidence in order
 
 1. `dodb/docs/experiments/results/backend-hotpaths-20261026/RESULTS.md`
