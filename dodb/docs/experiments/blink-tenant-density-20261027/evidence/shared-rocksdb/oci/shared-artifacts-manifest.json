@@ -1,0 +1,305 @@
+{
+  "source_commit": "b67484d02faf8fdac3007a123f863c130ef906e5",
+  "source_status": "",
+  "preserved_source_archives": [
+    {
+      "path": "/home/opc/tenant-density-harness-20261027/sources/shared-resources-probe01.tar.gz",
+      "bytes": 165943,
+      "sha256": "60b0aaa52c459e6a169560036dbb63ff004356cbaaab7e9a0dc291a4f86b6eea"
+    },
+    {
+      "path": "/home/opc/tenant-density-harness-20261027/sources/shared-resources-probe02.tar.gz",
+      "bytes": 163006,
+      "sha256": "7c2c81ca086c641f0042c831b1b04427b6973d6f26edd8ea43b464c2e913781d"
+    },
+    {
+      "path": "/home/opc/tenant-density-harness-20261027/sources/shared-resources-probe03.tar.gz",
+      "bytes": 163037,
+      "sha256": "0b3dd19ebe0ab0ed8325c03567c07ff3d0279cbe84f1a6fabe7f5ee0250a0a4e"
+    },
+    {
+      "path": "/home/opc/tenant-density-harness-20261027/sources/shared-resources-probe04.tar.gz",
+      "bytes": 163091,
+      "sha256": "9f06b57ef31650258a03ec8a356e61f6af70d422c163d43fd9dee2fe108998a1"
+    },
+    {
+      "path": "/home/opc/tenant-density-harness-20261027/sources/shared-resources-probe05.tar.gz",
+      "bytes": 163198,
+      "sha256": "93aad477487144856f5c89038acd5bac648d65e895d06bba20846377ca7d616c"
+    },
+    {
+      "path": "/home/opc/tenant-density-harness-20261027/sources/shared-resources-probe06.tar.gz",
+      "bytes": 163381,
+      "sha256": "6220a855a2d3a6644fe3c89027949b6e963783f7bb6a2a8bceb200c5c2916622"
+    }
+  ],
+  "rejected_database_copies": {
+    "04": {
+      "path": "/home/opc/tenant-density-harness-20261027/shared-pressure-hang-probe04/database",
+      "scope": "files copied from a stalled unit-test database before terminating its process; not a validated recovery backup",
+      "files": [
+        {
+          "path": "tenant-1/000011.sst",
+          "bytes": 64233,
+          "sha256": "56233d6d86c29cbee54fbc73605c8c3675ff82bb6a6ec6dd205002a9e5e0fa3b"
+        },
+        {
+          "path": "tenant-1/000012.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "tenant-1/000013.sst",
+          "bytes": 64211,
+          "sha256": "aecb32bedb6dcdd5c1629696a54eb0446f0b5f72007042653e41141784655ea6"
+        },
+        {
+          "path": "tenant-1/CURRENT",
+          "bytes": 16,
+          "sha256": "9c283f6e81028b9eb0760d918ee4bc0aa256ed3b926393c1734c760c4bd724fd"
+        },
+        {
+          "path": "tenant-1/IDENTITY",
+          "bytes": 36,
+          "sha256": "191dac79d93553f896d0a965436e5eb97e793018d374629ccc0a0db8dd10a3c5"
+        },
+        {
+          "path": "tenant-1/LOCK",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "tenant-1/LOG",
+          "bytes": 51421,
+          "sha256": "82e714fcc10168cfd85b32b79d8b5997386fc9f8781ec7749434bb066f7b5030"
+        },
+        {
+          "path": "tenant-1/MANIFEST-000005",
+          "bytes": 405,
+          "sha256": "d52c56e0ef90c07b1ff813d56865e4bbab86bae47da2157f37e5b16ad439587e"
+        },
+        {
+          "path": "tenant-1/OPTIONS-000007",
+          "bytes": 8981,
+          "sha256": "915d436010ea777c9cd99e00de540d8f9386ec82eceb0871a8dd2e72778fffd5"
+        },
+        {
+          "path": "tenant-1/OPTIONS-000009",
+          "bytes": 8982,
+          "sha256": "e5f093c8aab9e1e0ed061aacf3725c986d1c146f3cb0288f599ccdb9e901cf7b"
+        }
+      ]
+    },
+    "05": {
+      "path": "/home/opc/tenant-density-harness-20261027/shared-pressure-hang-probe05/database",
+      "scope": "files copied from a stalled unit-test database before terminating its process; not a validated recovery backup",
+      "files": [
+        {
+          "path": "tenant-1/000011.sst",
+          "bytes": 64233,
+          "sha256": "971622020d3cdd9427cdd9376aff9a10be9095dbd47d0d58abab705e068c7a5f"
+        },
+        {
+          "path": "tenant-1/000013.sst",
+          "bytes": 64211,
+          "sha256": "7bec47d58d40ee82c292cf58c18d2afc70e8b84f30cde8be8888764c4e50faf7"
+        },
+        {
+          "path": "tenant-1/000015.sst",
+          "bytes": 64211,
+          "sha256": "1373d795e773595e79f9a28feab6118dcb4f0a40b68ece04beffab41848c1745"
+        },
+        {
+          "path": "tenant-1/000017.sst",
+          "bytes": 64211,
+          "sha256": "7b397d0b051e35a2406a95402e8f4cdd360c89ee921e556b5cb06039676d1e10"
+        },
+        {
+          "path": "tenant-1/000019.sst",
+          "bytes": 64211,
+          "sha256": "0a202feb657e9379d1c073454d3bc3847e9eda2a4c15a12c70a8ddf66a15165e"
+        },
+        {
+          "path": "tenant-1/000021.sst",
+          "bytes": 64211,
+          "sha256": "77e09ac826b04d9bd4074cb9bf69515b371978bb6297c4f57fc757edc5caf70e"
+        },
+        {
+          "path": "tenant-1/000023.sst",
+          "bytes": 64211,
+          "sha256": "1d02a3d50cfd56c005dd35836a67b1d31cf9042824bb23a7895e033baf13adec"
+        },
+        {
+          "path": "tenant-1/000024.log",
+          "bytes": 33271,
+          "sha256": "2e15579be8189d788749e8a454d4a0924f2dda8ef9c3dce5d6fdf1dbb8b7febd"
+        },
+        {
+          "path": "tenant-1/000025.sst",
+          "bytes": 64211,
+          "sha256": "bab9ca5f10ffe61dba921d907f994c1d9d54b5c38f44bcfbd722a1ae62cdd771"
+        },
+        {
+          "path": "tenant-1/CURRENT",
+          "bytes": 16,
+          "sha256": "9c283f6e81028b9eb0760d918ee4bc0aa256ed3b926393c1734c760c4bd724fd"
+        },
+        {
+          "path": "tenant-1/IDENTITY",
+          "bytes": 36,
+          "sha256": "7082998a1ae084a102d923ec92af2dfd8981e7f0ae42876847ec6493937e9644"
+        },
+        {
+          "path": "tenant-1/LOCK",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "tenant-1/LOG",
+          "bytes": 80039,
+          "sha256": "486ff8a52f7d979b6e4ebd110cc1618d3d036438f30018cf28032631347cb0a7"
+        },
+        {
+          "path": "tenant-1/MANIFEST-000005",
+          "bytes": 1942,
+          "sha256": "cedf2017e482b3020173ccc6ce795acd28eb22f4a653b3a0de0f8437c4a6b973"
+        },
+        {
+          "path": "tenant-1/OPTIONS-000007",
+          "bytes": 8976,
+          "sha256": "c5fd79f1b35d9d3722dccd56dfd18d2cbd1010baea1cb1bbf363a80eb75b513a"
+        },
+        {
+          "path": "tenant-1/OPTIONS-000009",
+          "bytes": 8977,
+          "sha256": "4b11029191bd0271215ad2829fcb7702eed16fd7d69568189e548d5f7f581f98"
+        },
+        {
+          "path": "tenant-2/000011.sst",
+          "bytes": 64233,
+          "sha256": "1ae45f7fbcfee1e5b71017ceb003ba8612de7dd36f35176a93aef74d98977130"
+        },
+        {
+          "path": "tenant-2/000013.sst",
+          "bytes": 64211,
+          "sha256": "4ae7beea1bdafe1dbf82986b6241d2e0889f87d6cfb5ae4a1fd8993a85742e21"
+        },
+        {
+          "path": "tenant-2/000015.sst",
+          "bytes": 64211,
+          "sha256": "8337ce08b1c42984b526ebeb6e5b1955c36ef4c33fa6caab2d4328a5f76cbd39"
+        },
+        {
+          "path": "tenant-2/000017.sst",
+          "bytes": 64211,
+          "sha256": "0acaf5e3130b6e4db18ccbc6f1477d7f13e689e6920ce4da71b5011a097ffa48"
+        },
+        {
+          "path": "tenant-2/000019.sst",
+          "bytes": 64211,
+          "sha256": "b5ed842c4fcca135e03d2ca3ae79d75b2690148fefc21206aa0932f922e86bfe"
+        },
+        {
+          "path": "tenant-2/000021.sst",
+          "bytes": 64211,
+          "sha256": "a6a6336884a3bb4cb48b130407b58971146fad2cffcdcc4e7fe267b62bf9fa03"
+        },
+        {
+          "path": "tenant-2/000023.sst",
+          "bytes": 64211,
+          "sha256": "b3730f87bb005e6674f5ccebd596d28e65e533fb4ba49254092beee986743caa"
+        },
+        {
+          "path": "tenant-2/000024.log",
+          "bytes": 33271,
+          "sha256": "5455cfc9d11034b68aa9ab8aaf30b67d39545da1b60cb63d4e68dd0e9a695e2a"
+        },
+        {
+          "path": "tenant-2/000025.sst",
+          "bytes": 64211,
+          "sha256": "9e36a464562f18336dd111718d3098ea3ff6f265d0d8467fd44d690869390e7d"
+        },
+        {
+          "path": "tenant-2/CURRENT",
+          "bytes": 16,
+          "sha256": "9c283f6e81028b9eb0760d918ee4bc0aa256ed3b926393c1734c760c4bd724fd"
+        },
+        {
+          "path": "tenant-2/IDENTITY",
+          "bytes": 36,
+          "sha256": "ffc815f3c8f6a51d92bf334152c0ba74017600362eda897d5ebbd7d0b02cce80"
+        },
+        {
+          "path": "tenant-2/LOCK",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "tenant-2/LOG",
+          "bytes": 80043,
+          "sha256": "daa8b4e5b4853ea00febcae132551ef0e11a324b82d7e76a7abec60929c8fb31"
+        },
+        {
+          "path": "tenant-2/MANIFEST-000005",
+          "bytes": 1942,
+          "sha256": "9efecd4ccbbe0b7a1c48d451eff4d5f9a0f1738ac041260646b563efe4bbc032"
+        },
+        {
+          "path": "tenant-2/OPTIONS-000007",
+          "bytes": 8976,
+          "sha256": "c5fd79f1b35d9d3722dccd56dfd18d2cbd1010baea1cb1bbf363a80eb75b513a"
+        },
+        {
+          "path": "tenant-2/OPTIONS-000009",
+          "bytes": 8977,
+          "sha256": "4b11029191bd0271215ad2829fcb7702eed16fd7d69568189e548d5f7f581f98"
+        },
+        {
+          "path": "tenant-3/000010.log",
+          "bytes": 12474,
+          "sha256": "c267016f4aef257db359718e975bb932693a0b992b14c5cb3e7585b3921b7a6b"
+        },
+        {
+          "path": "tenant-3/000011.sst",
+          "bytes": 47449,
+          "sha256": "b90ce8a7d73b8cbcb76945f4060f9ecc7e30ab19271d86b31cb60652b747456a"
+        },
+        {
+          "path": "tenant-3/CURRENT",
+          "bytes": 16,
+          "sha256": "9c283f6e81028b9eb0760d918ee4bc0aa256ed3b926393c1734c760c4bd724fd"
+        },
+        {
+          "path": "tenant-3/IDENTITY",
+          "bytes": 36,
+          "sha256": "70c47cf1e9a931c77ca12e2aaa9cd01dd0bf834d956773b8cc3ae7682e878013"
+        },
+        {
+          "path": "tenant-3/LOCK",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "tenant-3/LOG",
+          "bytes": 47300,
+          "sha256": "86913f913a7f0e878d46e4f62344b09d3cb90456982d37814339dd273ebcf505"
+        },
+        {
+          "path": "tenant-3/MANIFEST-000005",
+          "bytes": 253,
+          "sha256": "2b86a077b8f1c1bb5c67b062376e002c40d398ac9abbd610e57a481b7aa252d9"
+        },
+        {
+          "path": "tenant-3/OPTIONS-000007",
+          "bytes": 8976,
+          "sha256": "c5fd79f1b35d9d3722dccd56dfd18d2cbd1010baea1cb1bbf363a80eb75b513a"
+        },
+        {
+          "path": "tenant-3/OPTIONS-000009",
+          "bytes": 8977,
+          "sha256": "4b11029191bd0271215ad2829fcb7702eed16fd7d69568189e548d5f7f581f98"
+        }
+      ]
+    }
+  }
+}

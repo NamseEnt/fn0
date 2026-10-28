@@ -1,0 +1,14 @@
+{
+  "scope": "Advisory changed-target Clippy review; not a warning-free workspace claim",
+  "baseline_log": "evidence/harness/oci/builds/accepted-advisory-clippy/cargo.log",
+  "current_log": "builds/shared-accepted-clippy/cargo.log",
+  "baseline_package_library_diagnostics": 16,
+  "current_package_diagnostics": 17,
+  "unchanged_baseline_library_diagnostics": true,
+  "additional_unchanged_test_diagnostic": [
+    "warning: this expression creates a reference which is immediately dereferenced by the compiler",
+    "dodb/crates/dodb-rocksdb/tests/common/transaction_contract.rs"
+  ],
+  "new_implementation_diagnostics": [],
+  "lint_suppressions_added": false
+}

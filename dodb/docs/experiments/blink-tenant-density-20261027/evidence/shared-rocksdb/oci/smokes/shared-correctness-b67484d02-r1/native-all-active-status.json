@@ -1,0 +1,18 @@
+{
+  "case": "native-all-active",
+  "exit_code": 0,
+  "validation": {
+    "passed": true,
+    "failures": []
+  },
+  "ended_unix_seconds": 1793154797.547082,
+  "capacity_after": {
+    "zfs_free_bytes": 11105177600,
+    "memory_bytes": {
+      "MemAvailable": 6902665216,
+      "SwapFree": 3831586816
+    }
+  },
+  "report_exists": true,
+  "report_sha256": "48dffcbf506c689d3047fc7da2f54757b8a34c91edb1f6f7cfbf3ff4d9263fc5"
+}

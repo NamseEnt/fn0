@@ -87,3 +87,5 @@ The worker snapshot predates the small Delete-response follow-up; accepted runti
 ## Continuation
 
 Next prepare the explicit shared-cache/WBM contract-equivalent RocksDB reference. Then complete the missing retained-memory and pressure instrumentation, recheck host capacity, freeze a safe matrix, and run the density/maintenance experiments. Keep the current harness's loopback transport/runtime costs, feature selection, admitted/completed input differences, sampling gaps, and unsupported budgets explicit. Issue #126 remains open.
+
+The next shared-resource increment is now implemented and validated separately in [SHARED-ROCKSDB-RESULTS.md](SHARED-ROCKSDB-RESULTS.md). The harness results above retain their original source, configuration, and scope.

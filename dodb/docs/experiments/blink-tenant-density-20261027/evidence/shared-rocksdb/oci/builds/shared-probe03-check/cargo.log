@@ -1,0 +1,26 @@
+   Compiling dodb-rocksdb v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-rocksdb)
+error[E0615]: attempted to take value of method `value` on type `dodb_core::RevisionState`
+   --> dodb/crates/dodb-rocksdb/src/minimal_native.rs:683:42
+    |
+683 |                         assert_eq!(state.value, Some(vec![tenant_number as u8; 4096]))
+    |                                          ^^^^^ method, not a field
+    |
+help: use parentheses to call the method
+    |
+683 |                         assert_eq!(state.value(), Some(vec![tenant_number as u8; 4096]))
+    |                                               ++
+
+error[E0615]: attempted to take value of method `value` on type `dodb_core::RevisionState`
+   --> dodb/crates/dodb-rocksdb/src/minimal_native.rs:715:26
+    |
+715 |         assert_eq!(state.value, Some(b"retained".to_vec()));
+    |                          ^^^^^ method, not a field
+    |
+help: use parentheses to call the method
+    |
+715 |         assert_eq!(state.value(), Some(b"retained".to_vec()));
+    |                               ++
+
+For more information about this error, try `rustc --explain E0615`.
+error: could not compile `dodb-rocksdb` (lib test) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

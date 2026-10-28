@@ -67,7 +67,17 @@ This preparation increment is complete. Accepted runtime source is `99932ec33419
 
 The isolated OCI build root is `/home/opc/tenant-density-harness-20261027`; build output is on the boot filesystem. Preserve source probe archives, failed logs, databases, and previously accepted cells. Real smoke databases are under `/bench/zfs/db/tenant-density-harness-20261027`. The benchmark filesystem had only about 0.39 GiB above the required 10 GiB free reserve during preparation, so this increment permits only tiny correctness/accounting smokes. Recheck live capacity before future work.
 
-The next separate implementation scope is the shared-cache/WBM minimal-native reference. Production-wide pin ages, allocator/representation retained bytes, queue/snapshot byte budgets, and enforced common memory pressure remain absent. The density/maintenance matrix and adoption decision are not completed by making the harness executable.
+The shared-cache/WBM reference is now implemented and validated separately; see the following section. Production-wide pin ages, allocator/representation retained bytes, queue/snapshot byte budgets, and enforced common memory pressure remain absent. The density/maintenance matrix and adoption decision are not completed by making the harness executable.
+
+## Shared-resource RocksDB increment
+
+Read [SHARED-ROCKSDB-PLAN.md](SHARED-ROCKSDB-PLAN.md) and [SHARED-ROCKSDB-RESULTS.md](SHARED-ROCKSDB-RESULTS.md). The primary completed this increment without delegation. Accepted implementation/runtime source is `b67484d02faf8fdac3007a123f863c130ef906e5`; documentation/evidence commits follow it.
+
+`minimal-native-shared` requires explicit shared cache/WBM bytes, per-tenant write-buffer bytes/open-file limits, and process-global flush/compaction pool counts. The service uses one cache and WBM across tenant TransactionDBs, charges memtables to the cache, caches index/filter blocks, and verifies actual native options and aggregate usage. Existing routes retain their defaults. WBM writer stalls are disabled and the write-history target is one byte: two preserved tiny stall-enabled pressure probes stopped making progress. This reference provides soft flush/cache settings, not a hard process/OS memory cap.
+
+All 37 clean-source tests passed, including seven new checks; default and A1 feature links passed. Four default-feature OCI correctness cells completed 3,580 successful requests, both full-population oracles, exact matched-input review, actual resource-sharing checks, and complete process shutdown. Evidence is in `evidence/shared-rocksdb/oci/`. The remote namespace is `shared-correctness-b67484d02-r1`; frozen binaries and all databases remain preserved. No performance/density or new crash-recovery claim is made.
+
+Next complete the missing retained-memory/pressure accounting, establish a common enforced process/OS budget, recheck host capacity, and freeze a safe matrix before density/maintenance experiments. The lowest observed benchmark free space in this increment was 11,074,265,088 bytes; keep the 10 GiB reserve. Do not infer headroom for a broad matrix from these tiny cells. Issue #126 remains open.
 
 ## Read existing evidence in order
 

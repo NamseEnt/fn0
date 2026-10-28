@@ -1,0 +1,18 @@
+{
+  "case": "shared-sparse",
+  "exit_code": 0,
+  "validation": {
+    "passed": true,
+    "failures": []
+  },
+  "ended_unix_seconds": 1793154819.1115234,
+  "capacity_after": {
+    "zfs_free_bytes": 11074265088,
+    "memory_bytes": {
+      "MemAvailable": 6821974016,
+      "SwapFree": 3832111104
+    }
+  },
+  "report_exists": true,
+  "report_sha256": "59d67f8842219c50dae68321e06a45313a07fb319b0f14a2a5b7315052c88b0e"
+}

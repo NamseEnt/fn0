@@ -1,0 +1,278 @@
+{
+  "scope": "Correctness and shared-resource acceptance only; no performance, SLO, density, or enforced process-memory result",
+  "source_commit": "b67484d02faf8fdac3007a123f863c130ef906e5",
+  "reviewed_unix_seconds": 1793154866.1932282,
+  "review_script_sha256": "19632a8e95f5a8eba026caf5d91f2a0db30f591ad135ff8a5c105d96e64b0ece",
+  "cases": {
+    "native-all-active": {
+      "report_sha256": "48dffcbf506c689d3047fc7da2f54757b8a34c91edb1f6f7cfbf3ff4d9263fc5",
+      "scheduled": 1700,
+      "completed": 1700,
+      "successful": 1700,
+      "completed_at_offer_end": 1700,
+      "drain_completions": 0,
+      "request_fingerprint": "fnv1a64:4b3b8c9a7410d587",
+      "scheduled_fingerprint": "fnv1a64:93a0287ff7782865",
+      "per_tenant_completions": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "verified_seed_rows_per_oracle": 4352,
+      "verified_extra_keys_per_oracle": 596,
+      "measurement_process_sampling_status": "sampled",
+      "periodic_offer_sample_count": 1,
+      "process_samples_truncated": false,
+      "same_backend_identity": true,
+      "recorded_processes_still_live": []
+    },
+    "native-sparse": {
+      "report_sha256": "aea8fe8957ad36fad46c75f955544a8b7b6f9c6d1fa5d1fff36dcc098fa18b3d",
+      "scheduled": 90,
+      "completed": 90,
+      "successful": 90,
+      "completed_at_offer_end": 90,
+      "drain_completions": 0,
+      "request_fingerprint": "fnv1a64:741f5d1cb7d6c644",
+      "scheduled_fingerprint": "fnv1a64:2face046d6c83cdf",
+      "per_tenant_completions": [
+        30,
+        30,
+        30
+      ],
+      "verified_seed_rows_per_oracle": 4352,
+      "verified_extra_keys_per_oracle": 51,
+      "measurement_process_sampling_status": "sampled",
+      "periodic_offer_sample_count": 3,
+      "process_samples_truncated": false,
+      "same_backend_identity": true,
+      "recorded_processes_still_live": []
+    },
+    "shared-all-active": {
+      "report_sha256": "3227a7470860168b1c01da7078371f8bb4ae8148fc863a1bc0f86e1ef94c526f",
+      "scheduled": 1700,
+      "completed": 1700,
+      "successful": 1700,
+      "completed_at_offer_end": 1700,
+      "drain_completions": 0,
+      "request_fingerprint": "fnv1a64:4b3b8c9a7410d587",
+      "scheduled_fingerprint": "fnv1a64:93a0287ff7782865",
+      "per_tenant_completions": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "verified_seed_rows_per_oracle": 4352,
+      "verified_extra_keys_per_oracle": 596,
+      "measurement_process_sampling_status": "sampled",
+      "periodic_offer_sample_count": 1,
+      "process_samples_truncated": false,
+      "same_backend_identity": true,
+      "recorded_processes_still_live": [],
+      "native_resource_snapshots": {
+        "before_shutdown": {
+          "all_opened_tenants_use_shared_resources": true,
+          "opened_tenants": 17,
+          "scope": "service-wide snapshot counted once; non-atomic across native counters",
+          "tenants_verified_using_shared_resources": 17,
+          "usage": {
+            "cache_capacity_bytes": 8388608,
+            "cache_pinned_usage_bytes": 1049016,
+            "cache_usage_bytes": 2832144,
+            "compaction_threads": 1,
+            "flush_threads": 1,
+            "wbm_cache_reservation_bytes": 1048576,
+            "wbm_limit_bytes": 4194304,
+            "wbm_mutable_bytes": 813816,
+            "wbm_usage_bytes": 813816
+          }
+        },
+        "measurement_end": {
+          "all_opened_tenants_use_shared_resources": true,
+          "opened_tenants": 17,
+          "scope": "service-wide snapshot counted once; non-atomic across native counters",
+          "tenants_verified_using_shared_resources": 17,
+          "usage": {
+            "cache_capacity_bytes": 8388608,
+            "cache_pinned_usage_bytes": 1049016,
+            "cache_usage_bytes": 2832144,
+            "compaction_threads": 1,
+            "flush_threads": 1,
+            "wbm_cache_reservation_bytes": 1048576,
+            "wbm_limit_bytes": 4194304,
+            "wbm_mutable_bytes": 813816,
+            "wbm_usage_bytes": 813816
+          }
+        },
+        "measurement_start": {
+          "all_opened_tenants_use_shared_resources": true,
+          "opened_tenants": 17,
+          "scope": "service-wide snapshot counted once; non-atomic across native counters",
+          "tenants_verified_using_shared_resources": 17,
+          "usage": {
+            "cache_capacity_bytes": 8388608,
+            "cache_pinned_usage_bytes": 262320,
+            "cache_usage_bytes": 527488,
+            "compaction_threads": 1,
+            "flush_threads": 1,
+            "wbm_cache_reservation_bytes": 262144,
+            "wbm_limit_bytes": 4194304,
+            "wbm_mutable_bytes": 43016,
+            "wbm_usage_bytes": 43016
+          }
+        },
+        "scope": "control-command boundaries; end includes drain; not continuous or peak instrumentation"
+      }
+    },
+    "shared-sparse": {
+      "report_sha256": "59d67f8842219c50dae68321e06a45313a07fb319b0f14a2a5b7315052c88b0e",
+      "scheduled": 90,
+      "completed": 90,
+      "successful": 90,
+      "completed_at_offer_end": 90,
+      "drain_completions": 0,
+      "request_fingerprint": "fnv1a64:741f5d1cb7d6c644",
+      "scheduled_fingerprint": "fnv1a64:2face046d6c83cdf",
+      "per_tenant_completions": [
+        30,
+        30,
+        30
+      ],
+      "verified_seed_rows_per_oracle": 4352,
+      "verified_extra_keys_per_oracle": 51,
+      "measurement_process_sampling_status": "sampled",
+      "periodic_offer_sample_count": 3,
+      "process_samples_truncated": false,
+      "same_backend_identity": true,
+      "recorded_processes_still_live": [],
+      "native_resource_snapshots": {
+        "before_shutdown": {
+          "all_opened_tenants_use_shared_resources": true,
+          "opened_tenants": 5,
+          "scope": "service-wide snapshot counted once; non-atomic across native counters",
+          "tenants_verified_using_shared_resources": 5,
+          "usage": {
+            "cache_capacity_bytes": 8388608,
+            "cache_pinned_usage_bytes": 262320,
+            "cache_usage_bytes": 429568,
+            "compaction_threads": 1,
+            "flush_threads": 1,
+            "wbm_cache_reservation_bytes": 262144,
+            "wbm_limit_bytes": 4194304,
+            "wbm_mutable_bytes": 108640,
+            "wbm_usage_bytes": 108640
+          }
+        },
+        "measurement_end": {
+          "all_opened_tenants_use_shared_resources": true,
+          "opened_tenants": 5,
+          "scope": "service-wide snapshot counted once; non-atomic across native counters",
+          "tenants_verified_using_shared_resources": 5,
+          "usage": {
+            "cache_capacity_bytes": 8388608,
+            "cache_pinned_usage_bytes": 262320,
+            "cache_usage_bytes": 429568,
+            "compaction_threads": 1,
+            "flush_threads": 1,
+            "wbm_cache_reservation_bytes": 262144,
+            "wbm_limit_bytes": 4194304,
+            "wbm_mutable_bytes": 108640,
+            "wbm_usage_bytes": 108640
+          }
+        },
+        "measurement_start": {
+          "all_opened_tenants_use_shared_resources": true,
+          "opened_tenants": 5,
+          "scope": "service-wide snapshot counted once; non-atomic across native counters",
+          "tenants_verified_using_shared_resources": 5,
+          "usage": {
+            "cache_capacity_bytes": 8388608,
+            "cache_pinned_usage_bytes": 262320,
+            "cache_usage_bytes": 340384,
+            "compaction_threads": 1,
+            "flush_threads": 1,
+            "wbm_cache_reservation_bytes": 262144,
+            "wbm_limit_bytes": 4194304,
+            "wbm_mutable_bytes": 18440,
+            "wbm_usage_bytes": 18440
+          }
+        },
+        "scope": "control-command boundaries; end includes drain; not continuous or peak instrumentation"
+      }
+    }
+  },
+  "matched_pairs": {
+    "all-active": {
+      "deterministic_fingerprints": true,
+      "request_count": true,
+      "request_fingerprint": true,
+      "scheduled_fingerprint": true,
+      "scheduled": true,
+      "admitted": true,
+      "completed": true,
+      "successful": true,
+      "per_tenant_tenant": true,
+      "per_tenant_request_count": true,
+      "per_tenant_request_fingerprint": true,
+      "per_tenant_scheduled_fingerprint": true,
+      "per_tenant_scheduled": true,
+      "per_tenant_admitted": true,
+      "per_tenant_completed": true,
+      "per_tenant_successful": true,
+      "per_tenant_operation_counts": true,
+      "per_tenant_transaction_counts": true,
+      "per_tenant_width_counts": true
+    },
+    "sparse": {
+      "deterministic_fingerprints": true,
+      "request_count": true,
+      "request_fingerprint": true,
+      "scheduled_fingerprint": true,
+      "scheduled": true,
+      "admitted": true,
+      "completed": true,
+      "successful": true,
+      "per_tenant_tenant": true,
+      "per_tenant_request_count": true,
+      "per_tenant_request_fingerprint": true,
+      "per_tenant_scheduled_fingerprint": true,
+      "per_tenant_scheduled": true,
+      "per_tenant_admitted": true,
+      "per_tenant_completed": true,
+      "per_tenant_successful": true,
+      "per_tenant_operation_counts": true,
+      "per_tenant_transaction_counts": true,
+      "per_tenant_width_counts": true
+    }
+  },
+  "minimum_observed_zfs_free_bytes": 11074265088,
+  "passed": true
+}

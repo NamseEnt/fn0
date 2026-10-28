@@ -1,0 +1,256 @@
+    Checking dodb-core v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-core)
+   Compiling dodb-rocksdb v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-rocksdb)
+    Checking dodb-service v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-service)
+    Checking dodb-protocol v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-protocol)
+    Checking dodb-storage v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-storage)
+    Checking dodb-client v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-client)
+    Checking dodb-server v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-server)
+warning: this function has too many arguments (8/7)
+   --> dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs:156:5
+    |
+156 | /     pub async fn spawn_worker(
+157 | |         self: &Arc<Self>,
+158 | |         worker_executable: &Path,
+159 | |         worker_arguments: &[String],
+...   |
+164 | |         startup_timeout: Duration,
+165 | |     ) -> Result<MemoryDiagnosticWorker, String> {
+    | |_______________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: this `if` statement can be collapsed
+   --> dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs:545:9
+    |
+545 | /         if let Ok(mut child) = self.child.lock() {
+546 | |             if child.try_wait().ok().flatten().is_none() {
+547 | |                 self.connection.close();
+548 | |                 terminate_child(&mut child);
+549 | |             }
+550 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+    = note: `#[warn(clippy::collapsible_if)]` on by default
+help: collapse nested if block
+    |
+545 ~         if let Ok(mut child) = self.child.lock()
+546 ~             && child.try_wait().ok().flatten().is_none() {
+547 |                 self.connection.close();
+548 |                 terminate_child(&mut child);
+549 ~             }
+    |
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> dodb/crates/dodb-rocksdb/src/minimal_native.rs:530:26
+    |
+530 |     fn current(&self) -> Result<Option<(Vec<u8>, *const u8, usize)>, Error> {
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> dodb/crates/dodb-rocksdb/src/raw_research.rs:128:27
+    |
+128 |     pub fn scan(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#type_complexity
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> dodb/crates/dodb-rocksdb/src/raw_research.rs:143:10
+    |
+143 |     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#type_complexity
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> dodb/crates/dodb-rocksdb/src/raw_research.rs:167:10
+    |
+167 |     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#type_complexity
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> dodb/crates/dodb-rocksdb/src/raw_research.rs:198:10
+    |
+198 |     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#type_complexity
+
+warning: this `if` statement can be collapsed
+   --> dodb/crates/dodb-rocksdb/src/lib.rs:916:9
+    |
+916 | /         if let (Some(context), Some(metrics)) = (&read_context, &self.research_metrics) {
+917 | |             if context.first_permit.swap(false, Ordering::AcqRel) {
+918 | |                 metrics.record_read(
+919 | |                     tenant,
+...   |
+925 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+help: collapse nested if block
+    |
+916 ~         if let (Some(context), Some(metrics)) = (&read_context, &self.research_metrics)
+917 ~             && context.first_permit.swap(false, Ordering::AcqRel) {
+918 |                 metrics.record_read(
+...
+923 |                 );
+924 ~             }
+    |
+
+warning: this `if` statement can be collapsed
+    --> dodb/crates/dodb-rocksdb/src/lib.rs:1046:9
+     |
+1046 | /         if let Some(metrics) = &self.research_metrics {
+1047 | |             if let Some(tenant_metrics) = metrics.tenant(tenant) {
+1048 | |                 let stage = metrics.stage.load(Ordering::Acquire);
+1049 | |                 metrics.record(tenant, Metric::RequestDuration, started.elapsed());
+...    |
+1101 | |         }
+     | |_________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+help: collapse nested if block
+     |
+1046 ~         if let Some(metrics) = &self.research_metrics
+1047 ~             && let Some(tenant_metrics) = metrics.tenant(tenant) {
+1048 |                 let stage = metrics.stage.load(Ordering::Acquire);
+ ...
+1099 |                 }
+1100 ~             }
+     |
+
+warning: this `if` statement can be collapsed
+    --> dodb/crates/dodb-rocksdb/src/lib.rs:1117:17
+     |
+1117 | /                 if let Some(metrics) = &self.research_metrics {
+1118 | |                     if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
+1119 | |                     {
+1120 | |                         metrics.record_read(
+...    |
+1127 | |                 }
+     | |_________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+help: collapse nested if block
+     |
+1117 ~                 if let Some(metrics) = &self.research_metrics
+1118 ~                     && let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
+1119 |                     {
+ ...
+1125 |                         );
+1126 ~                     }
+     |
+
+warning: matching on `Some` with `ok()` is redundant
+    --> dodb/crates/dodb-rocksdb/src/lib.rs:1118:21
+     |
+1118 |                     if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
+     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#match_result_ok
+     = note: `#[warn(clippy::match_result_ok)]` on by default
+help: consider matching on `Ok(kind)` and removing the call to `ok` instead
+     |
+1118 -                     if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
+1118 +                     if let Ok(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind)
+     |
+
+warning: this `if` statement can be collapsed
+    --> dodb/crates/dodb-rocksdb/src/lib.rs:1250:17
+     |
+1250 | /                 if let Some(metrics) = &self.research_metrics {
+1251 | |                     if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
+1252 | |                     {
+1253 | |                         metrics.record_read(
+...    |
+1260 | |                 }
+     | |_________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+help: collapse nested if block
+     |
+1250 ~                 if let Some(metrics) = &self.research_metrics
+1251 ~                     && let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
+1252 |                     {
+ ...
+1258 |                         );
+1259 ~                     }
+     |
+
+warning: matching on `Some` with `ok()` is redundant
+    --> dodb/crates/dodb-rocksdb/src/lib.rs:1251:21
+     |
+1251 |                     if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
+     |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#match_result_ok
+help: consider matching on `Ok(kind)` and removing the call to `ok` instead
+     |
+1251 -                     if let Some(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind).ok()
+1251 +                     if let Ok(kind) = RESEARCH_READ_CONTEXT.try_with(|context| context.kind)
+     |
+
+warning: this function has too many arguments (8/7)
+    --> dodb/crates/dodb-rocksdb/src/lib.rs:1576:5
+     |
+1576 | /     fn query_with_metrics(
+1577 | |         &self,
+1578 | |         tenant: TenantId,
+1579 | |         pk: &PrimaryKey,
+...    |
+1584 | |         kind: Option<ResearchReadKind>,
+1585 | |     ) -> Result<Vec<dodb_service::Document>, Error> {
+     | |___________________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+warning: this `if` statement can be collapsed
+    --> dodb/crates/dodb-rocksdb/src/lib.rs:2067:13
+     |
+2067 | /             if let Some(metrics) = &metrics {
+2068 | |                 if stage > 0 {
+2069 | |                     let outcomes = if stage == 2 {
+2070 | |                         &metrics.measurement_outcomes
+...    |
+2078 | |             }
+     | |_____________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+help: collapse nested if block
+     |
+2067 ~             if let Some(metrics) = &metrics
+2068 ~                 && stage > 0 {
+2069 |                     let outcomes = if stage == 2 {
+ ...
+2076 |                         .fetch_add(1, Ordering::Relaxed);
+2077 ~                 }
+     |
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+    --> dodb/crates/dodb-rocksdb/src/lib.rs:2220:26
+     |
+2220 |     fn current(&self) -> Result<Option<(Vec<u8>, *const u8, usize)>, Error> {
+     |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#type_complexity
+
+warning: `dodb-rocksdb` (lib) generated 16 warnings (run `cargo clippy --fix --lib -p dodb-rocksdb -- --no-deps` to apply 8 suggestions)
+warning: this expression creates a reference which is immediately dereferenced by the compiler
+   --> dodb/crates/dodb-rocksdb/tests/common/transaction_contract.rs:942:17
+    |
+942 |                 &expected_value
+    |                 ^^^^^^^^^^^^^^^ help: change this to: `expected_value`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_borrow
+    = note: `#[warn(clippy::needless_borrow)]` on by default
+
+warning: `dodb-rocksdb` (test "transaction_contract") generated 1 warning (run `cargo clippy --fix --test "transaction_contract" -p dodb-rocksdb -- --no-deps` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 10.31s

@@ -271,9 +271,9 @@ Expected effect: lower allocation and cache footprint for affected sizes. Costs:
 
 The comparator is minimal-native DODB-contract TransactionDB, not raw WriteBatch. It preserves conditional/multi-key transactions, sorted key locks, logical revisions/reservation, tombstones, snapshot Query/Scan, response budgets, and synchronous WAL commit. Mutation-only lock-without-fetch already exists.
 
-The shim currently creates default Options per DB, sets create_if_missing and no compression, and does not pass shared block-cache or WriteBufferManager objects. Its default Env is already shared, so background pools are not necessarily duplicated per DB.
+The existing minimal-native route creates default Options per DB, sets create_if_missing and no compression, and does not pass shared block-cache or WriteBufferManager objects. Its default Env is already shared, so background pools are not necessarily duplicated per DB. The new opt-in minimal-native-shared route now implements explicit cache/WBM sharing and background-pool configuration; see [SHARED-ROCKSDB-RESULTS.md](SHARED-ROCKSDB-RESULTS.md) for its soft-limit policy and acceptance evidence.
 
-| Resource | Available shared configuration | Actual adapter |
+| Resource | Available shared configuration | Existing minimal-native route |
 | --- | --- | --- |
 | Block cache | Same cache object across independent tenant DBs | No explicit shared cache |
 | Memtable budget | Same WriteBufferManager across DBs, optionally charged to cache | No explicit shared WBM |
@@ -409,7 +409,7 @@ If shared-resource minimal-native meets the service objective with no meaningful
 - [x] Preserve this analysis and plan in English.
 - [x] A1 opt-in implementation, test-scoped allocation/reuse/pin diagnostics, and real-service recovery checks; see [A1-RESULTS.md](A1-RESULTS.md). No density or production resource-accounting completion is claimed.
 - [x] Process/disk accounting and executable density harness preparation, with four Linux correctness smokes; see [DENSITY-HARNESS-RESULTS.md](DENSITY-HARNESS-RESULTS.md). Retained-heap/pin-age instrumentation and enforced common memory budgets remain incomplete.
-- [ ] Shared-cache/WBM minimal-native reference.
+- [x] Opt-in shared-cache/WBM minimal-native reference with explicit soft limits and native accounting; see [SHARED-ROCKSDB-RESULTS.md](SHARED-ROCKSDB-RESULTS.md). Common enforced process/OS budgets remain incomplete.
 - [ ] Live host sizing and an explicit frozen experiment matrix.
 - [ ] Density/maintenance experiments and evidence reduction.
 - [ ] Decision on B1/B2/B3/B4 implementation and adoption.

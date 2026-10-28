@@ -1,0 +1,13 @@
+{
+  "source_commit": "b67484d02faf8fdac3007a123f863c130ef906e5",
+  "oci_evidence_archive_sha256": "320033641aa6a78c338a8f6b58ad49a9de60ca1a8bea31e49e35462c2861e47f",
+  "oci_evidence_archive_bytes": 103147,
+  "clean_source_build_checks": 8,
+  "passing_tests": 37,
+  "new_tests": 7,
+  "correctness_cells": 4,
+  "successful_requests": 3580,
+  "local_package_format": "passed",
+  "python_syntax": "passed",
+  "scope": "Correctness/reference preparation; no performance or density ranking; no common enforced process/OS memory budget"
+}

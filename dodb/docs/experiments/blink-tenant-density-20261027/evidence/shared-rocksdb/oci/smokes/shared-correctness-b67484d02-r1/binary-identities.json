@@ -1,0 +1,10 @@
+{
+  "tenant_density_workload": {
+    "sha256": "92638590761d74291eb8a323194287c7a8a82e80e6d0dbb54a62e2aa433b1cbb",
+    "bytes": 16459568
+  },
+  "memory_diagnostic_worker": {
+    "sha256": "edb3a03e8805602ce1cfe54673db573eba10071916efef38c70cdc45ec317432",
+    "bytes": 17056136
+  }
+}

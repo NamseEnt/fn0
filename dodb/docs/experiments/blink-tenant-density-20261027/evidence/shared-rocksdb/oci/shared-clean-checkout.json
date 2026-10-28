@@ -1,0 +1,11 @@
+{
+  "before": {
+    "source_commit": "99932ec33419214a7ee1cc542e937d31ef733a7c",
+    "source_status": "M dodb/crates/dodb-rocksdb/shim/transaction_shim.cc\n M dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs\n M dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/config.rs\n M dodb/crates/dodb-rocksdb/src/bin/support/tenant_density/scheduler.rs\n M dodb/crates/dodb-rocksdb/src/bin/tenant_density_workload.rs\n M dodb/crates/dodb-rocksdb/src/lib.rs\n M dodb/crates/dodb-rocksdb/src/minimal_native.rs\n M dodb/crates/dodb-rocksdb/tests/read_contract.rs\n M dodb/crates/dodb-rocksdb/tests/transaction_contract.rs\n?? dodb/crates/dodb-rocksdb/src/shared_resources.rs",
+    "preserved_probe_stash": "7fbff3ba7f6486335bd91d0568f01aa71a42af45"
+  },
+  "after": {
+    "source_commit": "b67484d02faf8fdac3007a123f863c130ef906e5",
+    "source_status": ""
+  }
+}

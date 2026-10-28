@@ -1,0 +1,123 @@
+   Compiling dodb-rocksdb v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-rocksdb)
+warning: dodb-rocksdb@0.1.0: shim/transaction_shim.cc: In function 'void* dodb_rocksdb_shared_new(const DodbSharedConfig*, char**)':
+warning: dodb-rocksdb@0.1.0: shim/transaction_shim.cc:212:78: error: no matching function for call to 'rocksdb::LRUCacheOptions::LRUCacheOptions(const size_t&, int, bool)'
+warning: dodb-rocksdb@0.1.0:   212 |     resources->cache = rocksdb::LRUCacheOptions(config->cache_bytes, 0, false).MakeSharedCache();
+warning: dodb-rocksdb@0.1.0:       |                                                                              ^
+warning: dodb-rocksdb@0.1.0: In file included from /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/advanced_options.h:14,
+warning: dodb-rocksdb@0.1.0:                  from /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/options.h:21,
+warning: dodb-rocksdb@0.1.0:                  from /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/block_cache_trace_writer.h:8,
+warning: dodb-rocksdb@0.1.0:                  from /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/db.h:21,
+warning: dodb-rocksdb@0.1.0:                  from shim/transaction_shim.cc:12:
+warning: dodb-rocksdb@0.1.0: /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:255:3: note: candidate: 'rocksdb::LRUCacheOptions::LRUCacheOptions(size_t, int, bool, double, std::shared_ptr<rocksdb::MemoryAllocator>, bool, rocksdb::CacheMetadataChargePolicy, double)'
+warning: dodb-rocksdb@0.1.0:   255 |   LRUCacheOptions(size_t _capacity, int _num_shard_bits,
+warning: dodb-rocksdb@0.1.0:       |   ^~~~~~~~~~~~~~~
+warning: dodb-rocksdb@0.1.0: /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:255:3: note:   candidate expects 8 arguments, 3 provided
+warning: dodb-rocksdb@0.1.0: /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:254:3: note: candidate: 'rocksdb::LRUCacheOptions::LRUCacheOptions()'
+warning: dodb-rocksdb@0.1.0:   254 |   LRUCacheOptions() {}
+warning: dodb-rocksdb@0.1.0:       |   ^~~~~~~~~~~~~~~
+warning: dodb-rocksdb@0.1.0: /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:254:3: note:   candidate expects 0 arguments, 3 provided
+warning: dodb-rocksdb@0.1.0: /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:222:8: note: candidate: 'rocksdb::LRUCacheOptions::LRUCacheOptions(const rocksdb::LRUCacheOptions&)'
+warning: dodb-rocksdb@0.1.0:   222 | struct LRUCacheOptions : public ShardedCacheOptions {
+warning: dodb-rocksdb@0.1.0:       |        ^~~~~~~~~~~~~~~
+warning: dodb-rocksdb@0.1.0: /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:222:8: note:   candidate expects 1 argument, 3 provided
+warning: dodb-rocksdb@0.1.0: /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:222:8: note: candidate: 'rocksdb::LRUCacheOptions::LRUCacheOptions(rocksdb::LRUCacheOptions&&)'
+warning: dodb-rocksdb@0.1.0: /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:222:8: note:   candidate expects 1 argument, 3 provided
+error: failed to run custom build command for `dodb-rocksdb v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-rocksdb)`
+
+Caused by:
+  process didn't exit successfully: `/home/opc/tenant-density-harness-20261027/target/release/build/dodb-rocksdb-88c3889adc8a78a0/build-script-build` (exit status: 1)
+  --- stdout
+  cargo:rustc-env=DODB_BUILD_GIT_COMMIT=99932ec33419214a7ee1cc542e937d31ef733a7c
+  cargo:rerun-if-changed=/home/opc/tenant-density-harness-20261027/source/.git/HEAD
+  cargo:rerun-if-env-changed=DODB_ROCKSDB_DIR
+  cargo:rustc-env=DODB_ROCKSDB_COMMIT=abeebd9630f11bd08c28b7bd43c7bdfc62050654
+  cargo:rerun-if-changed=shim/transaction_shim.cc
+  cargo:rerun-if-changed=shim/raw_write_shim.cc
+  cargo:rerun-if-changed=/bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+  OUT_DIR = Some(/home/opc/tenant-density-harness-20261027/target/release/build/dodb-rocksdb-b710975df1f56fe4/out)
+  OPT_LEVEL = Some(3)
+  TARGET = Some(aarch64-unknown-linux-gnu)
+  CARGO_ENCODED_RUSTFLAGS = Some(-Ctarget-feature=+crc)
+  HOST = Some(aarch64-unknown-linux-gnu)
+  cargo:rerun-if-env-changed=CXX_aarch64-unknown-linux-gnu
+  CXX_aarch64-unknown-linux-gnu = None
+  cargo:rerun-if-env-changed=CXX_aarch64_unknown_linux_gnu
+  CXX_aarch64_unknown_linux_gnu = None
+  cargo:rerun-if-env-changed=HOST_CXX
+  HOST_CXX = None
+  cargo:rerun-if-env-changed=CXX
+  CXX = None
+  cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+  RUSTC_WRAPPER = None
+  cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+  CRATE_CC_NO_DEFAULTS = None
+  DEBUG = Some(false)
+  CARGO_CFG_TARGET_FEATURE = Some(crc,neon)
+  cargo:rerun-if-env-changed=CXXFLAGS
+  CXXFLAGS = None
+  cargo:rerun-if-env-changed=HOST_CXXFLAGS
+  HOST_CXXFLAGS = None
+  cargo:rerun-if-env-changed=CXXFLAGS_aarch64_unknown_linux_gnu
+  CXXFLAGS_aarch64_unknown_linux_gnu = None
+  cargo:rerun-if-env-changed=CXXFLAGS_aarch64-unknown-linux-gnu
+  CXXFLAGS_aarch64-unknown-linux-gnu = None
+  OUT_DIR = Some(/home/opc/tenant-density-harness-20261027/target/release/build/dodb-rocksdb-b710975df1f56fe4/out)
+  cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+  cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+  CRATE_CC_NO_DEFAULTS = None
+  TARGET = Some(aarch64-unknown-linux-gnu)
+  CARGO_CFG_TARGET_FEATURE = Some(crc,neon)
+  HOST = Some(aarch64-unknown-linux-gnu)
+  cargo:rerun-if-env-changed=CXXFLAGS
+  CXXFLAGS = None
+  cargo:rerun-if-env-changed=HOST_CXXFLAGS
+  HOST_CXXFLAGS = None
+  cargo:rerun-if-env-changed=CXXFLAGS_aarch64_unknown_linux_gnu
+  CXXFLAGS_aarch64_unknown_linux_gnu = None
+  cargo:rerun-if-env-changed=CXXFLAGS_aarch64-unknown-linux-gnu
+  CXXFLAGS_aarch64-unknown-linux-gnu = None
+  OUT_DIR = Some(/home/opc/tenant-density-harness-20261027/target/release/build/dodb-rocksdb-b710975df1f56fe4/out)
+  cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+  cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+  CRATE_CC_NO_DEFAULTS = None
+  TARGET = Some(aarch64-unknown-linux-gnu)
+  CARGO_CFG_TARGET_FEATURE = Some(crc,neon)
+  HOST = Some(aarch64-unknown-linux-gnu)
+  cargo:rerun-if-env-changed=CXXFLAGS
+  CXXFLAGS = None
+  cargo:rerun-if-env-changed=HOST_CXXFLAGS
+  HOST_CXXFLAGS = None
+  cargo:rerun-if-env-changed=CXXFLAGS_aarch64_unknown_linux_gnu
+  CXXFLAGS_aarch64_unknown_linux_gnu = None
+  cargo:rerun-if-env-changed=CXXFLAGS_aarch64-unknown-linux-gnu
+  CXXFLAGS_aarch64-unknown-linux-gnu = None
+  cargo:warning=shim/transaction_shim.cc: In function 'void* dodb_rocksdb_shared_new(const DodbSharedConfig*, char**)':
+  cargo:warning=shim/transaction_shim.cc:212:78: error: no matching function for call to 'rocksdb::LRUCacheOptions::LRUCacheOptions(const size_t&, int, bool)'
+  cargo:warning=  212 |     resources->cache = rocksdb::LRUCacheOptions(config->cache_bytes, 0, false).MakeSharedCache();
+  cargo:warning=      |                                                                              ^
+  cargo:warning=In file included from /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/advanced_options.h:14,
+  cargo:warning=                 from /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/options.h:21,
+  cargo:warning=                 from /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/block_cache_trace_writer.h:8,
+  cargo:warning=                 from /bench/zfs/db/product-build/rocksdb-source/include/rocksdb/db.h:21,
+  cargo:warning=                 from shim/transaction_shim.cc:12:
+  cargo:warning=/bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:255:3: note: candidate: 'rocksdb::LRUCacheOptions::LRUCacheOptions(size_t, int, bool, double, std::shared_ptr<rocksdb::MemoryAllocator>, bool, rocksdb::CacheMetadataChargePolicy, double)'
+  cargo:warning=  255 |   LRUCacheOptions(size_t _capacity, int _num_shard_bits,
+  cargo:warning=      |   ^~~~~~~~~~~~~~~
+  cargo:warning=/bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:255:3: note:   candidate expects 8 arguments, 3 provided
+  cargo:warning=/bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:254:3: note: candidate: 'rocksdb::LRUCacheOptions::LRUCacheOptions()'
+  cargo:warning=  254 |   LRUCacheOptions() {}
+  cargo:warning=      |   ^~~~~~~~~~~~~~~
+  cargo:warning=/bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:254:3: note:   candidate expects 0 arguments, 3 provided
+  cargo:warning=/bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:222:8: note: candidate: 'rocksdb::LRUCacheOptions::LRUCacheOptions(const rocksdb::LRUCacheOptions&)'
+  cargo:warning=  222 | struct LRUCacheOptions : public ShardedCacheOptions {
+  cargo:warning=      |        ^~~~~~~~~~~~~~~
+  cargo:warning=/bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:222:8: note:   candidate expects 1 argument, 3 provided
+  cargo:warning=/bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:222:8: note: candidate: 'rocksdb::LRUCacheOptions::LRUCacheOptions(rocksdb::LRUCacheOptions&&)'
+  cargo:warning=/bench/zfs/db/product-build/rocksdb-source/include/rocksdb/cache.h:222:8: note:   candidate expects 1 argument, 3 provided
+
+  --- stderr
+
+
+  error occurred in cc-rs: command did not execute successfully (status code exit status: 1): LC_ALL="C" "c++" "-O3" "-ffunction-sections" "-fdata-sections" "-fPIC" "-I" "/bench/zfs/db/product-build/rocksdb-source/include" "-Wall" "-Wextra" "-std=c++20" "-fno-rtti" "-o" "/home/opc/tenant-density-harness-20261027/target/release/build/dodb-rocksdb-b710975df1f56fe4/out/343d176ec1acb507-transaction_shim.o" "-c" "shim/transaction_shim.cc"
+
+

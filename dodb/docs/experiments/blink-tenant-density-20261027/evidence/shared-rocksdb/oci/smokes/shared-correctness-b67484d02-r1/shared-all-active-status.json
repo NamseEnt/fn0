@@ -1,0 +1,18 @@
+{
+  "case": "shared-all-active",
+  "exit_code": 0,
+  "validation": {
+    "passed": true,
+    "failures": []
+  },
+  "ended_unix_seconds": 1793154811.3191075,
+  "capacity_after": {
+    "zfs_free_bytes": 11081900032,
+    "memory_bytes": {
+      "MemAvailable": 6835159040,
+      "SwapFree": 3832111104
+    }
+  },
+  "report_exists": true,
+  "report_sha256": "3227a7470860168b1c01da7078371f8bb4ae8148fc863a1bc0f86e1ef94c526f"
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "case": "native-all-active",
+    "exit_code": 0,
+    "validation": {
+      "passed": true,
+      "failures": []
+    },
+    "ended_unix_seconds": 1793154797.547082,
+    "capacity_after": {
+      "zfs_free_bytes": 11105177600,
+      "memory_bytes": {
+        "MemAvailable": 6902665216,
+        "SwapFree": 3831586816
+      }
+    },
+    "report_exists": true,
+    "report_sha256": "48dffcbf506c689d3047fc7da2f54757b8a34c91edb1f6f7cfbf3ff4d9263fc5"
+  },
+  {
+    "case": "native-sparse",
+    "exit_code": 0,
+    "validation": {
+      "passed": true,
+      "failures": []
+    },
+    "ended_unix_seconds": 1793154805.3326778,
+    "capacity_after": {
+      "zfs_free_bytes": 11092291584,
+      "memory_bytes": {
+        "MemAvailable": 6877085696,
+        "SwapFree": 3831848960
+      }
+    },
+    "report_exists": true,
+    "report_sha256": "aea8fe8957ad36fad46c75f955544a8b7b6f9c6d1fa5d1fff36dcc098fa18b3d"
+  },
+  {
+    "case": "shared-all-active",
+    "exit_code": 0,
+    "validation": {
+      "passed": true,
+      "failures": []
+    },
+    "ended_unix_seconds": 1793154811.3191075,
+    "capacity_after": {
+      "zfs_free_bytes": 11081900032,
+      "memory_bytes": {
+        "MemAvailable": 6835159040,
+        "SwapFree": 3832111104
+      }
+    },
+    "report_exists": true,
+    "report_sha256": "3227a7470860168b1c01da7078371f8bb4ae8148fc863a1bc0f86e1ef94c526f"
+  },
+  {
+    "case": "shared-sparse",
+    "exit_code": 0,
+    "validation": {
+      "passed": true,
+      "failures": []
+    },
+    "ended_unix_seconds": 1793154819.1115234,
+    "capacity_after": {
+      "zfs_free_bytes": 11074265088,
+      "memory_bytes": {
+        "MemAvailable": 6821974016,
+        "SwapFree": 3832111104
+      }
+    },
+    "report_exists": true,
+    "report_sha256": "59d67f8842219c50dae68321e06a45313a07fb319b0f14a2a5b7315052c88b0e"
+  }
+]

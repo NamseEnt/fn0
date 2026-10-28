@@ -1,0 +1,21 @@
+   Compiling dodb-rocksdb v0.1.0 (/home/opc/tenant-density-harness-20261027/source/dodb/crates/dodb-rocksdb)
+    Finished `release` profile [optimized] target(s) in 22.57s
+     Running unittests src/lib.rs (/home/opc/tenant-density-harness-20261027/target/release/deps/dodb_rocksdb-a6251970cf086f7c)
+
+running 10 tests
+test minimal_native::tests::invalid_shared_configuration_creates_no_directory ... ok
+test minimal_native::tests::shared_native_resources_survive_service_and_tenant_drop_with_a_live_iterator ... ok
+test minimal_native::tests::shared_resources_flush_across_tenants_and_reopen_every_value ... Shared pressure boundary: {"all_opened_tenants_use_shared_resources":true,"opened_tenants":3,"scope":"service-wide snapshot counted once; non-atomic across native counters","tenants_verified_using_shared_resources":3,"usage":{"cache_capacity_bytes":524288,"cache_pinned_usage_bytes":262320,"cache_usage_bytes":284040,"compaction_threads":1,"flush_threads":1,"wbm_cache_reservation_bytes":262144,"wbm_limit_bytes":131072,"wbm_mutable_bytes":89552,"wbm_usage_bytes":124976}}
+WBM-triggered flushes: 36
+SST files before clean shutdown: 42
+ok
+test shared_resources::tests::explicit_resource_options_round_trip_and_reject_incompatible_inputs ... ok
+test tests::disk_tenant_cold_open_is_shared_and_then_uses_read_fast_path ... ok
+test tests::shared_admission_accepts_sixteen_slots_and_rejects_zero ... ok
+test tests::shared_admission_remains_the_default_eight_slot_mode ... ok
+test tests::shared_condition_locks_allow_concurrent_holders_for_present_and_missing_keys ... ok
+test tests::shared_sixteen_slot_admission_stays_bounded_until_blocking_work_finishes ... ok
+test tests::writer_first_prevents_stale_condition_success_and_rollback_releases_shared_locks ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 1.58s
+

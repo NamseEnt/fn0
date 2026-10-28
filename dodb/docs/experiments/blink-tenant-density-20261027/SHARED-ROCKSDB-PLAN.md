@@ -2,13 +2,13 @@
 
 Tracking issue: https://github.com/NamseEnt/fn0/issues/126
 
-This plan is recorded before implementation. Work stays in the existing tenant-density worktree and branch. The primary executes this increment without delegation.
+Status: completed reference increment; see [SHARED-ROCKSDB-RESULTS.md](SHARED-ROCKSDB-RESULTS.md). The initial plan was recorded before implementation; pressure-probe amendments are explicit below. Work stays in the existing tenant-density worktree and branch. The primary executes this increment without delegation.
 
 ## Scope
 
 Add an opt-in `minimal-native-shared` density/diagnostic-worker route using the existing independent TransactionDB adapter. Preserve reserved-range revisions, exclusive condition locks, synchronous WAL, disabled compression, read/transaction contracts, and historical routes/defaults. No B-link changes or E2/E3/E4 performance matrix are included.
 
-One service owns one shared LRU cache and one WriteBufferManager across all its tenant databases. Charge memtable reservations to that cache, cache index/filter blocks, report non-strict cache capacity and soft WBM flush thresholds accurately. The initial stall-enabled proposal was rejected after the pressure probes documented below; accepted configuration disables WBM stalls. Neither is a hard process/RSS/OS-cache budget. Native handles must retain the resource owner until database destruction, including iterator lifetime and service shutdown.
+One service owns one shared LRU cache and one WriteBufferManager across all its tenant databases. Charge memtable reservations to that cache, cache index/filter blocks, report non-strict cache capacity and soft WBM flush thresholds accurately. The initial stall-enabled proposal was rejected after the pressure probes documented below; accepted configuration disables WBM stalls. Neither is a hard process/RSS/OS-cache budget. Native database options must retain the shared cache/WBM objects until database destruction, including iterator lifetime and service shutdown.
 
 Require explicit cache bytes, WBM bytes, per-tenant write-buffer bytes, flush/compaction thread counts, and per-tenant open-file limits on the new route. Reject incomplete, invalid, duplicate, or incompatible resource options before database creation. Configure and report process-global Env::Default high/low pools, per-DB background limits, and one subcompaction. The worker isolates each backend epoch; other diagnostic routes retain their existing behavior. These background pools do not cap application/Tokio threads or all native threads.
 
