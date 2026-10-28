@@ -364,6 +364,20 @@ impl BackendService {
             }
         }
     }
+
+    fn periodic_blink_checkpoint_metrics(&self) -> serde_json::Value {
+        let mut metrics = self.blink_checkpoint_metrics();
+        if let Some(fields) = metrics.as_object_mut()
+            && fields.remove("checkpoint_events").is_some()
+        {
+            fields.remove("transaction_group_histogram");
+            fields.insert(
+                "detail_scope".to_owned(),
+                json!("cumulative counters only; event details and group histogram are retained in the final worker report"),
+            );
+        }
+        metrics
+    }
 }
 
 fn main() -> WorkerResult<()> {
@@ -476,7 +490,7 @@ async fn run(
                         "phase": pressure_phase,
                         "shared_resources": backend.shared_resource_snapshot(),
                         "rocksdb_properties": backend.engine_health_observer().map(|observer| observer.sample()),
-                        "blink_checkpoints": backend.blink_checkpoint_metrics(),
+                        "blink_checkpoints": backend.periodic_blink_checkpoint_metrics(),
                     });
                     let serialized_bytes = serde_json::to_vec(&sample)?.len();
                     if pressure_sample_bytes + serialized_bytes <= 8 * 1024 * 1024 {
