@@ -35,6 +35,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments = std::env::args().skip(1).collect::<Vec<_>>();
     let options = Options::parse(&arguments).map_err(std::io::Error::other)?;
     let report_path = options.report_path.clone();
+    let mut pressure_monitor = options
+        .memory_budget
+        .clone()
+        .map(dodb_rocksdb::memory_pressure::PressureMonitor::new)
+        .transpose()
+        .map_err(std::io::Error::other)?;
+    let session =
+        MemoryDiagnosticSession::new(std::env::var("DODB_SOURCE_REVISION").unwrap_or_default())
+            .map_err(std::io::Error::other)?;
     let execution: Result<Value, Box<dyn std::error::Error>> = async {
     let source_revision = std::env::var("DODB_SOURCE_REVISION")?;
     let compiled_source_revision = env!("DODB_BUILD_GIT_COMMIT");
@@ -43,16 +52,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "requested source revision {source_revision} does not match compiled revision {compiled_source_revision}"
         )).into());
     }
-    let session = MemoryDiagnosticSession::new(source_revision.clone()).map_err(std::io::Error::other)?;
     let worker_path = std::env::current_exe()?.with_file_name("memory_diagnostic_worker");
     let filesystem_before_setup = filesystem_snapshot(&options.data_dir);
-    let setup_worker = spawn_worker(&session, &worker_path, &options, "setup").await?;
+    let setup_worker = spawn_worker(&session, &worker_path, &options, pressure_monitor.as_ref(), "setup").await?;
     let setup_service = RemoteDodbService::new(setup_worker.connection().clone());
     seed_population(&setup_service, &options).await?;
     setup_worker.shutdown().map_err(std::io::Error::other)?;
     let filesystem_after_setup = filesystem_snapshot(&options.data_dir);
 
-    let measurement_worker = spawn_worker(&session, &worker_path, &options, "measurement").await?;
+    let measurement_worker = spawn_worker(&session, &worker_path, &options, pressure_monitor.as_ref(), "measurement").await?;
     let service = RemoteDodbService::new(measurement_worker.connection().clone());
     open_measurement_tenants(&service, &options).await?;
     session.set_phase("measurement-correctness-preflight");
@@ -61,6 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .start_measurement()
         .map_err(std::io::Error::other)?;
     session.set_phase("offered-load");
+    if let Some(monitor) = &pressure_monitor { monitor.boundary("offer-start"); }
     let offer_process_before = session.process_boundary_snapshot();
     let offer_host_before = resources::host_device_snapshot();
     let offer_io_before = resources::process_io_from_boundary(&offer_process_before);
@@ -68,6 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let started = Instant::now();
     let workload = run_workload(&service, &options, &session).await;
     let elapsed_after_drain = started.elapsed();
+    if let Some(monitor) = &pressure_monitor { monitor.boundary("after-drain"); }
     session.set_phase("measurement-drain");
     measurement_worker
         .stop_measurement()
@@ -107,13 +117,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         && boundary_fields_present
         && accounting_is_valid;
     let (oracle, reopened_oracle, oracle_filesystem_after, reopened_filesystem_after) = if oracle_is_valid {
-        let oracle_worker = spawn_worker(&session, &worker_path, &options, "oracle").await?;
+        let oracle_worker = spawn_worker(&session, &worker_path, &options, pressure_monitor.as_ref(), "oracle").await?;
         let oracle_service = RemoteDodbService::new(oracle_worker.connection().clone());
         let oracle = validate_population(&oracle_service, &options, &expected_mutations).await?;
         oracle_worker.shutdown().map_err(std::io::Error::other)?;
         let filesystem_after_oracle = filesystem_snapshot(&options.data_dir);
 
-        let reopened_worker = spawn_worker(&session, &worker_path, &options, "reopen-oracle").await?;
+        let reopened_worker = spawn_worker(&session, &worker_path, &options, pressure_monitor.as_ref(), "reopen-oracle").await?;
         let reopened_service = RemoteDodbService::new(reopened_worker.connection().clone());
         let reopened =
             validate_population(&reopened_service, &options, &expected_mutations).await?;
@@ -175,8 +185,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }))
     }
     .await;
+    let pressure_report = pressure_monitor
+        .as_mut()
+        .map_or_else(|| json!({"enabled": false}), |monitor| monitor.finish());
     match execution {
-        Ok(report) => {
+        Ok(mut report) => {
+            report["backend_memory_pressure"] = pressure_report;
             let cell_is_valid = report["status"].as_str() == Some("completed")
                 && report["post_measurement_full_population_oracle"]["passed"] == true
                 && report["reopened_full_population_oracle"]["passed"] == true;
@@ -195,6 +209,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "status": "failed_or_inconclusive",
                 "failure_reason": error.to_string(),
                 "data_directory_preserved": true,
+                "effective_configuration": effective_configuration(&options),
+                "backend_memory_pressure": pressure_report,
+                "memory_diagnostic": session.finish_sampling(),
                 "partial_workload_counters": {"status": "unavailable_after_early_abort"}
             });
             std::fs::write(&report_path, serde_json::to_vec_pretty(&failure_report)?)?;
@@ -207,6 +224,7 @@ async fn spawn_worker(
     session: &Arc<MemoryDiagnosticSession>,
     worker_path: &Path,
     options: &Options,
+    pressure_monitor: Option<&dodb_rocksdb::memory_pressure::PressureMonitor>,
     phase: &str,
 ) -> Result<dodb_rocksdb::memory_diagnostic::MemoryDiagnosticWorker, Box<dyn std::error::Error>> {
     session.set_phase(phase);
@@ -222,6 +240,13 @@ async fn spawn_worker(
         "--memory-tenant-count".to_owned(),
         options.registered_tenants.to_string(),
     ];
+    if let Some(monitor) = pressure_monitor {
+        worker_arguments.extend(
+            monitor
+                .worker_arguments(phase)
+                .map_err(std::io::Error::other)?,
+        );
+    }
     if let Some(resources) = options.shared_resources {
         worker_arguments.extend(resources.arguments());
     }
@@ -592,6 +617,10 @@ async fn run_workload(
 ) -> Result<(Value, BTreeMap<(u64, usize), Option<Vec<u8>>>), Box<dyn std::error::Error>> {
     let scheduler_service = Arc::new(RemoteDodbService::new(service.connection().clone()));
     let callback_session = Arc::clone(session);
+    let pressure_root = options
+        .memory_budget
+        .as_ref()
+        .map(|budget| budget.cgroup_root.clone());
     let on_offer_end = move || {
         callback_session.set_phase("measurement-drain");
         let process_after = callback_session.process_boundary_snapshot();
@@ -599,7 +628,11 @@ async fn run_workload(
             "process_after": process_after,
             "host_device_after": resources::host_device_snapshot(),
             "process_io_after": resources::process_io_from_boundary(&process_after),
-            "driver_process_io_after": blink_checkpoint::process_write_io()
+            "driver_process_io_after": blink_checkpoint::process_write_io(),
+            "backend_memory_pressure_after": pressure_root.as_ref().map(|root| json!({
+                "cell": dodb_rocksdb::memory_pressure::group_snapshot(root),
+                "measurement": dodb_rocksdb::memory_pressure::group_snapshot(&root.join("measurement"))
+            }))
         })
     };
     if options.topology == Topology::FixedPerTenant {
@@ -717,6 +750,7 @@ fn expect_response(response: Response, context: &str) -> Result<(), Box<dyn std:
 fn effective_configuration(options: &Options) -> Value {
     json!({
         "rocksdb_shared_resources": options.shared_resources.map(|resources| resources.report()),
+        "backend_memory_budget": options.memory_budget,
         "backend": options.backend.as_str(), "registered_tenants": options.registered_tenants,
         "seed": options.seed, "duration_ms": options.duration_ms, "operation_count": options.operation_count,
         "request_timeout_ms": options.request_timeout_ms, "drain_timeout_ms": options.drain_timeout_ms,

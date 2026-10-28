@@ -82,6 +82,7 @@ impl Profile {
 pub struct Options {
     pub backend: Backend,
     pub shared_resources: Option<dodb_rocksdb::shared_resources::SharedResourceConfig>,
+    pub memory_budget: Option<dodb_rocksdb::memory_pressure::MemoryBudget>,
     pub data_dir: PathBuf,
     pub report_path: PathBuf,
     pub seed: u64,
@@ -145,6 +146,10 @@ impl Options {
             "--blink-checkpoint-execution",
             "--blink-wal-segment-bytes",
             "--blink-checkpoint-wal-bytes",
+            "--backend-cgroup-root",
+            "--backend-memory-max-bytes",
+            "--backend-memory-high-bytes",
+            "--pressure-sample-interval-ms",
         ];
         for name in values.keys() {
             if !known_options.contains(name)
@@ -164,6 +169,30 @@ impl Options {
                 backend.as_str(),
                 arguments,
             )?;
+        let budget_flags = [
+            "--backend-cgroup-root",
+            "--backend-memory-max-bytes",
+            "--backend-memory-high-bytes",
+        ];
+        let memory_budget = if budget_flags.iter().any(|name| values.contains_key(name)) {
+            Some(dodb_rocksdb::memory_pressure::MemoryBudget {
+                cgroup_root: PathBuf::from(required(&values, budget_flags[0])?),
+                max_bytes: parse_number(&values, budget_flags[1])?,
+                high_bytes: parse_number(&values, budget_flags[2])?,
+                sample_interval_ms: parse_optional_number(
+                    &values,
+                    "--pressure-sample-interval-ms",
+                )?
+                .unwrap_or(100),
+            })
+        } else {
+            if values.contains_key("--pressure-sample-interval-ms") {
+                return Err(
+                    "pressure sampling requires an explicit backend memory budget".to_owned(),
+                );
+            }
+            None
+        };
         let data_dir = PathBuf::from(required(&values, "--data-dir")?);
         let report_path = PathBuf::from(required(&values, "--report")?);
         let seed = parse_number(&values, "--seed")?;
@@ -230,6 +259,7 @@ impl Options {
         let options = Self {
             backend,
             shared_resources,
+            memory_budget,
             data_dir,
             report_path,
             seed,
@@ -257,6 +287,9 @@ impl Options {
     }
 
     pub fn validate(&self) -> Result<(), String> {
+        if let Some(budget) = &self.memory_budget {
+            budget.validate()?;
+        }
         if self.registered_tenants == 0 || self.registered_tenants > 65_536 {
             return Err("registered tenants must be between 1 and 65536".to_owned());
         }
@@ -508,6 +541,33 @@ mod tests {
         assert_eq!(options.shared_resources, Some(config));
         argument_values[backend_position + 1] = "minimal-native".to_owned();
         assert!(Options::parse(&argument_values).is_err());
+    }
+
+    #[test]
+    fn incomplete_memory_enforcement_fails_before_database_creation() {
+        for extra in [
+            vec!["--backend-memory-max-bytes", "67108864"],
+            vec!["--pressure-sample-interval-ms", "100"],
+            vec![
+                "--backend-cgroup-root",
+                "/tmp",
+                "--backend-memory-max-bytes",
+                "67108864",
+                "--backend-memory-high-bytes",
+                "33554432",
+            ],
+        ] {
+            let (directory, argument_values) = arguments(&extra);
+            assert!(Options::parse(&argument_values).is_err());
+            assert!(!directory.path().join("database").exists());
+        }
+        let (_directory, argument_values) = arguments(&[]);
+        assert!(
+            Options::parse(&argument_values)
+                .unwrap()
+                .memory_budget
+                .is_none()
+        );
     }
 
     #[test]

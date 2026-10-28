@@ -33,6 +33,8 @@ type WorkerResult<T> = Result<T, WorkerError>;
 struct Arguments {
     backend: String,
     shared_resources: Option<dodb_rocksdb::shared_resources::SharedResourceConfig>,
+    memory_cgroup_path: Option<PathBuf>,
+    pressure_interval_ms: u64,
     data_dir: PathBuf,
     certificate_path: PathBuf,
     private_key_path: PathBuf,
@@ -139,7 +141,7 @@ impl BackendService {
     fn engine_health_observer(&self) -> Option<dodb_rocksdb::EngineHealthObserver> {
         match self {
             Self::Blink(_) => None,
-            Self::MinimalNative(_) => None,
+            Self::MinimalNative(service) => Some(service.engine_health_observer()),
             Self::RocksDb(service) => Some(service.engine_health_observer()),
             Self::Core(tenants) => Some(dodb_rocksdb::EngineHealthObserver::combine(
                 tenants.iter().map(|(tenant, database)| {
@@ -364,11 +366,26 @@ impl BackendService {
     }
 }
 
-#[tokio::main]
-async fn main() -> WorkerResult<()> {
-    let _ = quinn::rustls::crypto::aws_lc_rs::default_provider().install_default();
+fn main() -> WorkerResult<()> {
     let arguments = parse_arguments()?;
     install_parent_death_signal(arguments.parent_pid)?;
+    let memory_membership = arguments
+        .memory_cgroup_path
+        .as_ref()
+        .map(|path| dodb_rocksdb::memory_pressure::attach_worker(path))
+        .transpose()
+        .map_err(std::io::Error::other)?;
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(run(arguments, memory_membership))
+}
+
+async fn run(
+    arguments: Arguments,
+    memory_membership: Option<serde_json::Value>,
+) -> WorkerResult<()> {
+    let _ = quinn::rustls::crypto::aws_lc_rs::default_provider().install_default();
     let backend = Arc::new(BackendService::open(&arguments)?);
     let protocol_limits = ProtocolLimits {
         max_response_frame_size: arguments.response_budget,
@@ -439,9 +456,40 @@ async fn main() -> WorkerResult<()> {
     let mut health_report = engine_health_disabled_report();
     let mut shared_measurement_start = serde_json::Value::Null;
     let mut shared_measurement_end = serde_json::Value::Null;
-    while let Some(command) = command_receiver.recv().await {
+    let mut pressure_samples = Vec::new();
+    let mut pressure_samples_truncated = false;
+    let mut pressure_sample_bytes = 0_usize;
+    let mut pressure_phase = "before-measurement";
+    let mut pressure_interval =
+        tokio::time::interval(Duration::from_millis(arguments.pressure_interval_ms.max(1)));
+    pressure_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        let command = tokio::select! {
+            command = command_receiver.recv() => match command {
+                Some(command) => command,
+                None => break,
+            },
+            _ = pressure_interval.tick(), if arguments.pressure_interval_ms > 0 => {
+                if !pressure_samples_truncated && pressure_samples.len() < 4096 && pressure_sample_bytes < 8 * 1024 * 1024 {
+                    let sample = json!({
+                        "timestamp_unix_ms": dodb_rocksdb::memory_pressure::unix_time_ms(),
+                        "phase": pressure_phase,
+                        "shared_resources": backend.shared_resource_snapshot(),
+                        "rocksdb_properties": backend.engine_health_observer().map(|observer| observer.sample()),
+                        "blink_checkpoints": backend.blink_checkpoint_metrics(),
+                    });
+                    let serialized_bytes = serde_json::to_vec(&sample)?.len();
+                    if pressure_sample_bytes + serialized_bytes <= 8 * 1024 * 1024 {
+                        pressure_sample_bytes += serialized_bytes;
+                        pressure_samples.push(sample);
+                    } else { pressure_samples_truncated = true; }
+                } else { pressure_samples_truncated = true; }
+                continue;
+            }
+        };
         match command.as_str() {
             "start-measurement" => {
+                pressure_phase = "measurement-including-drain";
                 shared_measurement_start = backend.shared_resource_snapshot();
                 health_sampler = if arguments.engine_health_interval_ms == 0 {
                     None
@@ -458,6 +506,7 @@ async fn main() -> WorkerResult<()> {
                 };
             }
             "stop-measurement" => {
+                pressure_phase = "after-measurement";
                 shared_measurement_end = backend.shared_resource_snapshot();
                 health_report = match health_sampler.take() {
                     Some(sampler) => sampler.finish()?,
@@ -523,6 +572,19 @@ async fn main() -> WorkerResult<()> {
                 "scope": "control-command boundaries; end includes drain; not continuous or peak instrumentation",
             },
             "effective_backend_configuration": backend_configuration_json(&arguments),
+            "backend_memory_cgroup": memory_membership,
+            "periodic_pressure": {
+                "enabled": arguments.pressure_interval_ms > 0,
+                "interval_ms": arguments.pressure_interval_ms,
+                "sample_limit": 4096,
+                "serialized_sample_byte_limit": 8 * 1024 * 1024,
+                "serialized_sample_bytes": pressure_sample_bytes,
+                "storage_scope": "serialized sample bytes bound retained observation volume, not exact serde_json heap allocation; observations are charged to the worker budget",
+                "samples_truncated": pressure_samples_truncated,
+                "samples": pressure_samples,
+                "scope": "worker lifetime after readiness; non-atomic sampled observations; not instantaneous peaks; measurement phase includes drain; shared cache/WBM counted once in shared_resources; repeated per-DB cache properties must not be summed",
+                "unsupported": ["allocator retained heap", "generation pin ages", "request and checkpoint queue representation bytes"],
+            },
             "blink_checkpoint_metrics": blink_checkpoint_metrics,
             "blink_checkpoint_metrics_scope": "worker_lifetime_including setup/preflight, offered load, measurement drain, and shutdown; measurement start/stop controls the RocksDB sampler only and does not reset or snapshot B-link checkpoint counters at offer boundaries",
             "retained_heap_bytes": {
@@ -565,6 +627,18 @@ fn parse_arguments() -> WorkerResult<Arguments> {
     }
     let shared_resources =
         dodb_rocksdb::shared_resources::SharedResourceConfig::from_arguments(&backend, &values)?;
+    let memory_cgroup_path = option_value(&values, "--memory-cgroup-path").map(PathBuf::from);
+    let pressure_interval_ms = option_value(&values, "--memory-pressure-interval-ms")
+        .map(|value| value.parse::<u64>())
+        .transpose()?
+        .unwrap_or(0);
+    if (memory_cgroup_path.is_some() && !(10..=10_000).contains(&pressure_interval_ms))
+        || (memory_cgroup_path.is_none() && pressure_interval_ms != 0)
+    {
+        return Err(
+            "memory pressure sampling requires a cgroup and a 10..10000 ms interval".into(),
+        );
+    }
     let data_dir = PathBuf::from(argument_value(&values, "--memory-data-dir")?);
     let certificate_path = PathBuf::from(argument_value(&values, "--memory-certificate")?);
     let private_key_path = PathBuf::from(argument_value(&values, "--memory-private-key")?);
@@ -672,6 +746,8 @@ fn parse_arguments() -> WorkerResult<Arguments> {
     Ok(Arguments {
         backend,
         shared_resources,
+        memory_cgroup_path,
+        pressure_interval_ms,
         data_dir,
         certificate_path,
         private_key_path,

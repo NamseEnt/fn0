@@ -67,6 +67,14 @@ struct MinimalIterator {
 unsafe impl Send for MinimalIterator {}
 
 impl MinimalNativeService {
+    pub fn engine_health_observer(&self) -> crate::EngineHealthObserver {
+        let mut observer = crate::EngineHealthObserver::new();
+        for tenant in &self.tenants {
+            observer.add_database(format!("tenant_{}", tenant.key()), &tenant.handle);
+        }
+        observer
+    }
+
     pub fn new(config: MinimalNativeConfig) -> Result<Self, Error> {
         if config.revision_allocator != RevisionAllocatorMode::ReservedRanges {
             return Err(Error::invalid_input(

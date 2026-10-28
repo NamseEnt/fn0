@@ -1439,6 +1439,7 @@ mod tests {
         Options {
             backend: crate::config::Backend::Blink,
             shared_resources: None,
+            memory_budget: None,
             data_dir: "/tmp/density-test-data".into(),
             report_path: "/tmp/density-test-report.json".into(),
             seed: 7,
