@@ -1,0 +1,119 @@
+{
+  "source_commit": "aaa40565529ca92150df5d94e19b02ca93859f71",
+  "checks": {
+    "capacity-clean-a1-link": {
+      "exit_code": 0,
+      "source_commit": "aaa40565529ca92150df5d94e19b02ca93859f71",
+      "native_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+      "native_archive_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+      "command": [
+        "/home/opc/.cargo/bin/rustup",
+        "run",
+        "1.97.1",
+        "cargo",
+        "build",
+        "--locked",
+        "--offline",
+        "--release",
+        "-p",
+        "dodb-rocksdb",
+        "--bin",
+        "tenant_density_workload",
+        "--bin",
+        "memory_diagnostic_worker",
+        "--features",
+        "dodb-storage/blink-writer-pin-reuse"
+      ]
+    },
+    "capacity-clean-clippy": {
+      "exit_code": 0,
+      "source_commit": "aaa40565529ca92150df5d94e19b02ca93859f71",
+      "native_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+      "native_archive_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+      "command": [
+        "/home/opc/.cargo/bin/rustup",
+        "run",
+        "1.97.1",
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--release",
+        "-p",
+        "dodb-rocksdb",
+        "--lib",
+        "--bin",
+        "tenant_density_workload",
+        "--bin",
+        "memory_diagnostic_worker",
+        "--test",
+        "read_contract",
+        "--test",
+        "transaction_contract",
+        "--no-deps"
+      ]
+    },
+    "capacity-clean-default-link": {
+      "exit_code": 0,
+      "source_commit": "aaa40565529ca92150df5d94e19b02ca93859f71",
+      "native_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+      "native_archive_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+      "command": [
+        "/home/opc/.cargo/bin/rustup",
+        "run",
+        "1.97.1",
+        "cargo",
+        "build",
+        "--locked",
+        "--offline",
+        "--release",
+        "-p",
+        "dodb-rocksdb",
+        "--bin",
+        "tenant_density_workload",
+        "--bin",
+        "memory_diagnostic_worker"
+      ]
+    },
+    "capacity-clean-tests": {
+      "exit_code": 0,
+      "source_commit": "aaa40565529ca92150df5d94e19b02ca93859f71",
+      "native_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+      "native_archive_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+      "command": [
+        "/home/opc/.cargo/bin/rustup",
+        "run",
+        "1.97.1",
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--release",
+        "-p",
+        "dodb-rocksdb",
+        "--lib",
+        "--bin",
+        "tenant_density_workload",
+        "--bin",
+        "memory_diagnostic_worker",
+        "--test",
+        "read_contract",
+        "--test",
+        "transaction_contract",
+        "--",
+        "--test-threads=1"
+      ]
+    }
+  },
+  "passing_tests": 68,
+  "test_group_counts": [
+    42,
+    0,
+    17,
+    5,
+    4
+  ],
+  "same_17_existing_clippy_diagnostics": true,
+  "validation_archive_sha256": "6a0b64009d25ebf69b1db6a6a1a493bf744835efc024d2412c66d908f8293665",
+  "scope": "Clean-source validation only; capacity measurements are reviewed separately"
+}

@@ -4,5 +4,6 @@
   "python_compilation_passed": true,
   "percentile_checks": "nearest-rank p99 and aligned histogram boundaries at buckets 0, 1, 23, 24, 26; 99/1 versus 98/2 split",
   "baseline_schema_checks": "Both prior positive reports exercised reducer in memory with explicit cache/WBM configuration adaptation; not a new runtime or capacity result",
-  "runtime_workloads_started": false
+  "runtime_workloads_started": false,
+  "periodic_detail_review_added": "Runtime reducer verifies compact periodic B-link samples and final detailed checkpoint report"
 }

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "capacity-clean-tests",
+    "exit_code": 0,
+    "reused_completed_check": true
+  },
+  {
+    "name": "capacity-clean-clippy",
+    "exit_code": 0,
+    "reused_completed_check": false
+  },
+  {
+    "name": "capacity-clean-a1-link",
+    "exit_code": 0,
+    "reused_completed_check": false
+  },
+  {
+    "name": "capacity-clean-default-link",
+    "exit_code": 0,
+    "reused_completed_check": false
+  }
+]

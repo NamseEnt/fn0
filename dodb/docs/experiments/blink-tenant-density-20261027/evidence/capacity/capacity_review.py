@@ -99,6 +99,9 @@ def reduce_report(report, source_commit):
     assert report['measurement_worker_process_sampling']['same_backend_identity_at_offer_boundaries']
     health = health_reports[1]
     native_samples = health['periodic_pressure']['samples']
+    if configuration['backend'] == 'blink':
+        assert all('checkpoint_events' not in sample['blink_checkpoints'] and 'transaction_group_histogram' not in sample['blink_checkpoints'] for sample in native_samples)
+        assert 'checkpoint_events' in health['blink_checkpoint_metrics']
     measurement_samples = [sample for sample in pressure['samples'] if sample['epoch'] == 'measurement' and sample['event'] == 'periodic']
     timestamps = [sample['snapshot']['timestamp_unix_ms'] for sample in measurement_samples]
     result['measurement_sample_count'] = len(measurement_samples)
