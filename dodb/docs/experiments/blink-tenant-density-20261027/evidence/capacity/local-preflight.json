@@ -1,0 +1,8 @@
+{
+  "source_commit": "aaa40565529ca92150df5d94e19b02ca93859f71",
+  "rustfmt_passed": true,
+  "python_compilation_passed": true,
+  "percentile_checks": "nearest-rank p99 and aligned histogram boundaries at buckets 0, 1, 23, 24, 26; 99/1 versus 98/2 split",
+  "baseline_schema_checks": "Both prior positive reports exercised reducer in memory with explicit cache/WBM configuration adaptation; not a new runtime or capacity result",
+  "runtime_workloads_started": false
+}
