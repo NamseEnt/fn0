@@ -91,6 +91,18 @@ Cleanup removed only 13 explicit obsolete compiler/intermediate paths while pres
 
 The next decision work is to size and freeze a modest paired E2/E3 capacity bracket under the same explicit budget and per-tenant service objective, then examine E4 maintenance near that boundary. Keep sampling gaps and instrumentation perturbation explicit. Unsupported retained-heap/pin/queue representations prevent exact causal attribution; they must not be presented as zero or silently substituted with normalized checkpoint bytes. No density/performance winner or default promotion follows from the correctness cells.
 
+## Bounded capacity increment in progress
+
+Read [DENSITY-CAPACITY-PLAN.md](DENSITY-CAPACITY-PLAN.md), [DENSITY-CAPACITY-RESULTS.md](DENSITY-CAPACITY-RESULTS.md), [CAPACITY-CONTINUATION.md](CAPACITY-CONTINUATION.md), [CAPACITY-SUPPLEMENT-PLAN.md](CAPACITY-SUPPLEMENT-PLAN.md), and [CAPACITY-SOURCE-AUDIT.md](CAPACITY-SOURCE-AUDIT.md). Runtime source is `aaa40565529ca92150df5d94e19b02ca93859f71`. Only periodic diagnostic detail changed after the accepted memory-pressure source; engine semantics and A1/default settings are preserved. All 68 checks and both feature links passed; the same seventeen pre-existing Clippy diagnostics remain.
+
+The original `capacity-aaa405655-r1` namespace stopped after 36 unique cells because B-link's six-tenant E3 setup worker exceeded its existing fifteen-second shutdown deadline. B-link's eight-tenant E3 setup had already failed with kernel OOM; shared RocksDB completed both counts. The stopped namespace, failed databases, logs, and original statuses remain immutable.
+
+`capacity-aaa405655-r2` continues the frozen sequence using an explicit composite evidence view. It reuses all 36 original raw reports without launching those workloads again and classifies only the exact recorded setup-shutdown deadline separately from OOM. Its provenance links the original namespace and controller/reducer hashes. Do not add the two namespaces' case counts together or restart already completed cells.
+
+The live controller is on the designated OCI host under `/home/opc/tenant-density-harness-20261027/`; inspect `capacity-runtime-r2-launcher.log` and `capacity/capacity-aaa405655-r2/`. Its PID/command receipt is `capacity-runtime-r2-pid.json`. New databases are under `/bench/zfs/db/tenant-density-harness-20261027/capacity-aaa405655-r2/`; copied cases still refer to their original r1 databases and cgroups. A `completion.json` marks the end of the main sequence; `continuation-failure.json` requires review before any restart. The source checkout remains detached at the frozen runtime SHA.
+
+After the main sequence finishes, collect and review its original/composite evidence, then run the separately frozen supplement without overlapping workloads. The supplement confirms the surviving eight-tenant E3 route three times and, when applicable, adds a 180-second maintenance pair at the actual confirmed E2 boundary with 2,000 ms sampling. Main and supplemental cohorts remain separate. Preserve the backend budget's exclusions, finite-window scope, instrumentation differences, ten-GiB reserve, and all previous data. Issue #126 remains open.
+
 ## Read existing evidence in order
 
 1. `dodb/docs/experiments/results/backend-hotpaths-20261026/RESULTS.md`

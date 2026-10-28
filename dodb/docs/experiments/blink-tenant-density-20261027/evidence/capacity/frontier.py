@@ -84,9 +84,11 @@ def main(run_directory):
     for outcome in summary:
         case = outcome['case']
         reduced = review['cases'][case]
-        row = {name: reduced.get(name) for name in ['backend', 'registered', 'active', 'initial_rows', 'duration_ms', 'sample_interval_ms', 'operational_pass', 'slo_pass', 'resource_failure', 'failure_epochs', 'successful', 'dropped', 'offer_throughput_completed_per_second', 'cell_peak_bytes', 'epoch_peaks_bytes', 'cell_events', 'worst_tenant_p99_upper_exclusive_ms', 'backend_offer_cpu_usec', 'maximum_measurement_sample_gap_ms']}
+        row = {name: reduced.get(name) for name in ['backend', 'registered', 'active', 'initial_rows', 'duration_ms', 'sample_interval_ms', 'operational_pass', 'slo_pass', 'resource_failure', 'operational_timeout', 'failure_kind', 'failure_epochs', 'successful', 'dropped', 'offer_throughput_completed_per_second', 'cell_peak_bytes', 'epoch_peaks_bytes', 'cell_events', 'worst_tenant_p99_upper_exclusive_ms', 'backend_offer_cpu_usec', 'maximum_measurement_sample_gap_ms']}
         row['case'] = case
+        row['runtime_origin'] = outcome.get('reused_from_run', run_directory.name)
         report = json.loads((run_directory / (case + '.json')).read_text())
+        row['offered_load_started'] = any(sample['event'] == 'offer-start' for sample in report['backend_memory_pressure']['samples'])
         if reduced['operational_pass']:
             configuration = report['effective_configuration']
             count = configuration['duration_ms'] * configuration['per_tenant_rate'] // 1000
@@ -108,6 +110,7 @@ def main(run_directory):
         cohorts[prefix.rstrip('-')] = {'cells': len(selected), 'operational_passes': sum(row['operational_pass'] for row in selected),
                                        'slo_passes': sum(row['slo_pass'] for row in selected),
                                        'resource_failures': sum(row['resource_failure'] for row in selected),
+                                       'operational_deadline_failures': sum(bool(row.get('operational_timeout')) for row in selected),
                                        'successful_requests_with_complete_reports': sum(row['successful'] or 0 for row in selected)}
     confirmations = []
     for stage in ['e2', 'e3']:
