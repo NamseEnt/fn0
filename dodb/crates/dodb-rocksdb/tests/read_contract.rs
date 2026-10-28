@@ -770,6 +770,23 @@ async fn rocksdb_query_and_scan_survive_shutdown_and_reopen() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn shared_minimal_native_reads_satisfy_common_contract() {
+    let directory = temporary_db_directory();
+    let mut config = MinimalNativeConfig::new(directory.path());
+    config.shared_resources = Some(dodb_rocksdb::shared_resources::SharedResourceConfig {
+        cache_bytes: 16 * 1024 * 1024,
+        wbm_bytes: 4 * 1024 * 1024,
+        write_buffer_bytes: 256 * 1024,
+        flush_threads: 1,
+        compaction_threads: 1,
+        max_open_files: 64,
+    });
+    let service = MinimalNativeService::new(config).unwrap();
+    check_read_contract(&service, true).await;
+    service.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn minimal_native_reads_satisfy_common_contract() {
     let directory = temporary_db_directory();
     let service = MinimalNativeService::new(MinimalNativeConfig::new(directory.path())).unwrap();

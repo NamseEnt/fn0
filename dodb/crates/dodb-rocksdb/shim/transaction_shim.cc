@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -11,6 +12,10 @@
 
 #include "rocksdb/db.h"
 #include "rocksdb/env.h"
+#include "rocksdb/cache.h"
+#include "rocksdb/advanced_cache.h"
+#include "rocksdb/table.h"
+#include "rocksdb/write_buffer_manager.h"
 #include "rocksdb/options.h"
 #include "rocksdb/perf_context.h"
 #include "rocksdb/perf_level.h"
@@ -165,6 +170,133 @@ int query_int_property(rocksdb::DB* database, const unsigned char* property,
 }
 
 extern "C" {
+
+struct DodbSharedConfig {
+  size_t cache_bytes;
+  size_t wbm_bytes;
+  size_t write_buffer_bytes;
+  int flush_threads;
+  int compaction_threads;
+  int max_open_files;
+};
+
+struct DodbSharedResources {
+  DodbSharedConfig config;
+  std::shared_ptr<rocksdb::Cache> cache;
+  std::shared_ptr<rocksdb::WriteBufferManager> wbm;
+};
+
+struct DodbSharedSnapshot {
+  uint64_t cache_capacity_bytes;
+  uint64_t cache_usage_bytes;
+  uint64_t cache_pinned_usage_bytes;
+  uint64_t wbm_limit_bytes;
+  uint64_t wbm_usage_bytes;
+  uint64_t wbm_mutable_bytes;
+  uint64_t wbm_cache_reservation_bytes;
+  uint64_t flush_threads;
+  uint64_t compaction_threads;
+};
+
+void* dodb_rocksdb_shared_new(const DodbSharedConfig* config, char** error) {
+  try {
+    if (config == nullptr || config->cache_bytes == 0 || config->wbm_bytes == 0 ||
+        config->wbm_bytes > config->cache_bytes || config->write_buffer_bytes < 65536 ||
+        config->write_buffer_bytes > config->wbm_bytes || config->flush_threads < 1 ||
+        config->compaction_threads < 1 || config->max_open_files < 20 ||
+        config->flush_threads > 64 || config->compaction_threads > 64) {
+      set_error(error, rocksdb::Status::InvalidArgument("invalid shared-resource configuration"));
+      return nullptr;
+    }
+    auto resources = std::make_unique<DodbSharedResources>();
+    resources->config = *config;
+    rocksdb::LRUCacheOptions cache_options;
+    cache_options.capacity = config->cache_bytes;
+    cache_options.num_shard_bits = 0;
+    cache_options.strict_capacity_limit = false;
+    resources->cache = cache_options.MakeSharedCache();
+    resources->wbm = std::make_shared<rocksdb::WriteBufferManager>(
+        config->wbm_bytes, resources->cache, false);
+    auto* environment = rocksdb::Env::Default();
+    environment->SetBackgroundThreads(config->flush_threads, rocksdb::Env::HIGH);
+    environment->SetBackgroundThreads(config->compaction_threads, rocksdb::Env::LOW);
+    return resources.release();
+  } catch (const std::exception& exception) {
+    set_error(error, rocksdb::Status::Aborted(exception.what()));
+    return nullptr;
+  }
+}
+
+void dodb_rocksdb_shared_delete(void* resources) {
+  delete static_cast<DodbSharedResources*>(resources);
+}
+
+void dodb_rocksdb_shared_snapshot(void* resource_pointer, DodbSharedSnapshot* snapshot) {
+  auto* resources = static_cast<DodbSharedResources*>(resource_pointer);
+  auto* environment = rocksdb::Env::Default();
+  *snapshot = {
+      resources->cache->GetCapacity(), resources->cache->GetUsage(),
+      resources->cache->GetPinnedUsage(), resources->wbm->buffer_size(),
+      resources->wbm->memory_usage(), resources->wbm->mutable_memtable_memory_usage(),
+      resources->wbm->dummy_entries_in_cache_usage(),
+      static_cast<uint64_t>(environment->GetBackgroundThreads(rocksdb::Env::HIGH)),
+      static_cast<uint64_t>(environment->GetBackgroundThreads(rocksdb::Env::LOW))};
+}
+
+void* dodb_rocksdb_open_shared(const char* path, void* resource_pointer, char** error) {
+  try {
+    auto* resources = static_cast<DodbSharedResources*>(resource_pointer);
+    rocksdb::Options options;
+    options.create_if_missing = true;
+    options.compression = rocksdb::kNoCompression;
+    options.env = rocksdb::Env::Default();
+    options.write_buffer_manager = resources->wbm;
+    options.write_buffer_size = resources->config.write_buffer_bytes;
+    options.max_write_buffer_number = 2;
+    options.max_write_buffer_size_to_maintain = 1;
+    options.max_background_jobs = resources->config.flush_threads + resources->config.compaction_threads;
+    options.max_background_flushes = resources->config.flush_threads;
+    options.max_background_compactions = resources->config.compaction_threads;
+    options.max_subcompactions = 1;
+    options.max_open_files = resources->config.max_open_files;
+    rocksdb::BlockBasedTableOptions table;
+    table.block_cache = resources->cache;
+    table.cache_index_and_filter_blocks = true;
+    table.pin_l0_filter_and_index_blocks_in_cache = false;
+    table.pin_top_level_index_and_filter = false;
+    options.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table));
+    rocksdb::TransactionDB* database = nullptr;
+    const auto status = rocksdb::TransactionDB::Open(
+        options, rocksdb::TransactionDBOptions(), path, &database);
+    if (!status.ok()) {
+      set_error(error, status);
+      return nullptr;
+    }
+    return database;
+  } catch (const std::exception& exception) {
+    set_error(error, rocksdb::Status::Aborted(exception.what()));
+    return nullptr;
+  }
+}
+
+bool dodb_rocksdb_uses_shared(void* database_pointer, void* resource_pointer) {
+  auto* database = static_cast<rocksdb::TransactionDB*>(database_pointer);
+  auto* resources = static_cast<DodbSharedResources*>(resource_pointer);
+  const auto options = database->GetOptions();
+  const auto* table = options.table_factory->GetOptions<rocksdb::BlockBasedTableOptions>();
+  return options.write_buffer_manager == resources->wbm && table != nullptr &&
+      table->block_cache == resources->cache && table->cache_index_and_filter_blocks &&
+      !table->pin_l0_filter_and_index_blocks_in_cache &&
+      !table->pin_top_level_index_and_filter && resources->wbm->cost_to_cache() &&
+      options.env == rocksdb::Env::Default() &&
+      options.write_buffer_size == resources->config.write_buffer_bytes &&
+      options.max_open_files == resources->config.max_open_files &&
+      options.max_background_flushes == resources->config.flush_threads &&
+      options.max_background_compactions == resources->config.compaction_threads &&
+      options.max_background_jobs == resources->config.flush_threads + resources->config.compaction_threads &&
+      options.max_subcompactions == 1 && options.max_write_buffer_size_to_maintain == 1 &&
+      options.max_write_buffer_number == 2 && options.compression == rocksdb::kNoCompression;
+}
 
 struct DodbRocksDbReadTimings {
   uint64_t native_call_nanos;

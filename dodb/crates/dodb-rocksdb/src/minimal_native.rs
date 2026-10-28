@@ -28,6 +28,7 @@ const REVISION_RANGE_SIZE: u64 = DEFAULT_REVISION_RANGE_SIZE;
 pub struct MinimalNativeConfig {
     pub data_dir: PathBuf,
     pub revision_allocator: RevisionAllocatorMode,
+    pub shared_resources: Option<crate::shared_resources::SharedResourceConfig>,
 }
 
 impl MinimalNativeConfig {
@@ -35,6 +36,7 @@ impl MinimalNativeConfig {
         Self {
             data_dir: data_dir.into(),
             revision_allocator: RevisionAllocatorMode::ReservedRanges,
+            shared_resources: None,
         }
     }
 }
@@ -43,6 +45,7 @@ pub struct MinimalNativeService {
     data_dir: PathBuf,
     tenants: DashMap<TenantId, Arc<MinimalNativeTenant>>,
     tenant_open: Mutex<()>,
+    shared_resources: Option<crate::shared_resources::SharedResources>,
 }
 
 struct MinimalNativeTenant {
@@ -65,21 +68,51 @@ unsafe impl Send for MinimalIterator {}
 
 impl MinimalNativeService {
     pub fn new(config: MinimalNativeConfig) -> Result<Self, Error> {
-        std::fs::create_dir_all(&config.data_dir)?;
         if config.revision_allocator != RevisionAllocatorMode::ReservedRanges {
             return Err(Error::invalid_input(
                 "minimal native baseline requires reserved-range revisions",
             ));
         }
+        let shared_resources = config
+            .shared_resources
+            .map(crate::shared_resources::SharedResources::new)
+            .transpose()?;
+        std::fs::create_dir_all(&config.data_dir)?;
         Ok(Self {
             data_dir: config.data_dir,
             tenants: DashMap::new(),
             tenant_open: Mutex::new(()),
+            shared_resources,
         })
     }
 
     pub fn tenant_path(&self, tenant: TenantId) -> PathBuf {
         self.data_dir.join(format!("tenant-{}", tenant.get()))
+    }
+
+    pub fn shared_resource_snapshot(&self) -> Option<serde_json::Value> {
+        let resources = self.shared_resources.as_ref()?;
+        let _open_guard = self
+            .tenant_open
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let verified_tenants = self
+            .tenants
+            .iter()
+            .filter(|tenant| unsafe {
+                crate::shared_resources::dodb_rocksdb_uses_shared(
+                    tenant.handle.0.as_ptr(),
+                    resources.pointer(),
+                )
+            })
+            .count();
+        Some(serde_json::json!({
+            "scope": "service-wide snapshot counted once; non-atomic across native counters",
+            "usage": resources.snapshot(),
+            "opened_tenants": self.tenants.len(),
+            "tenants_verified_using_shared_resources": verified_tenants,
+            "all_opened_tenants_use_shared_resources": verified_tenants == self.tenants.len(),
+        }))
     }
 
     fn tenant(
@@ -107,7 +140,16 @@ impl MinimalNativeService {
         let path_c = CString::new(path_text)
             .map_err(|_| Error::invalid_input("tenant path contains a NUL byte"))?;
         let mut error = std::ptr::null_mut();
-        let handle = unsafe { crate::dodb_rocksdb_open(path_c.as_ptr(), &mut error) };
+        let handle = unsafe {
+            match &self.shared_resources {
+                Some(resources) => crate::shared_resources::dodb_rocksdb_open_shared(
+                    path_c.as_ptr(),
+                    resources.pointer(),
+                    &mut error,
+                ),
+                None => crate::dodb_rocksdb_open(path_c.as_ptr(), &mut error),
+            }
+        };
         let handle = NonNull::new(handle).ok_or_else(|| ffi_error(error, "RocksDB open failed"))?;
         let database = Arc::new(MinimalNativeTenant {
             handle: Arc::new(RocksDbHandle(handle)),
@@ -563,6 +605,159 @@ fn decode_present_record(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn shared_test_config(directory: &std::path::Path) -> MinimalNativeConfig {
+        let mut config = MinimalNativeConfig::new(directory);
+        config.shared_resources = Some(crate::shared_resources::SharedResourceConfig {
+            cache_bytes: 512 * 1024,
+            wbm_bytes: 128 * 1024,
+            write_buffer_bytes: 64 * 1024,
+            flush_threads: 1,
+            compaction_threads: 1,
+            max_open_files: 64,
+        });
+        config
+    }
+
+    #[test]
+    fn shared_resources_flush_across_tenants_and_reopen_every_value() {
+        let directory = tempfile::TempDir::new().unwrap();
+        let config = shared_test_config(directory.path());
+        let service = MinimalNativeService::new(config.clone()).unwrap();
+        let empty = service.shared_resource_snapshot().unwrap();
+        assert_eq!(empty["opened_tenants"], 0);
+        for row_number in 0_u64..128 {
+            for tenant_number in 1..=3 {
+                service
+                    .execute_request(
+                        TenantId::new(tenant_number),
+                        Request::Put {
+                            key: DocumentKey::new("pressure", row_number.to_be_bytes().to_vec()),
+                            value: vec![tenant_number as u8; 4096],
+                        },
+                        ExecutionBudget::new(2 * 1024 * 1024),
+                    )
+                    .unwrap();
+            }
+        }
+        let snapshot = service.shared_resource_snapshot().unwrap();
+        println!("Shared pressure boundary: {snapshot}");
+        assert_eq!(snapshot["opened_tenants"], 3);
+        assert_eq!(snapshot["tenants_verified_using_shared_resources"], 3);
+        assert_eq!(snapshot["all_opened_tenants_use_shared_resources"], true);
+        assert_eq!(snapshot["usage"]["cache_capacity_bytes"], 512 * 1024);
+        assert_eq!(snapshot["usage"]["wbm_limit_bytes"], 128 * 1024);
+        assert_eq!(snapshot["usage"]["flush_threads"], 1);
+        assert_eq!(snapshot["usage"]["compaction_threads"], 1);
+        let sst_count = (1..=3)
+            .flat_map(|tenant_number| {
+                std::fs::read_dir(service.tenant_path(TenantId::new(tenant_number))).unwrap()
+            })
+            .filter(|entry| {
+                entry
+                    .as_ref()
+                    .unwrap()
+                    .path()
+                    .extension()
+                    .is_some_and(|extension| extension == "sst")
+            })
+            .count();
+        let wbm_flush_count: usize = (1..=3)
+            .map(|tenant_number| {
+                std::fs::read_to_string(
+                    service
+                        .tenant_path(TenantId::new(tenant_number))
+                        .join("LOG"),
+                )
+                .unwrap()
+                .matches("Flushing triggered to alleviate write buffer memory usage")
+                .count()
+            })
+            .sum();
+        println!("WBM-triggered flushes: {wbm_flush_count}");
+        assert!(
+            wbm_flush_count > 0,
+            "the shared WBM must trigger a flush before shutdown"
+        );
+        println!("SST files before clean shutdown: {sst_count}");
+        assert!(
+            sst_count > 0,
+            "writes exceeding the WBM threshold must flush to SSTs"
+        );
+        drop(service);
+        let reopened = MinimalNativeService::new(config).unwrap();
+        for tenant_number in 1..=3 {
+            for row_number in 0_u64..128 {
+                let response = reopened
+                    .execute_request(
+                        TenantId::new(tenant_number),
+                        Request::Get {
+                            key: DocumentKey::new("pressure", row_number.to_be_bytes().to_vec()),
+                        },
+                        ExecutionBudget::new(2 * 1024 * 1024),
+                    )
+                    .unwrap();
+                match response {
+                    Response::Get(state) => {
+                        assert_eq!(
+                            state.value(),
+                            Some(vec![tenant_number as u8; 4096].as_slice())
+                        )
+                    }
+                    _ => panic!("expected Get response"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn shared_native_resources_survive_service_and_tenant_drop_with_a_live_iterator() {
+        let directory = tempfile::TempDir::new().unwrap();
+        let service = MinimalNativeService::new(shared_test_config(directory.path())).unwrap();
+        let key = DocumentKey::new("lifetime", "value");
+        service
+            .execute_request(
+                TenantId::new(1),
+                Request::Put {
+                    key: key.clone(),
+                    value: b"retained".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .unwrap();
+        let tenant = service.tenant(TenantId::new(1), false).unwrap().unwrap();
+        let iterator = tenant.iterator(&user_key(&key)).unwrap();
+        drop(tenant);
+        drop(service);
+        let (actual_key, value_pointer, value_length) = iterator.current().unwrap().unwrap();
+        assert_eq!(actual_key, user_key(&key));
+        let state =
+            decode_state(unsafe { std::slice::from_raw_parts(value_pointer, value_length) })
+                .unwrap();
+        assert_eq!(state.value(), Some(b"retained".as_slice()));
+        drop(iterator);
+        let reopened = MinimalNativeService::new(shared_test_config(directory.path())).unwrap();
+        assert!(matches!(
+            reopened
+                .execute_request(
+                    TenantId::new(1),
+                    Request::Get { key },
+                    ExecutionBudget::new(1024)
+                )
+                .unwrap(),
+            Response::Get(_)
+        ));
+    }
+
+    #[test]
+    fn invalid_shared_configuration_creates_no_directory() {
+        let directory = tempfile::TempDir::new().unwrap();
+        let missing = directory.path().join("must-not-exist");
+        let mut config = shared_test_config(&missing);
+        config.shared_resources.as_mut().unwrap().wbm_bytes = 0;
+        assert!(MinimalNativeService::new(config).is_err());
+        assert!(!missing.exists());
+    }
 
     #[test]
     fn lock_only_keys_exclude_writers_and_release_after_rollback_or_commit() {

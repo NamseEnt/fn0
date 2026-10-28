@@ -26,6 +26,24 @@ async fn minimal_native_transaction_path_satisfies_common_contract() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn shared_minimal_native_satisfies_transaction_and_reopen_contract() {
+    let directory = temporary_db_directory();
+    let service = || {
+        let mut config = MinimalNativeConfig::new(directory.path());
+        config.shared_resources = Some(dodb_rocksdb::shared_resources::SharedResourceConfig {
+            cache_bytes: 16 * 1024 * 1024,
+            wbm_bytes: 4 * 1024 * 1024,
+            write_buffer_bytes: 256 * 1024,
+            flush_threads: 1,
+            compaction_threads: 1,
+            max_open_files: 64,
+        });
+        MinimalNativeService::new(config).unwrap()
+    };
+    check_transaction_contract(service(), service).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn btree_blink_and_rocksdb_share_transaction_contract() {
     let native_directory = temporary_db_directory();
     let native_path = native_directory.path().to_path_buf();

@@ -23,6 +23,7 @@ pub mod memory_diagnostic;
 pub mod minimal_native;
 pub mod raw_research;
 pub mod research;
+pub mod shared_resources;
 
 pub use engine_health::{
     EngineHealthObserver, EngineHealthSampler, disabled_report as engine_health_disabled_report,

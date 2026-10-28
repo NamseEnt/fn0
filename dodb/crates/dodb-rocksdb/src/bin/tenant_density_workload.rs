@@ -222,6 +222,9 @@ async fn spawn_worker(
         "--memory-tenant-count".to_owned(),
         options.registered_tenants.to_string(),
     ];
+    if let Some(resources) = options.shared_resources {
+        worker_arguments.extend(resources.arguments());
+    }
     if options.backend == config::Backend::Blink {
         let checkpoint_configuration = options.blink_checkpoint.configuration();
         worker_arguments.extend([
@@ -713,6 +716,7 @@ fn expect_response(response: Response, context: &str) -> Result<(), Box<dyn std:
 
 fn effective_configuration(options: &Options) -> Value {
     json!({
+        "rocksdb_shared_resources": options.shared_resources.map(|resources| resources.report()),
         "backend": options.backend.as_str(), "registered_tenants": options.registered_tenants,
         "seed": options.seed, "duration_ms": options.duration_ms, "operation_count": options.operation_count,
         "request_timeout_ms": options.request_timeout_ms, "drain_timeout_ms": options.drain_timeout_ms,

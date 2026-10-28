@@ -32,6 +32,7 @@ type WorkerResult<T> = Result<T, WorkerError>;
 
 struct Arguments {
     backend: String,
+    shared_resources: Option<dodb_rocksdb::shared_resources::SharedResourceConfig>,
     data_dir: PathBuf,
     certificate_path: PathBuf,
     private_key_path: PathBuf,
@@ -84,11 +85,12 @@ impl BackendService {
                 };
                 Ok(Self::Blink(BlinkTenantService::new(config)?))
             }
-            "minimal-native" => {
+            "minimal-native" | "minimal-native-shared" => {
                 let mut config = dodb_rocksdb::minimal_native::MinimalNativeConfig::new(
                     arguments.data_dir.clone(),
                 );
                 config.revision_allocator = arguments.revision_allocator;
+                config.shared_resources = arguments.shared_resources;
                 Ok(Self::MinimalNative(Arc::new(
                     dodb_rocksdb::minimal_native::MinimalNativeService::new(config)?,
                 )))
@@ -122,6 +124,15 @@ impl BackendService {
             }
             "raw" => Ok(Self::Raw(Arc::new(RawRocksDb::open(&arguments.data_dir)?))),
             backend => Err(format!("unsupported diagnostic worker backend {backend}").into()),
+        }
+    }
+
+    fn shared_resource_snapshot(&self) -> serde_json::Value {
+        match self {
+            Self::MinimalNative(service) => service
+                .shared_resource_snapshot()
+                .unwrap_or(serde_json::Value::Null),
+            _ => serde_json::Value::Null,
         }
     }
 
@@ -274,7 +285,8 @@ fn backend_configuration_json(arguments: &Arguments) -> serde_json::Value {
             },
             "cache_capacity_is_blink_memory_limit": false,
         }),
-        "minimal-native" => json!({
+        "minimal-native" | "minimal-native-shared" => json!({
+            "shared_resources": arguments.shared_resources.map(|resources| resources.report()),
             "revision_allocator": "reserved-ranges",
             "condition_key_lock_mode": "exclusive",
             "compression": "disabled",
@@ -425,9 +437,12 @@ async fn main() -> WorkerResult<()> {
     });
     let mut health_sampler = None;
     let mut health_report = engine_health_disabled_report();
+    let mut shared_measurement_start = serde_json::Value::Null;
+    let mut shared_measurement_end = serde_json::Value::Null;
     while let Some(command) = command_receiver.recv().await {
         match command.as_str() {
             "start-measurement" => {
+                shared_measurement_start = backend.shared_resource_snapshot();
                 health_sampler = if arguments.engine_health_interval_ms == 0 {
                     None
                 } else {
@@ -443,6 +458,7 @@ async fn main() -> WorkerResult<()> {
                 };
             }
             "stop-measurement" => {
+                shared_measurement_end = backend.shared_resource_snapshot();
                 health_report = match health_sampler.take() {
                     Some(sampler) => sampler.finish()?,
                     None if arguments.engine_health_interval_ms == 0 => {
@@ -462,6 +478,7 @@ async fn main() -> WorkerResult<()> {
         || json!({"status": "unsupported", "reason": "backend exposes no RocksDB properties"}),
         |observer| observer.sample(),
     );
+    let shared_before_shutdown = backend.shared_resource_snapshot();
     let shutdown = tokio::time::timeout(Duration::from_secs(15), async {
         server.shutdown().await;
         (&mut server_task).await
@@ -499,6 +516,12 @@ async fn main() -> WorkerResult<()> {
             } else {
                 serde_json::Value::Null
             },
+            "shared_resource_snapshots": {
+                "measurement_start": shared_measurement_start,
+                "measurement_end": shared_measurement_end,
+                "before_shutdown": shared_before_shutdown,
+                "scope": "control-command boundaries; end includes drain; not continuous or peak instrumentation",
+            },
             "effective_backend_configuration": backend_configuration_json(&arguments),
             "blink_checkpoint_metrics": blink_checkpoint_metrics,
             "blink_checkpoint_metrics_scope": "worker_lifetime_including setup/preflight, offered load, measurement drain, and shutdown; measurement start/stop controls the RocksDB sampler only and does not reset or snapshot B-link checkpoint counters at offer boundaries",
@@ -528,9 +551,20 @@ async fn main() -> WorkerResult<()> {
 fn parse_arguments() -> WorkerResult<Arguments> {
     let values = std::env::args().skip(1).collect::<Vec<_>>();
     let backend = argument_value(&values, "--backend")?;
-    if !["raw", "core", "rocksdb-service", "blink", "minimal-native"].contains(&backend.as_str()) {
+    if ![
+        "raw",
+        "core",
+        "rocksdb-service",
+        "blink",
+        "minimal-native",
+        "minimal-native-shared",
+    ]
+    .contains(&backend.as_str())
+    {
         return Err(format!("unsupported diagnostic worker backend {backend}").into());
     }
+    let shared_resources =
+        dodb_rocksdb::shared_resources::SharedResourceConfig::from_arguments(&backend, &values)?;
     let data_dir = PathBuf::from(argument_value(&values, "--memory-data-dir")?);
     let certificate_path = PathBuf::from(argument_value(&values, "--memory-certificate")?);
     let private_key_path = PathBuf::from(argument_value(&values, "--memory-private-key")?);
@@ -626,7 +660,7 @@ fn parse_arguments() -> WorkerResult<Arguments> {
         "shared" => ConditionKeyLockMode::Shared,
         other => return Err(format!("unknown condition key lock mode {other}").into()),
     };
-    if backend == "minimal-native"
+    if matches!(backend.as_str(), "minimal-native" | "minimal-native-shared")
         && (revision_allocator != RevisionAllocatorMode::ReservedRanges
             || condition_key_lock_mode != ConditionKeyLockMode::Exclusive)
     {
@@ -637,6 +671,7 @@ fn parse_arguments() -> WorkerResult<Arguments> {
     }
     Ok(Arguments {
         backend,
+        shared_resources,
         data_dir,
         certificate_path,
         private_key_path,

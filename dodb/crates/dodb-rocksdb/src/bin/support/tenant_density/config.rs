@@ -6,6 +6,7 @@ use dodb_server::BlinkCheckpointPolicy;
 pub enum Backend {
     Blink,
     MinimalNative,
+    MinimalNativeShared,
 }
 
 impl Backend {
@@ -13,6 +14,7 @@ impl Backend {
         match self {
             Self::Blink => "blink",
             Self::MinimalNative => "minimal-native",
+            Self::MinimalNativeShared => "minimal-native-shared",
         }
     }
 }
@@ -79,6 +81,7 @@ impl Profile {
 #[derive(Clone, Debug)]
 pub struct Options {
     pub backend: Backend,
+    pub shared_resources: Option<dodb_rocksdb::shared_resources::SharedResourceConfig>,
     pub data_dir: PathBuf,
     pub report_path: PathBuf,
     pub seed: u64,
@@ -144,15 +147,23 @@ impl Options {
             "--blink-checkpoint-wal-bytes",
         ];
         for name in values.keys() {
-            if !known_options.contains(name) {
+            if !known_options.contains(name)
+                && !dodb_rocksdb::shared_resources::SHARED_RESOURCE_FLAGS.contains(name)
+            {
                 return Err(format!("unknown option {name}"));
             }
         }
         let backend = match required(&values, "--backend")? {
             "blink" => Backend::Blink,
             "minimal-native" => Backend::MinimalNative,
+            "minimal-native-shared" => Backend::MinimalNativeShared,
             value => return Err(format!("unsupported backend {value}")),
         };
+        let shared_resources =
+            dodb_rocksdb::shared_resources::SharedResourceConfig::from_arguments(
+                backend.as_str(),
+                arguments,
+            )?;
         let data_dir = PathBuf::from(required(&values, "--data-dir")?);
         let report_path = PathBuf::from(required(&values, "--report")?);
         let seed = parse_number(&values, "--seed")?;
@@ -218,6 +229,7 @@ impl Options {
         }
         let options = Self {
             backend,
+            shared_resources,
             data_dir,
             report_path,
             seed,
@@ -465,6 +477,37 @@ mod tests {
             assert_eq!(options.profile, Profile::ReadHeavy);
             drop(directory);
         }
+    }
+
+    #[test]
+    fn shared_route_requires_explicit_resources_and_preserves_old_defaults() {
+        let (_directory, mut argument_values) = arguments(&[]);
+        let backend_position = argument_values
+            .iter()
+            .position(|argument| argument == "--backend")
+            .unwrap();
+        assert!(
+            Options::parse(&argument_values)
+                .unwrap()
+                .shared_resources
+                .is_none()
+        );
+        argument_values[backend_position + 1] = "minimal-native-shared".to_owned();
+        assert!(Options::parse(&argument_values).is_err());
+        let config = dodb_rocksdb::shared_resources::SharedResourceConfig {
+            cache_bytes: 16 * 1024 * 1024,
+            wbm_bytes: 4 * 1024 * 1024,
+            write_buffer_bytes: 256 * 1024,
+            flush_threads: 1,
+            compaction_threads: 1,
+            max_open_files: 64,
+        };
+        argument_values.extend(config.arguments());
+        let options = Options::parse(&argument_values).unwrap();
+        assert_eq!(options.backend, Backend::MinimalNativeShared);
+        assert_eq!(options.shared_resources, Some(config));
+        argument_values[backend_position + 1] = "minimal-native".to_owned();
+        assert!(Options::parse(&argument_values).is_err());
     }
 
     #[test]

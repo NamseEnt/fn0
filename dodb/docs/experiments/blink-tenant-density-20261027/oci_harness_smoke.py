@@ -16,6 +16,17 @@ CASES = [
     ('native-all-active', 'minimal-native', 'fixed-total'),
     ('native-sparse', 'minimal-native', 'fixed-per-tenant'),
     ('blink-sparse', 'blink', 'fixed-per-tenant'),
+    ('shared-all-active', 'minimal-native-shared', 'fixed-total'),
+    ('shared-sparse', 'minimal-native-shared', 'fixed-per-tenant'),
+]
+
+
+SHARED_ARGUMENTS = [
+    '--rocksdb-shared-cache-bytes', str(8 * 1024**2),
+    '--rocksdb-shared-wbm-bytes', str(4 * 1024**2),
+    '--rocksdb-write-buffer-bytes', str(64 * 1024),
+    '--rocksdb-flush-threads', '1', '--rocksdb-compaction-threads', '1',
+    '--rocksdb-max-open-files', '64',
 ]
 
 
@@ -105,6 +116,34 @@ def validate_report(path, source_commit, backend, topology):
         require(health.get('shutdown_complete') is True, 'worker shutdown incomplete')
         require(health.get('compiled_source_revision') == source_commit, 'worker source revision mismatch')
         require(health.get('backend') == backend, 'worker backend mismatch')
+    if backend == 'minimal-native-shared' and len(health_reports) == 4:
+        expected_config = {'cache_bytes': 8 * 1024**2, 'wbm_bytes': 4 * 1024**2,
+            'write_buffer_bytes': 64 * 1024, 'flush_threads': 1,
+            'compaction_threads': 1, 'max_open_files': 64}
+        require(configuration.get('rocksdb_shared_resources', {}).get('configured') == expected_config, 'driver resource configuration mismatch')
+        for epoch_index, health in enumerate(health_reports):
+            resource_config = health.get('effective_backend_configuration', {}).get('shared_resources', {})
+            require(resource_config.get('configured') == expected_config, 'worker resource configuration mismatch')
+            require(resource_config.get('process_memory_limit_enforced') is False, 'misleading process memory enforcement')
+            require(resource_config.get('memtables_charged_to_cache') is True, 'memtables not charged to cache')
+            require(resource_config.get('wbm_allow_stall') is False, 'rejected WBM stall policy enabled')
+            require(resource_config.get('max_write_buffer_size_to_maintain_per_tenant') == 1, 'history target mismatch')
+            snapshots = health.get('shared_resource_snapshots', {})
+            snapshot_names = ['before_shutdown']
+            if epoch_index == 1:
+                snapshot_names += ['measurement_start', 'measurement_end']
+            for snapshot_name in snapshot_names:
+                snapshot = snapshots.get(snapshot_name, {})
+                expected_opened = active_count + (0 if active_count == 17 else 2) if epoch_index == 1 else 17
+                require(snapshot.get('opened_tenants') == expected_opened, 'native opened tenant count mismatch')
+                require(snapshot.get('tenants_verified_using_shared_resources') == expected_opened, 'shared native pointer verification mismatch')
+                require(snapshot.get('all_opened_tenants_use_shared_resources') is True, 'tenant resource sharing failed')
+                usage = snapshot.get('usage', {})
+                require(usage.get('cache_capacity_bytes') == expected_config['cache_bytes'], 'native cache capacity mismatch')
+                require(usage.get('wbm_limit_bytes') == expected_config['wbm_bytes'], 'native WBM limit mismatch')
+                require(usage.get('flush_threads') == 1 and usage.get('compaction_threads') == 1, 'native background pool mismatch')
+                for field in ['cache_usage_bytes', 'cache_pinned_usage_bytes', 'wbm_usage_bytes', 'wbm_mutable_bytes', 'wbm_cache_reservation_bytes']:
+                    require(isinstance(usage.get(field), int) and usage[field] >= 0, f'missing native usage {field}')
     if backend == 'blink' and len(health_reports) == 4:
         measured = health_reports[1]
         effective = measured.get('effective_backend_configuration', {})
@@ -162,6 +201,8 @@ def run_smoke(run_name, source_commit, selected_cases):
             invocation += ['--operation-count', '1700']
         else:
             invocation += ['--duration-ms', '3000', '--per-tenant-rate', '10']
+        if backend == 'minimal-native-shared':
+            invocation += SHARED_ARGUMENTS
         if backend == 'blink':
             invocation += ['--blink-wal-layout', 'segmented-bases-coalesced',
                 '--blink-checkpoint-execution', 'background', '--blink-wal-segment-bytes', '8192',
@@ -194,7 +235,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--run-name', required=True)
     parser.add_argument('--source-commit', required=True)
-    parser.add_argument('--cases', nargs='+', choices=[case[0] for case in CASES], default=[case[0] for case in CASES])
+    parser.add_argument('--cases', nargs='+', choices=[case[0] for case in CASES], default=[case[0] for case in CASES if case[1] != 'minimal-native-shared'])
     options = parser.parse_args()
     return run_smoke(options.run_name, options.source_commit, options.cases)
 
