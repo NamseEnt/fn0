@@ -1,0 +1,9 @@
+{
+  "archive": "/home/opc/tenant-density-harness-20261027/shutdown-runtime-b22638bdc-r1.tar.gz",
+  "archive_sha256": "faa8385a15da717d4c5b1f9337e244d6fe7e351a71df136443a975c26e3204a4",
+  "bytes": 217505,
+  "runs": [
+    "shutdown-b22638bdc-r1"
+  ],
+  "preserved_database_records": 4
+}

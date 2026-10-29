@@ -1,0 +1,30 @@
+{
+  "reason": "AssertionError({'case': 'confirm-e3-n5-r1-blink', 'backend': 'blink', 'stage': 'E3', 'tenants': 5, 'active': 5, 'duration_ms': 60000, 'sample_interval_ms': 1000, 'exit_code': 1, 'elapsed_seconds': 106.12940167495981, 'capacity_after': {'timestamp_unix_seconds': 1793239927.6135747, 'zfs_free_bytes': 29428006912, 'boot_free_bytes': 5500895232, 'memory_bytes': {'MemTotal': 11427577856, 'MemAvailable': 5105512448, 'SwapTotal': 4294963200, 'SwapFree': 3859197952, 'Dirty': 1110016, 'Writeback': 0}, 'arc': {'c': 5713788928, 'c_min': 357111808, 'c_max': 5713788928, 'size': 5604749120, 'memory_throttle_count': 0}, 'device_stat': '11253492       15 481531680 14207678 119346191   208677 6177301324 192934668        0 55918644 207152980     1098      384 1961318615    10634        0        0', 'cpu_stat': ['cpu  10143917 303111 5333244 481237858 1334310 333335 158307 1713215 0 0', 'cpu0 5085079 142820 2668620 240612596 677501 165599 79928 845121 0 0', 'cpu1 5058838 160291 2664624 240625262 656808 167736 78378 868093 0 0']}, 'stop_reason': None, 'report_sha256': '01e2695134f98f71af996cf11e3ed53c4fc5fa9642787498862bea0f2bab464c', 'review_error': \"AssertionError({'backend': 'blink', 'registered': 5, 'active': 5, 'initial_rows': 32768, 'duration_ms': 60000, 'sample_interval_ms': 1000, 'status': 'failed_or_inconclusive', 'cell_peak_bytes': 228511744, 'cell_events': {'high': 6218, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'epoch_peaks_bytes': {'measurement': 0, 'oracle': 0, 'reopen-oracle': 0, 'setup': 228470784}, 'epoch_events': {'measurement': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'oracle': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'reopen-oracle': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'setup': {'high': 3109, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}}, 'operational_pass': False, 'slo_pass': False, 'resource_failure': False, 'failure_reason': 'diagnostic worker shutdown timed out and was killed'})\"})",
+  "completed_cells": 4,
+  "capacity": {
+    "timestamp_unix_seconds": 1793239927.628432,
+    "zfs_free_bytes": 29428006912,
+    "boot_free_bytes": 5500772352,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5105512448,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3859197952,
+      "Dirty": 1245184,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5713788928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5604749120,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11253492       15 481531680 14207678 119346191   208677 6177301324 192934668        0 55918644 207152980     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  10143918 303111 5333245 481237860 1334310 333335 158307 1713215 0 0",
+      "cpu0 5085079 142820 2668620 240612598 677501 165599 79928 845121 0 0",
+      "cpu1 5058838 160291 2664625 240625262 656808 167736 78378 868093 0 0"
+    ]
+  }
+}

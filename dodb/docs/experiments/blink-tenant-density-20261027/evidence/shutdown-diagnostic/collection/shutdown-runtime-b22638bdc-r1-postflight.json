@@ -1,0 +1,292 @@
+{
+  "collector_sha256": "ce3480bcf4a3946579611dad07b53824a708b95d3f5bfb0ab83765b1ca0bc904",
+  "capacity": {
+    "timestamp_unix_seconds": 1793240043.070354,
+    "zfs_free_bytes": 29428006912,
+    "boot_free_bytes": 5504995328,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5129695232,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3859197952,
+      "Dirty": 53248,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5713788928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5605213792,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11253492       15 481531680 14207678 119346191   208677 6177301324 192934668        0 55918644 207152980     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  10144131 303111 5333400 481260554 1334310 333341 158313 1713220 0 0",
+      "cpu0 5085232 142820 2668714 240623883 677501 165602 79931 845123 0 0",
+      "cpu1 5058898 160291 2664685 240636671 656809 167738 78381 868096 0 0"
+    ]
+  },
+  "source_commit": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+  "source_clean": true,
+  "native_archive_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+  "native_archive_bytes": 1199825562,
+  "validation_sha256": "51e46b38bcca577595c8d6b482c5bc43c74ef019fb253ef2e968287e1d3cca7e",
+  "validation_passing_tests": 79,
+  "validation_same_17_existing_clippy_diagnostics": true,
+  "target_symlink": "/bench/zfs/db/tenant-density-build-cache-20261029/target",
+  "resolved_target_directory": "/bench/zfs/db/tenant-density-build-cache-20261029/target",
+  "validation_build_hashes": {
+    "observations-clean-tests": {
+      "builds/observations-clean-tests/cargo.log": "8495c969c2c12e5bed2a1fd1317adf0ce36de8d6317b59faceac25cdb4b2e1fb",
+      "builds/observations-clean-tests/provenance.json": "d2b7f4bc2d44e31c021c1d099353b740502e468efca194468b4e38a3c10f8ebc",
+      "builds/observations-clean-tests/status.json": "98058ee571bc75c5532369b742e3421806139b662710b84323dd936c79e349d6"
+    },
+    "observations-clean-clippy": {
+      "builds/observations-clean-clippy/cargo.log": "e18db3923c10f8a38e7e97532a34f20fa6b542fecd3736937ab7fc445701a245",
+      "builds/observations-clean-clippy/provenance.json": "fafc03eb2a150825836e833fa8d026d2ffdea4223ae9069addfdd3a6e2a0d3fd",
+      "builds/observations-clean-clippy/status.json": "20d587788737bf48b640bfcaa793c03e6daafefa43b6720aea0b5cf02e5e4b49"
+    },
+    "observations-clean-a1-link": {
+      "builds/observations-clean-a1-link/cargo.log": "b718a29aac7f2c5b8f971492654b925bbbd5a90a27bad417129166e41d50effa",
+      "builds/observations-clean-a1-link/provenance.json": "c561d25b9e52d13c1299fce2e27b7950be12ed37a4c1d735f80f2defa3c86d3f",
+      "builds/observations-clean-a1-link/status.json": "9cf84cd00cd92f83f995727aa5cf9abf6399629c1d837e97dd3a627f5a94c4db"
+    },
+    "observations-clean-default-link": {
+      "builds/observations-clean-default-link/cargo.log": "c2901d717a8126fbe5e38426d66c75fe57c2dffb464c4eb12a025c8c7f4ab824",
+      "builds/observations-clean-default-link/provenance.json": "d6efe0976651e67cac72341b36cf62cc2634ed9e3fbaca88168e469ff0412a75",
+      "builds/observations-clean-default-link/status.json": "4ef464d5f36a9221d550474a2ed73e83e2a823e383da0ad44419124770f2994a"
+    },
+    "shutdown-clean-tests": {
+      "builds/shutdown-clean-tests/cargo.log": "4f168c32804953e03b1a00d30c78325f8eb228ca4a316101e50ed344b29aed34",
+      "builds/shutdown-clean-tests/provenance.json": "51af4a0dd0ead82f62131330ec3100081b798acdae06dba3a0824f7337c984e5",
+      "builds/shutdown-clean-tests/status.json": "89bd50f8dbf6dafe01628c4710dbac3f837a625b44bbfaf3bc06661a5e3e108a"
+    },
+    "shutdown-clean-clippy": {
+      "builds/shutdown-clean-clippy/cargo.log": "1d43d8a1926a8ce46688941d28f2384f5222b597382a5779fc3715492cd99205",
+      "builds/shutdown-clean-clippy/provenance.json": "061a14ca5b82cb083904f6f90725d57c3a88f12c6e6e3be044e450b78cfe7e9e",
+      "builds/shutdown-clean-clippy/status.json": "0e3cf90be02ce7e69935e6e307d32498a6d6d77fc2e63a6ae95cdd5c7118c49d"
+    },
+    "shutdown-clean-a1-link": {
+      "builds/shutdown-clean-a1-link/cargo.log": "d47c90a6d6b8e83d106b93583ad96d707b8f8fc2a813855f5b504fdffb7dd5db",
+      "builds/shutdown-clean-a1-link/provenance.json": "7485e5049350605825a97a53697c7adf8747d697b8d77b1d2a6418d41b6cc8f9",
+      "builds/shutdown-clean-a1-link/status.json": "d9b88e655e50c28a4c40efdfddd9fd50844df8047231f31f3c283989497b9a64"
+    },
+    "shutdown-clean-default-link": {
+      "builds/shutdown-clean-default-link/cargo.log": "a2f9f7889e88ba38ddcfecdb5afc8516742ad9186965960a94adbbe4ac21b5ad",
+      "builds/shutdown-clean-default-link/provenance.json": "acd83ce352c62ed9914e22699a75e1e9a854feee4c5407f77f2be23883665d59",
+      "builds/shutdown-clean-default-link/status.json": "2c6f402a44e6e3f812788f362304d26122f8eb409b28feef43e07b551beb0f90"
+    }
+  },
+  "runs": {
+    "shutdown-b22638bdc-r1": {
+      "source_commit": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+      "binaries": {
+        "tenant_density_workload": {
+          "sha256": "1dffa40a17a3f422267fe63685c1d5e69b8b53d1ba057e14265022905b89a843",
+          "bytes": 16714032
+        },
+        "memory_diagnostic_worker": {
+          "sha256": "31a4adc6e135694de43a911ea1de4e1546c064143711c7118932d3f0b4d35508",
+          "bytes": 17232664
+        }
+      },
+      "processes": [
+        {
+          "pid": 2406930,
+          "start_time_ticks": 250149290,
+          "role": "harness-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406935,
+          "start_time_ticks": 250149303,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406467,
+          "start_time_ticks": 250133268,
+          "role": "harness-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406473,
+          "start_time_ticks": 250133281,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406567,
+          "start_time_ticks": 250135071,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406706,
+          "start_time_ticks": 250141119,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406801,
+          "start_time_ticks": 250145024,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406302,
+          "start_time_ticks": 250132061,
+          "role": "harness-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406307,
+          "start_time_ticks": 250132075,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406324,
+          "start_time_ticks": 250132159,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406330,
+          "start_time_ticks": 250132391,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406335,
+          "start_time_ticks": 250132460,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406340,
+          "start_time_ticks": 250132663,
+          "role": "harness-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406345,
+          "start_time_ticks": 250132675,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406373,
+          "start_time_ticks": 250132735,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406397,
+          "start_time_ticks": 250132968,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2406421,
+          "start_time_ticks": 250133045,
+          "role": "backend-process",
+          "same_live_process": false
+        }
+      ],
+      "databases": {
+        "confirm-e3-n5-r1-blink": {
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/shutdown-b22638bdc-r1/confirm-e3-n5-r1-blink",
+          "preserved": true
+        },
+        "confirm-e3-n5-r1-shared": {
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/shutdown-b22638bdc-r1/confirm-e3-n5-r1-shared",
+          "preserved": true
+        },
+        "tiny-e2-n1-ms1000-blink": {
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/shutdown-b22638bdc-r1/tiny-e2-n1-ms1000-blink",
+          "preserved": true
+        },
+        "tiny-e2-n1-ms1000-shared": {
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/shutdown-b22638bdc-r1/tiny-e2-n1-ms1000-shared",
+          "preserved": true
+        }
+      },
+      "cgroup_processes": {
+        "confirm-e3-n5-r1-blink": {
+          "cgroup.procs": "",
+          "measurement/cgroup.procs": "",
+          "oracle/cgroup.procs": "",
+          "reopen-oracle/cgroup.procs": "",
+          "setup/cgroup.procs": ""
+        },
+        "confirm-e3-n5-r1-shared": {
+          "cgroup.procs": "",
+          "measurement/cgroup.procs": "",
+          "oracle/cgroup.procs": "",
+          "reopen-oracle/cgroup.procs": "",
+          "setup/cgroup.procs": ""
+        },
+        "tiny-e2-n1-ms1000-blink": {
+          "cgroup.procs": "",
+          "measurement/cgroup.procs": "",
+          "oracle/cgroup.procs": "",
+          "reopen-oracle/cgroup.procs": "",
+          "setup/cgroup.procs": ""
+        },
+        "tiny-e2-n1-ms1000-shared": {
+          "cgroup.procs": "",
+          "measurement/cgroup.procs": "",
+          "oracle/cgroup.procs": "",
+          "reopen-oracle/cgroup.procs": "",
+          "setup/cgroup.procs": ""
+        }
+      },
+      "status_count": 4,
+      "completed": false,
+      "controller_failure": true
+    }
+  },
+  "extra_files": [
+    {
+      "path": "shutdown-validation-launcher.log",
+      "sha256": "96c01e4fb4a39ff2c1a4cfb2bd19cb308b43e322d1bef551de8d7ca659a1719b",
+      "bytes": 360
+    },
+    {
+      "path": "shutdown-validation-pid.txt",
+      "sha256": "284e2939b74c60fcd4725dfcab7cfab57afb8fe1c849d4d68896526184d60852",
+      "bytes": 8
+    },
+    {
+      "path": "shutdown-validation-r2-launcher.log",
+      "sha256": "eb0ab7016fbcb39004325e625ce5a7dc0bf8420c5188eecdd716f319520b455e",
+      "bytes": 3795
+    },
+    {
+      "path": "shutdown-validation-r2-pid.txt",
+      "sha256": "ca4868634c4427be256ebec9f3ec5b871e276af3310fb266b9e4be3cbf90720a",
+      "bytes": 8
+    },
+    {
+      "path": "shutdown-runtime-r1-launcher.log",
+      "sha256": "e8cf1712fc3d87b02115aaedc0cd44e3204dce71a8a953688fba7823f775f561",
+      "bytes": 5187
+    },
+    {
+      "path": "shutdown-runtime-r1-pid.txt",
+      "sha256": "761bdc1a22de0a583c8195db89fc31f4cbe9b4fb57f1d0633983802e399e3358",
+      "bytes": 8
+    },
+    {
+      "path": "oci_shutdown_validate.py",
+      "sha256": "5fc774977b3630a87b5cae4405c651559176943d2f3741d9618a298cdd862680",
+      "bytes": 9779
+    },
+    {
+      "path": "oci_harness_build.py",
+      "sha256": "81ef2f497fc924c80533ab7d0b27c16686c3f9b7c4e11077ee9875aef92b6a58",
+      "bytes": 5578
+    }
+  ]
+}

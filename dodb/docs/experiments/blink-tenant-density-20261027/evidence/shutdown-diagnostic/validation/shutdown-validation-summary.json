@@ -1,0 +1,256 @@
+{
+  "source_commit": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+  "baseline_passing_tests": 74,
+  "baseline_test_group_counts": [
+    42,
+    6,
+    17,
+    5,
+    4
+  ],
+  "baseline_clippy_diagnostics": [
+    {
+      "message": "matching on `Some` with `ok()` is redundant",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "matching on `Some` with `ok()` is redundant",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this function has too many arguments (8/7)",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "path": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs"
+    },
+    {
+      "message": "this function has too many arguments (8/7)",
+      "path": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs"
+    },
+    {
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "path": "dodb/crates/dodb-rocksdb/src/minimal_native.rs"
+    },
+    {
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+    },
+    {
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+    },
+    {
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+    },
+    {
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+    },
+    {
+      "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+      "path": "dodb/crates/dodb-rocksdb/tests/common/transaction_contract.rs"
+    }
+  ],
+  "native_archive_sha256_before": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+  "native_archive_bytes_before": 1199825562,
+  "target_symlink_before": "/bench/zfs/db/tenant-density-build-cache-20261029/target",
+  "resolved_target_directory_before": "/bench/zfs/db/tenant-density-build-cache-20261029/target",
+  "outcomes": [
+    {
+      "name": "shutdown-clean-tests",
+      "exit_code": 0,
+      "command": [
+        "test",
+        "--locked",
+        "--offline",
+        "--release",
+        "-p",
+        "dodb-rocksdb",
+        "--lib",
+        "--bin",
+        "tenant_density_workload",
+        "--bin",
+        "memory_diagnostic_worker",
+        "--test",
+        "read_contract",
+        "--test",
+        "transaction_contract",
+        "--",
+        "--test-threads=1"
+      ],
+      "reused_completed_check": false,
+      "test_group_counts": [
+        42,
+        9,
+        19,
+        5,
+        4
+      ],
+      "passing_tests": 79
+    },
+    {
+      "name": "shutdown-clean-clippy",
+      "exit_code": 0,
+      "command": [
+        "clippy",
+        "--locked",
+        "--offline",
+        "--release",
+        "-p",
+        "dodb-rocksdb",
+        "--lib",
+        "--bin",
+        "tenant_density_workload",
+        "--bin",
+        "memory_diagnostic_worker",
+        "--test",
+        "read_contract",
+        "--test",
+        "transaction_contract",
+        "--no-deps"
+      ],
+      "reused_completed_check": false,
+      "clippy_diagnostics": [
+        {
+          "message": "matching on `Some` with `ok()` is redundant",
+          "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+        },
+        {
+          "message": "matching on `Some` with `ok()` is redundant",
+          "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+        },
+        {
+          "message": "this function has too many arguments (8/7)",
+          "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+        },
+        {
+          "message": "very complex type used. Consider factoring parts into `type` definitions",
+          "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+        },
+        {
+          "message": "this `if` statement can be collapsed",
+          "path": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs"
+        },
+        {
+          "message": "this function has too many arguments (8/7)",
+          "path": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs"
+        },
+        {
+          "message": "very complex type used. Consider factoring parts into `type` definitions",
+          "path": "dodb/crates/dodb-rocksdb/src/minimal_native.rs"
+        },
+        {
+          "message": "very complex type used. Consider factoring parts into `type` definitions",
+          "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+        },
+        {
+          "message": "very complex type used. Consider factoring parts into `type` definitions",
+          "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+        },
+        {
+          "message": "very complex type used. Consider factoring parts into `type` definitions",
+          "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+        },
+        {
+          "message": "very complex type used. Consider factoring parts into `type` definitions",
+          "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+        },
+        {
+          "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+          "path": "dodb/crates/dodb-rocksdb/tests/common/transaction_contract.rs"
+        }
+      ],
+      "same_17_existing_clippy_diagnostics": true
+    },
+    {
+      "name": "shutdown-clean-a1-link",
+      "exit_code": 0,
+      "command": [
+        "build",
+        "--locked",
+        "--offline",
+        "--release",
+        "-p",
+        "dodb-rocksdb",
+        "--bin",
+        "tenant_density_workload",
+        "--bin",
+        "memory_diagnostic_worker",
+        "--features",
+        "dodb-storage/blink-writer-pin-reuse"
+      ],
+      "reused_completed_check": false
+    },
+    {
+      "name": "shutdown-clean-default-link",
+      "exit_code": 0,
+      "command": [
+        "build",
+        "--locked",
+        "--offline",
+        "--release",
+        "-p",
+        "dodb-rocksdb",
+        "--bin",
+        "tenant_density_workload",
+        "--bin",
+        "memory_diagnostic_worker"
+      ],
+      "reused_completed_check": false
+    }
+  ],
+  "native_archive_sha256_after": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+  "native_archive_bytes_after": 1199825562,
+  "target_symlink_after": "/bench/zfs/db/tenant-density-build-cache-20261029/target",
+  "resolved_target_directory_after": "/bench/zfs/db/tenant-density-build-cache-20261029/target",
+  "passing_tests": 79,
+  "same_17_existing_clippy_diagnostics": true,
+  "default_link_was_last": true
+}

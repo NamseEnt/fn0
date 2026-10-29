@@ -14,6 +14,8 @@ The raw-observation follow-up confirms an actual diagnostic cost: at one E2 tena
 
 Report both sources and dates. The current-host archived-binary cadence control addresses that narrow low-load comparison; it does not recreate every large-population baseline. [OBSERVATION-RETENTION-RESULTS.md](OBSERVATION-RETENTION-RESULTS.md) preserves all twenty new cells and their acceptance boundaries.
 
+The subsequent b226 shutdown diagnostic stopped at its first five-tenant B-link setup, before offered load. Its trace locates an outstanding asynchronous server-shutdown interval under the same high/max policy, without identifying the internal cause. Three other diagnostic cells completed, including the five-tenant reference. [SHUTDOWN-DIAGNOSTIC-RESULTS.md](SHUTDOWN-DIAGNOSTIC-RESULTS.md) preserves this separate cohort; the further external wait observation is not a completed capacity result.
+
 File allocation snapshots also remain relevant to the goal. They measure reachable files at named phase boundaries. They do not measure continuous peak space, unlinked-open files, physical space returned after deletion, or steady-state write amplification. Do not replace the disk-efficiency question with a throughput comparison or infer disk reclamation from checkpoint completion.
 
 ## Structure confirmed in source

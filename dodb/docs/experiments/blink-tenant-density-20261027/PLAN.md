@@ -414,7 +414,7 @@ If shared-resource minimal-native meets the service objective with no meaningful
 - [x] Live host sizing and explicit frozen bounded E2/E3/maintenance protocols; see [DENSITY-CAPACITY-PLAN.md](DENSITY-CAPACITY-PLAN.md), [CAPACITY-CONTINUATION.md](CAPACITY-CONTINUATION.md), and [CAPACITY-SUPPLEMENT-PLAN.md](CAPACITY-SUPPLEMENT-PLAN.md).
 - [x] Bounded instrumented E2/E3 frontier, cadence/sparse sensitivities, short maintenance observations, and reproducible evidence reduction; see [DENSITY-CAPACITY-RESULTS.md](DENSITY-CAPACITY-RESULTS.md).
 - [x] Lower-overhead raw observation storage, current-host cadence control, and preserved stopped confirmation; see [OBSERVATION-RETENTION-RESULTS.md](OBSERVATION-RETENTION-RESULTS.md). This does not accept the unexecuted capacity/maintenance cells.
-- [ ] Shutdown attribution without relaxing the twenty-second parent or fifteen-second worker deadlines; see [SHUTDOWN-DIAGNOSTIC-PLAN.md](SHUTDOWN-DIAGNOSTIC-PLAN.md).
+- [ ] Internal shutdown attribution without relaxing the twenty-second parent or fifteen-second worker deadlines. The phase diagnostic located an outstanding asynchronous server-shutdown interval but did not identify its internal cause; see [SHUTDOWN-DIAGNOSTIC-RESULTS.md](SHUTDOWN-DIAGNOSTIC-RESULTS.md) and [SHUTDOWN-OFFCPU-PLAN.md](SHUTDOWN-OFFCPU-PLAN.md).
 - [ ] Broader density/maintenance acceptance, including larger-than-budget and host-ARC boundaries.
 - [ ] Decision on B1/B2/B3/B4 implementation and adoption.
 

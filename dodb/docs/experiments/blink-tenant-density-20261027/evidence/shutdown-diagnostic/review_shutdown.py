@@ -60,6 +60,15 @@ def read_json(file_path):
     return json.loads(file_path.read_text())
 
 
+def write_review_output(output_path, output):
+    serialized = json.dumps(output, indent=2) + '\n'
+    if output_path.exists():
+        assert output_path.read_text() == serialized, 'existing shutdown review differs from the deterministic result'
+        return
+    with output_path.open('x') as output_file:
+        output_file.write(serialized)
+
+
 def worker_identities(report):
     diagnostic = report['memory_diagnostic']
     processes = {
@@ -167,9 +176,23 @@ def measurement_worker_pid(report):
     health_reports = report['memory_diagnostic']['engine_health_reports']
     if len(health_reports) > 1:
         return health_reports[1]['worker_pid']
+    epochs = {sample.get('epoch') for sample in report.get('backend_memory_pressure', {}).get('samples', [])}
+    if report['status'] != 'completed' and 'measurement' not in epochs and 'setup' in epochs:
+        return None
     started = [event for event in report['memory_diagnostic']['worker_lifecycle']
                if event['event'] == 'started']
     return started[-1]['pid'] if started else None
+
+
+def selected_worker(report, measurement_pid):
+    if measurement_pid is not None:
+        return measurement_pid, 'measurement'
+    lifecycle = report['memory_diagnostic']['worker_lifecycle']
+    started = [event for event in lifecycle if event['event'] == 'started']
+    epochs = {sample.get('epoch') for sample in report.get('backend_memory_pressure', {}).get('samples', [])}
+    if report['status'] != 'completed' and 'measurement' not in epochs and 'setup' in epochs:
+        return (started[-1]['pid'] if started else None), 'setup'
+    return None, None
 
 
 def parent_watchdog(report):
@@ -205,6 +228,59 @@ def partial_workload_review(report):
         assert 'workload' in partial and type(partial['workload']) is dict
         return {'status': status, 'validated': False, 'workload': partial['workload']}
     raise AssertionError({'partial_workload_counters_status': status})
+
+
+def setup_parent_watchdog_classification(case, source_commit, report, status,
+                                         selected_worker_pid, selected_worker_epoch, stages, trace_events):
+    if case != 'confirm-e3-n5-r1-blink' or source_commit != SOURCE_COMMIT:
+        return None
+    diagnostic = report['memory_diagnostic']
+    pressure_samples = report['backend_memory_pressure']['samples']
+    epochs = {sample['epoch'] for sample in pressure_samples}
+    assert report['status'] == 'failed_or_inconclusive'
+    assert report['failure_reason'] == 'diagnostic worker shutdown timed out and was killed'
+    assert status['exit_code'] == 1
+    assert selected_worker_epoch == 'setup' and selected_worker_pid is not None
+    assert 'measurement' not in epochs and epochs == {'setup'}
+    assert stages['outstanding_stage'] == 'async_server_shutdown'
+    worker_events = [event for event in trace_events if event['process_id'] == selected_worker_pid]
+    assert [event['stage'] for event in worker_events] == [
+        'command_received_shutdown', 'final_property_capture_start', 'final_property_capture_end',
+        'async_server_shutdown_start',
+    ]
+    worker_identity = next(process for process in diagnostic['processes']
+                           if process['pid'] == selected_worker_pid)
+    assert worker_identity['role'] == 'backend-process'
+    pressure_events = [sample['snapshot']['memory.events'] for sample in pressure_samples]
+    maximum_counts = {
+        key: max(events.get(key, 0) for events in pressure_events)
+        for key in ('high', 'max', 'oom', 'oom_kill', 'oom_group_kill')
+    }
+    assert maximum_counts['high'] > 0
+    assert all(maximum_counts[key] == 0 for key in ('max', 'oom', 'oom_kill', 'oom_group_kill'))
+    configuration = report['effective_configuration']['backend_memory_budget']
+    assert configuration['high_bytes'] == 201326592
+    assert configuration['max_bytes'] == 268435456
+    assert all(sample['snapshot']['memory.high'] == configuration['high_bytes']
+               and sample['snapshot']['memory.max'] == configuration['max_bytes']
+               and sample['snapshot']['memory.swap.max'] == 0
+               for sample in pressure_samples)
+    assert report.get('data_directory_preserved') is True
+    assert report.get('partial_workload_counters') == {'status': 'unavailable_after_early_abort'}
+    assert 'post_measurement_full_population_oracle' not in report
+    assert 'reopened_full_population_oracle' not in report
+    return {
+        'failure_kind': 'setup_parent_worker_stop_watchdog',
+        'operational_timeout': True,
+        'kernel_oom': False,
+        'resource_failure': False,
+        'memory_event_maxima': maximum_counts,
+        'configured_setup_memory_limits': {
+            'high_bytes': configuration['high_bytes'],
+            'max_bytes': configuration['max_bytes'],
+            'swap_max_bytes': 0,
+        },
+    }
 
 
 def normal_trace_errors(report, events, parse_errors):
@@ -250,7 +326,8 @@ def review_case(run_directory, status_path, source_commit, binaries, allow_trace
                for event in lifecycle)
     events, trace_parse_errors = parse_trace_events(run_directory / (case + '.log'), report)
     measurement_pid = measurement_worker_pid(report)
-    stages = stage_review(events, measurement_pid)
+    selected_worker_pid, selected_worker_epoch = selected_worker(report, measurement_pid)
+    stages = stage_review(events, selected_worker_pid)
     trace_errors = normal_trace_errors(report, events, trace_parse_errors) if report['status'] == 'completed' else trace_parse_errors
     if report['status'] == 'completed':
         assert 'partial_workload_counters' not in report
@@ -284,14 +361,20 @@ def review_case(run_directory, status_path, source_commit, binaries, allow_trace
             raise AssertionError({'case': case, 'normal_shutdown_trace_errors': trace_errors})
     else:
         assert status['exit_code'] != 0 or status.get('stop_reason') is not None or 'review_error' in status
+        classification = setup_parent_watchdog_classification(
+            case, source_commit, report, status, selected_worker_pid, selected_worker_epoch, stages, events)
         reduced = {
             'status': report['status'],
             'operational_pass': False,
             'slo_pass': None,
-            'resource_failure': None,
+            'resource_failure': classification['resource_failure'] if classification else None,
             'failure_reason': report.get('failure_reason'),
-            'failure_kind': 'unreviewed_operational_failure',
+            'failure_kind': classification['failure_kind'] if classification else 'unreviewed_operational_failure',
         }
+        if classification:
+            reduced.update({key: classification[key] for key in ('operational_timeout', 'kernel_oom',
+                                                                  'memory_event_maxima',
+                                                                  'configured_setup_memory_limits')})
         workload = partial_workload_review(report)
     return {
         'case': case,
@@ -302,6 +385,10 @@ def review_case(run_directory, status_path, source_commit, binaries, allow_trace
         'reduction': reduced,
         'partial_workload_counters': workload,
         'measurement_worker_pid': measurement_pid,
+        'selected_worker_pid': selected_worker_pid,
+        'selected_worker_epoch': selected_worker_epoch,
+        'failed_worker_pid': selected_worker_pid if report['status'] != 'completed' else None,
+        'failed_worker_epoch': selected_worker_epoch if report['status'] != 'completed' else None,
         'shutdown_stages': stages,
         'normal_shutdown_trace': {
             'passed': not trace_errors if report['status'] == 'completed' else None,
@@ -340,6 +427,11 @@ def main():
     assert not any(process['same_live_process'] for process in postflight_run['processes'])
     assert all(database['preserved'] for database in postflight_run['databases'].values())
     assert all(not pids for group in postflight_run['cgroup_processes'].values() for pids in group.values())
+    transfer_receipt = read_json(HELPER_DIRECTORY / 'collection/runtime-transfer.json')
+    runtime_archive = HELPER_DIRECTORY / 'runtime.tar.gz'
+    assert transfer_receipt['archive_sha256'] == capacity_review.digest(runtime_archive)
+    assert transfer_receipt['bytes'] == runtime_archive.stat().st_size
+    assert run_directory.name in transfer_receipt['runs']
     summary = read_json(run_directory / 'summary.json')
     status_paths_by_case = {
         read_json(status_path)['case']: status_path
@@ -402,7 +494,6 @@ def main():
         else:
             assert cells[-1]['reduction']['operational_pass'] is False
     output_path = run_directory / 'shutdown-review.json'
-    assert not output_path.exists()
     output = {
         'source_commit': SOURCE_COMMIT,
         'run_name': run_directory.name,
@@ -417,7 +508,7 @@ def main():
         'controller_failure': None if completed else read_json(failure_path),
         'scope': 'Shutdown trace intervals and preserved run classification; timings do not prove causality or establish a performance ranking',
     }
-    output_path.write_text(json.dumps(output, indent=2) + '\n')
+    write_review_output(output_path, output)
     failure_cell = None
     if not completed:
         failure_case = failure.get('trace_validation', {}).get('failing_case')
@@ -430,7 +521,7 @@ def main():
         'completed_cells': output['completed_cells'],
         'stopped_case': output['stopped_case'],
         'stopped_after_pair': trace_failure_pair,
-        'failure_kind': failure.get('failure_kind') if not completed else None,
+        'failure_kind': failure_cell['reduction'].get('failure_kind') if failure_cell else None,
         'shutdown_stage': failure_cell['shutdown_stages'] if failure_cell else None,
         'parent_watchdog': failure_cell['parent_watchdog'] if failure_cell and not trace_failure_pair else None,
     }

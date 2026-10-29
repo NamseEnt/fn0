@@ -1,0 +1,1885 @@
+{
+  "source_commit": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+  "run_name": "shutdown-b22638bdc-r1",
+  "completed_sequence": false,
+  "attempted_cells": 4,
+  "completed_cells": 3,
+  "pairs": [
+    {
+      "pair": "tiny-e2-n1-ms1000-pair",
+      "realized_comparison_available": true
+    }
+  ],
+  "stopped_case": "confirm-e3-n5-r1-blink",
+  "stopped_after_pair": null,
+  "cells": [
+    {
+      "case": "tiny-e2-n1-ms1000-blink",
+      "status_exit_code": 0,
+      "status_stop_reason": null,
+      "status_review_error_preserved": null,
+      "report_status": "completed",
+      "reduction": {
+        "status": "completed",
+        "operational_pass": true,
+        "slo_pass": false,
+        "resource_failure": false,
+        "failure_reason": null,
+        "full_population_oracles": {
+          "post_measurement": true,
+          "reopened": true
+        }
+      },
+      "partial_workload_counters": {
+        "status": "validated_complete_report",
+        "validated": true,
+        "workload": null
+      },
+      "measurement_worker_pid": 2406324,
+      "selected_worker_pid": 2406324,
+      "selected_worker_epoch": "measurement",
+      "failed_worker_pid": null,
+      "failed_worker_epoch": null,
+      "shutdown_stages": {
+        "last_completed_stage": "runtime_destruction_end",
+        "last_completed_timestamp_unix_ns": 1793239652413696486,
+        "outstanding_stage": null,
+        "outstanding_stage_start_unix_ns": null,
+        "stage_intervals": [
+          {
+            "stage": "final_sampler_capture",
+            "start_stage": "final_sampler_capture_start",
+            "terminal_stage": "final_sampler_capture_end",
+            "elapsed_ns": 33720,
+            "status": "completed"
+          },
+          {
+            "stage": "final_property_capture",
+            "start_stage": "final_property_capture_start",
+            "terminal_stage": "final_property_capture_end",
+            "elapsed_ns": 28920,
+            "status": "completed"
+          },
+          {
+            "stage": "async_server_shutdown",
+            "start_stage": "async_server_shutdown_start",
+            "terminal_stage": "async_server_shutdown_end",
+            "elapsed_ns": 79933610,
+            "status": "completed"
+          },
+          {
+            "stage": "final_checkpoint_metrics_capture",
+            "start_stage": "final_checkpoint_metrics_capture_start",
+            "terminal_stage": "final_checkpoint_metrics_capture_end",
+            "elapsed_ns": 41000,
+            "status": "completed"
+          },
+          {
+            "stage": "server_drop",
+            "start_stage": "server_drop_start",
+            "terminal_stage": "server_drop_end",
+            "elapsed_ns": 42681,
+            "status": "completed"
+          },
+          {
+            "stage": "backend_drop",
+            "start_stage": "backend_drop_start",
+            "terminal_stage": "backend_drop_end",
+            "elapsed_ns": 28040,
+            "status": "completed"
+          },
+          {
+            "stage": "health_report_write",
+            "start_stage": "health_report_write_start",
+            "terminal_stage": "health_report_write_end",
+            "elapsed_ns": 291202,
+            "status": "completed"
+          },
+          {
+            "stage": "runtime_destruction",
+            "start_stage": "runtime_destruction_start",
+            "terminal_stage": "runtime_destruction_end",
+            "elapsed_ns": 237242,
+            "status": "completed"
+          }
+        ],
+        "unmatched_terminal_stages": [],
+        "trace_event_count": 20
+      },
+      "normal_shutdown_trace": {
+        "passed": true,
+        "errors": []
+      },
+      "parent_watchdog": {
+        "configured_parent_stop_timeout_seconds": 20,
+        "worker_internal_shutdown_timeout_seconds": 15,
+        "after_drain_to_after_worker_exit_ms": null,
+        "parent_worker_shutdown_timeout_observed": false,
+        "failure_reason": null,
+        "causal_interpretation": "A stage interval locates elapsed time only; it does not establish an internal cause"
+      },
+      "structured_trace_events": [
+        {
+          "timestamp_unix_ns": 1793239650006302231,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239650006383631,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239650006413072,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239650006440792,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239650086519763,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239650086572443,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239650086663484,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239650086692445,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239650086735205,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239650086764885,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239650086793365,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239650086909446,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239650087235889,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239650087281930,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_run_return_success"
+        },
+        {
+          "timestamp_unix_ns": 1793239650087310450,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239650087539132,
+          "process_id": 2406307,
+          "process_start_time_ticks": 250132075,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239650329831863,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_start_measurement"
+        },
+        {
+          "timestamp_unix_ns": 1793239652332598066,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_stop_measurement"
+        },
+        {
+          "timestamp_unix_ns": 1793239652332653267,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_sampler_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239652332686987,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_sampler_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239652332715907,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239652332758388,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239652332787308,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239652332830548,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239652412764158,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239652412820999,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239652412861999,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239652412889679,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239652412932360,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239652412962240,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239652412990280,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239652413095321,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239652413386523,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239652413431044,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_run_return_success"
+        },
+        {
+          "timestamp_unix_ns": 1793239652413459244,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239652413696486,
+          "process_id": 2406324,
+          "process_start_time_ticks": 250132159,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653020691764,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239653020758525,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653020787685,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653020815525,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653101604703,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653101669063,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653101722144,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653101749984,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653101790344,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653101821744,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653101850585,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653102137267,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653102403430,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653102445710,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_run_return_success"
+        },
+        {
+          "timestamp_unix_ns": 1793239653102473470,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653102633711,
+          "process_id": 2406330,
+          "process_start_time_ticks": 250132391,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653748077162,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239653748147242,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653748177242,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653748204723,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653828060012,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653828117132,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653828158493,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653828186173,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653828256973,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653828286894,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653828315094,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653828411335,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653828723858,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239653828765178,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_run_return_success"
+        },
+        {
+          "timestamp_unix_ns": 1793239653828792658,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239653829007140,
+          "process_id": 2406335,
+          "process_start_time_ticks": 250132460,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_end"
+        }
+      ]
+    },
+    {
+      "case": "tiny-e2-n1-ms1000-shared",
+      "status_exit_code": 0,
+      "status_stop_reason": null,
+      "status_review_error_preserved": null,
+      "report_status": "completed",
+      "reduction": {
+        "status": "completed",
+        "operational_pass": true,
+        "slo_pass": false,
+        "resource_failure": false,
+        "failure_reason": null,
+        "full_population_oracles": {
+          "post_measurement": true,
+          "reopened": true
+        }
+      },
+      "partial_workload_counters": {
+        "status": "validated_complete_report",
+        "validated": true,
+        "workload": null
+      },
+      "measurement_worker_pid": 2406373,
+      "selected_worker_pid": 2406373,
+      "selected_worker_epoch": "measurement",
+      "failed_worker_pid": null,
+      "failed_worker_epoch": null,
+      "shutdown_stages": {
+        "last_completed_stage": "runtime_destruction_end",
+        "last_completed_timestamp_unix_ns": 1793239658184741889,
+        "outstanding_stage": null,
+        "outstanding_stage_start_unix_ns": null,
+        "stage_intervals": [
+          {
+            "stage": "final_sampler_capture",
+            "start_stage": "final_sampler_capture_start",
+            "terminal_stage": "final_sampler_capture_end",
+            "elapsed_ns": 53200,
+            "status": "completed"
+          },
+          {
+            "stage": "final_property_capture",
+            "start_stage": "final_property_capture_start",
+            "terminal_stage": "final_property_capture_end",
+            "elapsed_ns": 118561,
+            "status": "completed"
+          },
+          {
+            "stage": "async_server_shutdown",
+            "start_stage": "async_server_shutdown_start",
+            "terminal_stage": "async_server_shutdown_end",
+            "elapsed_ns": 79857729,
+            "status": "completed"
+          },
+          {
+            "stage": "final_checkpoint_metrics_capture",
+            "start_stage": "final_checkpoint_metrics_capture_start",
+            "terminal_stage": "final_checkpoint_metrics_capture_end",
+            "elapsed_ns": 28280,
+            "status": "completed"
+          },
+          {
+            "stage": "server_drop",
+            "start_stage": "server_drop_start",
+            "terminal_stage": "server_drop_end",
+            "elapsed_ns": 46280,
+            "status": "completed"
+          },
+          {
+            "stage": "backend_drop",
+            "start_stage": "backend_drop_start",
+            "terminal_stage": "backend_drop_end",
+            "elapsed_ns": 56400,
+            "status": "completed"
+          },
+          {
+            "stage": "health_report_write",
+            "start_stage": "health_report_write_start",
+            "terminal_stage": "health_report_write_end",
+            "elapsed_ns": 346603,
+            "status": "completed"
+          },
+          {
+            "stage": "runtime_destruction",
+            "start_stage": "runtime_destruction_start",
+            "terminal_stage": "runtime_destruction_end",
+            "elapsed_ns": 176121,
+            "status": "completed"
+          }
+        ],
+        "unmatched_terminal_stages": [],
+        "trace_event_count": 20
+      },
+      "normal_shutdown_trace": {
+        "passed": true,
+        "errors": []
+      },
+      "parent_watchdog": {
+        "configured_parent_stop_timeout_seconds": 20,
+        "worker_internal_shutdown_timeout_seconds": 15,
+        "after_drain_to_after_worker_exit_ms": null,
+        "parent_worker_shutdown_timeout_observed": false,
+        "failure_reason": null,
+        "causal_interpretation": "A stage interval locates elapsed time only; it does not establish an internal cause"
+      },
+      "structured_trace_events": [
+        {
+          "timestamp_unix_ns": 1793239655770183212,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239655770269133,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239655770397614,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239655770427214,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239655850270583,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239655850320183,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239655850350744,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239655850378784,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239655850426104,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239655850487745,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239655850524625,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239655850614786,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239655850913749,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239655850958949,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_run_return_success"
+        },
+        {
+          "timestamp_unix_ns": 1793239655850986749,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239655851275792,
+          "process_id": 2406345,
+          "process_start_time_ticks": 250132675,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239656099053450,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_start_measurement"
+        },
+        {
+          "timestamp_unix_ns": 1793239658103631709,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_stop_measurement"
+        },
+        {
+          "timestamp_unix_ns": 1793239658103687990,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_sampler_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658103741190,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_sampler_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658103770510,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239658103814511,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658103933072,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658103961312,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658183819041,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658183871322,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658183899602,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658183926642,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658183972922,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658184001803,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658184058203,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658184140604,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658184487207,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658184537687,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_run_return_success"
+        },
+        {
+          "timestamp_unix_ns": 1793239658184565768,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658184741889,
+          "process_id": 2406373,
+          "process_start_time_ticks": 250132735,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658866096369,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239658866229610,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658866349491,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658866379011,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658946187300,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658946239621,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658946278261,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658946306421,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658946356742,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658946385862,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658946537063,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658946617904,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658946938627,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239658946986027,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_run_return_success"
+        },
+        {
+          "timestamp_unix_ns": 1793239658947013667,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239658947213109,
+          "process_id": 2406397,
+          "process_start_time_ticks": 250132968,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239659613945023,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239659614018343,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239659614149065,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239659614179145,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239659693973713,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239659694025914,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239659694055394,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239659694082594,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239659694132195,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239659694162995,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239659694318316,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239659694410317,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239659694774600,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239659694821321,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_run_return_success"
+        },
+        {
+          "timestamp_unix_ns": 1793239659694849841,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239659695093443,
+          "process_id": 2406421,
+          "process_start_time_ticks": 250133045,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_end"
+        }
+      ]
+    },
+    {
+      "case": "confirm-e3-n5-r1-shared",
+      "status_exit_code": 0,
+      "status_stop_reason": null,
+      "status_review_error_preserved": null,
+      "report_status": "completed",
+      "reduction": {
+        "status": "completed",
+        "operational_pass": true,
+        "slo_pass": true,
+        "resource_failure": false,
+        "failure_reason": null,
+        "full_population_oracles": {
+          "post_measurement": true,
+          "reopened": true
+        }
+      },
+      "partial_workload_counters": {
+        "status": "validated_complete_report",
+        "validated": true,
+        "workload": null
+      },
+      "measurement_worker_pid": 2406567,
+      "selected_worker_pid": 2406567,
+      "selected_worker_epoch": "measurement",
+      "failed_worker_pid": null,
+      "failed_worker_epoch": null,
+      "shutdown_stages": {
+        "last_completed_stage": "runtime_destruction_end",
+        "last_completed_timestamp_unix_ns": 1793239739696834202,
+        "outstanding_stage": null,
+        "outstanding_stage_start_unix_ns": null,
+        "stage_intervals": [
+          {
+            "stage": "final_sampler_capture",
+            "start_stage": "final_sampler_capture_start",
+            "terminal_stage": "final_sampler_capture_end",
+            "elapsed_ns": 70881,
+            "status": "completed"
+          },
+          {
+            "stage": "final_property_capture",
+            "start_stage": "final_property_capture_start",
+            "terminal_stage": "final_property_capture_end",
+            "elapsed_ns": 350083,
+            "status": "completed"
+          },
+          {
+            "stage": "async_server_shutdown",
+            "start_stage": "async_server_shutdown_start",
+            "terminal_stage": "async_server_shutdown_end",
+            "elapsed_ns": 83840843,
+            "status": "completed"
+          },
+          {
+            "stage": "final_checkpoint_metrics_capture",
+            "start_stage": "final_checkpoint_metrics_capture_start",
+            "terminal_stage": "final_checkpoint_metrics_capture_end",
+            "elapsed_ns": 30280,
+            "status": "completed"
+          },
+          {
+            "stage": "server_drop",
+            "start_stage": "server_drop_start",
+            "terminal_stage": "server_drop_end",
+            "elapsed_ns": 48081,
+            "status": "completed"
+          },
+          {
+            "stage": "backend_drop",
+            "start_stage": "backend_drop_start",
+            "terminal_stage": "backend_drop_end",
+            "elapsed_ns": 3553351,
+            "status": "completed"
+          },
+          {
+            "stage": "health_report_write",
+            "start_stage": "health_report_write_start",
+            "terminal_stage": "health_report_write_end",
+            "elapsed_ns": 1054929,
+            "status": "completed"
+          },
+          {
+            "stage": "runtime_destruction",
+            "start_stage": "runtime_destruction_start",
+            "terminal_stage": "runtime_destruction_end",
+            "elapsed_ns": 408164,
+            "status": "completed"
+          }
+        ],
+        "unmatched_terminal_stages": [],
+        "trace_event_count": 20
+      },
+      "normal_shutdown_trace": {
+        "passed": true,
+        "errors": []
+      },
+      "parent_watchdog": {
+        "configured_parent_stop_timeout_seconds": 20,
+        "worker_internal_shutdown_timeout_seconds": 15,
+        "after_drain_to_after_worker_exit_ms": null,
+        "parent_worker_shutdown_timeout_observed": false,
+        "failure_reason": null,
+        "causal_interpretation": "A stage interval locates elapsed time only; it does not establish an internal cause"
+      },
+      "structured_trace_events": [
+        {
+          "timestamp_unix_ns": 1793239679128649271,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239679128731071,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239679129448238,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239679129478638,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239679210750739,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239679210802500,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239679210832100,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239679210860060,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239679210909501,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239679210939221,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239679211154263,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239679211571306,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239679212091311,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239679212172831,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_run_return_success"
+        },
+        {
+          "timestamp_unix_ns": 1793239679212201592,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239679212490154,
+          "process_id": 2406473,
+          "process_start_time_ticks": 250133281,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239679601088068,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_start_measurement"
+        },
+        {
+          "timestamp_unix_ns": 1793239739606886465,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_stop_measurement"
+        },
+        {
+          "timestamp_unix_ns": 1793239739606953346,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_sampler_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239739607024227,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_sampler_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239739607080107,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239739607125387,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239739607475470,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239739607506551,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239739691347394,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239739691404475,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239739691434755,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239739691462755,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239739691510836,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239739691540796,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239739695094147,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239739695242788,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239739696297717,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239739696396758,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_run_return_success"
+        },
+        {
+          "timestamp_unix_ns": 1793239739696426038,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239739696834202,
+          "process_id": 2406567,
+          "process_start_time_ticks": 250135071,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239778660859613,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239778660932294,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239778661291857,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239778661323257,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239778743353845,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239778743411605,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239778743451966,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239778743479246,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239778743527606,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239778743556887,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239778753158370,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239778753290651,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239778753884376,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239778753959776,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_run_return_success"
+        },
+        {
+          "timestamp_unix_ns": 1793239778753988217,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239778755313868,
+          "process_id": 2406706,
+          "process_start_time_ticks": 250141119,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239819931762652,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239819931853653,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239819932227816,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239819932267017,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239820014458766,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239820014513407,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239820014544167,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_checkpoint_metrics_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239820014572367,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239820014621327,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "server_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239820014652448,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239820023841087,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "backend_drop_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239820024003728,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239820024925216,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "health_report_write_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239820025017657,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_run_return_success"
+        },
+        {
+          "timestamp_unix_ns": 1793239820025046417,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239820025316020,
+          "process_id": 2406801,
+          "process_start_time_ticks": 250145024,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "runtime_destruction_end"
+        }
+      ]
+    },
+    {
+      "case": "confirm-e3-n5-r1-blink",
+      "status_exit_code": 1,
+      "status_stop_reason": null,
+      "status_review_error_preserved": "AssertionError({'backend': 'blink', 'registered': 5, 'active': 5, 'initial_rows': 32768, 'duration_ms': 60000, 'sample_interval_ms': 1000, 'status': 'failed_or_inconclusive', 'cell_peak_bytes': 228511744, 'cell_events': {'high': 6218, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'epoch_peaks_bytes': {'measurement': 0, 'oracle': 0, 'reopen-oracle': 0, 'setup': 228470784}, 'epoch_events': {'measurement': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'oracle': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'reopen-oracle': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'setup': {'high': 3109, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}}, 'operational_pass': False, 'slo_pass': False, 'resource_failure': False, 'failure_reason': 'diagnostic worker shutdown timed out and was killed'})",
+      "report_status": "failed_or_inconclusive",
+      "reduction": {
+        "status": "failed_or_inconclusive",
+        "operational_pass": false,
+        "slo_pass": null,
+        "resource_failure": null,
+        "failure_reason": "diagnostic worker shutdown timed out and was killed",
+        "failure_kind": "unreviewed_operational_failure"
+      },
+      "partial_workload_counters": {
+        "status": "unavailable_after_early_abort",
+        "validated": false,
+        "workload": null
+      },
+      "measurement_worker_pid": null,
+      "selected_worker_pid": 2406935,
+      "selected_worker_epoch": "setup",
+      "failed_worker_pid": 2406935,
+      "failed_worker_epoch": "setup",
+      "shutdown_stages": {
+        "last_completed_stage": "final_property_capture_end",
+        "last_completed_timestamp_unix_ns": 1793239906525474498,
+        "outstanding_stage": "async_server_shutdown",
+        "outstanding_stage_start_unix_ns": 1793239906525501458,
+        "stage_intervals": [
+          {
+            "stage": "final_property_capture",
+            "start_stage": "final_property_capture_start",
+            "terminal_stage": "final_property_capture_end",
+            "elapsed_ns": 28800,
+            "status": "completed"
+          }
+        ],
+        "unmatched_terminal_stages": [],
+        "trace_event_count": 4
+      },
+      "normal_shutdown_trace": {
+        "passed": null,
+        "errors": []
+      },
+      "parent_watchdog": {
+        "configured_parent_stop_timeout_seconds": 20,
+        "worker_internal_shutdown_timeout_seconds": 15,
+        "after_drain_to_after_worker_exit_ms": null,
+        "parent_worker_shutdown_timeout_observed": true,
+        "failure_reason": "diagnostic worker shutdown timed out and was killed",
+        "causal_interpretation": "A stage interval locates elapsed time only; it does not establish an internal cause"
+      },
+      "structured_trace_events": [
+        {
+          "timestamp_unix_ns": 1793239906525350657,
+          "process_id": 2406935,
+          "process_start_time_ticks": 250149303,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "command_received_shutdown"
+        },
+        {
+          "timestamp_unix_ns": 1793239906525445698,
+          "process_id": 2406935,
+          "process_start_time_ticks": 250149303,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_start"
+        },
+        {
+          "timestamp_unix_ns": 1793239906525474498,
+          "process_id": 2406935,
+          "process_start_time_ticks": 250149303,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "final_property_capture_end"
+        },
+        {
+          "timestamp_unix_ns": 1793239906525501458,
+          "process_id": 2406935,
+          "process_start_time_ticks": 250149303,
+          "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+          "stage": "async_server_shutdown_start"
+        }
+      ]
+    }
+  ],
+  "completion": null,
+  "controller_failure": {
+    "reason": "AssertionError({'case': 'confirm-e3-n5-r1-blink', 'backend': 'blink', 'stage': 'E3', 'tenants': 5, 'active': 5, 'duration_ms': 60000, 'sample_interval_ms': 1000, 'exit_code': 1, 'elapsed_seconds': 106.12940167495981, 'capacity_after': {'timestamp_unix_seconds': 1793239927.6135747, 'zfs_free_bytes': 29428006912, 'boot_free_bytes': 5500895232, 'memory_bytes': {'MemTotal': 11427577856, 'MemAvailable': 5105512448, 'SwapTotal': 4294963200, 'SwapFree': 3859197952, 'Dirty': 1110016, 'Writeback': 0}, 'arc': {'c': 5713788928, 'c_min': 357111808, 'c_max': 5713788928, 'size': 5604749120, 'memory_throttle_count': 0}, 'device_stat': '11253492       15 481531680 14207678 119346191   208677 6177301324 192934668        0 55918644 207152980     1098      384 1961318615    10634        0        0', 'cpu_stat': ['cpu  10143917 303111 5333244 481237858 1334310 333335 158307 1713215 0 0', 'cpu0 5085079 142820 2668620 240612596 677501 165599 79928 845121 0 0', 'cpu1 5058838 160291 2664624 240625262 656808 167736 78378 868093 0 0']}, 'stop_reason': None, 'report_sha256': '01e2695134f98f71af996cf11e3ed53c4fc5fa9642787498862bea0f2bab464c', 'review_error': \"AssertionError({'backend': 'blink', 'registered': 5, 'active': 5, 'initial_rows': 32768, 'duration_ms': 60000, 'sample_interval_ms': 1000, 'status': 'failed_or_inconclusive', 'cell_peak_bytes': 228511744, 'cell_events': {'high': 6218, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'epoch_peaks_bytes': {'measurement': 0, 'oracle': 0, 'reopen-oracle': 0, 'setup': 228470784}, 'epoch_events': {'measurement': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'oracle': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'reopen-oracle': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'setup': {'high': 3109, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}}, 'operational_pass': False, 'slo_pass': False, 'resource_failure': False, 'failure_reason': 'diagnostic worker shutdown timed out and was killed'})\"})",
+    "completed_cells": 4,
+    "capacity": {
+      "timestamp_unix_seconds": 1793239927.628432,
+      "zfs_free_bytes": 29428006912,
+      "boot_free_bytes": 5500772352,
+      "memory_bytes": {
+        "MemTotal": 11427577856,
+        "MemAvailable": 5105512448,
+        "SwapTotal": 4294963200,
+        "SwapFree": 3859197952,
+        "Dirty": 1245184,
+        "Writeback": 0
+      },
+      "arc": {
+        "c": 5713788928,
+        "c_min": 357111808,
+        "c_max": 5713788928,
+        "size": 5604749120,
+        "memory_throttle_count": 0
+      },
+      "device_stat": "11253492       15 481531680 14207678 119346191   208677 6177301324 192934668        0 55918644 207152980     1098      384 1961318615    10634        0        0",
+      "cpu_stat": [
+        "cpu  10143918 303111 5333245 481237860 1334310 333335 158307 1713215 0 0",
+        "cpu0 5085079 142820 2668620 240612598 677501 165599 79928 845121 0 0",
+        "cpu1 5058838 160291 2664625 240625262 656808 167736 78378 868093 0 0"
+      ]
+    }
+  },
+  "scope": "Shutdown trace intervals and preserved run classification; timings do not prove causality or establish a performance ranking"
+}

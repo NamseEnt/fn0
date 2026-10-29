@@ -2,7 +2,7 @@
 
 Tracking issue: https://github.com/NamseEnt/fn0/issues/126
 
-Status: implementation and clean-source checks passed; the new frozen runtime diagnostic is pending. The earlier measurement-worker failure remains unresolved until phase evidence is reviewed.
+Status: implementation and clean-source checks passed. The new frozen diagnostic stopped on a five-tenant setup-worker watchdog failure. Its phase trace narrows the outstanding interval to asynchronous server shutdown; the internal cause remains unresolved.
 
 ## Implementation and validation
 
@@ -20,6 +20,35 @@ One validation-wrapper preflight attempt failed on a stale variable reference be
 
 ## Runtime acceptance boundary
 
-The new namespace is `shutdown-b22638bdc-r1`: a tiny paired correctness/trace check, then up to three fresh paired five-tenant E3 observations. Stop at the first operational or diagnostic failure and preserve omitted cells. This is a changed instrumentation variant for attribution, not a repeat to repair the old result or obtain a passing median. No six/eight-tenant or maintenance cells are authorized by this matrix.
+Namespace `shutdown-b22638bdc-r1` attempted four cells before the frozen stop rule fired. Both tiny correctness cells completed one hundred successful API calls, both oracles, verified worker identities, and normal shutdown-marker ordering. Their Query sample counts are below the SLO minimum, so their recorded SLO=false is not a capacity-tail miss. The first five-tenant shared-reference cell completed 15,000 calls and both oracles and passed the objective. The following B-link cell failed in setup; offered load never started. No remaining repetition ran, and no completion receipt was fabricated.
 
-Do not present the phase trace as an engine fix, a production maximum, or new crash-recovery evidence. If all pairs complete, report only that the bounded variant did not reproduce the earlier failure. Issue #126 remains open.
+The three complete reports account for 15,200 successful offered calls and six full-population oracles. Collection verified four preserved databases, seventeen exited process identities, empty groups, clean source, unchanged frozen binaries/native archive, and the existing target symlink. The setup failure contributes no throughput, measurement-native summary, request success, or oracle result. The available-after-later-failure metadata branch was covered by unit checks and source review; this setup abort did not exercise it with an actual returned workload summary.
+
+## Located interval and remaining uncertainty
+
+The failed case is `confirm-e3-n5-r1-blink`, with backend PID/start ticks `2406935:250149303`. Its exact stderr sequence is:
+
+1. `command_received_shutdown`
+2. `final_property_capture_start`
+3. `final_property_capture_end`
+4. `async_server_shutdown_start`
+
+Final property capture took 28,800 ns. No asynchronous server-shutdown end/error marker, worker-internal fifteen-second error, final checkpoint-metric, backend-drop, health-report-write, or runtime-destruction marker was observed afterward. The parent reported `diagnostic worker shutdown timed out and was killed` and the original completion reducer stopped for review. Its raw review error remains unchanged.
+
+The marked interval awaits `server.shutdown()` and then the server task. Source shows that server shutdown closes the endpoint, awaits connection idle, and awaits service-owned shard/coordinator shutdown. The trace does not distinguish these awaits, executor scheduling, or kernel waits. This setup failure is not the same measured phase as the earlier source-023 measurement failure; no shared internal cause is established.
+
+The failed cell took 106.129 seconds. Parent/setup peaks were 228,511,744 / 228,470,784 bytes. Parent/setup-local high counts were 6,218 / 3,109; max, OOM, and kill counts were zero. Measurement/oracle/reopen peaks were zero. Between the approximately +1.036 s and +19.047 s shutdown samples, setup cgroup CPU advanced only 22,348 microseconds while high events advanced from 2,802 to 3,109. Memory remained above the 192 MiB high limit. These observations motivate external thread-wait sampling; they do not identify a specific blocking allocation or syscall. [SHUTDOWN-OFFCPU-PLAN.md](SHUTDOWN-OFFCPU-PLAN.md) preserves that next diagnostic before implementation, with both timeouts and the resource policy fixed.
+
+## Reproduction and preserved evidence
+
+The raw `evidence/shutdown-diagnostic/runtime.tar.gz` archive is 217,505 bytes with SHA256 `faa8385a15da717d4c5b1f9337e244d6fe7e351a71df136443a975c26e3204a4`. It includes runtime records, postflight, validation logs/provenance, the actual executed validation wrapper, and both the failed preflight and successful validation launchers. The extracted source-023 evidence and older capacity archives remain intact.
+
+From the worktree, run:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 dodb/docs/experiments/blink-tenant-density-20261027/evidence/shutdown-diagnostic/review_shutdown.py dodb/docs/experiments/blink-tenant-density-20261027/evidence/shutdown-diagnostic/runtime/shutdown-b22638bdc-r1 --postflight dodb/docs/experiments/blink-tenant-density-20261027/evidence/shutdown-diagnostic/collection/shutdown-runtime-b22638bdc-r1-postflight.json --validation-summary dodb/docs/experiments/blink-tenant-density-20261027/evidence/shutdown-diagnostic/validation/shutdown-validation-summary.json
+```
+
+The derived review distinguishes setup from measurement, preserves the original error, verifies the archive transfer, limits, identities, and normal traces, and classifies only the exact observed setup watchdog failure. Re-running identical reduction reuses the matching derived result. The earlier unclassified derived review is separately retained; raw reports were not rewritten.
+
+Do not present this trace as an engine fix, a production maximum, or new crash-recovery evidence. Issue #126 remains open.

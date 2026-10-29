@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/home/opc/tenant-density-harness-20261027/oci_shutdown_validate.py", line 192, in <module>
+    raise SystemExit(main())
+  File "/home/opc/tenant-density-harness-20261027/oci_shutdown_validate.py", line 113, in main
+    'native_archive_bytes_before': len(native_before),
+NameError: name 'native_before' is not defined
