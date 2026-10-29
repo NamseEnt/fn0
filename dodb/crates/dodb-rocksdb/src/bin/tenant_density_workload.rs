@@ -6,6 +6,8 @@ mod config;
 mod resources;
 #[path = "support/tenant_density/scheduler.rs"]
 mod scheduler;
+#[path = "support/tenant_density/workload_failure.rs"]
+mod workload_failure;
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -44,6 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let session =
         MemoryDiagnosticSession::new(std::env::var("DODB_SOURCE_REVISION").unwrap_or_default())
             .map_err(std::io::Error::other)?;
+    let mut retained_workload = None;
     let execution: Result<Value, Box<dyn std::error::Error>> = async {
     let source_revision = std::env::var("DODB_SOURCE_REVISION")?;
     let compiled_source_revision = env!("DODB_BUILD_GIT_COMMIT");
@@ -76,6 +79,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let driver_io_before = blink_checkpoint::process_write_io();
     let started = Instant::now();
     let workload = run_workload(&service, &options, &session).await;
+    retained_workload = workload
+        .as_ref()
+        .ok()
+        .map(|(workload, _)| workload.clone());
     let elapsed_after_drain = started.elapsed();
     if let Some(monitor) = &pressure_monitor { monitor.boundary("after-drain"); }
     session.set_phase("measurement-drain");
@@ -212,7 +219,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "effective_configuration": effective_configuration(&options),
                 "backend_memory_pressure": pressure_report,
                 "memory_diagnostic": session.finish_sampling(),
-                "partial_workload_counters": {"status": "unavailable_after_early_abort"}
+                "partial_workload_counters": workload_failure::failure_metadata(retained_workload)
             });
             std::fs::write(&report_path, serde_json::to_vec_pretty(&failure_report)?)?;
             Err(error)

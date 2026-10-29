@@ -2,6 +2,8 @@
 mod blink_checkpoint;
 #[path = "support/pressure_observations.rs"]
 mod pressure_observations;
+#[path = "support/shutdown_trace.rs"]
+mod shutdown_trace;
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, Write};
@@ -391,15 +393,29 @@ fn main() -> WorkerResult<()> {
         .map(|path| dodb_rocksdb::memory_pressure::attach_worker(path))
         .transpose()
         .map_err(std::io::Error::other)?;
-    tokio::runtime::Builder::new_multi_thread()
+    let trace = shutdown_trace::ShutdownTrace::new(
+        arguments.pressure_interval_ms > 0,
+        &arguments.source_revision,
+    );
+    let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .build()?
-        .block_on(run(arguments, memory_membership))
+        .build()?;
+    let execution = runtime.block_on(run(arguments, memory_membership, &trace));
+    trace.emit(if execution.is_ok() {
+        "async_run_return_success"
+    } else {
+        "async_run_return_error"
+    });
+    trace.emit("runtime_destruction_start");
+    drop(runtime);
+    trace.emit("runtime_destruction_end");
+    execution
 }
 
 async fn run(
     arguments: Arguments,
     memory_membership: Option<serde_json::Value>,
+    trace: &shutdown_trace::ShutdownTrace,
 ) -> WorkerResult<()> {
     let _ = quinn::rustls::crypto::aws_lc_rs::default_provider().install_default();
     let backend = Arc::new(BackendService::open(&arguments)?);
@@ -499,6 +515,7 @@ async fn run(
         };
         match command.as_str() {
             "start-measurement" => {
+                trace.emit("command_received_start_measurement");
                 pressure_phase = "measurement-including-drain";
                 shared_measurement_start = backend.shared_resource_snapshot();
                 health_sampler = if arguments.engine_health_interval_ms == 0 {
@@ -516,45 +533,87 @@ async fn run(
                 };
             }
             "stop-measurement" => {
+                trace.emit("command_received_stop_measurement");
+                trace.emit("final_sampler_capture_start");
                 pressure_phase = "after-measurement";
                 shared_measurement_end = backend.shared_resource_snapshot();
-                health_report = match health_sampler.take() {
-                    Some(sampler) => sampler.finish()?,
+                let final_sampler_capture = match health_sampler.take() {
+                    Some(sampler) => sampler.finish(),
                     None if arguments.engine_health_interval_ms == 0 => {
-                        engine_health_disabled_report()
+                        Ok(engine_health_disabled_report())
                     }
-                    None => json!({"status": "unsupported"}),
+                    None => Ok(json!({"status": "unsupported"})),
                 };
+                match final_sampler_capture {
+                    Ok(report) => {
+                        health_report = report;
+                        trace.emit("final_sampler_capture_end");
+                    }
+                    Err(error) => {
+                        trace.emit("final_sampler_capture_error");
+                        return Err(error.into());
+                    }
+                }
             }
-            "shutdown" => break,
+            "shutdown" => {
+                trace.emit("command_received_shutdown");
+                break;
+            }
             other => return Err(format!("unknown diagnostic worker command {other}").into()),
         }
     }
     if let Some(sampler) = health_sampler.take() {
-        health_report = sampler.finish()?;
+        trace.emit("final_sampler_capture_start");
+        let final_sampler_capture = sampler.finish();
+        match final_sampler_capture {
+            Ok(report) => {
+                health_report = report;
+                trace.emit("final_sampler_capture_end");
+            }
+            Err(error) => {
+                trace.emit("final_sampler_capture_error");
+                return Err(error.into());
+            }
+        }
     }
+    trace.emit("final_property_capture_start");
     let shutdown_property_snapshot = backend.engine_health_observer().map_or_else(
         || json!({"status": "unsupported", "reason": "backend exposes no RocksDB properties"}),
         |observer| observer.sample(),
     );
     let shared_before_shutdown = backend.shared_resource_snapshot();
+    trace.emit("final_property_capture_end");
+    trace.emit("async_server_shutdown_start");
     let shutdown = tokio::time::timeout(Duration::from_secs(15), async {
         server.shutdown().await;
         (&mut server_task).await
     })
     .await;
     match shutdown {
-        Ok(Ok(Ok(()))) => {}
-        Ok(Ok(Err(error))) => return Err(Box::new(error) as WorkerError),
-        Ok(Err(error)) => return Err(Box::new(error) as WorkerError),
+        Ok(Ok(Ok(()))) => trace.emit("async_server_shutdown_end"),
+        Ok(Ok(Err(error))) => {
+            trace.emit("async_server_shutdown_error");
+            return Err(Box::new(error) as WorkerError);
+        }
+        Ok(Err(error)) => {
+            trace.emit("async_server_shutdown_error");
+            return Err(Box::new(error) as WorkerError);
+        }
         Err(_) => {
+            trace.emit("async_server_shutdown_error");
             server_task.abort();
             return Err("diagnostic worker shutdown exceeded 15 seconds".into());
         }
     }
+    trace.emit("final_checkpoint_metrics_capture_start");
     let blink_checkpoint_metrics = backend.blink_checkpoint_metrics();
+    trace.emit("final_checkpoint_metrics_capture_end");
+    trace.emit("server_drop_start");
     drop(server);
+    trace.emit("server_drop_end");
+    trace.emit("backend_drop_start");
     drop(backend);
+    trace.emit("backend_drop_end");
     let worker_process_high_water_kb =
         std::fs::read_to_string("/proc/self/status")
             .ok()
@@ -566,7 +625,8 @@ async fn run(
                         .flatten()
                 })
             });
-    pressure_observations::write_health_report(
+    trace.emit("health_report_write_start");
+    let health_report_write = pressure_observations::write_health_report(
         &arguments.health_path,
         json!({
             "backend": arguments.backend.clone(),
@@ -616,7 +676,14 @@ async fn run(
             "shutdown_complete": true,
         }),
         &pressure_samples,
-    )?;
+    );
+    match health_report_write {
+        Ok(()) => trace.emit("health_report_write_end"),
+        Err(error) => {
+            trace.emit("health_report_write_error");
+            return Err(error.into());
+        }
+    }
     Ok(())
 }
 
