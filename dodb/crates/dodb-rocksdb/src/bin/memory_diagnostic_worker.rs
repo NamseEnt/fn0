@@ -1,5 +1,7 @@
 #[path = "support/blink_checkpoint.rs"]
 mod blink_checkpoint;
+#[path = "support/pressure_observations.rs"]
+mod pressure_observations;
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, Write};
@@ -470,9 +472,7 @@ async fn run(
     let mut health_report = engine_health_disabled_report();
     let mut shared_measurement_start = serde_json::Value::Null;
     let mut shared_measurement_end = serde_json::Value::Null;
-    let mut pressure_samples = Vec::new();
-    let mut pressure_samples_truncated = false;
-    let mut pressure_sample_bytes = 0_usize;
+    let mut pressure_samples = pressure_observations::PressureObservations::default();
     let mut pressure_phase = "before-measurement";
     let mut pressure_interval =
         tokio::time::interval(Duration::from_millis(arguments.pressure_interval_ms.max(1)));
@@ -484,7 +484,7 @@ async fn run(
                 None => break,
             },
             _ = pressure_interval.tick(), if arguments.pressure_interval_ms > 0 => {
-                if !pressure_samples_truncated && pressure_samples.len() < 4096 && pressure_sample_bytes < 8 * 1024 * 1024 {
+                if pressure_samples.can_record() {
                     let sample = json!({
                         "timestamp_unix_ms": dodb_rocksdb::memory_pressure::unix_time_ms(),
                         "phase": pressure_phase,
@@ -492,12 +492,8 @@ async fn run(
                         "rocksdb_properties": backend.engine_health_observer().map(|observer| observer.sample()),
                         "blink_checkpoints": backend.periodic_blink_checkpoint_metrics(),
                     });
-                    let serialized_bytes = serde_json::to_vec(&sample)?.len();
-                    if pressure_sample_bytes + serialized_bytes <= 8 * 1024 * 1024 {
-                        pressure_sample_bytes += serialized_bytes;
-                        pressure_samples.push(sample);
-                    } else { pressure_samples_truncated = true; }
-                } else { pressure_samples_truncated = true; }
+                    pressure_samples.record(&sample)?;
+                } else { pressure_samples.mark_truncated(); }
                 continue;
             }
         };
@@ -570,9 +566,9 @@ async fn run(
                         .flatten()
                 })
             });
-    std::fs::write(
+    pressure_observations::write_health_report(
         &arguments.health_path,
-        serde_json::to_vec_pretty(&json!({
+        json!({
             "backend": arguments.backend.clone(),
             "blink_configuration": if arguments.backend == "blink" {
                 backend_configuration_json(&arguments)
@@ -590,12 +586,11 @@ async fn run(
             "periodic_pressure": {
                 "enabled": arguments.pressure_interval_ms > 0,
                 "interval_ms": arguments.pressure_interval_ms,
-                "sample_limit": 4096,
-                "serialized_sample_byte_limit": 8 * 1024 * 1024,
-                "serialized_sample_bytes": pressure_sample_bytes,
+                "sample_limit": pressure_observations::SAMPLE_LIMIT,
+                "serialized_sample_byte_limit": pressure_observations::SERIALIZED_BYTE_LIMIT,
+                "serialized_sample_bytes": pressure_samples.serialized_bytes(),
                 "storage_scope": "serialized sample bytes bound retained observation volume, not exact serde_json heap allocation; observations are charged to the worker budget",
-                "samples_truncated": pressure_samples_truncated,
-                "samples": pressure_samples,
+                "samples_truncated": pressure_samples.truncated(),
                 "scope": "worker lifetime after readiness; non-atomic sampled observations; not instantaneous peaks; measurement phase includes drain; shared cache/WBM counted once in shared_resources; repeated per-DB cache properties must not be summed",
                 "unsupported": ["allocator retained heap", "generation pin ages", "request and checkpoint queue representation bytes"],
             },
@@ -619,7 +614,8 @@ async fn run(
             "compiled_source_revision": env!("DODB_BUILD_GIT_COMMIT"),
             "worker_process_high_water_rss_kb_after_backend_shutdown": worker_process_high_water_kb,
             "shutdown_complete": true,
-        }))?,
+        }),
+        &pressure_samples,
     )?;
     Ok(())
 }
