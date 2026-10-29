@@ -1,0 +1,21 @@
+Warning: you are leaving 8 commits behind, not connected to
+any of your branches:
+
+  023b18bd Retain pressure samples as raw JSON and stream health reports
+  74420ec0 Record bounded capacity frontier and observation overhead evidence
+  fcbbdda9 Record cadence sensitivity and plan bounded observation storage
+  dc8e6282 Preserve capacity observations and live continuation handoff
+ ... and 4 more.
+
+If you want to keep them by creating a new branch, this may be a good time
+to do so with:
+
+ git branch <new-branch-name> 023b18bd
+
+HEAD is now at aaa40565 Bound periodic checkpoint detail before sustained density runs
+{"case": "sampling-e2-n1-ms1000-blink", "exit_code": 0, "elapsed_seconds": 64.07758809067309, "stop_reason": null, "operational_pass": true, "slo_pass": true, "measurement_peak_bytes": 6053888, "worst_p99_ms": {"Get": 4.194304, "Query": 4.194304, "Write": 8.388608}, "review_error": null}
+{"case": "sampling-e2-n1-ms1000-shared", "exit_code": 0, "elapsed_seconds": 64.08132775779814, "stop_reason": null, "operational_pass": true, "slo_pass": true, "measurement_peak_bytes": 8192000, "worst_p99_ms": {"Get": 4.194304, "Query": 4.194304, "Write": 4.194304}, "review_error": null}
+{"case": "sampling-e2-n1-ms100-shared", "exit_code": 0, "elapsed_seconds": 64.07991362502798, "stop_reason": null, "operational_pass": true, "slo_pass": true, "measurement_peak_bytes": 35651584, "worst_p99_ms": {"Get": 4.194304, "Query": 4.194304, "Write": 8.388608}, "review_error": null}
+{"case": "sampling-e2-n1-ms100-blink", "exit_code": 0, "elapsed_seconds": 64.07412077486515, "stop_reason": null, "operational_pass": true, "slo_pass": true, "measurement_peak_bytes": 14626816, "worst_p99_ms": {"Get": 2.097152, "Query": 2.097152, "Write": 8.388608}, "review_error": null}
+Previous HEAD position was aaa40565 Bound periodic checkpoint detail before sustained density runs
+HEAD is now at 023b18bd Retain pressure samples as raw JSON and stream health reports

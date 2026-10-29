@@ -1,0 +1,10 @@
+{
+  "archive": "/home/opc/tenant-density-harness-20261027/observations-runtime-r1.tar.gz",
+  "archive_sha256": "724500af7b15fa2f464ea08580fee7be684b870ce959fad6470d672c18dd99ea",
+  "bytes": 2110210,
+  "runs": [
+    "observations-control-aaa405655-r1",
+    "observations-023b18bd8-r1"
+  ],
+  "preserved_database_records": 20
+}
