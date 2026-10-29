@@ -1,0 +1,8 @@
+{
+  "logical_target_path_unchanged": true,
+  "runtime_and_native_identities_unchanged": true,
+  "capacity": {
+    "boot_free_bytes": 1127677952,
+    "benchmark_free_bytes": 32584036352
+  }
+}

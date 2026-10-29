@@ -1,0 +1,83 @@
+{
+  "source_commit": "023b18bd8921b593f243f59b9eaa1576125c6572",
+  "passing_tests": 74,
+  "group_counts": [
+    42,
+    6,
+    17,
+    5,
+    4
+  ],
+  "same_17_existing_clippy_diagnostics": true,
+  "clippy_diagnostics": [
+    {
+      "message": "this function has too many arguments (8/7)",
+      "path": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs"
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "path": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs"
+    },
+    {
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "path": "dodb/crates/dodb-rocksdb/src/minimal_native.rs"
+    },
+    {
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+    },
+    {
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+    },
+    {
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+    },
+    {
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "matching on `Some` with `ok()` is redundant",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "matching on `Some` with `ok()` is redundant",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this function has too many arguments (8/7)",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this `if` statement can be collapsed",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "very complex type used. Consider factoring parts into `type` definitions",
+      "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+    },
+    {
+      "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+      "path": "dodb/crates/dodb-rocksdb/tests/common/transaction_contract.rs"
+    }
+  ],
+  "archive_sha256": "5b49cc3ed2f3104fcb6ee2d2a770a8f32ecae5e104b4bfbf1c91d461518df2f9"
+}

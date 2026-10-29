@@ -1,0 +1,4 @@
+{"name": "observations-clean-tests", "exit_code": 0, "reused_completed_check": true}
+{"name": "observations-clean-clippy", "exit_code": 0, "reused_completed_check": false}
+{"name": "observations-clean-a1-link", "exit_code": 0, "reused_completed_check": false}
+{"name": "observations-clean-default-link", "exit_code": 0, "reused_completed_check": false}

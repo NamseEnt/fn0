@@ -1,0 +1,51 @@
+{
+  "source": "/home/opc/tenant-density-harness-20261027/target",
+  "destination": "/bench/zfs/db/tenant-density-build-cache-20261029/target",
+  "previous_duplicate": "/home/opc/tenant-density-harness-20261027/target-on-boot-before-20261029",
+  "cache_apparent_bytes": 4579515288,
+  "capacity_before": {
+    "boot_free_bytes": 1128271872,
+    "benchmark_free_bytes": 37298245632
+  },
+  "identities_before": {
+    "/home/opc/tenant-density-harness-20261027/target/release/tenant_density_workload": {
+      "sha256": "876f09812c7d1188c32fe5b25e8670d964adcc03b4fb118d3bdc7a14c7db3e22",
+      "bytes": 16647928
+    },
+    "/home/opc/tenant-density-harness-20261027/target/release/memory_diagnostic_worker": {
+      "sha256": "365db618c04cd5a020def60c50107fcb54871cf287e83d32b4684e7590e74fef",
+      "bytes": 17226112
+    },
+    "/bench/zfs/db/product-build/rocksdb-source/librocksdb.a": {
+      "sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+      "bytes": 1199825562
+    },
+    "/home/opc/tenant-density-harness-20261027/capacity/capacity-aaa405655-r1/bin/tenant_density_workload": {
+      "sha256": "180077b6b75c8d52c1a4de33248dc1eb357414edceb26325d8f6d66a753c4f49",
+      "bytes": 16634904
+    },
+    "/home/opc/tenant-density-harness-20261027/capacity/capacity-aaa405655-r2/bin/tenant_density_workload": {
+      "sha256": "180077b6b75c8d52c1a4de33248dc1eb357414edceb26325d8f6d66a753c4f49",
+      "bytes": 16634904
+    },
+    "/home/opc/tenant-density-harness-20261027/capacity/capacity-supplement-aaa405655-r1/bin/tenant_density_workload": {
+      "sha256": "180077b6b75c8d52c1a4de33248dc1eb357414edceb26325d8f6d66a753c4f49",
+      "bytes": 16634904
+    },
+    "/home/opc/tenant-density-harness-20261027/capacity/capacity-aaa405655-r1/bin/memory_diagnostic_worker": {
+      "sha256": "5ed5800bef5da6f3fadf8635099de21397111837f2750115fa3859e63cb04cc9",
+      "bytes": 17218192
+    },
+    "/home/opc/tenant-density-harness-20261027/capacity/capacity-aaa405655-r2/bin/memory_diagnostic_worker": {
+      "sha256": "5ed5800bef5da6f3fadf8635099de21397111837f2750115fa3859e63cb04cc9",
+      "bytes": 17218192
+    },
+    "/home/opc/tenant-density-harness-20261027/capacity/capacity-supplement-aaa405655-r1/bin/memory_diagnostic_worker": {
+      "sha256": "5ed5800bef5da6f3fadf8635099de21397111837f2750115fa3859e63cb04cc9",
+      "bytes": 17218192
+    }
+  },
+  "processes_before": "    PID COMMAND\n      1 systemd\n      2 kthreadd\n      3 pool_workqueue_release\n      4 kworker/R-kvfree_rcu_reclaim\n      5 kworker/R-rcu_gp\n      6 kworker/R-sync_wq\n      7 kworker/R-slub_flushwq\n      8 kworker/R-netns\n     10 kworker/0:0H-events_highpri\n     13 kworker/R-mm_percpu_wq\n     14 rcu_tasks_rude_kthread\n     15 rcu_tasks_trace_kthread\n     16 ksoftirqd/0\n     17 rcu_sched\n     18 rcu_exp_par_gp_kthread_worker/0\n     19 rcu_exp_gp_kthread_worker\n     20 migration/0\n     21 cpuhp/0\n     22 cpuhp/1\n     23 migration/1\n     24 ksoftirqd/1\n     26 kworker/1:0H-events_highpri\n     28 kdevtmpfs\n     29 kworker/R-inet_frag_wq\n     30 kauditd\n     31 khungtaskd\n     33 oom_reaper\n     34 kworker/R-writeback\n     35 kcompactd0\n     36 ksmd\n     37 khugepaged\n     38 kworker/R-cryptd\n     39 kworker/R-kintegrityd\n     40 kworker/R-kblockd\n     41 kworker/R-blkcg_punt_bio\n     42 kworker/R-tpm_dev_wq\n     43 kworker/R-ata_sff\n     44 kworker/R-md\n     45 kworker/R-md_bitmap\n     46 kworker/R-edac-poller\n     47 kworker/R-devfreq_wq\n     48 watchdogd\n     49 kworker/R-quota_events_unbound\n     50 kworker/0:1H-xfs-log/dm-1\n     51 kswapd0\n     69 kworker/R-kthrotld\n     74 irq/50-aerdrv\n     75 irq/50-pciehp\n     76 irq/51-aerdrv\n     77 irq/51-pciehp\n     78 irq/52-aerdrv\n     79 irq/52-pciehp\n     80 irq/53-aerdrv\n     81 irq/53-pciehp\n     82 irq/54-aerdrv\n     83 irq/54-pciehp\n     84 irq/55-aerdrv\n     85 irq/55-pciehp\n     86 irq/56-aerdrv\n     87 irq/56-pciehp\n     88 irq/57-aerdrv\n     89 irq/57-pciehp\n     90 irq/58-aerdrv\n     91 irq/58-pciehp\n     92 irq/59-aerdrv\n     93 irq/59-pciehp\n     94 irq/60-aerdrv\n     95 irq/60-pciehp\n     96 irq/61-aerdrv\n     97 irq/61-pciehp\n     98 irq/62-aerdrv\n     99 irq/62-pciehp\n    100 irq/63-aerdrv\n    101 irq/63-pciehp\n    102 irq/64-aerdrv\n    103 irq/64-pciehp\n    104 irq/65-aerdrv\n    105 irq/65-pciehp\n    106 irq/66-aerdrv\n    107 irq/66-pciehp\n    108 irq/67-aerdrv\n    109 irq/67-pciehp\n    110 irq/68-aerdrv\n    111 irq/68-pciehp\n    112 irq/69-aerdrv\n    113 irq/69-pciehp\n    114 irq/70-aerdrv\n    115 irq/70-pciehp\n    116 irq/71-aerdrv\n    117 irq/71-pciehp\n    118 irq/72-aerdrv\n    119 irq/72-pciehp\n    120 irq/73-aerdrv\n    121 irq/73-pciehp\n    122 irq/49-ACPI:Ged\n    123 kworker/R-acpi_thermal_pm\n    124 kworker/R-vfio-irqfd-cleanup\n    125 kworker/R-bch_btree_io\n    126 kworker/R-bcache\n    127 kworker/R-bch_journal\n    128 hwrng\n    129 kworker/R-mld\n    130 kworker/1:1H-kblockd\n    131 kworker/R-ipv6_addrconf\n    132 kworker/R-dsa_ordered\n    133 kworker/R-kstrp\n    139 kworker/u9:0\n    375 kworker/R-iscsi_conn_cleanup\n    377 kworker/R-tls-strp\n    378 kworker/R-cnic_wq\n    379 bnx2i_thread/0\n    380 bnx2i_thread/1\n    461 kworker/R-rpciod\n    462 kworker/R-xprtiod\n    566 scsi_eh_0\n    570 kworker/R-scsi_tmf_0\n    625 kworker/R-nvme-wq\n    626 kworker/R-nvme-reset-wq\n    627 kworker/R-nvme-delete-wq\n    628 kworker/R-nvme-auth-wq\n    629 kworker/R-nvme_tcp_wq\n    931 kworker/R-kdmflush/252:0\n    940 kworker/R-kdmflush/252:1\n    964 kworker/R-xfsalloc\n    965 kworker/R-xfs_mru_cache\n    966 kworker/R-xfs-buf/dm-0\n    967 kworker/R-xfs-conv/dm-0\n    968 kworker/R-xfs-reclaim/dm-0\n    969 kworker/R-xfs-blockgc/dm-0\n    970 kworker/R-xfs-inodegc/dm-0\n    971 kworker/R-xfs-log/dm-0\n    972 kworker/R-xfs-cil/dm-0\n    973 xfsaild/dm-0\n   1080 systemd-journal\n   1108 systemd-udevd\n   1454 kworker/R-xfs-buf/sda2\n   1455 kworker/R-xfs-conv/sda2\n   1457 kworker/R-xfs-reclaim/sda2\n   1458 kworker/R-xfs-blockgc/sda2\n   1459 kworker/R-xfs-inodegc/sda2\n   1461 kworker/R-xfs-log/sda2\n   1462 kworker/R-xfs-cil/sda2\n   1463 xfsaild/sda2\n   1464 kworker/R-xfs-buf/dm-1\n   1465 kworker/R-xfs-conv/dm-1\n   1466 kworker/R-xfs-reclaim/dm-1\n   1467 kworker/R-xfs-blockgc/dm-1\n   1468 kworker/R-xfs-inodegc/dm-1\n   1469 kworker/R-xfs-log/dm-1\n   1470 kworker/R-xfs-cil/dm-1\n   1471 xfsaild/dm-1\n   1505 rpcbind\n   1506 auditd\n   1508 sedispatch\n   1535 dbus-broker-lau\n   1536 dtprobed\n   1541 dtprobed\n   1543 dbus-broker\n   1546 firewalld\n   1548 irqbalance\n   1549 lsmd\n   1551 systemd-logind\n   1687 NetworkManager\n   1688 polkitd\n   1705 nm-dispatcher\n   1712 tuned\n   1720 gssproxy\n   2198 iscsid\n   2220 rsyslogd\n   2224 sshd\n   2228 chronyd\n   2292 atd\n   2297 crond\n   2299 agetty\n   2301 agetty\n   2434 pmcd\n   2450 pmdaroot\n   2466 pmdaxfs\n   2470 pmdalinux\n   2475 python3\n   2532 pmdakvm\n   2536 pmdadm\n   2543 python3\n   2642 systemd\n   2644 (sd-pam)\n   2710 runcommand\n   3338 pmie\n   3348 pmlogger\n   3357 pmpause\n   3480 pmpause\n  13365 spl_system_task\n  13366 spl_delay_taskq\n  13367 spl_dynamic_tas\n  13368 spl_kmem_cache\n  13371 zvol_tq-0\n  13372 arc_prune\n  13373 arc_evict\n  13374 arc_reap\n  13375 dbu_evict\n  13376 dbuf_evict\n  13377 z_vdev_file\n  13378 l2arc_feed\n  30822 z_null_iss\n  30823 z_null_int\n  30824 z_rd_iss\n  30825 z_rd_int\n  30826 z_wr_iss\n  30827 z_wr_iss_h\n  30828 z_wr_int\n  30829 z_wr_int_h\n  30830 z_fr_iss\n  30831 z_fr_int\n  30832 z_cl_iss\n  30833 z_cl_int\n  30834 z_ioctl_iss\n  30835 z_ioctl_int\n  30836 z_trim_iss\n  30837 z_trim_int\n  30838 z_zvol\n  30839 z_metaslab\n  30840 z_prefetch\n  30841 z_upgrade\n  30844 dp_sync_taskq\n  30845 dp_zil_clean_ta\n  30846 dp_zil_clean_ta\n  30847 z_zrele\n  30848 z_unlinked_drai\n  30849 txg_quiesce\n  30850 txg_sync\n  30851 mmp\n  30862 z_indirect_cond\n  30863 z_livelist_dest\n  30864 z_livelist_cond\n  30865 z_checkpoint_di\n 122339 agent\n 122376 gomon\n 122390 oci-wlp\n 122398 updater\n 122496 sudo\n 122498 runcommand\n 122507 unifiedmonitori\n 122643 fluentd\n 122657 ruby\n2223140 pmdaproc\n2355513 z_zrele\n2383298 z_rd_iss\n2383300 z_rd_iss\n2383341 kworker/1:3-cgroup_free\n2383618 kworker/u8:0-events_unbound\n2384165 kworker/u8:1-events_unbound\n2384171 kworker/0:2-events\n2384212 kworker/u8:2-events_unbound\n2384226 kworker/1:1-cgroup_release\n2384921 kworker/0:0-xfs-sync/sda2\n2385351 z_rd_iss\n2385352 z_rd_iss\n2385353 z_rd_iss\n2385354 z_rd_iss\n2385355 z_rd_iss\n2386143 kworker/1:2-xfs-buf/dm-0\n2388863 kworker/0:1-events\n2388918 systemd\n2388920 (sd-pam)\n2388996 python3\n2388997 ps\n",
+  "controller_sha256": "af5247732dd6ba0712cf0f846687ab73d20990462a119597af37694866427d38",
+  "scope": "Relocate the complete regenerable build cache; preserve runtime binaries, logs, source, native archive, databases, and failed evidence"
+}

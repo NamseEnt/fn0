@@ -1,0 +1,26 @@
+{
+  "outcomes": [
+    {
+      "name": "observations-clean-tests",
+      "exit_code": 0,
+      "reused_completed_check": true
+    },
+    {
+      "name": "observations-clean-clippy",
+      "exit_code": 0,
+      "reused_completed_check": false
+    },
+    {
+      "name": "observations-clean-a1-link",
+      "exit_code": 0,
+      "reused_completed_check": false
+    },
+    {
+      "name": "observations-clean-default-link",
+      "exit_code": 0,
+      "reused_completed_check": false
+    }
+  ],
+  "resolved_target_directory": "/bench/zfs/db/tenant-density-build-cache-20261029/target",
+  "source_commit": "023b18bd8921b593f243f59b9eaa1576125c6572"
+}
