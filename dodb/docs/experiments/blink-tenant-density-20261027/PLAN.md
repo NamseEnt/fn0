@@ -2,7 +2,7 @@
 
 Tracking issue: [NamseEnt/fn0#126](https://github.com/NamseEnt/fn0/issues/126). Start with [HANDOFF.md](HANDOFF.md) when continuing in a new session.
 
-Status: A1 implementation and local correctness validation are tracked in [A1-IMPLEMENTATION.md](A1-IMPLEMENTATION.md) and [A1-RESULTS.md](A1-RESULTS.md). Executable harness/process-accounting preparation and four Linux correctness smokes are complete; see [DENSITY-HARNESS-RESULTS.md](DENSITY-HARNESS-RESULTS.md). The original analysis below is the frozen preparation baseline. Density measurements, shared-resource RocksDB reference, default promotion, merge, and deployment remain future work.
+Status: A1, the executable harness, shared-resource RocksDB, common backend budgets, and a bounded active-tenant comparison are complete as separately scoped increments. See [DENSITY-CAPACITY-RESULTS.md](DENSITY-CAPACITY-RESULTS.md) for 57 unique OCI cells and the measured observation-retention cost. [OBSERVATION-RETENTION-PLAN.md](OBSERVATION-RETENTION-PLAN.md) defines the next measurement correction. The analysis below remains the frozen preparation baseline. Engine-only attribution, the broader matrix, structural investment, adoption, defaults, merge, and deployment are not completed by these bounded results.
 
 ## Objective and decision criteria
 
@@ -411,8 +411,9 @@ If shared-resource minimal-native meets the service objective with no meaningful
 - [x] Process/disk accounting and executable density harness preparation, with four Linux correctness smokes; see [DENSITY-HARNESS-RESULTS.md](DENSITY-HARNESS-RESULTS.md). Retained-heap/pin-age instrumentation remains incomplete.
 - [x] Opt-in shared-cache/WBM minimal-native reference with explicit soft limits and native accounting; see [SHARED-ROCKSDB-RESULTS.md](SHARED-ROCKSDB-RESULTS.md).
 - [x] Common opt-in Linux cgroup v2 backend budgets, periodic pressure observations, explicit unsupported metrics, and disk preparation; see [MEMORY-PRESSURE-RESULTS.md](MEMORY-PRESSURE-RESULTS.md). This excludes uncharged ARC/host memory and does not supply application byte admission or eviction.
-- [ ] Live host sizing and an explicit frozen experiment matrix.
-- [ ] Density/maintenance experiments and evidence reduction.
+- [x] Live host sizing and explicit frozen bounded E2/E3/maintenance protocols; see [DENSITY-CAPACITY-PLAN.md](DENSITY-CAPACITY-PLAN.md), [CAPACITY-CONTINUATION.md](CAPACITY-CONTINUATION.md), and [CAPACITY-SUPPLEMENT-PLAN.md](CAPACITY-SUPPLEMENT-PLAN.md).
+- [x] Bounded instrumented E2/E3 frontier, cadence/sparse sensitivities, short maintenance observations, and reproducible evidence reduction; see [DENSITY-CAPACITY-RESULTS.md](DENSITY-CAPACITY-RESULTS.md).
+- [ ] Lower-overhead observation storage/confirmation and broader density/maintenance acceptance, including larger-than-budget and host-ARC boundaries.
 - [ ] Decision on B1/B2/B3/B4 implementation and adoption.
 
-Unchecked items are future work. No implementation or experiment completion is claimed by creating the issue and documents.
+Unchecked items remain future work. Each completed increment has its own acceptance limits; the bounded instrumented results do not establish a production tenant maximum or close the structural objective.

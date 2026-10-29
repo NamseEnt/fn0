@@ -1,0 +1,1031 @@
+{
+  "case": "confirm-e3-n5-r1-shared",
+  "backend": "minimal-native-shared",
+  "stage": "E3",
+  "tenants": 5,
+  "active": 5,
+  "duration_ms": 60000,
+  "sample_interval_ms": 1000,
+  "exit_code": 0,
+  "elapsed_seconds": 158.1836204258725,
+  "capacity_after": {
+    "timestamp_unix_seconds": 1793183782.3035824,
+    "zfs_free_bytes": 39300771840,
+    "boot_free_bytes": 2693873664,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5742546944,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3829141504,
+      "Dirty": 4710400,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5619031552,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5613706432,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11066484       15 468573992 13902364 117119192   208677 6114686716 189789531        0 54980456 203702530     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  9923843 287984 5147200 470523911 1305427 320076 136988 1678998 0 0",
+      "cpu0 4974533 129768 2574716 235264497 661559 158946 69231 826854 0 0",
+      "cpu1 4949309 158216 2572484 235259414 643868 161130 67757 852143 0 0"
+    ]
+  },
+  "stop_reason": null,
+  "report_sha256": "bdc3a069943083e6d1b3d641c9a4e81ff37666879a55719053f97ceaa74ca616",
+  "reduced": {
+    "backend": "minimal-native-shared",
+    "registered": 5,
+    "active": 5,
+    "initial_rows": 32768,
+    "duration_ms": 60000,
+    "sample_interval_ms": 1000,
+    "status": "completed",
+    "cell_peak_bytes": 80633856,
+    "cell_events": {
+      "high": 0,
+      "low": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_group_kill": 0,
+      "oom_kill": 0
+    },
+    "epoch_peaks_bytes": {
+      "measurement": 49188864,
+      "oracle": 76681216,
+      "reopen-oracle": 78667776,
+      "setup": 14860288
+    },
+    "epoch_events": {
+      "measurement": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "oracle": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "reopen-oracle": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "setup": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      }
+    },
+    "operational_pass": true,
+    "slo_pass": true,
+    "resource_failure": false,
+    "failure_reason": null,
+    "measurement_sample_count": 60,
+    "maximum_measurement_sample_gap_ms": 1001,
+    "native_measurement_sample_count": 61,
+    "native_serialized_bytes": 581703,
+    "native_samples_truncated": false,
+    "process_sampling": {
+      "backend": {
+        "fields": {
+          "anonymous_kb": {
+            "available_observations": 62,
+            "observed_max": 41468,
+            "unavailable_observations": 0
+          },
+          "file_kb": {
+            "available_observations": 62,
+            "observed_max": 10749,
+            "unavailable_observations": 0
+          },
+          "pss_kb": {
+            "available_observations": 62,
+            "observed_max": 52217,
+            "unavailable_observations": 0
+          },
+          "rss_kb": {
+            "available_observations": 62,
+            "observed_max": 55024,
+            "unavailable_observations": 0
+          },
+          "swap_kb": {
+            "available_observations": 62,
+            "observed_max": 0,
+            "unavailable_observations": 0
+          },
+          "vm_hwm_kb": {
+            "available_observations": 62,
+            "observed_max": 55024,
+            "unavailable_observations": 0
+          }
+        },
+        "sample_count": 62
+      },
+      "backend_pid": 2345478,
+      "backend_start_time_ticks": 244531289,
+      "boundary_snapshots_requested": 2,
+      "driver": {
+        "fields": {
+          "anonymous_kb": {
+            "available_observations": 62,
+            "observed_max": 6896,
+            "unavailable_observations": 0
+          },
+          "file_kb": {
+            "available_observations": 62,
+            "observed_max": 9789,
+            "unavailable_observations": 0
+          },
+          "pss_kb": {
+            "available_observations": 62,
+            "observed_max": 16685,
+            "unavailable_observations": 0
+          },
+          "rss_kb": {
+            "available_observations": 62,
+            "observed_max": 19480,
+            "unavailable_observations": 0
+          },
+          "swap_kb": {
+            "available_observations": 62,
+            "observed_max": 0,
+            "unavailable_observations": 0
+          },
+          "vm_hwm_kb": {
+            "available_observations": 62,
+            "observed_max": 19480,
+            "unavailable_observations": 0
+          }
+        },
+        "sample_count": 62
+      },
+      "field_sources": {
+        "anonymous_kb": "smaps_rollup Anonymous",
+        "file_kb": "smaps_rollup Pss_File, not file RSS",
+        "pss_kb": "smaps_rollup Pss",
+        "rss_kb": "VmRSS or smaps_rollup Rss",
+        "swap_kb": "smaps_rollup Swap or VmSwap",
+        "vm_hwm_kb": "VmHWM"
+      },
+      "maximum_observed_gap_ms": 1005,
+      "peak_scope": "sampled observations only; instantaneous peaks between samples can be missed",
+      "periodic_offer_sample_count": 60,
+      "phase_periodic_sample_count_before_identity_filter": 60,
+      "process_samples_truncated": false,
+      "same_backend_identity_at_offer_boundaries": true,
+      "scope": "offer phase and its boundaries, separated by PID/start-time; no setup/oracle samples or engine-heap claim",
+      "status": "sampled",
+      "vm_hwm_scope": "process lifetime high-water includes earlier measurement-worker startup and open phases"
+    },
+    "backend_offer_cpu_usec": 4146291,
+    "backend_offer_io_delta": {
+      "cancelled_write_bytes": 0,
+      "rchar": 114833897,
+      "read_bytes": 114833857,
+      "syscr": 31494,
+      "syscw": 14506,
+      "wchar": 99569951,
+      "write_bytes": 99510389
+    },
+    "whole_device_offer_write_bytes": 133808128,
+    "filesystem_snapshots": {
+      "after_measurement_worker_shutdown": {
+        "allocated_directory_bytes": 44032,
+        "allocated_file_bytes": 98618368,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 6,
+        "distinct_files": 150,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 95548818,
+        "regular_file_paths": 150,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "after_oracle_worker_shutdown": {
+        "allocated_directory_bytes": 44032,
+        "allocated_file_bytes": 99113472,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 6,
+        "distinct_files": 165,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 95798218,
+        "regular_file_paths": 165,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "after_reopen_oracle_worker_shutdown": {
+        "allocated_directory_bytes": 44032,
+        "allocated_file_bytes": 99380736,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 6,
+        "distinct_files": 175,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 96014837,
+        "regular_file_paths": 175,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "after_setup_worker_shutdown": {
+        "allocated_directory_bytes": 44032,
+        "allocated_file_bytes": 84360704,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 6,
+        "distinct_files": 135,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 92687279,
+        "regular_file_paths": 135,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "before_setup": {
+        "allocated_file_bytes": null,
+        "logical_file_bytes": null,
+        "status": "not_created"
+      }
+    },
+    "offer_elapsed_ms": 60003,
+    "scheduled": 15000,
+    "successful": 15000,
+    "dropped": 0,
+    "completed_at_offer_end": 15000,
+    "offer_throughput_completed_per_second": 249.98750062496876,
+    "aggregate_p99": {
+      "Get": {
+        "bucket": 22,
+        "lower_inclusive_ns": 2097152,
+        "upper_exclusive_ns": 4194304
+      },
+      "Query": {
+        "bucket": 23,
+        "lower_inclusive_ns": 4194304,
+        "upper_exclusive_ns": 8388608
+      },
+      "Write": {
+        "bucket": 24,
+        "lower_inclusive_ns": 8388608,
+        "upper_exclusive_ns": 16777216
+      }
+    },
+    "per_tenant_objective": [
+      {
+        "tenant": 1,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Write": {
+            "bucket": 24,
+            "lower_inclusive_ns": 8388608,
+            "upper_exclusive_ns": 16777216
+          }
+        },
+        "completed_at_offer_end": 3000,
+        "passed": true
+      },
+      {
+        "tenant": 2,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 23,
+            "lower_inclusive_ns": 4194304,
+            "upper_exclusive_ns": 8388608
+          },
+          "Write": {
+            "bucket": 24,
+            "lower_inclusive_ns": 8388608,
+            "upper_exclusive_ns": 16777216
+          }
+        },
+        "completed_at_offer_end": 3000,
+        "passed": true
+      },
+      {
+        "tenant": 3,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 23,
+            "lower_inclusive_ns": 4194304,
+            "upper_exclusive_ns": 8388608
+          },
+          "Write": {
+            "bucket": 23,
+            "lower_inclusive_ns": 4194304,
+            "upper_exclusive_ns": 8388608
+          }
+        },
+        "completed_at_offer_end": 3000,
+        "passed": true
+      },
+      {
+        "tenant": 4,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Write": {
+            "bucket": 23,
+            "lower_inclusive_ns": 4194304,
+            "upper_exclusive_ns": 8388608
+          }
+        },
+        "completed_at_offer_end": 3000,
+        "passed": true
+      },
+      {
+        "tenant": 5,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 23,
+            "lower_inclusive_ns": 4194304,
+            "upper_exclusive_ns": 8388608
+          },
+          "Write": {
+            "bucket": 24,
+            "lower_inclusive_ns": 8388608,
+            "upper_exclusive_ns": 16777216
+          }
+        },
+        "completed_at_offer_end": 3000,
+        "passed": true
+      }
+    ],
+    "worst_tenant_p99_upper_exclusive_ms": {
+      "Get": 4.194304,
+      "Query": 8.388608,
+      "Write": 16.777216
+    },
+    "checkpoint_metrics": {
+      "reason": "backend does not expose B-link checkpoint metrics",
+      "status": "unsupported",
+      "value": null
+    },
+    "native_first_last": [
+      {
+        "blink_checkpoints": {
+          "reason": "backend does not expose B-link checkpoint metrics",
+          "status": "unsupported",
+          "value": null
+        },
+        "phase": "before-measurement",
+        "rocksdb_properties": {
+          "databases": [],
+          "timestamp_unix_ms": 1793183641561
+        },
+        "shared_resources": {
+          "all_opened_tenants_use_shared_resources": true,
+          "opened_tenants": 0,
+          "scope": "service-wide snapshot counted once; non-atomic across native counters",
+          "tenants_verified_using_shared_resources": 0,
+          "usage": {
+            "cache_capacity_bytes": 67108864,
+            "cache_pinned_usage_bytes": 0,
+            "cache_usage_bytes": 0,
+            "compaction_threads": 1,
+            "flush_threads": 1,
+            "wbm_cache_reservation_bytes": 0,
+            "wbm_limit_bytes": 33554432,
+            "wbm_mutable_bytes": 0,
+            "wbm_usage_bytes": 0
+          }
+        },
+        "timestamp_unix_ms": 1793183641561
+      },
+      {
+        "blink_checkpoints": {
+          "reason": "backend does not expose B-link checkpoint metrics",
+          "status": "unsupported",
+          "value": null
+        },
+        "phase": "measurement-including-drain",
+        "rocksdb_properties": {
+          "databases": [
+            {
+              "database": "tenant_3",
+              "properties": {
+                "actual-delayed-write-rate": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes_per_second",
+                  "value": 0
+                },
+                "block-cache-capacity": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 67108864
+                },
+                "block-cache-usage": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 30241096
+                },
+                "compaction-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "cur-size-all-mem-tables": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 526368
+                },
+                "estimate-live-data-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 18339249
+                },
+                "estimate-pending-compaction-bytes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 0
+                },
+                "is-write-stopped": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "live-sst-files-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 18349080
+                },
+                "mem-table-flush-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "num-running-compactions": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                },
+                "num-running-flushes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                }
+              },
+              "status": "open"
+            },
+            {
+              "database": "tenant_4",
+              "properties": {
+                "actual-delayed-write-rate": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes_per_second",
+                  "value": 0
+                },
+                "block-cache-capacity": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 67108864
+                },
+                "block-cache-usage": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 30241096
+                },
+                "compaction-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "cur-size-all-mem-tables": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 526368
+                },
+                "estimate-live-data-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 18339249
+                },
+                "estimate-pending-compaction-bytes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 0
+                },
+                "is-write-stopped": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "live-sst-files-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 18349080
+                },
+                "mem-table-flush-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "num-running-compactions": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                },
+                "num-running-flushes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                }
+              },
+              "status": "open"
+            },
+            {
+              "database": "tenant_2",
+              "properties": {
+                "actual-delayed-write-rate": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes_per_second",
+                  "value": 0
+                },
+                "block-cache-capacity": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 67108864
+                },
+                "block-cache-usage": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 30241096
+                },
+                "compaction-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "cur-size-all-mem-tables": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 526368
+                },
+                "estimate-live-data-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 18339249
+                },
+                "estimate-pending-compaction-bytes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 0
+                },
+                "is-write-stopped": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "live-sst-files-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 18349080
+                },
+                "mem-table-flush-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "num-running-compactions": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                },
+                "num-running-flushes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                }
+              },
+              "status": "open"
+            },
+            {
+              "database": "tenant_1",
+              "properties": {
+                "actual-delayed-write-rate": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes_per_second",
+                  "value": 0
+                },
+                "block-cache-capacity": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 67108864
+                },
+                "block-cache-usage": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 30241096
+                },
+                "compaction-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "cur-size-all-mem-tables": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 526368
+                },
+                "estimate-live-data-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 18339249
+                },
+                "estimate-pending-compaction-bytes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 0
+                },
+                "is-write-stopped": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "live-sst-files-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 18349104
+                },
+                "mem-table-flush-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "num-running-compactions": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                },
+                "num-running-flushes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                }
+              },
+              "status": "open"
+            },
+            {
+              "database": "tenant_5",
+              "properties": {
+                "actual-delayed-write-rate": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes_per_second",
+                  "value": 0
+                },
+                "block-cache-capacity": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 67108864
+                },
+                "block-cache-usage": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 30241096
+                },
+                "compaction-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "cur-size-all-mem-tables": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 526368
+                },
+                "estimate-live-data-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 18339249
+                },
+                "estimate-pending-compaction-bytes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 0
+                },
+                "is-write-stopped": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "live-sst-files-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 18349080
+                },
+                "mem-table-flush-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "num-running-compactions": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                },
+                "num-running-flushes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                }
+              },
+              "status": "open"
+            }
+          ],
+          "timestamp_unix_ms": 1793183701562
+        },
+        "shared_resources": {
+          "all_opened_tenants_use_shared_resources": true,
+          "opened_tenants": 5,
+          "scope": "service-wide snapshot counted once; non-atomic across native counters",
+          "tenants_verified_using_shared_resources": 5,
+          "usage": {
+            "cache_capacity_bytes": 67108864,
+            "cache_pinned_usage_bytes": 2884640,
+            "cache_usage_bytes": 30241096,
+            "compaction_threads": 1,
+            "flush_threads": 1,
+            "wbm_cache_reservation_bytes": 2883584,
+            "wbm_limit_bytes": 33554432,
+            "wbm_mutable_bytes": 2631840,
+            "wbm_usage_bytes": 2631840
+          }
+        },
+        "timestamp_unix_ms": 1793183701561
+      }
+    ],
+    "offer_boundary_process_identities": {
+      "before": {
+        "processes": [
+          {
+            "anonymous_kb": 3620,
+            "file_kb": 9789,
+            "pid": 2345373,
+            "process_group_id": 2345373,
+            "pss_kb": 13409,
+            "role": "harness-process",
+            "rss_kb": 16208,
+            "start_time_ticks": 244529554,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 16208
+          },
+          {
+            "pid": 2345378,
+            "process_group_id": 2345373,
+            "role": "backend-process",
+            "start_time_ticks": 244529567,
+            "status": "exited-or-pid-reused"
+          },
+          {
+            "anonymous_kb": 4960,
+            "file_kb": 10749,
+            "pid": 2345478,
+            "process_group_id": 2345373,
+            "pss_kb": 15709,
+            "role": "backend-process",
+            "rss_kb": 18516,
+            "start_time_ticks": 244531289,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 20208
+          }
+        ],
+        "timestamp_unix_ms": 1793183641767
+      },
+      "after": {
+        "processes": [
+          {
+            "anonymous_kb": 6896,
+            "file_kb": 9789,
+            "pid": 2345373,
+            "process_group_id": 2345373,
+            "pss_kb": 16685,
+            "role": "harness-process",
+            "rss_kb": 19480,
+            "start_time_ticks": 244529554,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 19480
+          },
+          {
+            "pid": 2345378,
+            "process_group_id": 2345373,
+            "role": "backend-process",
+            "start_time_ticks": 244529567,
+            "status": "exited-or-pid-reused"
+          },
+          {
+            "anonymous_kb": 41468,
+            "file_kb": 10749,
+            "pid": 2345478,
+            "process_group_id": 2345373,
+            "pss_kb": 52217,
+            "role": "backend-process",
+            "rss_kb": 55024,
+            "start_time_ticks": 244531289,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 55024
+          }
+        ],
+        "timestamp_unix_ms": 1793183701769
+      }
+    }
+  }
+}

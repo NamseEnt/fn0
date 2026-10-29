@@ -10,6 +10,8 @@ The frozen one-tenant E2 cadence sensitivity completed identical sixty-second re
 
 The worker keeps periodic observations as `Vec<serde_json::Value>` until shutdown. Nested per-database property maps therefore retain a much larger representation than their serialized byte count. The existing 8 MiB bound limits serialized native observation bytes, not exact heap. B-link's service-wide counters have a different representation. The earlier checkpoint-detail summary removed repeated event arrays, but retained property/counter DOM objects remain. Raw result and driver costs must stay visible.
 
+The pinned serde_json 1.0.148 `json!` macro serializes arbitrary expressions through `to_value(&$other)`. The worker embeds `pressure_samples` in that macro and then calls `to_vec_pretty`, after dropping the backend. This can build another observation DOM plus a complete serialized report buffer while the original samples remain alive. Compare the kernel peak at the offer boundary with the final epoch peak before attributing a lifetime peak to the active engine. The exact allocation contribution remains unprofiled.
+
 ## Implementation scope
 
 Change only the opt-in worker pressure-observation representation and report serialization. Serialize each completed observation once and retain validated raw JSON frames instead of their DOM. Keep the 4,096-frame and 8 MiB serialized-byte bounds and explicit truncation. Stream raw frames into the final health report without rebuilding their entire DOM or holding another complete serialized report buffer in the worker. Preserve the report's JSON schema, timestamps, phases, property availability states, shared-resource counting, full final checkpoint events, and metadata.

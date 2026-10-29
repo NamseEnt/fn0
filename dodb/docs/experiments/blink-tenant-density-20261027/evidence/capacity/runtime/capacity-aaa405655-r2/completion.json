@@ -1,0 +1,1623 @@
+{
+  "completed": true,
+  "source_commit": "aaa40565529ca92150df5d94e19b02ca93859f71",
+  "cases": 52,
+  "confirmed_common_counts": {
+    "E2": [
+      24,
+      28
+    ],
+    "E3": [
+      5
+    ]
+  },
+  "maintenance_count": 16,
+  "capacity_after": {
+    "timestamp_unix_seconds": 1793185757.9115539,
+    "zfs_free_bytes": 37930844160,
+    "boot_free_bytes": 2634043392,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5655728128,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3829403648,
+      "Dirty": 6397952,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5713788928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5645285248,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11066577       15 468579560 13902459 117844313   208677 6132121820 190638230        0 55197036 204551324     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  9963634 288159 5196106 470810347 1306715 323627 143334 1688309 0 0",
+      "cpu0 4994561 129887 2599346 235407435 662277 160708 72426 831337 0 0",
+      "cpu1 4969073 158272 2596759 235402912 644437 162918 70908 856972 0 0"
+    ]
+  },
+  "processes": [
+    {
+      "pid": 2319813,
+      "role": "harness-process",
+      "start_time_ticks": 244038800,
+      "same_live_process": false
+    },
+    {
+      "pid": 2319818,
+      "role": "backend-process",
+      "start_time_ticks": 244038815,
+      "same_live_process": false
+    },
+    {
+      "pid": 2319829,
+      "role": "backend-process",
+      "start_time_ticks": 244038894,
+      "same_live_process": false
+    },
+    {
+      "pid": 2319883,
+      "role": "backend-process",
+      "start_time_ticks": 244041926,
+      "same_live_process": false
+    },
+    {
+      "pid": 2319889,
+      "role": "backend-process",
+      "start_time_ticks": 244041995,
+      "same_live_process": false
+    },
+    {
+      "pid": 2319894,
+      "role": "harness-process",
+      "start_time_ticks": 244042205,
+      "same_live_process": false
+    },
+    {
+      "pid": 2319899,
+      "role": "backend-process",
+      "start_time_ticks": 244042218,
+      "same_live_process": false
+    },
+    {
+      "pid": 2319928,
+      "role": "backend-process",
+      "start_time_ticks": 244042277,
+      "same_live_process": false
+    },
+    {
+      "pid": 2319960,
+      "role": "backend-process",
+      "start_time_ticks": 244045310,
+      "same_live_process": false
+    },
+    {
+      "pid": 2319987,
+      "role": "backend-process",
+      "start_time_ticks": 244045383,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320014,
+      "role": "harness-process",
+      "start_time_ticks": 244045612,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320019,
+      "role": "backend-process",
+      "start_time_ticks": 244045624,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320093,
+      "role": "backend-process",
+      "start_time_ticks": 244045753,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320230,
+      "role": "backend-process",
+      "start_time_ticks": 244048792,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320301,
+      "role": "backend-process",
+      "start_time_ticks": 244049008,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320381,
+      "role": "harness-process",
+      "start_time_ticks": 244049218,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320386,
+      "role": "backend-process",
+      "start_time_ticks": 244049231,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320431,
+      "role": "backend-process",
+      "start_time_ticks": 244049448,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320486,
+      "role": "backend-process",
+      "start_time_ticks": 244052485,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320492,
+      "role": "backend-process",
+      "start_time_ticks": 244052664,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320499,
+      "role": "harness-process",
+      "start_time_ticks": 244053026,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320504,
+      "role": "backend-process",
+      "start_time_ticks": 244053039,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320520,
+      "role": "backend-process",
+      "start_time_ticks": 244053431,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320581,
+      "role": "backend-process",
+      "start_time_ticks": 244056471,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320587,
+      "role": "backend-process",
+      "start_time_ticks": 244056797,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320592,
+      "role": "harness-process",
+      "start_time_ticks": 244057234,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320597,
+      "role": "backend-process",
+      "start_time_ticks": 244057246,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320734,
+      "role": "backend-process",
+      "start_time_ticks": 244057466,
+      "same_live_process": false
+    },
+    {
+      "pid": 2320879,
+      "role": "backend-process",
+      "start_time_ticks": 244060514,
+      "same_live_process": false
+    },
+    {
+      "pid": 2321010,
+      "role": "backend-process",
+      "start_time_ticks": 244060926,
+      "same_live_process": false
+    },
+    {
+      "pid": 2321146,
+      "role": "harness-process",
+      "start_time_ticks": 244061444,
+      "same_live_process": false
+    },
+    {
+      "pid": 2321151,
+      "role": "backend-process",
+      "start_time_ticks": 244061456,
+      "same_live_process": false
+    },
+    {
+      "pid": 2321404,
+      "role": "backend-process",
+      "start_time_ticks": 244061862,
+      "same_live_process": false
+    },
+    {
+      "pid": 2321669,
+      "role": "backend-process",
+      "start_time_ticks": 244064933,
+      "same_live_process": false
+    },
+    {
+      "pid": 2321923,
+      "role": "backend-process",
+      "start_time_ticks": 244065723,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322174,
+      "role": "harness-process",
+      "start_time_ticks": 244066655,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322179,
+      "role": "backend-process",
+      "start_time_ticks": 244066668,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322197,
+      "role": "backend-process",
+      "start_time_ticks": 244067415,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322260,
+      "role": "backend-process",
+      "start_time_ticks": 244070464,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322266,
+      "role": "backend-process",
+      "start_time_ticks": 244071070,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322272,
+      "role": "harness-process",
+      "start_time_ticks": 244071868,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322277,
+      "role": "backend-process",
+      "start_time_ticks": 244071881,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322294,
+      "role": "backend-process",
+      "start_time_ticks": 244073379,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322325,
+      "role": "backend-process",
+      "start_time_ticks": 244076462,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322331,
+      "role": "backend-process",
+      "start_time_ticks": 244077733,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322339,
+      "role": "harness-process",
+      "start_time_ticks": 244079082,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322344,
+      "role": "backend-process",
+      "start_time_ticks": 244079094,
+      "same_live_process": false
+    },
+    {
+      "pid": 2322842,
+      "role": "backend-process",
+      "start_time_ticks": 244079867,
+      "same_live_process": false
+    },
+    {
+      "pid": 2323389,
+      "role": "backend-process",
+      "start_time_ticks": 244082973,
+      "same_live_process": false
+    },
+    {
+      "pid": 2323884,
+      "role": "backend-process",
+      "start_time_ticks": 244084564,
+      "same_live_process": false
+    },
+    {
+      "pid": 2324381,
+      "role": "harness-process",
+      "start_time_ticks": 244086307,
+      "same_live_process": false
+    },
+    {
+      "pid": 2324386,
+      "role": "backend-process",
+      "start_time_ticks": 244086320,
+      "same_live_process": false
+    },
+    {
+      "pid": 2324767,
+      "role": "backend-process",
+      "start_time_ticks": 244086901,
+      "same_live_process": false
+    },
+    {
+      "pid": 2325192,
+      "role": "backend-process",
+      "start_time_ticks": 244089983,
+      "same_live_process": false
+    },
+    {
+      "pid": 2325565,
+      "role": "backend-process",
+      "start_time_ticks": 244091156,
+      "same_live_process": false
+    },
+    {
+      "pid": 2325938,
+      "role": "harness-process",
+      "start_time_ticks": 244092524,
+      "same_live_process": false
+    },
+    {
+      "pid": 2325943,
+      "role": "backend-process",
+      "start_time_ticks": 244092538,
+      "same_live_process": false
+    },
+    {
+      "pid": 2325959,
+      "role": "backend-process",
+      "start_time_ticks": 244093655,
+      "same_live_process": false
+    },
+    {
+      "pid": 2325985,
+      "role": "backend-process",
+      "start_time_ticks": 244096723,
+      "same_live_process": false
+    },
+    {
+      "pid": 2326008,
+      "role": "backend-process",
+      "start_time_ticks": 244097623,
+      "same_live_process": false
+    },
+    {
+      "pid": 2326015,
+      "role": "harness-process",
+      "start_time_ticks": 244098543,
+      "same_live_process": false
+    },
+    {
+      "pid": 2326020,
+      "role": "backend-process",
+      "start_time_ticks": 244098555,
+      "same_live_process": false
+    },
+    {
+      "pid": 2326034,
+      "role": "backend-process",
+      "start_time_ticks": 244099838,
+      "same_live_process": false
+    },
+    {
+      "pid": 2326067,
+      "role": "backend-process",
+      "start_time_ticks": 244102909,
+      "same_live_process": false
+    },
+    {
+      "pid": 2326105,
+      "role": "backend-process",
+      "start_time_ticks": 244104069,
+      "same_live_process": false
+    },
+    {
+      "pid": 2326111,
+      "role": "harness-process",
+      "start_time_ticks": 244105357,
+      "same_live_process": false
+    },
+    {
+      "pid": 2326116,
+      "role": "backend-process",
+      "start_time_ticks": 244105369,
+      "same_live_process": false
+    },
+    {
+      "pid": 2326556,
+      "role": "backend-process",
+      "start_time_ticks": 244106055,
+      "same_live_process": false
+    },
+    {
+      "pid": 2327003,
+      "role": "backend-process",
+      "start_time_ticks": 244109157,
+      "same_live_process": false
+    },
+    {
+      "pid": 2327437,
+      "role": "backend-process",
+      "start_time_ticks": 244110588,
+      "same_live_process": false
+    },
+    {
+      "pid": 2327871,
+      "role": "harness-process",
+      "start_time_ticks": 244112181,
+      "same_live_process": false
+    },
+    {
+      "pid": 2327876,
+      "role": "backend-process",
+      "start_time_ticks": 244112194,
+      "same_live_process": false
+    },
+    {
+      "pid": 2328258,
+      "role": "backend-process",
+      "start_time_ticks": 244112780,
+      "same_live_process": false
+    },
+    {
+      "pid": 2329318,
+      "role": "backend-process",
+      "start_time_ticks": 244118870,
+      "same_live_process": false
+    },
+    {
+      "pid": 2329780,
+      "role": "backend-process",
+      "start_time_ticks": 244120104,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330152,
+      "role": "harness-process",
+      "start_time_ticks": 244121407,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330157,
+      "role": "backend-process",
+      "start_time_ticks": 244121420,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330170,
+      "role": "backend-process",
+      "start_time_ticks": 244122537,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330242,
+      "role": "backend-process",
+      "start_time_ticks": 244128601,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330248,
+      "role": "backend-process",
+      "start_time_ticks": 244129588,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330254,
+      "role": "harness-process",
+      "start_time_ticks": 244130634,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330259,
+      "role": "backend-process",
+      "start_time_ticks": 244130647,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330275,
+      "role": "backend-process",
+      "start_time_ticks": 244131749,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330354,
+      "role": "backend-process",
+      "start_time_ticks": 244137813,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330547,
+      "role": "backend-process",
+      "start_time_ticks": 244138732,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330552,
+      "role": "harness-process",
+      "start_time_ticks": 244139653,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330557,
+      "role": "backend-process",
+      "start_time_ticks": 244139666,
+      "same_live_process": false
+    },
+    {
+      "pid": 2330936,
+      "role": "backend-process",
+      "start_time_ticks": 244140250,
+      "same_live_process": false
+    },
+    {
+      "pid": 2331373,
+      "role": "backend-process",
+      "start_time_ticks": 244146342,
+      "same_live_process": false
+    },
+    {
+      "pid": 2331748,
+      "role": "backend-process",
+      "start_time_ticks": 244147599,
+      "same_live_process": false
+    },
+    {
+      "pid": 2332120,
+      "role": "harness-process",
+      "start_time_ticks": 244148887,
+      "same_live_process": false
+    },
+    {
+      "pid": 2332127,
+      "role": "backend-process",
+      "start_time_ticks": 244148900,
+      "same_live_process": false
+    },
+    {
+      "pid": 2332535,
+      "role": "backend-process",
+      "start_time_ticks": 244149493,
+      "same_live_process": false
+    },
+    {
+      "pid": 2332945,
+      "role": "backend-process",
+      "start_time_ticks": 244155586,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333323,
+      "role": "backend-process",
+      "start_time_ticks": 244156851,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333712,
+      "role": "harness-process",
+      "start_time_ticks": 244158114,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333717,
+      "role": "backend-process",
+      "start_time_ticks": 244158127,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333734,
+      "role": "backend-process",
+      "start_time_ticks": 244159231,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333809,
+      "role": "backend-process",
+      "start_time_ticks": 244165294,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333819,
+      "role": "backend-process",
+      "start_time_ticks": 244166286,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333824,
+      "role": "harness-process",
+      "start_time_ticks": 244167343,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333829,
+      "role": "backend-process",
+      "start_time_ticks": 244167355,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333846,
+      "role": "backend-process",
+      "start_time_ticks": 244168630,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333893,
+      "role": "backend-process",
+      "start_time_ticks": 244174701,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333899,
+      "role": "backend-process",
+      "start_time_ticks": 244175786,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333905,
+      "role": "harness-process",
+      "start_time_ticks": 244176965,
+      "same_live_process": false
+    },
+    {
+      "pid": 2333910,
+      "role": "backend-process",
+      "start_time_ticks": 244176978,
+      "same_live_process": false
+    },
+    {
+      "pid": 2334349,
+      "role": "backend-process",
+      "start_time_ticks": 244177661,
+      "same_live_process": false
+    },
+    {
+      "pid": 2334869,
+      "role": "backend-process",
+      "start_time_ticks": 244183760,
+      "same_live_process": false
+    },
+    {
+      "pid": 2335308,
+      "role": "backend-process",
+      "start_time_ticks": 244185213,
+      "same_live_process": false
+    },
+    {
+      "pid": 2335741,
+      "role": "harness-process",
+      "start_time_ticks": 244186803,
+      "same_live_process": false
+    },
+    {
+      "pid": 2335746,
+      "role": "backend-process",
+      "start_time_ticks": 244186816,
+      "same_live_process": false
+    },
+    {
+      "pid": 2336184,
+      "role": "backend-process",
+      "start_time_ticks": 244187495,
+      "same_live_process": false
+    },
+    {
+      "pid": 2336678,
+      "role": "backend-process",
+      "start_time_ticks": 244193598,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337114,
+      "role": "backend-process",
+      "start_time_ticks": 244195041,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337549,
+      "role": "harness-process",
+      "start_time_ticks": 244196635,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337554,
+      "role": "backend-process",
+      "start_time_ticks": 244196648,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337570,
+      "role": "backend-process",
+      "start_time_ticks": 244197932,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337652,
+      "role": "backend-process",
+      "start_time_ticks": 244204002,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337658,
+      "role": "backend-process",
+      "start_time_ticks": 244205101,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337664,
+      "role": "harness-process",
+      "start_time_ticks": 244206268,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337669,
+      "role": "backend-process",
+      "start_time_ticks": 244206280,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337685,
+      "role": "backend-process",
+      "start_time_ticks": 244207554,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337726,
+      "role": "backend-process",
+      "start_time_ticks": 244213625,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337734,
+      "role": "backend-process",
+      "start_time_ticks": 244214665,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337740,
+      "role": "harness-process",
+      "start_time_ticks": 244215892,
+      "same_live_process": false
+    },
+    {
+      "pid": 2337747,
+      "role": "backend-process",
+      "start_time_ticks": 244215905,
+      "same_live_process": false
+    },
+    {
+      "pid": 2338219,
+      "role": "backend-process",
+      "start_time_ticks": 244216585,
+      "same_live_process": false
+    },
+    {
+      "pid": 2338699,
+      "role": "backend-process",
+      "start_time_ticks": 244222685,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339170,
+      "role": "backend-process",
+      "start_time_ticks": 244224126,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339603,
+      "role": "harness-process",
+      "start_time_ticks": 244225534,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339608,
+      "role": "backend-process",
+      "start_time_ticks": 244225547,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339641,
+      "role": "backend-process",
+      "start_time_ticks": 244225931,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339694,
+      "role": "backend-process",
+      "start_time_ticks": 244228964,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339722,
+      "role": "backend-process",
+      "start_time_ticks": 244229744,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339747,
+      "role": "harness-process",
+      "start_time_ticks": 244230553,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339752,
+      "role": "backend-process",
+      "start_time_ticks": 244230566,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339770,
+      "role": "backend-process",
+      "start_time_ticks": 244231536,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339784,
+      "role": "backend-process",
+      "start_time_ticks": 244234590,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339828,
+      "role": "backend-process",
+      "start_time_ticks": 244235211,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339833,
+      "role": "harness-process",
+      "start_time_ticks": 244235974,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339838,
+      "role": "backend-process",
+      "start_time_ticks": 244235987,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339856,
+      "role": "backend-process",
+      "start_time_ticks": 244237932,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339871,
+      "role": "backend-process",
+      "start_time_ticks": 244241007,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339877,
+      "role": "backend-process",
+      "start_time_ticks": 244242270,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339883,
+      "role": "harness-process",
+      "start_time_ticks": 244243597,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339888,
+      "role": "backend-process",
+      "start_time_ticks": 244243609,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339939,
+      "role": "backend-process",
+      "start_time_ticks": 244244327,
+      "same_live_process": false
+    },
+    {
+      "pid": 2339986,
+      "role": "backend-process",
+      "start_time_ticks": 244247364,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340031,
+      "role": "backend-process",
+      "start_time_ticks": 244248928,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340074,
+      "role": "harness-process",
+      "start_time_ticks": 244250620,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340079,
+      "role": "backend-process",
+      "start_time_ticks": 244250633,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340160,
+      "role": "backend-process",
+      "start_time_ticks": 244252011,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340274,
+      "role": "backend-process",
+      "start_time_ticks": 244255054,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340353,
+      "role": "backend-process",
+      "start_time_ticks": 244258152,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340428,
+      "role": "harness-process",
+      "start_time_ticks": 244261248,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340433,
+      "role": "backend-process",
+      "start_time_ticks": 244261260,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340455,
+      "role": "backend-process",
+      "start_time_ticks": 244265092,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340477,
+      "role": "backend-process",
+      "start_time_ticks": 244268206,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340483,
+      "role": "backend-process",
+      "start_time_ticks": 244270781,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340489,
+      "role": "harness-process",
+      "start_time_ticks": 244273481,
+      "same_live_process": false
+    },
+    {
+      "pid": 2340494,
+      "role": "backend-process",
+      "start_time_ticks": 244273494,
+      "same_live_process": false
+    },
+    {
+      "pid": 2342202,
+      "role": "harness-process",
+      "start_time_ticks": 244375832,
+      "same_live_process": false
+    },
+    {
+      "pid": 2342207,
+      "role": "backend-process",
+      "start_time_ticks": 244375845,
+      "same_live_process": false
+    },
+    {
+      "pid": 2342350,
+      "role": "backend-process",
+      "start_time_ticks": 244378619,
+      "same_live_process": false
+    },
+    {
+      "pid": 2342491,
+      "role": "backend-process",
+      "start_time_ticks": 244381677,
+      "same_live_process": false
+    },
+    {
+      "pid": 2342677,
+      "role": "backend-process",
+      "start_time_ticks": 244388029,
+      "same_live_process": false
+    },
+    {
+      "pid": 2342816,
+      "role": "harness-process",
+      "start_time_ticks": 244394285,
+      "same_live_process": false
+    },
+    {
+      "pid": 2342821,
+      "role": "backend-process",
+      "start_time_ticks": 244394298,
+      "same_live_process": false
+    },
+    {
+      "pid": 2342936,
+      "role": "backend-process",
+      "start_time_ticks": 244396409,
+      "same_live_process": false
+    },
+    {
+      "pid": 2343101,
+      "role": "backend-process",
+      "start_time_ticks": 244399462,
+      "same_live_process": false
+    },
+    {
+      "pid": 2343213,
+      "role": "backend-process",
+      "start_time_ticks": 244404133,
+      "same_live_process": false
+    },
+    {
+      "pid": 2343320,
+      "role": "harness-process",
+      "start_time_ticks": 244408719,
+      "same_live_process": false
+    },
+    {
+      "pid": 2343325,
+      "role": "backend-process",
+      "start_time_ticks": 244408732,
+      "same_live_process": false
+    },
+    {
+      "pid": 2344840,
+      "role": "harness-process",
+      "start_time_ticks": 244502285,
+      "same_live_process": false
+    },
+    {
+      "pid": 2344845,
+      "role": "backend-process",
+      "start_time_ticks": 244502299,
+      "same_live_process": false
+    },
+    {
+      "pid": 2344860,
+      "role": "backend-process",
+      "start_time_ticks": 244507668,
+      "same_live_process": false
+    },
+    {
+      "pid": 2344918,
+      "role": "backend-process",
+      "start_time_ticks": 244510811,
+      "same_live_process": false
+    },
+    {
+      "pid": 2344929,
+      "role": "backend-process",
+      "start_time_ticks": 244513911,
+      "same_live_process": false
+    },
+    {
+      "pid": 2344938,
+      "role": "harness-process",
+      "start_time_ticks": 244516917,
+      "same_live_process": false
+    },
+    {
+      "pid": 2344943,
+      "role": "backend-process",
+      "start_time_ticks": 244516930,
+      "same_live_process": false
+    },
+    {
+      "pid": 2345059,
+      "role": "backend-process",
+      "start_time_ticks": 244518700,
+      "same_live_process": false
+    },
+    {
+      "pid": 2345191,
+      "role": "backend-process",
+      "start_time_ticks": 244521746,
+      "same_live_process": false
+    },
+    {
+      "pid": 2345282,
+      "role": "backend-process",
+      "start_time_ticks": 244525634,
+      "same_live_process": false
+    },
+    {
+      "pid": 2345373,
+      "role": "harness-process",
+      "start_time_ticks": 244529554,
+      "same_live_process": false
+    },
+    {
+      "pid": 2345378,
+      "role": "backend-process",
+      "start_time_ticks": 244529567,
+      "same_live_process": false
+    },
+    {
+      "pid": 2345478,
+      "role": "backend-process",
+      "start_time_ticks": 244531289,
+      "same_live_process": false
+    },
+    {
+      "pid": 2345623,
+      "role": "backend-process",
+      "start_time_ticks": 244537341,
+      "same_live_process": false
+    },
+    {
+      "pid": 2345736,
+      "role": "backend-process",
+      "start_time_ticks": 244541216,
+      "same_live_process": false
+    },
+    {
+      "pid": 2345866,
+      "role": "harness-process",
+      "start_time_ticks": 244545390,
+      "same_live_process": false
+    },
+    {
+      "pid": 2345871,
+      "role": "backend-process",
+      "start_time_ticks": 244545403,
+      "same_live_process": false
+    },
+    {
+      "pid": 2345928,
+      "role": "backend-process",
+      "start_time_ticks": 244551757,
+      "same_live_process": false
+    },
+    {
+      "pid": 2345966,
+      "role": "backend-process",
+      "start_time_ticks": 244557900,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346011,
+      "role": "backend-process",
+      "start_time_ticks": 244560814,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346052,
+      "role": "harness-process",
+      "start_time_ticks": 244563833,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346057,
+      "role": "backend-process",
+      "start_time_ticks": 244563846,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346128,
+      "role": "backend-process",
+      "start_time_ticks": 244576410,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346217,
+      "role": "backend-process",
+      "start_time_ticks": 244582548,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346259,
+      "role": "backend-process",
+      "start_time_ticks": 244585668,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346291,
+      "role": "harness-process",
+      "start_time_ticks": 244588881,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346296,
+      "role": "backend-process",
+      "start_time_ticks": 244588894,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346395,
+      "role": "backend-process",
+      "start_time_ticks": 244590629,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346537,
+      "role": "backend-process",
+      "start_time_ticks": 244596681,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346633,
+      "role": "backend-process",
+      "start_time_ticks": 244600566,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346759,
+      "role": "harness-process",
+      "start_time_ticks": 244604924,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346764,
+      "role": "backend-process",
+      "start_time_ticks": 244604937,
+      "same_live_process": false
+    },
+    {
+      "pid": 2346862,
+      "role": "backend-process",
+      "start_time_ticks": 244606705,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347021,
+      "role": "backend-process",
+      "start_time_ticks": 244612757,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347119,
+      "role": "backend-process",
+      "start_time_ticks": 244616638,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347210,
+      "role": "harness-process",
+      "start_time_ticks": 244620761,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347215,
+      "role": "backend-process",
+      "start_time_ticks": 244620773,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347269,
+      "role": "backend-process",
+      "start_time_ticks": 244625673,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347303,
+      "role": "backend-process",
+      "start_time_ticks": 244631838,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347311,
+      "role": "backend-process",
+      "start_time_ticks": 244634816,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347335,
+      "role": "harness-process",
+      "start_time_ticks": 244638004,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347340,
+      "role": "backend-process",
+      "start_time_ticks": 244638017,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347357,
+      "role": "backend-process",
+      "start_time_ticks": 244638098,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347451,
+      "role": "backend-process",
+      "start_time_ticks": 244644131,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347457,
+      "role": "backend-process",
+      "start_time_ticks": 244644199,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347462,
+      "role": "harness-process",
+      "start_time_ticks": 244644428,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347467,
+      "role": "backend-process",
+      "start_time_ticks": 244644441,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347502,
+      "role": "backend-process",
+      "start_time_ticks": 244644502,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347543,
+      "role": "backend-process",
+      "start_time_ticks": 244650536,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347573,
+      "role": "backend-process",
+      "start_time_ticks": 244650614,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347603,
+      "role": "harness-process",
+      "start_time_ticks": 244650853,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347608,
+      "role": "backend-process",
+      "start_time_ticks": 244650866,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347668,
+      "role": "backend-process",
+      "start_time_ticks": 244650928,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347727,
+      "role": "backend-process",
+      "start_time_ticks": 244656968,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347761,
+      "role": "backend-process",
+      "start_time_ticks": 244657051,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347787,
+      "role": "harness-process",
+      "start_time_ticks": 244657286,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347792,
+      "role": "backend-process",
+      "start_time_ticks": 244657299,
+      "same_live_process": false
+    },
+    {
+      "pid": 2347800,
+      "role": "backend-process",
+      "start_time_ticks": 244657382,
+      "same_live_process": false
+    },
+    {
+      "pid": 2348504,
+      "role": "backend-process",
+      "start_time_ticks": 244663416,
+      "same_live_process": false
+    },
+    {
+      "pid": 2348510,
+      "role": "backend-process",
+      "start_time_ticks": 244663483,
+      "same_live_process": false
+    },
+    {
+      "pid": 2348515,
+      "role": "harness-process",
+      "start_time_ticks": 244663729,
+      "same_live_process": false
+    },
+    {
+      "pid": 2348520,
+      "role": "backend-process",
+      "start_time_ticks": 244663741,
+      "same_live_process": false
+    },
+    {
+      "pid": 2348584,
+      "role": "backend-process",
+      "start_time_ticks": 244674964,
+      "same_live_process": false
+    },
+    {
+      "pid": 2348795,
+      "role": "backend-process",
+      "start_time_ticks": 244681056,
+      "same_live_process": false
+    },
+    {
+      "pid": 2348802,
+      "role": "backend-process",
+      "start_time_ticks": 244684021,
+      "same_live_process": false
+    },
+    {
+      "pid": 2348810,
+      "role": "harness-process",
+      "start_time_ticks": 244687175,
+      "same_live_process": false
+    },
+    {
+      "pid": 2348815,
+      "role": "backend-process",
+      "start_time_ticks": 244687188,
+      "same_live_process": false
+    },
+    {
+      "pid": 2348914,
+      "role": "backend-process",
+      "start_time_ticks": 244688964,
+      "same_live_process": false
+    },
+    {
+      "pid": 2348981,
+      "role": "backend-process",
+      "start_time_ticks": 244695000,
+      "same_live_process": false
+    },
+    {
+      "pid": 2349099,
+      "role": "backend-process",
+      "start_time_ticks": 244698683,
+      "same_live_process": false
+    },
+    {
+      "pid": 2349227,
+      "role": "harness-process",
+      "start_time_ticks": 244702617,
+      "same_live_process": false
+    },
+    {
+      "pid": 2349232,
+      "role": "backend-process",
+      "start_time_ticks": 244702630,
+      "same_live_process": false
+    },
+    {
+      "pid": 2349494,
+      "role": "backend-process",
+      "start_time_ticks": 244703049,
+      "same_live_process": false
+    },
+    {
+      "pid": 2349878,
+      "role": "backend-process",
+      "start_time_ticks": 244721137,
+      "same_live_process": false
+    },
+    {
+      "pid": 2350132,
+      "role": "backend-process",
+      "start_time_ticks": 244721941,
+      "same_live_process": false
+    },
+    {
+      "pid": 2350383,
+      "role": "harness-process",
+      "start_time_ticks": 244722871,
+      "same_live_process": false
+    },
+    {
+      "pid": 2350388,
+      "role": "backend-process",
+      "start_time_ticks": 244722885,
+      "same_live_process": false
+    },
+    {
+      "pid": 2350405,
+      "role": "backend-process",
+      "start_time_ticks": 244723638,
+      "same_live_process": false
+    },
+    {
+      "pid": 2350543,
+      "role": "backend-process",
+      "start_time_ticks": 244741695,
+      "same_live_process": false
+    },
+    {
+      "pid": 2350550,
+      "role": "backend-process",
+      "start_time_ticks": 244742284,
+      "same_live_process": false
+    }
+  ],
+  "reused_existing_cases": [
+    "screen-e2-n1-blink",
+    "screen-e2-n1-shared",
+    "screen-e2-n4-shared",
+    "screen-e2-n4-blink",
+    "screen-e2-n8-blink",
+    "screen-e2-n8-shared",
+    "screen-e2-n16-shared",
+    "screen-e2-n16-blink",
+    "screen-e2-n32-blink",
+    "screen-e2-n32-shared",
+    "refine-e2-n24-shared",
+    "refine-e2-n24-blink",
+    "refine-e2-n28-blink",
+    "refine-e2-n28-shared",
+    "confirm-e2-n24-r1-shared",
+    "confirm-e2-n24-r1-blink",
+    "confirm-e2-n24-r2-blink",
+    "confirm-e2-n24-r2-shared",
+    "confirm-e2-n24-r3-shared",
+    "confirm-e2-n24-r3-blink",
+    "confirm-e2-n28-r1-blink",
+    "confirm-e2-n28-r1-shared",
+    "confirm-e2-n28-r2-shared",
+    "confirm-e2-n28-r2-blink",
+    "confirm-e2-n28-r3-blink",
+    "confirm-e2-n28-r3-shared",
+    "screen-e3-n1-shared",
+    "screen-e3-n1-blink",
+    "screen-e3-n2-blink",
+    "screen-e3-n2-shared",
+    "screen-e3-n4-shared",
+    "screen-e3-n4-blink",
+    "screen-e3-n8-blink",
+    "screen-e3-n8-shared",
+    "refine-e3-n6-shared",
+    "refine-e3-n6-blink"
+  ],
+  "executed_new_cases": [
+    "refine-e3-n5-blink",
+    "refine-e3-n5-shared",
+    "confirm-e3-n5-r1-shared",
+    "confirm-e3-n5-r1-blink",
+    "confirm-e3-n5-r2-blink",
+    "confirm-e3-n5-r2-shared",
+    "confirm-e3-n5-r3-shared",
+    "confirm-e3-n5-r3-blink",
+    "sampling-e2-n1-ms1000-blink",
+    "sampling-e2-n1-ms1000-shared",
+    "sampling-e2-n1-ms100-shared",
+    "sampling-e2-n1-ms100-blink",
+    "sparse-e3-registered5-active1-idle1-blink",
+    "sparse-e3-registered5-active1-idle1-shared",
+    "maintenance-e2-n16-shared",
+    "maintenance-e2-n16-blink"
+  ]
+}

@@ -1,0 +1,761 @@
+{
+  "source_commit": "aaa40565529ca92150df5d94e19b02ca93859f71",
+  "plan_commit": "5e68d6575197edcc16f2624dbcb738ade923fe5a",
+  "runtime_script_hashes_verified": true,
+  "cohorts": {
+    "screen": {
+      "cells": 0,
+      "operational_passes": 0,
+      "slo_passes": 0,
+      "resource_failures": 0,
+      "operational_deadline_failures": 0,
+      "successful_requests_with_complete_reports": 0
+    },
+    "refine": {
+      "cells": 0,
+      "operational_passes": 0,
+      "slo_passes": 0,
+      "resource_failures": 0,
+      "operational_deadline_failures": 0,
+      "successful_requests_with_complete_reports": 0
+    },
+    "confirm": {
+      "cells": 3,
+      "operational_passes": 3,
+      "slo_passes": 3,
+      "resource_failures": 0,
+      "operational_deadline_failures": 0,
+      "successful_requests_with_complete_reports": 72000
+    },
+    "sampling": {
+      "cells": 0,
+      "operational_passes": 0,
+      "slo_passes": 0,
+      "resource_failures": 0,
+      "operational_deadline_failures": 0,
+      "successful_requests_with_complete_reports": 0
+    },
+    "sparse": {
+      "cells": 0,
+      "operational_passes": 0,
+      "slo_passes": 0,
+      "resource_failures": 0,
+      "operational_deadline_failures": 0,
+      "successful_requests_with_complete_reports": 0
+    },
+    "maintenance": {
+      "cells": 2,
+      "operational_passes": 2,
+      "slo_passes": 2,
+      "resource_failures": 0,
+      "operational_deadline_failures": 0,
+      "successful_requests_with_complete_reports": 504000
+    }
+  },
+  "cells": [
+    {
+      "backend": "minimal-native-shared",
+      "registered": 8,
+      "active": 8,
+      "initial_rows": 32768,
+      "duration_ms": 60000,
+      "sample_interval_ms": 1000,
+      "operational_pass": true,
+      "slo_pass": true,
+      "resource_failure": false,
+      "operational_timeout": null,
+      "failure_kind": null,
+      "failure_epochs": null,
+      "successful": 24000,
+      "dropped": 0,
+      "offer_throughput_completed_per_second": 399.9733351109926,
+      "cell_peak_bytes": 94326784,
+      "epoch_peaks_bytes": {
+        "measurement": 76283904,
+        "oracle": 91877376,
+        "reopen-oracle": 85266432,
+        "setup": 22867968
+      },
+      "cell_events": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "worst_tenant_p99_upper_exclusive_ms": {
+        "Get": 8.388608,
+        "Query": 8.388608,
+        "Write": 16.777216
+      },
+      "backend_offer_cpu_usec": 6121309,
+      "maximum_measurement_sample_gap_ms": 1003,
+      "case": "confirm-e3-n8-r1-shared",
+      "runtime_origin": "capacity-supplement-aaa405655-r1",
+      "offered_load_started": true,
+      "offer_boundary_epoch_peak_bytes": 65941504,
+      "offer_boundary_current_bytes": 65941504,
+      "post_offer_epoch_peak_increase_bytes": 10342400,
+      "offered_distinct_seed_get_rows_per_tenant": 1200,
+      "offered_seed_get_coverage_fraction": 0.03662109375,
+      "seed_read_coverage_scope": "Get recipe only; Query reads first sixteen rows; realized Get coverage matches only if no drops",
+      "backend_sampled_rss_max_kib": 77180,
+      "driver_sampled_rss_max_kib": 21512,
+      "measurement_native_serialized_bytes": 903809,
+      "filesystem_after_measurement": {
+        "allocated_directory_bytes": 78336,
+        "allocated_file_bytes": 157884416,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 9,
+        "distinct_files": 240,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 152876472,
+        "regular_file_paths": 240,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      }
+    },
+    {
+      "backend": "minimal-native-shared",
+      "registered": 8,
+      "active": 8,
+      "initial_rows": 32768,
+      "duration_ms": 60000,
+      "sample_interval_ms": 1000,
+      "operational_pass": true,
+      "slo_pass": true,
+      "resource_failure": false,
+      "operational_timeout": null,
+      "failure_kind": null,
+      "failure_epochs": null,
+      "successful": 24000,
+      "dropped": 0,
+      "offer_throughput_completed_per_second": 399.98000099995,
+      "cell_peak_bytes": 91504640,
+      "epoch_peaks_bytes": {
+        "measurement": 76185600,
+        "oracle": 89059328,
+        "reopen-oracle": 84553728,
+        "setup": 22765568
+      },
+      "cell_events": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "worst_tenant_p99_upper_exclusive_ms": {
+        "Get": 8.388608,
+        "Query": 8.388608,
+        "Write": 16.777216
+      },
+      "backend_offer_cpu_usec": 6165963,
+      "maximum_measurement_sample_gap_ms": 1001,
+      "case": "confirm-e3-n8-r2-shared",
+      "runtime_origin": "capacity-supplement-aaa405655-r1",
+      "offered_load_started": true,
+      "offer_boundary_epoch_peak_bytes": 65572864,
+      "offer_boundary_current_bytes": 65572864,
+      "post_offer_epoch_peak_increase_bytes": 10612736,
+      "offered_distinct_seed_get_rows_per_tenant": 1200,
+      "offered_seed_get_coverage_fraction": 0.03662109375,
+      "seed_read_coverage_scope": "Get recipe only; Query reads first sixteen rows; realized Get coverage matches only if no drops",
+      "backend_sampled_rss_max_kib": 77712,
+      "driver_sampled_rss_max_kib": 21536,
+      "measurement_native_serialized_bytes": 903808,
+      "filesystem_after_measurement": {
+        "allocated_directory_bytes": 78336,
+        "allocated_file_bytes": 157986816,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 9,
+        "distinct_files": 240,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 152878978,
+        "regular_file_paths": 240,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      }
+    },
+    {
+      "backend": "minimal-native-shared",
+      "registered": 8,
+      "active": 8,
+      "initial_rows": 32768,
+      "duration_ms": 60000,
+      "sample_interval_ms": 1000,
+      "operational_pass": true,
+      "slo_pass": true,
+      "resource_failure": false,
+      "operational_timeout": null,
+      "failure_kind": null,
+      "failure_epochs": null,
+      "successful": 24000,
+      "dropped": 0,
+      "offer_throughput_completed_per_second": 399.9733351109926,
+      "cell_peak_bytes": 97083392,
+      "epoch_peaks_bytes": {
+        "measurement": 76300288,
+        "oracle": 94617600,
+        "reopen-oracle": 84209664,
+        "setup": 23261184
+      },
+      "cell_events": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "worst_tenant_p99_upper_exclusive_ms": {
+        "Get": 8.388608,
+        "Query": 8.388608,
+        "Write": 16.777216
+      },
+      "backend_offer_cpu_usec": 6413988,
+      "maximum_measurement_sample_gap_ms": 1001,
+      "case": "confirm-e3-n8-r3-shared",
+      "runtime_origin": "capacity-supplement-aaa405655-r1",
+      "offered_load_started": true,
+      "offer_boundary_epoch_peak_bytes": 65687552,
+      "offer_boundary_current_bytes": 65687552,
+      "post_offer_epoch_peak_increase_bytes": 10612736,
+      "offered_distinct_seed_get_rows_per_tenant": 1200,
+      "offered_seed_get_coverage_fraction": 0.03662109375,
+      "seed_read_coverage_scope": "Get recipe only; Query reads first sixteen rows; realized Get coverage matches only if no drops",
+      "backend_sampled_rss_max_kib": 77680,
+      "driver_sampled_rss_max_kib": 21592,
+      "measurement_native_serialized_bytes": 903809,
+      "filesystem_after_measurement": {
+        "allocated_directory_bytes": 78336,
+        "allocated_file_bytes": 157229056,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 9,
+        "distinct_files": 240,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 152876479,
+        "regular_file_paths": 240,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      }
+    },
+    {
+      "backend": "blink",
+      "registered": 28,
+      "active": 28,
+      "initial_rows": 2048,
+      "duration_ms": 180000,
+      "sample_interval_ms": 2000,
+      "operational_pass": true,
+      "slo_pass": true,
+      "resource_failure": false,
+      "operational_timeout": null,
+      "failure_kind": null,
+      "failure_epochs": null,
+      "successful": 252000,
+      "dropped": 0,
+      "offer_throughput_completed_per_second": 1399.9766670555491,
+      "cell_peak_bytes": 72847360,
+      "epoch_peaks_bytes": {
+        "measurement": 72540160,
+        "oracle": 53436416,
+        "reopen-oracle": 53342208,
+        "setup": 63094784
+      },
+      "cell_events": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "worst_tenant_p99_upper_exclusive_ms": {
+        "Get": 8.388608,
+        "Query": 8.388608,
+        "Write": 33.554432
+      },
+      "backend_offer_cpu_usec": 41639059,
+      "maximum_measurement_sample_gap_ms": 2003,
+      "case": "maintenance-e2-n28-ms2000-blink",
+      "runtime_origin": "capacity-supplement-aaa405655-r1",
+      "offered_load_started": true,
+      "offer_boundary_epoch_peak_bytes": 71880704,
+      "offer_boundary_current_bytes": 71864320,
+      "post_offer_epoch_peak_increase_bytes": 659456,
+      "offered_distinct_seed_get_rows_per_tenant": 2048,
+      "offered_seed_get_coverage_fraction": 1.0,
+      "seed_read_coverage_scope": "Get recipe only; Query reads first sixteen rows; realized Get coverage matches only if no drops",
+      "backend_sampled_rss_max_kib": 82836,
+      "driver_sampled_rss_max_kib": 21920,
+      "measurement_native_serialized_bytes": 110978,
+      "filesystem_after_measurement": {
+        "allocated_directory_bytes": 277504,
+        "allocated_file_bytes": 87521280,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 30,
+        "distinct_files": 252,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 86546179,
+        "regular_file_paths": 252,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      }
+    },
+    {
+      "backend": "minimal-native-shared",
+      "registered": 28,
+      "active": 28,
+      "initial_rows": 2048,
+      "duration_ms": 180000,
+      "sample_interval_ms": 2000,
+      "operational_pass": true,
+      "slo_pass": true,
+      "resource_failure": false,
+      "operational_timeout": null,
+      "failure_kind": null,
+      "failure_epochs": null,
+      "successful": 252000,
+      "dropped": 0,
+      "offer_throughput_completed_per_second": 1399.953334888837,
+      "cell_peak_bytes": 187215872,
+      "epoch_peaks_bytes": {
+        "measurement": 186834944,
+        "oracle": 51257344,
+        "reopen-oracle": 48570368,
+        "setup": 26492928
+      },
+      "cell_events": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "worst_tenant_p99_upper_exclusive_ms": {
+        "Get": 8.388608,
+        "Query": 16.777216,
+        "Write": 33.554432
+      },
+      "backend_offer_cpu_usec": 43413362,
+      "maximum_measurement_sample_gap_ms": 2002,
+      "case": "maintenance-e2-n28-ms2000-shared",
+      "runtime_origin": "capacity-supplement-aaa405655-r1",
+      "offered_load_started": true,
+      "offer_boundary_epoch_peak_bytes": 146489344,
+      "offer_boundary_current_bytes": 146485248,
+      "post_offer_epoch_peak_increase_bytes": 40345600,
+      "offered_distinct_seed_get_rows_per_tenant": 2048,
+      "offered_seed_get_coverage_fraction": 1.0,
+      "seed_read_coverage_scope": "Get recipe only; Query reads first sixteen rows; realized Get coverage matches only if no drops",
+      "backend_sampled_rss_max_kib": 155824,
+      "driver_sampled_rss_max_kib": 22916,
+      "measurement_native_serialized_bytes": 4571134,
+      "filesystem_after_measurement": {
+        "allocated_directory_bytes": 252416,
+        "allocated_file_bytes": 50913280,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 29,
+        "distinct_files": 336,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 48435752,
+        "regular_file_paths": 336,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      }
+    }
+  ],
+  "confirmation_groups": [
+    {
+      "stage": "E3",
+      "backend": "minimal-native-shared",
+      "active": 8,
+      "repetitions": 3,
+      "slo_passes": 3,
+      "operational_passes": 3,
+      "all_three_slo_pass": true,
+      "median_measurement_epoch_peak_bytes": 76283904,
+      "median_cell_peak_bytes": 94326784,
+      "median_backend_offer_cpu_usec": 6165963,
+      "worst_p99_upper_exclusive_ms_across_repetitions": {
+        "Get": 8.388608,
+        "Query": 8.388608,
+        "Write": 16.777216
+      }
+    }
+  ],
+  "completion": {
+    "completed": true,
+    "source_commit": "aaa40565529ca92150df5d94e19b02ca93859f71",
+    "cases": 5,
+    "capacity_after": {
+      "timestamp_unix_seconds": 1793187055.9662473,
+      "zfs_free_bytes": 37298245632,
+      "boot_free_bytes": 2550288384,
+      "memory_bytes": {
+        "MemTotal": 11427577856,
+        "MemAvailable": 5694173184,
+        "SwapTotal": 4294963200,
+        "SwapFree": 3829927936,
+        "Dirty": 14036992,
+        "Writeback": 0
+      },
+      "arc": {
+        "c": 5713788928,
+        "c_min": 357111808,
+        "c_max": 5713788928,
+        "size": 5683284584,
+        "memory_throttle_count": 0
+      },
+      "device_stat": "11066632       15 468582928 13902510 118111139   208677 6138436252 190903886        0 55335228 204817031     1098      384 1961318615    10634        0        0",
+      "cpu_stat": [
+        "cpu  10000018 288159 5234057 470982532 1307490 326305 148548 1693946 0 0",
+        "cpu0 5012538 129887 2618404 235493102 662684 162059 75044 834850 0 0",
+        "cpu1 4987480 158272 2615652 235489430 644805 164245 73503 859095 0 0"
+      ]
+    },
+    "selections": {
+      "eight_tenant_e3_survivors": [
+        "minimal-native-shared"
+      ],
+      "eight_tenant_e3_oom_failures": [
+        "blink"
+      ],
+      "maintenance_count": 28
+    },
+    "scope": "Conditional independent reference confirmation and actual-boundary maintenance; main sequence unchanged",
+    "processes": [
+      {
+        "pid": 2350849,
+        "role": "harness-process",
+        "start_time_ticks": 244763962,
+        "same_live_process": false
+      },
+      {
+        "pid": 2350854,
+        "role": "backend-process",
+        "start_time_ticks": 244763976,
+        "same_live_process": false
+      },
+      {
+        "pid": 2351000,
+        "role": "backend-process",
+        "start_time_ticks": 244766764,
+        "same_live_process": false
+      },
+      {
+        "pid": 2351179,
+        "role": "backend-process",
+        "start_time_ticks": 244772828,
+        "same_live_process": false
+      },
+      {
+        "pid": 2351325,
+        "role": "backend-process",
+        "start_time_ticks": 244778944,
+        "same_live_process": false
+      },
+      {
+        "pid": 2351465,
+        "role": "harness-process",
+        "start_time_ticks": 244785392,
+        "same_live_process": false
+      },
+      {
+        "pid": 2351470,
+        "role": "backend-process",
+        "start_time_ticks": 244785405,
+        "same_live_process": false
+      },
+      {
+        "pid": 2351615,
+        "role": "backend-process",
+        "start_time_ticks": 244788202,
+        "same_live_process": false
+      },
+      {
+        "pid": 2351772,
+        "role": "backend-process",
+        "start_time_ticks": 244794263,
+        "same_live_process": false
+      },
+      {
+        "pid": 2351926,
+        "role": "backend-process",
+        "start_time_ticks": 244800543,
+        "same_live_process": false
+      },
+      {
+        "pid": 2352068,
+        "role": "harness-process",
+        "start_time_ticks": 244807224,
+        "same_live_process": false
+      },
+      {
+        "pid": 2352073,
+        "role": "backend-process",
+        "start_time_ticks": 244807237,
+        "same_live_process": false
+      },
+      {
+        "pid": 2352220,
+        "role": "backend-process",
+        "start_time_ticks": 244810080,
+        "same_live_process": false
+      },
+      {
+        "pid": 2352377,
+        "role": "backend-process",
+        "start_time_ticks": 244816147,
+        "same_live_process": false
+      },
+      {
+        "pid": 2352535,
+        "role": "backend-process",
+        "start_time_ticks": 244822401,
+        "same_live_process": false
+      },
+      {
+        "pid": 2352676,
+        "role": "harness-process",
+        "start_time_ticks": 244829059,
+        "same_live_process": false
+      },
+      {
+        "pid": 2352681,
+        "role": "backend-process",
+        "start_time_ticks": 244829072,
+        "same_live_process": false
+      },
+      {
+        "pid": 2352699,
+        "role": "backend-process",
+        "start_time_ticks": 244830383,
+        "same_live_process": false
+      },
+      {
+        "pid": 2353521,
+        "role": "backend-process",
+        "start_time_ticks": 244848454,
+        "same_live_process": false
+      },
+      {
+        "pid": 2353527,
+        "role": "backend-process",
+        "start_time_ticks": 244849609,
+        "same_live_process": false
+      },
+      {
+        "pid": 2353534,
+        "role": "harness-process",
+        "start_time_ticks": 244850888,
+        "same_live_process": false
+      },
+      {
+        "pid": 2353539,
+        "role": "backend-process",
+        "start_time_ticks": 244850902,
+        "same_live_process": false
+      },
+      {
+        "pid": 2353979,
+        "role": "backend-process",
+        "start_time_ticks": 244851595,
+        "same_live_process": false
+      },
+      {
+        "pid": 2354677,
+        "role": "backend-process",
+        "start_time_ticks": 244869700,
+        "same_live_process": false
+      },
+      {
+        "pid": 2355110,
+        "role": "backend-process",
+        "start_time_ticks": 244871113,
+        "same_live_process": false
+      }
+    ]
+  },
+  "maintenance": {
+    "maintenance-e2-n28-ms2000-blink": {
+      "measurement_cgroup_current_bytes": {
+        "samples": 91,
+        "first": 60157952,
+        "last": 71618560,
+        "minimum": 60157952,
+        "maximum": 71774208,
+        "latter_half_linear_slope_per_second": 15065.118415809113,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "wal_bytes_current": {
+        "samples": 90,
+        "first": 491191,
+        "last": 31061,
+        "minimum": 27062,
+        "maximum": 1025791,
+        "latter_half_linear_slope_per_second": 1113.9788839805597,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "retained_image_bytes_normalized_page_images": {
+        "samples": 90,
+        "first": 0,
+        "last": 0,
+        "minimum": 0,
+        "maximum": 0,
+        "latter_half_linear_slope_per_second": 0.0,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "tasks_running": {
+        "samples": 90,
+        "first": 0,
+        "last": 0,
+        "minimum": 0,
+        "maximum": 0,
+        "latter_half_linear_slope_per_second": 0.0,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "checkpoints_completed": {
+        "samples": 90,
+        "first": 0,
+        "last": 168,
+        "minimum": 0,
+        "maximum": 168,
+        "latter_half_linear_slope_per_second": 0.8447974977172443,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "full_base_snapshots": {
+        "samples": 0
+      },
+      "checkpoint_events_started_during_offer": 168,
+      "full_base_events_started_during_offer": 0,
+      "omitted_final_checkpoint_events": 0
+    },
+    "maintenance-e2-n28-ms2000-shared": {
+      "measurement_cgroup_current_bytes": {
+        "samples": 91,
+        "first": 14663680,
+        "last": 145711104,
+        "minimum": 14663680,
+        "maximum": 145711104,
+        "latter_half_linear_slope_per_second": 444442.2415400762,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "cache_usage_bytes": {
+        "samples": 90,
+        "first": 8911632,
+        "last": 52742536,
+        "minimum": 8911632,
+        "maximum": 67108592,
+        "latter_half_linear_slope_per_second": -191095.46928155306,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "wbm_usage_bytes": {
+        "samples": 90,
+        "first": 3727584,
+        "last": 14738304,
+        "minimum": 3727584,
+        "maximum": 28501704,
+        "latter_half_linear_slope_per_second": -41336.493521616365,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "wbm_mutable_bytes": {
+        "samples": 90,
+        "first": 3727584,
+        "last": 14738304,
+        "minimum": 3727584,
+        "maximum": 28501704,
+        "latter_half_linear_slope_per_second": -41336.493521616365,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "tenant_property_sum_estimate-pending-compaction-bytes": {
+        "samples": 90,
+        "first": 0,
+        "last": 0,
+        "minimum": 0,
+        "maximum": 0,
+        "latter_half_linear_slope_per_second": 0.0,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "tenant_property_sum_compaction-pending": {
+        "samples": 90,
+        "first": 0,
+        "last": 0,
+        "minimum": 0,
+        "maximum": 0,
+        "latter_half_linear_slope_per_second": 0.0,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "tenant_property_sum_mem-table-flush-pending": {
+        "samples": 90,
+        "first": 0,
+        "last": 0,
+        "minimum": 0,
+        "maximum": 0,
+        "latter_half_linear_slope_per_second": 0.0,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "tenant_property_sum_num-running-flushes": {
+        "samples": 90,
+        "first": 0,
+        "last": 0,
+        "minimum": 0,
+        "maximum": 0,
+        "latter_half_linear_slope_per_second": 0.0,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "tenant_property_sum_num-running-compactions": {
+        "samples": 90,
+        "first": 0,
+        "last": 0,
+        "minimum": 0,
+        "maximum": 0,
+        "latter_half_linear_slope_per_second": 0.0,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "tenant_property_sum_is-write-stopped": {
+        "samples": 90,
+        "first": 0,
+        "last": 0,
+        "minimum": 0,
+        "maximum": 0,
+        "latter_half_linear_slope_per_second": 0.0,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      },
+      "tenant_property_sum_live-sst-files-size": {
+        "samples": 90,
+        "first": 32122524,
+        "last": 32867518,
+        "minimum": 32122524,
+        "maximum": 32867518,
+        "latter_half_linear_slope_per_second": 7101.4780127876775,
+        "scope": "sampled trend, not a steady-state or causality proof"
+      }
+    }
+  },
+  "scope": "Frozen modest capacity bracket; cohorts and memory/SLO outcomes remain separate"
+}

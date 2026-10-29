@@ -1,0 +1,290 @@
+[
+  {
+    "case": "screen-e2-n1-blink",
+    "report_sha256": "fd1a8c0fee3ef19d569f757f916a2e7b3b736db52b80a5042cad71ca4d8e48f5",
+    "original_status_sha256": "633e28302e07e80298701d7e97000d7fc216680954242a2706f52dc60e92193f",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e2-n1-shared",
+    "report_sha256": "ed37d459db38b6ef1bb7a78606084d11b8857fc024c08208f73139616d9359f7",
+    "original_status_sha256": "41d67ef0d13b6057f4c5ce6bbe8db8c4a015457650fa662d8612e7213b9e6f6d",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e2-n4-shared",
+    "report_sha256": "f7f7a8978ffee7192de220b66a2082896d31ec3c24a8432753a75db4fd6ba4a1",
+    "original_status_sha256": "d051205ca0da8557a66991eb5037cba31f2cb035586dcb8072f876288cd182a7",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e2-n4-blink",
+    "report_sha256": "b3e69a4d41305aafb8a37059a0816c8224251d0b2b4f88bf2a8d3abab9abb5a5",
+    "original_status_sha256": "087f4cc6f62d659215aac9fda9df0e8e49fe8f82e01d1323e66057f658b9de33",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e2-n8-blink",
+    "report_sha256": "24820b849537ee62c29afd93bb1723ff657d8ea43d878146e8abb37956defdcb",
+    "original_status_sha256": "c65b4fbcbff50acedbc66baca64c4a6eeea0606689a17ac1ab374d477a6405a1",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e2-n8-shared",
+    "report_sha256": "b91fe52d472a0d77b99d78e2a3d8f29735f0c8aaf4a2d9d31264a74953217810",
+    "original_status_sha256": "4ee7c926934000f8f1a7d940ce3589753c13847fdc43bf89317000cd221af615",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e2-n16-shared",
+    "report_sha256": "f06cd578f8c7766edba5d30009803f036b27dacd7c798d233e26b880711f3ecd",
+    "original_status_sha256": "55eeee0138ae81ac379110f15ea20164497237a33be0f2a8380a38887007d099",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e2-n16-blink",
+    "report_sha256": "e937255e8ed9f09e9e10c74eaa7acc2b94fd6de76b2eddaf4cbf26742028cb1b",
+    "original_status_sha256": "b1e903729951b535e45851b3fe878f5c241fe05347db5e3542af274f7474ac24",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e2-n32-blink",
+    "report_sha256": "73f994d2119e88e88d7c07631c02543791735444a86550892fb7e4e53ce7ec2d",
+    "original_status_sha256": "50815c9fab6a42a4fcce0504d0c77e2da0565926ea5a2064152a9d08ca85cf17",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e2-n32-shared",
+    "report_sha256": "a362b1f15ed0b7f40a10309e9b7ded72e80b3884848636cc0bfa04b22622be44",
+    "original_status_sha256": "3f5cb8d982b40d363a371b01f62beb6c630b0112442b962607ae3c0f1e4a2f59",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "refine-e2-n24-shared",
+    "report_sha256": "af31a9da46c52e9d31dcaae6c305bbe0c3c7f1d829c624fd57a9ea654d8ac58f",
+    "original_status_sha256": "fb8e89a026837cebf51b6559c5b4706ea329d0f455524c8882819f4d7bdb25dd",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "refine-e2-n24-blink",
+    "report_sha256": "1b9fef3f0a970d899376aa02bf3b0143dbdea14e23bc97df9785296e38252360",
+    "original_status_sha256": "ce722ff69368737cc92fa884348094ec4345b0ab9b8590ddbaa3fc73782fb151",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "refine-e2-n28-blink",
+    "report_sha256": "7cf5d21420177cca5de084e56218c11d2ad2b64608c9392d707acc4e84f4d86c",
+    "original_status_sha256": "7846bc8d80e9bafd5402fd30d30fad660f801742497464b93197bf8f85e28bd3",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "refine-e2-n28-shared",
+    "report_sha256": "a363fb8496d4b8d55321c415589bef7aa9e954498a08703a6a7a141b3b8e0cd2",
+    "original_status_sha256": "686b52a11e2296e1b8b497d0d76245603ed035afbbf289480e218890c0c35142",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "confirm-e2-n24-r1-shared",
+    "report_sha256": "a17003c3e2794b474ac2adc3791910559649f60f93813e4669a4a0734637053a",
+    "original_status_sha256": "4af04a921a60a2ebd4b0606e524ae16db413efd8a30c2f0f8ad473e60797255e",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "confirm-e2-n24-r1-blink",
+    "report_sha256": "e761390e56a3f2f074dabad788da48c8003a0b2aedb3c6994cdcec06e4003640",
+    "original_status_sha256": "32a4bb89459fa1608878b31882affc7702b5c9349529be29ea5a5cbd2697cc2a",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "confirm-e2-n24-r2-blink",
+    "report_sha256": "dfc2411850d47e457d11e60214c8571e68e5098492a791595c174a3ee3ad8ad5",
+    "original_status_sha256": "a4e675e5ca33ca29db625a800fa72528b87678c7643e022df73fb5b9a2951d51",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "confirm-e2-n24-r2-shared",
+    "report_sha256": "88dddb3fa7a9bd878ed8fae6895aa3f1eba1b01d5e5edb230ccbbe22b0478e52",
+    "original_status_sha256": "37f82440019e41b25182bb6cbaa0db01171e08140358286b9ed4b69c1f531e47",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "confirm-e2-n24-r3-shared",
+    "report_sha256": "30781f9a22eeede3db2f790e6d719bb28a71475f9816100d1a9033dcefe19b10",
+    "original_status_sha256": "7bc27cb190f36060631e6c5addf7ad64e5e2031318f64f9fe8950c352fb79207",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "confirm-e2-n24-r3-blink",
+    "report_sha256": "14a681a4e098f39c5644ae3f6194f1e571238a16b34906db03987976e4021a21",
+    "original_status_sha256": "ad0cabecee96cb53d85472facc8a6bf69e8a97fcecc44a95426f1ba28d7adc10",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "confirm-e2-n28-r1-blink",
+    "report_sha256": "f0a36304b8106dfd17aaf474cf05ee84fd83118cbda6316724568fe7bb7cf363",
+    "original_status_sha256": "bc45851a51e794ee3f7a2713e37bce73b9c4a9a9db688462b0750b845740b267",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "confirm-e2-n28-r1-shared",
+    "report_sha256": "0c8c8ef74876bfcae9f039f162d882084cfe8600998089970aa554d0f4507235",
+    "original_status_sha256": "35979d1143307e9c274101e5a6f1af7250f0827e6bebd34dfc6e3be94f6c9417",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "confirm-e2-n28-r2-shared",
+    "report_sha256": "48c185ac7977b097e1d2ce7b1cd38e3f0696588df1ab007136385686f8b33beb",
+    "original_status_sha256": "13f6f0fe67692c08bd1226434d6428d91c40e4dfc3291279e7bc6e416fb1ae00",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "confirm-e2-n28-r2-blink",
+    "report_sha256": "b7d40c9387e90d617b0916beead5b618196a35e205b67219bea0a9236089dd69",
+    "original_status_sha256": "9ad1c0694dafb5b3ad541c3fa73c1501d653ea0741af8f3b8c294120029c221c",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "confirm-e2-n28-r3-blink",
+    "report_sha256": "063eb91e83e356215960b747eb7c1a0ff1efac37754e2c92c44c9cf1faa40fa3",
+    "original_status_sha256": "3cd8de453d0fd49c8f5ef60341023a2438337548632b9eb78f6c66770dfa33c7",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "confirm-e2-n28-r3-shared",
+    "report_sha256": "10919e811c956d365d8a3c8e410bacb70c799024a1e082d5348406bbe3b72e9b",
+    "original_status_sha256": "041ec2b853040f754cdb5a6479691ceafe8a261291196931a14dd84bcf893b74",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e3-n1-shared",
+    "report_sha256": "6b373ab3ea6a796ac2121f579c4ebc4d4ab002aa8d2f00cad80b136b5027454f",
+    "original_status_sha256": "ee07e0d67f937d8fec396a9aed52d0af8b69bb7edd9796da4c44800d350a324f",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e3-n1-blink",
+    "report_sha256": "3cac70138d4febfebe63c3163bbdb41057a7877c320175e470394e07673f88df",
+    "original_status_sha256": "474e05ca821a55ff4db76eacb6bb9edf06017cc32d138edba664f7c8164907a8",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e3-n2-blink",
+    "report_sha256": "527c191e16e7ab6cbc0367dcc5e2f3a94ce74b5f9c9f977cd55e10b34c52239c",
+    "original_status_sha256": "b539631842f5f8f7ba403bb013bffa5f105b881709fb4211c72f25469d202547",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e3-n2-shared",
+    "report_sha256": "edc4780da8d6d160e16a9108c7bede94cb1e616ebcc68c023052745d33f61730",
+    "original_status_sha256": "0a89d099ea2fd25a6b9caeec1073ba68a2309329958f20b6dd7e226755bf2a62",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e3-n4-shared",
+    "report_sha256": "f3b067944bc6ec8e88e698e0d32e85041b971b7fece22b1bfc72ad756e6fcc16",
+    "original_status_sha256": "42cd72cf8007ad8b99d3af6c7d821a0aa870bf23d507c47b99e40e6192053cbd",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e3-n4-blink",
+    "report_sha256": "97405a0ed40d1a7b9708576331364c8e81f1d755bbac974ed1d308a028b50872",
+    "original_status_sha256": "d9ca4d95870455767ca44fe8f665c21bed4f0b880e53e3928beb825aa7abf4cf",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e3-n8-blink",
+    "report_sha256": "115bd56c1c0e0958638d68a67cee2ead26dbbf5eb084c625a8dcef332612a94f",
+    "original_status_sha256": "bedd1e8174b110e14d4f53fe80590ffaacada65d24c9e8d4025877c3b75997bf",
+    "operational_pass": false,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "screen-e3-n8-shared",
+    "report_sha256": "0392fe7028c5fd4c25ff1c4c4d6135d5251478557ee6dd118f02a74b345e7ce2",
+    "original_status_sha256": "f670c1bb4b0972e7d44b0320d79ebecfceca76194b59e8b34f5e6da7fd38171c",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "refine-e3-n6-shared",
+    "report_sha256": "75467d19c4622c30be2714f6e7131649eedcc961ce630eca2daaa9c55d819753",
+    "original_status_sha256": "9ff87cf8ce45bc7ff81b7a609dea244a355838f6b58d5af3be11d061be65f8fe",
+    "operational_pass": true,
+    "failure_kind": null,
+    "runtime_replayed": false
+  },
+  {
+    "case": "refine-e3-n6-blink",
+    "report_sha256": "6c596b3065b932b897b3262aa61b00ba4e03a0c80bade8f6669ac49897174f8e",
+    "original_status_sha256": "2d16d14c8a3b3ee073dd7219b2553b2eede379c63fadd2cd5f6919c71571191e",
+    "operational_pass": false,
+    "failure_kind": "setup_worker_shutdown_deadline",
+    "runtime_replayed": false
+  }
+]

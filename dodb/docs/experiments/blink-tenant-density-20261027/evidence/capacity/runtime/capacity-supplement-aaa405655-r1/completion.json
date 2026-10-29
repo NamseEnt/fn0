@@ -1,0 +1,193 @@
+{
+  "completed": true,
+  "source_commit": "aaa40565529ca92150df5d94e19b02ca93859f71",
+  "cases": 5,
+  "capacity_after": {
+    "timestamp_unix_seconds": 1793187055.9662473,
+    "zfs_free_bytes": 37298245632,
+    "boot_free_bytes": 2550288384,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5694173184,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3829927936,
+      "Dirty": 14036992,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5713788928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5683284584,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11066632       15 468582928 13902510 118111139   208677 6138436252 190903886        0 55335228 204817031     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  10000018 288159 5234057 470982532 1307490 326305 148548 1693946 0 0",
+      "cpu0 5012538 129887 2618404 235493102 662684 162059 75044 834850 0 0",
+      "cpu1 4987480 158272 2615652 235489430 644805 164245 73503 859095 0 0"
+    ]
+  },
+  "selections": {
+    "eight_tenant_e3_survivors": [
+      "minimal-native-shared"
+    ],
+    "eight_tenant_e3_oom_failures": [
+      "blink"
+    ],
+    "maintenance_count": 28
+  },
+  "scope": "Conditional independent reference confirmation and actual-boundary maintenance; main sequence unchanged",
+  "processes": [
+    {
+      "pid": 2350849,
+      "role": "harness-process",
+      "start_time_ticks": 244763962,
+      "same_live_process": false
+    },
+    {
+      "pid": 2350854,
+      "role": "backend-process",
+      "start_time_ticks": 244763976,
+      "same_live_process": false
+    },
+    {
+      "pid": 2351000,
+      "role": "backend-process",
+      "start_time_ticks": 244766764,
+      "same_live_process": false
+    },
+    {
+      "pid": 2351179,
+      "role": "backend-process",
+      "start_time_ticks": 244772828,
+      "same_live_process": false
+    },
+    {
+      "pid": 2351325,
+      "role": "backend-process",
+      "start_time_ticks": 244778944,
+      "same_live_process": false
+    },
+    {
+      "pid": 2351465,
+      "role": "harness-process",
+      "start_time_ticks": 244785392,
+      "same_live_process": false
+    },
+    {
+      "pid": 2351470,
+      "role": "backend-process",
+      "start_time_ticks": 244785405,
+      "same_live_process": false
+    },
+    {
+      "pid": 2351615,
+      "role": "backend-process",
+      "start_time_ticks": 244788202,
+      "same_live_process": false
+    },
+    {
+      "pid": 2351772,
+      "role": "backend-process",
+      "start_time_ticks": 244794263,
+      "same_live_process": false
+    },
+    {
+      "pid": 2351926,
+      "role": "backend-process",
+      "start_time_ticks": 244800543,
+      "same_live_process": false
+    },
+    {
+      "pid": 2352068,
+      "role": "harness-process",
+      "start_time_ticks": 244807224,
+      "same_live_process": false
+    },
+    {
+      "pid": 2352073,
+      "role": "backend-process",
+      "start_time_ticks": 244807237,
+      "same_live_process": false
+    },
+    {
+      "pid": 2352220,
+      "role": "backend-process",
+      "start_time_ticks": 244810080,
+      "same_live_process": false
+    },
+    {
+      "pid": 2352377,
+      "role": "backend-process",
+      "start_time_ticks": 244816147,
+      "same_live_process": false
+    },
+    {
+      "pid": 2352535,
+      "role": "backend-process",
+      "start_time_ticks": 244822401,
+      "same_live_process": false
+    },
+    {
+      "pid": 2352676,
+      "role": "harness-process",
+      "start_time_ticks": 244829059,
+      "same_live_process": false
+    },
+    {
+      "pid": 2352681,
+      "role": "backend-process",
+      "start_time_ticks": 244829072,
+      "same_live_process": false
+    },
+    {
+      "pid": 2352699,
+      "role": "backend-process",
+      "start_time_ticks": 244830383,
+      "same_live_process": false
+    },
+    {
+      "pid": 2353521,
+      "role": "backend-process",
+      "start_time_ticks": 244848454,
+      "same_live_process": false
+    },
+    {
+      "pid": 2353527,
+      "role": "backend-process",
+      "start_time_ticks": 244849609,
+      "same_live_process": false
+    },
+    {
+      "pid": 2353534,
+      "role": "harness-process",
+      "start_time_ticks": 244850888,
+      "same_live_process": false
+    },
+    {
+      "pid": 2353539,
+      "role": "backend-process",
+      "start_time_ticks": 244850902,
+      "same_live_process": false
+    },
+    {
+      "pid": 2353979,
+      "role": "backend-process",
+      "start_time_ticks": 244851595,
+      "same_live_process": false
+    },
+    {
+      "pid": 2354677,
+      "role": "backend-process",
+      "start_time_ticks": 244869700,
+      "same_live_process": false
+    },
+    {
+      "pid": 2355110,
+      "role": "backend-process",
+      "start_time_ticks": 244871113,
+      "same_live_process": false
+    }
+  ]
+}

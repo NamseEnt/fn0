@@ -1,0 +1,2 @@
+Error: "diagnostic worker shutdown exceeded 15 seconds"
+Error: Custom { kind: Other, error: "diagnostic worker exited unsuccessfully: Some(ExitStatus(unix_wait_status(256)))" }

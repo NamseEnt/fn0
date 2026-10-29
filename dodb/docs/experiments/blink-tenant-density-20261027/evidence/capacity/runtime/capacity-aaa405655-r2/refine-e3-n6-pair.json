@@ -1,0 +1,10 @@
+{
+  "cases": [
+    "refine-e3-n6-blink",
+    "refine-e3-n6-shared"
+  ],
+  "comparison": {
+    "realized_comparison_available": false,
+    "reason": "at least one cell failed before complete workload counters"
+  }
+}

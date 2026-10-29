@@ -91,6 +91,10 @@ def main(run_directory):
         row['offered_load_started'] = any(sample['event'] == 'offer-start' for sample in report['backend_memory_pressure']['samples'])
         if reduced['operational_pass']:
             configuration = report['effective_configuration']
+            boundary = report['workload']['offer_boundary']['backend_memory_pressure_after']['measurement']
+            row['offer_boundary_epoch_peak_bytes'] = boundary['memory.peak']
+            row['offer_boundary_current_bytes'] = boundary['memory.current']
+            row['post_offer_epoch_peak_increase_bytes'] = reduced['epoch_peaks_bytes']['measurement'] - boundary['memory.peak']
             count = configuration['duration_ms'] * configuration['per_tenant_rate'] // 1000
             rows = configuration['initial_rows_per_tenant']
             distinct_get_rows = len({(operation * 0x9e37 + 1) % rows for operation in range(count) if operation * 37 % 100 < 40})

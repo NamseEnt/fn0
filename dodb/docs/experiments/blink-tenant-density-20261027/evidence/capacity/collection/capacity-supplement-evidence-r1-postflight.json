@@ -1,0 +1,257 @@
+{
+  "collector_sha256": "f3471359b04390db308ae327139c07648e814ee2fba0243a640623d6ce91ee27",
+  "capacity": {
+    "timestamp_unix_seconds": 1793232611.8823128,
+    "zfs_free_bytes": 37298245632,
+    "boot_free_bytes": 2542931968,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5559517184,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3874959360,
+      "Dirty": 528384,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5713788928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5724937480,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11182423       15 469521936 13983697 118111139   208677 6138436252 190903886        0 55414808 204898218     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  10024336 303079 5251185 480022102 1316296 327831 150219 1695390 0 0",
+      "cpu0 5024939 142800 2627381 240006944 667052 162821 75885 835543 0 0",
+      "cpu1 4999397 160279 2623803 240015158 649243 165010 74333 859847 0 0"
+    ]
+  },
+  "runs": {
+    "capacity-supplement-aaa405655-r1": {
+      "binaries": {
+        "tenant_density_workload": {
+          "sha256": "180077b6b75c8d52c1a4de33248dc1eb357414edceb26325d8f6d66a753c4f49",
+          "bytes": 16634904
+        },
+        "memory_diagnostic_worker": {
+          "sha256": "5ed5800bef5da6f3fadf8635099de21397111837f2750115fa3859e63cb04cc9",
+          "bytes": 17218192
+        }
+      },
+      "processes": [
+        {
+          "pid": 2350849,
+          "start_time_ticks": 244763962,
+          "role": "harness-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2350854,
+          "start_time_ticks": 244763976,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2351000,
+          "start_time_ticks": 244766764,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2351179,
+          "start_time_ticks": 244772828,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2351325,
+          "start_time_ticks": 244778944,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2351465,
+          "start_time_ticks": 244785392,
+          "role": "harness-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2351470,
+          "start_time_ticks": 244785405,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2351615,
+          "start_time_ticks": 244788202,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2351772,
+          "start_time_ticks": 244794263,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2351926,
+          "start_time_ticks": 244800543,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2352068,
+          "start_time_ticks": 244807224,
+          "role": "harness-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2352073,
+          "start_time_ticks": 244807237,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2352220,
+          "start_time_ticks": 244810080,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2352377,
+          "start_time_ticks": 244816147,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2352535,
+          "start_time_ticks": 244822401,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2352676,
+          "start_time_ticks": 244829059,
+          "role": "harness-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2352681,
+          "start_time_ticks": 244829072,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2352699,
+          "start_time_ticks": 244830383,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2353521,
+          "start_time_ticks": 244848454,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2353527,
+          "start_time_ticks": 244849609,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2353534,
+          "start_time_ticks": 244850888,
+          "role": "harness-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2353539,
+          "start_time_ticks": 244850902,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2353979,
+          "start_time_ticks": 244851595,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2354677,
+          "start_time_ticks": 244869700,
+          "role": "backend-process",
+          "same_live_process": false
+        },
+        {
+          "pid": 2355110,
+          "start_time_ticks": 244871113,
+          "role": "backend-process",
+          "same_live_process": false
+        }
+      ],
+      "databases": {
+        "confirm-e3-n8-r1-shared": {
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/capacity-supplement-aaa405655-r1/confirm-e3-n8-r1-shared",
+          "preserved": true
+        },
+        "confirm-e3-n8-r2-shared": {
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/capacity-supplement-aaa405655-r1/confirm-e3-n8-r2-shared",
+          "preserved": true
+        },
+        "confirm-e3-n8-r3-shared": {
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/capacity-supplement-aaa405655-r1/confirm-e3-n8-r3-shared",
+          "preserved": true
+        },
+        "maintenance-e2-n28-ms2000-blink": {
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/capacity-supplement-aaa405655-r1/maintenance-e2-n28-ms2000-blink",
+          "preserved": true
+        },
+        "maintenance-e2-n28-ms2000-shared": {
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/capacity-supplement-aaa405655-r1/maintenance-e2-n28-ms2000-shared",
+          "preserved": true
+        }
+      },
+      "cgroup_processes": {
+        "confirm-e3-n8-r1-shared": {
+          "cgroup.procs": "",
+          "reopen-oracle/cgroup.procs": "",
+          "oracle/cgroup.procs": "",
+          "measurement/cgroup.procs": "",
+          "setup/cgroup.procs": ""
+        },
+        "confirm-e3-n8-r2-shared": {
+          "cgroup.procs": "",
+          "reopen-oracle/cgroup.procs": "",
+          "oracle/cgroup.procs": "",
+          "measurement/cgroup.procs": "",
+          "setup/cgroup.procs": ""
+        },
+        "confirm-e3-n8-r3-shared": {
+          "cgroup.procs": "",
+          "reopen-oracle/cgroup.procs": "",
+          "oracle/cgroup.procs": "",
+          "measurement/cgroup.procs": "",
+          "setup/cgroup.procs": ""
+        },
+        "maintenance-e2-n28-ms2000-blink": {
+          "cgroup.procs": "",
+          "reopen-oracle/cgroup.procs": "",
+          "oracle/cgroup.procs": "",
+          "measurement/cgroup.procs": "",
+          "setup/cgroup.procs": ""
+        },
+        "maintenance-e2-n28-ms2000-shared": {
+          "cgroup.procs": "",
+          "reopen-oracle/cgroup.procs": "",
+          "oracle/cgroup.procs": "",
+          "measurement/cgroup.procs": "",
+          "setup/cgroup.procs": ""
+        }
+      }
+    }
+  },
+  "source_commit": "aaa40565529ca92150df5d94e19b02ca93859f71",
+  "source_clean": true,
+  "scope": "Post-workload evidence collection; frozen binaries and every database remain on the OCI host"
+}

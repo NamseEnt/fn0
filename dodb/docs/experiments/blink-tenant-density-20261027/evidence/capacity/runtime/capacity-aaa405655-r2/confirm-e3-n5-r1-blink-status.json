@@ -1,0 +1,859 @@
+{
+  "case": "confirm-e3-n5-r1-blink",
+  "backend": "blink",
+  "stage": "E3",
+  "tenants": 5,
+  "active": 5,
+  "duration_ms": 60000,
+  "sample_interval_ms": 1000,
+  "exit_code": 0,
+  "elapsed_seconds": 184.2164238137193,
+  "capacity_after": {
+    "timestamp_unix_seconds": 1793183966.6943524,
+    "zfs_free_bytes": 39057141760,
+    "boot_free_bytes": 2692403200,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5757104128,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3829141504,
+      "Dirty": 2813952,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5582368928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5557598568,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11066511       15 468575520 13902387 117258469   208677 6118032988 189957848        0 55011284 203870870     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  9928059 288159 5153247 470547165 1305818 320504 137772 1680494 0 0",
+      "cpu0 4976715 129887 2577717 235276070 661828 159154 69625 827383 0 0",
+      "cpu1 4951343 158272 2575530 235271095 643990 161350 68147 853111 0 0"
+    ]
+  },
+  "stop_reason": null,
+  "report_sha256": "a509e62524581558938941009f905934428114ec4fd5d1d43e716af171bf2d11",
+  "reduced": {
+    "backend": "blink",
+    "registered": 5,
+    "active": 5,
+    "initial_rows": 32768,
+    "duration_ms": 60000,
+    "sample_interval_ms": 1000,
+    "status": "completed",
+    "cell_peak_bytes": 221200384,
+    "cell_events": {
+      "high": 2834,
+      "low": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_group_kill": 0,
+      "oom_kill": 0
+    },
+    "epoch_peaks_bytes": {
+      "measurement": 192880640,
+      "oracle": 181145600,
+      "reopen-oracle": 181092352,
+      "setup": 221159424
+    },
+    "epoch_events": {
+      "measurement": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "oracle": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "reopen-oracle": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "setup": {
+        "high": 1417,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      }
+    },
+    "operational_pass": true,
+    "slo_pass": true,
+    "resource_failure": false,
+    "failure_reason": null,
+    "measurement_sample_count": 61,
+    "maximum_measurement_sample_gap_ms": 1002,
+    "native_measurement_sample_count": 62,
+    "native_serialized_bytes": 74564,
+    "native_samples_truncated": false,
+    "process_sampling": {
+      "backend": {
+        "fields": {
+          "anonymous_kb": {
+            "available_observations": 62,
+            "observed_max": 188236,
+            "unavailable_observations": 0
+          },
+          "file_kb": {
+            "available_observations": 62,
+            "observed_max": 10159,
+            "unavailable_observations": 0
+          },
+          "pss_kb": {
+            "available_observations": 62,
+            "observed_max": 198323,
+            "unavailable_observations": 0
+          },
+          "rss_kb": {
+            "available_observations": 62,
+            "observed_max": 201024,
+            "unavailable_observations": 0
+          },
+          "swap_kb": {
+            "available_observations": 62,
+            "observed_max": 0,
+            "unavailable_observations": 0
+          },
+          "vm_hwm_kb": {
+            "available_observations": 62,
+            "observed_max": 201040,
+            "unavailable_observations": 0
+          }
+        },
+        "sample_count": 62
+      },
+      "backend_pid": 2345928,
+      "backend_start_time_ticks": 244551757,
+      "boundary_snapshots_requested": 2,
+      "driver": {
+        "fields": {
+          "anonymous_kb": {
+            "available_observations": 62,
+            "observed_max": 9644,
+            "unavailable_observations": 0
+          },
+          "file_kb": {
+            "available_observations": 62,
+            "observed_max": 9787,
+            "unavailable_observations": 0
+          },
+          "pss_kb": {
+            "available_observations": 62,
+            "observed_max": 19163,
+            "unavailable_observations": 0
+          },
+          "rss_kb": {
+            "available_observations": 62,
+            "observed_max": 22236,
+            "unavailable_observations": 0
+          },
+          "swap_kb": {
+            "available_observations": 62,
+            "observed_max": 0,
+            "unavailable_observations": 0
+          },
+          "vm_hwm_kb": {
+            "available_observations": 62,
+            "observed_max": 22236,
+            "unavailable_observations": 0
+          }
+        },
+        "sample_count": 62
+      },
+      "field_sources": {
+        "anonymous_kb": "smaps_rollup Anonymous",
+        "file_kb": "smaps_rollup Pss_File, not file RSS",
+        "pss_kb": "smaps_rollup Pss",
+        "rss_kb": "VmRSS or smaps_rollup Rss",
+        "swap_kb": "smaps_rollup Swap or VmSwap",
+        "vm_hwm_kb": "VmHWM"
+      },
+      "maximum_observed_gap_ms": 1007,
+      "peak_scope": "sampled observations only; instantaneous peaks between samples can be missed",
+      "periodic_offer_sample_count": 60,
+      "phase_periodic_sample_count_before_identity_filter": 60,
+      "process_samples_truncated": false,
+      "same_backend_identity_at_offer_boundaries": true,
+      "scope": "offer phase and its boundaries, separated by PID/start-time; no setup/oracle samples or engine-heap claim",
+      "status": "sampled",
+      "vm_hwm_scope": "process lifetime high-water includes earlier measurement-worker startup and open phases"
+    },
+    "backend_offer_cpu_usec": 3324634,
+    "backend_offer_io_delta": {
+      "cancelled_write_bytes": 0,
+      "rchar": 19,
+      "read_bytes": 0,
+      "syscr": 2,
+      "syscw": 13537,
+      "wchar": 12050378,
+      "write_bytes": 11995202
+    },
+    "whole_device_offer_write_bytes": 43155456,
+    "filesystem_snapshots": {
+      "after_measurement_worker_shutdown": {
+        "allocated_directory_bytes": 69120,
+        "allocated_file_bytes": 242608640,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 7,
+        "distinct_files": 61,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 237738721,
+        "regular_file_paths": 61,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "after_oracle_worker_shutdown": {
+        "allocated_directory_bytes": 69120,
+        "allocated_file_bytes": 242924032,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 7,
+        "distinct_files": 61,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 237738721,
+        "regular_file_paths": 61,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "after_reopen_oracle_worker_shutdown": {
+        "allocated_directory_bytes": 69120,
+        "allocated_file_bytes": 242924032,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 7,
+        "distinct_files": 61,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 237738721,
+        "regular_file_paths": 61,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "after_setup_worker_shutdown": {
+        "allocated_directory_bytes": 69120,
+        "allocated_file_bytes": 192475648,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 7,
+        "distinct_files": 49,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 235212148,
+        "regular_file_paths": 49,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "before_setup": {
+        "allocated_file_bytes": null,
+        "logical_file_bytes": null,
+        "status": "not_created"
+      }
+    },
+    "offer_elapsed_ms": 60004,
+    "scheduled": 15000,
+    "successful": 15000,
+    "dropped": 0,
+    "completed_at_offer_end": 15000,
+    "offer_throughput_completed_per_second": 249.98333444437037,
+    "aggregate_p99": {
+      "Get": {
+        "bucket": 22,
+        "lower_inclusive_ns": 2097152,
+        "upper_exclusive_ns": 4194304
+      },
+      "Query": {
+        "bucket": 22,
+        "lower_inclusive_ns": 2097152,
+        "upper_exclusive_ns": 4194304
+      },
+      "Write": {
+        "bucket": 24,
+        "lower_inclusive_ns": 8388608,
+        "upper_exclusive_ns": 16777216
+      }
+    },
+    "per_tenant_objective": [
+      {
+        "tenant": 1,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Write": {
+            "bucket": 23,
+            "lower_inclusive_ns": 4194304,
+            "upper_exclusive_ns": 8388608
+          }
+        },
+        "completed_at_offer_end": 3000,
+        "passed": true
+      },
+      {
+        "tenant": 2,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Write": {
+            "bucket": 24,
+            "lower_inclusive_ns": 8388608,
+            "upper_exclusive_ns": 16777216
+          }
+        },
+        "completed_at_offer_end": 3000,
+        "passed": true
+      },
+      {
+        "tenant": 3,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Write": {
+            "bucket": 24,
+            "lower_inclusive_ns": 8388608,
+            "upper_exclusive_ns": 16777216
+          }
+        },
+        "completed_at_offer_end": 3000,
+        "passed": true
+      },
+      {
+        "tenant": 4,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Write": {
+            "bucket": 24,
+            "lower_inclusive_ns": 8388608,
+            "upper_exclusive_ns": 16777216
+          }
+        },
+        "completed_at_offer_end": 3000,
+        "passed": true
+      },
+      {
+        "tenant": 5,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Write": {
+            "bucket": 23,
+            "lower_inclusive_ns": 4194304,
+            "upper_exclusive_ns": 8388608
+          }
+        },
+        "completed_at_offer_end": 3000,
+        "passed": true
+      }
+    ],
+    "worst_tenant_p99_upper_exclusive_ms": {
+      "Get": 4.194304,
+      "Query": 4.194304,
+      "Write": 16.777216
+    },
+    "checkpoint_metrics": {
+      "capacity_wait_count": 0,
+      "capacity_wait_nanos": 0,
+      "checkpoint_events": [
+        {
+          "base_bytes_reclaimed": 0,
+          "base_bytes_retained": 46895132,
+          "base_bytes_written": 430084,
+          "checkpoint_bytes_written": 430084,
+          "checkpoint_write_requests": 4,
+          "completion_nanos": 4935403,
+          "data_sync_nanos": 6141453,
+          "duration_nanos": 35262224,
+          "ended_unix_nanos": 1793183858099452611,
+          "full_base_snapshots": 0,
+          "metadata_sync_nanos": 49761,
+          "page_write_nanos": 734886,
+          "phase": "segmented_snapshot_data_sync_coordinator_manifest_reclaim",
+          "preparation_nanos": 23323361,
+          "reclaimed_bytes": 1052078,
+          "started_unix_nanos": 1793183858064189507,
+          "succeeded": true,
+          "target_lsn": 20618,
+          "task_id": 1,
+          "wal_bytes_after": 104,
+          "wal_bytes_before": 1052078,
+          "writes_during_checkpoint": 0
+        },
+        {
+          "base_bytes_reclaimed": 0,
+          "base_bytes_retained": 46895132,
+          "base_bytes_written": 430084,
+          "checkpoint_bytes_written": 430084,
+          "checkpoint_write_requests": 4,
+          "completion_nanos": 5141405,
+          "data_sync_nanos": 4813521,
+          "duration_nanos": 33870612,
+          "ended_unix_nanos": 1793183858797266028,
+          "full_base_snapshots": 0,
+          "metadata_sync_nanos": 51041,
+          "page_write_nanos": 776007,
+          "phase": "segmented_snapshot_data_sync_coordinator_manifest_reclaim",
+          "preparation_nanos": 23003438,
+          "reclaimed_bytes": 1048757,
+          "started_unix_nanos": 1793183858763394136,
+          "succeeded": true,
+          "target_lsn": 20641,
+          "task_id": 2,
+          "wal_bytes_after": 104,
+          "wal_bytes_before": 1048757,
+          "writes_during_checkpoint": 0
+        },
+        {
+          "base_bytes_reclaimed": 0,
+          "base_bytes_retained": 46895132,
+          "base_bytes_written": 430084,
+          "checkpoint_bytes_written": 430084,
+          "checkpoint_write_requests": 4,
+          "completion_nanos": 5606608,
+          "data_sync_nanos": 5436247,
+          "duration_nanos": 35093382,
+          "ended_unix_nanos": 1793183858832367890,
+          "full_base_snapshots": 0,
+          "metadata_sync_nanos": 45081,
+          "page_write_nanos": 615085,
+          "phase": "segmented_snapshot_data_sync_coordinator_manifest_reclaim",
+          "preparation_nanos": 23280121,
+          "reclaimed_bytes": 1048757,
+          "started_unix_nanos": 1793183858797273388,
+          "succeeded": true,
+          "target_lsn": 20641,
+          "task_id": 3,
+          "wal_bytes_after": 2097,
+          "wal_bytes_before": 1048757,
+          "writes_during_checkpoint": 0
+        },
+        {
+          "base_bytes_reclaimed": 0,
+          "base_bytes_retained": 46895132,
+          "base_bytes_written": 430084,
+          "checkpoint_bytes_written": 430084,
+          "checkpoint_write_requests": 4,
+          "completion_nanos": 6571697,
+          "data_sync_nanos": 5577368,
+          "duration_nanos": 34871501,
+          "ended_unix_nanos": 1793183858867246151,
+          "full_base_snapshots": 0,
+          "metadata_sync_nanos": 43801,
+          "page_write_nanos": 704446,
+          "phase": "segmented_snapshot_data_sync_coordinator_manifest_reclaim",
+          "preparation_nanos": 21867829,
+          "reclaimed_bytes": 1050750,
+          "started_unix_nanos": 1793183858832373770,
+          "succeeded": true,
+          "target_lsn": 20643,
+          "task_id": 4,
+          "wal_bytes_after": 104,
+          "wal_bytes_before": 1050750,
+          "writes_during_checkpoint": 0
+        },
+        {
+          "base_bytes_reclaimed": 0,
+          "base_bytes_retained": 46829580,
+          "base_bytes_written": 40964,
+          "checkpoint_bytes_written": 40964,
+          "checkpoint_write_requests": 3,
+          "completion_nanos": 5107644,
+          "data_sync_nanos": 4452398,
+          "duration_nanos": 32168637,
+          "ended_unix_nanos": 1793183877875688132,
+          "full_base_snapshots": 0,
+          "metadata_sync_nanos": 30441,
+          "page_write_nanos": 196562,
+          "phase": "segmented_snapshot_data_sync_coordinator_manifest_reclaim",
+          "preparation_nanos": 22319112,
+          "reclaimed_bytes": 1053095,
+          "started_unix_nanos": 1793183877843518775,
+          "succeeded": true,
+          "target_lsn": 21536,
+          "task_id": 5,
+          "wal_bytes_after": 104,
+          "wal_bytes_before": 1053095,
+          "writes_during_checkpoint": 0
+        },
+        {
+          "base_bytes_reclaimed": 0,
+          "base_bytes_retained": 46919712,
+          "base_bytes_written": 24580,
+          "checkpoint_bytes_written": 24580,
+          "checkpoint_write_requests": 3,
+          "completion_nanos": 4531559,
+          "data_sync_nanos": 1216130,
+          "duration_nanos": 28497526,
+          "ended_unix_nanos": 1793183889971722711,
+          "full_base_snapshots": 0,
+          "metadata_sync_nanos": 29560,
+          "page_write_nanos": 194242,
+          "phase": "segmented_snapshot_data_sync_coordinator_manifest_reclaim",
+          "preparation_nanos": 22482074,
+          "reclaimed_bytes": 1050463,
+          "started_unix_nanos": 1793183889943224265,
+          "succeeded": true,
+          "target_lsn": 22118,
+          "task_id": 6,
+          "wal_bytes_after": 104,
+          "wal_bytes_before": 1050463,
+          "writes_during_checkpoint": 0
+        },
+        {
+          "base_bytes_reclaimed": 0,
+          "base_bytes_retained": 46919712,
+          "base_bytes_written": 24580,
+          "checkpoint_bytes_written": 24580,
+          "checkpoint_write_requests": 3,
+          "completion_nanos": 4365118,
+          "data_sync_nanos": 1224051,
+          "duration_nanos": 29058411,
+          "ended_unix_nanos": 1793183890472379388,
+          "full_base_snapshots": 0,
+          "metadata_sync_nanos": 24160,
+          "page_write_nanos": 190522,
+          "phase": "segmented_snapshot_data_sync_coordinator_manifest_reclaim",
+          "preparation_nanos": 23205760,
+          "reclaimed_bytes": 1049206,
+          "started_unix_nanos": 1793183890443320017,
+          "succeeded": true,
+          "target_lsn": 22132,
+          "task_id": 7,
+          "wal_bytes_after": 104,
+          "wal_bytes_before": 1049206,
+          "writes_during_checkpoint": 0
+        },
+        {
+          "base_bytes_reclaimed": 0,
+          "base_bytes_retained": 46919712,
+          "base_bytes_written": 24580,
+          "checkpoint_bytes_written": 24580,
+          "checkpoint_write_requests": 3,
+          "completion_nanos": 5354087,
+          "data_sync_nanos": 981289,
+          "duration_nanos": 31533792,
+          "ended_unix_nanos": 1793183890503922660,
+          "full_base_snapshots": 0,
+          "metadata_sync_nanos": 23880,
+          "page_write_nanos": 376843,
+          "phase": "segmented_snapshot_data_sync_coordinator_manifest_reclaim",
+          "preparation_nanos": 24696253,
+          "reclaimed_bytes": 1049206,
+          "started_unix_nanos": 1793183890472387828,
+          "succeeded": true,
+          "target_lsn": 22132,
+          "task_id": 8,
+          "wal_bytes_after": 2495,
+          "wal_bytes_before": 1049206,
+          "writes_during_checkpoint": 1
+        },
+        {
+          "base_bytes_reclaimed": 0,
+          "base_bytes_retained": 46919712,
+          "base_bytes_written": 24580,
+          "checkpoint_bytes_written": 24580,
+          "checkpoint_write_requests": 3,
+          "completion_nanos": 4545359,
+          "data_sync_nanos": 1052209,
+          "duration_nanos": 29591295,
+          "ended_unix_nanos": 1793183890533522115,
+          "full_base_snapshots": 0,
+          "metadata_sync_nanos": 29320,
+          "page_write_nanos": 193202,
+          "phase": "segmented_snapshot_data_sync_coordinator_manifest_reclaim",
+          "preparation_nanos": 23720844,
+          "reclaimed_bytes": 1049601,
+          "started_unix_nanos": 1793183890503929780,
+          "succeeded": true,
+          "target_lsn": 22135,
+          "task_id": 9,
+          "wal_bytes_after": 104,
+          "wal_bytes_before": 1049601,
+          "writes_during_checkpoint": 0
+        }
+      ],
+      "checkpoint_max_nanos": 35262224,
+      "checkpoint_total_nanos": 289947380,
+      "checkpoint_wal_syncs": 9,
+      "checkpoints_completed": 9,
+      "checkpoints_failed": 0,
+      "checkpoints_started": 9,
+      "commit_wal_syncs": 6034,
+      "coordinator_pause_nanos": 254044632,
+      "execution": "background",
+      "failed_message": null,
+      "merged_checkpoint_requests": 1,
+      "mutation_commit_groups": 6004,
+      "omitted_checkpoint_events": 0,
+      "peak_retained_image_bytes_normalized_page_images": 434176,
+      "peak_tasks_running": 1,
+      "policy": {
+        "mode": "wal_bytes_threshold",
+        "threshold_bytes": 1048576
+      },
+      "retained_image_bytes_normalized_page_images": 0,
+      "status": "sampled",
+      "successful_mutation_transactions": 6004,
+      "tasks_running": 0,
+      "threshold_bytes": 1048576,
+      "threshold_excess_max_bytes": 4519,
+      "transaction_group_count": 6004,
+      "transaction_group_histogram": [
+        0,
+        6004
+      ],
+      "wal_bytes_at_measurement_end": 965682,
+      "wal_bytes_at_measurement_start": 624868,
+      "wal_bytes_current": 965682,
+      "wal_bytes_max": 1053199,
+      "wal_syncs": 6043,
+      "writes_during_checkpoint": 1
+    },
+    "native_first_last": [
+      {
+        "blink_checkpoints": {
+          "capacity_wait_count": 0,
+          "capacity_wait_nanos": 0,
+          "checkpoint_max_nanos": 0,
+          "checkpoint_total_nanos": 0,
+          "checkpoint_wal_syncs": 0,
+          "checkpoints_completed": 0,
+          "checkpoints_failed": 0,
+          "checkpoints_started": 0,
+          "commit_wal_syncs": 0,
+          "coordinator_pause_nanos": 0,
+          "detail_scope": "cumulative counters only; event details and group histogram are retained in the final worker report",
+          "execution": "background",
+          "failed_message": null,
+          "merged_checkpoint_requests": 0,
+          "mutation_commit_groups": 0,
+          "omitted_checkpoint_events": 0,
+          "peak_retained_image_bytes_normalized_page_images": 0,
+          "peak_tasks_running": 0,
+          "policy": {
+            "mode": "wal_bytes_threshold",
+            "threshold_bytes": 1048576
+          },
+          "retained_image_bytes_normalized_page_images": 0,
+          "status": "sampled",
+          "successful_mutation_transactions": 0,
+          "tasks_running": 0,
+          "threshold_bytes": 1048576,
+          "threshold_excess_max_bytes": 0,
+          "transaction_group_count": 0,
+          "wal_bytes_at_measurement_end": null,
+          "wal_bytes_at_measurement_start": null,
+          "wal_bytes_current": 0,
+          "wal_bytes_max": 0,
+          "wal_syncs": 0,
+          "writes_during_checkpoint": 0
+        },
+        "phase": "before-measurement",
+        "rocksdb_properties": null,
+        "shared_resources": null,
+        "timestamp_unix_ms": 1793183846241
+      },
+      {
+        "blink_checkpoints": {
+          "capacity_wait_count": 0,
+          "capacity_wait_nanos": 0,
+          "checkpoint_max_nanos": 35262224,
+          "checkpoint_total_nanos": 289947380,
+          "checkpoint_wal_syncs": 9,
+          "checkpoints_completed": 9,
+          "checkpoints_failed": 0,
+          "checkpoints_started": 9,
+          "commit_wal_syncs": 6019,
+          "coordinator_pause_nanos": 254044632,
+          "detail_scope": "cumulative counters only; event details and group histogram are retained in the final worker report",
+          "execution": "background",
+          "failed_message": null,
+          "merged_checkpoint_requests": 1,
+          "mutation_commit_groups": 5989,
+          "omitted_checkpoint_events": 0,
+          "peak_retained_image_bytes_normalized_page_images": 434176,
+          "peak_tasks_running": 1,
+          "policy": {
+            "mode": "wal_bytes_threshold",
+            "threshold_bytes": 1048576
+          },
+          "retained_image_bytes_normalized_page_images": 0,
+          "status": "sampled",
+          "successful_mutation_transactions": 5989,
+          "tasks_running": 0,
+          "threshold_bytes": 1048576,
+          "threshold_excess_max_bytes": 4519,
+          "transaction_group_count": 5989,
+          "wal_bytes_at_measurement_end": 539657,
+          "wal_bytes_at_measurement_start": 624868,
+          "wal_bytes_current": 539657,
+          "wal_bytes_max": 1053199,
+          "wal_syncs": 6028,
+          "writes_during_checkpoint": 1
+        },
+        "phase": "measurement-including-drain",
+        "rocksdb_properties": null,
+        "shared_resources": null,
+        "timestamp_unix_ms": 1793183907242
+      }
+    ],
+    "offer_boundary_process_identities": {
+      "before": {
+        "processes": [
+          {
+            "anonymous_kb": 6336,
+            "file_kb": 9787,
+            "pid": 2345866,
+            "process_group_id": 2345866,
+            "pss_kb": 16123,
+            "role": "harness-process",
+            "rss_kb": 18928,
+            "start_time_ticks": 244545390,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 18928
+          },
+          {
+            "pid": 2345871,
+            "process_group_id": 2345866,
+            "role": "backend-process",
+            "start_time_ticks": 244545403,
+            "status": "exited-or-pid-reused"
+          },
+          {
+            "anonymous_kb": 177968,
+            "file_kb": 10159,
+            "pid": 2345928,
+            "process_group_id": 2345866,
+            "pss_kb": 188127,
+            "role": "backend-process",
+            "rss_kb": 190756,
+            "start_time_ticks": 244551757,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 190756
+          }
+        ],
+        "timestamp_unix_ms": 1793183847357
+      },
+      "after": {
+        "processes": [
+          {
+            "anonymous_kb": 9644,
+            "file_kb": 9422,
+            "pid": 2345866,
+            "process_group_id": 2345866,
+            "pss_kb": 19066,
+            "role": "harness-process",
+            "rss_kb": 22236,
+            "start_time_ticks": 244545390,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 22236
+          },
+          {
+            "pid": 2345871,
+            "process_group_id": 2345866,
+            "role": "backend-process",
+            "start_time_ticks": 244545403,
+            "status": "exited-or-pid-reused"
+          },
+          {
+            "anonymous_kb": 188236,
+            "file_kb": 9797,
+            "pid": 2345928,
+            "process_group_id": 2345866,
+            "pss_kb": 198033,
+            "role": "backend-process",
+            "rss_kb": 201024,
+            "start_time_ticks": 244551757,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 201040
+          }
+        ],
+        "timestamp_unix_ms": 1793183907361
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "cases": [
+    "screen-e3-n8-blink",
+    "screen-e3-n8-shared"
+  ],
+  "comparison": {
+    "realized_comparison_available": false,
+    "reason": "at least one cell failed before complete workload counters"
+  }
+}

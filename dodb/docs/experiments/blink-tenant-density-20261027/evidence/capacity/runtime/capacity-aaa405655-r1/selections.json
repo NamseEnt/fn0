@@ -1,0 +1,10 @@
+{
+  "E2": {
+    "common_screen_pass": 24,
+    "next_screen_failure": 28,
+    "confirmation_counts": [
+      24,
+      28
+    ]
+  }
+}

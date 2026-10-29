@@ -1,0 +1,18 @@
+{
+  "E2": {
+    "common_screen_pass": 24,
+    "next_screen_failure": 28,
+    "confirmation_counts": [
+      24,
+      28
+    ]
+  },
+  "E3": {
+    "common_screen_pass": 5,
+    "next_screen_failure": 6,
+    "confirmation_counts": [
+      5,
+      6
+    ]
+  }
+}

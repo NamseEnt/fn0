@@ -1,0 +1,9 @@
+{
+  "eight_tenant_e3_survivors": [
+    "minimal-native-shared"
+  ],
+  "eight_tenant_e3_oom_failures": [
+    "blink"
+  ],
+  "maintenance_count": 28
+}

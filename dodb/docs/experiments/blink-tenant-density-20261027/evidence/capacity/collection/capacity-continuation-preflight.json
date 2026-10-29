@@ -1,0 +1,226 @@
+{
+  "reviewed_cases": 36,
+  "results": [
+    {
+      "case": "confirm-e2-n24-r1-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "confirm-e2-n24-r1-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "confirm-e2-n24-r2-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "confirm-e2-n24-r2-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "confirm-e2-n24-r3-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "confirm-e2-n24-r3-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "confirm-e2-n28-r1-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "confirm-e2-n28-r1-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "confirm-e2-n28-r2-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "confirm-e2-n28-r2-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "confirm-e2-n28-r3-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "confirm-e2-n28-r3-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "refine-e2-n24-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "refine-e2-n24-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "refine-e2-n28-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "refine-e2-n28-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "refine-e3-n6-blink",
+      "operational_pass": false,
+      "resource_failure": false,
+      "failure_kind": "setup_worker_shutdown_deadline"
+    },
+    {
+      "case": "refine-e3-n6-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e2-n1-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e2-n1-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e2-n16-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e2-n16-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e2-n32-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e2-n32-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e2-n4-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e2-n4-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e2-n8-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e2-n8-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e3-n1-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e3-n1-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e3-n2-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e3-n2-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e3-n4-blink",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e3-n4-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e3-n8-blink",
+      "operational_pass": false,
+      "resource_failure": true,
+      "failure_kind": null
+    },
+    {
+      "case": "screen-e3-n8-shared",
+      "operational_pass": true,
+      "resource_failure": false,
+      "failure_kind": null
+    }
+  ],
+  "negative_checks_passed": [
+    "unrecognized_stderr_rejected",
+    "mismatched_source_rejected",
+    "zero_high_events_rejected"
+  ]
+}

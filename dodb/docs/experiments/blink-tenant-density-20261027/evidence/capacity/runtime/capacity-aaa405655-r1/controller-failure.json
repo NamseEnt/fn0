@@ -1,0 +1,29 @@
+{
+  "reason": "AssertionError({'case': 'refine-e3-n6-blink', 'backend': 'blink', 'stage': 'E3', 'tenants': 6, 'active': 6, 'duration_ms': 30000, 'sample_interval_ms': 1000, 'exit_code': 1, 'elapsed_seconds': 346.4283439796418, 'capacity_after': {'timestamp_unix_seconds': 1793182762.199617, 'zfs_free_bytes': 39787515904, 'boot_free_bytes': 2884743168, 'memory_bytes': {'MemTotal': 11427577856, 'MemAvailable': 5665730560, 'SwapTotal': 4294963200, 'SwapFree': 3828355072, 'Dirty': 3878912, 'Writeback': 0}, 'arc': {'c': 5713788928, 'c_min': 357111808, 'c_max': 5713788928, 'size': 5708236200, 'memory_throttle_count': 0}, 'device_stat': '11066464       15 468572384 13902343 116938443   208677 6109766948 189569319        0 54923928 203482297     1098      384 1961318615    10634        0        0', 'cpu_stat': ['cpu  9909125 287984 5130249 470358379 1305184 318835 134669 1676838 0 0', 'cpu0 4967348 129768 2566237 235181555 661426 158329 68062 825888 0 0', 'cpu1 4941776 158216 2564012 235176824 643758 160505 66606 850950 0 0']}, 'stop_reason': None, 'report_sha256': '6c596b3065b932b897b3262aa61b00ba4e03a0c80bade8f6669ac49897174f8e', 'review_error': \"AssertionError({'backend': 'blink', 'registered': 6, 'active': 6, 'initial_rows': 32768, 'duration_ms': 30000, 'sample_interval_ms': 1000, 'status': 'failed_or_inconclusive', 'cell_peak_bytes': 245739520, 'cell_events': {'high': 18569, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'epoch_peaks_bytes': {'measurement': 0, 'oracle': 0, 'reopen-oracle': 0, 'setup': 245698560}, 'epoch_events': {'measurement': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'oracle': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'reopen-oracle': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'setup': {'high': 9284, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}}, 'operational_pass': False, 'slo_pass': False, 'resource_failure': False, 'failure_reason': 'diagnostic worker exited unsuccessfully: Some(ExitStatus(unix_wait_status(256)))'})\"})",
+  "capacity": {
+    "timestamp_unix_seconds": 1793182762.3529403,
+    "zfs_free_bytes": 39787515904,
+    "boot_free_bytes": 2882244608,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5681958912,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3828355072,
+      "Dirty": 6275072,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5713788928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5708236200,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11066464       15 468572384 13902343 116938443   208677 6109766948 189569319        0 54923928 203482297     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  9909137 287984 5130253 470358394 1305184 318835 134669 1676838 0 0",
+      "cpu0 4967361 129768 2566240 235181555 661426 158329 68062 825888 0 0",
+      "cpu1 4941776 158216 2564012 235176839 643758 160505 66606 850950 0 0"
+    ]
+  }
+}
