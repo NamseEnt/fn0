@@ -1,0 +1,92 @@
+{
+  "probe_kind": "owned_sleep_child_proc_read_capability",
+  "timestamp_unix_ns": 1793240994618119572,
+  "kernel_release": "6.12.0-206.104.4.4.el9uek.aarch64",
+  "child_pid": 2408341,
+  "child_start_time_ticks": 250266598,
+  "child_start_time_error": null,
+  "fields": {
+    "stat": {
+      "status": "read",
+      "bytes_read": 332,
+      "truncated": false,
+      "read_duration_ns": 58640,
+      "useful_wait_value": false,
+      "selected": {
+        "command": "python3",
+        "state": "S",
+        "user_ticks": 0,
+        "system_ticks": 0,
+        "start_time_ticks": 250266598
+      },
+      "value": null,
+      "error": null
+    },
+    "status": {
+      "status": "truncated",
+      "bytes_read": 1024,
+      "truncated": true,
+      "read_duration_ns": 43121,
+      "useful_wait_value": false,
+      "selected": {
+        "State": "S (sleeping)",
+        "VmHWM": "16988 kB",
+        "VmRSS": "16988 kB",
+        "Threads": "1"
+      },
+      "value": null,
+      "error": null
+    },
+    "wchan": {
+      "status": "read",
+      "bytes_read": 9,
+      "truncated": false,
+      "read_duration_ns": 26601,
+      "useful_wait_value": true,
+      "selected": null,
+      "value": "do_select",
+      "error": null
+    },
+    "syscall": {
+      "status": "read",
+      "bytes_read": 68,
+      "truncated": false,
+      "read_duration_ns": 19320,
+      "useful_wait_value": true,
+      "selected": null,
+      "value": "72 0x0 0x0 0x0 0x0 0xffffd1512298 0x0 0xffffd1512270 0xffffbbf361cc",
+      "error": null
+    },
+    "stack": {
+      "status": "read",
+      "bytes_read": 299,
+      "truncated": false,
+      "read_duration_ns": 31320,
+      "useful_wait_value": true,
+      "selected": null,
+      "value": "[<0>] do_select+0x3b8/0x7e0\n[<0>] core_sys_select+0x24c/0x500\n[<0>] __arm64_sys_pselect6+0x158/0x260\n[<0>] invoke_syscall+0x68/0x140\n[<0>] el0_svc_common.constprop.0+0x108/0x140\n[<0>] do_el0_svc+0x24/0x60\n[<0>] el0_svc+0x38/0x178\n[<0>] el0t_64_sync_handler+0xe0/0x100\n[<0>] el0t_64_sync+0x194/0x198",
+      "error": null
+    },
+    "schedstat": {
+      "status": "read",
+      "bytes_read": 15,
+      "truncated": false,
+      "read_duration_ns": 17120,
+      "useful_wait_value": false,
+      "selected": {
+        "runtime_ns": 9797200,
+        "runqueue_wait_ns": 9240,
+        "timeslices": 2
+      },
+      "value": null,
+      "error": null
+    }
+  },
+  "useful_wait_fields": [
+    "wchan",
+    "syscall",
+    "stack"
+  ],
+  "wait_fields_available": true,
+  "probe_child_terminated": true
+}
