@@ -1,0 +1,15 @@
+{
+  "reviewer_commit": "2c6c79eccde1ed92a91670b27ab525d822075e29",
+  "reviewer_sha256": "6bd65facde7695c8e1357f32eae1a0252ac352449fa4c298a1e042b6439a0ee5",
+  "command": [
+    "/bin/python3",
+    "/home/opc/tenant-density-harness-20261027/resident-frontier/2c6c79ecc/resident_frontier_review.py",
+    "--run-directory",
+    "/home/opc/tenant-density-harness-20261027/arrival-phase/resident-frontier-cb0e04482-r2",
+    "--capacity-reviewer",
+    "/home/opc/tenant-density-harness-20261027/capacity_review.py",
+    "--output",
+    "/home/opc/tenant-density-harness-20261027/arrival-phase/resident-frontier-cb0e04482-r2/review-r2.json"
+  ],
+  "exit_code": 0
+}

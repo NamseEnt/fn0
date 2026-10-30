@@ -1,0 +1,195 @@
+{
+  "candidate_counts": {
+    "blink": 24,
+    "minimal-native-shared": null
+  },
+  "confirmation_results": {
+    "blink": {
+      "candidate": [
+        {
+          "active_tenants": 24,
+          "case": "confirm-n24-r1-blink",
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "active_tenants": 24,
+          "case": "confirm-n24-r2-blink",
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "active_tenants": 24,
+          "case": "confirm-n24-r3-blink",
+          "operational_pass": true,
+          "slo_pass": true
+        }
+      ],
+      "fallback": []
+    },
+    "minimal-native-shared": {
+      "candidate": [],
+      "fallback": []
+    }
+  },
+  "controls_baseline": {
+    "blink": {
+      "accepted": false,
+      "cases": [
+        "control-n28-r1-staggered-blink",
+        "control-n28-r2-staggered-blink",
+        "control-n28-r3-staggered-blink"
+      ]
+    },
+    "minimal-native-shared": {
+      "accepted": true,
+      "cases": [
+        "control-n28-r1-staggered-shared",
+        "control-n28-r2-staggered-shared",
+        "control-n28-r3-staggered-shared"
+      ]
+    }
+  },
+  "decisions": {
+    "blink": {
+      "accepted_count": 24,
+      "accepted_from": "candidate_confirmed",
+      "backend": "blink",
+      "candidate_count": 24,
+      "fallback_count": null
+    },
+    "minimal-native-shared": {
+      "accepted_count": 28,
+      "accepted_from": "preserved_control_baseline",
+      "backend": "minimal-native-shared",
+      "candidate_count": null,
+      "fallback_count": null,
+      "omission_reason": "no_passing_screen"
+    }
+  },
+  "design_plan_commit": "6f57299f3af21c19444ebb203e40d636abcd0a04",
+  "global_stop": null,
+  "omitted_after_stop": [],
+  "omitted_cases": [
+    {
+      "case": "screen-n48-shared",
+      "reason": "higher_screen_omitted_after_first_route_slo_miss",
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n64-shared",
+      "reason": "higher_screen_omitted_after_first_route_slo_miss",
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n80-shared",
+      "reason": "higher_screen_omitted_after_first_route_slo_miss",
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n96-shared",
+      "reason": "higher_screen_omitted_after_first_route_slo_miss",
+      "stage": "screen"
+    },
+    {
+      "case": "confirm-no-candidate-shared",
+      "reason": "route_has_no_passing_screen",
+      "stage": "candidate_confirmation"
+    },
+    {
+      "case": "fallback-unavailable-shared",
+      "reason": "no_lower_passing_screen_for_single_fallback",
+      "stage": "fallback_confirmation"
+    }
+  ],
+  "screen_results": {
+    "blink": {
+      "16": {
+        "case": "screen-n16-blink",
+        "operational_pass": true,
+        "slo_pass": true
+      },
+      "24": {
+        "case": "screen-n24-blink",
+        "operational_pass": true,
+        "slo_pass": true
+      }
+    },
+    "minimal-native-shared": {
+      "32": {
+        "case": "screen-n32-shared",
+        "operational_pass": true,
+        "slo_pass": false
+      }
+    }
+  },
+  "screen_schedule": [
+    {
+      "active_tenants": 16,
+      "backend_order": [
+        "blink"
+      ],
+      "count_group_number": 1,
+      "first_backend": "blink"
+    },
+    {
+      "active_tenants": 24,
+      "backend_order": [
+        "blink"
+      ],
+      "count_group_number": 2,
+      "first_backend": "minimal-native-shared"
+    },
+    {
+      "active_tenants": 32,
+      "backend_order": [
+        "minimal-native-shared"
+      ],
+      "count_group_number": 3,
+      "first_backend": "blink"
+    },
+    {
+      "active_tenants": 48,
+      "backend_order": [
+        "minimal-native-shared"
+      ],
+      "count_group_number": 4,
+      "first_backend": "minimal-native-shared"
+    },
+    {
+      "active_tenants": 64,
+      "backend_order": [
+        "minimal-native-shared"
+      ],
+      "count_group_number": 5,
+      "first_backend": "blink"
+    },
+    {
+      "active_tenants": 80,
+      "backend_order": [
+        "minimal-native-shared"
+      ],
+      "count_group_number": 6,
+      "first_backend": "minimal-native-shared"
+    },
+    {
+      "active_tenants": 96,
+      "backend_order": [
+        "minimal-native-shared"
+      ],
+      "count_group_number": 7,
+      "first_backend": "blink"
+    }
+  ],
+  "source_commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d",
+  "source_native_after": {
+    "native_archive_bytes_before": 1199825562,
+    "native_archive_sha256_before": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+    "native_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+    "resolved_target_directory_before": "/bench/zfs/db/tenant-density-build-cache-20261029/target",
+    "source_commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d",
+    "source_status": "",
+    "target_symlink_before": "/bench/zfs/db/tenant-density-build-cache-20261029/target"
+  },
+  "terminal_status": "completed"
+}

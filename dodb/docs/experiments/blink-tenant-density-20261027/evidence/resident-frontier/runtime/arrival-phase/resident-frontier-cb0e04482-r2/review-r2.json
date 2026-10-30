@@ -1,0 +1,445 @@
+{
+  "accepted_run": false,
+  "actual_cell_count": 6,
+  "cells": {
+    "confirm-n24-r1-blink": {
+      "active_tenants": 24,
+      "aggregate_p99": {
+        "Get": {
+          "bucket": 22,
+          "lower_inclusive_ns": 2097152,
+          "upper_exclusive_ns": 4194304
+        },
+        "Query": {
+          "bucket": 22,
+          "lower_inclusive_ns": 2097152,
+          "upper_exclusive_ns": 4194304
+        },
+        "Write": {
+          "bucket": 24,
+          "lower_inclusive_ns": 8388608,
+          "upper_exclusive_ns": 16777216
+        }
+      },
+      "backend": "blink",
+      "case": "confirm-n24-r1-blink",
+      "cell_peak_bytes": 62922752,
+      "cgroups": {
+        "cell": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r1-blink",
+        "empty": true,
+        "epoch_count": 4,
+        "limits_valid": true,
+        "root": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2"
+      },
+      "command_sha256": "8759515c53ac1c373fd572bfc6837cacb0d1f33c54c6feac0ce256fd086ebdc8",
+      "database": {
+        "file_count": 240,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/confirm-n24-r1-blink",
+        "preserved": true,
+        "total_file_bytes": 80369622
+      },
+      "duration_ms": 60000,
+      "host_sample_count": 45,
+      "host_samples_sha256": "f863adfdccf4f165570e30b105e7b46750606a2a12fc29b848d7486896b3727a",
+      "kind": "confirm",
+      "log_sha256": "ac7079a045570fd8380b6d4628a56e7bae1a6d65010f45f8cbace1463aba1845",
+      "operational_pass": true,
+      "report_sha256": "d018091a283c1c6fbacd1a891d0f4caa9e8572f92cac20b0d73dc83094bc6de8",
+      "scheduled": 72000,
+      "slo_pass": true,
+      "status_sha256": "e216afd409e447f519837ec2354864272db1995a89b7f06e779779d7b752fd8e",
+      "successful": 72000,
+      "valid": true
+    },
+    "confirm-n24-r2-blink": {
+      "active_tenants": 24,
+      "aggregate_p99": {
+        "Get": {
+          "bucket": 22,
+          "lower_inclusive_ns": 2097152,
+          "upper_exclusive_ns": 4194304
+        },
+        "Query": {
+          "bucket": 22,
+          "lower_inclusive_ns": 2097152,
+          "upper_exclusive_ns": 4194304
+        },
+        "Write": {
+          "bucket": 23,
+          "lower_inclusive_ns": 4194304,
+          "upper_exclusive_ns": 8388608
+        }
+      },
+      "backend": "blink",
+      "case": "confirm-n24-r2-blink",
+      "cell_peak_bytes": 60502016,
+      "cgroups": {
+        "cell": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r2-blink",
+        "empty": true,
+        "epoch_count": 4,
+        "limits_valid": true,
+        "root": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2"
+      },
+      "command_sha256": "1ee58297d88042829588dc1a94f87b82b58f7522cf81ac0e74f5dee4b32cbd9f",
+      "database": {
+        "file_count": 240,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/confirm-n24-r2-blink",
+        "preserved": true,
+        "total_file_bytes": 80373913
+      },
+      "duration_ms": 60000,
+      "host_sample_count": 45,
+      "host_samples_sha256": "f55679c432a3090d52a0feeb3db4ce6ad015df4b5e85d61cba21aad765c2ed18",
+      "kind": "confirm",
+      "log_sha256": "72eafb117f2e8c804fa363b6625f325cc4980d08f09801fd1e647ee831df1f02",
+      "operational_pass": true,
+      "report_sha256": "c39977d7db259de7e512dc35a8f08c94724d3d679821ce92af6ced29adaf7552",
+      "scheduled": 72000,
+      "slo_pass": true,
+      "status_sha256": "c6cd1d0a57e4e55668758209a6788311abda8334a21c0109e0adf9c6131ab439",
+      "successful": 72000,
+      "valid": true
+    },
+    "confirm-n24-r3-blink": {
+      "active_tenants": 24,
+      "aggregate_p99": {
+        "Get": {
+          "bucket": 22,
+          "lower_inclusive_ns": 2097152,
+          "upper_exclusive_ns": 4194304
+        },
+        "Query": {
+          "bucket": 22,
+          "lower_inclusive_ns": 2097152,
+          "upper_exclusive_ns": 4194304
+        },
+        "Write": {
+          "bucket": 23,
+          "lower_inclusive_ns": 4194304,
+          "upper_exclusive_ns": 8388608
+        }
+      },
+      "backend": "blink",
+      "case": "confirm-n24-r3-blink",
+      "cell_peak_bytes": 60817408,
+      "cgroups": {
+        "cell": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r3-blink",
+        "empty": true,
+        "epoch_count": 4,
+        "limits_valid": true,
+        "root": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2"
+      },
+      "command_sha256": "138dcd38cccae0764d8a1a5cd38e482a82471ecca41feac3df17d35cd5e1965f",
+      "database": {
+        "file_count": 240,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/confirm-n24-r3-blink",
+        "preserved": true,
+        "total_file_bytes": 80378873
+      },
+      "duration_ms": 60000,
+      "host_sample_count": 45,
+      "host_samples_sha256": "7f206263db904df93caec4275cd67cab01f3f9cd8ae105533947731ab68aa4ac",
+      "kind": "confirm",
+      "log_sha256": "48d9295a48f22613143050d03b4657d403dd2d468314f46b67b1c1c991643fd7",
+      "operational_pass": true,
+      "report_sha256": "891869aedfe634f4552178700075a394f5077c8a1fe16dec7af79aa3c27cdd52",
+      "scheduled": 72000,
+      "slo_pass": true,
+      "status_sha256": "5b1ccba8e890e5d281dec6aa1f76e699e8ee77e86ea98c64c7233cb4eda8bcd3",
+      "successful": 72000,
+      "valid": true
+    },
+    "screen-n16-blink": {
+      "active_tenants": 16,
+      "aggregate_p99": {
+        "Get": {
+          "bucket": 22,
+          "lower_inclusive_ns": 2097152,
+          "upper_exclusive_ns": 4194304
+        },
+        "Query": {
+          "bucket": 22,
+          "lower_inclusive_ns": 2097152,
+          "upper_exclusive_ns": 4194304
+        },
+        "Write": {
+          "bucket": 23,
+          "lower_inclusive_ns": 4194304,
+          "upper_exclusive_ns": 8388608
+        }
+      },
+      "backend": "blink",
+      "case": "screen-n16-blink",
+      "cell_peak_bytes": 42713088,
+      "cgroups": {
+        "cell": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n16-blink",
+        "empty": true,
+        "epoch_count": 4,
+        "limits_valid": true,
+        "root": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2"
+      },
+      "command_sha256": "deda187754f6efcc2e7176a956d05ae056ae581deb5cb81435e796c6179363bc",
+      "database": {
+        "file_count": 144,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/screen-n16-blink",
+        "preserved": true,
+        "total_file_bytes": 54247429
+      },
+      "duration_ms": 30000,
+      "host_sample_count": 25,
+      "host_samples_sha256": "8cdbe72ab57e891dbf8b67bbd807cf8a9b6177c5c01a20f9e2ccb7d111590161",
+      "kind": "screen",
+      "log_sha256": "7ce3756198bc986c715fca5436198a20ac0c12607ff6c4eeeb4a7b612594bb73",
+      "operational_pass": true,
+      "report_sha256": "854e0dd94ef7d7d149bd9db18523d6eac5f09c9799fbcbc227503cf88fee7210",
+      "scheduled": 24000,
+      "slo_pass": true,
+      "status_sha256": "1da4bbd8645f8aa48768d27603a07f86c9fcb8234bc94b5e8cae242efd91810a",
+      "successful": 24000,
+      "valid": true
+    },
+    "screen-n24-blink": {
+      "active_tenants": 24,
+      "aggregate_p99": {
+        "Get": {
+          "bucket": 22,
+          "lower_inclusive_ns": 2097152,
+          "upper_exclusive_ns": 4194304
+        },
+        "Query": {
+          "bucket": 22,
+          "lower_inclusive_ns": 2097152,
+          "upper_exclusive_ns": 4194304
+        },
+        "Write": {
+          "bucket": 23,
+          "lower_inclusive_ns": 4194304,
+          "upper_exclusive_ns": 8388608
+        }
+      },
+      "backend": "blink",
+      "case": "screen-n24-blink",
+      "cell_peak_bytes": 59396096,
+      "cgroups": {
+        "cell": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n24-blink",
+        "empty": true,
+        "epoch_count": 4,
+        "limits_valid": true,
+        "root": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2"
+      },
+      "command_sha256": "17b15100efbd7cc298b3d14f905b158f1e34a07f1b7dd4436d52aaaa06d1df64",
+      "database": {
+        "file_count": 216,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/screen-n24-blink",
+        "preserved": true,
+        "total_file_bytes": 81325801
+      },
+      "duration_ms": 30000,
+      "host_sample_count": 31,
+      "host_samples_sha256": "17285f1d4b58925258cc245fc29a0e86300162d587d7742ad02a265a4a41073c",
+      "kind": "screen",
+      "log_sha256": "de3b4a75508f113f6fa75cda1e9ace59ce742ed076a9968787039e610b3087b0",
+      "operational_pass": true,
+      "report_sha256": "2679bcdafa26572f863d50a84e5146442c93f8b6c4e8d20eebd6cfdf36001b49",
+      "scheduled": 36000,
+      "slo_pass": true,
+      "status_sha256": "a2ff533f617219fbb009b41c43f50fdee0de376e1ab9187f6b2eb959feff9e10",
+      "successful": 36000,
+      "valid": true
+    },
+    "screen-n32-shared": {
+      "active_tenants": 32,
+      "aggregate_p99": {
+        "Get": {
+          "bucket": 23,
+          "lower_inclusive_ns": 4194304,
+          "upper_exclusive_ns": 8388608
+        },
+        "Query": {
+          "bucket": 23,
+          "lower_inclusive_ns": 4194304,
+          "upper_exclusive_ns": 8388608
+        },
+        "Write": {
+          "bucket": 24,
+          "lower_inclusive_ns": 8388608,
+          "upper_exclusive_ns": 16777216
+        }
+      },
+      "backend": "minimal-native-shared",
+      "case": "screen-n32-shared",
+      "cell_peak_bytes": 83136512,
+      "cgroups": {
+        "cell": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n32-shared",
+        "empty": true,
+        "epoch_count": 4,
+        "limits_valid": true,
+        "root": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2"
+      },
+      "command_sha256": "632e192ea8e5a12d04250ec59b0d106c46d2382bd2aae4fded7cbfaa03a55918",
+      "database": {
+        "file_count": 544,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/screen-n32-shared",
+        "preserved": true,
+        "total_file_bytes": 73789037
+      },
+      "duration_ms": 30000,
+      "host_sample_count": 35,
+      "host_samples_sha256": "cb01cce44a72da5d4509e4df034be150d16fc0e9d3cf612c4163c99def4fe7a3",
+      "kind": "screen",
+      "log_sha256": "4678908060c09234eaa2a030d42bcfcfde3291a137f93c546d5ea0554766695f",
+      "operational_pass": true,
+      "report_sha256": "26f3d8ac8276f5a4d1fa5f1f144567ebd57e92340cc76059761986e7ce083d82",
+      "scheduled": 48000,
+      "slo_pass": false,
+      "status_sha256": "a9fda5300b3d0d7d588e3c77f08ddf766e3a3d2e8e5af101043912a923ea66cd",
+      "successful": 48000,
+      "valid": true
+    }
+  },
+  "cells_remaining_after_global_stop": [],
+  "completed_run_evidence_valid": true,
+  "cross_population_throughput_comparisons_performed": false,
+  "databases": {
+    "all_attempted_databases_preserved": true,
+    "attempted_cell_count": 6,
+    "cases": [
+      {
+        "case": "confirm-n24-r1-blink",
+        "file_count": 240,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/confirm-n24-r1-blink",
+        "preserved": true,
+        "total_file_bytes": 80369622
+      },
+      {
+        "case": "confirm-n24-r2-blink",
+        "file_count": 240,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/confirm-n24-r2-blink",
+        "preserved": true,
+        "total_file_bytes": 80373913
+      },
+      {
+        "case": "confirm-n24-r3-blink",
+        "file_count": 240,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/confirm-n24-r3-blink",
+        "preserved": true,
+        "total_file_bytes": 80378873
+      },
+      {
+        "case": "screen-n16-blink",
+        "file_count": 144,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/screen-n16-blink",
+        "preserved": true,
+        "total_file_bytes": 54247429
+      },
+      {
+        "case": "screen-n24-blink",
+        "file_count": 216,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/screen-n24-blink",
+        "preserved": true,
+        "total_file_bytes": 81325801
+      },
+      {
+        "case": "screen-n32-shared",
+        "file_count": 544,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/screen-n32-shared",
+        "preserved": true,
+        "total_file_bytes": 73789037
+      }
+    ]
+  },
+  "decisions": {
+    "blink": {
+      "accepted_count": 24,
+      "accepted_from": "candidate_confirmed",
+      "backend": "blink",
+      "candidate_count": 24,
+      "fallback_count": null
+    },
+    "minimal-native-shared": {
+      "accepted_count": 28,
+      "accepted_from": "preserved_control_baseline",
+      "backend": "minimal-native-shared",
+      "candidate_count": null,
+      "fallback_count": null,
+      "omission_reason": "no_passing_screen"
+    }
+  },
+  "design_plan_commit": "6f57299f3af21c19444ebb203e40d636abcd0a04",
+  "execution_order": [
+    {
+      "case": "screen-n16-blink",
+      "repetition": null,
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n24-blink",
+      "repetition": null,
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n32-shared",
+      "repetition": null,
+      "stage": "screen"
+    },
+    {
+      "case": "confirm-n24-r1-blink",
+      "repetition": 1,
+      "stage": "candidate_confirmation"
+    },
+    {
+      "case": "confirm-n24-r2-blink",
+      "repetition": 2,
+      "stage": "candidate_confirmation"
+    },
+    {
+      "case": "confirm-n24-r3-blink",
+      "repetition": 3,
+      "stage": "candidate_confirmation"
+    }
+  ],
+  "frontier_sha256": "c47343be81e8f2cd4d1f28bc21058a6e8465649c629cd038141950637bf4c8df",
+  "omissions": [
+    {
+      "case": "screen-n48-shared",
+      "reason": "higher_screen_omitted_after_first_route_slo_miss",
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n64-shared",
+      "reason": "higher_screen_omitted_after_first_route_slo_miss",
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n80-shared",
+      "reason": "higher_screen_omitted_after_first_route_slo_miss",
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n96-shared",
+      "reason": "higher_screen_omitted_after_first_route_slo_miss",
+      "stage": "screen"
+    },
+    {
+      "case": "confirm-no-candidate-shared",
+      "reason": "route_has_no_passing_screen",
+      "stage": "candidate_confirmation"
+    },
+    {
+      "case": "fallback-unavailable-shared",
+      "reason": "no_lower_passing_screen_for_single_fallback",
+      "stage": "fallback_confirmation"
+    }
+  ],
+  "operational_failure_cases": [],
+  "operationally_valid_cell_count": 6,
+  "provenance_sha256": "a9767475425a6dcf156b894a5b6e8d9388616b8f1b0dda1f93c61e97d6c2ef8d",
+  "review_valid": true,
+  "source_commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d",
+  "terminal_receipt": {
+    "all_recorded_processes_exited": true,
+    "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/resident-frontier-cb0e04482-r2/completion.json",
+    "process_count": 60,
+    "sha256": "33f2ceb25e038011c572a40fed963bb765c5f6399c93564a79aa7f2d1700f043"
+  }
+}

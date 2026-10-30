@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/home/opc/tenant-density-harness-20261027/resident-frontier/5cc6ac930/oci_resident_frontier.py", line 712, in <module>
+    raise SystemExit(main())
+  File "/home/opc/tenant-density-harness-20261027/resident-frontier/5cc6ac930/oci_resident_frontier.py", line 703, in main
+    result = run_frontier(arguments.plan_commit, controls)
+  File "/home/opc/tenant-density-harness-20261027/resident-frontier/5cc6ac930/oci_resident_frontier.py", line 429, in run_frontier
+    helper_paths = controls_helper_paths(controls, evidence_directory)
+  File "/home/opc/tenant-density-harness-20261027/resident-frontier/5cc6ac930/oci_resident_frontier.py", line 312, in controls_helper_paths
+    'oci_arrival_controls.py': runtime_helper(runtime_directory / 'oci_arrival_controls.py',
+  File "/home/opc/tenant-density-harness-20261027/resident-frontier/5cc6ac930/oci_resident_frontier.py", line 291, in runtime_helper
+    raise AssertionError(f'required frozen helper is missing: {primary}')
+AssertionError: required frozen helper is missing: /home/opc/tenant-density-harness-20261027/arrival-phase/oci_arrival_controls.py

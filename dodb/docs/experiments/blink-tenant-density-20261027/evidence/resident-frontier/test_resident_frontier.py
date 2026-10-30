@@ -375,7 +375,7 @@ class ResidentFrontierTests(unittest.TestCase):
             REVIEW.validate_report(report, 'screen-n32-blink', 'blink')
 
     def test_actual_r2_command_and_report_match_frozen_recipe(self):
-        runtime_directory = Path('/tmp/resident-frontier-review-debug-20261030')
+        runtime_directory = EVIDENCE_DIRECTORY / 'runtime' / 'arrival-phase' / REVIEW.RUN_NAME
         command = json.loads((runtime_directory / 'screen-n16-blink-command.json').read_text())
         report = json.loads((runtime_directory / 'screen-n16-blink.json').read_text())
         expected = REVIEW.parse_command(command, 'screen-n16-blink')
@@ -383,7 +383,7 @@ class ResidentFrontierTests(unittest.TestCase):
         self.assertEqual(REVIEW.validate_report(report, 'screen-n16-blink', 'blink'), expected)
 
     def test_actual_r2_frontier_decisions_recompute_from_preserved_cell_statuses(self):
-        runtime_directory = Path('/tmp/resident-frontier-review-debug-20261030')
+        runtime_directory = EVIDENCE_DIRECTORY / 'runtime' / 'arrival-phase' / REVIEW.RUN_NAME
         state = json.loads((runtime_directory / 'frontier.json').read_text())
         outcomes = json.loads((runtime_directory / 'summary.json').read_text())
         reviewed_cells = {}

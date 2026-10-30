@@ -1,0 +1,11 @@
+{
+  "all_archive_and_extracted_file_hashes_match": true,
+  "all_cell_recipes_and_reductions_match_oci": true,
+  "all_frontier_decisions_recomputed": true,
+  "archive_matches_receipt": true,
+  "archive_sha256": "d8a7a932af7903e0c922a9c263bca5a9a0d14bfcb5aece93f7d2b2273c3a633c",
+  "final_review_sha256": "938d17f0f0334f8a1b7731dae5e155b59017c73bcae4dd1c79aa5cbcb4b7828e",
+  "oracles": 12,
+  "regular_file_count": 59,
+  "requests": 324000
+}

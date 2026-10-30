@@ -1,0 +1,750 @@
+{
+  "all_cgroups_empty": true,
+  "all_recorded_processes_exited": true,
+  "archive": {
+    "bytes": 14194977,
+    "path": "/home/opc/tenant-density-harness-20261027/resident-frontier/resident-frontier-cb0e04482-r2.tar.gz",
+    "sha256": "d8a7a932af7903e0c922a9c263bca5a9a0d14bfcb5aece93f7d2b2273c3a633c"
+  },
+  "capacity_after": {
+    "/": {
+      "available_bytes": 5224783872
+    },
+    "/bench/zfs/db": {
+      "available_bytes": 27222994944
+    }
+  },
+  "cgroups": [
+    {
+      "memory_high": "max",
+      "memory_max": "max",
+      "memory_swap_max": "max",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r1-blink",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r1-blink/measurement",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r1-blink/oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r1-blink/reopen-oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r1-blink/setup",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r2-blink",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r2-blink/measurement",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r2-blink/oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r2-blink/reopen-oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r2-blink/setup",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r3-blink",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r3-blink/measurement",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r3-blink/oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r3-blink/reopen-oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/confirm-n24-r3-blink/setup",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n16-blink",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n16-blink/measurement",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n16-blink/oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n16-blink/reopen-oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n16-blink/setup",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n24-blink",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n24-blink/measurement",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n24-blink/oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n24-blink/reopen-oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n24-blink/setup",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n32-shared",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n32-shared/measurement",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n32-shared/oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n32-shared/reopen-oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-resident-frontier-cb0e04482-r2/screen-n32-shared/setup",
+      "processes_empty": true
+    }
+  ],
+  "collection_status": "completed",
+  "completed_run_evidence_valid": true,
+  "databases": {
+    "all_attempted_databases_preserved": true,
+    "attempted_cell_count": 6,
+    "cases": [
+      {
+        "case": "confirm-n24-r1-blink",
+        "file_count": 240,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/confirm-n24-r1-blink",
+        "preserved": true,
+        "total_file_bytes": 80369622
+      },
+      {
+        "case": "confirm-n24-r2-blink",
+        "file_count": 240,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/confirm-n24-r2-blink",
+        "preserved": true,
+        "total_file_bytes": 80373913
+      },
+      {
+        "case": "confirm-n24-r3-blink",
+        "file_count": 240,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/confirm-n24-r3-blink",
+        "preserved": true,
+        "total_file_bytes": 80378873
+      },
+      {
+        "case": "screen-n16-blink",
+        "file_count": 144,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/screen-n16-blink",
+        "preserved": true,
+        "total_file_bytes": 54247429
+      },
+      {
+        "case": "screen-n24-blink",
+        "file_count": 216,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/screen-n24-blink",
+        "preserved": true,
+        "total_file_bytes": 81325801
+      },
+      {
+        "case": "screen-n32-shared",
+        "file_count": 544,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/screen-n32-shared",
+        "preserved": true,
+        "total_file_bytes": 73789037
+      }
+    ]
+  },
+  "file_manifest": [
+    {
+      "bytes": 17232672,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/bin/memory_diagnostic_worker",
+      "sha256": "631ff543aacfa9544cf900e0f8bbabbb0680fad0125e5cb97412a63c6d47e291"
+    },
+    {
+      "bytes": 16651064,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/bin/tenant_density_workload",
+      "sha256": "7b1044090563f414f4502e5cf7b99206ddac9001fb3f2f3cf9b3c53d318a8614"
+    },
+    {
+      "bytes": 10048,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/completion.json",
+      "sha256": "33f2ceb25e038011c572a40fed963bb765c5f6399c93564a79aa7f2d1700f043"
+    },
+    {
+      "bytes": 2763,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r1-blink-command.json",
+      "sha256": "8759515c53ac1c373fd572bfc6837cacb0d1f33c54c6feac0ce256fd086ebdc8"
+    },
+    {
+      "bytes": 41715,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r1-blink-host-samples.json",
+      "sha256": "f863adfdccf4f165570e30b105e7b46750606a2a12fc29b848d7486896b3727a"
+    },
+    {
+      "bytes": 113277,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r1-blink-status.json",
+      "sha256": "e216afd409e447f519837ec2354864272db1995a89b7f06e779779d7b752fd8e"
+    },
+    {
+      "bytes": 853941,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r1-blink.json",
+      "sha256": "d018091a283c1c6fbacd1a891d0f4caa9e8572f92cac20b0d73dc83094bc6de8"
+    },
+    {
+      "bytes": 13379,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r1-blink.log",
+      "sha256": "ac7079a045570fd8380b6d4628a56e7bae1a6d65010f45f8cbace1463aba1845"
+    },
+    {
+      "bytes": 2762,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r2-blink-command.json",
+      "sha256": "1ee58297d88042829588dc1a94f87b82b58f7522cf81ac0e74f5dee4b32cbd9f"
+    },
+    {
+      "bytes": 41676,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r2-blink-host-samples.json",
+      "sha256": "f55679c432a3090d52a0feeb3db4ce6ad015df4b5e85d61cba21aad765c2ed18"
+    },
+    {
+      "bytes": 113268,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r2-blink-status.json",
+      "sha256": "c6cd1d0a57e4e55668758209a6788311abda8334a21c0109e0adf9c6131ab439"
+    },
+    {
+      "bytes": 845766,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r2-blink.json",
+      "sha256": "c39977d7db259de7e512dc35a8f08c94724d3d679821ce92af6ced29adaf7552"
+    },
+    {
+      "bytes": 13379,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r2-blink.log",
+      "sha256": "72eafb117f2e8c804fa363b6625f325cc4980d08f09801fd1e647ee831df1f02"
+    },
+    {
+      "bytes": 2763,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r3-blink-command.json",
+      "sha256": "138dcd38cccae0764d8a1a5cd38e482a82471ecca41feac3df17d35cd5e1965f"
+    },
+    {
+      "bytes": 41702,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r3-blink-host-samples.json",
+      "sha256": "7f206263db904df93caec4275cd67cab01f3f9cd8ae105533947731ab68aa4ac"
+    },
+    {
+      "bytes": 113265,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r3-blink-status.json",
+      "sha256": "5b1ccba8e890e5d281dec6aa1f76e699e8ee77e86ea98c64c7233cb4eda8bcd3"
+    },
+    {
+      "bytes": 856018,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r3-blink.json",
+      "sha256": "891869aedfe634f4552178700075a394f5077c8a1fe16dec7af79aa3c27cdd52"
+    },
+    {
+      "bytes": 13379,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/confirm-n24-r3-blink.log",
+      "sha256": "48d9295a48f22613143050d03b4657d403dd2d468314f46b67b1c1c991643fd7"
+    },
+    {
+      "bytes": 5463,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/final-review.json",
+      "sha256": "fa2c8fece1c1c02e5776c758a2c1e233f15caed7fc8b7c0a05ffc31c070921fe"
+    },
+    {
+      "bytes": 4950,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/frontier.json",
+      "sha256": "c47343be81e8f2cd4d1f28bc21058a6e8465649c629cd038141950637bf4c8df"
+    },
+    {
+      "bytes": 20250,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/provenance.json",
+      "sha256": "a9767475425a6dcf156b894a5b6e8d9388616b8f1b0dda1f93c61e97d6c2ef8d"
+    },
+    {
+      "bytes": 15348,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/review-r2.json",
+      "sha256": "938d17f0f0334f8a1b7731dae5e155b59017c73bcae4dd1c79aa5cbcb4b7828e"
+    },
+    {
+      "bytes": 2737,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n16-blink-command.json",
+      "sha256": "deda187754f6efcc2e7176a956d05ae056ae581deb5cb81435e796c6179363bc"
+    },
+    {
+      "bytes": 23167,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n16-blink-host-samples.json",
+      "sha256": "8cdbe72ab57e891dbf8b67bbd807cf8a9b6177c5c01a20f9e2ccb7d111590161"
+    },
+    {
+      "bytes": 62267,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n16-blink-status.json",
+      "sha256": "1da4bbd8645f8aa48768d27603a07f86c9fcb8234bc94b5e8cae242efd91810a"
+    },
+    {
+      "bytes": 583532,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n16-blink.json",
+      "sha256": "854e0dd94ef7d7d149bd9db18523d6eac5f09c9799fbcbc227503cf88fee7210"
+    },
+    {
+      "bytes": 13379,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n16-blink.log",
+      "sha256": "7ce3756198bc986c715fca5436198a20ac0c12607ff6c4eeeb4a7b612594bb73"
+    },
+    {
+      "bytes": 2737,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n24-blink-command.json",
+      "sha256": "17b15100efbd7cc298b3d14f905b158f1e34a07f1b7dd4436d52aaaa06d1df64"
+    },
+    {
+      "bytes": 28718,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n24-blink-host-samples.json",
+      "sha256": "17285f1d4b58925258cc245fc29a0e86300162d587d7742ad02a265a4a41073c"
+    },
+    {
+      "bytes": 79791,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n24-blink-status.json",
+      "sha256": "a2ff533f617219fbb009b41c43f50fdee0de376e1ab9187f6b2eb959feff9e10"
+    },
+    {
+      "bytes": 709567,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n24-blink.json",
+      "sha256": "2679bcdafa26572f863d50a84e5146442c93f8b6c4e8d20eebd6cfdf36001b49"
+    },
+    {
+      "bytes": 13379,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n24-blink.log",
+      "sha256": "de3b4a75508f113f6fa75cda1e9ace59ce742ed076a9968787039e610b3087b0"
+    },
+    {
+      "bytes": 2824,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n32-shared-command.json",
+      "sha256": "632e192ea8e5a12d04250ec59b0d106c46d2382bd2aae4fded7cbfaa03a55918"
+    },
+    {
+      "bytes": 32441,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n32-shared-host-samples.json",
+      "sha256": "cb01cce44a72da5d4509e4df034be150d16fc0e9d3cf612c4163c99def4fe7a3"
+    },
+    {
+      "bytes": 175869,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n32-shared-status.json",
+      "sha256": "a9fda5300b3d0d7d588e3c77f08ddf766e3a3d2e8e5af101043912a923ea66cd"
+    },
+    {
+      "bytes": 2493659,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n32-shared.json",
+      "sha256": "26f3d8ac8276f5a4d1fa5f1f144567ebd57e92340cc76059761986e7ce083d82"
+    },
+    {
+      "bytes": 13379,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/screen-n32-shared.log",
+      "sha256": "4678908060c09234eaa2a030d42bcfcfde3291a137f93c546d5ea0554766695f"
+    },
+    {
+      "bytes": 703650,
+      "path": "arrival-phase/resident-frontier-cb0e04482-r2/summary.json",
+      "sha256": "42c9f922d415e32b0ca5afc743a8005de35584328f5eb651db86b827c7466c9b"
+    },
+    {
+      "bytes": 15136,
+      "path": "arrival_review.py",
+      "sha256": "1f6f7a1c4a86787c46be08c7af24c0d9f9d3cf27f18ee44a031764e76dd2696b"
+    },
+    {
+      "bytes": 12810,
+      "path": "capacity_review.py",
+      "sha256": "d03cd663fa4dd4a1b2f87d716937ba8566d7c205032286853d876f416333ad57"
+    },
+    {
+      "bytes": 33308,
+      "path": "oci_arrival_controls.py",
+      "sha256": "97b26bb9d18a6b772e4044c3ccd5f985f655d2e42d1273d13260357b255867a0"
+    },
+    {
+      "bytes": 19667,
+      "path": "oci_arrival_validate.py",
+      "sha256": "07e2cbad6bde30a52efe8a0b7ca00811b32320b10dc8572365a3fe582009e2bb"
+    },
+    {
+      "bytes": 16150,
+      "path": "oci_capacity.py",
+      "sha256": "e97065f5d5aeb89d9a59cb67d28b9b1f94ca2a652ef80e096fed26bd3957b238"
+    },
+    {
+      "bytes": 157,
+      "path": "resident-frontier/2c6c79ecc/frozen-reviewer.json",
+      "sha256": "57b0eef37ffb419e687d5feebae606fafb662220e6ce1cdadc033cc09b3a0a2e"
+    },
+    {
+      "bytes": 32674,
+      "path": "resident-frontier/2c6c79ecc/resident_frontier_review.py",
+      "sha256": "6bd65facde7695c8e1357f32eae1a0252ac352449fa4c298a1e042b6439a0ee5"
+    },
+    {
+      "bytes": 656,
+      "path": "resident-frontier/2c6c79ecc/review-receipt.json",
+      "sha256": "d337a50341e19a7f5f7967f41c5e226f8e7e29d1dc60f321c6e76c377a73b482"
+    },
+    {
+      "bytes": 84,
+      "path": "resident-frontier/2c6c79ecc/review.log",
+      "sha256": "42cf9ce49337127f3452d7a0ccdbec101191cd1e81fccb57c5ac1fddf77283f2"
+    },
+    {
+      "bytes": 1721955,
+      "path": "resident-frontier/5cc6ac930/final-review.json",
+      "sha256": "b90ba441a9f66bf65809050db69cc802faa7516a3defc75978592de6dd2b9193"
+    },
+    {
+      "bytes": 383,
+      "path": "resident-frontier/5cc6ac930/frozen-controller.json",
+      "sha256": "69df3982769c1cc195dc1b95fc0e6ceab6e33c4ca50392ec81aaa3dd2b67e248"
+    },
+    {
+      "bytes": 1017,
+      "path": "resident-frontier/5cc6ac930/launcher.json",
+      "sha256": "b15f6b0149ef92d3daa972a532110d02a6df1f2a29bc4cf0719c4c31857bc820"
+    },
+    {
+      "bytes": 1146,
+      "path": "resident-frontier/5cc6ac930/launcher.log",
+      "sha256": "5faff11ac2a880fdfcc37c0d4e11a8f315803fd91cd1050ec583f22af72d3bbc"
+    },
+    {
+      "bytes": 38802,
+      "path": "resident-frontier/5cc6ac930/oci_resident_frontier.py",
+      "sha256": "6a883facb356243f5c173c1d616b9843a9d85323dd1978ab93ae7392a9cc410c"
+    },
+    {
+      "bytes": 32522,
+      "path": "resident-frontier/5cc6ac930/resident_frontier_review.py",
+      "sha256": "62a3e732c09ba3dcd342b804f31c975bfc6b4b18555c4c73a38f5d07cf3a769d"
+    },
+    {
+      "bytes": 1721955,
+      "path": "resident-frontier/714320187/final-review.json",
+      "sha256": "b90ba441a9f66bf65809050db69cc802faa7516a3defc75978592de6dd2b9193"
+    },
+    {
+      "bytes": 383,
+      "path": "resident-frontier/714320187/frozen-controller.json",
+      "sha256": "ce9af042c4626e5468867e5952018e2e1a9042eba9115d768fec7cd95c726da3"
+    },
+    {
+      "bytes": 1015,
+      "path": "resident-frontier/714320187/launcher.json",
+      "sha256": "7b0f0ade140cfb4e508a3c236aaa783faaeadbabb1641639f468c7d8f6ad2da9"
+    },
+    {
+      "bytes": 408,
+      "path": "resident-frontier/714320187/launcher.log",
+      "sha256": "d25d40c7a70e010762828d782af8fb88ed2a18c6f8ec0b3b2d16034e6f7be826"
+    },
+    {
+      "bytes": 38784,
+      "path": "resident-frontier/714320187/oci_resident_frontier.py",
+      "sha256": "fbb07d16dc5614db8a596f199940144ea0b2ba19f2e0cfbf70c34b702481e8aa"
+    },
+    {
+      "bytes": 32522,
+      "path": "resident-frontier/714320187/resident_frontier_review.py",
+      "sha256": "8786a4ae819f1e009f907c376a270323dd22d64f56bff384c6f697c91cd02bc5"
+    }
+  ],
+  "manifest_unchanged_after_archive": true,
+  "memory_after": {
+    "MemAvailable": 4974395392,
+    "MemTotal": 11427577856,
+    "SwapFree": 3895529472,
+    "SwapTotal": 4294963200
+  },
+  "namespace": "resident-frontier-cb0e04482-r2",
+  "processes": [
+    {
+      "pid": 2493567,
+      "same_live_process": false,
+      "start_time_ticks": 260794652
+    },
+    {
+      "pid": 2493572,
+      "same_live_process": false,
+      "start_time_ticks": 260794667
+    },
+    {
+      "pid": 2493591,
+      "same_live_process": false,
+      "start_time_ticks": 260795430
+    },
+    {
+      "pid": 2493727,
+      "same_live_process": false,
+      "start_time_ticks": 260798480
+    },
+    {
+      "pid": 2493765,
+      "same_live_process": false,
+      "start_time_ticks": 260799080
+    },
+    {
+      "pid": 2493770,
+      "same_live_process": false,
+      "start_time_ticks": 260799691
+    },
+    {
+      "pid": 2493775,
+      "same_live_process": false,
+      "start_time_ticks": 260799704
+    },
+    {
+      "pid": 2493790,
+      "same_live_process": false,
+      "start_time_ticks": 260800803
+    },
+    {
+      "pid": 2493815,
+      "same_live_process": false,
+      "start_time_ticks": 260803863
+    },
+    {
+      "pid": 2493858,
+      "same_live_process": false,
+      "start_time_ticks": 260804846
+    },
+    {
+      "pid": 2493863,
+      "same_live_process": false,
+      "start_time_ticks": 260805944
+    },
+    {
+      "pid": 2493868,
+      "same_live_process": false,
+      "start_time_ticks": 260805956
+    },
+    {
+      "pid": 2494367,
+      "same_live_process": false,
+      "start_time_ticks": 260806719
+    },
+    {
+      "pid": 2494879,
+      "same_live_process": false,
+      "start_time_ticks": 260809817
+    },
+    {
+      "pid": 2495373,
+      "same_live_process": false,
+      "start_time_ticks": 260811376
+    },
+    {
+      "pid": 2495904,
+      "same_live_process": false,
+      "start_time_ticks": 260813017
+    },
+    {
+      "pid": 2495909,
+      "same_live_process": false,
+      "start_time_ticks": 260813030
+    },
+    {
+      "pid": 2495927,
+      "same_live_process": false,
+      "start_time_ticks": 260814152
+    },
+    {
+      "pid": 2496010,
+      "same_live_process": false,
+      "start_time_ticks": 260820216
+    },
+    {
+      "pid": 2496018,
+      "same_live_process": false,
+      "start_time_ticks": 260821112
+    },
+    {
+      "pid": 2496024,
+      "same_live_process": false,
+      "start_time_ticks": 260822101
+    },
+    {
+      "pid": 2496029,
+      "same_live_process": false,
+      "start_time_ticks": 260822113
+    },
+    {
+      "pid": 2496047,
+      "same_live_process": false,
+      "start_time_ticks": 260823234
+    },
+    {
+      "pid": 2496131,
+      "same_live_process": false,
+      "start_time_ticks": 260829296
+    },
+    {
+      "pid": 2496137,
+      "same_live_process": false,
+      "start_time_ticks": 260830164
+    },
+    {
+      "pid": 2496144,
+      "same_live_process": false,
+      "start_time_ticks": 260831186
+    },
+    {
+      "pid": 2496149,
+      "same_live_process": false,
+      "start_time_ticks": 260831199
+    },
+    {
+      "pid": 2496167,
+      "same_live_process": false,
+      "start_time_ticks": 260832295
+    },
+    {
+      "pid": 2496258,
+      "same_live_process": false,
+      "start_time_ticks": 260838353
+    },
+    {
+      "pid": 2496267,
+      "same_live_process": false,
+      "start_time_ticks": 260839325
+    }
+  ],
+  "review_path": "/home/opc/tenant-density-harness-20261027/arrival-phase/resident-frontier-cb0e04482-r2/review-r2.json",
+  "review_sha256": "938d17f0f0334f8a1b7731dae5e155b59017c73bcae4dd1c79aa5cbcb4b7828e",
+  "review_valid": true,
+  "source_clean": true,
+  "source_commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d",
+  "timestamp_unix_seconds": 1793346875.406028,
+  "unique_workload_process_count": 30
+}

@@ -1,0 +1,171 @@
+{
+  "accepted_run": false,
+  "actual_cell_count": 6,
+  "cells": {},
+  "cells_remaining_after_global_stop": [],
+  "completed_run_evidence_valid": false,
+  "cross_population_throughput_comparisons_performed": false,
+  "databases": {
+    "all_attempted_databases_preserved": true,
+    "attempted_cell_count": 6,
+    "cases": [
+      {
+        "case": "confirm-n24-r1-blink",
+        "file_count": 240,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/confirm-n24-r1-blink",
+        "preserved": true,
+        "total_file_bytes": 80369622
+      },
+      {
+        "case": "confirm-n24-r2-blink",
+        "file_count": 240,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/confirm-n24-r2-blink",
+        "preserved": true,
+        "total_file_bytes": 80373913
+      },
+      {
+        "case": "confirm-n24-r3-blink",
+        "file_count": 240,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/confirm-n24-r3-blink",
+        "preserved": true,
+        "total_file_bytes": 80378873
+      },
+      {
+        "case": "screen-n16-blink",
+        "file_count": 144,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/screen-n16-blink",
+        "preserved": true,
+        "total_file_bytes": 54247429
+      },
+      {
+        "case": "screen-n24-blink",
+        "file_count": 216,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/screen-n24-blink",
+        "preserved": true,
+        "total_file_bytes": 81325801
+      },
+      {
+        "case": "screen-n32-shared",
+        "file_count": 544,
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/resident-frontier-cb0e04482-r2/screen-n32-shared",
+        "preserved": true,
+        "total_file_bytes": 73789037
+      }
+    ]
+  },
+  "decisions": {},
+  "design_plan_commit": "6f57299f3af21c19444ebb203e40d636abcd0a04",
+  "execution_order": [
+    {
+      "case": "screen-n16-blink",
+      "repetition": null,
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n24-blink",
+      "repetition": null,
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n32-shared",
+      "repetition": null,
+      "stage": "screen"
+    },
+    {
+      "case": "confirm-n24-r1-blink",
+      "repetition": 1,
+      "stage": "candidate_confirmation"
+    },
+    {
+      "case": "confirm-n24-r2-blink",
+      "repetition": 2,
+      "stage": "candidate_confirmation"
+    },
+    {
+      "case": "confirm-n24-r3-blink",
+      "repetition": 3,
+      "stage": "candidate_confirmation"
+    }
+  ],
+  "frontier_sha256": "c47343be81e8f2cd4d1f28bc21058a6e8465649c629cd038141950637bf4c8df",
+  "omissions": [
+    {
+      "case": "screen-n48-shared",
+      "reason": "higher_screen_omitted_after_first_route_slo_miss",
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n64-shared",
+      "reason": "higher_screen_omitted_after_first_route_slo_miss",
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n80-shared",
+      "reason": "higher_screen_omitted_after_first_route_slo_miss",
+      "stage": "screen"
+    },
+    {
+      "case": "screen-n96-shared",
+      "reason": "higher_screen_omitted_after_first_route_slo_miss",
+      "stage": "screen"
+    },
+    {
+      "case": "confirm-no-candidate-shared",
+      "reason": "route_has_no_passing_screen",
+      "stage": "candidate_confirmation"
+    },
+    {
+      "case": "fallback-unavailable-shared",
+      "reason": "no_lower_passing_screen_for_single_fallback",
+      "stage": "fallback_confirmation"
+    }
+  ],
+  "operational_failure_cases": [
+    {
+      "available_unvalidated_counters": null,
+      "case": "confirm-n24-r1-blink",
+      "error": "cell command differs from the frozen recipe: confirm-n24-r1-blink",
+      "error_type": "AssertionError"
+    },
+    {
+      "available_unvalidated_counters": null,
+      "case": "confirm-n24-r2-blink",
+      "error": "cell command differs from the frozen recipe: confirm-n24-r2-blink",
+      "error_type": "AssertionError"
+    },
+    {
+      "available_unvalidated_counters": null,
+      "case": "confirm-n24-r3-blink",
+      "error": "cell command differs from the frozen recipe: confirm-n24-r3-blink",
+      "error_type": "AssertionError"
+    },
+    {
+      "available_unvalidated_counters": null,
+      "case": "screen-n16-blink",
+      "error": "cell command differs from the frozen recipe: screen-n16-blink",
+      "error_type": "AssertionError"
+    },
+    {
+      "available_unvalidated_counters": null,
+      "case": "screen-n24-blink",
+      "error": "cell command differs from the frozen recipe: screen-n24-blink",
+      "error_type": "AssertionError"
+    },
+    {
+      "available_unvalidated_counters": null,
+      "case": "screen-n32-shared",
+      "error": "cell command differs from the frozen recipe: screen-n32-shared",
+      "error_type": "AssertionError"
+    }
+  ],
+  "operationally_valid_cell_count": 0,
+  "provenance_sha256": "a9767475425a6dcf156b894a5b6e8d9388616b8f1b0dda1f93c61e97d6c2ef8d",
+  "review_valid": false,
+  "source_commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d",
+  "terminal_receipt": {
+    "all_recorded_processes_exited": true,
+    "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/resident-frontier-cb0e04482-r2/completion.json",
+    "process_count": 60,
+    "sha256": "33f2ceb25e038011c572a40fed963bb765c5f6399c93564a79aa7f2d1700f043"
+  }
+}

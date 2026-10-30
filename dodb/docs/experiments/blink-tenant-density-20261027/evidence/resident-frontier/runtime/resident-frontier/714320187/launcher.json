@@ -1,0 +1,22 @@
+{
+  "controller_commit": "714320187d78aaf47d94a7579b77b3320e3b842f",
+  "files": {
+    "oci_resident_frontier.py": "fbb07d16dc5614db8a596f199940144ea0b2ba19f2e0cfbf70c34b702481e8aa",
+    "resident_frontier_review.py": "8786a4ae819f1e009f907c376a270323dd22d64f56bff384c6f697c91cd02bc5",
+    "final-review.json": "b90ba441a9f66bf65809050db69cc802faa7516a3defc75978592de6dd2b9193"
+  },
+  "command": [
+    "/bin/python3",
+    "/home/opc/tenant-density-harness-20261027/resident-frontier/714320187/oci_resident_frontier.py",
+    "--plan-commit",
+    "6f57299f3af21c19444ebb203e40d636abcd0a04",
+    "--controls-review",
+    "/home/opc/tenant-density-harness-20261027/resident-frontier/714320187/final-review.json",
+    "--controls-review-sha256",
+    "b90ba441a9f66bf65809050db69cc802faa7516a3defc75978592de6dd2b9193"
+  ],
+  "pid": 2493542,
+  "start_time_ticks": 260794484,
+  "launch_time_unix_seconds": 1793346273.42026,
+  "controller_directory": "/home/opc/tenant-density-harness-20261027/resident-frontier/714320187"
+}
