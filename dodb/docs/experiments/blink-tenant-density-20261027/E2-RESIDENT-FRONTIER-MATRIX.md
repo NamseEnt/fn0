@@ -1,0 +1,17 @@
+# Frozen resident-frontier execution
+
+Tracking issue: https://github.com/NamseEnt/fn0/issues/126
+
+Execute [E2-RESIDENT-FRONTIER-PLAN.md](E2-RESIDENT-FRONTIER-PLAN.md) using the reviewed controller and reviewer committed alongside this matrix. Runtime source stays `cb0e0448270c1da3d9a214fb008ec01406d8e40d`; reuse the validated default binaries without rebuilding. Namespace is `resident-frontier-cb0e04482-r1`.
+
+The completed arrival controls pass the operational entry gate. Their canonical review SHA256 is `b90ba441a9f66bf65809050db69cc802faa7516a3defc75978592de6dd2b9193`. Shared RocksDB retains its three-of-three staggered N28 baseline and screens 32/48/64/80/96. B-link lacks that baseline and screens 16/24. Execute count groups in ascending order, applying the plan's alternating backend order and route-specific first-SLO-miss omissions. Candidates and at most one fallback each require three fresh sixty-second passes. Any operational failure stops the entire new cohort; preserve it without retrying.
+
+All twelve controller/reviewer checks passed, including the actual collected-controls schema, baseline split, frozen helper hashes, preserved binary copying, actual arrival-controller adapter execution with a fake child, SLO stop/omission rules, and global operational stop. No runtime or engine implementation changed. The prior 85 native checks and compatibility builds are reused by exact source/native/binary provenance.
+
+Before execution, the designated OCI host reported 27,707,191,296 benchmark bytes available and 5,016,354,816 bytes MemAvailable, above the 12 GiB / 1.5 GiB entry requirements. No existing workload or arrival/frontier controller matched the process check. The controller repeats its own capacity, source/native hash, helper hash, binary, descriptor, and group checks before creating work; runtime guards remain 10 GiB / 1.5 GiB. Driver and uncharged ARC remain outside the backend cgroup.
+
+Preserve the uploaded controller/reviewer and canonical review in an immutable directory named with this controller commit. Record its full commit, file hashes, launcher PID/start-time, logs, and terminal receipt. Run the reviewer on OCI while original database paths and cgroups remain available, then archive the complete namespace with a file manifest and collect it locally. The controller does not collect its own namespace; collection is an external operator procedure. Do not rerun cells for reporting.
+
+Exact flags are `--plan-commit 6f57299f3af21c19444ebb203e40d636abcd0a04 --controls-review <preserved-final-review.json> --controls-review-sha256 b90ba441a9f66bf65809050db69cc802faa7516a3defc75978592de6dd2b9193`. Invoke the controller as root on `opc@217.142.246.204`, with the designated SSH identity and normal host-key checking. After a terminal receipt, invoke `resident_frontier_review.py --run-directory /home/opc/tenant-density-harness-20261027/arrival-phase/resident-frontier-cb0e04482-r1 --capacity-reviewer /home/opc/tenant-density-harness-20261027/capacity_review.py`.
+
+This is a bounded small-store staggered service experiment, not an engine maximum or a general adoption decision. Issue #126 remains open.
