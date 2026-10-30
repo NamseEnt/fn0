@@ -1,0 +1,3445 @@
+{
+  "collection_status": "completed",
+  "attempt_name": "arrival-control-collection-cb0e04482-r1",
+  "controls_terminal_status": "completed",
+  "controls_success_preserved": true,
+  "controls_terminal_path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/completion.json",
+  "controls_terminal_sha256": "2f8636fe3be6c746d2b0dc8831bae40f21365e1c8860afa66bbb2004c836d79b",
+  "controls_validity": {
+    "completion_receipt_present": true,
+    "failure_receipt_present": false,
+    "initialization_failure_receipt_present": false,
+    "source_commit_matches": true,
+    "frozen_plan_commit_matches": true,
+    "actual_controller_commit_recorded": "95c3b8c5323415dfc493bdfcb32c7dc5e057e8b8",
+    "sixteen_cells_required_only_for_completion": true,
+    "all_sixteen_cells_operationally_valid": true,
+    "all_sixteen_cells_slo_pass": false,
+    "slo_miss_cases": [
+      "control-n28-r1-synchronized-shared",
+      "control-n28-r3-staggered-blink",
+      "control-n28-r3-synchronized-shared"
+    ],
+    "status_cases_match_terminal_outcomes": true,
+    "grouping_root_memory_max_is_unbounded": true,
+    "cell_epoch_budgets_match": true,
+    "all_cgroup_process_lists_empty": true,
+    "validation_source_native_and_binaries_valid": true,
+    "validation_summary_hash_matches_receipt": true,
+    "control_binaries_match_validation": true,
+    "all_attempted_cell_databases_preserved": true,
+    "all_completed_cell_databases_preserved": true,
+    "helper_hashes_match_run_provenance": true,
+    "completed_run_evidence_valid": true,
+    "accepted_run": false
+  },
+  "source": {
+    "path": "/home/opc/tenant-density-harness-20261027/source",
+    "commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d",
+    "clean": true,
+    "expected_commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d",
+    "valid": true
+  },
+  "native": {
+    "commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+    "expected_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+    "archive_path": "/bench/zfs/db/product-build/rocksdb-source/librocksdb.a",
+    "archive_bytes": 1199825562,
+    "archive_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+    "expected_archive_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+    "archive_sha256_after": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+    "archive_bytes_after": 1199825562,
+    "unchanged_during_collection": true,
+    "valid": true
+  },
+  "validation": {
+    "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-cb0e04482-r1",
+    "summary_path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-cb0e04482-r1/arrival-validation-summary.json",
+    "summary_sha256": "a0d429e748857507408547ffb44964789d3facdc6f09d67d83ec6ce517c56a6f",
+    "valid": true,
+    "passing_tests": 85,
+    "checks": [
+      {
+        "name": "tests",
+        "exit_code": 0,
+        "command": [
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "-p",
+          "dodb-rocksdb",
+          "--lib",
+          "--bin",
+          "tenant_density_workload",
+          "--bin",
+          "memory_diagnostic_worker",
+          "--test",
+          "read_contract",
+          "--test",
+          "transaction_contract",
+          "--",
+          "--test-threads=1"
+        ],
+        "invocation": [
+          "/home/opc/.cargo/bin/rustup",
+          "run",
+          "1.97.1",
+          "cargo",
+          "test",
+          "--locked",
+          "--offline",
+          "--release",
+          "-p",
+          "dodb-rocksdb",
+          "--lib",
+          "--bin",
+          "tenant_density_workload",
+          "--bin",
+          "memory_diagnostic_worker",
+          "--test",
+          "read_contract",
+          "--test",
+          "transaction_contract",
+          "--",
+          "--test-threads=1"
+        ],
+        "build_directory": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-tests",
+        "provenance_path": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-tests/provenance.json",
+        "cargo_log_path": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-tests/cargo.log",
+        "status_path": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-tests/status.json",
+        "provenance_sha256": "53f37e71866704b596bb6684bb370021af8e7771fb49d84111cea10ed2e6f2f5",
+        "cargo_log_sha256": "bb8dff78ed66704797bd671ff7367e6029057fc59e090d762006806a19503e2c",
+        "reused_completed_check": false,
+        "test_group_counts": [
+          42,
+          9,
+          25,
+          5,
+          4
+        ],
+        "passing_tests": 85,
+        "expected_test_group_counts": [
+          42,
+          9,
+          25,
+          5,
+          4
+        ],
+        "expected_test_count_matches": true,
+        "build_started_unix_seconds": 1793327959.6340742
+      },
+      {
+        "name": "clippy",
+        "exit_code": 0,
+        "command": [
+          "clippy",
+          "--locked",
+          "--offline",
+          "--release",
+          "-p",
+          "dodb-rocksdb",
+          "--lib",
+          "--bin",
+          "tenant_density_workload",
+          "--bin",
+          "memory_diagnostic_worker",
+          "--test",
+          "read_contract",
+          "--test",
+          "transaction_contract",
+          "--no-deps"
+        ],
+        "invocation": [
+          "/home/opc/.cargo/bin/rustup",
+          "run",
+          "1.97.1",
+          "cargo",
+          "clippy",
+          "--locked",
+          "--offline",
+          "--release",
+          "-p",
+          "dodb-rocksdb",
+          "--lib",
+          "--bin",
+          "tenant_density_workload",
+          "--bin",
+          "memory_diagnostic_worker",
+          "--test",
+          "read_contract",
+          "--test",
+          "transaction_contract",
+          "--no-deps"
+        ],
+        "build_directory": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-clippy",
+        "provenance_path": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-clippy/provenance.json",
+        "cargo_log_path": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-clippy/cargo.log",
+        "status_path": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-clippy/status.json",
+        "provenance_sha256": "a17b1995e47f91bae8377d2a5abf2927d026e10784c0c5cc0bbe8a12313e72b9",
+        "cargo_log_sha256": "35948e05db0711fba4468589a0a269e3020a201ceb84ef3ed686902aefb69d71",
+        "reused_completed_check": false,
+        "clippy_diagnostics": [
+          {
+            "message": "matching on `Some` with `ok()` is redundant",
+            "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+          },
+          {
+            "message": "matching on `Some` with `ok()` is redundant",
+            "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+          },
+          {
+            "message": "this `if` statement can be collapsed",
+            "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+          },
+          {
+            "message": "this `if` statement can be collapsed",
+            "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+          },
+          {
+            "message": "this `if` statement can be collapsed",
+            "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+          },
+          {
+            "message": "this `if` statement can be collapsed",
+            "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+          },
+          {
+            "message": "this `if` statement can be collapsed",
+            "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+          },
+          {
+            "message": "this function has too many arguments (8/7)",
+            "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+          },
+          {
+            "message": "very complex type used. Consider factoring parts into `type` definitions",
+            "path": "dodb/crates/dodb-rocksdb/src/lib.rs"
+          },
+          {
+            "message": "this `if` statement can be collapsed",
+            "path": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs"
+          },
+          {
+            "message": "this function has too many arguments (8/7)",
+            "path": "dodb/crates/dodb-rocksdb/src/memory_diagnostic.rs"
+          },
+          {
+            "message": "very complex type used. Consider factoring parts into `type` definitions",
+            "path": "dodb/crates/dodb-rocksdb/src/minimal_native.rs"
+          },
+          {
+            "message": "very complex type used. Consider factoring parts into `type` definitions",
+            "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+          },
+          {
+            "message": "very complex type used. Consider factoring parts into `type` definitions",
+            "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+          },
+          {
+            "message": "very complex type used. Consider factoring parts into `type` definitions",
+            "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+          },
+          {
+            "message": "very complex type used. Consider factoring parts into `type` definitions",
+            "path": "dodb/crates/dodb-rocksdb/src/raw_research.rs"
+          },
+          {
+            "message": "this expression creates a reference which is immediately dereferenced by the compiler",
+            "path": "dodb/crates/dodb-rocksdb/tests/common/transaction_contract.rs"
+          }
+        ],
+        "same_17_existing_clippy_diagnostics": true,
+        "build_started_unix_seconds": 1793328098.1329186
+      },
+      {
+        "name": "a1-link",
+        "exit_code": 0,
+        "command": [
+          "build",
+          "--locked",
+          "--offline",
+          "--release",
+          "-p",
+          "dodb-rocksdb",
+          "--bin",
+          "tenant_density_workload",
+          "--bin",
+          "memory_diagnostic_worker",
+          "--features",
+          "dodb-storage/blink-writer-pin-reuse"
+        ],
+        "invocation": [
+          "/home/opc/.cargo/bin/rustup",
+          "run",
+          "1.97.1",
+          "cargo",
+          "build",
+          "--locked",
+          "--offline",
+          "--release",
+          "-p",
+          "dodb-rocksdb",
+          "--bin",
+          "tenant_density_workload",
+          "--bin",
+          "memory_diagnostic_worker",
+          "--features",
+          "dodb-storage/blink-writer-pin-reuse"
+        ],
+        "build_directory": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-a1-link",
+        "provenance_path": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-a1-link/provenance.json",
+        "cargo_log_path": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-a1-link/cargo.log",
+        "status_path": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-a1-link/status.json",
+        "provenance_sha256": "3f187186acae5dd9d19c6d05fa6f76159df3682bd573f9d525eab2cae2c58e95",
+        "cargo_log_sha256": "2cca809ef49d956dd9f875fd4463be9f8a2542a7a61807ae9ca80270d13f16fa",
+        "reused_completed_check": false,
+        "build_started_unix_seconds": 1793328114.0623364
+      },
+      {
+        "name": "default-link",
+        "exit_code": 0,
+        "command": [
+          "build",
+          "--locked",
+          "--offline",
+          "--release",
+          "-p",
+          "dodb-rocksdb",
+          "--bin",
+          "tenant_density_workload",
+          "--bin",
+          "memory_diagnostic_worker"
+        ],
+        "invocation": [
+          "/home/opc/.cargo/bin/rustup",
+          "run",
+          "1.97.1",
+          "cargo",
+          "build",
+          "--locked",
+          "--offline",
+          "--release",
+          "-p",
+          "dodb-rocksdb",
+          "--bin",
+          "tenant_density_workload",
+          "--bin",
+          "memory_diagnostic_worker"
+        ],
+        "build_directory": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-default-link",
+        "provenance_path": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-default-link/provenance.json",
+        "cargo_log_path": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-default-link/cargo.log",
+        "status_path": "/home/opc/tenant-density-harness-20261027/builds/arrival-cb0e04482-r1-default-link/status.json",
+        "provenance_sha256": "403deb2529bf38a4ff7d2a83695ff9c96b444330c464b04354fa78af16a9e2ac",
+        "cargo_log_sha256": "15d373be47ad080a0d3a21fed8d931dcf5e169236e6807c52be17a2447133595",
+        "reused_completed_check": false,
+        "build_started_unix_seconds": 1793328160.6613624
+      }
+    ],
+    "default_binaries": {
+      "tenant_density_workload": {
+        "sha256": "7b1044090563f414f4502e5cf7b99206ddac9001fb3f2f3cf9b3c53d318a8614",
+        "bytes": 16651064
+      },
+      "memory_diagnostic_worker": {
+        "sha256": "631ff543aacfa9544cf900e0f8bbabbb0680fad0125e5cb97412a63c6d47e291",
+        "bytes": 17232672
+      }
+    }
+  },
+  "controls": {
+    "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1",
+    "provenance_path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/provenance.json",
+    "provenance_present": true,
+    "provenance_sha256": "be7b4cf751b665f4fee1c9edaa50e4b4d509c4021b39ffede9f163be09b0b2ff",
+    "plan_commit": "e02a1fbdde81fd6fc363a26e5341c8c61000023e",
+    "frozen_plan_commit": "e02a1fbdde81fd6fc363a26e5341c8c61000023e",
+    "actual_controller_commit": "95c3b8c5323415dfc493bdfcb32c7dc5e057e8b8",
+    "source_validation": {
+      "source_commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d",
+      "source_status": "",
+      "native_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+      "native_archive_sha256_before": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+      "native_archive_bytes_before": 1199825562,
+      "target_symlink_before": "/bench/zfs/db/tenant-density-build-cache-20261029/target",
+      "resolved_target_directory_before": "/bench/zfs/db/tenant-density-build-cache-20261029/target"
+    },
+    "runtime_limits": {
+      "controller_pid": 2469595,
+      "original_soft": 1024,
+      "original_hard": 524288,
+      "new_soft": 65536,
+      "new_hard": 524288,
+      "proc_hard": 524288,
+      "proc_limits_before": {
+        "soft": 1024,
+        "hard": 524288,
+        "units": "files"
+      },
+      "controller_proc_limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      },
+      "preflight_child": {
+        "role": "preflight-limit-child",
+        "pid": 2469619,
+        "parent_pid": 2469595,
+        "start_time_ticks": 259019750,
+        "limits": {
+          "soft": 65536,
+          "hard": 524288,
+          "units": "files"
+        },
+        "exit_code": 0,
+        "same_live_process_after_exit": false
+      }
+    },
+    "validation_sha256_recorded": "a0d429e748857507408547ffb44964789d3facdc6f09d67d83ec6ce517c56a6f",
+    "launcher_attempt_count": 2,
+    "preflight_launch_attempts": [
+      {
+        "launcher_name": "arrival-controls-cb0e04482-r1",
+        "classification": "preflight_only_plan_commit_mismatch",
+        "actual_workload_cells": 0,
+        "launcher_log_sha256": "d3d8cf2df56e2390f8223045c19e4b11af899255db791e97cc2f525c22cd69e0",
+        "pid_file_sha256": "54d4c6891d3c373f1cf1de03bf6ea24e460c82de5f62f81dba5431f99e462fbd"
+      }
+    ],
+    "actual_cell_command_count": 16,
+    "actual_cell_status_count": 16,
+    "statuses": {
+      "statuses": [
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink-status.json",
+          "sha256": "f2727177ec771b70f32362864a5f632079945de3a85df918fdca362bf0c86a09",
+          "case": "control-n28-r1-staggered-blink",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared-status.json",
+          "sha256": "04ca002f27604f667b6e9d388988ddd6d859f316e0b9a4582f67e4e5a2ad4d11",
+          "case": "control-n28-r1-staggered-shared",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink-status.json",
+          "sha256": "e61cc7cf80aa76282ed957ea8632279afd441998c05fbb02cf7e8e2373ef1c9b",
+          "case": "control-n28-r1-synchronized-blink",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared-status.json",
+          "sha256": "9cb06d13e4e5b787ecd05880c8c378d176913fb0384dd47f865d8a80ae95ae8a",
+          "case": "control-n28-r1-synchronized-shared",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": false
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink-status.json",
+          "sha256": "b1076a251ae1e1a278762934d0ac40082d780b37cf7d880cd77ef52bbe105321",
+          "case": "control-n28-r2-staggered-blink",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared-status.json",
+          "sha256": "0f09791d3847f1d751ddae52aa82e54544c2a7c5bef43d78e35f8ee97e33d2ce",
+          "case": "control-n28-r2-staggered-shared",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink-status.json",
+          "sha256": "1119f035b15564f612fd7021a5cb0e8ebd0038f5d0bf31c392d07d66d374c09d",
+          "case": "control-n28-r2-synchronized-blink",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared-status.json",
+          "sha256": "3355cb6842ea605f4602bb460925a594f6392dedce59f79284eebb7d6dcf4d8e",
+          "case": "control-n28-r2-synchronized-shared",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink-status.json",
+          "sha256": "b68f500c632d392dad171ccba944e5550fc8449082323401a0038944db1e3405",
+          "case": "control-n28-r3-staggered-blink",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": false
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared-status.json",
+          "sha256": "49f91361c93318dcfd98d570c640f4ad28bed3e7fefc887a61f4faacea74e422",
+          "case": "control-n28-r3-staggered-shared",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink-status.json",
+          "sha256": "bc8ae00f43f0463be74818f3c51031f75a0ff4e0e01dbe1871aea4392d296ccb",
+          "case": "control-n28-r3-synchronized-blink",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared-status.json",
+          "sha256": "d8f55266b9c4f273f54ae7ac712e344b5953041ec653b9d08bafe65cc5cba48a",
+          "case": "control-n28-r3-synchronized-shared",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": false
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-blink-status.json",
+          "sha256": "b93e272f7acf54508205a658f82a6e69377fc6e19666bfbd7dcfd38a261215f6",
+          "case": "tiny-staggered-blink",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-shared-status.json",
+          "sha256": "0e969f18e3ec1161913bf2b7f024dd820740a2c269fb46438deba580586b5247",
+          "case": "tiny-staggered-shared",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-blink-status.json",
+          "sha256": "33c91d201c13a54f515092cd049d71ef2ca6e6fe5e1a889d8141b100b483c9eb",
+          "case": "tiny-synchronized-blink",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        },
+        {
+          "path": "/home/opc/tenant-density-harness-20261027/arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-shared-status.json",
+          "sha256": "b1f0b3f25c7497aadb1c61c535b116810f689f1c816a54eaca3a035675a50e1b",
+          "case": "tiny-synchronized-shared",
+          "exit_code": 0,
+          "stop_reason": null,
+          "review_error": null,
+          "operational_pass": true,
+          "slo_pass": true
+        }
+      ],
+      "status_count": 16,
+      "terminal_outcome_count": 0,
+      "status_cases_match_terminal_outcomes": true,
+      "recorded_cells_operationally_valid": true,
+      "all_sixteen_cells_operationally_valid": true,
+      "all_sixteen_cells_slo_pass": false,
+      "slo_miss_cases": [
+        "control-n28-r1-synchronized-shared",
+        "control-n28-r3-staggered-blink",
+        "control-n28-r3-synchronized-shared"
+      ]
+    },
+    "control_binaries": {
+      "tenant_density_workload": {
+        "sha256": "7b1044090563f414f4502e5cf7b99206ddac9001fb3f2f3cf9b3c53d318a8614",
+        "bytes": 16651064,
+        "present": true,
+        "matches_validation": true
+      },
+      "memory_diagnostic_worker": {
+        "sha256": "631ff543aacfa9544cf900e0f8bbabbb0680fad0125e5cb97412a63c6d47e291",
+        "bytes": 17232672,
+        "present": true,
+        "matches_validation": true
+      }
+    },
+    "processes": [
+      {
+        "pid": 2469622,
+        "start_time_ticks": 259019815,
+        "origins": [
+          "terminal_receipt",
+          "tiny-synchronized-blink-status.json",
+          "tiny-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2469627,
+        "start_time_ticks": 259019830,
+        "origins": [
+          "terminal_receipt",
+          "tiny-synchronized-blink-status.json",
+          "tiny-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2469642,
+        "start_time_ticks": 259020044,
+        "origins": [
+          "terminal_receipt",
+          "tiny-synchronized-blink-status.json",
+          "tiny-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2469650,
+        "start_time_ticks": 259021081,
+        "origins": [
+          "terminal_receipt",
+          "tiny-synchronized-blink-status.json",
+          "tiny-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2469656,
+        "start_time_ticks": 259021248,
+        "origins": [
+          "terminal_receipt",
+          "tiny-synchronized-blink.json"
+        ],
+        "roles": [
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2469663,
+        "start_time_ticks": 259021428,
+        "origins": [
+          "terminal_receipt",
+          "tiny-synchronized-shared-status.json",
+          "tiny-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2469743,
+        "start_time_ticks": 259021571,
+        "origins": [
+          "terminal_receipt",
+          "tiny-synchronized-shared-status.json",
+          "tiny-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2469817,
+        "start_time_ticks": 259022609,
+        "origins": [
+          "terminal_receipt",
+          "tiny-synchronized-shared-status.json",
+          "tiny-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2469888,
+        "start_time_ticks": 259022827,
+        "origins": [
+          "terminal_receipt",
+          "tiny-synchronized-shared-status.json",
+          "tiny-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2469668,
+        "start_time_ticks": 259021440,
+        "origins": [
+          "terminal_receipt",
+          "tiny-synchronized-shared.json"
+        ],
+        "roles": [
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2469998,
+        "start_time_ticks": 259023242,
+        "origins": [
+          "terminal_receipt",
+          "tiny-staggered-shared-status.json",
+          "tiny-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470075,
+        "start_time_ticks": 259023385,
+        "origins": [
+          "terminal_receipt",
+          "tiny-staggered-shared-status.json",
+          "tiny-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470146,
+        "start_time_ticks": 259024424,
+        "origins": [
+          "terminal_receipt",
+          "tiny-staggered-shared-status.json",
+          "tiny-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470219,
+        "start_time_ticks": 259024643,
+        "origins": [
+          "terminal_receipt",
+          "tiny-staggered-shared-status.json",
+          "tiny-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470003,
+        "start_time_ticks": 259023254,
+        "origins": [
+          "terminal_receipt",
+          "tiny-staggered-shared.json"
+        ],
+        "roles": [
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470288,
+        "start_time_ticks": 259025056,
+        "origins": [
+          "terminal_receipt",
+          "tiny-staggered-blink-status.json",
+          "tiny-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470293,
+        "start_time_ticks": 259025068,
+        "origins": [
+          "terminal_receipt",
+          "tiny-staggered-blink-status.json",
+          "tiny-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470308,
+        "start_time_ticks": 259025283,
+        "origins": [
+          "terminal_receipt",
+          "tiny-staggered-blink-status.json",
+          "tiny-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470314,
+        "start_time_ticks": 259026319,
+        "origins": [
+          "terminal_receipt",
+          "tiny-staggered-blink-status.json",
+          "tiny-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470320,
+        "start_time_ticks": 259026491,
+        "origins": [
+          "terminal_receipt",
+          "tiny-staggered-blink.json"
+        ],
+        "roles": [
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470325,
+        "start_time_ticks": 259026669,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-synchronized-blink-status.json",
+          "control-n28-r1-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470330,
+        "start_time_ticks": 259026682,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-synchronized-blink-status.json",
+          "control-n28-r1-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470382,
+        "start_time_ticks": 259027965,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-synchronized-blink-status.json",
+          "control-n28-r1-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470458,
+        "start_time_ticks": 259034036,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-synchronized-blink-status.json",
+          "control-n28-r1-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470464,
+        "start_time_ticks": 259035101,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-synchronized-blink-status.json",
+          "control-n28-r1-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470481,
+        "start_time_ticks": 259036353,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-synchronized-shared-status.json",
+          "control-n28-r1-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470486,
+        "start_time_ticks": 259036366,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-synchronized-shared-status.json",
+          "control-n28-r1-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2470925,
+        "start_time_ticks": 259037050,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-synchronized-shared-status.json",
+          "control-n28-r1-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2471481,
+        "start_time_ticks": 259043142,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-synchronized-shared-status.json",
+          "control-n28-r1-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2471917,
+        "start_time_ticks": 259044584,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-synchronized-shared-status.json",
+          "control-n28-r1-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2472350,
+        "start_time_ticks": 259046040,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-staggered-shared-status.json",
+          "control-n28-r1-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2472355,
+        "start_time_ticks": 259046052,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-staggered-shared-status.json",
+          "control-n28-r1-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2472793,
+        "start_time_ticks": 259046739,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-staggered-shared-status.json",
+          "control-n28-r1-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2473324,
+        "start_time_ticks": 259052831,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-staggered-shared-status.json",
+          "control-n28-r1-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2473799,
+        "start_time_ticks": 259054263,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-staggered-shared-status.json",
+          "control-n28-r1-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2474254,
+        "start_time_ticks": 259055729,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-staggered-blink-status.json",
+          "control-n28-r1-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2474259,
+        "start_time_ticks": 259055741,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-staggered-blink-status.json",
+          "control-n28-r1-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2474282,
+        "start_time_ticks": 259057009,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-staggered-blink-status.json",
+          "control-n28-r1-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2475006,
+        "start_time_ticks": 259063080,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-staggered-blink-status.json",
+          "control-n28-r1-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2475052,
+        "start_time_ticks": 259064248,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r1-staggered-blink-status.json",
+          "control-n28-r1-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2475058,
+        "start_time_ticks": 259065420,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-staggered-blink-status.json",
+          "control-n28-r2-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2475063,
+        "start_time_ticks": 259065432,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-staggered-blink-status.json",
+          "control-n28-r2-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2475080,
+        "start_time_ticks": 259066713,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-staggered-blink-status.json",
+          "control-n28-r2-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2475128,
+        "start_time_ticks": 259072785,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-staggered-blink-status.json",
+          "control-n28-r2-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2475134,
+        "start_time_ticks": 259073958,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-staggered-blink-status.json",
+          "control-n28-r2-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2475140,
+        "start_time_ticks": 259075107,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-staggered-shared-status.json",
+          "control-n28-r2-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2475145,
+        "start_time_ticks": 259075120,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-staggered-shared-status.json",
+          "control-n28-r2-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2475726,
+        "start_time_ticks": 259075819,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-staggered-shared-status.json",
+          "control-n28-r2-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2476270,
+        "start_time_ticks": 259081916,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-staggered-shared-status.json",
+          "control-n28-r2-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2476708,
+        "start_time_ticks": 259083349,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-staggered-shared-status.json",
+          "control-n28-r2-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2477181,
+        "start_time_ticks": 259084802,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-synchronized-shared-status.json",
+          "control-n28-r2-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2477186,
+        "start_time_ticks": 259084815,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-synchronized-shared-status.json",
+          "control-n28-r2-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2477660,
+        "start_time_ticks": 259085497,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-synchronized-shared-status.json",
+          "control-n28-r2-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2478163,
+        "start_time_ticks": 259091591,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-synchronized-shared-status.json",
+          "control-n28-r2-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2478600,
+        "start_time_ticks": 259093038,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-synchronized-shared-status.json",
+          "control-n28-r2-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479050,
+        "start_time_ticks": 259094496,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-synchronized-blink-status.json",
+          "control-n28-r2-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479055,
+        "start_time_ticks": 259094509,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-synchronized-blink-status.json",
+          "control-n28-r2-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479070,
+        "start_time_ticks": 259095786,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-synchronized-blink-status.json",
+          "control-n28-r2-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479130,
+        "start_time_ticks": 259101858,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-synchronized-blink-status.json",
+          "control-n28-r2-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479174,
+        "start_time_ticks": 259103000,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r2-synchronized-blink-status.json",
+          "control-n28-r2-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479180,
+        "start_time_ticks": 259104187,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-synchronized-blink-status.json",
+          "control-n28-r3-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479185,
+        "start_time_ticks": 259104200,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-synchronized-blink-status.json",
+          "control-n28-r3-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479225,
+        "start_time_ticks": 259105494,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-synchronized-blink-status.json",
+          "control-n28-r3-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479266,
+        "start_time_ticks": 259111566,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-synchronized-blink-status.json",
+          "control-n28-r3-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479274,
+        "start_time_ticks": 259112625,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-synchronized-blink-status.json",
+          "control-n28-r3-synchronized-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479282,
+        "start_time_ticks": 259113887,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-synchronized-shared-status.json",
+          "control-n28-r3-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479287,
+        "start_time_ticks": 259113900,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-synchronized-shared-status.json",
+          "control-n28-r3-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2479727,
+        "start_time_ticks": 259114590,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-synchronized-shared-status.json",
+          "control-n28-r3-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2480226,
+        "start_time_ticks": 259120683,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-synchronized-shared-status.json",
+          "control-n28-r3-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2480663,
+        "start_time_ticks": 259122153,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-synchronized-shared-status.json",
+          "control-n28-r3-synchronized-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2481095,
+        "start_time_ticks": 259123587,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-staggered-shared-status.json",
+          "control-n28-r3-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2481100,
+        "start_time_ticks": 259123600,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-staggered-shared-status.json",
+          "control-n28-r3-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2481539,
+        "start_time_ticks": 259124300,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-staggered-shared-status.json",
+          "control-n28-r3-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2482040,
+        "start_time_ticks": 259130390,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-staggered-shared-status.json",
+          "control-n28-r3-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2482478,
+        "start_time_ticks": 259131857,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-staggered-shared-status.json",
+          "control-n28-r3-staggered-shared.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2482911,
+        "start_time_ticks": 259133298,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-staggered-blink-status.json",
+          "control-n28-r3-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-workload-process",
+          "harness-process",
+          "owned-descendant"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2482916,
+        "start_time_ticks": 259133311,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-staggered-blink-status.json",
+          "control-n28-r3-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2482930,
+        "start_time_ticks": 259134618,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-staggered-blink-status.json",
+          "control-n28-r3-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2483006,
+        "start_time_ticks": 259140686,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-staggered-blink-status.json",
+          "control-n28-r3-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      },
+      {
+        "pid": 2483018,
+        "start_time_ticks": 259141723,
+        "origins": [
+          "terminal_receipt",
+          "control-n28-r3-staggered-blink-status.json",
+          "control-n28-r3-staggered-blink.json"
+        ],
+        "roles": [
+          "owned-descendant",
+          "backend-process"
+        ],
+        "recorded_same_live_process": false,
+        "same_live_process_at_collection": false
+      }
+    ],
+    "cgroups": {
+      "grouping_root": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1",
+      "grouping_root_path_matches_expected": true,
+      "grouping_root_budget": {
+        "memory.max": "max",
+        "memory.high": "max",
+        "memory.swap.max": "max"
+      },
+      "grouping_root_memory_max_is_unbounded": true,
+      "cell_epoch_budgets_match": true,
+      "cell_groups_present": true,
+      "all_four_epochs_present_for_each_cell": true,
+      "all_cgroup_process_lists_empty": true,
+      "expected_cell_count": 16,
+      "all_expected_cells_have_commands": true,
+      "groups": {
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1",
+          "relative_to_grouping_root": ".",
+          "memory.max": "max",
+          "memory.high": "max",
+          "memory.swap.max": "max",
+          "memory.current": "3706880",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink",
+          "relative_to_grouping_root": "control-n28-r1-staggered-blink",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "274432",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink/measurement",
+          "relative_to_grouping_root": "control-n28-r1-staggered-blink/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "69632",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink/oracle",
+          "relative_to_grouping_root": "control-n28-r1-staggered-blink/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink/reopen-oracle",
+          "relative_to_grouping_root": "control-n28-r1-staggered-blink/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink/setup",
+          "relative_to_grouping_root": "control-n28-r1-staggered-blink/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "147456",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared",
+          "relative_to_grouping_root": "control-n28-r1-staggered-shared",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "258048",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared/measurement",
+          "relative_to_grouping_root": "control-n28-r1-staggered-shared/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "57344",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared/oracle",
+          "relative_to_grouping_root": "control-n28-r1-staggered-shared/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "49152",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared/reopen-oracle",
+          "relative_to_grouping_root": "control-n28-r1-staggered-shared/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "40960",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared/setup",
+          "relative_to_grouping_root": "control-n28-r1-staggered-shared/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "69632",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink",
+          "relative_to_grouping_root": "control-n28-r1-synchronized-blink",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "274432",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink/measurement",
+          "relative_to_grouping_root": "control-n28-r1-synchronized-blink/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "69632",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink/oracle",
+          "relative_to_grouping_root": "control-n28-r1-synchronized-blink/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink/reopen-oracle",
+          "relative_to_grouping_root": "control-n28-r1-synchronized-blink/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink/setup",
+          "relative_to_grouping_root": "control-n28-r1-synchronized-blink/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "147456",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared",
+          "relative_to_grouping_root": "control-n28-r1-synchronized-shared",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "253952",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared/measurement",
+          "relative_to_grouping_root": "control-n28-r1-synchronized-shared/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "57344",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared/oracle",
+          "relative_to_grouping_root": "control-n28-r1-synchronized-shared/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "45056",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared/reopen-oracle",
+          "relative_to_grouping_root": "control-n28-r1-synchronized-shared/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "40960",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared/setup",
+          "relative_to_grouping_root": "control-n28-r1-synchronized-shared/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "69632",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink",
+          "relative_to_grouping_root": "control-n28-r2-staggered-blink",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "274432",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink/measurement",
+          "relative_to_grouping_root": "control-n28-r2-staggered-blink/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "69632",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink/oracle",
+          "relative_to_grouping_root": "control-n28-r2-staggered-blink/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink/reopen-oracle",
+          "relative_to_grouping_root": "control-n28-r2-staggered-blink/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink/setup",
+          "relative_to_grouping_root": "control-n28-r2-staggered-blink/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "147456",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared",
+          "relative_to_grouping_root": "control-n28-r2-staggered-shared",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "253952",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared/measurement",
+          "relative_to_grouping_root": "control-n28-r2-staggered-shared/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "57344",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared/oracle",
+          "relative_to_grouping_root": "control-n28-r2-staggered-shared/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "45056",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared/reopen-oracle",
+          "relative_to_grouping_root": "control-n28-r2-staggered-shared/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "40960",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared/setup",
+          "relative_to_grouping_root": "control-n28-r2-staggered-shared/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "69632",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink",
+          "relative_to_grouping_root": "control-n28-r2-synchronized-blink",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "274432",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink/measurement",
+          "relative_to_grouping_root": "control-n28-r2-synchronized-blink/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "69632",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink/oracle",
+          "relative_to_grouping_root": "control-n28-r2-synchronized-blink/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink/reopen-oracle",
+          "relative_to_grouping_root": "control-n28-r2-synchronized-blink/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink/setup",
+          "relative_to_grouping_root": "control-n28-r2-synchronized-blink/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "147456",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared",
+          "relative_to_grouping_root": "control-n28-r2-synchronized-shared",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "253952",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared/measurement",
+          "relative_to_grouping_root": "control-n28-r2-synchronized-shared/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "57344",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared/oracle",
+          "relative_to_grouping_root": "control-n28-r2-synchronized-shared/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "45056",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared/reopen-oracle",
+          "relative_to_grouping_root": "control-n28-r2-synchronized-shared/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "40960",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared/setup",
+          "relative_to_grouping_root": "control-n28-r2-synchronized-shared/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "69632",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink",
+          "relative_to_grouping_root": "control-n28-r3-staggered-blink",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "274432",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink/measurement",
+          "relative_to_grouping_root": "control-n28-r3-staggered-blink/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "69632",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink/oracle",
+          "relative_to_grouping_root": "control-n28-r3-staggered-blink/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink/reopen-oracle",
+          "relative_to_grouping_root": "control-n28-r3-staggered-blink/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink/setup",
+          "relative_to_grouping_root": "control-n28-r3-staggered-blink/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "147456",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared",
+          "relative_to_grouping_root": "control-n28-r3-staggered-shared",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "253952",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared/measurement",
+          "relative_to_grouping_root": "control-n28-r3-staggered-shared/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "57344",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared/oracle",
+          "relative_to_grouping_root": "control-n28-r3-staggered-shared/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "45056",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared/reopen-oracle",
+          "relative_to_grouping_root": "control-n28-r3-staggered-shared/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "40960",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared/setup",
+          "relative_to_grouping_root": "control-n28-r3-staggered-shared/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "69632",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink",
+          "relative_to_grouping_root": "control-n28-r3-synchronized-blink",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "274432",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink/measurement",
+          "relative_to_grouping_root": "control-n28-r3-synchronized-blink/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "69632",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink/oracle",
+          "relative_to_grouping_root": "control-n28-r3-synchronized-blink/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink/reopen-oracle",
+          "relative_to_grouping_root": "control-n28-r3-synchronized-blink/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink/setup",
+          "relative_to_grouping_root": "control-n28-r3-synchronized-blink/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "147456",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared",
+          "relative_to_grouping_root": "control-n28-r3-synchronized-shared",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "253952",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared/measurement",
+          "relative_to_grouping_root": "control-n28-r3-synchronized-shared/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "57344",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared/oracle",
+          "relative_to_grouping_root": "control-n28-r3-synchronized-shared/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "45056",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared/reopen-oracle",
+          "relative_to_grouping_root": "control-n28-r3-synchronized-shared/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "40960",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared/setup",
+          "relative_to_grouping_root": "control-n28-r3-synchronized-shared/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "69632",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-blink": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-blink",
+          "relative_to_grouping_root": "tiny-staggered-blink",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "94208",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-blink/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-blink/measurement",
+          "relative_to_grouping_root": "tiny-staggered-blink/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-blink/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-blink/oracle",
+          "relative_to_grouping_root": "tiny-staggered-blink/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-blink/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-blink/reopen-oracle",
+          "relative_to_grouping_root": "tiny-staggered-blink/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-blink/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-blink/setup",
+          "relative_to_grouping_root": "tiny-staggered-blink/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "28672",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-shared": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-shared",
+          "relative_to_grouping_root": "tiny-staggered-shared",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "94208",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-shared/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-shared/measurement",
+          "relative_to_grouping_root": "tiny-staggered-shared/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "12288",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-shared/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-shared/oracle",
+          "relative_to_grouping_root": "tiny-staggered-shared/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "12288",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-shared/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-shared/reopen-oracle",
+          "relative_to_grouping_root": "tiny-staggered-shared/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "12288",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-shared/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-staggered-shared/setup",
+          "relative_to_grouping_root": "tiny-staggered-shared/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "16384",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-blink": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-blink",
+          "relative_to_grouping_root": "tiny-synchronized-blink",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "94208",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-blink/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-blink/measurement",
+          "relative_to_grouping_root": "tiny-synchronized-blink/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-blink/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-blink/oracle",
+          "relative_to_grouping_root": "tiny-synchronized-blink/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-blink/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-blink/reopen-oracle",
+          "relative_to_grouping_root": "tiny-synchronized-blink/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "8192",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-blink/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-blink/setup",
+          "relative_to_grouping_root": "tiny-synchronized-blink/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "28672",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-shared": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-shared",
+          "relative_to_grouping_root": "tiny-synchronized-shared",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "94208",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-shared/measurement": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-shared/measurement",
+          "relative_to_grouping_root": "tiny-synchronized-shared/measurement",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "12288",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-shared/oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-shared/oracle",
+          "relative_to_grouping_root": "tiny-synchronized-shared/oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "12288",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-shared/reopen-oracle": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-shared/reopen-oracle",
+          "relative_to_grouping_root": "tiny-synchronized-shared/reopen-oracle",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "12288",
+          "cgroup.procs": []
+        },
+        "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-shared/setup": {
+          "path": "/sys/fs/cgroup/dodb-density-arrival-controls-cb0e04482-r1/tiny-synchronized-shared/setup",
+          "relative_to_grouping_root": "tiny-synchronized-shared/setup",
+          "memory.max": "268435456",
+          "memory.high": "201326592",
+          "memory.swap.max": "0",
+          "memory.current": "16384",
+          "cgroup.procs": []
+        }
+      },
+      "cell_count": 16,
+      "group_count": 81
+    },
+    "databases": {
+      "root_path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1",
+      "root_exists": true,
+      "cases": [
+        {
+          "case": "control-n28-r1-staggered-blink",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink",
+          "preserved": true,
+          "file_count": 280,
+          "total_file_bytes": 93739609
+        },
+        {
+          "case": "control-n28-r1-staggered-shared",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared",
+          "preserved": true,
+          "file_count": 392,
+          "total_file_bytes": 51183469
+        },
+        {
+          "case": "control-n28-r1-synchronized-blink",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink",
+          "preserved": true,
+          "file_count": 280,
+          "total_file_bytes": 93759380
+        },
+        {
+          "case": "control-n28-r1-synchronized-shared",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared",
+          "preserved": true,
+          "file_count": 392,
+          "total_file_bytes": 51281901
+        },
+        {
+          "case": "control-n28-r2-staggered-blink",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink",
+          "preserved": true,
+          "file_count": 280,
+          "total_file_bytes": 93747454
+        },
+        {
+          "case": "control-n28-r2-staggered-shared",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared",
+          "preserved": true,
+          "file_count": 392,
+          "total_file_bytes": 51177477
+        },
+        {
+          "case": "control-n28-r2-synchronized-blink",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink",
+          "preserved": true,
+          "file_count": 280,
+          "total_file_bytes": 93739621
+        },
+        {
+          "case": "control-n28-r2-synchronized-shared",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared",
+          "preserved": true,
+          "file_count": 392,
+          "total_file_bytes": 51352825
+        },
+        {
+          "case": "control-n28-r3-staggered-blink",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink",
+          "preserved": true,
+          "file_count": 280,
+          "total_file_bytes": 93748497
+        },
+        {
+          "case": "control-n28-r3-staggered-shared",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared",
+          "preserved": true,
+          "file_count": 392,
+          "total_file_bytes": 51174964
+        },
+        {
+          "case": "control-n28-r3-synchronized-blink",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink",
+          "preserved": true,
+          "file_count": 280,
+          "total_file_bytes": 93758712
+        },
+        {
+          "case": "control-n28-r3-synchronized-shared",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared",
+          "preserved": true,
+          "file_count": 392,
+          "total_file_bytes": 51264906
+        },
+        {
+          "case": "tiny-staggered-blink",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/tiny-staggered-blink",
+          "preserved": true,
+          "file_count": 35,
+          "total_file_bytes": 13650096
+        },
+        {
+          "case": "tiny-staggered-shared",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/tiny-staggered-shared",
+          "preserved": true,
+          "file_count": 67,
+          "total_file_bytes": 7040669
+        },
+        {
+          "case": "tiny-synchronized-blink",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/tiny-synchronized-blink",
+          "preserved": true,
+          "file_count": 35,
+          "total_file_bytes": 13650096
+        },
+        {
+          "case": "tiny-synchronized-shared",
+          "path": "/bench/zfs/db/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1/tiny-synchronized-shared",
+          "preserved": true,
+          "file_count": 67,
+          "total_file_bytes": 7040884
+        }
+      ],
+      "preserved_case_count": 16
+    },
+    "launchers": [
+      {
+        "name": "arrival-cb0e04482-r1",
+        "pid": 2465337,
+        "launcher_log": "/home/opc/tenant-density-harness-20261027/arrival-cb0e04482-r1-launcher.log",
+        "launcher_pid_file": "/home/opc/tenant-density-harness-20261027/arrival-cb0e04482-r1-pid.txt",
+        "launcher_sha256": "5f5b1b08be25a58887397300c5612154a8f13283f286e717e6b32fdfa54a4ef6",
+        "pid_file_sha256": "457103b338a6d20d71fcff1046d6580e8fc8328d20651f92d7b92cb2cbfe201c",
+        "process_running": false,
+        "process_command_line": ""
+      },
+      {
+        "name": "arrival-controls-cb0e04482-r1",
+        "pid": 2469482,
+        "launcher_log": "/home/opc/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1-launcher.log",
+        "launcher_pid_file": "/home/opc/tenant-density-harness-20261027/arrival-controls-cb0e04482-r1-pid.txt",
+        "launcher_sha256": "d3d8cf2df56e2390f8223045c19e4b11af899255db791e97cc2f525c22cd69e0",
+        "pid_file_sha256": "54d4c6891d3c373f1cf1de03bf6ea24e460c82de5f62f81dba5431f99e462fbd",
+        "process_running": false,
+        "process_command_line": ""
+      },
+      {
+        "name": "arrival-controls-cb0e04482-r2",
+        "pid": 2469595,
+        "launcher_log": "/home/opc/tenant-density-harness-20261027/arrival-controls-cb0e04482-r2-launcher.log",
+        "launcher_pid_file": "/home/opc/tenant-density-harness-20261027/arrival-controls-cb0e04482-r2-pid.txt",
+        "launcher_sha256": "91c15ee81092a907a5b91722bca7daa38da116f3f0a05bdd39468ac041b754d4",
+        "pid_file_sha256": "ae19973a22a597194cef3a0823b1f658f65918e930b290629842dfb71ef3fff4",
+        "process_running": false,
+        "process_command_line": ""
+      }
+    ]
+  },
+  "helpers": [
+    {
+      "archive_path": "arrival-phase/oci_arrival_validate.py",
+      "path": "/home/opc/tenant-density-harness-20261027/oci_arrival_validate.py",
+      "sha256": "07e2cbad6bde30a52efe8a0b7ca00811b32320b10dc8572365a3fe582009e2bb",
+      "expected_sha256": "07e2cbad6bde30a52efe8a0b7ca00811b32320b10dc8572365a3fe582009e2bb",
+      "hash_matches_provenance": true
+    },
+    {
+      "archive_path": "arrival-phase/oci_arrival_controls.py",
+      "path": "/home/opc/tenant-density-harness-20261027/oci_arrival_controls.py",
+      "sha256": "97b26bb9d18a6b772e4044c3ccd5f985f655d2e42d1273d13260357b255867a0",
+      "expected_sha256": "97b26bb9d18a6b772e4044c3ccd5f985f655d2e42d1273d13260357b255867a0",
+      "hash_matches_provenance": true
+    },
+    {
+      "archive_path": "arrival-phase/arrival_review.py",
+      "path": "/home/opc/tenant-density-harness-20261027/arrival_review.py",
+      "sha256": "1f6f7a1c4a86787c46be08c7af24c0d9f9d3cf27f18ee44a031764e76dd2696b",
+      "expected_sha256": "1f6f7a1c4a86787c46be08c7af24c0d9f9d3cf27f18ee44a031764e76dd2696b",
+      "hash_matches_provenance": true
+    },
+    {
+      "archive_path": "arrival-phase/oci_arrival_collect.py",
+      "path": "/home/opc/tenant-density-harness-20261027/oci_arrival_collect.py",
+      "sha256": "7bd406452516bcfdac6c92d4f1c223203dd2ef1bbf05832a8df6a947bb58d72e",
+      "expected_sha256": null,
+      "hash_matches_provenance": null
+    },
+    {
+      "archive_path": "capacity/oci_capacity.py",
+      "path": "/home/opc/tenant-density-harness-20261027/oci_capacity.py",
+      "sha256": "e97065f5d5aeb89d9a59cb67d28b9b1f94ca2a652ef80e096fed26bd3957b238",
+      "expected_sha256": "e97065f5d5aeb89d9a59cb67d28b9b1f94ca2a652ef80e096fed26bd3957b238",
+      "hash_matches_provenance": true
+    },
+    {
+      "archive_path": "capacity/capacity_review.py",
+      "path": "/home/opc/tenant-density-harness-20261027/capacity_review.py",
+      "sha256": "d03cd663fa4dd4a1b2f87d716937ba8566d7c205032286853d876f416333ad57",
+      "expected_sha256": "d03cd663fa4dd4a1b2f87d716937ba8566d7c205032286853d876f416333ad57",
+      "hash_matches_provenance": true
+    }
+  ],
+  "space_before_archive": {
+    "filesystems": {
+      "harness_root": {
+        "path": "/home/opc/tenant-density-harness-20261027",
+        "available_bytes": 5319495680,
+        "total_bytes": 31608274944
+      },
+      "benchmark_root": {
+        "path": "/bench/zfs/db",
+        "available_bytes": 27707191296,
+        "total_bytes": 159127236608
+      }
+    },
+    "memory_bytes": {
+      "MemAvailable": 5031583744,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3895267328
+    }
+  },
+  "space_after_archive": {
+    "filesystems": {
+      "harness_root": {
+        "path": "/home/opc/tenant-density-harness-20261027",
+        "available_bytes": 5291311104,
+        "total_bytes": 31608274944
+      },
+      "benchmark_root": {
+        "path": "/bench/zfs/db",
+        "available_bytes": 27707191296,
+        "total_bytes": 159127236608
+      }
+    },
+    "memory_bytes": {
+      "MemAvailable": 5032861696,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3895267328
+    }
+  },
+  "database_preserved_case_count": 16,
+  "archive": {
+    "path": "/home/opc/tenant-density-harness-20261027/arrival-control-collection-cb0e04482-r1/runtime.tar.gz",
+    "bytes": 28183785,
+    "sha256": "59b0fc954f9d0ee4337095e6031cb43ee99ad48c647a624de57663706d3a7c58"
+  },
+  "file_manifest_scope": "regular files included in runtime.tar.gz; collection.json is a sidecar to avoid self-reference",
+  "file_manifest": [
+    {
+      "relative_archive_path": "arrival-phase/arrival-cb0e04482-r1/arrival-validation-summary.json",
+      "bytes": 14695,
+      "sha256": "a0d429e748857507408547ffb44964789d3facdc6f09d67d83ec6ce517c56a6f"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-cb0e04482-r1/bin/memory_diagnostic_worker",
+      "bytes": 17232672,
+      "sha256": "631ff543aacfa9544cf900e0f8bbabbb0680fad0125e5cb97412a63c6d47e291"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-cb0e04482-r1/bin/tenant_density_workload",
+      "bytes": 16651064,
+      "sha256": "7b1044090563f414f4502e5cf7b99206ddac9001fb3f2f3cf9b3c53d318a8614"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/bin/memory_diagnostic_worker",
+      "bytes": 17232672,
+      "sha256": "631ff543aacfa9544cf900e0f8bbabbb0680fad0125e5cb97412a63c6d47e291"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/bin/tenant_density_workload",
+      "bytes": 16651064,
+      "sha256": "7b1044090563f414f4502e5cf7b99206ddac9001fb3f2f3cf9b3c53d318a8614"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/completion.json",
+      "bytes": 30737,
+      "sha256": "2f8636fe3be6c746d2b0dc8831bae40f21365e1c8860afa66bbb2004c836d79b"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink-command.json",
+      "bytes": 2625,
+      "sha256": "cfe0b20b25beae4cae29fbb08d659badaed7bf08f6fefa8457e13e7882725785"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink-host-samples.json",
+      "bytes": 44472,
+      "sha256": "5e3d7e8ba6727f83f9af724c2c184191b2456835a2592b9fff62949ba62c9bdb"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink-status.json",
+      "bytes": 125660,
+      "sha256": "f2727177ec771b70f32362864a5f632079945de3a85df918fdca362bf0c86a09"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink.json",
+      "bytes": 928572,
+      "sha256": "f103d3de4410cd93abe4e7f99db0700cd7d211eaf24a16afc803a883dcaaafe0"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-blink.log",
+      "bytes": 13379,
+      "sha256": "4431d14d7736b7c91616464229af1abc6a472e4ea9fb8faa625613f9df91dff3"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-pair.json",
+      "bytes": 1058,
+      "sha256": "61f4a38278b0a8064398c3e00d2d0373bff41d5474a9dd1b6b656ae27ed8de8e"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared-command.json",
+      "bytes": 2716,
+      "sha256": "a26f8687ffea43f091e9c78e5a0e7220d15ce681f6a4b6c0749b261d91c0d86d"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared-host-samples.json",
+      "bytes": 44484,
+      "sha256": "67f49df0d8bd16c8bc85752d0b5c7bcbc6f1eec77eda49b44d6d9709ca278c82"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared-status.json",
+      "bytes": 169826,
+      "sha256": "04ca002f27604f667b6e9d388988ddd6d859f316e0b9a4582f67e4e5a2ad4d11"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared.json",
+      "bytes": 2842962,
+      "sha256": "d0e045af29d9b8dce7f7debce811af95315d3d0c5d3b864552a6c0218d85f754"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-staggered-shared.log",
+      "bytes": 13379,
+      "sha256": "5f30aa9359a73d59b254180ba710bde5b7e216f10aa238a3e3e908e9e39eaf28"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized--control-n28-r1-staggered-blink-phase-comparison.json",
+      "bytes": 835,
+      "sha256": "f246b0fb4aac2b91aea175609b3f8f000d54493c9bfc385b80edc87431fee5a2"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized--control-n28-r1-staggered-minimal-native-shared-phase-comparison.json",
+      "bytes": 835,
+      "sha256": "f246b0fb4aac2b91aea175609b3f8f000d54493c9bfc385b80edc87431fee5a2"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink-command.json",
+      "bytes": 2641,
+      "sha256": "2b259c5286bd70f479597ee44139847ecebccfb1c28533e43213e20ef60dcd50"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink-host-samples.json",
+      "bytes": 44460,
+      "sha256": "2a2bec48dbef31ab32f182ff0bbc4fd54b0652eff74c12f4d72e2375120bab2a"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink-status.json",
+      "bytes": 125666,
+      "sha256": "e61cc7cf80aa76282ed957ea8632279afd441998c05fbb02cf7e8e2373ef1c9b"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink.json",
+      "bytes": 918252,
+      "sha256": "e46ca5440638077ff81bdf454976b13b9e83fded4eb60ca6d2aaf74516073a52"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-blink.log",
+      "bytes": 13379,
+      "sha256": "af4355240b749d043db95297c59555e6655c8d56638f020b2a05bda9647e8f7d"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-pair.json",
+      "bytes": 1071,
+      "sha256": "5d17be715ce40f2f372fbebb2fe1f88a5a4aafa293964c898f95ebc575ea784d"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared-command.json",
+      "bytes": 2730,
+      "sha256": "eabe18a1fac3b4681d02822207f563ff7df98e2d4f98ea4e4abb761d6a342899"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared-host-samples.json",
+      "bytes": 44469,
+      "sha256": "9ccfd54efdf2c58d642591c1231b272cc824ca7dc8f924b17b60e7af198758f6"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared-status.json",
+      "bytes": 169909,
+      "sha256": "9cb06d13e4e5b787ecd05880c8c378d176913fb0384dd47f865d8a80ae95ae8a"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared.json",
+      "bytes": 2834955,
+      "sha256": "20da34be00203bbcffd3cebe790f5e75a6bcee20e32cd2992e242effd1e416da"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r1-synchronized-shared.log",
+      "bytes": 13379,
+      "sha256": "10a78f6f7157dd146a30053172e9a983f63e40ebc550361fd95935cfc1dc8ca1"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered--control-n28-r2-synchronized-blink-phase-comparison.json",
+      "bytes": 835,
+      "sha256": "f246b0fb4aac2b91aea175609b3f8f000d54493c9bfc385b80edc87431fee5a2"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered--control-n28-r2-synchronized-minimal-native-shared-phase-comparison.json",
+      "bytes": 835,
+      "sha256": "f246b0fb4aac2b91aea175609b3f8f000d54493c9bfc385b80edc87431fee5a2"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink-command.json",
+      "bytes": 2628,
+      "sha256": "0358699c5557751585c0267b166cae5a2757fb56ab1006afc31df4b6f783e66c"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink-host-samples.json",
+      "bytes": 44484,
+      "sha256": "f05924bb53907ceeb0873c196b774e7d2ae3be2387660500bf90dcc3a8ebcddb"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink-status.json",
+      "bytes": 125667,
+      "sha256": "b1076a251ae1e1a278762934d0ac40082d780b37cf7d880cd77ef52bbe105321"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink.json",
+      "bytes": 930767,
+      "sha256": "117574cc9cf4d059ca60fd0e7b4ea676ecd5d81d35a14e172611cf67fc56bb35"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-blink.log",
+      "bytes": 13379,
+      "sha256": "3af59a8aed62efec2e2525fd0e518b7d07d041f6ad232f0fa8e1b39d4b123a84"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-pair.json",
+      "bytes": 1058,
+      "sha256": "d4eb646283110410d8dcc1da64e802f95da102484e7c1932409f7b8ab47378e3"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared-command.json",
+      "bytes": 2716,
+      "sha256": "504fc5c887998ff6e7a58d4e403e6a1e7418e49899713405f2da84aa01748622"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared-host-samples.json",
+      "bytes": 44479,
+      "sha256": "f4032ea263bdf3240c45be432237fb6ddd9f73d67cd18eeaae1915bcf2a569f6"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared-status.json",
+      "bytes": 169816,
+      "sha256": "0f09791d3847f1d751ddae52aa82e54544c2a7c5bef43d78e35f8ee97e33d2ce"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared.json",
+      "bytes": 2828646,
+      "sha256": "49340098374cdeeaf9cd1e859dc5a289af6332757596444702626e250367ccc4"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-staggered-shared.log",
+      "bytes": 13379,
+      "sha256": "46eb187bbfdca4a12e49a50bf6d40ff369e98b5de0059e7735cb3d467d893a34"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink-command.json",
+      "bytes": 2643,
+      "sha256": "1bf9d9f0f746032cfcf11b9b91e5b827aeeb74b6a66511be90c69f3262d659e3"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink-host-samples.json",
+      "bytes": 44487,
+      "sha256": "82f55dbf531d71d2c617409cc3b6b7c3d187acf256984eb8a2b0df5b58973e5d"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink-status.json",
+      "bytes": 125680,
+      "sha256": "1119f035b15564f612fd7021a5cb0e8ebd0038f5d0bf31c392d07d66d374c09d"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink.json",
+      "bytes": 928880,
+      "sha256": "e7f8b28f84685318770e60ef18f1cd1038ee1ec493dabc9b213d3d80a709c725"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-blink.log",
+      "bytes": 13379,
+      "sha256": "f92f95f655ef167f6dfc4357bf27582dee7b1fea59c3f76de256b1a7106104f2"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-pair.json",
+      "bytes": 1070,
+      "sha256": "7eb678d747369037e4c00ceaf44e4f0fefddecba6f4c1cf7c32ec2d7a8c9e6c8"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared-command.json",
+      "bytes": 2731,
+      "sha256": "232069e1e9596b7dac991ad81ccc51c26a416556f0996ea933b195f7b9d4a000"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared-host-samples.json",
+      "bytes": 44477,
+      "sha256": "0d20cc9b53ec3d5de03a35a7cd080a464776fc0acf574c56ffde47327115945a"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared-status.json",
+      "bytes": 169857,
+      "sha256": "3355cb6842ea605f4602bb460925a594f6392dedce59f79284eebb7d6dcf4d8e"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared.json",
+      "bytes": 2833596,
+      "sha256": "7811379684cfb35bd60edaba2e82e071b40b477b6fff6a85d9bd68da86cbc5bb"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r2-synchronized-shared.log",
+      "bytes": 13379,
+      "sha256": "54a6af2352fcfacdf2cabbc460b614b8aac13f97a311ab7a8a71c03a91d1b33a"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink-command.json",
+      "bytes": 2628,
+      "sha256": "a4488c7124aa34cf90b2c459d0aac0f090ecc012ba398f1467a3008bb3dde30f"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink-host-samples.json",
+      "bytes": 43525,
+      "sha256": "698d62c2c85e51eec32cf85d07f530f1bd07607a5d5d1fd91ed1515101de12ca"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink-status.json",
+      "bytes": 124860,
+      "sha256": "b68f500c632d392dad171ccba944e5550fc8449082323401a0038944db1e3405"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink.json",
+      "bytes": 915897,
+      "sha256": "1e99ac3376846322539b991f68fa2bf8a9e49809fc36d148c647502762efbd31"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-blink.log",
+      "bytes": 13379,
+      "sha256": "6aebd4afa7bd11a318b9c11cf03091543a5dbe334136e64fb7a95fdbbbed490f"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-pair.json",
+      "bytes": 1059,
+      "sha256": "d6eb210d189080debcc01f97a10be0815ed74e2693fc725275bb3304ce86e1ef"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared-command.json",
+      "bytes": 2715,
+      "sha256": "45445d59d2db514ce1c9ddbcfc817edc8481538aa0fe725c20faefc7bc03bb72"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared-host-samples.json",
+      "bytes": 44488,
+      "sha256": "397d66cf75508f304ba8b627445aa3313423b1c0a2068779c36df60d6f4df8d7"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared-status.json",
+      "bytes": 169821,
+      "sha256": "49f91361c93318dcfd98d570c640f4ad28bed3e7fefc887a61f4faacea74e422"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared.json",
+      "bytes": 2834301,
+      "sha256": "d1eb20fb9b893cd7135cf5212aaf1004f069ef797aecbc45c9a002f6157b6907"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-staggered-shared.log",
+      "bytes": 13379,
+      "sha256": "78dea54a176b2f408398277c3d2ef9b41e13ca6fe6bf1fdbe18f076304763502"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized--control-n28-r3-staggered-blink-phase-comparison.json",
+      "bytes": 835,
+      "sha256": "f246b0fb4aac2b91aea175609b3f8f000d54493c9bfc385b80edc87431fee5a2"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized--control-n28-r3-staggered-minimal-native-shared-phase-comparison.json",
+      "bytes": 835,
+      "sha256": "f246b0fb4aac2b91aea175609b3f8f000d54493c9bfc385b80edc87431fee5a2"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink-command.json",
+      "bytes": 2641,
+      "sha256": "d7655ab5ea25c85c279415f6687cfd286f4078b696c3623c4dab520d0d211d2f"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink-host-samples.json",
+      "bytes": 44450,
+      "sha256": "80a6126e92144699a1f2e1b719b57c238e28a03a048ffae3f4800ca068704692"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink-status.json",
+      "bytes": 125257,
+      "sha256": "bc8ae00f43f0463be74818f3c51031f75a0ff4e0e01dbe1871aea4392d296ccb"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink.json",
+      "bytes": 918327,
+      "sha256": "e90dad9a1aa52469acb96930a95fd8aa780761d846607a9af0e8245c26759304"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-blink.log",
+      "bytes": 13379,
+      "sha256": "73cd6dbb6e5779b3c2e501070b9f6b681bf6a08a5ffbd98afb7e8288d2b28ad2"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-pair.json",
+      "bytes": 1071,
+      "sha256": "0e286788b9e9a79424aceef561bb899b583b6d9fa73d62a71794e83d24460141"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared-command.json",
+      "bytes": 2731,
+      "sha256": "3f1426e06614dfc66adb1498b3018d80cb0776366bfae301580f756e7d111f49"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared-host-samples.json",
+      "bytes": 44484,
+      "sha256": "00e98b2517a7d97a82fcd841bfe27c6a60c8e464fee62522920e202e1885501d"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared-status.json",
+      "bytes": 169870,
+      "sha256": "d8f55266b9c4f273f54ae7ac712e344b5953041ec653b9d08bafe65cc5cba48a"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared.json",
+      "bytes": 2833511,
+      "sha256": "3c2f55f041bc8a75cdb7a5ab08169c0ea28c72fa97aac1b24541fd7f14b44a45"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/control-n28-r3-synchronized-shared.log",
+      "bytes": 13379,
+      "sha256": "ffa9ada6bc5de6b694cfe96e26d033ac196506e006db3d2cdd119125c9943036"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/provenance.json",
+      "bytes": 20861,
+      "sha256": "be7b4cf751b665f4fee1c9edaa50e4b4d509c4021b39ffede9f163be09b0b2ff"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/summary.json",
+      "bytes": 2025717,
+      "sha256": "238a177666a14b0c576a61c0c2cd98490594d3e741faf261b259cfc3cd3daaf8"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-blink-command.json",
+      "bytes": 2594,
+      "sha256": "c578d76cfac167783cf295c436a1ab8b7ba20b910de3f055ba1dfdd85949d893"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-blink-host-samples.json",
+      "bytes": 7424,
+      "sha256": "65eefdeac207d0056be8c7d858f26921e3349fa72603a6713a0edd2142134257"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-blink-status.json",
+      "bytes": 24988,
+      "sha256": "b93e272f7acf54508205a658f82a6e69377fc6e19666bfbd7dcfd38a261215f6"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-blink.json",
+      "bytes": 301184,
+      "sha256": "aaf3149dda7d4863c48aa99031da534dce6d4998b174247ac660c26f507d1dc8"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-blink.log",
+      "bytes": 13379,
+      "sha256": "341e9357e8d59e5793df67b0dc8eb9059370e2aa9486c8f98707c3bd9b3eabd6"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-pair.json",
+      "bytes": 1028,
+      "sha256": "a717336c57bc7bbc159129a6acd7ec182b98d640a0607098c840fc97dd4d03cf"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-shared-command.json",
+      "bytes": 2683,
+      "sha256": "2147c7407d0fbcdf8f9cf45f9807273c96533d64573deadab37ad7db372bd7f1"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-shared-host-samples.json",
+      "bytes": 8348,
+      "sha256": "2a0f3b311fab5a6e2a079f06bee8574b7306ad4bc89cd7061a63befdf1f06282"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-shared-status.json",
+      "bytes": 37082,
+      "sha256": "0e969f18e3ec1161913bf2b7f024dd820740a2c269fb46438deba580586b5247"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-shared.json",
+      "bytes": 374975,
+      "sha256": "c7f60482aaf3638a4c4c8ef3ff73ecc112b071372e4ea2a3891eea916df8987a"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-staggered-shared.log",
+      "bytes": 13379,
+      "sha256": "3b1b4c8414897940d3b134774a4dfd3b14bfd52e72480296d743f9774ed21814"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized--tiny-staggered-blink-phase-comparison.json",
+      "bytes": 498,
+      "sha256": "6d4029a1db7faf07bdd38d1e95b31a8955343c14744873ee9e05812d6678494b"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized--tiny-staggered-minimal-native-shared-phase-comparison.json",
+      "bytes": 498,
+      "sha256": "6d4029a1db7faf07bdd38d1e95b31a8955343c14744873ee9e05812d6678494b"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-blink-command.json",
+      "bytes": 2612,
+      "sha256": "0dbdd5dcaceae031993752c911659e04024c0dcb85c07bb9c5660ccf2c379765"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-blink-host-samples.json",
+      "bytes": 7418,
+      "sha256": "6f9866b2e568b56fced4b3a465449a085b29e298419a444945f2ca2b0c085a53"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-blink-status.json",
+      "bytes": 25006,
+      "sha256": "33c91d201c13a54f515092cd049d71ef2ca6e6fe5e1a889d8141b100b483c9eb"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-blink.json",
+      "bytes": 301533,
+      "sha256": "8bb3f60de4faacf8a4ec44b9fa6ec1404613f061d1d0edf861532135bb55b609"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-blink.log",
+      "bytes": 13379,
+      "sha256": "4756aa58d0b56be6c905c94ebbad85ee579557940457bd8210f0438d5d3490ba"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-pair.json",
+      "bytes": 1040,
+      "sha256": "a873a95830df6b1c685dc46797e73c08a1d3647c098ec73b1300fdd125a0eaff"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-shared-command.json",
+      "bytes": 2697,
+      "sha256": "3d1a275ccfd15e936a479587ee5f83ac6460cab6d5112f896a24aca4dd861e94"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-shared-host-samples.json",
+      "bytes": 8343,
+      "sha256": "334ed294e344217164e348a2ab41dd1e2b82d7b5ea03333083dc593c0e3b03a4"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-shared-status.json",
+      "bytes": 37497,
+      "sha256": "b1f0b3f25c7497aadb1c61c535b116810f689f1c816a54eaca3a035675a50e1b"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-shared.json",
+      "bytes": 375235,
+      "sha256": "daa71fc9e3cec929b566d6f86404a993dbc467e3088fa227011ec463f3ed3d72"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival-controls-cb0e04482-r1/tiny-synchronized-shared.log",
+      "bytes": 13379,
+      "sha256": "35d97f2f76a4d3c2883589d212df6c058cb55b8969733840ca0d578ea885c7c9"
+    },
+    {
+      "relative_archive_path": "arrival-phase/arrival_review.py",
+      "bytes": 15136,
+      "sha256": "1f6f7a1c4a86787c46be08c7af24c0d9f9d3cf27f18ee44a031764e76dd2696b"
+    },
+    {
+      "relative_archive_path": "arrival-phase/oci_arrival_collect.py",
+      "bytes": 39414,
+      "sha256": "7bd406452516bcfdac6c92d4f1c223203dd2ef1bbf05832a8df6a947bb58d72e"
+    },
+    {
+      "relative_archive_path": "arrival-phase/oci_arrival_controls.py",
+      "bytes": 33308,
+      "sha256": "97b26bb9d18a6b772e4044c3ccd5f985f655d2e42d1273d13260357b255867a0"
+    },
+    {
+      "relative_archive_path": "arrival-phase/oci_arrival_validate.py",
+      "bytes": 19667,
+      "sha256": "07e2cbad6bde30a52efe8a0b7ca00811b32320b10dc8572365a3fe582009e2bb"
+    },
+    {
+      "relative_archive_path": "builds/arrival-cb0e04482-r1-a1-link/cargo.log",
+      "bytes": 172,
+      "sha256": "2cca809ef49d956dd9f875fd4463be9f8a2542a7a61807ae9ca80270d13f16fa"
+    },
+    {
+      "relative_archive_path": "builds/arrival-cb0e04482-r1-a1-link/provenance.json",
+      "bytes": 1745,
+      "sha256": "3f187186acae5dd9d19c6d05fa6f76159df3682bd573f9d525eab2cae2c58e95"
+    },
+    {
+      "relative_archive_path": "builds/arrival-cb0e04482-r1-a1-link/status.json",
+      "bytes": 302,
+      "sha256": "80d6fb628d0adf27a3537db237f5bda920c7b5ff823ac6d441115f7224d35e28"
+    },
+    {
+      "relative_archive_path": "builds/arrival-cb0e04482-r1-clippy/cargo.log",
+      "bytes": 11403,
+      "sha256": "35948e05db0711fba4468589a0a269e3020a201ceb84ef3ed686902aefb69d71"
+    },
+    {
+      "relative_archive_path": "builds/arrival-cb0e04482-r1-clippy/provenance.json",
+      "bytes": 1792,
+      "sha256": "a17b1995e47f91bae8377d2a5abf2927d026e10784c0c5cc0bbe8a12313e72b9"
+    },
+    {
+      "relative_archive_path": "builds/arrival-cb0e04482-r1-clippy/status.json",
+      "bytes": 302,
+      "sha256": "82b03ff201589f58362dcc878a8a69a7a5fb5891140ee41ddd68f8f96c2b275d"
+    },
+    {
+      "relative_archive_path": "builds/arrival-cb0e04482-r1-default-link/cargo.log",
+      "bytes": 62,
+      "sha256": "15d373be47ad080a0d3a21fed8d931dcf5e169236e6807c52be17a2447133595"
+    },
+    {
+      "relative_archive_path": "builds/arrival-cb0e04482-r1-default-link/provenance.json",
+      "bytes": 1684,
+      "sha256": "403deb2529bf38a4ff7d2a83695ff9c96b444330c464b04354fa78af16a9e2ac"
+    },
+    {
+      "relative_archive_path": "builds/arrival-cb0e04482-r1-default-link/status.json",
+      "bytes": 303,
+      "sha256": "9d38e75eda2393cb5ed294e48c93afa8ac289852ebade90768b871641dad10ba"
+    },
+    {
+      "relative_archive_path": "builds/arrival-cb0e04482-r1-tests/cargo.log",
+      "bytes": 8694,
+      "sha256": "bb8dff78ed66704797bd671ff7367e6029057fc59e090d762006806a19503e2c"
+    },
+    {
+      "relative_archive_path": "builds/arrival-cb0e04482-r1-tests/provenance.json",
+      "bytes": 1807,
+      "sha256": "53f37e71866704b596bb6684bb370021af8e7771fb49d84111cea10ed2e6f2f5"
+    },
+    {
+      "relative_archive_path": "builds/arrival-cb0e04482-r1-tests/status.json",
+      "bytes": 303,
+      "sha256": "0470fbc8618ff233d529a8f4de8fb35de03376f9ead28e69e31f2493369e2835"
+    },
+    {
+      "relative_archive_path": "capacity/capacity_review.py",
+      "bytes": 12810,
+      "sha256": "d03cd663fa4dd4a1b2f87d716937ba8566d7c205032286853d876f416333ad57"
+    },
+    {
+      "relative_archive_path": "capacity/oci_capacity.py",
+      "bytes": 16150,
+      "sha256": "e97065f5d5aeb89d9a59cb67d28b9b1f94ca2a652ef80e096fed26bd3957b238"
+    },
+    {
+      "relative_archive_path": "launcher/arrival-cb0e04482-r1-launcher.log",
+      "bytes": 432,
+      "sha256": "5f5b1b08be25a58887397300c5612154a8f13283f286e717e6b32fdfa54a4ef6"
+    },
+    {
+      "relative_archive_path": "launcher/arrival-cb0e04482-r1-pid.txt",
+      "bytes": 8,
+      "sha256": "457103b338a6d20d71fcff1046d6580e8fc8328d20651f92d7b92cb2cbfe201c"
+    },
+    {
+      "relative_archive_path": "launcher/arrival-controls-cb0e04482-r1-launcher.log",
+      "bytes": 452,
+      "sha256": "d3d8cf2df56e2390f8223045c19e4b11af899255db791e97cc2f525c22cd69e0"
+    },
+    {
+      "relative_archive_path": "launcher/arrival-controls-cb0e04482-r1-pid.txt",
+      "bytes": 8,
+      "sha256": "54d4c6891d3c373f1cf1de03bf6ea24e460c82de5f62f81dba5431f99e462fbd"
+    },
+    {
+      "relative_archive_path": "launcher/arrival-controls-cb0e04482-r2-launcher.log",
+      "bytes": 153,
+      "sha256": "91c15ee81092a907a5b91722bca7daa38da116f3f0a05bdd39468ac041b754d4"
+    },
+    {
+      "relative_archive_path": "launcher/arrival-controls-cb0e04482-r2-pid.txt",
+      "bytes": 8,
+      "sha256": "ae19973a22a597194cef3a0823b1f658f65918e930b290629842dfb71ef3fff4"
+    }
+  ],
+  "manifest_unchanged_after_archive": true,
+  "archive_matches_file_manifest": true
+}

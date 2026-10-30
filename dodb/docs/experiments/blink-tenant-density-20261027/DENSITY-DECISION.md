@@ -2,7 +2,7 @@
 
 Tracking issue: https://github.com/NamseEnt/fn0/issues/126
 
-Status: assessment after the bounded capacity experiment and the stopped raw-observation confirmation. Shutdown attribution is a separate next diagnostic; unfinished cells are not accepted.
+Status: assessment after bounded capacity, shutdown diagnostics, and completed matched arrival-phase controls. Unfinished cells are not accepted.
 
 The evidence does not support adopting the current B-link implementation for greater active-tenant density or practical disk efficiency. Keep defaults unchanged. This is a decision about the measured implementation and policies, not a general B-tree versus LSM conclusion.
 
@@ -18,7 +18,7 @@ The subsequent b226 shutdown diagnostic stopped at its first five-tenant B-link 
 
 [SHUTDOWN-OFFCPU-RESULTS.md](SHUTDOWN-OFFCPU-RESULTS.md) now records the bounded external observation: two more B-link five-tenant cells passed, then a setup failure supplied eighteen verified snapshots of a Tokio-named thread in the memory.high kernel wait path. Anonymous charged memory dominated that interval and little reclaim progress was recorded. This identifies a sampled pressure-wait contribution under the chosen policy, without a unique allocator/object attribution or a cause assigned to the earlier unprofiled failure. The cgroup does not supply eviction or application byte admission.
 
-The E2 twenty-eight-tenant tail result remains specific to synchronized arrivals and the global in-flight limit of eight. [E2-ARRIVAL-PHASE-PLAN.md](E2-ARRIVAL-PHASE-PLAN.md) defines matched synchronized/staggered controls before a wider resident-population bracket. This tests a workload condition rather than treating a wrapper's synchronized-burst frontier as an engine maximum. It does not address the E3 pre-offer resident-memory limitation or justify promoting B-link.
+The completed current-source arrival controls found synchronized SLO passes of B-link 3/3 versus shared RocksDB 1/3, and staggered passes of 2/3 versus 3/3, at twenty-eight tenants. All sixteen cells completed correctly with 32 oracles. [E2-ARRIVAL-PHASE-RESULTS.md](E2-ARRIVAL-PHASE-RESULTS.md) preserves the evidence. There is no consistent B-link density advantage; synchronized SLO misses cannot alone identify a resident-memory limit. The E2 tail result remains specific to arrival phase and the global in-flight limit of eight. [E2-ARRIVAL-PHASE-PLAN.md](E2-ARRIVAL-PHASE-PLAN.md) defines matched synchronized/staggered controls before a wider resident-population bracket. This tests a workload condition rather than treating a wrapper's synchronized-burst frontier as an engine maximum. It does not address the E3 pre-offer resident-memory limitation or justify promoting B-link.
 
 File allocation snapshots also remain relevant to the goal. They measure reachable files at named phase boundaries. They do not measure continuous peak space, unlinked-open files, physical space returned after deletion, or steady-state write amplification. Do not replace the disk-efficiency question with a throughput comparison or infer disk reclamation from checkpoint completion.
 

@@ -1,0 +1,123 @@
+{
+  "run_name": "arrival-controls-cb0e04482-r1",
+  "source_commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d",
+  "plan_commit": "e02a1fbdde81fd6fc363a26e5341c8c61000023e",
+  "runtime_uid": 0,
+  "source_validation": {
+    "source_commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d",
+    "source_status": "",
+    "native_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+    "native_archive_sha256_before": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+    "native_archive_bytes_before": 1199825562,
+    "target_symlink_before": "/bench/zfs/db/tenant-density-build-cache-20261029/target",
+    "resolved_target_directory_before": "/bench/zfs/db/tenant-density-build-cache-20261029/target"
+  },
+  "validation_sha256": "a0d429e748857507408547ffb44964789d3facdc6f09d67d83ec6ce517c56a6f",
+  "arrival_validator_sha256": "07e2cbad6bde30a52efe8a0b7ca00811b32320b10dc8572365a3fe582009e2bb",
+  "build_helper_sha256": "81ef2f497fc924c80533ab7d0b27c16686c3f9b7c4e11077ee9875aef92b6a58",
+  "validation": {
+    "passing_tests": 85,
+    "same_17_existing_clippy_diagnostics": true,
+    "default_link_was_last": true,
+    "native_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+    "native_archive_bytes": 1199825562,
+    "native_archive_sha256_before": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+    "native_archive_sha256_after": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+    "default_binaries": {
+      "tenant_density_workload": {
+        "bytes": 16651064,
+        "sha256": "7b1044090563f414f4502e5cf7b99206ddac9001fb3f2f3cf9b3c53d318a8614"
+      },
+      "memory_diagnostic_worker": {
+        "bytes": 17232672,
+        "sha256": "631ff543aacfa9544cf900e0f8bbabbb0680fad0125e5cb97412a63c6d47e291"
+      }
+    }
+  },
+  "controller_sha256": "97b26bb9d18a6b772e4044c3ccd5f985f655d2e42d1273d13260357b255867a0",
+  "reviewer_sha256": "1f6f7a1c4a86787c46be08c7af24c0d9f9d3cf27f18ee44a031764e76dd2696b",
+  "capacity_controller_sha256": "e97065f5d5aeb89d9a59cb67d28b9b1f94ca2a652ef80e096fed26bd3957b238",
+  "capacity_reviewer_sha256": "d03cd663fa4dd4a1b2f87d716937ba8566d7c205032286853d876f416333ad57",
+  "runtime_limits": {
+    "controller_pid": 2469595,
+    "original_soft": 1024,
+    "original_hard": 524288,
+    "new_soft": 65536,
+    "new_hard": 524288,
+    "proc_hard": 524288,
+    "proc_limits_before": {
+      "soft": 1024,
+      "hard": 524288,
+      "units": "files"
+    },
+    "controller_proc_limits": {
+      "soft": 65536,
+      "hard": 524288,
+      "units": "files"
+    },
+    "preflight_child": {
+      "role": "preflight-limit-child",
+      "pid": 2469619,
+      "parent_pid": 2469595,
+      "start_time_ticks": 259019750,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      },
+      "exit_code": 0,
+      "same_live_process_after_exit": false
+    }
+  },
+  "capacity_before": {
+    "timestamp_unix_seconds": 1793328526.6993356,
+    "zfs_free_bytes": 28697808896,
+    "boot_free_bytes": 5348900864,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5017894912,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3895267328,
+      "Dirty": 33898496,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5713788928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5612115176,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11395151       15 482841088 14304404 119853997   208677 6193003260 193686004        0 56151180 208001043     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  10228971 307278 5381298 498786998 1345013 337485 163356 1722537 0 0",
+      "cpu0 5128601 145088 2693085 249385622 682837 167664 82487 849841 0 0",
+      "cpu1 5100369 162189 2688212 249401376 662175 169821 80868 872695 0 0"
+    ]
+  },
+  "kernel": "6.12.0-206.104.4.4.el9uek.aarch64",
+  "hostname": "instance-20260923-1013",
+  "online_cpus": 2,
+  "filesystem_properties": "used\t130429710336\navailable\t28697808896\nrecordsize\t4096\ncompression\toff\natime\toff\nsync\tstandard",
+  "processes_before": "PID    PPID   UID %CPU   RSS COMMAND\n2469595       1     0 64.5 28212 python3 /home/opc/tenant-density-harness-20261027/oci_arrival_controls.py --plan-commit e02a1fbdde81fd6fc363a26e5341c8c61000023e\n2469551       1  1000  4.8 16776 /usr/lib/systemd/systemd --user\n      1       0     0  0.0 15364 /usr/lib/systemd/systemd --switched-root --system --deserialize 28\n      2       0     0  0.0     0 [kthreadd]\n      3       2     0  0.0     0 [pool_workqueue_release]\n      4       2     0  0.0     0 [kworker/R-kvfree_rcu_reclaim]\n      5       2     0  0.0     0 [kworker/R-rcu_gp]\n      6       2     0  0.0     0 [kworker/R-sync_wq]\n      7       2     0  0.0     0 [kworker/R-slub_flushwq]\n      8       2     0  0.0     0 [kworker/R-netns]\n     10       2     0  0.0     0 [kworker/0:0H-events_highpri]\n     13       2     0  0.0     0 [kworker/R-mm_percpu_wq]\n     14       2     0  0.0     0 [rcu_tasks_rude_kthread]\n     15       2     0  0.0     0 [rcu_tasks_trace_kthread]\n     16       2     0  0.0     0 [ksoftirqd/0]\n     17       2     0  0.0     0 [rcu_sched]\n     18       2     0  0.0     0 [rcu_exp_par_gp_kthread_worker/0]\n     19       2     0  0.0     0 [rcu_exp_gp_kthread_worker]\n     20       2     0  0.0     0 [migration/0]\n     21       2     0  0.0     0 [cpuhp/0]\n     22       2     0  0.0     0 [cpuhp/1]\n     23       2     0  0.0     0 [migration/1]\n     24       2     0  0.0     0 [ksoftirqd/1]\n     26       2     0  0.0     0 [kworker/1:0H-events_highpri]\n     28       2     0  0.0     0 [kdevtmpfs]\n     29       2     0  0.0     0 [kworker/R-inet_frag_wq]\n     30       2     0  0.0     0 [kauditd]\n     31       2     0  0.0     0 [khungtaskd]\n     33       2     0  0.0     0 [oom_reaper]\n     34       2     0  0.0     0 [kworker/R-writeback]\n     35       2     0  0.0     0 [kcompactd0]\n     36       2     0  0.0     0 [ksmd]\n     37       2     0  0.0     0 [khugepaged]\n     38       2     0  0.0     0 [kworker/R-cryptd]\n     39       2     0  0.0     0 [kworker/R-kintegrityd]\n     40       2     0  0.0     0 [kworker/R-kblockd]\n     41       2     0  0.0     0 [kworker/R-blkcg_punt_bio]\n     42       2     0  0.0     0 [kworker/R-tpm_dev_wq]\n     43       2     0  0.0     0 [kworker/R-ata_sff]\n     44       2     0  0.0     0 [kworker/R-md]\n     45       2     0  0.0     0 [kworker/R-md_bitmap]\n     46       2     0  0.0     0 [kworker/R-edac-poller]\n     47       2     0  0.0     0 [kworker/R-devfreq_wq]\n     48       2     0  0.0     0 [watchdogd]\n     49       2     0  0.0     0 [kworker/R-quota_events_unbound]\n     50       2     0  0.0     0 [kworker/0:1H-xfs-log/dm-0]\n     51       2     0  0.0     0 [kswapd0]\n     69       2     0  0.0     0 [kworker/R-kthrotld]\n     74       2     0  0.0     0 [irq/50-aerdrv]\n     75       2     0  0.0     0 [irq/50-pciehp]\n     76       2     0  0.0     0 [irq/51-aerdrv]\n     77       2     0  0.0     0 [irq/51-pciehp]\n     78       2     0  0.0     0 [irq/52-aerdrv]\n     79       2     0  0.0     0 [irq/52-pciehp]\n     80       2     0  0.0     0 [irq/53-aerdrv]\n     81       2     0  0.0     0 [irq/53-pciehp]\n     82       2     0  0.0     0 [irq/54-aerdrv]\n     83       2     0  0.0     0 [irq/54-pciehp]\n     84       2     0  0.0     0 [irq/55-aerdrv]\n     85       2     0  0.0     0 [irq/55-pciehp]\n     86       2     0  0.0     0 [irq/56-aerdrv]\n     87       2     0  0.0     0 [irq/56-pciehp]\n     88       2     0  0.0     0 [irq/57-aerdrv]\n     89       2     0  0.0     0 [irq/57-pciehp]\n     90       2     0  0.0     0 [irq/58-aerdrv]\n     91       2     0  0.0     0 [irq/58-pciehp]\n     92       2     0  0.0     0 [irq/59-aerdrv]\n     93       2     0  0.0     0 [irq/59-pciehp]\n     94       2     0  0.0     0 [irq/60-aerdrv]\n     95       2     0  0.0     0 [irq/60-pciehp]\n     96       2     0  0.0     0 [irq/61-aerdrv]\n     97       2     0  0.0     0 [irq/61-pciehp]\n     98       2     0  0.0     0 [irq/62-aerdrv]\n     99       2     0  0.0     0 [irq/62-pciehp]\n    100       2     0  0.0     0 [irq/63-aerdrv]\n    101       2     0  0.0     0 [irq/63-pciehp]\n    102       2     0  0.0     0 [irq/64-aerdrv]\n    103       2     0  0.0     0 [irq/64-pciehp]\n    104       2     0  0.0     0 [irq/65-aerdrv]\n    105       2     0  0.0     0 [irq/65-pciehp]\n    106       2     0  0.0     0 [irq/66-aerdrv]\n    107       2     0  0.0     0 [irq/66-pciehp]\n    108       2     0  0.0     0 [irq/67-aerdrv]\n    109       2     0  0.0     0 [irq/67-pciehp]\n    110       2     0  0.0     0 [irq/68-aerdrv]\n    111       2     0  0.0     0 [irq/68-pciehp]\n    112       2     0  0.0     0 [irq/69-aerdrv]\n    113       2     0  0.0     0 [irq/69-pciehp]\n    114       2     0  0.0     0 [irq/70-aerdrv]\n    115       2     0  0.0     0 [irq/70-pciehp]\n    116       2     0  0.0     0 [irq/71-aerdrv]\n    117       2     0  0.0     0 [irq/71-pciehp]\n    118       2     0  0.0     0 [irq/72-aerdrv]\n    119       2     0  0.0     0 [irq/72-pciehp]\n    120       2     0  0.0     0 [irq/73-aerdrv]\n    121       2     0  0.0     0 [irq/73-pciehp]\n    122       2     0  0.0     0 [irq/49-ACPI:Ged]\n    123       2     0  0.0     0 [kworker/R-acpi_thermal_pm]\n    124       2     0  0.0     0 [kworker/R-vfio-irqfd-cleanup]\n    125       2     0  0.0     0 [kworker/R-bch_btree_io]\n    126       2     0  0.0     0 [kworker/R-bcache]\n    127       2     0  0.0     0 [kworker/R-bch_journal]\n    128       2     0  0.0     0 [hwrng]\n    129       2     0  0.0     0 [kworker/R-mld]\n    130       2     0  0.0     0 [kworker/1:1H-xfs-log/dm-1]\n    131       2     0  0.0     0 [kworker/R-ipv6_addrconf]\n    132       2     0  0.0     0 [kworker/R-dsa_ordered]\n    133       2     0  0.0     0 [kworker/R-kstrp]\n    139       2     0  0.0     0 [kworker/u9:0]\n    375       2     0  0.0     0 [kworker/R-iscsi_conn_cleanup]\n    377       2     0  0.0     0 [kworker/R-tls-strp]\n    378       2     0  0.0     0 [kworker/R-cnic_wq]\n    379       2     0  0.0     0 [bnx2i_thread/0]\n    380       2     0  0.0     0 [bnx2i_thread/1]\n    461       2     0  0.0     0 [kworker/R-rpciod]\n    462       2     0  0.0     0 [kworker/R-xprtiod]\n    566       2     0  0.0     0 [scsi_eh_0]\n    570       2     0  0.0     0 [kworker/R-scsi_tmf_0]\n    625       2     0  0.0     0 [kworker/R-nvme-wq]\n    626       2     0  0.0     0 [kworker/R-nvme-reset-wq]\n    627       2     0  0.0     0 [kworker/R-nvme-delete-wq]\n    628       2     0  0.0     0 [kworker/R-nvme-auth-wq]\n    629       2     0  0.0     0 [kworker/R-nvme_tcp_wq]\n    931       2     0  0.0     0 [kworker/R-kdmflush/252:0]\n    940       2     0  0.0     0 [kworker/R-kdmflush/252:1]\n    964       2     0  0.0     0 [kworker/R-xfsalloc]\n    965       2     0  0.0     0 [kworker/R-xfs_mru_cache]\n    966       2     0  0.0     0 [kworker/R-xfs-buf/dm-0]\n    967       2     0  0.0     0 [kworker/R-xfs-conv/dm-0]\n    968       2     0  0.0     0 [kworker/R-xfs-reclaim/dm-0]\n    969       2     0  0.0     0 [kworker/R-xfs-blockgc/dm-0]\n    970       2     0  0.0     0 [kworker/R-xfs-inodegc/dm-0]\n    971       2     0  0.0     0 [kworker/R-xfs-log/dm-0]\n    972       2     0  0.0     0 [kworker/R-xfs-cil/dm-0]\n    973       2     0  0.0     0 [xfsaild/dm-0]\n   1080       1     0  0.0 25240 /usr/lib/systemd/systemd-journald\n   1108       1     0  0.0  5132 /usr/lib/systemd/systemd-udevd\n   1454       2     0  0.0     0 [kworker/R-xfs-buf/sda2]\n   1455       2     0  0.0     0 [kworker/R-xfs-conv/sda2]\n   1457       2     0  0.0     0 [kworker/R-xfs-reclaim/sda2]\n   1458       2     0  0.0     0 [kworker/R-xfs-blockgc/sda2]\n   1459       2     0  0.0     0 [kworker/R-xfs-inodegc/sda2]\n   1461       2     0  0.0     0 [kworker/R-xfs-log/sda2]\n   1462       2     0  0.0     0 [kworker/R-xfs-cil/sda2]\n   1463       2     0  0.0     0 [xfsaild/sda2]\n   1464       2     0  0.0     0 [kworker/R-xfs-buf/dm-1]\n   1465       2     0  0.0     0 [kworker/R-xfs-conv/dm-1]\n   1466       2     0  0.0     0 [kworker/R-xfs-reclaim/dm-1]\n   1467       2     0  0.0     0 [kworker/R-xfs-blockgc/dm-1]\n   1468       2     0  0.0     0 [kworker/R-xfs-inodegc/dm-1]\n   1469       2     0  0.0     0 [kworker/R-xfs-log/dm-1]\n   1470       2     0  0.0     0 [kworker/R-xfs-cil/dm-1]\n   1471       2     0  0.0     0 [xfsaild/dm-1]\n   1505       1    32  0.0  2560 /usr/bin/rpcbind -w -f\n   1506       1     0  0.0  2080 /sbin/auditd\n   1508    1506     0  0.0  2604 /usr/sbin/sedispatch\n   1535       1    81  0.0  2880 /usr/bin/dbus-broker-launch --scope system --audit\n   1536       1     0  0.0  1508 /usr/sbin/dtprobed -F\n   1541    1536     0  0.0   640 /usr/sbin/dtprobed -F\n   1543    1535    81  0.0  2248 dbus-broker --log 4 --controller 9 --machine-id 17531f2fd367415ca1173d370692f492 --max-bytes 536870912 --max-fds 4096 --max-matches 131072 --audit\n   1546       1     0  0.0  2548 /usr/bin/python3 -s /usr/sbin/firewalld --nofork --nopid\n   1548       1     0  0.0  2816 /usr/sbin/irqbalance\n   1549       1   995  0.0  1360 /usr/bin/lsmd -d\n   1551       1     0  0.0  9552 /usr/lib/systemd/systemd-logind\n   1687       1     0  0.0 12708 /usr/sbin/NetworkManager --no-daemon\n   1688       1   997  0.0  9000 /usr/lib/polkit-1/polkitd --no-debug\n   1705       1     0  0.0  4220 /usr/libexec/nm-dispatcher --persist\n   1712       1     0  0.0 11568 /usr/bin/python3 -Es /usr/sbin/tuned -l -P\n   1720       1     0  0.0  3640 /usr/sbin/gssproxy -D\n   2198       1     0  0.0 12216 /usr/sbin/iscsid -f -d2\n   2220       1     0  0.0 10056 /usr/sbin/rsyslogd -n\n   2224       1     0  0.0  6576 sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups\n   2228       1   992  0.0  1652 /usr/sbin/chronyd -F 2\n   2292       1     0  0.0  6132 /usr/sbin/atd -f\n   2297       1     0  0.0  3952 /usr/sbin/crond -n\n   2299       1     0  0.0  1236 /sbin/agetty -o -p -- \\u --noclear - linux\n   2301       1     0  0.0  1240 /sbin/agetty -o -p -- \\u --keep-baud 115200,57600,38400,9600 - vt220\n   2434       1   991  0.0  7856 /usr/libexec/pcp/bin/pmcd -A\n   2450    2434     0  0.0  6592 /var/lib/pcp/pmdas/root/pmdaroot\n   2466    2450     0  0.0  6584 /var/lib/pcp/pmdas/xfs/pmdaxfs -d 11\n   2470    2450     0  0.0  7916 /var/lib/pcp/pmdas/linux/pmdalinux -A\n   2475    2450     0  0.0 12708 /usr/bin/python3 /var/lib/pcp/pmdas/nfsclient/pmdanfsclient.python\n   2532    2450     0  0.0  6588 /var/lib/pcp/pmdas/kvm/pmdakvm -d 95\n   2536    2450     0  0.0  6820 /var/lib/pcp/pmdas/dm/pmdadm -d 129\n   2543    2450   991  0.0  8836 /usr/bin/python3 /var/lib/pcp/pmdas/openmetrics/pmdaopenmetrics.python\n   2642       1   988  0.0 12588 /usr/lib/systemd/systemd --user\n   2644    2642   988  0.0   944 (sd-pam)\n   2710       1   988  0.0  7804 /usr/libexec/oracle-cloud-agent/plugins/runcommand/runcommand\n   3338       1   991  0.0  7692 /usr/bin/pmie -b -m pmie_check -F -P -l /var/oled/pcp/pmie/instance-20260923-1013/pmie.log -c config.default\n   3348       1   991  0.0 18936 /usr/libexec/pcp/bin/pmlogger -N -P -d \"/var/oled/pcp/pmlogger/LOCALHOSTNAME\" -r -T24h10m -c config.ora -v 100mb -mreexec %Y%m%d.%H.%M\n   3357       1   991  0.0  6380 /usr/libexec/pcp/bin/pmpause\n   3480       1   991  0.0  6228 /usr/libexec/pcp/bin/pmpause\n  13365       2     0  0.0     0 [spl_system_task]\n  13366       2     0  0.0     0 [spl_delay_taskq]\n  13367       2     0  0.0     0 [spl_dynamic_tas]\n  13368       2     0  0.0     0 [spl_kmem_cache]\n  13371       2     0  0.0     0 [zvol_tq-0]\n  13372       2     0  0.0     0 [arc_prune]\n  13373       2     0  0.0     0 [arc_evict]\n  13374       2     0  0.0     0 [arc_reap]\n  13375       2     0  0.0     0 [dbu_evict]\n  13376       2     0  0.0     0 [dbuf_evict]\n  13377       2     0  0.0     0 [z_vdev_file]\n  13378       2     0  0.0     0 [l2arc_feed]\n  30822       2     0  0.0     0 [z_null_iss]\n  30823       2     0  0.0     0 [z_null_int]\n  30824       2     0  0.0     0 [z_rd_iss]\n  30825       2     0  0.0     0 [z_rd_int]\n  30826       2     0  0.0     0 [z_wr_iss]\n  30827       2     0  0.0     0 [z_wr_iss_h]\n  30828       2     0  0.0     0 [z_wr_int]\n  30829       2     0  0.0     0 [z_wr_int_h]\n  30830       2     0  0.0     0 [z_fr_iss]\n  30831       2     0  0.0     0 [z_fr_int]\n  30832       2     0  0.0     0 [z_cl_iss]\n  30833       2     0  0.0     0 [z_cl_int]\n  30834       2     0  0.0     0 [z_ioctl_iss]\n  30835       2     0  0.0     0 [z_ioctl_int]\n  30836       2     0  0.0     0 [z_trim_iss]\n  30837       2     0  0.0     0 [z_trim_int]\n  30838       2     0  0.0     0 [z_zvol]\n  30839       2     0  0.0     0 [z_metaslab]\n  30840       2     0  0.0     0 [z_prefetch]\n  30841       2     0  0.0     0 [z_upgrade]\n  30844       2     0  0.0     0 [dp_sync_taskq]\n  30845       2     0  0.0     0 [dp_zil_clean_ta]\n  30846       2     0  0.0     0 [dp_zil_clean_ta]\n  30847       2     0  0.0     0 [z_zrele]\n  30848       2     0  0.0     0 [z_unlinked_drai]\n  30849       2     0  0.0     0 [txg_quiesce]\n  30850       2     0  0.0     0 [txg_sync]\n  30851       2     0  0.0     0 [mmp]\n  30862       2     0  0.0     0 [z_indirect_cond]\n  30863       2     0  0.0     0 [z_livelist_dest]\n  30864       2     0  0.0     0 [z_livelist_cond]\n  30865       2     0  0.0     0 [z_checkpoint_di]\n 122339       1   990  0.0 19504 /usr/libexec/oracle-cloud-agent/agent\n 122376  122339   990  0.0 22164 /usr/libexec/oracle-cloud-agent/plugins/gomon/gomon\n 122390  122339   990  0.0 22432 /usr/libexec/oracle-cloud-agent/plugins/oci-wlp/oci-wlp\n 122398       1   989  0.0 15908 /usr/libexec/oracle-cloud-agent/updater/updater\n 122496  122339     0  0.0  6124 /usr/bin/sudo -u ocarun /usr/libexec/oracle-cloud-agent/plugins/runcommand/runcommand\n 122498  122496   988  0.0 18660 /usr/libexec/oracle-cloud-agent/plugins/runcommand/runcommand\n 122507  122339   990  0.0 17520 /usr/libexec/oracle-cloud-agent/plugins/unifiedmonitoring/unifiedmonitoring\n 122643       1     0  0.0 16924 /opt/unified-monitoring-agent/embedded/bin/ruby /opt/unified-monitoring-agent/embedded/bin/fluentd --log /var/log/unified-monitoring-agent/unified-monitoring-agent.log --log-rotate-size 1048576 --log-rotate-age 10\n 122657  122643     0  0.0  5872 /opt/unified-monitoring-agent/embedded/bin/ruby -Eascii-8bit:ascii-8bit /opt/unified-monitoring-agent/embedded/bin/fluentd --log /var/log/unified-monitoring-agent/unified-monitoring-agent.log --log-rotate-size 1048576 --log-rotate-age 10 --under-supervisor\n2223140    2450     0  0.0  9236 /var/lib/pcp/pmdas/proc/pmdaproc -d 3\n2460085       2     0  0.0     0 [kworker/u8:0-events_unbound]\n2461842       2     0  0.0     0 [z_wr_iss_h]\n2461844       2     0  0.0     0 [z_wr_iss_h]\n2461845       2     0  0.0     0 [z_wr_int_h]\n2461847       2     0  0.0     0 [z_wr_int_h]\n2463638       2     0  0.0     0 [kworker/1:0-events]\n2463822       2     0  0.0     0 [kworker/u8:3-flush-252:0]\n2464873       2     0  0.0     0 [kworker/0:0-cgroup_free]\n2464962       2     0  0.0     0 [kworker/0:2-mm_percpu_wq]\n2465190       2     0  0.0     0 [kworker/1:3-xfs-sync/sda2]\n2465242       2     0  0.0     0 [kworker/u8:2-flush-252:0]\n2465605       2     0  0.0     0 [z_rd_iss]\n2465606       2     0  0.0     0 [z_rd_iss]\n2465608       2     0  0.0     0 [z_rd_iss]\n2465609       2     0  0.0     0 [z_rd_iss]\n2465610       2     0  0.0     0 [z_rd_iss]\n2465611       2     0  0.0     0 [z_rd_iss]\n2465949       2     0  0.0     0 [kworker/0:1-cgroup_release]\n2469071       2     0  0.0     0 [kworker/1:2-events]\n2469106       2     0  0.0     0 [z_zrele]\n2469271       2     0  0.0     0 [kworker/0:3-rcu_gp]\n2469276       2     0  0.0     0 [kworker/u8:1-kvfree_rcu_reclaim]\n2469553 2469551  1000  0.0  8092 (sd-pam)\n2469621 2469595     0  0.0 13472 ps -eo pid,ppid,uid,pcpu,rss,args --sort=-pcpu",
+  "policy": {
+    "pressure_sample_interval_ms": 5000,
+    "backend_memory_max_bytes": 268435456,
+    "backend_memory_high_bytes": 201326592,
+    "backend_memory_swap_max_bytes": 0,
+    "request_timeout_ms": 5000,
+    "drain_timeout_ms": 15000,
+    "internal_shutdown_timeout_ms": 15000,
+    "parent_stop_watchdog_ms": 20000,
+    "controller_child_stop_wait_seconds": 5,
+    "controller_timeout_seconds": 1200,
+    "arrival_modes": [
+      "synchronized",
+      "staggered"
+    ],
+    "cells": 16,
+    "planned_requests": 1014000,
+    "full_population_oracles": 32
+  },
+  "scope": "E2 tiny correctness gates and matched N28 arrival-phase controls; no frontier or adoption claim"
+}

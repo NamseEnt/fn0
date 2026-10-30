@@ -152,3 +152,9 @@ The full issue describes A1-A5, B1-B4, E0-E4, all-active versus sparse-active ca
 ## Completion boundary for this issue
 
 The issue remains open because the A1 and harness increments do not complete the density comparison or structural objective. Use the checklist in PLAN.md and the acceptance status in A1-RESULTS.md and DENSITY-HARNESS-RESULTS.md without rewriting failed or historical evidence. Do not promote defaults or close the issue based on local overwrite/recovery diagnostics or tiny harness smokes.
+
+## Completed arrival controls and resident-frontier continuation
+
+Read [E2-ARRIVAL-PHASE-RESULTS.md](E2-ARRIVAL-PHASE-RESULTS.md) and `evidence/arrival-phase/final-review.json`. All sixteen controls are operationally valid, with 1,014,000 successful requests, 32 oracles, sixteen preserved databases, eighty exited workload identities, and empty collected cgroups. Twenty-eight-tenant synchronized SLO passes are B-link 3/3 versus shared RocksDB 1/3; staggered passes are 2/3 versus 3/3. No consistent B-link density advantage follows. The local review reproduces these results; all 26 Python checks pass.
+
+The operational cohort is valid despite its aggregate `accepted_run: false` SLO flag. Only shared RocksDB has an accepted staggered twenty-eight-tenant baseline for [E2-RESIDENT-FRONTIER-PLAN.md](E2-RESIDENT-FRONTIER-PLAN.md). Preserve original evidence and reuse the pinned default runtime binaries. Freeze the reviewed frontier controller before execution; every operational failure stops its entire new cohort.

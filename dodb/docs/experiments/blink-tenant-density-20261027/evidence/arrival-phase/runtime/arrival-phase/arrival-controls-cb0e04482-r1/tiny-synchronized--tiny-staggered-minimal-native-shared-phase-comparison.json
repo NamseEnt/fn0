@@ -1,0 +1,23 @@
+{
+  "recipe_matches": true,
+  "request_matches": {
+    "request_count": true,
+    "request_fingerprint": true,
+    "per_tenant_requests": true
+  },
+  "schedule_identity_differs": true,
+  "expected_staggered_offsets_ns": [
+    0,
+    6666666,
+    13333333
+  ],
+  "realized_matches": {
+    "scheduled_fingerprint": false,
+    "scheduled": true,
+    "admitted": true,
+    "completed": true,
+    "successful": true
+  },
+  "realized_difference_observed": true,
+  "either_mode_dropped_requests": false
+}

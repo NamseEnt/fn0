@@ -1,0 +1,906 @@
+{
+  "case": "tiny-synchronized-blink",
+  "backend": "blink",
+  "mode": "synchronized",
+  "stage": "E2",
+  "registered": 4,
+  "active": 3,
+  "idle": 1,
+  "duration_ms": 10000,
+  "sample_interval_ms": 5000,
+  "exit_code": 0,
+  "elapsed_seconds": 16.118553877808154,
+  "capacity_after": {
+    "timestamp_unix_seconds": 1793328542.8509314,
+    "zfs_free_bytes": 28683300864,
+    "boot_free_bytes": 5348691968,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 4969009152,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3895267328,
+      "Dirty": 552960,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5713788928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5631994536,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11395152       15 482841096 14304405 119860796   208677 6193084988 193692700        0 56153032 208007740     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  10229251 307278 5381607 498789486 1345036 337507 163397 1722606 0 0",
+      "cpu0 5128734 145088 2693236 249386874 682854 167675 82507 849872 0 0",
+      "cpu1 5100516 162189 2688370 249402612 662182 169832 80889 872734 0 0"
+    ]
+  },
+  "stop_reason": null,
+  "owned_process_limits": [
+    {
+      "role": "owned-workload-process",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469627,
+      "start_time_ticks": 259019830,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469627,
+      "start_time_ticks": 259019830,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469642,
+      "start_time_ticks": 259020044,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469642,
+      "start_time_ticks": 259020044,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469642,
+      "start_time_ticks": 259020044,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469642,
+      "start_time_ticks": 259020044,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469642,
+      "start_time_ticks": 259020044,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469642,
+      "start_time_ticks": 259020044,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469642,
+      "start_time_ticks": 259020044,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469642,
+      "start_time_ticks": 259020044,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469642,
+      "start_time_ticks": 259020044,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469642,
+      "start_time_ticks": 259020044,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469650,
+      "start_time_ticks": 259021081,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469622,
+      "start_time_ticks": 259019815,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469650,
+      "start_time_ticks": 259021081,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    }
+  ],
+  "report_sha256": "8bb3f60de4faacf8a4ec44b9fa6ec1404613f061d1d0edf861532135bb55b609",
+  "reduced": {
+    "backend": "blink",
+    "registered": 4,
+    "active": 3,
+    "initial_rows": 2048,
+    "duration_ms": 10000,
+    "sample_interval_ms": 5000,
+    "status": "completed",
+    "cell_peak_bytes": 13283328,
+    "cell_events": {
+      "high": 0,
+      "low": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_group_kill": 0,
+      "oom_kill": 0
+    },
+    "epoch_peaks_bytes": {
+      "measurement": 12972032,
+      "oracle": 11661312,
+      "reopen-oracle": 11825152,
+      "setup": 11382784
+    },
+    "epoch_events": {
+      "measurement": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "oracle": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "reopen-oracle": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "setup": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      }
+    },
+    "operational_pass": true,
+    "slo_pass": true,
+    "resource_failure": false,
+    "failure_reason": null,
+    "measurement_sample_count": 2,
+    "maximum_measurement_sample_gap_ms": 5001,
+    "native_measurement_sample_count": 3,
+    "native_serialized_bytes": 3489,
+    "native_samples_truncated": false,
+    "process_sampling": {
+      "backend": {
+        "fields": {
+          "anonymous_kb": {
+            "available_observations": 12,
+            "observed_max": 13048,
+            "unavailable_observations": 0
+          },
+          "file_kb": {
+            "available_observations": 12,
+            "observed_max": 10223,
+            "unavailable_observations": 0
+          },
+          "pss_kb": {
+            "available_observations": 12,
+            "observed_max": 23271,
+            "unavailable_observations": 0
+          },
+          "rss_kb": {
+            "available_observations": 12,
+            "observed_max": 25876,
+            "unavailable_observations": 0
+          },
+          "swap_kb": {
+            "available_observations": 12,
+            "observed_max": 0,
+            "unavailable_observations": 0
+          },
+          "vm_hwm_kb": {
+            "available_observations": 12,
+            "observed_max": 25876,
+            "unavailable_observations": 0
+          }
+        },
+        "sample_count": 12
+      },
+      "backend_pid": 2469642,
+      "backend_start_time_ticks": 259020044,
+      "boundary_snapshots_requested": 2,
+      "driver": {
+        "fields": {
+          "anonymous_kb": {
+            "available_observations": 12,
+            "observed_max": 2624,
+            "unavailable_observations": 0
+          },
+          "file_kb": {
+            "available_observations": 12,
+            "observed_max": 9986,
+            "unavailable_observations": 0
+          },
+          "pss_kb": {
+            "available_observations": 12,
+            "observed_max": 12610,
+            "unavailable_observations": 0
+          },
+          "rss_kb": {
+            "available_observations": 12,
+            "observed_max": 15408,
+            "unavailable_observations": 0
+          },
+          "swap_kb": {
+            "available_observations": 12,
+            "observed_max": 0,
+            "unavailable_observations": 0
+          },
+          "vm_hwm_kb": {
+            "available_observations": 12,
+            "observed_max": 15408,
+            "unavailable_observations": 0
+          }
+        },
+        "sample_count": 12
+      },
+      "field_sources": {
+        "anonymous_kb": "smaps_rollup Anonymous",
+        "file_kb": "smaps_rollup Pss_File, not file RSS",
+        "pss_kb": "smaps_rollup Pss",
+        "rss_kb": "VmRSS or smaps_rollup Rss",
+        "swap_kb": "smaps_rollup Swap or VmSwap",
+        "vm_hwm_kb": "VmHWM"
+      },
+      "maximum_observed_gap_ms": 1002,
+      "peak_scope": "sampled observations only; instantaneous peaks between samples can be missed",
+      "periodic_offer_sample_count": 10,
+      "phase_periodic_sample_count_before_identity_filter": 10,
+      "process_samples_truncated": false,
+      "same_backend_identity_at_offer_boundaries": true,
+      "scope": "offer phase and its boundaries, separated by PID/start-time; no setup/oracle samples or engine-heap claim",
+      "status": "sampled",
+      "vm_hwm_scope": "process lifetime high-water includes earlier measurement-worker startup and open phases"
+    },
+    "backend_offer_cpu_usec": 367843,
+    "backend_offer_io_delta": {
+      "cancelled_write_bytes": 0,
+      "rchar": 18,
+      "read_bytes": 0,
+      "syscr": 1,
+      "syscw": 1804,
+      "wchar": 1119502,
+      "write_bytes": 1110270
+    },
+    "whole_device_offer_write_bytes": 4710400,
+    "filesystem_snapshots": {
+      "after_measurement_worker_shutdown": {
+        "allocated_directory_bytes": 60416,
+        "allocated_file_bytes": 14153216,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 6,
+        "distinct_files": 35,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 13650096,
+        "regular_file_paths": 35,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "after_oracle_worker_shutdown": {
+        "allocated_directory_bytes": 60416,
+        "allocated_file_bytes": 14153216,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 6,
+        "distinct_files": 35,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 13650096,
+        "regular_file_paths": 35,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "after_reopen_oracle_worker_shutdown": {
+        "allocated_directory_bytes": 60416,
+        "allocated_file_bytes": 14153216,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 6,
+        "distinct_files": 35,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 13650096,
+        "regular_file_paths": 35,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "after_setup_worker_shutdown": {
+        "allocated_directory_bytes": 60416,
+        "allocated_file_bytes": 13008896,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 6,
+        "distinct_files": 32,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 12529472,
+        "regular_file_paths": 32,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "before_setup": {
+        "allocated_file_bytes": null,
+        "logical_file_bytes": null,
+        "status": "not_created"
+      }
+    },
+    "offer_elapsed_ms": 10002,
+    "scheduled": 1500,
+    "successful": 1500,
+    "dropped": 0,
+    "completed_at_offer_end": 1500,
+    "offer_throughput_completed_per_second": 149.97000599880025,
+    "aggregate_p99": {
+      "Get": {
+        "bucket": 21,
+        "lower_inclusive_ns": 1048576,
+        "upper_exclusive_ns": 2097152
+      },
+      "Query": {
+        "bucket": 22,
+        "lower_inclusive_ns": 2097152,
+        "upper_exclusive_ns": 4194304
+      },
+      "Write": {
+        "bucket": 25,
+        "lower_inclusive_ns": 16777216,
+        "upper_exclusive_ns": 33554432
+      }
+    },
+    "per_tenant_objective": [
+      {
+        "tenant": 1,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 21,
+            "lower_inclusive_ns": 1048576,
+            "upper_exclusive_ns": 2097152
+          },
+          "Query": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Write": {
+            "bucket": 25,
+            "lower_inclusive_ns": 16777216,
+            "upper_exclusive_ns": 33554432
+          }
+        },
+        "completed_at_offer_end": 500,
+        "passed": true
+      },
+      {
+        "tenant": 2,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 21,
+            "lower_inclusive_ns": 1048576,
+            "upper_exclusive_ns": 2097152
+          },
+          "Query": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Write": {
+            "bucket": 25,
+            "lower_inclusive_ns": 16777216,
+            "upper_exclusive_ns": 33554432
+          }
+        },
+        "completed_at_offer_end": 500,
+        "passed": true
+      },
+      {
+        "tenant": 3,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 21,
+            "lower_inclusive_ns": 1048576,
+            "upper_exclusive_ns": 2097152
+          },
+          "Query": {
+            "bucket": 21,
+            "lower_inclusive_ns": 1048576,
+            "upper_exclusive_ns": 2097152
+          },
+          "Write": {
+            "bucket": 25,
+            "lower_inclusive_ns": 16777216,
+            "upper_exclusive_ns": 33554432
+          }
+        },
+        "completed_at_offer_end": 500,
+        "passed": true
+      }
+    ],
+    "worst_tenant_p99_upper_exclusive_ms": {
+      "Get": 2.097152,
+      "Query": 4.194304,
+      "Write": 33.554432
+    },
+    "checkpoint_metrics": {
+      "capacity_wait_count": 0,
+      "capacity_wait_nanos": 0,
+      "checkpoint_events": [],
+      "checkpoint_max_nanos": 0,
+      "checkpoint_total_nanos": 0,
+      "checkpoint_wal_syncs": 0,
+      "checkpoints_completed": 0,
+      "checkpoints_failed": 0,
+      "checkpoints_started": 0,
+      "commit_wal_syncs": 607,
+      "coordinator_pause_nanos": 0,
+      "execution": "background",
+      "failed_message": null,
+      "merged_checkpoint_requests": 0,
+      "mutation_commit_groups": 604,
+      "omitted_checkpoint_events": 0,
+      "peak_retained_image_bytes_normalized_page_images": 0,
+      "peak_tasks_running": 0,
+      "policy": {
+        "mode": "wal_bytes_threshold",
+        "threshold_bytes": 1048576
+      },
+      "retained_image_bytes_normalized_page_images": 0,
+      "status": "sampled",
+      "successful_mutation_transactions": 604,
+      "tasks_running": 0,
+      "threshold_bytes": 1048576,
+      "threshold_excess_max_bytes": 0,
+      "transaction_group_count": 604,
+      "transaction_group_histogram": [
+        0,
+        604
+      ],
+      "wal_bytes_at_measurement_end": 789814,
+      "wal_bytes_at_measurement_start": 399932,
+      "wal_bytes_current": 789814,
+      "wal_bytes_max": 789814,
+      "wal_syncs": 607,
+      "writes_during_checkpoint": 0
+    },
+    "native_first_last": [
+      {
+        "blink_checkpoints": {
+          "capacity_wait_count": 0,
+          "capacity_wait_nanos": 0,
+          "checkpoint_max_nanos": 0,
+          "checkpoint_total_nanos": 0,
+          "checkpoint_wal_syncs": 0,
+          "checkpoints_completed": 0,
+          "checkpoints_failed": 0,
+          "checkpoints_started": 0,
+          "commit_wal_syncs": 0,
+          "coordinator_pause_nanos": 0,
+          "detail_scope": "cumulative counters only; event details and group histogram are retained in the final worker report",
+          "execution": "background",
+          "failed_message": null,
+          "merged_checkpoint_requests": 0,
+          "mutation_commit_groups": 0,
+          "omitted_checkpoint_events": 0,
+          "peak_retained_image_bytes_normalized_page_images": 0,
+          "peak_tasks_running": 0,
+          "policy": {
+            "mode": "wal_bytes_threshold",
+            "threshold_bytes": 1048576
+          },
+          "retained_image_bytes_normalized_page_images": 0,
+          "status": "sampled",
+          "successful_mutation_transactions": 0,
+          "tasks_running": 0,
+          "threshold_bytes": 1048576,
+          "threshold_excess_max_bytes": 0,
+          "transaction_group_count": 0,
+          "wal_bytes_at_measurement_end": null,
+          "wal_bytes_at_measurement_start": null,
+          "wal_bytes_current": 0,
+          "wal_bytes_max": 0,
+          "wal_syncs": 0,
+          "writes_during_checkpoint": 0
+        },
+        "phase": "before-measurement",
+        "rocksdb_properties": null,
+        "shared_resources": null,
+        "timestamp_unix_ms": 1793328529165
+      },
+      {
+        "blink_checkpoints": {
+          "capacity_wait_count": 0,
+          "capacity_wait_nanos": 0,
+          "checkpoint_max_nanos": 0,
+          "checkpoint_total_nanos": 0,
+          "checkpoint_wal_syncs": 0,
+          "checkpoints_completed": 0,
+          "checkpoints_failed": 0,
+          "checkpoints_started": 0,
+          "commit_wal_syncs": 601,
+          "coordinator_pause_nanos": 0,
+          "detail_scope": "cumulative counters only; event details and group histogram are retained in the final worker report",
+          "execution": "background",
+          "failed_message": null,
+          "merged_checkpoint_requests": 0,
+          "mutation_commit_groups": 598,
+          "omitted_checkpoint_events": 0,
+          "peak_retained_image_bytes_normalized_page_images": 0,
+          "peak_tasks_running": 0,
+          "policy": {
+            "mode": "wal_bytes_threshold",
+            "threshold_bytes": 1048576
+          },
+          "retained_image_bytes_normalized_page_images": 0,
+          "status": "sampled",
+          "successful_mutation_transactions": 598,
+          "tasks_running": 0,
+          "threshold_bytes": 1048576,
+          "threshold_excess_max_bytes": 0,
+          "transaction_group_count": 598,
+          "wal_bytes_at_measurement_end": 763894,
+          "wal_bytes_at_measurement_start": 399932,
+          "wal_bytes_current": 763894,
+          "wal_bytes_max": 788477,
+          "wal_syncs": 601,
+          "writes_during_checkpoint": 0
+        },
+        "phase": "measurement-including-drain",
+        "rocksdb_properties": null,
+        "shared_resources": null,
+        "timestamp_unix_ms": 1793328539114
+      }
+    ],
+    "offer_boundary_process_identities": {
+      "before": {
+        "processes": [
+          {
+            "anonymous_kb": 2024,
+            "file_kb": 9986,
+            "pid": 2469622,
+            "process_group_id": 2469622,
+            "pss_kb": 12010,
+            "role": "harness-process",
+            "rss_kb": 14808,
+            "start_time_ticks": 259019815,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 14808
+          },
+          {
+            "pid": 2469627,
+            "process_group_id": 2469622,
+            "role": "backend-process",
+            "start_time_ticks": 259019830,
+            "status": "exited-or-pid-reused"
+          },
+          {
+            "anonymous_kb": 12224,
+            "file_kb": 10223,
+            "pid": 2469642,
+            "process_group_id": 2469622,
+            "pss_kb": 22447,
+            "role": "backend-process",
+            "rss_kb": 25052,
+            "start_time_ticks": 259020044,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 25052
+          }
+        ],
+        "timestamp_unix_ms": 1793328529220
+      },
+      "after": {
+        "processes": [
+          {
+            "anonymous_kb": 2624,
+            "file_kb": 9986,
+            "pid": 2469622,
+            "process_group_id": 2469622,
+            "pss_kb": 12610,
+            "role": "harness-process",
+            "rss_kb": 15408,
+            "start_time_ticks": 259019815,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 15408
+          },
+          {
+            "pid": 2469627,
+            "process_group_id": 2469622,
+            "role": "backend-process",
+            "start_time_ticks": 259019830,
+            "status": "exited-or-pid-reused"
+          },
+          {
+            "anonymous_kb": 13048,
+            "file_kb": 10223,
+            "pid": 2469642,
+            "process_group_id": 2469622,
+            "pss_kb": 23271,
+            "role": "backend-process",
+            "rss_kb": 25876,
+            "start_time_ticks": 259020044,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 25876
+          }
+        ],
+        "timestamp_unix_ms": 1793328539222
+      }
+    }
+  }
+}

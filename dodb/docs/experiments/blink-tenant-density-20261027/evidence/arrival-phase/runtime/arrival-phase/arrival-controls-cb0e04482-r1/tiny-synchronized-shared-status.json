@@ -1,0 +1,1245 @@
+{
+  "case": "tiny-synchronized-shared",
+  "backend": "minimal-native-shared",
+  "mode": "synchronized",
+  "stage": "E2",
+  "registered": 4,
+  "active": 3,
+  "idle": 1,
+  "duration_ms": 10000,
+  "sample_interval_ms": 5000,
+  "exit_code": 0,
+  "elapsed_seconds": 18.128811138682067,
+  "capacity_after": {
+    "timestamp_unix_seconds": 1793328560.987167,
+    "zfs_free_bytes": 28675239936,
+    "boot_free_bytes": 5348122624,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 4976611328,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3895267328,
+      "Dirty": 798720,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5713788928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5646125728,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11395152       15 482841096 14304405 119862395   208677 6193132276 193694242        0 56154584 208009282     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  10229580 307278 5381938 498792331 1345046 337530 163439 1722637 0 0",
+      "cpu0 5128903 145088 2693389 249388304 682857 167685 82528 849872 0 0",
+      "cpu1 5100676 162189 2688548 249404026 662188 169844 80910 872764 0 0"
+    ]
+  },
+  "stop_reason": null,
+  "owned_process_limits": [
+    {
+      "role": "owned-workload-process",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469743,
+      "start_time_ticks": 259021571,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469743,
+      "start_time_ticks": 259021571,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469743,
+      "start_time_ticks": 259021571,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469743,
+      "start_time_ticks": 259021571,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469743,
+      "start_time_ticks": 259021571,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469743,
+      "start_time_ticks": 259021571,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469743,
+      "start_time_ticks": 259021571,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469743,
+      "start_time_ticks": 259021571,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469743,
+      "start_time_ticks": 259021571,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469743,
+      "start_time_ticks": 259021571,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469817,
+      "start_time_ticks": 259022609,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469817,
+      "start_time_ticks": 259022609,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469888,
+      "start_time_ticks": 259022827,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469888,
+      "start_time_ticks": 259022827,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469888,
+      "start_time_ticks": 259022827,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-workload-process",
+      "pid": 2469663,
+      "start_time_ticks": 259021428,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    },
+    {
+      "role": "owned-descendant",
+      "pid": 2469888,
+      "start_time_ticks": 259022827,
+      "limits": {
+        "soft": 65536,
+        "hard": 524288,
+        "units": "files"
+      }
+    }
+  ],
+  "report_sha256": "daa71fc9e3cec929b566d6f86404a993dbc467e3088fa227011ec463f3ed3d72",
+  "reduced": {
+    "backend": "minimal-native-shared",
+    "registered": 4,
+    "active": 3,
+    "initial_rows": 2048,
+    "duration_ms": 10000,
+    "sample_interval_ms": 5000,
+    "status": "completed",
+    "cell_peak_bytes": 8798208,
+    "cell_events": {
+      "high": 0,
+      "low": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_group_kill": 0,
+      "oom_kill": 0
+    },
+    "epoch_peaks_bytes": {
+      "measurement": 8515584,
+      "oracle": 7913472,
+      "reopen-oracle": 7860224,
+      "setup": 7352320
+    },
+    "epoch_events": {
+      "measurement": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "oracle": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "reopen-oracle": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      },
+      "setup": {
+        "high": 0,
+        "low": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_group_kill": 0,
+        "oom_kill": 0
+      }
+    },
+    "operational_pass": true,
+    "slo_pass": true,
+    "resource_failure": false,
+    "failure_reason": null,
+    "measurement_sample_count": 2,
+    "maximum_measurement_sample_gap_ms": 5001,
+    "native_measurement_sample_count": 3,
+    "native_serialized_bytes": 16457,
+    "native_samples_truncated": false,
+    "process_sampling": {
+      "backend": {
+        "fields": {
+          "anonymous_kb": {
+            "available_observations": 12,
+            "observed_max": 8636,
+            "unavailable_observations": 0
+          },
+          "file_kb": {
+            "available_observations": 12,
+            "observed_max": 10802,
+            "unavailable_observations": 0
+          },
+          "pss_kb": {
+            "available_observations": 12,
+            "observed_max": 18726,
+            "unavailable_observations": 0
+          },
+          "rss_kb": {
+            "available_observations": 12,
+            "observed_max": 21524,
+            "unavailable_observations": 0
+          },
+          "swap_kb": {
+            "available_observations": 12,
+            "observed_max": 0,
+            "unavailable_observations": 0
+          },
+          "vm_hwm_kb": {
+            "available_observations": 12,
+            "observed_max": 21632,
+            "unavailable_observations": 0
+          }
+        },
+        "sample_count": 12
+      },
+      "backend_pid": 2469743,
+      "backend_start_time_ticks": 259021571,
+      "boundary_snapshots_requested": 2,
+      "driver": {
+        "fields": {
+          "anonymous_kb": {
+            "available_observations": 12,
+            "observed_max": 2608,
+            "unavailable_observations": 0
+          },
+          "file_kb": {
+            "available_observations": 12,
+            "observed_max": 9970,
+            "unavailable_observations": 0
+          },
+          "pss_kb": {
+            "available_observations": 12,
+            "observed_max": 12490,
+            "unavailable_observations": 0
+          },
+          "rss_kb": {
+            "available_observations": 12,
+            "observed_max": 15304,
+            "unavailable_observations": 0
+          },
+          "swap_kb": {
+            "available_observations": 12,
+            "observed_max": 0,
+            "unavailable_observations": 0
+          },
+          "vm_hwm_kb": {
+            "available_observations": 12,
+            "observed_max": 15304,
+            "unavailable_observations": 0
+          }
+        },
+        "sample_count": 12
+      },
+      "field_sources": {
+        "anonymous_kb": "smaps_rollup Anonymous",
+        "file_kb": "smaps_rollup Pss_File, not file RSS",
+        "pss_kb": "smaps_rollup Pss",
+        "rss_kb": "VmRSS or smaps_rollup Rss",
+        "swap_kb": "smaps_rollup Swap or VmSwap",
+        "vm_hwm_kb": "VmHWM"
+      },
+      "maximum_observed_gap_ms": 1002,
+      "peak_scope": "sampled observations only; instantaneous peaks between samples can be missed",
+      "periodic_offer_sample_count": 10,
+      "phase_periodic_sample_count_before_identity_filter": 10,
+      "process_samples_truncated": false,
+      "same_backend_identity_at_offer_boundaries": true,
+      "scope": "offer phase and its boundaries, separated by PID/start-time; no setup/oracle samples or engine-heap claim",
+      "status": "sampled",
+      "vm_hwm_scope": "process lifetime high-water includes earlier measurement-worker startup and open phases"
+    },
+    "backend_offer_cpu_usec": 467906,
+    "backend_offer_io_delta": {
+      "cancelled_write_bytes": 0,
+      "rchar": 4360407,
+      "read_bytes": 4360389,
+      "syscr": 1136,
+      "syscw": 1988,
+      "wchar": 3553396,
+      "write_bytes": 3542645
+    },
+    "whole_device_offer_write_bytes": 7528448,
+    "filesystem_snapshots": {
+      "after_measurement_worker_shutdown": {
+        "allocated_directory_bytes": 35328,
+        "allocated_file_bytes": 7135232,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 5,
+        "distinct_files": 48,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 6675553,
+        "regular_file_paths": 48,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "after_oracle_worker_shutdown": {
+        "allocated_directory_bytes": 35328,
+        "allocated_file_bytes": 6944256,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 5,
+        "distinct_files": 59,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 6875315,
+        "regular_file_paths": 59,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "after_reopen_oracle_worker_shutdown": {
+        "allocated_directory_bytes": 35328,
+        "allocated_file_bytes": 6948352,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 5,
+        "distinct_files": 67,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 7040884,
+        "regular_file_paths": 67,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "after_setup_worker_shutdown": {
+        "allocated_directory_bytes": 18944,
+        "allocated_file_bytes": 1251328,
+        "allocation_source": "Unix st_blocks in 512-byte units, deduplicated by device/inode",
+        "directory_count": 5,
+        "distinct_files": 36,
+        "duplicate_hardlink_paths": 0,
+        "logical_file_bytes": 4890086,
+        "regular_file_paths": 36,
+        "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
+        "status": "sampled",
+        "unlinked_open_files": {
+          "bytes": null,
+          "status": "unsupported"
+        }
+      },
+      "before_setup": {
+        "allocated_file_bytes": null,
+        "logical_file_bytes": null,
+        "status": "not_created"
+      }
+    },
+    "offer_elapsed_ms": 10002,
+    "scheduled": 1500,
+    "successful": 1500,
+    "dropped": 0,
+    "completed_at_offer_end": 1500,
+    "offer_throughput_completed_per_second": 149.97000599880025,
+    "aggregate_p99": {
+      "Get": {
+        "bucket": 22,
+        "lower_inclusive_ns": 2097152,
+        "upper_exclusive_ns": 4194304
+      },
+      "Query": {
+        "bucket": 22,
+        "lower_inclusive_ns": 2097152,
+        "upper_exclusive_ns": 4194304
+      },
+      "Write": {
+        "bucket": 23,
+        "lower_inclusive_ns": 4194304,
+        "upper_exclusive_ns": 8388608
+      }
+    },
+    "per_tenant_objective": [
+      {
+        "tenant": 1,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Write": {
+            "bucket": 23,
+            "lower_inclusive_ns": 4194304,
+            "upper_exclusive_ns": 8388608
+          }
+        },
+        "completed_at_offer_end": 500,
+        "passed": true
+      },
+      {
+        "tenant": 2,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Write": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          }
+        },
+        "completed_at_offer_end": 500,
+        "passed": true
+      },
+      {
+        "tenant": 3,
+        "counts_pass": true,
+        "offer_rate_pass": true,
+        "latency_pass": true,
+        "p99": {
+          "Get": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Query": {
+            "bucket": 22,
+            "lower_inclusive_ns": 2097152,
+            "upper_exclusive_ns": 4194304
+          },
+          "Write": {
+            "bucket": 23,
+            "lower_inclusive_ns": 4194304,
+            "upper_exclusive_ns": 8388608
+          }
+        },
+        "completed_at_offer_end": 500,
+        "passed": true
+      }
+    ],
+    "worst_tenant_p99_upper_exclusive_ms": {
+      "Get": 4.194304,
+      "Query": 4.194304,
+      "Write": 8.388608
+    },
+    "checkpoint_metrics": {
+      "reason": "backend does not expose B-link checkpoint metrics",
+      "status": "unsupported",
+      "value": null
+    },
+    "native_first_last": [
+      {
+        "blink_checkpoints": {
+          "reason": "backend does not expose B-link checkpoint metrics",
+          "status": "unsupported",
+          "value": null
+        },
+        "phase": "before-measurement",
+        "rocksdb_properties": {
+          "databases": [],
+          "timestamp_unix_ms": 1793328544373
+        },
+        "shared_resources": {
+          "all_opened_tenants_use_shared_resources": true,
+          "opened_tenants": 0,
+          "scope": "service-wide snapshot counted once; non-atomic across native counters",
+          "tenants_verified_using_shared_resources": 0,
+          "usage": {
+            "cache_capacity_bytes": 67108864,
+            "cache_pinned_usage_bytes": 0,
+            "cache_usage_bytes": 0,
+            "compaction_threads": 1,
+            "flush_threads": 1,
+            "wbm_cache_reservation_bytes": 0,
+            "wbm_limit_bytes": 33554432,
+            "wbm_mutable_bytes": 0,
+            "wbm_usage_bytes": 0
+          }
+        },
+        "timestamp_unix_ms": 1793328544373
+      },
+      {
+        "blink_checkpoints": {
+          "reason": "backend does not expose B-link checkpoint metrics",
+          "status": "unsupported",
+          "value": null
+        },
+        "phase": "measurement-including-drain",
+        "rocksdb_properties": {
+          "databases": [
+            {
+              "database": "tenant_4",
+              "properties": {
+                "actual-delayed-write-rate": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes_per_second",
+                  "value": 0
+                },
+                "block-cache-capacity": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 67108864
+                },
+                "block-cache-usage": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 2933720
+                },
+                "compaction-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "cur-size-all-mem-tables": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 2048
+                },
+                "estimate-live-data-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 1147238
+                },
+                "estimate-pending-compaction-bytes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 0
+                },
+                "is-write-stopped": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "live-sst-files-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 1147238
+                },
+                "mem-table-flush-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "num-running-compactions": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                },
+                "num-running-flushes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                }
+              },
+              "status": "open"
+            },
+            {
+              "database": "tenant_3",
+              "properties": {
+                "actual-delayed-write-rate": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes_per_second",
+                  "value": 0
+                },
+                "block-cache-capacity": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 67108864
+                },
+                "block-cache-usage": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 2933720
+                },
+                "compaction-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "cur-size-all-mem-tables": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 264208
+                },
+                "estimate-live-data-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 1147233
+                },
+                "estimate-pending-compaction-bytes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 0
+                },
+                "is-write-stopped": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "live-sst-files-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 1147233
+                },
+                "mem-table-flush-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "num-running-compactions": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                },
+                "num-running-flushes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                }
+              },
+              "status": "open"
+            },
+            {
+              "database": "tenant_2",
+              "properties": {
+                "actual-delayed-write-rate": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes_per_second",
+                  "value": 0
+                },
+                "block-cache-capacity": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 67108864
+                },
+                "block-cache-usage": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 2933720
+                },
+                "compaction-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "cur-size-all-mem-tables": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 264208
+                },
+                "estimate-live-data-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 1147233
+                },
+                "estimate-pending-compaction-bytes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 0
+                },
+                "is-write-stopped": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "live-sst-files-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 1147233
+                },
+                "mem-table-flush-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "num-running-compactions": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                },
+                "num-running-flushes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                }
+              },
+              "status": "open"
+            },
+            {
+              "database": "tenant_1",
+              "properties": {
+                "actual-delayed-write-rate": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes_per_second",
+                  "value": 0
+                },
+                "block-cache-capacity": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 67108864
+                },
+                "block-cache-usage": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 2933720
+                },
+                "compaction-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "cur-size-all-mem-tables": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 264208
+                },
+                "estimate-live-data-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 1147233
+                },
+                "estimate-pending-compaction-bytes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 0
+                },
+                "is-write-stopped": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "live-sst-files-size": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "bytes",
+                  "value": 1147233
+                },
+                "mem-table-flush-pending": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "boolean_as_integer",
+                  "value": 0
+                },
+                "num-running-compactions": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                },
+                "num-running-flushes": {
+                  "get_int_property_status": "value",
+                  "get_property_status": "not_needed",
+                  "status": "value",
+                  "unit": "count",
+                  "value": 0
+                }
+              },
+              "status": "open"
+            }
+          ],
+          "timestamp_unix_ms": 1793328554374
+        },
+        "shared_resources": {
+          "all_opened_tenants_use_shared_resources": true,
+          "opened_tenants": 4,
+          "scope": "service-wide snapshot counted once; non-atomic across native counters",
+          "tenants_verified_using_shared_resources": 4,
+          "usage": {
+            "cache_capacity_bytes": 67108864,
+            "cache_pinned_usage_bytes": 1049016,
+            "cache_usage_bytes": 2933720,
+            "compaction_threads": 1,
+            "flush_threads": 1,
+            "wbm_cache_reservation_bytes": 1048576,
+            "wbm_limit_bytes": 33554432,
+            "wbm_mutable_bytes": 794672,
+            "wbm_usage_bytes": 794672
+          }
+        },
+        "timestamp_unix_ms": 1793328554373
+      }
+    ],
+    "offer_boundary_process_identities": {
+      "before": {
+        "processes": [
+          {
+            "anonymous_kb": 2044,
+            "file_kb": 9970,
+            "pid": 2469663,
+            "process_group_id": 2469663,
+            "pss_kb": 12014,
+            "role": "harness-process",
+            "rss_kb": 14828,
+            "start_time_ticks": 259021428,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 14828
+          },
+          {
+            "pid": 2469668,
+            "process_group_id": 2469663,
+            "role": "backend-process",
+            "start_time_ticks": 259021440,
+            "status": "exited-or-pid-reused"
+          },
+          {
+            "anonymous_kb": 4148,
+            "file_kb": 10802,
+            "pid": 2469743,
+            "process_group_id": 2469663,
+            "pss_kb": 14950,
+            "role": "backend-process",
+            "rss_kb": 17748,
+            "start_time_ticks": 259021571,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 17748
+          }
+        ],
+        "timestamp_unix_ms": 1793328544509
+      },
+      "after": {
+        "processes": [
+          {
+            "anonymous_kb": 2608,
+            "file_kb": 8114,
+            "pid": 2469663,
+            "process_group_id": 2469663,
+            "pss_kb": 10722,
+            "role": "harness-process",
+            "rss_kb": 13536,
+            "start_time_ticks": 259021428,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 15152
+          },
+          {
+            "pid": 2469668,
+            "process_group_id": 2469663,
+            "role": "backend-process",
+            "start_time_ticks": 259021440,
+            "status": "exited-or-pid-reused"
+          },
+          {
+            "anonymous_kb": 8636,
+            "file_kb": 9138,
+            "pid": 2469743,
+            "process_group_id": 2469663,
+            "pss_kb": 17774,
+            "role": "backend-process",
+            "rss_kb": 20572,
+            "start_time_ticks": 259021571,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 21632
+          }
+        ],
+        "timestamp_unix_ms": 1793328554510
+      }
+    }
+  }
+}

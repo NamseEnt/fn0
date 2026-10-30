@@ -1,0 +1,13 @@
+command: PYTHONDONTWRITEBYTECODE=1 python3 dodb/docs/experiments/blink-tenant-density-20261027/evidence/arrival-phase/review_arrival.py
+exit_code: 1
+stdout:
+stderr:
+Traceback (most recent call last):
+  File "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/docs/experiments/blink-tenant-density-20261027/evidence/arrival-phase/review_arrival.py", line 1122, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/docs/experiments/blink-tenant-density-20261027/evidence/arrival-phase/review_arrival.py", line 1113, in main
+    result = review(arguments.evidence_dir, arguments.output)
+  File "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/docs/experiments/blink-tenant-density-20261027/evidence/arrival-phase/review_arrival.py", line 1027, in review
+    raise AssertionError('collector acceptance and per-cell SLO review disagree')
+AssertionError: collector acceptance and per-cell SLO review disagree

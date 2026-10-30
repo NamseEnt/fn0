@@ -1,0 +1,15 @@
+command: PYTHONDONTWRITEBYTECODE=1 python3 dodb/docs/experiments/blink-tenant-density-20261027/evidence/arrival-phase/review_arrival.py
+exit_code: 1
+stdout: none
+stderr:
+Traceback (most recent call last):
+  File "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/docs/experiments/blink-tenant-density-20261027/evidence/arrival-phase/review_arrival.py", line 1113, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/docs/experiments/blink-tenant-density-20261027/evidence/arrival-phase/review_arrival.py", line 1104, in main
+    result = review(arguments.evidence_dir, arguments.output)
+  File "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/docs/experiments/blink-tenant-density-20261027/evidence/arrival-phase/review_arrival.py", line 1009, in review
+    process_results = validate_process_receipt(receipt, terminal, controls_directory, reports, commands)
+  File "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/docs/experiments/blink-tenant-density-20261027/evidence/arrival-phase/review_arrival.py", line 722, in validate_process_receipt
+    raise AssertionError(f'cell does not have exactly one recorded workload child: {case}')
+AssertionError: cell does not have exactly one recorded workload child: tiny-synchronized-shared

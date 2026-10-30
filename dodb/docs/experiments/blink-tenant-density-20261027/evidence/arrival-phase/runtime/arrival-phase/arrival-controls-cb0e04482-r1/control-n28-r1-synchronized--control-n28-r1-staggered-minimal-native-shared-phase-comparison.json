@@ -1,0 +1,48 @@
+{
+  "recipe_matches": true,
+  "request_matches": {
+    "request_count": true,
+    "request_fingerprint": true,
+    "per_tenant_requests": true
+  },
+  "schedule_identity_differs": true,
+  "expected_staggered_offsets_ns": [
+    0,
+    714285,
+    1428571,
+    2142857,
+    2857142,
+    3571428,
+    4285714,
+    5000000,
+    5714285,
+    6428571,
+    7142857,
+    7857142,
+    8571428,
+    9285714,
+    10000000,
+    10714285,
+    11428571,
+    12142857,
+    12857142,
+    13571428,
+    14285714,
+    15000000,
+    15714285,
+    16428571,
+    17142857,
+    17857142,
+    18571428,
+    19285714
+  ],
+  "realized_matches": {
+    "scheduled_fingerprint": false,
+    "scheduled": true,
+    "admitted": true,
+    "completed": true,
+    "successful": true
+  },
+  "realized_difference_observed": true,
+  "either_mode_dropped_requests": false
+}

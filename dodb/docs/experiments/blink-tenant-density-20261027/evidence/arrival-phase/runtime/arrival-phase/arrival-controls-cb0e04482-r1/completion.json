@@ -1,0 +1,1306 @@
+{
+  "completed": true,
+  "source_commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d",
+  "plan_commit": "e02a1fbdde81fd6fc363a26e5341c8c61000023e",
+  "cases": 16,
+  "phase_comparisons": {
+    "tiny-synchronized--tiny-staggered-blink": {
+      "recipe_matches": true,
+      "request_matches": {
+        "request_count": true,
+        "request_fingerprint": true,
+        "per_tenant_requests": true
+      },
+      "schedule_identity_differs": true,
+      "expected_staggered_offsets_ns": [
+        0,
+        6666666,
+        13333333
+      ],
+      "realized_matches": {
+        "scheduled_fingerprint": false,
+        "scheduled": true,
+        "admitted": true,
+        "completed": true,
+        "successful": true
+      },
+      "realized_difference_observed": true,
+      "either_mode_dropped_requests": false
+    },
+    "tiny-synchronized--tiny-staggered-minimal-native-shared": {
+      "recipe_matches": true,
+      "request_matches": {
+        "request_count": true,
+        "request_fingerprint": true,
+        "per_tenant_requests": true
+      },
+      "schedule_identity_differs": true,
+      "expected_staggered_offsets_ns": [
+        0,
+        6666666,
+        13333333
+      ],
+      "realized_matches": {
+        "scheduled_fingerprint": false,
+        "scheduled": true,
+        "admitted": true,
+        "completed": true,
+        "successful": true
+      },
+      "realized_difference_observed": true,
+      "either_mode_dropped_requests": false
+    },
+    "control-n28-r1-synchronized--control-n28-r1-staggered-blink": {
+      "recipe_matches": true,
+      "request_matches": {
+        "request_count": true,
+        "request_fingerprint": true,
+        "per_tenant_requests": true
+      },
+      "schedule_identity_differs": true,
+      "expected_staggered_offsets_ns": [
+        0,
+        714285,
+        1428571,
+        2142857,
+        2857142,
+        3571428,
+        4285714,
+        5000000,
+        5714285,
+        6428571,
+        7142857,
+        7857142,
+        8571428,
+        9285714,
+        10000000,
+        10714285,
+        11428571,
+        12142857,
+        12857142,
+        13571428,
+        14285714,
+        15000000,
+        15714285,
+        16428571,
+        17142857,
+        17857142,
+        18571428,
+        19285714
+      ],
+      "realized_matches": {
+        "scheduled_fingerprint": false,
+        "scheduled": true,
+        "admitted": true,
+        "completed": true,
+        "successful": true
+      },
+      "realized_difference_observed": true,
+      "either_mode_dropped_requests": false
+    },
+    "control-n28-r1-synchronized--control-n28-r1-staggered-minimal-native-shared": {
+      "recipe_matches": true,
+      "request_matches": {
+        "request_count": true,
+        "request_fingerprint": true,
+        "per_tenant_requests": true
+      },
+      "schedule_identity_differs": true,
+      "expected_staggered_offsets_ns": [
+        0,
+        714285,
+        1428571,
+        2142857,
+        2857142,
+        3571428,
+        4285714,
+        5000000,
+        5714285,
+        6428571,
+        7142857,
+        7857142,
+        8571428,
+        9285714,
+        10000000,
+        10714285,
+        11428571,
+        12142857,
+        12857142,
+        13571428,
+        14285714,
+        15000000,
+        15714285,
+        16428571,
+        17142857,
+        17857142,
+        18571428,
+        19285714
+      ],
+      "realized_matches": {
+        "scheduled_fingerprint": false,
+        "scheduled": true,
+        "admitted": true,
+        "completed": true,
+        "successful": true
+      },
+      "realized_difference_observed": true,
+      "either_mode_dropped_requests": false
+    },
+    "control-n28-r2-staggered--control-n28-r2-synchronized-blink": {
+      "recipe_matches": true,
+      "request_matches": {
+        "request_count": true,
+        "request_fingerprint": true,
+        "per_tenant_requests": true
+      },
+      "schedule_identity_differs": true,
+      "expected_staggered_offsets_ns": [
+        0,
+        714285,
+        1428571,
+        2142857,
+        2857142,
+        3571428,
+        4285714,
+        5000000,
+        5714285,
+        6428571,
+        7142857,
+        7857142,
+        8571428,
+        9285714,
+        10000000,
+        10714285,
+        11428571,
+        12142857,
+        12857142,
+        13571428,
+        14285714,
+        15000000,
+        15714285,
+        16428571,
+        17142857,
+        17857142,
+        18571428,
+        19285714
+      ],
+      "realized_matches": {
+        "scheduled_fingerprint": false,
+        "scheduled": true,
+        "admitted": true,
+        "completed": true,
+        "successful": true
+      },
+      "realized_difference_observed": true,
+      "either_mode_dropped_requests": false
+    },
+    "control-n28-r2-staggered--control-n28-r2-synchronized-minimal-native-shared": {
+      "recipe_matches": true,
+      "request_matches": {
+        "request_count": true,
+        "request_fingerprint": true,
+        "per_tenant_requests": true
+      },
+      "schedule_identity_differs": true,
+      "expected_staggered_offsets_ns": [
+        0,
+        714285,
+        1428571,
+        2142857,
+        2857142,
+        3571428,
+        4285714,
+        5000000,
+        5714285,
+        6428571,
+        7142857,
+        7857142,
+        8571428,
+        9285714,
+        10000000,
+        10714285,
+        11428571,
+        12142857,
+        12857142,
+        13571428,
+        14285714,
+        15000000,
+        15714285,
+        16428571,
+        17142857,
+        17857142,
+        18571428,
+        19285714
+      ],
+      "realized_matches": {
+        "scheduled_fingerprint": false,
+        "scheduled": true,
+        "admitted": true,
+        "completed": true,
+        "successful": true
+      },
+      "realized_difference_observed": true,
+      "either_mode_dropped_requests": false
+    },
+    "control-n28-r3-synchronized--control-n28-r3-staggered-blink": {
+      "recipe_matches": true,
+      "request_matches": {
+        "request_count": true,
+        "request_fingerprint": true,
+        "per_tenant_requests": true
+      },
+      "schedule_identity_differs": true,
+      "expected_staggered_offsets_ns": [
+        0,
+        714285,
+        1428571,
+        2142857,
+        2857142,
+        3571428,
+        4285714,
+        5000000,
+        5714285,
+        6428571,
+        7142857,
+        7857142,
+        8571428,
+        9285714,
+        10000000,
+        10714285,
+        11428571,
+        12142857,
+        12857142,
+        13571428,
+        14285714,
+        15000000,
+        15714285,
+        16428571,
+        17142857,
+        17857142,
+        18571428,
+        19285714
+      ],
+      "realized_matches": {
+        "scheduled_fingerprint": false,
+        "scheduled": true,
+        "admitted": true,
+        "completed": true,
+        "successful": true
+      },
+      "realized_difference_observed": true,
+      "either_mode_dropped_requests": false
+    },
+    "control-n28-r3-synchronized--control-n28-r3-staggered-minimal-native-shared": {
+      "recipe_matches": true,
+      "request_matches": {
+        "request_count": true,
+        "request_fingerprint": true,
+        "per_tenant_requests": true
+      },
+      "schedule_identity_differs": true,
+      "expected_staggered_offsets_ns": [
+        0,
+        714285,
+        1428571,
+        2142857,
+        2857142,
+        3571428,
+        4285714,
+        5000000,
+        5714285,
+        6428571,
+        7142857,
+        7857142,
+        8571428,
+        9285714,
+        10000000,
+        10714285,
+        11428571,
+        12142857,
+        12857142,
+        13571428,
+        14285714,
+        15000000,
+        15714285,
+        16428571,
+        17142857,
+        17857142,
+        18571428,
+        19285714
+      ],
+      "realized_matches": {
+        "scheduled_fingerprint": false,
+        "scheduled": true,
+        "admitted": true,
+        "completed": true,
+        "successful": true
+      },
+      "realized_difference_observed": true,
+      "either_mode_dropped_requests": false
+    }
+  },
+  "capacity_after": {
+    "timestamp_unix_seconds": 1793329757.4388766,
+    "zfs_free_bytes": 27707191296,
+    "boot_free_bytes": 5319938048,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 4987297792,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3895267328,
+      "Dirty": 3153920,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5713788928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5650286896,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11395231       15 482845672 14304488 120472556   208677 6202625236 194282798        0 56418464 208597921     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  10265124 307278 5423459 498935298 1345992 340748 169037 1734377 0 0",
+      "cpu0 5146755 145088 2714082 249459990 683345 169275 85318 855281 0 0",
+      "cpu1 5118369 162189 2709377 249475308 662647 171473 83718 879096 0 0"
+    ]
+  },
+  "processes": [
+    {
+      "pid": 2469622,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259019815,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469627,
+      "role": "owned-descendant",
+      "start_time_ticks": 259019830,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469642,
+      "role": "owned-descendant",
+      "start_time_ticks": 259020044,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469650,
+      "role": "owned-descendant",
+      "start_time_ticks": 259021081,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469622,
+      "role": "harness-process",
+      "start_time_ticks": 259019815,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469627,
+      "role": "backend-process",
+      "start_time_ticks": 259019830,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469642,
+      "role": "backend-process",
+      "start_time_ticks": 259020044,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469650,
+      "role": "backend-process",
+      "start_time_ticks": 259021081,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469656,
+      "role": "backend-process",
+      "start_time_ticks": 259021248,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469663,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259021428,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469743,
+      "role": "owned-descendant",
+      "start_time_ticks": 259021571,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469817,
+      "role": "owned-descendant",
+      "start_time_ticks": 259022609,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469888,
+      "role": "owned-descendant",
+      "start_time_ticks": 259022827,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469663,
+      "role": "harness-process",
+      "start_time_ticks": 259021428,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469668,
+      "role": "backend-process",
+      "start_time_ticks": 259021440,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469743,
+      "role": "backend-process",
+      "start_time_ticks": 259021571,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469817,
+      "role": "backend-process",
+      "start_time_ticks": 259022609,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469888,
+      "role": "backend-process",
+      "start_time_ticks": 259022827,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469998,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259023242,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470075,
+      "role": "owned-descendant",
+      "start_time_ticks": 259023385,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470146,
+      "role": "owned-descendant",
+      "start_time_ticks": 259024424,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470219,
+      "role": "owned-descendant",
+      "start_time_ticks": 259024643,
+      "same_live_process": false
+    },
+    {
+      "pid": 2469998,
+      "role": "harness-process",
+      "start_time_ticks": 259023242,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470003,
+      "role": "backend-process",
+      "start_time_ticks": 259023254,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470075,
+      "role": "backend-process",
+      "start_time_ticks": 259023385,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470146,
+      "role": "backend-process",
+      "start_time_ticks": 259024424,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470219,
+      "role": "backend-process",
+      "start_time_ticks": 259024643,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470288,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259025056,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470293,
+      "role": "owned-descendant",
+      "start_time_ticks": 259025068,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470308,
+      "role": "owned-descendant",
+      "start_time_ticks": 259025283,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470314,
+      "role": "owned-descendant",
+      "start_time_ticks": 259026319,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470288,
+      "role": "harness-process",
+      "start_time_ticks": 259025056,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470293,
+      "role": "backend-process",
+      "start_time_ticks": 259025068,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470308,
+      "role": "backend-process",
+      "start_time_ticks": 259025283,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470314,
+      "role": "backend-process",
+      "start_time_ticks": 259026319,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470320,
+      "role": "backend-process",
+      "start_time_ticks": 259026491,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470325,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259026669,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470330,
+      "role": "owned-descendant",
+      "start_time_ticks": 259026682,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470382,
+      "role": "owned-descendant",
+      "start_time_ticks": 259027965,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470458,
+      "role": "owned-descendant",
+      "start_time_ticks": 259034036,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470464,
+      "role": "owned-descendant",
+      "start_time_ticks": 259035101,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470325,
+      "role": "harness-process",
+      "start_time_ticks": 259026669,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470330,
+      "role": "backend-process",
+      "start_time_ticks": 259026682,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470382,
+      "role": "backend-process",
+      "start_time_ticks": 259027965,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470458,
+      "role": "backend-process",
+      "start_time_ticks": 259034036,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470464,
+      "role": "backend-process",
+      "start_time_ticks": 259035101,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470481,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259036353,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470486,
+      "role": "owned-descendant",
+      "start_time_ticks": 259036366,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470925,
+      "role": "owned-descendant",
+      "start_time_ticks": 259037050,
+      "same_live_process": false
+    },
+    {
+      "pid": 2471481,
+      "role": "owned-descendant",
+      "start_time_ticks": 259043142,
+      "same_live_process": false
+    },
+    {
+      "pid": 2471917,
+      "role": "owned-descendant",
+      "start_time_ticks": 259044584,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470481,
+      "role": "harness-process",
+      "start_time_ticks": 259036353,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470486,
+      "role": "backend-process",
+      "start_time_ticks": 259036366,
+      "same_live_process": false
+    },
+    {
+      "pid": 2470925,
+      "role": "backend-process",
+      "start_time_ticks": 259037050,
+      "same_live_process": false
+    },
+    {
+      "pid": 2471481,
+      "role": "backend-process",
+      "start_time_ticks": 259043142,
+      "same_live_process": false
+    },
+    {
+      "pid": 2471917,
+      "role": "backend-process",
+      "start_time_ticks": 259044584,
+      "same_live_process": false
+    },
+    {
+      "pid": 2472350,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259046040,
+      "same_live_process": false
+    },
+    {
+      "pid": 2472355,
+      "role": "owned-descendant",
+      "start_time_ticks": 259046052,
+      "same_live_process": false
+    },
+    {
+      "pid": 2472793,
+      "role": "owned-descendant",
+      "start_time_ticks": 259046739,
+      "same_live_process": false
+    },
+    {
+      "pid": 2473324,
+      "role": "owned-descendant",
+      "start_time_ticks": 259052831,
+      "same_live_process": false
+    },
+    {
+      "pid": 2473799,
+      "role": "owned-descendant",
+      "start_time_ticks": 259054263,
+      "same_live_process": false
+    },
+    {
+      "pid": 2472350,
+      "role": "harness-process",
+      "start_time_ticks": 259046040,
+      "same_live_process": false
+    },
+    {
+      "pid": 2472355,
+      "role": "backend-process",
+      "start_time_ticks": 259046052,
+      "same_live_process": false
+    },
+    {
+      "pid": 2472793,
+      "role": "backend-process",
+      "start_time_ticks": 259046739,
+      "same_live_process": false
+    },
+    {
+      "pid": 2473324,
+      "role": "backend-process",
+      "start_time_ticks": 259052831,
+      "same_live_process": false
+    },
+    {
+      "pid": 2473799,
+      "role": "backend-process",
+      "start_time_ticks": 259054263,
+      "same_live_process": false
+    },
+    {
+      "pid": 2474254,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259055729,
+      "same_live_process": false
+    },
+    {
+      "pid": 2474259,
+      "role": "owned-descendant",
+      "start_time_ticks": 259055741,
+      "same_live_process": false
+    },
+    {
+      "pid": 2474282,
+      "role": "owned-descendant",
+      "start_time_ticks": 259057009,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475006,
+      "role": "owned-descendant",
+      "start_time_ticks": 259063080,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475052,
+      "role": "owned-descendant",
+      "start_time_ticks": 259064248,
+      "same_live_process": false
+    },
+    {
+      "pid": 2474254,
+      "role": "harness-process",
+      "start_time_ticks": 259055729,
+      "same_live_process": false
+    },
+    {
+      "pid": 2474259,
+      "role": "backend-process",
+      "start_time_ticks": 259055741,
+      "same_live_process": false
+    },
+    {
+      "pid": 2474282,
+      "role": "backend-process",
+      "start_time_ticks": 259057009,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475006,
+      "role": "backend-process",
+      "start_time_ticks": 259063080,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475052,
+      "role": "backend-process",
+      "start_time_ticks": 259064248,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475058,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259065420,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475063,
+      "role": "owned-descendant",
+      "start_time_ticks": 259065432,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475080,
+      "role": "owned-descendant",
+      "start_time_ticks": 259066713,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475128,
+      "role": "owned-descendant",
+      "start_time_ticks": 259072785,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475134,
+      "role": "owned-descendant",
+      "start_time_ticks": 259073958,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475058,
+      "role": "harness-process",
+      "start_time_ticks": 259065420,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475063,
+      "role": "backend-process",
+      "start_time_ticks": 259065432,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475080,
+      "role": "backend-process",
+      "start_time_ticks": 259066713,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475128,
+      "role": "backend-process",
+      "start_time_ticks": 259072785,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475134,
+      "role": "backend-process",
+      "start_time_ticks": 259073958,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475140,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259075107,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475145,
+      "role": "owned-descendant",
+      "start_time_ticks": 259075120,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475726,
+      "role": "owned-descendant",
+      "start_time_ticks": 259075819,
+      "same_live_process": false
+    },
+    {
+      "pid": 2476270,
+      "role": "owned-descendant",
+      "start_time_ticks": 259081916,
+      "same_live_process": false
+    },
+    {
+      "pid": 2476708,
+      "role": "owned-descendant",
+      "start_time_ticks": 259083349,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475140,
+      "role": "harness-process",
+      "start_time_ticks": 259075107,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475145,
+      "role": "backend-process",
+      "start_time_ticks": 259075120,
+      "same_live_process": false
+    },
+    {
+      "pid": 2475726,
+      "role": "backend-process",
+      "start_time_ticks": 259075819,
+      "same_live_process": false
+    },
+    {
+      "pid": 2476270,
+      "role": "backend-process",
+      "start_time_ticks": 259081916,
+      "same_live_process": false
+    },
+    {
+      "pid": 2476708,
+      "role": "backend-process",
+      "start_time_ticks": 259083349,
+      "same_live_process": false
+    },
+    {
+      "pid": 2477181,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259084802,
+      "same_live_process": false
+    },
+    {
+      "pid": 2477186,
+      "role": "owned-descendant",
+      "start_time_ticks": 259084815,
+      "same_live_process": false
+    },
+    {
+      "pid": 2477660,
+      "role": "owned-descendant",
+      "start_time_ticks": 259085497,
+      "same_live_process": false
+    },
+    {
+      "pid": 2478163,
+      "role": "owned-descendant",
+      "start_time_ticks": 259091591,
+      "same_live_process": false
+    },
+    {
+      "pid": 2478600,
+      "role": "owned-descendant",
+      "start_time_ticks": 259093038,
+      "same_live_process": false
+    },
+    {
+      "pid": 2477181,
+      "role": "harness-process",
+      "start_time_ticks": 259084802,
+      "same_live_process": false
+    },
+    {
+      "pid": 2477186,
+      "role": "backend-process",
+      "start_time_ticks": 259084815,
+      "same_live_process": false
+    },
+    {
+      "pid": 2477660,
+      "role": "backend-process",
+      "start_time_ticks": 259085497,
+      "same_live_process": false
+    },
+    {
+      "pid": 2478163,
+      "role": "backend-process",
+      "start_time_ticks": 259091591,
+      "same_live_process": false
+    },
+    {
+      "pid": 2478600,
+      "role": "backend-process",
+      "start_time_ticks": 259093038,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479050,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259094496,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479055,
+      "role": "owned-descendant",
+      "start_time_ticks": 259094509,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479070,
+      "role": "owned-descendant",
+      "start_time_ticks": 259095786,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479130,
+      "role": "owned-descendant",
+      "start_time_ticks": 259101858,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479174,
+      "role": "owned-descendant",
+      "start_time_ticks": 259103000,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479050,
+      "role": "harness-process",
+      "start_time_ticks": 259094496,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479055,
+      "role": "backend-process",
+      "start_time_ticks": 259094509,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479070,
+      "role": "backend-process",
+      "start_time_ticks": 259095786,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479130,
+      "role": "backend-process",
+      "start_time_ticks": 259101858,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479174,
+      "role": "backend-process",
+      "start_time_ticks": 259103000,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479180,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259104187,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479185,
+      "role": "owned-descendant",
+      "start_time_ticks": 259104200,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479225,
+      "role": "owned-descendant",
+      "start_time_ticks": 259105494,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479266,
+      "role": "owned-descendant",
+      "start_time_ticks": 259111566,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479274,
+      "role": "owned-descendant",
+      "start_time_ticks": 259112625,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479180,
+      "role": "harness-process",
+      "start_time_ticks": 259104187,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479185,
+      "role": "backend-process",
+      "start_time_ticks": 259104200,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479225,
+      "role": "backend-process",
+      "start_time_ticks": 259105494,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479266,
+      "role": "backend-process",
+      "start_time_ticks": 259111566,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479274,
+      "role": "backend-process",
+      "start_time_ticks": 259112625,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479282,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259113887,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479287,
+      "role": "owned-descendant",
+      "start_time_ticks": 259113900,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479727,
+      "role": "owned-descendant",
+      "start_time_ticks": 259114590,
+      "same_live_process": false
+    },
+    {
+      "pid": 2480226,
+      "role": "owned-descendant",
+      "start_time_ticks": 259120683,
+      "same_live_process": false
+    },
+    {
+      "pid": 2480663,
+      "role": "owned-descendant",
+      "start_time_ticks": 259122153,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479282,
+      "role": "harness-process",
+      "start_time_ticks": 259113887,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479287,
+      "role": "backend-process",
+      "start_time_ticks": 259113900,
+      "same_live_process": false
+    },
+    {
+      "pid": 2479727,
+      "role": "backend-process",
+      "start_time_ticks": 259114590,
+      "same_live_process": false
+    },
+    {
+      "pid": 2480226,
+      "role": "backend-process",
+      "start_time_ticks": 259120683,
+      "same_live_process": false
+    },
+    {
+      "pid": 2480663,
+      "role": "backend-process",
+      "start_time_ticks": 259122153,
+      "same_live_process": false
+    },
+    {
+      "pid": 2481095,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259123587,
+      "same_live_process": false
+    },
+    {
+      "pid": 2481100,
+      "role": "owned-descendant",
+      "start_time_ticks": 259123600,
+      "same_live_process": false
+    },
+    {
+      "pid": 2481539,
+      "role": "owned-descendant",
+      "start_time_ticks": 259124300,
+      "same_live_process": false
+    },
+    {
+      "pid": 2482040,
+      "role": "owned-descendant",
+      "start_time_ticks": 259130390,
+      "same_live_process": false
+    },
+    {
+      "pid": 2482478,
+      "role": "owned-descendant",
+      "start_time_ticks": 259131857,
+      "same_live_process": false
+    },
+    {
+      "pid": 2481095,
+      "role": "harness-process",
+      "start_time_ticks": 259123587,
+      "same_live_process": false
+    },
+    {
+      "pid": 2481100,
+      "role": "backend-process",
+      "start_time_ticks": 259123600,
+      "same_live_process": false
+    },
+    {
+      "pid": 2481539,
+      "role": "backend-process",
+      "start_time_ticks": 259124300,
+      "same_live_process": false
+    },
+    {
+      "pid": 2482040,
+      "role": "backend-process",
+      "start_time_ticks": 259130390,
+      "same_live_process": false
+    },
+    {
+      "pid": 2482478,
+      "role": "backend-process",
+      "start_time_ticks": 259131857,
+      "same_live_process": false
+    },
+    {
+      "pid": 2482911,
+      "role": "owned-workload-process",
+      "start_time_ticks": 259133298,
+      "same_live_process": false
+    },
+    {
+      "pid": 2482916,
+      "role": "owned-descendant",
+      "start_time_ticks": 259133311,
+      "same_live_process": false
+    },
+    {
+      "pid": 2482930,
+      "role": "owned-descendant",
+      "start_time_ticks": 259134618,
+      "same_live_process": false
+    },
+    {
+      "pid": 2483006,
+      "role": "owned-descendant",
+      "start_time_ticks": 259140686,
+      "same_live_process": false
+    },
+    {
+      "pid": 2483018,
+      "role": "owned-descendant",
+      "start_time_ticks": 259141723,
+      "same_live_process": false
+    },
+    {
+      "pid": 2482911,
+      "role": "harness-process",
+      "start_time_ticks": 259133298,
+      "same_live_process": false
+    },
+    {
+      "pid": 2482916,
+      "role": "backend-process",
+      "start_time_ticks": 259133311,
+      "same_live_process": false
+    },
+    {
+      "pid": 2482930,
+      "role": "backend-process",
+      "start_time_ticks": 259134618,
+      "same_live_process": false
+    },
+    {
+      "pid": 2483006,
+      "role": "backend-process",
+      "start_time_ticks": 259140686,
+      "same_live_process": false
+    },
+    {
+      "pid": 2483018,
+      "role": "backend-process",
+      "start_time_ticks": 259141723,
+      "same_live_process": false
+    }
+  ]
+}
