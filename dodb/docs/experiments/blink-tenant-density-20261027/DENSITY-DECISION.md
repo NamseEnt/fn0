@@ -16,6 +16,10 @@ Report both sources and dates. The current-host archived-binary cadence control 
 
 The subsequent b226 shutdown diagnostic stopped at its first five-tenant B-link setup, before offered load. Its trace locates an outstanding asynchronous server-shutdown interval under the same high/max policy, without identifying the internal cause. Three other diagnostic cells completed, including the five-tenant reference. [SHUTDOWN-DIAGNOSTIC-RESULTS.md](SHUTDOWN-DIAGNOSTIC-RESULTS.md) preserves this separate cohort; the further external wait observation is not a completed capacity result.
 
+[SHUTDOWN-OFFCPU-RESULTS.md](SHUTDOWN-OFFCPU-RESULTS.md) now records the bounded external observation: two more B-link five-tenant cells passed, then a setup failure supplied eighteen verified snapshots of a Tokio-named thread in the memory.high kernel wait path. Anonymous charged memory dominated that interval and little reclaim progress was recorded. This identifies a sampled pressure-wait contribution under the chosen policy, without a unique allocator/object attribution or a cause assigned to the earlier unprofiled failure. The cgroup does not supply eviction or application byte admission.
+
+The E2 twenty-eight-tenant tail result remains specific to synchronized arrivals and the global in-flight limit of eight. [E2-ARRIVAL-PHASE-PLAN.md](E2-ARRIVAL-PHASE-PLAN.md) defines matched synchronized/staggered controls before a wider resident-population bracket. This tests a workload condition rather than treating a wrapper's synchronized-burst frontier as an engine maximum. It does not address the E3 pre-offer resident-memory limitation or justify promoting B-link.
+
 File allocation snapshots also remain relevant to the goal. They measure reachable files at named phase boundaries. They do not measure continuous peak space, unlinked-open files, physical space returned after deletion, or steady-state write amplification. Do not replace the disk-efficiency question with a throughput comparison or infer disk reclamation from checkpoint completion.
 
 ## Structure confirmed in source

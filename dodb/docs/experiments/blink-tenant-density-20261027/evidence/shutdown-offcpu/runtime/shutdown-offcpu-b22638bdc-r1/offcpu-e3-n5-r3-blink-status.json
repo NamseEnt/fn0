@@ -1,0 +1,40 @@
+{
+  "case": "offcpu-e3-n5-r3-blink",
+  "backend": "blink",
+  "stage": "E3",
+  "tenants": 5,
+  "active": 5,
+  "duration_ms": 60000,
+  "sample_interval_ms": 1000,
+  "exit_code": 1,
+  "elapsed_seconds": 70.09150863206014,
+  "capacity_after": {
+    "timestamp_unix_seconds": 1793324064.3888762,
+    "zfs_free_bytes": 28697985024,
+    "boot_free_bytes": 5466374144,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5179490304,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3899781120,
+      "Dirty": 966656,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5713788928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5589039560,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11386087       15 482601432 14297229 119761412   208677 6187644908 193452303        0 56097068 207760167     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  10199260 307024 5374034 497936093 1343905 337112 163096 1720220 0 0",
+      "cpu0 5112633 144849 2689402 248961310 682275 167475 82354 848786 0 0",
+      "cpu1 5086626 162174 2684632 248974783 661629 169636 80742 871434 0 0"
+    ]
+  },
+  "stop_reason": null,
+  "report_sha256": "72196aae42f7f043bd3982dfd370e68c9ab6084a58404f4aea77f0b7595463c8",
+  "review_error": "AssertionError({'backend': 'blink', 'registered': 5, 'active': 5, 'initial_rows': 32768, 'duration_ms': 60000, 'sample_interval_ms': 1000, 'status': 'failed_or_inconclusive', 'cell_peak_bytes': 222236672, 'cell_events': {'high': 3176, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'epoch_peaks_bytes': {'measurement': 0, 'oracle': 0, 'reopen-oracle': 0, 'setup': 222195712}, 'epoch_events': {'measurement': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'oracle': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'reopen-oracle': {'high': 0, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}, 'setup': {'high': 1588, 'low': 0, 'max': 0, 'oom': 0, 'oom_group_kill': 0, 'oom_kill': 0}}, 'operational_pass': False, 'slo_pass': False, 'resource_failure': False, 'failure_reason': 'diagnostic worker shutdown timed out and was killed'})"
+}

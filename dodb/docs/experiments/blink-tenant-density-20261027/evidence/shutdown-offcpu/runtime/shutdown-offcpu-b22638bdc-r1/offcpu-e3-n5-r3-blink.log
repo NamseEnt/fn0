@@ -1,0 +1,5 @@
+{"timestamp_unix_ns":1793324043556388159,"process_id":2461833,"process_start_time_ticks":258566584,"source_revision":"b22638bdcc4a0b22dad0606c3003d193cf41bbed","stage":"command_received_shutdown"}
+{"timestamp_unix_ns":1793324043556475320,"process_id":2461833,"process_start_time_ticks":258566584,"source_revision":"b22638bdcc4a0b22dad0606c3003d193cf41bbed","stage":"final_property_capture_start"}
+{"timestamp_unix_ns":1793324043556505440,"process_id":2461833,"process_start_time_ticks":258566584,"source_revision":"b22638bdcc4a0b22dad0606c3003d193cf41bbed","stage":"final_property_capture_end"}
+{"timestamp_unix_ns":1793324043556532560,"process_id":2461833,"process_start_time_ticks":258566584,"source_revision":"b22638bdcc4a0b22dad0606c3003d193cf41bbed","stage":"async_server_shutdown_start"}
+Error: Custom { kind: Other, error: "diagnostic worker shutdown timed out and was killed" }

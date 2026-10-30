@@ -1,0 +1,511 @@
+{
+  "collection_timestamp_unix_ns": 1793324618288619624,
+  "run_name": "shutdown-offcpu-b22638bdc-r1",
+  "source_commit": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+  "source_clean": true,
+  "planned_collector_sha256": "9591adb44959639e9f731d58ece0a2e6a2087e04c8a91240534bec2ddedbbddb",
+  "actual_collector_sha256": "854565bfd2641e38f48169aa922a4ba788f402f7b9b74802772ae0b5ebeed2ed",
+  "planned_collector_matches_actual": false,
+  "completion_preserved": false,
+  "failure_preserved": true,
+  "attempted_cells": 3,
+  "completed_cells": 2,
+  "all_observations_valid": false,
+  "valid_diagnostic_run": false,
+  "cases": [
+    {
+      "case": "offcpu-e3-n5-r1-blink",
+      "exit_code": 0,
+      "operational_pass": true,
+      "report_sha256": "5fccb4a9258b33d47fa1748e448b843008fe8115d2d6041ed7454613d24fc205",
+      "log_sha256": "f789534aea1d613677afd84c4ad9ac18f7fa70dc2ec486021f86a9d8f81a246b",
+      "observer_jsonl_preserved": true,
+      "observer_jsonl_sha256": "6b692011596f796caff39c9418259d3c5b5988d7e31de9da7d888e676ae934c8",
+      "observer_status_sha256": "dccc88e3dd5e6cbc4fdd650d9395854b7b32f729ec8f89670b8d067a9fe544de",
+      "observer_valid": true,
+      "observer_failure": null,
+      "observer_errors": [],
+      "database": {
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/shutdown-offcpu-b22638bdc-r1/offcpu-e3-n5-r1-blink",
+        "preserved": true
+      }
+    },
+    {
+      "case": "offcpu-e3-n5-r2-blink",
+      "exit_code": 0,
+      "operational_pass": true,
+      "report_sha256": "f5e7d3ee5192d7c5672313f44bbac94dd855402cec2e4bd0741e701e572b4159",
+      "log_sha256": "fa90b3c2962b228a511564749f257d9334d4399543eb10cad8cb4093379fa94e",
+      "observer_jsonl_preserved": true,
+      "observer_jsonl_sha256": "abef279f3beeaf9c7d03a12c05d4c5c2052f34c9004d0b197f3b4ceabfee1eb5",
+      "observer_status_sha256": "4021007907ac00ae0b3b536524df6b778b1934aad02af6940da4a41870b95915",
+      "observer_valid": true,
+      "observer_failure": null,
+      "observer_errors": [],
+      "database": {
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/shutdown-offcpu-b22638bdc-r1/offcpu-e3-n5-r2-blink",
+        "preserved": true
+      }
+    },
+    {
+      "case": "offcpu-e3-n5-r3-blink",
+      "exit_code": 1,
+      "operational_pass": null,
+      "report_sha256": "72196aae42f7f043bd3982dfd370e68c9ab6084a58404f4aea77f0b7595463c8",
+      "log_sha256": "af2c52ed2aa636a3c95163bee2bc4cc31f47de0e7e6db7079242e4d4f180c26e",
+      "observer_jsonl_preserved": true,
+      "observer_jsonl_sha256": "288ba81812b37dc6e4817d7469b3dd124ea448fe15163f5a7f13328191bc391f",
+      "observer_status_sha256": "4a3b15732c174d46e7655558426a1329d63b7ed9cbb56bb225153a7e4a924959",
+      "observer_valid": false,
+      "observer_failure": null,
+      "observer_errors": [
+        "worker_capture_identity_invalid:process_identity_unavailable:FileNotFoundError"
+      ],
+      "database": {
+        "path": "/bench/zfs/db/tenant-density-harness-20261027/shutdown-offcpu-b22638bdc-r1/offcpu-e3-n5-r3-blink",
+        "preserved": true
+      }
+    }
+  ],
+  "processes": [
+    {
+      "pid": 2461297,
+      "start_time_ticks": 258532306,
+      "role": "harness-process",
+      "same_live_process": false
+    },
+    {
+      "pid": 2461302,
+      "start_time_ticks": 258532320,
+      "role": "backend-process",
+      "same_live_process": false
+    },
+    {
+      "pid": 2461542,
+      "start_time_ticks": 258537380,
+      "role": "backend-process",
+      "same_live_process": false
+    },
+    {
+      "pid": 2461583,
+      "start_time_ticks": 258543530,
+      "role": "backend-process",
+      "same_live_process": false
+    },
+    {
+      "pid": 2461625,
+      "start_time_ticks": 258546416,
+      "role": "backend-process",
+      "same_live_process": false
+    },
+    {
+      "pid": 2461655,
+      "start_time_ticks": 258549539,
+      "role": "harness-process",
+      "same_live_process": false
+    },
+    {
+      "pid": 2461660,
+      "start_time_ticks": 258549551,
+      "role": "backend-process",
+      "same_live_process": false
+    },
+    {
+      "pid": 2461679,
+      "start_time_ticks": 258554507,
+      "role": "backend-process",
+      "same_live_process": false
+    },
+    {
+      "pid": 2461769,
+      "start_time_ticks": 258560653,
+      "role": "backend-process",
+      "same_live_process": false
+    },
+    {
+      "pid": 2461775,
+      "start_time_ticks": 258563552,
+      "role": "backend-process",
+      "same_live_process": false
+    },
+    {
+      "pid": 2461828,
+      "start_time_ticks": 258566572,
+      "role": "harness-process",
+      "same_live_process": false
+    },
+    {
+      "pid": 2461833,
+      "start_time_ticks": 258566584,
+      "role": "backend-process",
+      "same_live_process": false
+    }
+  ],
+  "databases": {
+    "offcpu-e3-n5-r1-blink": {
+      "path": "/bench/zfs/db/tenant-density-harness-20261027/shutdown-offcpu-b22638bdc-r1/offcpu-e3-n5-r1-blink",
+      "preserved": true
+    },
+    "offcpu-e3-n5-r2-blink": {
+      "path": "/bench/zfs/db/tenant-density-harness-20261027/shutdown-offcpu-b22638bdc-r1/offcpu-e3-n5-r2-blink",
+      "preserved": true
+    },
+    "offcpu-e3-n5-r3-blink": {
+      "path": "/bench/zfs/db/tenant-density-harness-20261027/shutdown-offcpu-b22638bdc-r1/offcpu-e3-n5-r3-blink",
+      "preserved": true
+    }
+  },
+  "groups": {
+    ".": {
+      "cgroup.procs": "",
+      "memory.max": "max",
+      "memory.high": "max",
+      "memory.swap.max": "max",
+      "memory.current": "262144",
+      "memory.events": "low 0\nhigh 5499\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 32768\nkernel 229376\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 96480\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 32768\nactive_file 0\nunevictable 0\nslab_reclaimable 53920\nslab_unreclaimable 46320\nslab 100240\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 215\npgsteal 1\npgscan_kswapd 0\npgscan_direct 215\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 1\npgsteal_khugepaged 0\npgfault 775641\npgmajfault 0\npgrefill 47\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 131623037\nuser_usec 66873797\nsystem_usec 64749240\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 0\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "252:0 rbytes=0 wbytes=1097728 rios=0 wios=22 dbytes=0 dios=0\n8:0 rbytes=507904 wbytes=1097728 rios=124 wios=22 dbytes=0 dios=0",
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r1-blink": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "94208",
+      "memory.events": "low 0\nhigh 1242\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 16384\nkernel 77824\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 25728\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 16384\nactive_file 0\nunevictable 0\nslab_reclaimable 26384\nslab_unreclaimable 12352\nslab 38736\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 307660\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 56932018\nuser_usec 29232342\nsystem_usec 27699675\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r1-blink/measurement": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "20480",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 4096\nkernel 16384\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 4096\nactive_file 0\nunevictable 0\nslab_reclaimable 13688\nslab_unreclaimable 0\nslab 13688\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 47894\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 4704670\nuser_usec 2992379\nsystem_usec 1712290\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r1-blink/oracle": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "8192",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 4096\nkernel 4096\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 4096\nactive_file 0\nunevictable 0\nslab_reclaimable 1048\nslab_unreclaimable 0\nslab 1048\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 44195\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 17022975\nuser_usec 8623559\nsystem_usec 8399415\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r1-blink/reopen-oracle": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "8192",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 4096\nkernel 4096\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 4096\nactive_file 0\nunevictable 0\nslab_reclaimable 1048\nslab_unreclaimable 0\nslab 1048\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 44196\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 17315641\nuser_usec 8464527\nsystem_usec 8851114\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r1-blink/setup": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "16384",
+      "memory.events": "low 0\nhigh 621\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 4096\nkernel 12288\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 4096\nactive_file 0\nunevictable 0\nslab_reclaimable 10600\nslab_unreclaimable 0\nslab 10600\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 171375\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 17888731\nuser_usec 9092955\nsystem_usec 8795775\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r2-blink": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "94208",
+      "memory.events": "low 0\nhigh 1081\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 16384\nkernel 77824\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 25728\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 16384\nactive_file 0\nunevictable 0\nslab_reclaimable 25536\nslab_unreclaimable 12352\nslab 37888\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 286908\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 57251963\nuser_usec 28883011\nsystem_usec 28368951\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r2-blink/measurement": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "20480",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 4096\nkernel 16384\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 4096\nactive_file 0\nunevictable 0\nslab_reclaimable 12840\nslab_unreclaimable 0\nslab 12840\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 48020\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 4700813\nuser_usec 2858209\nsystem_usec 1842604\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r2-blink/oracle": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "8192",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 4096\nkernel 4096\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 4096\nactive_file 0\nunevictable 0\nslab_reclaimable 1048\nslab_unreclaimable 0\nslab 1048\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 44195\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 17254295\nuser_usec 8645625\nsystem_usec 8608670\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r2-blink/reopen-oracle": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "8192",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 4096\nkernel 4096\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 4096\nactive_file 0\nunevictable 0\nslab_reclaimable 1048\nslab_unreclaimable 0\nslab 1048\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 38914\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 17608587\nuser_usec 8795140\nsystem_usec 8813446\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r2-blink/setup": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "16384",
+      "memory.events": "low 0\nhigh 540\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 4096\nkernel 12288\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 4096\nactive_file 0\nunevictable 0\nslab_reclaimable 10600\nslab_unreclaimable 0\nslab 10600\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 155779\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 17688267\nuser_usec 8873833\nsystem_usec 8814433\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r3-blink": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "45056",
+      "memory.events": "low 0\nhigh 3176\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 0\nkernel 45056\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 25728\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 0\nactive_file 0\nunevictable 0\nslab_reclaimable 2000\nslab_unreclaimable 12352\nslab 14352\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 215\npgsteal 1\npgscan_kswapd 0\npgscan_direct 215\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 1\npgsteal_khugepaged 0\npgfault 181073\npgmajfault 0\npgrefill 47\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 17439056\nuser_usec 8738692\nsystem_usec 8700364\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r3-blink/measurement": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "0",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 0\nkernel 0\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 0\nactive_file 0\nunevictable 0\nslab_reclaimable 0\nslab_unreclaimable 0\nslab 0\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 0\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 0\nuser_usec 0\nsystem_usec 0\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r3-blink/oracle": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "0",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 0\nkernel 0\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 0\nactive_file 0\nunevictable 0\nslab_reclaimable 0\nslab_unreclaimable 0\nslab 0\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 0\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 0\nuser_usec 0\nsystem_usec 0\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r3-blink/reopen-oracle": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "0",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 0\nkernel 0\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 0\nactive_file 0\nunevictable 0\nslab_reclaimable 0\nslab_unreclaimable 0\nslab 0\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 0\npgsteal 0\npgscan_kswapd 0\npgscan_direct 0\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 0\npgsteal_khugepaged 0\npgfault 0\npgmajfault 0\npgrefill 0\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 0\nuser_usec 0\nsystem_usec 0\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    },
+    "offcpu-e3-n5-r3-blink/setup": {
+      "cgroup.procs": "",
+      "memory.max": "268435456",
+      "memory.high": "201326592",
+      "memory.swap.max": "0",
+      "memory.current": "4096",
+      "memory.events": "low 0\nhigh 1588\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "memory.stat": "anon 0\nfile 0\nkernel 4096\nkernel_stack 0\npagetables 0\nsec_pagetables 0\npercpu 0\nsock 0\nvmalloc 0\nshmem 0\nzswap 0\nzswapped 0\nfile_mapped 0\nfile_dirty 0\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 0\nshmem_thp 0\ninactive_anon 0\nactive_anon 0\ninactive_file 0\nactive_file 0\nunevictable 0\nslab_reclaimable 2000\nslab_unreclaimable 0\nslab 2000\nworkingset_refault_anon 0\nworkingset_refault_file 0\nworkingset_activate_anon 0\nworkingset_activate_file 0\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgpromote_success 0\npgscan 215\npgsteal 1\npgscan_kswapd 0\npgscan_direct 215\npgscan_khugepaged 0\npgsteal_kswapd 0\npgsteal_direct 1\npgsteal_khugepaged 0\npgfault 181073\npgmajfault 0\npgrefill 47\npgactivate 0\npgdeactivate 0\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nzswpin 0\nzswpout 0\nzswpwb 0\nthp_fault_alloc 0\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\nnuma_pages_migrated 0\nnuma_pte_updates 0\nnuma_hint_faults 0",
+      "cpu.stat": "usage_usec 17439056\nuser_usec 8738692\nsystem_usec 8700364\nnice_usec 0\ncore_sched.force_idle_usec 0",
+      "io.stat": {
+        "status": "unsupported"
+      },
+      "group_empty": true
+    }
+  },
+  "cgroup_group_validation": {
+    "grouping_root_path": ".",
+    "grouping_root_empty": true,
+    "grouping_root_memory_limits": {
+      "memory.max": "max",
+      "memory.high": "max",
+      "memory.swap.max": "max"
+    },
+    "budgeted_case_and_epoch_groups": {
+      "offcpu-e3-n5-r1-blink": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r1-blink/measurement": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r1-blink/oracle": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r1-blink/reopen-oracle": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r1-blink/setup": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r2-blink": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r2-blink/measurement": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r2-blink/oracle": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r2-blink/reopen-oracle": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r2-blink/setup": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r3-blink": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r3-blink/measurement": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r3-blink/oracle": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r3-blink/reopen-oracle": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      },
+      "offcpu-e3-n5-r3-blink/setup": {
+        "memory.max": "268435456",
+        "memory.high": "201326592",
+        "memory.swap.max": "0"
+      }
+    }
+  },
+  "binaries": {
+    "tenant_density_workload": {
+      "sha256": "1dffa40a17a3f422267fe63685c1d5e69b8b53d1ba057e14265022905b89a843",
+      "bytes": 16714032,
+      "matches_provenance": true
+    },
+    "memory_diagnostic_worker": {
+      "sha256": "31a4adc6e135694de43a911ea1de4e1546c064143711c7118932d3f0b4d35508",
+      "bytes": 17232664,
+      "matches_provenance": true
+    }
+  },
+  "native_archive_sha256_before": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+  "native_archive_sha256_after": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+  "capability_probe_sha256": "f728714123cbf7dada3b17c8f17018b75085b1f62906387e2f0d0c4280909231",
+  "capacity_after": {
+    "timestamp_unix_seconds": 1793324613.889079,
+    "zfs_free_bytes": 28697985024,
+    "boot_free_bytes": 5467766784,
+    "memory_bytes": {
+      "MemTotal": 11427577856,
+      "MemAvailable": 5230784512,
+      "SwapTotal": 4294963200,
+      "SwapFree": 3899781120,
+      "Dirty": 258048,
+      "Writeback": 0
+    },
+    "arc": {
+      "c": 5713788928,
+      "c_min": 357111808,
+      "c_max": 5713788928,
+      "size": 5589300072,
+      "memory_throttle_count": 0
+    },
+    "device_stat": "11386087       15 482601432 14297229 119761412   208677 6187644908 193452303        0 56097068 207760167     1098      384 1961318615    10634        0        0",
+    "cpu_stat": [
+      "cpu  10199787 307024 5374362 498045048 1343907 337133 163122 1720238 0 0",
+      "cpu0 5112968 144849 2689568 249015725 682277 167486 82366 848796 0 0",
+      "cpu1 5086818 162174 2684794 249029323 661630 169646 80755 871442 0 0"
+    ]
+  },
+  "runtime_archive": "/home/opc/tenant-density-harness-20261027/offcpu-collection-b22638bdc-r1/runtime.tar.gz",
+  "runtime_archive_sha256": "9ae14b70c4d61612b6ef3af6f96ee1103346cf4a5a0d7aaf39b42f2c222e8ece"
+}

@@ -1,0 +1,65 @@
+{
+  "record_type": "observer_summary",
+  "timestamp_unix_ns": 1793323823874716546,
+  "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+  "log_bytes_scanned": 13379,
+  "log_complete_line_offset": 13379,
+  "partial_trace_line_bytes": 0,
+  "partial_trace_line_truncated": false,
+  "partial_trace_line_pending_at_stop": false,
+  "observer_errors": [],
+  "observer_error_count": 0,
+  "observer_errors_truncated": false,
+  "workers": [
+    {
+      "process_id": 2461302,
+      "process_start_time_ticks": 258532320,
+      "captures": 0,
+      "identity_valid": true,
+      "pending_at_end": false,
+      "truncated": false,
+      "terminal_stage": "async_server_shutdown_end",
+      "observation_status": "finished_before_sampling",
+      "captured_file_bytes": 0,
+      "error_count": 0
+    },
+    {
+      "process_id": 2461542,
+      "process_start_time_ticks": 258537380,
+      "captures": 0,
+      "identity_valid": true,
+      "pending_at_end": false,
+      "truncated": false,
+      "terminal_stage": "async_server_shutdown_end",
+      "observation_status": "finished_before_sampling",
+      "captured_file_bytes": 0,
+      "error_count": 0
+    },
+    {
+      "process_id": 2461583,
+      "process_start_time_ticks": 258543530,
+      "captures": 0,
+      "identity_valid": true,
+      "pending_at_end": false,
+      "truncated": false,
+      "terminal_stage": "async_server_shutdown_end",
+      "observation_status": "finished_before_sampling",
+      "captured_file_bytes": 0,
+      "error_count": 0
+    },
+    {
+      "process_id": 2461625,
+      "process_start_time_ticks": 258546416,
+      "captures": 0,
+      "identity_valid": true,
+      "pending_at_end": false,
+      "truncated": false,
+      "terminal_stage": "async_server_shutdown_end",
+      "observation_status": "finished_before_sampling",
+      "captured_file_bytes": 0,
+      "error_count": 0
+    }
+  ],
+  "output_bytes_before_summary": 4581,
+  "output_truncated_workers": []
+}

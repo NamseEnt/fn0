@@ -1,0 +1,8 @@
+{
+  "archive_sha256": "9ae14b70c4d61612b6ef3af6f96ee1103346cf4a5a0d7aaf39b42f2c222e8ece",
+  "archive_bytes": 13824403,
+  "scp_completed": true,
+  "sha256_matches_collection": true,
+  "premature_incomplete_transfer_check_rejected": true,
+  "partial_extraction_replaced_from_verified_archive": true
+}

@@ -1,0 +1,31 @@
+{
+  "record_type": "observer_summary",
+  "timestamp_unix_ns": 1793324064401448824,
+  "source_revision": "b22638bdcc4a0b22dad0606c3003d193cf41bbed",
+  "log_bytes_scanned": 886,
+  "log_complete_line_offset": 886,
+  "partial_trace_line_bytes": 0,
+  "partial_trace_line_truncated": false,
+  "partial_trace_line_pending_at_stop": false,
+  "observer_errors": [
+    "worker_capture_identity_invalid:process_identity_unavailable:FileNotFoundError"
+  ],
+  "observer_error_count": 1,
+  "observer_errors_truncated": false,
+  "workers": [
+    {
+      "process_id": 2461833,
+      "process_start_time_ticks": 258566584,
+      "captures": 19,
+      "identity_valid": false,
+      "pending_at_end": false,
+      "truncated": false,
+      "terminal_stage": null,
+      "observation_status": "invalid_identity",
+      "captured_file_bytes": 247134,
+      "error_count": 1
+    }
+  ],
+  "output_bytes_before_summary": 211039,
+  "output_truncated_workers": []
+}

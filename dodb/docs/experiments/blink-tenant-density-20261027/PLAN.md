@@ -414,7 +414,9 @@ If shared-resource minimal-native meets the service objective with no meaningful
 - [x] Live host sizing and explicit frozen bounded E2/E3/maintenance protocols; see [DENSITY-CAPACITY-PLAN.md](DENSITY-CAPACITY-PLAN.md), [CAPACITY-CONTINUATION.md](CAPACITY-CONTINUATION.md), and [CAPACITY-SUPPLEMENT-PLAN.md](CAPACITY-SUPPLEMENT-PLAN.md).
 - [x] Bounded instrumented E2/E3 frontier, cadence/sparse sensitivities, short maintenance observations, and reproducible evidence reduction; see [DENSITY-CAPACITY-RESULTS.md](DENSITY-CAPACITY-RESULTS.md).
 - [x] Lower-overhead raw observation storage, current-host cadence control, and preserved stopped confirmation; see [OBSERVATION-RETENTION-RESULTS.md](OBSERVATION-RETENTION-RESULTS.md). This does not accept the unexecuted capacity/maintenance cells.
-- [ ] Internal shutdown attribution without relaxing the twenty-second parent or fifteen-second worker deadlines. The phase diagnostic located an outstanding asynchronous server-shutdown interval but did not identify its internal cause; see [SHUTDOWN-DIAGNOSTIC-RESULTS.md](SHUTDOWN-DIAGNOSTIC-RESULTS.md) and [SHUTDOWN-OFFCPU-PLAN.md](SHUTDOWN-OFFCPU-PLAN.md).
+- [x] Bounded external thread-wait observation and reproducible preservation of three attempts, including eighteen valid memory.high wait snapshots in the stopped setup cell; see [SHUTDOWN-OFFCPU-RESULTS.md](SHUTDOWN-OFFCPU-RESULTS.md). No allocator/object or universal shutdown-cause claim follows.
+- [ ] Allocation/representation-level shutdown attribution without relaxing the twenty-second parent or fifteen-second worker deadlines. The phase and kernel wait are located; the unique allocating call site and the prior unprofiled failure's cause remain unproven.
+- [ ] Matched arrival-phase controls and a wider small-store active frontier; see [E2-ARRIVAL-PHASE-PLAN.md](E2-ARRIVAL-PHASE-PLAN.md). This leaves the global in-flight cap, rate, budgets, and SLO fixed within the new cohort.
 - [ ] Broader density/maintenance acceptance, including larger-than-budget and host-ARC boundaries.
 - [ ] Decision on B1/B2/B3/B4 implementation and adoption.
 
