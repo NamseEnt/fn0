@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import types
@@ -149,11 +150,6 @@ class ResidentFrontierTests(unittest.TestCase):
         original_root = CONTROLLER.ROOT
         CONTROLLER.ROOT = runtime_root
         try:
-            helper_paths = CONTROLLER.controls_helper_paths(controls, EVIDENCE_DIRECTORY)
-            self.assertEqual(set(helper_paths), {
-                'oci_arrival_controls.py', 'oci_capacity.py', 'capacity_review.py',
-                'arrival_review.py', 'oci_arrival_validate.py',
-            })
             with tempfile.TemporaryDirectory() as temporary:
                 output_directory = Path(temporary) / CONTROLLER.RUN_NAME
                 output_directory.mkdir()
@@ -167,6 +163,32 @@ class ResidentFrontierTests(unittest.TestCase):
                     self.assertEqual(CONTROLLER.sha256_file(binary_path), identity['sha256'])
         finally:
             CONTROLLER.ROOT = original_root
+
+    def test_helpers_resolve_from_frozen_root_without_evidence_fallback(self):
+        controls_path = EVIDENCE_DIRECTORY.parent / 'arrival-phase' / 'final-review.json'
+        controls = CONTROLLER.validate_controls_review(
+            controls_path, CONTROLLER.sha256_file(controls_path))
+        runtime_helpers = (EVIDENCE_DIRECTORY.parent / 'arrival-phase' / 'runtime'
+                           / 'arrival-phase')
+        capacity_helpers = EVIDENCE_DIRECTORY.parent / 'capacity'
+        arrival_names = ['oci_arrival_controls.py', 'arrival_review.py', 'oci_arrival_validate.py']
+        capacity_names = ['oci_capacity.py', 'capacity_review.py']
+        original_root = CONTROLLER.ROOT
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary_root = Path(temporary) / 'frozen-root'
+            evidence_directory = temporary_root / 'resident-frontier'
+            evidence_directory.mkdir(parents=True)
+            for helper_name in arrival_names:
+                shutil.copyfile(runtime_helpers / helper_name, temporary_root / helper_name)
+            for helper_name in capacity_names:
+                shutil.copyfile(capacity_helpers / helper_name, temporary_root / helper_name)
+            CONTROLLER.ROOT = temporary_root
+            try:
+                paths = CONTROLLER.controls_helper_paths(controls, evidence_directory)
+                self.assertEqual(set(paths), set(arrival_names + capacity_names))
+                self.assertTrue(all(path.parent == temporary_root for path in paths.values()))
+            finally:
+                CONTROLLER.ROOT = original_root
 
     def test_resident_runner_uses_arrival_run_cell_contract_with_fake_child(self):
         with tempfile.TemporaryDirectory() as temporary:

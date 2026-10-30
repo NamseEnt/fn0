@@ -13,7 +13,7 @@ import time
 
 ROOT = Path('/home/opc/tenant-density-harness-20261027')
 SOURCE = ROOT / 'source'
-RUN_NAME = 'resident-frontier-cb0e04482-r1'
+RUN_NAME = 'resident-frontier-cb0e04482-r2'
 SOURCE_COMMIT = 'cb0e0448270c1da3d9a214fb008ec01406d8e40d'
 DESIGN_PLAN_COMMIT = '6f57299f3af21c19444ebb203e40d636abcd0a04'
 CONTROLS_RUN = 'arrival-controls-cb0e04482-r1'
@@ -306,7 +306,7 @@ def controls_helper_paths(controls_review, evidence_directory):
         'arrival_review.py': arrival_review_hash,
         'oci_arrival_validate.py': validation_hash,
     }
-    runtime_directory = ROOT / 'arrival-phase'
+    runtime_directory = ROOT
     capacity_directory = Path(evidence_directory).parent / 'capacity'
     paths = {
         'oci_arrival_controls.py': runtime_helper(runtime_directory / 'oci_arrival_controls.py',
