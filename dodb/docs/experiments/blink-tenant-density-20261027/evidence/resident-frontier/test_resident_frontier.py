@@ -374,6 +374,38 @@ class ResidentFrontierTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             REVIEW.validate_report(report, 'screen-n32-blink', 'blink')
 
+    def test_actual_r2_command_and_report_match_frozen_recipe(self):
+        runtime_directory = Path('/tmp/resident-frontier-review-debug-20261030')
+        command = json.loads((runtime_directory / 'screen-n16-blink-command.json').read_text())
+        report = json.loads((runtime_directory / 'screen-n16-blink.json').read_text())
+        expected = REVIEW.parse_command(command, 'screen-n16-blink')
+        self.assertEqual(expected['active_tenants'], 16)
+        self.assertEqual(REVIEW.validate_report(report, 'screen-n16-blink', 'blink'), expected)
+
+    def test_actual_r2_frontier_decisions_recompute_from_preserved_cell_statuses(self):
+        runtime_directory = Path('/tmp/resident-frontier-review-debug-20261030')
+        state = json.loads((runtime_directory / 'frontier.json').read_text())
+        outcomes = json.loads((runtime_directory / 'summary.json').read_text())
+        reviewed_cells = {}
+        for outcome in outcomes:
+            case = outcome['case']
+            expected = REVIEW.expected_cell(case)
+            reduced = outcome['reduced']
+            reviewed_cells[case] = {
+                'case': case,
+                'backend': expected['backend'],
+                'active_tenants': expected['active_tenants'],
+                'kind': expected['kind'],
+                'valid': reduced['operational_pass'] is True,
+                'operational_pass': reduced['operational_pass'],
+                'slo_pass': reduced['slo_pass'],
+            }
+        decisions = REVIEW.validate_frontier_decisions(state, reviewed_cells)
+        self.assertEqual(decisions['blink']['accepted_count'], 24)
+        self.assertEqual(decisions['blink']['accepted_from'], 'candidate_confirmed')
+        self.assertEqual(decisions['minimal-native-shared']['accepted_count'], 28)
+        self.assertEqual(decisions, state['decisions'])
+
     def test_review_requires_exact_screen_omissions_after_first_route_miss(self):
         baselines = {'blink': False, 'minimal-native-shared': False}
         state = CONTROLLER.make_frontier_state(baselines)

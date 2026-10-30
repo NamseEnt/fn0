@@ -16,6 +16,7 @@ CONFIRMATION_DURATION_MS = 60000
 BACKENDS = ['blink', 'minimal-native-shared']
 RUN_NAME = 'resident-frontier-cb0e04482-r2'
 DATABASE_ROOT = Path('/bench/zfs/db/tenant-density-harness-20261027') / RUN_NAME
+RUN_DIRECTORY = Path('/home/opc/tenant-density-harness-20261027') / 'arrival-phase' / RUN_NAME
 CGROUP_ROOT = Path('/sys/fs/cgroup') / f'dodb-density-{RUN_NAME}'
 EPOCHS = ['setup', 'measurement', 'oracle', 'reopen-oracle']
 SCREEN_COUNTS_WITH_BASELINE = [32, 48, 64, 80, 96]
@@ -187,6 +188,7 @@ def parse_command(command_record, case):
         '--seed': str(SEED),
         '--value-bytes': '512',
         '--client-count': '1',
+        '--report': str(RUN_DIRECTORY / f'{case}.json'),
         '--backend-memory-max-bytes': str(256 * 1024**2),
         '--backend-memory-high-bytes': str(192 * 1024**2),
         '--data-dir': str(DATABASE_ROOT / case),
