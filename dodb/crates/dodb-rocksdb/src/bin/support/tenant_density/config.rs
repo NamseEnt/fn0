@@ -25,6 +25,21 @@ pub enum Topology {
     FixedPerTenant,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TenantArrivalPhase {
+    Synchronized,
+    Staggered,
+}
+
+impl TenantArrivalPhase {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Synchronized => "synchronized",
+            Self::Staggered => "staggered",
+        }
+    }
+}
+
 impl Topology {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -95,6 +110,7 @@ pub struct Options {
     pub initial_rows: usize,
     pub value_bytes: usize,
     pub topology: Topology,
+    pub tenant_arrival_phase: TenantArrivalPhase,
     pub per_tenant_rate: Option<u64>,
     pub queue_bound: usize,
     pub max_in_flight: usize,
@@ -135,6 +151,7 @@ impl Options {
             "--initial-rows",
             "--value-bytes",
             "--topology",
+            "--tenant-arrival-phase",
             "--per-tenant-rate",
             "--queue-bound",
             "--max-in-flight",
@@ -209,6 +226,15 @@ impl Options {
             "fixed-per-tenant" => Topology::FixedPerTenant,
             value => return Err(format!("unsupported load topology {value}")),
         };
+        let tenant_arrival_phase = match values
+            .get("--tenant-arrival-phase")
+            .copied()
+            .unwrap_or("synchronized")
+        {
+            "synchronized" => TenantArrivalPhase::Synchronized,
+            "staggered" => TenantArrivalPhase::Staggered,
+            value => return Err(format!("unsupported tenant arrival phase {value}")),
+        };
         let per_tenant_rate = parse_optional_number(&values, "--per-tenant-rate")?;
         let queue_bound = parse_number(&values, "--queue-bound")?;
         let max_in_flight = parse_number(&values, "--max-in-flight")?;
@@ -272,6 +298,7 @@ impl Options {
             initial_rows,
             value_bytes,
             topology,
+            tenant_arrival_phase,
             per_tenant_rate,
             queue_bound,
             max_in_flight,
@@ -355,6 +382,14 @@ impl Options {
             (Topology::FixedPerTenant, None) => {
                 return Err("fixed-per-tenant topology requires per-tenant rate".to_owned());
             }
+        }
+        if self.topology == Topology::FixedTotal
+            && self.tenant_arrival_phase == TenantArrivalPhase::Staggered
+        {
+            return Err(
+                "staggered tenant arrival phase only applies to fixed-per-tenant topology"
+                    .to_owned(),
+            );
         }
         if self.queue_bound == 0 || self.queue_bound > 1_000_000 {
             return Err("queue bound must be between 1 and 1000000".to_owned());
@@ -440,7 +475,7 @@ fn validate_paths(data_dir: &Path, report_path: &Path) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Backend, Options, Profile, Topology, Width};
+    use super::{Backend, Options, Profile, TenantArrivalPhase, Topology, Width};
     use tempfile::TempDir;
 
     fn arguments(extra: &[&str]) -> (TempDir, Vec<String>) {
@@ -615,6 +650,52 @@ mod tests {
         let (_directory, argument_values) =
             arguments(&["--topology", "fixed-total", "--per-tenant-rate", "10"]);
         assert!(Options::parse(&argument_values).is_err());
+    }
+
+    #[test]
+    fn tenant_arrival_phase_defaults_to_synchronized_and_staggered_requires_fixed_per_tenant() {
+        let (_directory, argument_values) = arguments(&[]);
+        let defaults = Options::parse(&argument_values).unwrap();
+        assert_eq!(
+            defaults.tenant_arrival_phase,
+            TenantArrivalPhase::Synchronized
+        );
+
+        let (_directory, argument_values) = arguments(&["--tenant-arrival-phase", "synchronized"]);
+        let explicit = Options::parse(&argument_values).unwrap();
+        assert_eq!(
+            explicit.tenant_arrival_phase,
+            TenantArrivalPhase::Synchronized
+        );
+
+        let (_directory, argument_values) = arguments(&["--tenant-arrival-phase", "unknown"]);
+        assert!(Options::parse(&argument_values).is_err());
+
+        let (_directory, argument_values) = arguments(&["--tenant-arrival-phase", "staggered"]);
+        assert!(
+            Options::parse(&argument_values)
+                .err()
+                .unwrap()
+                .contains("only applies to fixed-per-tenant")
+        );
+
+        let (_directory, mut argument_values) = arguments(&[
+            "--tenant-arrival-phase",
+            "staggered",
+            "--per-tenant-rate",
+            "50",
+        ]);
+        let topology_position = argument_values
+            .iter()
+            .position(|argument| argument == "--topology")
+            .unwrap();
+        argument_values[topology_position + 1] = "fixed-per-tenant".to_owned();
+        let staggered = Options::parse(&argument_values).unwrap();
+        assert_eq!(staggered.topology, Topology::FixedPerTenant);
+        assert_eq!(
+            staggered.tenant_arrival_phase,
+            TenantArrivalPhase::Staggered
+        );
     }
 
     #[test]

@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use tokio::sync::{Semaphore, mpsc};
 use tokio::task::JoinSet;
 
-use crate::config::Options;
+use crate::config::{Options, TenantArrivalPhase};
 
 const RESPONSE_BUDGET_BYTES: usize = 64 * 1024 * 1024;
 type ExpectedMutations = BTreeMap<(u64, usize), Option<Vec<u8>>>;
@@ -117,6 +117,46 @@ fn roll_fingerprint(current: u64, value: u64) -> u64 {
     })
 }
 
+fn phase_offset_nanos(tenant_number: usize, active_tenants: usize, rate: u64) -> Option<u64> {
+    if tenant_number == 0 || tenant_number > active_tenants || active_tenants == 0 || rate == 0 {
+        return None;
+    }
+    let tenant_offset = u128::try_from(tenant_number - 1).ok()?;
+    let active_tenant_count = u128::try_from(active_tenants).ok()?;
+    let numerator = tenant_offset.checked_mul(1_000_000_000)?;
+    let denominator = u128::from(rate).checked_mul(active_tenant_count)?;
+    u64::try_from(numerator.checked_div(denominator)?).ok()
+}
+
+fn nominal_deadline_offset_nanos(
+    operation_number: u64,
+    rate: u64,
+    phase_offset: u64,
+) -> Option<u64> {
+    if rate == 0 {
+        return None;
+    }
+    let base_numerator = u128::from(operation_number).checked_mul(1_000_000_000)?;
+    let base_offset = base_numerator.checked_div(u128::from(rate))?;
+    let deadline_offset = base_offset.checked_add(u128::from(phase_offset))?;
+    u64::try_from(deadline_offset).ok()
+}
+
+fn roll_scheduled_fingerprint(
+    current: u64,
+    operation_number: u64,
+    deadline_offset_nanos: u64,
+    phase: TenantArrivalPhase,
+) -> u64 {
+    let operation_fingerprint = roll_fingerprint(current, operation_number);
+    match phase {
+        TenantArrivalPhase::Synchronized => operation_fingerprint,
+        TenantArrivalPhase::Staggered => {
+            roll_fingerprint(operation_fingerprint, deadline_offset_nanos)
+        }
+    }
+}
+
 struct TenantInFlightGuard {
     counts: Arc<Mutex<BTreeMap<usize, u64>>>,
     tenant_number: usize,
@@ -147,7 +187,20 @@ where
     let mut tasks = JoinSet::new();
     let mut producers = JoinSet::new();
     let mut tenant_counter_handles = Vec::new();
-    for tenant_number in 1..=options.active_tenants {
+    let rate = options
+        .per_tenant_rate
+        .ok_or_else(|| "fixed-per-tenant topology requires a per-tenant rate".to_owned())?;
+    let tenant_phase_offsets = (1..=options.active_tenants)
+        .map(|tenant_number| match options.tenant_arrival_phase {
+            TenantArrivalPhase::Synchronized => Some(0),
+            TenantArrivalPhase::Staggered => {
+                phase_offset_nanos(tenant_number, options.active_tenants, rate)
+            }
+        })
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| "tenant arrival phase offset is outside the supported range".to_owned())?;
+    for (tenant_index, phase_offset_nanos) in tenant_phase_offsets.iter().copied().enumerate() {
+        let tenant_number = tenant_index + 1;
         let (sender, mut receiver) = mpsc::channel::<Arrival>(options.queue_bound);
         let counters = Arc::new(Mutex::new(Counters::default()));
         tenant_counter_handles.push((tenant_number, Arc::clone(&counters)));
@@ -164,18 +217,16 @@ where
                 (limit - tenant_offset).div_ceil(options.active_tenants as u64)
             }
         });
-        let rate = options
-            .per_tenant_rate
-            .ok_or_else(|| "fixed-per-tenant topology requires a per-tenant rate".to_owned())?;
+        let tenant_arrival_phase = options.tenant_arrival_phase;
         producers.spawn(async move {
             let mut operation_number = 0_u64;
             loop {
                 if operation_limit.is_some_and(|limit| operation_number >= limit) {
                     break;
                 }
-                let deadline_nanos =
-                    u128::from(operation_number) * 1_000_000_000 / u128::from(rate);
-                let Ok(deadline_nanos) = u64::try_from(deadline_nanos) else {
+                let Some(deadline_nanos) =
+                    nominal_deadline_offset_nanos(operation_number, rate, phase_offset_nanos)
+                else {
                     break;
                 };
                 let Some(scheduled_at) = started.checked_add(Duration::from_nanos(deadline_nanos))
@@ -188,8 +239,12 @@ where
                 tokio::time::sleep_until(tokio::time::Instant::from_std(scheduled_at)).await;
                 if let Ok(mut state) = producer_counters.lock() {
                     state.scheduled += 1;
-                    state.scheduled_fingerprint =
-                        roll_fingerprint(state.scheduled_fingerprint, operation_number);
+                    state.scheduled_fingerprint = roll_scheduled_fingerprint(
+                        state.scheduled_fingerprint,
+                        operation_number,
+                        deadline_nanos,
+                        tenant_arrival_phase,
+                    );
                     if state.queued >= queue_bound {
                         state.dropped += 1;
                         state.scheduled_fingerprint =
@@ -427,7 +482,7 @@ where
                         partial_totals.rejected_conflicts += state.rejected_conflicts;
                         partial_totals.errors += state.errors;
                         partial_totals.timeouts += state.timeouts;
-                        json!({"tenant": tenant_number, "scheduled": state.scheduled, "admitted": state.admitted, "dropped": state.dropped, "completed": state.completed, "successful": state.successful, "rejected_conflicts": state.rejected_conflicts, "other_error": state.errors, "timed_out": state.timeouts, "queued": state.queued, "in_flight": state.in_flight, "request_count": state.request_count, "request_fingerprint": format!("fnv1a64:{:016x}", state.request_fingerprint), "scheduled_fingerprint": format!("fnv1a64:{:016x}", state.scheduled_fingerprint)})
+                        json!({"tenant": tenant_number, "arrival_phase_offset_nanos": tenant_phase_offsets[*tenant_number - 1], "scheduled": state.scheduled, "admitted": state.admitted, "dropped": state.dropped, "completed": state.completed, "successful": state.successful, "rejected_conflicts": state.rejected_conflicts, "other_error": state.errors, "timed_out": state.timeouts, "queued": state.queued, "in_flight": state.in_flight, "request_count": state.request_count, "request_fingerprint": format!("fnv1a64:{:016x}", state.request_fingerprint), "scheduled_fingerprint": format!("fnv1a64:{:016x}", state.scheduled_fingerprint)})
                     })
                 })
                 .collect::<Vec<_>>();
@@ -523,6 +578,7 @@ where
         }
         per_tenant.push(json!({
             "tenant": tenant_number,
+            "arrival_phase_offset_nanos": tenant_phase_offsets[tenant_number - 1],
             "scheduled": state.scheduled,
             "admitted": state.admitted,
             "dropped": state.dropped,
@@ -553,6 +609,7 @@ where
         {
             per_tenant.push(json!({
                 "tenant": tenant_number,
+                "arrival_phase_offset_nanos": tenant_phase_offsets[tenant_number - 1],
                 "scheduled": 0,
                 "admitted": 0,
                 "dropped": 0,
@@ -1075,7 +1132,7 @@ where
         }
         per_client.push(json!({"client_lane": client_number, "scheduled": state.scheduled, "admitted": state.admitted, "completed": state.completed, "successful": state.successful, "rejected_conflicts": state.rejected_conflicts, "other_error": state.errors, "timed_out": state.timeouts, "in_flight_high_water": state.in_flight_high_water, "request_count": state.request_count, "request_fingerprint": format!("fnv1a64:{:016x}", state.request_fingerprint), "scheduled_fingerprint": format!("fnv1a64:{:016x}", state.scheduled_fingerprint), "operation_counts": state.operation_counts, "transaction_counts": state.transaction_counts, "width_counts": state.width_counts}));
     }
-    let per_tenant = per_tenant_counters.into_iter().map(|(tenant_number, state)| json!({"tenant": tenant_number, "scheduled": state.scheduled, "admitted": state.admitted, "completed": state.completed, "successful": state.successful, "rejected_conflicts": state.rejected_conflicts, "other_error": state.errors, "timed_out": state.timeouts, "request_count": state.request_count, "request_fingerprint": format!("fnv1a64:{:016x}", state.request_fingerprint), "scheduled_fingerprint": format!("fnv1a64:{:016x}", state.scheduled_fingerprint), "operation_counts": state.operation_counts, "transaction_counts": state.transaction_counts, "width_counts": state.width_counts, "latency_histogram": state.latency_histogram, "operation_latency_histograms": operation_latency_json(&state), "maximum_latency_nanos": state.maximum_latency_nanos, "in_flight_high_water": state.in_flight_high_water})).collect::<Vec<_>>();
+    let per_tenant = per_tenant_counters.into_iter().map(|(tenant_number, state)| json!({"tenant": tenant_number, "arrival_phase_offset_nanos": Value::Null, "scheduled": state.scheduled, "admitted": state.admitted, "completed": state.completed, "successful": state.successful, "rejected_conflicts": state.rejected_conflicts, "other_error": state.errors, "timed_out": state.timeouts, "request_count": state.request_count, "request_fingerprint": format!("fnv1a64:{:016x}", state.request_fingerprint), "scheduled_fingerprint": format!("fnv1a64:{:016x}", state.scheduled_fingerprint), "operation_counts": state.operation_counts, "transaction_counts": state.transaction_counts, "width_counts": state.width_counts, "latency_histogram": state.latency_histogram, "operation_latency_histograms": operation_latency_json(&state), "maximum_latency_nanos": state.maximum_latency_nanos, "in_flight_high_water": state.in_flight_high_water})).collect::<Vec<_>>();
     let report = json!({
         "topology": "fixed-total",
         "deterministic_fingerprints": deterministic_fingerprints(options, "fixed-total"),
@@ -1370,7 +1427,7 @@ fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
         options.initial_rows,
         options.value_bytes
     );
-    let schedule_identity = format!(
+    let mut schedule_identity = format!(
         "hash=fnv1a64;topology={topology};profile={};width={:?};clients={};rate={:?};duration={:?};operations={:?};selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
         options.profile.as_str(),
         options.width,
@@ -1379,6 +1436,12 @@ fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
         options.duration_ms,
         options.operation_count
     );
+    if options.tenant_arrival_phase == TenantArrivalPhase::Staggered {
+        schedule_identity.push_str(&format!(
+            ";tenant_arrival_phase=staggered;phase_formula=floor((tenant_number-1)*1000000000/(rate*active_tenants));active_tenants={}",
+            options.active_tenants
+        ));
+    }
     json!({
         "input_fingerprint": stable_fingerprint(input_identity.as_bytes()),
         "input_identity": input_identity,
@@ -1423,10 +1486,11 @@ async fn abort_and_reap<T: 'static>(tasks: &mut JoinSet<T>) {
 #[cfg(test)]
 mod tests {
     use super::{
-        RequestAddress, deterministic_fingerprints, prepare_request, run_fixed_per_tenant,
-        run_fixed_total,
+        RequestAddress, TenantArrivalPhase, deterministic_fingerprints,
+        nominal_deadline_offset_nanos, phase_offset_nanos, prepare_request,
+        roll_scheduled_fingerprint, run_fixed_per_tenant, run_fixed_total,
     };
-    use crate::config::{Options, Profile, Width};
+    use crate::config::{Options, Profile, Topology, Width};
     use dodb_core::TenantId;
     use dodb_service::{DodbService, ExecutionBudget, Request, Response};
     use serde_json::json;
@@ -1451,7 +1515,8 @@ mod tests {
             operation_count: Some(20_000),
             initial_rows: 256,
             value_bytes: 512,
-            topology: crate::config::Topology::FixedTotal,
+            topology: Topology::FixedTotal,
+            tenant_arrival_phase: TenantArrivalPhase::Synchronized,
             per_tenant_rate: None,
             queue_bound: 32,
             max_in_flight: 8,
@@ -1527,6 +1592,160 @@ mod tests {
             first["schedule_fingerprint"],
             deterministic_fingerprints(&changed, "fixed-total")["schedule_fingerprint"]
         );
+    }
+
+    #[test]
+    fn tenant_phase_offsets_use_checked_rational_nanosecond_rounding() {
+        assert_eq!(
+            (1..=4)
+                .map(|tenant_number| phase_offset_nanos(tenant_number, 4, 50).unwrap())
+                .collect::<Vec<_>>(),
+            vec![0, 5_000_000, 10_000_000, 15_000_000]
+        );
+        assert_eq!(phase_offset_nanos(1, 1, 3), Some(0));
+        assert_eq!(phase_offset_nanos(2, 1, 3), None);
+        assert_eq!(phase_offset_nanos(0, 4, 50), None);
+        assert_eq!(phase_offset_nanos(1, 0, 50), None);
+        assert_eq!(phase_offset_nanos(1, 4, 0), None);
+        assert_eq!(phase_offset_nanos(4, 3, 7), None);
+        assert_eq!(phase_offset_nanos(2, 4, 3), Some(83_333_333));
+        assert_eq!(phase_offset_nanos(3, 4, 3), Some(166_666_666));
+        assert_eq!(nominal_deadline_offset_nanos(3, 3, 0), Some(1_000_000_000));
+        assert_eq!(
+            nominal_deadline_offset_nanos(3, 3, 83_333_333),
+            Some(1_083_333_333)
+        );
+        assert_eq!(nominal_deadline_offset_nanos(u64::MAX, 1, 0), None);
+        assert_eq!(nominal_deadline_offset_nanos(1, 0, 0), None);
+    }
+
+    #[test]
+    fn single_tenant_phase_keeps_the_synchronized_deadline() {
+        let synchronized = nominal_deadline_offset_nanos(17, 7, 0).unwrap();
+        let staggered =
+            nominal_deadline_offset_nanos(17, 7, phase_offset_nanos(1, 1, 7).unwrap()).unwrap();
+        assert_eq!(staggered, synchronized);
+    }
+
+    #[test]
+    fn whole_period_has_equal_counts_and_nonintegral_window_uses_deadline_inclusion() {
+        for phase in [
+            TenantArrivalPhase::Synchronized,
+            TenantArrivalPhase::Staggered,
+        ] {
+            let offsets = (1..=4)
+                .map(|tenant_number| match phase {
+                    TenantArrivalPhase::Synchronized => 0,
+                    TenantArrivalPhase::Staggered => {
+                        phase_offset_nanos(tenant_number, 4, 50).unwrap()
+                    }
+                })
+                .collect::<Vec<_>>();
+            let counts = offsets
+                .into_iter()
+                .map(|phase_offset| {
+                    (0..u64::MAX)
+                        .take_while(|operation_number| {
+                            nominal_deadline_offset_nanos(*operation_number, 50, phase_offset)
+                                .is_some_and(|deadline| deadline < 60_000_000_000)
+                        })
+                        .count()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(counts, vec![3_000; 4]);
+        }
+
+        let counts = (1..=4)
+            .map(|tenant_number| {
+                let phase_offset = phase_offset_nanos(tenant_number, 4, 3).unwrap();
+                (0..u64::MAX)
+                    .take_while(|operation_number| {
+                        nominal_deadline_offset_nanos(*operation_number, 3, phase_offset)
+                            .is_some_and(|deadline| deadline < 1_001_000_000)
+                    })
+                    .count()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(counts, vec![4, 3, 3, 3]);
+    }
+
+    #[test]
+    fn b226_synchronized_fingerprints_remain_compatible_and_staggered_changes_only_schedule() {
+        let mut options = test_options();
+        options.seed = 20_261_027;
+        options.registered_tenants = 5;
+        options.active_tenants = 5;
+        options.opened_idle_tenants = 0;
+        options.client_count = 1;
+        options.duration_ms = Some(60_000);
+        options.operation_count = None;
+        options.initial_rows = 32_768;
+        options.value_bytes = 512;
+        options.topology = Topology::FixedPerTenant;
+        options.per_tenant_rate = Some(50);
+        options.profile = Profile::Mixed;
+        options.width = Width::Mixed;
+        options.tenant_arrival_phase = TenantArrivalPhase::Synchronized;
+
+        let synchronized = deterministic_fingerprints(&options, "fixed-per-tenant");
+        assert_eq!(
+            synchronized["schedule_fingerprint"],
+            "fnv1a64:e913b4f65d1ccd15"
+        );
+        assert_eq!(
+            synchronized["input_fingerprint"],
+            "fnv1a64:5b2fc19f8839634b"
+        );
+
+        let expected = BTreeMap::new();
+        let address = RequestAddress {
+            tenant_number: 3,
+            operation_number: 29,
+            selection_offset: 0,
+            write_ordinal: 1,
+            mutation_ordinal: 4,
+            lane_start: 0,
+        };
+        let synchronized_request = prepare_request(&options, address, &expected);
+        options.tenant_arrival_phase = TenantArrivalPhase::Staggered;
+        let staggered = deterministic_fingerprints(&options, "fixed-per-tenant");
+        let staggered_request = prepare_request(&options, address, &expected);
+        assert_eq!(
+            synchronized["input_fingerprint"],
+            staggered["input_fingerprint"]
+        );
+        assert_ne!(
+            synchronized["schedule_fingerprint"],
+            staggered["schedule_fingerprint"]
+        );
+        assert!(
+            staggered["schedule_identity"].as_str().unwrap().contains(
+                "phase_formula=floor((tenant_number-1)*1000000000/(rate*active_tenants))"
+            )
+        );
+        assert!(
+            staggered["schedule_identity"]
+                .as_str()
+                .unwrap()
+                .contains("active_tenants=5")
+        );
+        assert_eq!(
+            synchronized_request.fingerprint,
+            staggered_request.fingerprint
+        );
+        let synchronized_scheduled = roll_scheduled_fingerprint(
+            0xcbf2_9ce4_8422_2325,
+            29,
+            580_000_000,
+            TenantArrivalPhase::Synchronized,
+        );
+        let staggered_scheduled = roll_scheduled_fingerprint(
+            0xcbf2_9ce4_8422_2325,
+            29,
+            600_000_000,
+            TenantArrivalPhase::Staggered,
+        );
+        assert_ne!(synchronized_scheduled, staggered_scheduled);
     }
 
     struct DelayedService {
@@ -1632,6 +1851,7 @@ mod tests {
         assert!(report["dropped"].as_u64().unwrap() > 0);
         assert!(report["accounting"]["scheduled_equals_admitted_plus_dropped"] == true);
         assert!(report["accounting"]["pending_equals_queued_plus_in_flight_at_offer_end"] == true);
+        assert_eq!(report["per_tenant"][0]["arrival_phase_offset_nanos"], 0);
         assert!(
             report["latency_histogram"]["maximum_nanos"]
                 .as_u64()
@@ -1659,6 +1879,13 @@ mod tests {
         assert_eq!(
             report["per_tenant"].as_array().unwrap().len(),
             options.active_tenants
+        );
+        assert!(
+            report["per_tenant"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|tenant| tenant["arrival_phase_offset_nanos"].is_null())
         );
         for (operation_name, operation_index) in [("Get", 0), ("Query", 1), ("Write", 2)] {
             assert_eq!(

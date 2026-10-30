@@ -764,6 +764,9 @@ fn effective_configuration(options: &Options) -> Value {
         "active_tenants": options.active_tenants, "opened_idle_tenants": options.opened_idle_tenants,
         "measurement_never_opened_tenants": options.registered_tenants - options.active_tenants - options.opened_idle_tenants,
         "client_count": options.client_count, "topology": options.topology.as_str(),
+        "tenant_arrival_phase_selected": options.tenant_arrival_phase.as_str(),
+        "tenant_arrival_phase_applies": options.topology == config::Topology::FixedPerTenant,
+        "tenant_arrival_phase": if options.topology == config::Topology::FixedPerTenant { json!(options.tenant_arrival_phase.as_str()) } else { Value::Null },
         "profile": options.profile.as_str(), "profile_weights_get_query_write": options.profile.weights(),
         "width": match options.width { config::Width::Mixed => json!("mixed 80/15/5 for 1/4/16"), config::Width::Fixed(width) => json!(width) }, "query_limit": 16, "primary_key_bytes": 16, "sort_key_bytes": 16,
         "value_bytes": options.value_bytes, "initial_rows_per_tenant": options.initial_rows,
@@ -773,4 +776,56 @@ fn effective_configuration(options: &Options) -> Value {
         "checkpoint_policy": format!("{:?}", options.checkpoint_policy),
         "minimal_native_revisions": "reserved-ranges", "minimal_native_condition_locks": "exclusive"
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::effective_configuration;
+    use crate::config::{Backend, Options, Profile, TenantArrivalPhase, Topology, Width};
+
+    fn options(topology: Topology) -> Options {
+        Options {
+            backend: Backend::Blink,
+            shared_resources: None,
+            memory_budget: None,
+            data_dir: "/tmp/density-effective-config-data".into(),
+            report_path: "/tmp/density-effective-config-report.json".into(),
+            seed: 1,
+            registered_tenants: 4,
+            active_tenants: 4,
+            opened_idle_tenants: 0,
+            client_count: 1,
+            duration_ms: Some(1_000),
+            operation_count: None,
+            initial_rows: 256,
+            value_bytes: 512,
+            topology,
+            tenant_arrival_phase: TenantArrivalPhase::Synchronized,
+            per_tenant_rate: (topology == Topology::FixedPerTenant).then_some(50),
+            queue_bound: 8,
+            max_in_flight: 8,
+            request_timeout_ms: 1_000,
+            drain_timeout_ms: 1_000,
+            profile: Profile::Mixed,
+            width: Width::Mixed,
+            checkpoint_policy: dodb_server::BlinkCheckpointPolicy::Disabled,
+            blink_checkpoint: crate::blink_checkpoint::Options::default(),
+        }
+    }
+
+    #[test]
+    fn effective_configuration_marks_fixed_total_phase_as_not_applicable() {
+        let fixed_total = effective_configuration(&options(Topology::FixedTotal));
+        assert_eq!(fixed_total["tenant_arrival_phase_selected"], "synchronized");
+        assert_eq!(fixed_total["tenant_arrival_phase_applies"], false);
+        assert!(fixed_total["tenant_arrival_phase"].is_null());
+
+        let fixed_per_tenant = effective_configuration(&options(Topology::FixedPerTenant));
+        assert_eq!(
+            fixed_per_tenant["tenant_arrival_phase_selected"],
+            "synchronized"
+        );
+        assert_eq!(fixed_per_tenant["tenant_arrival_phase_applies"], true);
+        assert_eq!(fixed_per_tenant["tenant_arrival_phase"], "synchronized");
+    }
 }
