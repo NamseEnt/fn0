@@ -79,6 +79,37 @@ def swap_snapshots(value):
     return snapshots
 
 
+def validate_cgroup_groups(groups):
+    assert groups
+    grouping_root = groups.get('.')
+    assert grouping_root is not None
+    assert grouping_root['group_empty']
+    budgeted_groups = {}
+    for relative_path, group in groups.items():
+        assert group['group_empty']
+        if relative_path == '.':
+            continue
+        assert group['memory.max'] == '268435456'
+        assert group['memory.high'] == '201326592'
+        assert group['memory.swap.max'] == '0'
+        budgeted_groups[relative_path] = {
+            'memory.max': group['memory.max'],
+            'memory.high': group['memory.high'],
+            'memory.swap.max': group['memory.swap.max'],
+        }
+    assert budgeted_groups
+    return {
+        'grouping_root_path': '.',
+        'grouping_root_empty': grouping_root['group_empty'],
+        'grouping_root_memory_limits': {
+            'memory.max': grouping_root['memory.max'],
+            'memory.high': grouping_root['memory.high'],
+            'memory.swap.max': grouping_root['memory.swap.max'],
+        },
+        'budgeted_case_and_epoch_groups': budgeted_groups,
+    }
+
+
 def collect(run_directory, output_directory, run_name):
     run_directory = Path(run_directory)
     output_directory = Path(output_directory)
@@ -194,9 +225,7 @@ def collect(run_directory, output_directory, run_name):
     assert native_archive_sha256_after == provenance['source_identity']['native_archive_sha256_before']
     assert native_archive_sha256_after == EXPECTED_NATIVE_ARCHIVE_SHA256
     groups = cgroup_snapshot(Path('/sys/fs/cgroup') / ('dodb-density-' + RUN_NAME))
-    assert groups
-    assert all(group['group_empty'] for group in groups.values())
-    assert all(group['memory.swap.max'] == '0' for group in groups.values())
+    cgroup_group_validation = validate_cgroup_groups(groups)
     capacity_module_path = ROOT / 'oci_capacity.py'
     import importlib.util
     import sys
@@ -216,6 +245,10 @@ def collect(run_directory, output_directory, run_name):
         'run_name': run_name,
         'source_commit': SOURCE_COMMIT,
         'source_clean': True,
+        'planned_collector_sha256': provenance['offcpu_collector_sha256'],
+        'actual_collector_sha256': digest(Path(__file__)),
+        'planned_collector_matches_actual': provenance['offcpu_collector_sha256'] ==
+            digest(Path(__file__)),
         'completion_preserved': completion_path.exists(),
         'failure_preserved': failure_path.exists(),
         'attempted_cells': len(cases),
@@ -229,6 +262,7 @@ def collect(run_directory, output_directory, run_name):
         'processes': list(processes.values()),
         'databases': databases,
         'groups': groups,
+        'cgroup_group_validation': cgroup_group_validation,
         'binaries': binaries,
         'native_archive_sha256_before': provenance['source_identity']['native_archive_sha256_before'],
         'native_archive_sha256_after': native_archive_sha256_after,
