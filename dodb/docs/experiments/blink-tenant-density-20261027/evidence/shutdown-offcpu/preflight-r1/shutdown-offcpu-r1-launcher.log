@@ -1,0 +1,15 @@
+fatal: not a git repository (or any of the parent directories): .git
+Traceback (most recent call last):
+  File "/home/opc/tenant-density-harness-20261027/oci_shutdown_offcpu.py", line 398, in <module>
+    raise SystemExit(main())
+  File "/home/opc/tenant-density-harness-20261027/oci_shutdown_offcpu.py", line 357, in main
+    experiment = prepare_run(arguments)
+  File "/home/opc/tenant-density-harness-20261027/oci_shutdown_offcpu.py", line 303, in prepare_run
+    assert git(ROOT, ['rev-parse', 'HEAD']) == arguments.plan_commit
+  File "/home/opc/tenant-density-harness-20261027/oci_shutdown_offcpu.py", line 23, in git
+    return subprocess.check_output(
+  File "/usr/lib64/python3.9/subprocess.py", line 424, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+  File "/usr/lib64/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['git', '-c', 'safe.directory=/home/opc/tenant-density-harness-20261027', '-C', '/home/opc/tenant-density-harness-20261027', 'rev-parse', 'HEAD']' returned non-zero exit status 128.

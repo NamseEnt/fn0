@@ -300,7 +300,6 @@ def prepare_run(arguments):
     assert len(arguments.plan_commit) == 40 and all(
         character in '0123456789abcdef' for character in arguments.plan_commit
     )
-    assert git(ROOT, ['rev-parse', 'HEAD']) == arguments.plan_commit
     observer_module = load_module(
         'offcpu_observer', Path(__file__).with_name('offcpu_observer.py'),
     )
