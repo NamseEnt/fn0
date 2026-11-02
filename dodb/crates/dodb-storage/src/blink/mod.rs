@@ -2690,9 +2690,23 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             previous_generation: previous_manifest.generation,
         };
         let publication_result =
-            manifest_store.publish_with_index_and_hook(manifest, &self.current.index, || {
+            manifest_store.publish_with_index_and_hook(manifest, &self.current.index, |stage| {
+                let point = match stage {
+                    paged_manifest::PagedManifestPointerStage::BeforeTemporaryCreate => {
+                        "before_paged_checkpoint_manifest_pointer"
+                    }
+                    paged_manifest::PagedManifestPointerStage::AfterTemporarySync => {
+                        "after_paged_checkpoint_pointer_temporary_sync"
+                    }
+                    paged_manifest::PagedManifestPointerStage::AfterRename => {
+                        "after_paged_checkpoint_pointer_rename"
+                    }
+                    paged_manifest::PagedManifestPointerStage::AfterDirectorySync => {
+                        "after_paged_checkpoint_pointer_directory_sync"
+                    }
+                };
                 if let Some(injector) = self.publication_fault_injector.as_deref_mut() {
-                    injector.hit("before_paged_checkpoint_manifest_pointer")?;
+                    injector.hit(point)?;
                 }
                 Ok(())
             });
@@ -16232,7 +16246,7 @@ mod tests {
             .transact(&fifth_write, &StorageLimits::default(), Revision::new(5))
             .unwrap();
         writer.set_boxed_publication_fault_injector(Box::new(FailOnOccurrence {
-            point: "before_paged_checkpoint_manifest_pointer",
+            point: "after_paged_checkpoint_pointer_temporary_sync",
             remaining: 1,
         }));
         let mut fault_job = writer
@@ -16265,6 +16279,15 @@ mod tests {
                 .is_err()
         );
         assert_eq!(manifest_store.current().generation, 3);
+        assert!(
+            std::fs::read_dir(database_path.with_file_name("database.blink-paged"))
+                .unwrap()
+                .flatten()
+                .any(|entry| entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("blink-paged.current.tmp-"))
+        );
         assert_eq!(
             writer.current().get(&key).unwrap().value(),
             Some(&b"not-published"[..])

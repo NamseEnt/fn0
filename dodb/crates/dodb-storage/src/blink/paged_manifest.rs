@@ -72,6 +72,14 @@ pub struct PagedManifestStore {
     broken: bool,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PagedManifestPointerStage {
+    BeforeTemporaryCreate,
+    AfterTemporarySync,
+    AfterRename,
+    AfterDirectorySync,
+}
+
 impl PagedManifestStore {
     pub fn prepare_format(database_path: &Path, identity: StoreIdentity) -> Result<()> {
         let marker_path = format_marker_path(database_path);
@@ -143,7 +151,7 @@ impl PagedManifestStore {
             broken: false,
         };
         let manifest_file_number = store.write_manifest(&manifest)?;
-        store.write_pointer(manifest_file_number, manifest.generation)?;
+        store.write_pointer(manifest_file_number, manifest.generation, &mut |_| Ok(()))?;
         store.manifest_file_number = manifest_file_number;
         store.next_file_number = manifest_file_number
             .checked_add(1)
@@ -201,25 +209,39 @@ impl PagedManifestStore {
         manifest: PagedManifest,
         index: &VersionIndex,
     ) -> Result<()> {
-        self.publish_with_index_and_hook(manifest, index, || Ok(()))
+        self.publish_with_index_and_hook(manifest, index, |_| Ok(()))
     }
 
     pub(crate) fn publish_with_index_and_hook<F>(
         &mut self,
         manifest: PagedManifest,
         index: &VersionIndex,
-        before_pointer: F,
+        mut pointer_fault: F,
     ) -> Result<()>
     where
-        F: FnOnce() -> Result<()>,
+        F: FnMut(PagedManifestPointerStage) -> Result<()>,
     {
         validate_index_root(index, manifest)?;
-        self.publish_with_hook(manifest, before_pointer)
+        self.publish_with_pointer_hook(manifest, || Ok(()), &mut pointer_fault)
     }
 
+    #[cfg(test)]
     fn publish_with_hook<F>(&mut self, manifest: PagedManifest, before_pointer: F) -> Result<()>
     where
         F: FnOnce() -> Result<()>,
+    {
+        self.publish_with_pointer_hook(manifest, before_pointer, &mut |_| Ok(()))
+    }
+
+    fn publish_with_pointer_hook<F, G>(
+        &mut self,
+        manifest: PagedManifest,
+        before_pointer: F,
+        pointer_fault: &mut G,
+    ) -> Result<()>
+    where
+        F: FnOnce() -> Result<()>,
+        G: FnMut(PagedManifestPointerStage) -> Result<()>,
     {
         if self.broken {
             return Err(Error::invariant(
@@ -242,7 +264,7 @@ impl PagedManifestStore {
         }
         let file_number = self.write_manifest(&manifest)?;
         before_pointer()?;
-        if let Err(error) = self.write_pointer(file_number, manifest.generation) {
+        if let Err(error) = self.write_pointer(file_number, manifest.generation, pointer_fault) {
             self.broken = true;
             return Err(error);
         }
@@ -280,8 +302,17 @@ impl PagedManifestStore {
         }
     }
 
-    fn write_pointer(&self, file_number: u64, generation: u64) -> Result<()> {
+    fn write_pointer<G>(
+        &self,
+        file_number: u64,
+        generation: u64,
+        pointer_fault: &mut G,
+    ) -> Result<()>
+    where
+        G: FnMut(PagedManifestPointerStage) -> Result<()>,
+    {
         let bytes = encode_pointer(self.identity, file_number, generation)?;
+        pointer_fault(PagedManifestPointerStage::BeforeTemporaryCreate)?;
         loop {
             let sequence = TEMPORARY_FILE_SEQUENCE.fetch_add(1, Ordering::AcqRel);
             let temporary_path = self.directory.join(format!(
@@ -296,8 +327,11 @@ impl PagedManifestStore {
                 Ok(mut file) => {
                     file.write_all(&bytes)?;
                     file.sync_all()?;
+                    pointer_fault(PagedManifestPointerStage::AfterTemporarySync)?;
                     fs::rename(&temporary_path, &self.pointer_path)?;
+                    pointer_fault(PagedManifestPointerStage::AfterRename)?;
                     sync_directory(&self.directory)?;
+                    pointer_fault(PagedManifestPointerStage::AfterDirectorySync)?;
                     return Ok(());
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
