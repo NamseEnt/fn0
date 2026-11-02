@@ -1884,19 +1884,37 @@ impl PagedCheckpointJob {
         if page_count == 0 {
             return Ok(());
         }
-        self.disk_reservation = Some(
-            self.target
-                .resources
-                .disk()
-                .reserve_wait(
+        let disk = self.target.resources.disk();
+        let mut root_releases = self.target.sources.root_release_receiver();
+        let wait_deadline = tokio::time::Instant::now() + wait_limit;
+        loop {
+            let sources = self.target.sources.clone();
+            let index = Arc::clone(&self.target.index);
+            tokio::task::spawn_blocking(move || sources.collect_all_sources(&index))
+                .await
+                .map_err(|error| {
+                    Error::durability(format!("paged source reclamation worker failed: {error}"))
+                })??;
+            let remaining_wait =
+                wait_deadline.saturating_duration_since(tokio::time::Instant::now());
+            match disk
+                .reserve_wait_for_root_release(
                     self.target.tenant_id,
-                    resource::DiskCategory::RetainedSource,
+                    resource::DiskCategory::CheckpointOutput,
                     durable_bases::encoded_size(page_count),
-                    wait_limit,
+                    remaining_wait,
+                    &mut root_releases,
                 )
                 .await
-                .map_err(page_cache::map_resource_error)?,
-        );
+                .map_err(page_cache::map_resource_error)?
+            {
+                resource::DiskCapacityWaitResult::Reserved(reservation) => {
+                    self.disk_reservation = Some(reservation);
+                    break;
+                }
+                resource::DiskCapacityWaitResult::RootReleased => {}
+            }
+        }
         Ok(())
     }
 
@@ -2055,7 +2073,7 @@ impl PagedCheckpointJob {
                         .disk()
                         .reserve(
                             self.target.tenant_id,
-                            resource::DiskCategory::RetainedSource,
+                            resource::DiskCategory::CheckpointOutput,
                             required_disk_bytes,
                         )
                         .map_err(|_| {
@@ -2130,7 +2148,7 @@ impl Drop for PagedCheckpointJob {
             return;
         };
         let pack_path = durable_bases::pack_path(&self.request.directory, self.request.file_number);
-        let written_bytes = match std::fs::metadata(pack_path) {
+        let written_bytes = match std::fs::metadata(&pack_path) {
             Ok(metadata) => metadata.len(),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => 0,
             Err(_) => reservation.bytes(),
@@ -2141,7 +2159,18 @@ impl Drop for PagedCheckpointJob {
             let _ = reservation.grow(written_bytes - reservation.bytes());
         }
         if written_bytes > 0 {
-            let _ = self.target.sources.retain_disk_reservation(reservation);
+            if reservation
+                .transfer_to(resource::DiskCategory::RetainedSource)
+                .is_ok()
+                && self
+                    .target
+                    .sources
+                    .retain_disk_reservation(reservation)
+                    .is_ok()
+            {
+                return;
+            }
+            let _ = std::fs::remove_file(pack_path);
         }
     }
 }
@@ -3407,6 +3436,22 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
         &self.current
     }
 
+    pub fn source_root_release_receiver(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.current.sources.root_release_receiver()
+    }
+
+    pub fn collect_retired_sources(&mut self) -> Result<(source_manager::SourceGcReport, bool)> {
+        let report = self
+            .current
+            .sources
+            .collect_all_sources(&self.current.index)?;
+        let has_old_roots = self
+            .current
+            .sources
+            .has_roots_other_than(self.current.root)?;
+        Ok((report, has_old_roots))
+    }
+
     pub fn wal_metrics(&self) -> Result<WalMetrics> {
         self.wal.metrics()
     }
@@ -3584,9 +3629,23 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             .disk_reservation
             .take()
             .ok_or_else(|| Error::invariant("paged checkpoint disk reservation is missing"))?;
-        self.current
+        let mut pack_disk_reservation = pack_disk_reservation;
+        if let Err(error) =
+            pack_disk_reservation.transfer_to(resource::DiskCategory::RetainedSource)
+        {
+            job.disk_reservation = Some(pack_disk_reservation);
+            return Err(page_cache::map_resource_error(error));
+        }
+        if let Err(error) = self
+            .current
             .sources
-            .retain_disk_reservation(pack_disk_reservation)?;
+            .retain_disk_reservation(pack_disk_reservation)
+        {
+            let pack_path =
+                durable_bases::pack_path(&job.request.directory, job.request.file_number);
+            let _ = std::fs::remove_file(pack_path);
+            return Err(error);
+        }
         let next_handle = self.current.fork_with_generation(
             checkpoint_root,
             self.current.root_page_id,

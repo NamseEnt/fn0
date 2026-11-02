@@ -17,6 +17,7 @@ use super::version_index::{
     SourceFileKind, SourceIdentity, SourceReachability, StoreIdentity, VersionIndex,
     VersionIndexRoot, VersionIndexRootPin,
 };
+use tokio::sync::watch;
 
 static GC_RUN_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 const ROOT_REGISTRATION_CHARGE_BYTES: u64 = 256;
@@ -55,6 +56,7 @@ struct SourceManagerInner {
     source_catalog: SourceCatalogStore,
     checkpoint_disk_key: String,
     wal_disk_key: String,
+    root_release_generation: watch::Sender<u64>,
     state: Mutex<SourceState>,
 }
 
@@ -208,6 +210,7 @@ impl SourceManager {
                 wal_disk_bytes,
             )
             .map_err(|_| Error::overloaded("paged WAL disk budget is exhausted"))?;
+        let (root_release_generation, _) = watch::channel(0);
         Ok(Self {
             inner: Arc::new(SourceManagerInner {
                 store_identity: config.store_identity,
@@ -223,6 +226,7 @@ impl SourceManager {
                 source_catalog,
                 checkpoint_disk_key,
                 wal_disk_key,
+                root_release_generation,
                 state: Mutex::new(SourceState {
                     roots: HashMap::new(),
                     active_handles: HashMap::new(),
@@ -250,6 +254,76 @@ impl SourceManager {
             .ok_or_else(|| Error::invariant("paged source index root reservation is missing"))?;
         let pin = index.pin_root_reserved(root, index_reservation)?;
         self.register_root(root, pin, reservation)
+    }
+
+    pub fn root_release_receiver(&self) -> watch::Receiver<u64> {
+        self.inner.root_release_generation.subscribe()
+    }
+
+    pub fn has_roots_other_than(&self, root: VersionIndexRoot) -> Result<bool> {
+        self.inner
+            .state
+            .lock()
+            .map(|state| state.roots.values().any(|entry| entry.root != root))
+            .map_err(|_| Error::invariant("paged source manager lock poisoned"))
+    }
+
+    pub fn collect_all_sources(&self, index: &VersionIndex) -> Result<SourceGcReport> {
+        let mut candidates = Vec::new();
+        for (directory, kind, prefix, suffix) in [
+            (
+                self.inner.checkpoint_directory.as_path(),
+                SourceFileKind::CheckpointPack,
+                "base-",
+                ".pages",
+            ),
+            (
+                self.inner.wal_directory.as_path(),
+                SourceFileKind::WalSegment,
+                "segment-",
+                ".wal",
+            ),
+        ] {
+            for entry in fs::read_dir(directory)? {
+                let entry = entry?;
+                if !entry.file_type()?.is_file() {
+                    continue;
+                }
+                let Some(file_name) = entry.file_name().to_str().map(str::to_owned) else {
+                    continue;
+                };
+                let Some(number_text) = file_name
+                    .strip_prefix(prefix)
+                    .and_then(|stem| stem.strip_suffix(suffix))
+                else {
+                    continue;
+                };
+                let file_number = number_text.parse::<u64>().map_err(|_| {
+                    Error::corruption("paged source filename contains an invalid file number")
+                })?;
+                if file_number == 0 {
+                    return Err(Error::corruption(
+                        "paged source filename contains file number zero",
+                    ));
+                }
+                let header_bytes = source_header_bytes(kind);
+                let mut file = File::open(entry.path())?;
+                if file.metadata()?.len() < header_bytes as u64 {
+                    return Err(Error::corruption("paged source header is truncated"));
+                }
+                let mut header = vec![0; header_bytes];
+                file.read_exact(&mut header)?;
+                candidates.push(SourceCandidate {
+                    identity: SourceIdentity {
+                        kind,
+                        file_number,
+                        header_identity: *blake3::hash(&header).as_bytes(),
+                    },
+                    header_bytes,
+                });
+            }
+        }
+        self.collect_garbage(index, candidates, |_| Ok(()))
     }
 
     #[cfg(test)]
@@ -927,16 +1001,20 @@ impl SourceManager {
             _reservation: Some(scratch_reservation),
         };
         for root in &roots {
-            index.visit_sources(*root, &mut |source| match source {
-                SourceReachability::Exact(identity) => write_source_marker(&scratch_path, identity),
-                SourceReachability::AllWalSegments => {
-                    OpenOptions::new()
-                        .write(true)
-                        .create(true)
-                        .truncate(false)
-                        .open(scratch_path.join("retain-all-wal-segments"))?;
-                    Ok(())
+            index.visit_sources(*root, &mut |source| {
+                match source {
+                    SourceReachability::Exact(identity) => {
+                        write_source_marker(&scratch_path, identity)?;
+                    }
+                    SourceReachability::AllWalSegments => {
+                        OpenOptions::new()
+                            .write(true)
+                            .create(true)
+                            .truncate(false)
+                            .open(scratch_path.join("retain-all-wal-segments"))?;
+                    }
                 }
+                Ok(())
             })?;
         }
         for catalog_root in [durable_catalog_root, pending_catalog_root]
@@ -993,6 +1071,8 @@ impl SourceManager {
                 .checked_add(metadata.len())
                 .ok_or_else(|| Error::invalid_input("paged source GC byte count overflow"))?;
             if source_is_marked {
+                let _verified =
+                    open_verified_source(&path, candidate.identity, candidate.header_bytes)?;
                 report.protected_sources = report
                     .protected_sources
                     .checked_add(1)
@@ -1166,8 +1246,14 @@ impl SourcePageReuseReservation {
 
 impl Drop for SourceRootLease {
     fn drop(&mut self) {
-        if let Ok(mut state) = self.manager.inner.state.lock() {
-            state.roots.remove(&self.root_id);
+        if let Ok(mut state) = self.manager.inner.state.lock()
+            && state.roots.remove(&self.root_id).is_some()
+        {
+            drop(state);
+            self.manager
+                .inner
+                .root_release_generation
+                .send_modify(|generation| *generation = generation.wrapping_add(1));
         }
     }
 }
@@ -1733,6 +1819,33 @@ mod tests {
         assert_eq!(report.unlinked_sources, 2);
         assert!(!manager.source_path(checkpoint).exists());
         assert!(!manager.source_path(wal).exists());
+    }
+
+    #[tokio::test]
+    async fn source_collection_resumes_after_the_last_old_root_releases() {
+        let directory = TestDirectory::new();
+        let index = test_index(directory.path());
+        let manager = manager(directory.path());
+        let (source, header_bytes) = write_checkpoint_page(&manager, 4, 47, 91);
+        let root = insert_checkpoint_page(&index, index.empty_root(), source, 8192, 8, 12);
+        let root_lease = manager.pin_root(&index, root).unwrap();
+        let mut releases = manager.root_release_receiver();
+
+        let held_report = manager.collect_all_sources(&index).unwrap();
+        assert_eq!(held_report.protected_sources, 1);
+        assert_eq!(held_report.unlinked_sources, 0);
+        assert!(manager.source_path(source).exists());
+
+        drop(root_lease);
+        tokio::time::timeout(std::time::Duration::from_secs(1), releases.changed())
+            .await
+            .unwrap()
+            .unwrap();
+        let released_report = manager.collect_all_sources(&index).unwrap();
+        assert_eq!(released_report.unlinked_sources, 1);
+        assert_eq!(released_report.unlinked_bytes, 8192);
+        assert!(!manager.source_path(source).exists());
+        assert_eq!(header_bytes, 4096);
     }
 
     #[test]

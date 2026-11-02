@@ -1,0 +1,19 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+error[E0382]: use of moved value: `pack_path`
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:2173:42
+     |
+2150 |         let pack_path = durable_bases::pack_path(&self.request.directory, self.request.file_number);
+     |             --------- move occurs because `pack_path` has type `PathBuf`, which does not implement the `Copy` trait
+2151 |         let written_bytes = match std::fs::metadata(pack_path) {
+     |                                                     --------- value moved here
+...
+2173 |             let _ = std::fs::remove_file(pack_path);
+     |                                          ^^^^^^^^^ value used here after move
+     |
+help: consider borrowing `pack_path`
+     |
+2151 |         let written_bytes = match std::fs::metadata(&pack_path) {
+     |                                                     +
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `dodb-storage` (lib) due to 1 previous error

@@ -1616,7 +1616,7 @@ enum BlinkShardReadHandle {
     Resident(dodb_storage::BlinkReadHandle),
     #[cfg(feature = "blink-demand-paging")]
     Paged {
-        handle: Arc<dodb_storage::blink::PagedReadHandle>,
+        handle: Option<Arc<dodb_storage::blink::PagedReadHandle>>,
         writable: Option<Arc<PagedWritableShard>>,
         blocking_workers: Arc<Semaphore>,
         activity: Arc<CoordinatorActivity>,
@@ -2470,10 +2470,13 @@ impl BlinkShardReadHandle {
                     .clone()
                     .try_acquire_owned()
                     .map_err(|_| Error::overloaded("paged read worker capacity is full"))?;
-                let handle = match writable {
-                    Some(writable) => writable.snapshot()?,
-                    None => Arc::clone(handle),
-                };
+                let handle =
+                    match writable {
+                        Some(writable) => writable.snapshot()?,
+                        None => Arc::clone(handle.as_ref().ok_or_else(|| {
+                            Error::invariant("read-only paged handle is missing")
+                        })?),
+                    };
                 let key = key.clone();
                 let activity = Arc::clone(activity);
                 let activity_guard = activity.enter();
@@ -2519,10 +2522,13 @@ impl BlinkShardReadHandle {
                     .clone()
                     .try_acquire_owned()
                     .map_err(|_| Error::overloaded("paged read worker capacity is full"))?;
-                let handle = match writable {
-                    Some(writable) => writable.snapshot()?,
-                    None => Arc::clone(handle),
-                };
+                let handle =
+                    match writable {
+                        Some(writable) => writable.snapshot()?,
+                        None => Arc::clone(handle.as_ref().ok_or_else(|| {
+                            Error::invariant("read-only paged handle is missing")
+                        })?),
+                    };
                 let primary_key = primary_key.clone();
                 let exclusive_after_sort_key = exclusive_after_sort_key.cloned();
                 let activity = Arc::clone(activity);
@@ -2570,10 +2576,13 @@ impl BlinkShardReadHandle {
                     .clone()
                     .try_acquire_owned()
                     .map_err(|_| Error::overloaded("paged read worker capacity is full"))?;
-                let handle = match writable {
-                    Some(writable) => writable.snapshot()?,
-                    None => Arc::clone(handle),
-                };
+                let handle =
+                    match writable {
+                        Some(writable) => writable.snapshot()?,
+                        None => Arc::clone(handle.as_ref().ok_or_else(|| {
+                            Error::invariant("read-only paged handle is missing")
+                        })?),
+                    };
                 let exclusive_after = exclusive_after.cloned();
                 let activity = Arc::clone(activity);
                 let activity_guard = activity.enter();
@@ -4047,6 +4056,7 @@ impl AsyncBlinkShard {
             foreground_resources,
             metadata_reservation,
         } = start_config;
+        let read_handle = writable.is_none().then_some(read_handle);
         Self {
             read_handle: BlinkShardReadHandle::Paged {
                 handle: read_handle,
@@ -6491,6 +6501,11 @@ mod tests {
     async fn paged_checkpoint_resumes_after_disk_capacity_release() {
         let directory = blink_test_directory();
         let tenant = TenantId::new(721);
+        let mut shared_resources = writable_paged_blink_shared_resources();
+        let output_category = dodb_storage::blink::resource::DiskCategory::CheckpointOutput;
+        let output_limit = 1024 * 1024;
+        shared_resources.disk.global_category_bytes[output_category as usize] = output_limit;
+        shared_resources.disk.per_tenant_category_bytes[output_category as usize] = output_limit;
         let config = LocalTenantServiceConfig {
             data_dir: directory.path().to_path_buf(),
             max_open_shards: 1,
@@ -6503,7 +6518,7 @@ mod tests {
                 threshold_bytes: u64::MAX,
             },
             blink_checkpoint_execution: BlinkCheckpointExecution::Background,
-            blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+            blink_shared_resources: Some(shared_resources),
             ..LocalTenantServiceConfig::default()
         };
         let service = BlinkTenantService::new(config).unwrap();
@@ -6541,18 +6556,12 @@ mod tests {
         let disk = resources.disk();
         let tenant_disk = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
         let disk_headroom = 256;
-        let blocker_bytes = writable_paged_blink_shared_resources()
-            .disk
-            .per_tenant_bytes
-            .saturating_sub(tenant_disk.current_total)
+        let blocker_bytes = output_limit
+            .saturating_sub(tenant_disk.current_by_category[output_category as usize])
             .saturating_sub(disk_headroom);
         assert!(blocker_bytes > 0);
         let blocker = disk
-            .reserve(
-                tenant.get(),
-                dodb_storage::blink::resource::DiskCategory::RetainedSource,
-                blocker_bytes,
-            )
+            .reserve(tenant.get(), output_category, blocker_bytes)
             .unwrap();
         let checkpoint = {
             let writable = Arc::clone(&writable);
@@ -6567,7 +6576,13 @@ mod tests {
             }
         })
         .await
-        .unwrap();
+        .unwrap_or_else(|_| {
+            panic!(
+                "checkpoint capacity wait did not start: finished={}, metrics={:?}",
+                checkpoint.is_finished(),
+                service.checkpoint_metrics_snapshot()
+            )
+        });
         drop(blocker);
         checkpoint.await.unwrap().unwrap();
         let disk_snapshot = disk.snapshot().unwrap();
@@ -6583,6 +6598,11 @@ mod tests {
     async fn paged_service_shutdown_cancels_checkpoint_waiting_for_disk_capacity() {
         let directory = blink_test_directory();
         let tenant = TenantId::new(724);
+        let mut shared_resources = writable_paged_blink_shared_resources();
+        let output_category = dodb_storage::blink::resource::DiskCategory::CheckpointOutput;
+        let output_limit = 1024 * 1024;
+        shared_resources.disk.global_category_bytes[output_category as usize] = output_limit;
+        shared_resources.disk.per_tenant_category_bytes[output_category as usize] = output_limit;
         let config = LocalTenantServiceConfig {
             data_dir: directory.path().to_path_buf(),
             max_open_shards: 1,
@@ -6595,7 +6615,7 @@ mod tests {
                 threshold_bytes: u64::MAX,
             },
             blink_checkpoint_execution: BlinkCheckpointExecution::Background,
-            blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+            blink_shared_resources: Some(shared_resources),
             ..LocalTenantServiceConfig::default()
         };
         let service = BlinkTenantService::new(config).unwrap();
@@ -6633,18 +6653,12 @@ mod tests {
         let disk = resources.disk();
         let tenant_disk = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
         let disk_headroom = 256;
-        let blocker_bytes = writable_paged_blink_shared_resources()
-            .disk
-            .per_tenant_bytes
-            .saturating_sub(tenant_disk.current_total)
+        let blocker_bytes = output_limit
+            .saturating_sub(tenant_disk.current_by_category[output_category as usize])
             .saturating_sub(disk_headroom);
         assert!(blocker_bytes > 0);
         let blocker = disk
-            .reserve(
-                tenant.get(),
-                dodb_storage::blink::resource::DiskCategory::RetainedSource,
-                blocker_bytes,
-            )
+            .reserve(tenant.get(), output_category, blocker_bytes)
             .unwrap();
         let checkpoint = {
             let writable = Arc::clone(&writable);

@@ -54,6 +54,8 @@ Named tests and validation:
 - `blink::resource::tests::disk_capacity_waiters_are_bounded_and_cancellation_releases_a_slot`: passed; waiters are capped and task cancellation releases its slot.
 - `tests::paged_checkpoint_resumes_after_disk_capacity_release`: passed through the writable service checkpoint path; it waits at the disk limit, resumes after capacity release, publishes, and clears the pending waiter.
 - `tests::paged_service_shutdown_cancels_checkpoint_waiting_for_disk_capacity`: passed through the writable service route; shutdown cancels the capacity wait, drains the checkpoint task, and clears the waiter registration.
+- `blink::resource::tests::disk_capacity_waiter_wakes_when_a_root_releases`: passed; a root-release signal wakes a bounded output-capacity waiter and releases its waiter slot.
+- `blink::source_manager::tests::source_collection_resumes_after_the_last_old_root_releases`: passed; a pinned checkpoint source remains live until its root releases, then collection unlinks it.
 - `tests::paged_checkpoint_progresses_while_foreground_queue_budget_is_full`: passed; checkpoint publication completes while the queued-foreground category is at its per-tenant byte ceiling. This does not fill every foreground category or prove a multi-tenant pressure bound.
 - `tests::checkpoint_debt_admission_enforces_global_and_tenant_limits`: passed.
 - `tests::paged_open_rejects_checkpoint_debt_cap_below_one_worst_case_transaction`: passed.
@@ -65,6 +67,7 @@ Named tests and validation:
 - `cargo test -p dodb-server --lib -- --test-threads=1`: 26 passed.
 - `cargo test -p dodb-server --features blink-demand-paging --lib -- --test-threads=1`: 48 passed.
 - `cargo test -p dodb-storage --features blink-demand-paging --lib -- --test-threads=1`: 322 passed, 4 ignored.
+- Revalidation after root-release wakeup and output-to-retained reservation transfer: storage paging library 324 passed, 4 ignored; server paging library 48 passed.
 - `cargo check -p dodb-server --all-targets`: passed.
 - `cargo check -p dodb-server --all-targets --features blink-demand-paging`: passed.
 - `cargo clippy -p dodb-server --all-targets --no-deps -- -D warnings`: passed.
@@ -75,4 +78,16 @@ Logs: `storage-paging-library-capacity-wake.log`, `server-default-all-targets-sh
 
 The first foreground-category saturation probe could not reserve the full category because its aggregate per-tenant memory limit left no headroom for existing metadata charges. The corrected test retains the category ceiling and increases only the aggregate memory limits. The rejected probe is recorded in `server-paging-foreground-full-initial-capacity-reject.log`.
 
-Remaining T14 gates: the capacity waiter is proven to resume after retained-source accounting is released, but the complete old-reader pin-release lifecycle has not been shown to release retained bytes and resume checkpoint publication. The queue simulation covers synchronized and staggered arrivals with a deterministic three-turn bound, but service-integrated all-active pressure and measured time bounds are not complete. A long pinned reader under pressure and recovery after capacity release remain unverified. The full queued-foreground category test does not fill all foreground categories. Debt-cap tests show configured foreground backpressure, not a multi-tenant SLO bound. T14 acceptance remains open; T15, T16, and T17 have not started.
+## Root-Release Wakeup Follow-Up
+
+Paged checkpoint output capacity now listens for source-root lease releases. Before each reservation attempt, the checkpoint worker scans checkpoint packs and WAL segments through the source collector. If output capacity is still unavailable, the bounded waiter wakes on either capacity change or a root release, runs collection again, and retries against the same absolute deadline.
+
+Checkpoint bytes are reserved under `CheckpointOutput` while the pack is being produced and transferred to `RetainedSource` at publication. If transfer or retention fails before manifest publication, the unpublished pack is removed when possible. The writable shard no longer keeps a redundant copy of its initial root handle; active operations continue to snapshot the writer's current root.
+
+The new source-manager test proves old-root pin release allows exact source unlinking. The resource test proves a root-release signal wakes and unregisters a bounded waiter. Existing writable-service tests prove output-capacity waiting resumes after capacity release and shutdown cancels a waiter. These separate gates do not yet prove the complete service lifecycle where an old reader is the retained source, its release reclaims enough disk, and the waiting checkpoint then publishes.
+
+The first service probe applied the artificial blocker to total disk capacity. That exhausted WAL growth before the checkpoint reached output reservation. A second probe reduced the retained-source category and prevented source-catalog reservation. Both failed attempts are retained as `server-paging-root-release-capacity-probe-failures.log`. The corrected service test limits only `CheckpointOutput`, leaving WAL and source-catalog budgets available.
+
+New logs: `server-paging-root-release-capacity-retry.log`, `server-paging-capacity-shutdown-cancel.log`, `server-paging-root-release-capacity-probe-failures.log`, `storage-paging-root-release-collection.log`, `storage-paging-root-release-wakeup.log`, and `storage-paging-root-release-collection-compile-failure.log`.
+
+Remaining T14 gates: the complete old-reader pin-release lifecycle through checkpoint publication is still unproven. The queue simulation covers synchronized and staggered arrivals with a deterministic three-turn bound, but service-integrated all-active pressure and measured time bounds are incomplete. A long pinned reader under pressure and recovery after capacity release remain unverified. The full queued-foreground category test does not fill all foreground categories. Debt-cap tests show configured foreground backpressure, not a multi-tenant SLO bound. T14 acceptance remains open; T15, T16, and T17 have not started.

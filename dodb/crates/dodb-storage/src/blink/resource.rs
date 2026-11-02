@@ -214,6 +214,11 @@ pub struct DiskReservation {
     charge: Arc<DiskCharge>,
 }
 
+pub enum DiskCapacityWaitResult {
+    Reserved(DiskReservation),
+    RootReleased,
+}
+
 impl BlinkResourceManager {
     pub fn new(limits: ResourceLimits) -> Result<Self, ResourceError> {
         let disk_limits = DiskResourceLimits::unbounded(limits.max_tenants);
@@ -279,6 +284,48 @@ impl BlinkResourceManager {
 }
 
 impl BlinkDiskResourceManager {
+    pub async fn reserve_wait_for_root_release(
+        &self,
+        tenant_id: u64,
+        category: DiskCategory,
+        bytes: u64,
+        wait_limit: Duration,
+        root_releases: &mut tokio::sync::watch::Receiver<u64>,
+    ) -> Result<DiskCapacityWaitResult, ResourceError> {
+        let category_index = category as usize;
+        if bytes > self.inner.limits.global_bytes
+            || bytes > self.inner.limits.per_tenant_bytes
+            || bytes > self.inner.limits.global_category_bytes[category_index]
+            || bytes > self.inner.limits.per_tenant_category_bytes[category_index]
+        {
+            return Err(ResourceError::CapacityExceeded);
+        }
+        let _waiter_registration = self.register_waiter()?;
+        let deadline = tokio::time::Instant::now() + wait_limit;
+        loop {
+            let capacity_changed = self.inner.capacity_changed.notified();
+            tokio::pin!(capacity_changed);
+            capacity_changed.as_mut().enable();
+            match self.reserve(tenant_id, category, bytes) {
+                Ok(reservation) => {
+                    return Ok(DiskCapacityWaitResult::Reserved(reservation));
+                }
+                Err(ResourceError::CapacityExceeded | ResourceError::TooManyTenants) => {}
+                Err(error) => return Err(error),
+            }
+            tokio::select! {
+                result = tokio::time::timeout_at(deadline, &mut capacity_changed) => {
+                    result.map_err(|_| ResourceError::WaitTimedOut)?;
+                }
+                result = tokio::time::timeout_at(deadline, root_releases.changed()) => {
+                    result.map_err(|_| ResourceError::WaitTimedOut)?
+                        .map_err(|_| ResourceError::WaitTimedOut)?;
+                    return Ok(DiskCapacityWaitResult::RootReleased);
+                }
+            }
+        }
+    }
+
     pub async fn reserve_wait(
         &self,
         tenant_id: u64,
@@ -1207,6 +1254,43 @@ mod tests {
         let snapshot = manager.snapshot().unwrap();
         assert_eq!(snapshot.current_total, 90);
         assert_eq!(snapshot.pending_waiters, 0);
+    }
+
+    #[tokio::test]
+    async fn disk_capacity_waiter_wakes_when_a_root_releases() {
+        let manager = disk_manager().disk();
+        manager
+            .reconcile_persistent_usage(1, DiskCategory::RetainedSource, "/tenant-1", 80)
+            .unwrap();
+        let (root_release_sender, mut root_releases) = tokio::sync::watch::channel(0);
+        let waiting_manager = manager.clone();
+        let waiter = tokio::spawn(async move {
+            waiting_manager
+                .reserve_wait_for_root_release(
+                    2,
+                    DiskCategory::CheckpointOutput,
+                    30,
+                    Duration::from_secs(1),
+                    &mut root_releases,
+                )
+                .await
+        });
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if manager.snapshot().unwrap().pending_waiters == 1 {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        root_release_sender.send_replace(1);
+        assert!(matches!(
+            waiter.await.unwrap().unwrap(),
+            super::DiskCapacityWaitResult::RootReleased
+        ));
+        assert_eq!(manager.snapshot().unwrap().pending_waiters, 0);
     }
 
     #[tokio::test]

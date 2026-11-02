@@ -1,0 +1,9 @@
+Root-release service capacity probe failure record
+
+Initial probe: the synthetic reservation nearly filled the tenant-wide disk budget. The checkpoint failed before entering output-capacity waiting with `overloaded: paged WAL disk budget is exhausted`.
+
+Second probe: reducing the `RetainedSource` category and reserving it as the blocker prevented source-catalog reservation. The checkpoint failed with `overloaded: source catalog disk budget is exhausted`.
+
+Category correction probe: reserving checkpoint output under `CheckpointOutput` without converting it at publication failed with `InternalInvariantViolation("paged source disk reservation has the wrong category")`.
+
+These probes were rejected. The final test constrains the `CheckpointOutput` category while preserving WAL, source-catalog, and retained-source budgets. The source-root collection and waiter wakeup path has separate unit coverage; no full old-reader-to-checkpoint-publication integration result is claimed.
