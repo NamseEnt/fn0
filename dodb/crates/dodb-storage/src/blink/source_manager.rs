@@ -695,6 +695,39 @@ mod tests {
         let wal = source_identity(SourceFileKind::WalSegment, 2, wal_header);
         write_source(&manager, checkpoint, checkpoint_header);
         write_source(&manager, wal, wal_header);
+        let chain = crate::blink::version_chain::DeltaChain::new(
+            PageId::new(2),
+            vec![
+                crate::blink::version_chain::DeltaChainEntry::CheckpointImage {
+                    source: checkpoint,
+                    offset: 64,
+                    source_length: 8192,
+                    image_lsn: Lsn::new(8),
+                    image_crc32c: 3,
+                },
+                crate::blink::version_chain::DeltaChainEntry::WalDelta {
+                    frame: WalFrameLocator {
+                        source: wal,
+                        frame_offset: 32,
+                        frame_length: 128,
+                        header_crc32c: 1,
+                        payload_offset: 48,
+                        payload_length: 64,
+                        payload_crc32c: 2,
+                        committed_prefix_length: 256,
+                        commit_frame_offset: 200,
+                        commit_lsn: Lsn::new(12),
+                    },
+                    record_lsn: Lsn::new(10),
+                    base_lsn: Lsn::new(8),
+                    base_crc32c: 3,
+                    image_lsn: Lsn::new(10),
+                    image_crc32c: 4,
+                },
+            ],
+        )
+        .unwrap();
+        let chain_reference = index.delta_chains().write(1, &chain).unwrap();
         let mut root = index.empty_root();
         root = index
             .insert(
@@ -721,16 +754,7 @@ mod tests {
                             commit_frame_offset: 200,
                             commit_lsn: Lsn::new(12),
                         },
-                        base_lsn: Lsn::new(8),
-                        base_crc32c: 3,
-                        base: crate::blink::version_index::BaseFrameLocator {
-                            source: checkpoint,
-                            frame_offset: 64,
-                            frame_length: 4096,
-                            header_crc32c: 5,
-                            image_lsn: Lsn::new(8),
-                            image_crc32c: 3,
-                        },
+                        chain: chain_reference,
                         depth: 1,
                     },
                 },
@@ -761,7 +785,7 @@ mod tests {
     }
 
     #[test]
-    fn delta_roots_retain_earlier_wal_segments_as_a_conservative_dependency_run() {
+    fn delta_roots_retain_only_exact_ancestry_sources() {
         let directory = TestDirectory::new();
         let index = test_index(directory.path());
         let manager = manager(directory.path());
@@ -774,6 +798,49 @@ mod tests {
         write_source(&manager, oldest, oldest_header);
         write_source(&manager, base, base_header);
         write_source(&manager, delta, delta_header);
+        let chain = crate::blink::version_chain::DeltaChain::new(
+            PageId::new(2),
+            vec![
+                crate::blink::version_chain::DeltaChainEntry::WalImage {
+                    frame: WalFrameLocator {
+                        source: base,
+                        frame_offset: 32,
+                        frame_length: 96,
+                        header_crc32c: 5,
+                        payload_offset: 48,
+                        payload_length: 64,
+                        payload_crc32c: 4,
+                        committed_prefix_length: 256,
+                        commit_frame_offset: 128,
+                        commit_lsn: Lsn::new(22),
+                    },
+                    record_lsn: Lsn::new(20),
+                    image_lsn: Lsn::new(20),
+                    image_crc32c: 4,
+                },
+                crate::blink::version_chain::DeltaChainEntry::WalDelta {
+                    frame: WalFrameLocator {
+                        source: delta,
+                        frame_offset: 64,
+                        frame_length: 96,
+                        header_crc32c: 1,
+                        payload_offset: 80,
+                        payload_length: 64,
+                        payload_crc32c: 2,
+                        committed_prefix_length: 256,
+                        commit_frame_offset: 192,
+                        commit_lsn: Lsn::new(32),
+                    },
+                    record_lsn: Lsn::new(30),
+                    base_lsn: Lsn::new(20),
+                    base_crc32c: 4,
+                    image_lsn: Lsn::new(30),
+                    image_crc32c: 3,
+                },
+            ],
+        )
+        .unwrap();
+        let chain_reference = index.delta_chains().write(1, &chain).unwrap();
         let root = index
             .insert(
                 index.empty_root(),
@@ -799,17 +866,8 @@ mod tests {
                             commit_frame_offset: 192,
                             commit_lsn: Lsn::new(32),
                         },
-                        base_lsn: Lsn::new(20),
-                        base_crc32c: 4,
-                        base: crate::blink::version_index::BaseFrameLocator {
-                            source: base,
-                            frame_offset: 32,
-                            frame_length: 96,
-                            header_crc32c: 5,
-                            image_lsn: Lsn::new(20),
-                            image_crc32c: 4,
-                        },
-                        depth: 2,
+                        chain: chain_reference,
+                        depth: 1,
                     },
                 },
             )
@@ -826,12 +884,13 @@ mod tests {
         let report = manager
             .collect_garbage(&index, candidates, |_| Ok(()))
             .unwrap();
-        assert_eq!(report.protected_sources, 3);
+        assert_eq!(report.protected_sources, 2);
+        assert_eq!(report.unlinked_sources, 1);
         drop(root_lease);
         let report = manager
             .collect_garbage(&index, candidates, |_| Ok(()))
             .unwrap();
-        assert_eq!(report.unlinked_sources, 3);
+        assert_eq!(report.unlinked_sources, 2);
     }
 
     #[test]

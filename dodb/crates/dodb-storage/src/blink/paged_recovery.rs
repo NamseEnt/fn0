@@ -13,9 +13,11 @@ use crate::wal::{
 use super::decode_blink_page;
 use super::durable_bases::{BasePackEntry, scan_pack};
 use super::paged_manifest::PagedManifest;
+use super::version_chain::DeltaChain;
+use super::version_chain::DeltaChainEntry;
 use super::version_index::{
-    BaseFrameLocator, SourceFileKind, SourceIdentity, VersionDescriptor, VersionIndex,
-    VersionIndexRoot, VersionLocator, VersionToken, WalFrameLocator,
+    SourceFileKind, SourceIdentity, VersionDescriptor, VersionIndex, VersionIndexRoot,
+    VersionLocator, VersionToken, WalFrameLocator,
 };
 
 pub fn build_checkpoint_index(
@@ -296,11 +298,59 @@ impl<'index> PagedRecoveryIndexBuilder<'index> {
                         "WAL delta base differs from its indexed predecessor",
                     ));
                 }
-                VersionLocator::WalDelta {
+                let mut ancestry = match previous.locator {
+                    VersionLocator::CheckpointImage {
+                        source,
+                        offset,
+                        source_length,
+                        image_lsn,
+                        image_crc32c,
+                    } => vec![DeltaChainEntry::CheckpointImage {
+                        source,
+                        offset,
+                        source_length,
+                        image_lsn,
+                        image_crc32c,
+                    }],
+                    VersionLocator::WalImage { frame } => {
+                        let VersionToken::Wal { record_lsn, .. } = previous.token else {
+                            return Err(Error::corruption("WAL image version has a non-WAL token"));
+                        };
+                        vec![DeltaChainEntry::WalImage {
+                            frame,
+                            record_lsn,
+                            image_lsn: previous.image_lsn,
+                            image_crc32c: previous.image_crc32c,
+                        }]
+                    }
+                    VersionLocator::WalDelta { chain, .. } => {
+                        self.index
+                            .delta_chains()
+                            .read(chain, location.page_id)?
+                            .entries
+                    }
+                };
+                ancestry.push(DeltaChainEntry::WalDelta {
                     frame,
+                    record_lsn: location.record_lsn,
                     base_lsn,
                     base_crc32c,
-                    base: base_locator(previous)?,
+                    image_lsn,
+                    image_crc32c,
+                });
+                let chain = DeltaChain::new(location.page_id, ancestry)?;
+                let next_index_generation = self
+                    .root
+                    .generation()
+                    .checked_add(1)
+                    .ok_or_else(|| Error::invariant("version index generation exhausted"))?;
+                let chain = self
+                    .index
+                    .delta_chains()
+                    .write(next_index_generation, &chain)?;
+                VersionLocator::WalDelta {
+                    frame,
+                    chain,
                     depth: location.delta_depth,
                 }
             }
@@ -404,41 +454,13 @@ fn is_superblock_page(page_id: dodb_core::PageId) -> bool {
     page_id.get() < 2
 }
 
-fn base_locator(descriptor: VersionDescriptor) -> Result<BaseFrameLocator> {
-    match descriptor.locator {
-        VersionLocator::CheckpointImage {
-            source,
-            offset,
-            image_lsn,
-            image_crc32c,
-            ..
-        } => Ok(BaseFrameLocator {
-            source,
-            frame_offset: offset,
-            frame_length: super::version_index::VERSION_INDEX_NODE_BYTES as u32,
-            header_crc32c: 0,
-            image_lsn,
-            image_crc32c,
-        }),
-        VersionLocator::WalImage { frame } | VersionLocator::WalDelta { frame, .. } => {
-            Ok(BaseFrameLocator {
-                source: frame.source,
-                frame_offset: frame.frame_offset,
-                frame_length: frame.frame_length,
-                header_crc32c: frame.header_crc32c,
-                image_lsn: descriptor.image_lsn,
-                image_crc32c: descriptor.image_crc32c,
-            })
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{PagedRecoveryIndexBuilder, build_checkpoint_index};
     use crate::blink::durable_bases::{BasePackJob, pack_path};
     use crate::blink::paged_manifest::PagedManifest;
     use crate::blink::resource::{BlinkResourceManager, ResourceLimits};
+    use crate::blink::version_chain::DeltaChainEntry;
     use crate::blink::version_index::{
         SourceFileKind, SourceIdentity, StoreIdentity, VersionDescriptor, VersionIndex,
         VersionLocator, VersionToken, WalFrameLocator,
@@ -632,19 +654,26 @@ mod tests {
         );
         let VersionLocator::WalDelta {
             frame,
-            base_lsn,
-            base_crc32c,
-            base,
+            chain,
             depth,
         } = recovered.locator
         else {
             panic!("recovered delta did not retain its locator");
         };
         assert_eq!(frame.source, source);
-        assert_eq!(base_lsn, Lsn::new(11));
-        assert_eq!(base_crc32c, 0x2222_3333);
-        assert_eq!(base.frame_offset, 100);
-        assert_eq!(base.image_lsn, Lsn::new(11));
+        let chain = index.delta_chains().read(chain, page_id).unwrap();
+        let Some(DeltaChainEntry::WalDelta {
+            base_lsn,
+            base_crc32c,
+            frame: latest_frame,
+            ..
+        }) = chain.entries.last()
+        else {
+            panic!("latest delta ancestry entry is missing");
+        };
+        assert_eq!(*base_lsn, Lsn::new(11));
+        assert_eq!(*base_crc32c, 0x2222_3333);
+        assert_eq!(latest_frame.frame_offset, 220);
         assert_eq!(depth, 1);
         assert!(index.root_node_is_rebuildable(recovered_root).unwrap());
     }
@@ -1021,20 +1050,21 @@ mod tests {
             index.lookup(checkpoint_root, page_id).unwrap().unwrap(),
             checkpoint_descriptor
         );
-        let VersionLocator::WalDelta {
-            base_lsn,
-            base_crc32c,
-            base,
-            depth,
-            ..
-        } = recovered.locator
-        else {
+        let VersionLocator::WalDelta { chain, depth, .. } = recovered.locator else {
             panic!("committed WAL delta was not retained as a delta locator");
         };
-        assert_eq!(base_lsn, Lsn::new(10));
-        assert_eq!(base_crc32c, checkpoint_descriptor.image_crc32c);
-        assert_eq!(base.source, checkpoint_source);
-        assert_eq!(base.image_lsn, Lsn::new(10));
+        let chain = index.delta_chains().read(chain, page_id).unwrap();
+        assert!(matches!(
+            chain.entries.first(),
+            Some(DeltaChainEntry::CheckpointImage {
+                source,
+                image_lsn,
+                image_crc32c,
+                ..
+            }) if *source == checkpoint_source
+                && *image_lsn == Lsn::new(10)
+                && *image_crc32c == checkpoint_descriptor.image_crc32c
+        ));
         assert_eq!(depth, 1);
     }
 }

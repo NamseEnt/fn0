@@ -27,6 +27,8 @@ use crate::btree::{
 };
 pub mod durable_bases;
 mod leaf;
+#[cfg(feature = "blink-demand-paging")]
+pub mod page_cache;
 #[cfg(feature = "blink-checkpoint-locators")]
 pub mod page_locator;
 #[cfg(feature = "blink-demand-paging")]
@@ -39,6 +41,8 @@ pub mod resource;
 pub mod segmented_wal;
 #[cfg(feature = "blink-demand-paging")]
 pub mod source_manager;
+#[cfg(feature = "blink-demand-paging")]
+pub mod version_chain;
 #[cfg(feature = "blink-demand-paging")]
 pub mod version_index;
 pub use physical_checkpoint::{BlinkCheckpointOutput, BlinkCheckpointSnapshot};
@@ -740,22 +744,50 @@ trait BlinkMutationState {
 }
 
 #[derive(Clone)]
-struct OwnedBlinkPageGuard(Arc<BlinkPage>);
+struct OwnedBlinkPageGuard(OwnedBlinkPage);
+
+#[derive(Clone)]
+enum OwnedBlinkPage {
+    Resident(Arc<BlinkPage>),
+    #[cfg(feature = "blink-demand-paging")]
+    Cached(page_cache::PageGuard<BlinkPage>),
+}
 
 impl OwnedBlinkPageGuard {
     fn clone_page(&self) -> BlinkPage {
-        self.0.as_ref().clone()
+        self.as_ref().clone()
     }
 
     #[cfg(test)]
     fn into_arc(self) -> Arc<BlinkPage> {
-        self.0
+        match self.0 {
+            OwnedBlinkPage::Resident(page) => page,
+            #[cfg(feature = "blink-demand-paging")]
+            OwnedBlinkPage::Cached(page) => Arc::new(page.as_ref().clone()),
+        }
+    }
+}
+
+impl From<Arc<BlinkPage>> for OwnedBlinkPageGuard {
+    fn from(page: Arc<BlinkPage>) -> Self {
+        Self(OwnedBlinkPage::Resident(page))
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl From<page_cache::PageGuard<BlinkPage>> for OwnedBlinkPageGuard {
+    fn from(page: page_cache::PageGuard<BlinkPage>) -> Self {
+        Self(OwnedBlinkPage::Cached(page))
     }
 }
 
 impl AsRef<BlinkPage> for OwnedBlinkPageGuard {
     fn as_ref(&self) -> &BlinkPage {
-        self.0.as_ref()
+        match &self.0 {
+            OwnedBlinkPage::Resident(page) => page.as_ref(),
+            #[cfg(feature = "blink-demand-paging")]
+            OwnedBlinkPage::Cached(page) => page.as_ref(),
+        }
     }
 }
 
@@ -763,7 +795,7 @@ impl std::ops::Deref for OwnedBlinkPageGuard {
     type Target = BlinkPage;
 
     fn deref(&self) -> &Self::Target {
-        self.0.as_ref()
+        self.as_ref()
     }
 }
 
@@ -790,7 +822,11 @@ impl BlinkMutationState for BlinkState {
         self.allow_page_reuse
     }
     fn page(&self, page_id: PageId) -> Result<Option<OwnedBlinkPageGuard>> {
-        Ok(self.pages.get(&page_id).cloned().map(OwnedBlinkPageGuard))
+        Ok(self
+            .pages
+            .get(&page_id)
+            .cloned()
+            .map(OwnedBlinkPageGuard::from))
     }
     fn insert_page(&mut self, page_id: PageId, page: BlinkPage) {
         self.pages.insert(page_id, Arc::new(page));
@@ -880,7 +916,7 @@ impl BlinkMutationState for WorkingBlinkState<'_> {
             .get(&page_id)
             .cloned()
             .or_else(|| self.base.pages.get(&page_id).cloned())
-            .map(OwnedBlinkPageGuard))
+            .map(OwnedBlinkPageGuard::from))
     }
     fn insert_page(&mut self, page_id: PageId, page: BlinkPage) {
         self.pages.insert(page_id, Arc::new(page));

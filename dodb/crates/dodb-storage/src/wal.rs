@@ -4727,6 +4727,80 @@ fn read_exact_frame<F: DurableFile>(
     })
 }
 
+#[cfg(feature = "blink-demand-paging")]
+pub(crate) fn validate_paged_frame_bytes(
+    bytes: &[u8],
+    locator: crate::blink::version_index::WalFrameLocator,
+    page_id: PageId,
+    record_lsn: Lsn,
+    is_delta: bool,
+) -> Result<Vec<u8>> {
+    let expected_length = usize::try_from(locator.frame_length)
+        .map_err(|_| Error::corruption("indexed WAL frame length is invalid"))?;
+    if bytes.len() != expected_length
+        || locator
+            .frame_offset
+            .saturating_add(u64::from(locator.frame_length))
+            > locator.committed_prefix_length
+        || locator.payload_offset
+            != locator
+                .frame_offset
+                .checked_add(WAL_HEADER_SIZE as u64)
+                .ok_or_else(|| Error::corruption("indexed WAL payload offset overflows"))?
+    {
+        return Err(Error::corruption(
+            "indexed WAL frame lies outside its committed source range",
+        ));
+    }
+    let header = &bytes[..WAL_HEADER_SIZE];
+    let (_format_version, record_type, frame_length, payload_length, actual_record_lsn, _, _) =
+        decode_header(header)?;
+    let expected_type = if is_delta {
+        WalRecordType::PageDelta
+    } else {
+        WalRecordType::PageImage
+    };
+    if record_type != expected_type
+        || actual_record_lsn != record_lsn.get()
+        || frame_length != expected_length
+        || frame_length != WAL_HEADER_SIZE + payload_length + WAL_TRAILER_SIZE
+        || payload_length != locator.payload_length as usize
+        || crc32c::crc32c(header) != locator.header_crc32c
+    {
+        return Err(Error::corruption(
+            "indexed WAL frame header differs from its locator",
+        ));
+    }
+    let payload_end = WAL_HEADER_SIZE
+        .checked_add(payload_length)
+        .ok_or_else(|| Error::corruption("indexed WAL payload length overflows"))?;
+    let payload = &bytes[WAL_HEADER_SIZE..payload_end];
+    let trailer = &bytes[payload_end..];
+    if crc32c::crc32c(payload) != locator.payload_crc32c
+        || u32::from_le_bytes(
+            trailer
+                .try_into()
+                .map_err(|_| Error::corruption("indexed WAL trailer is truncated"))?,
+        ) != frame_length as u32
+    {
+        return Err(Error::corruption(
+            "indexed WAL frame payload or trailer checksum differs",
+        ));
+    }
+    verify_payload_checksum(header, payload, locator.frame_offset)?;
+    let actual_page_id = if is_delta {
+        decode_page_delta(payload)?.page_id
+    } else {
+        decode_page_image(payload)?.page_id
+    };
+    if actual_page_id != page_id {
+        return Err(Error::corruption(
+            "indexed WAL frame page id differs from its descriptor",
+        ));
+    }
+    Ok(payload.to_vec())
+}
+
 fn decode_header(bytes: &[u8]) -> Result<(u16, WalRecordType, usize, usize, u64, u64, u32)> {
     if bytes.len() != WAL_HEADER_SIZE {
         return Err(Error::corruption("WAL header has an invalid length"));
@@ -5335,6 +5409,19 @@ pub(crate) fn init_frame_for_test(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "blink-demand-paging")]
+    use crate::blink::page_cache::{PageLoader, PageLoaderConfig};
+    #[cfg(feature = "blink-demand-paging")]
+    use crate::blink::resource::{BlinkResourceManager, ResourceLimits};
+    #[cfg(feature = "blink-demand-paging")]
+    use crate::blink::source_manager::{SourceManager, SourceManagerConfig};
+    #[cfg(feature = "blink-demand-paging")]
+    use crate::blink::version_chain::{DeltaChain, DeltaChainEntry};
+    #[cfg(feature = "blink-demand-paging")]
+    use crate::blink::version_index::{
+        SourceFileKind, SourceIdentity, StoreIdentity, VersionDescriptor, VersionIndex,
+        VersionLocator, VersionToken, WalFrameLocator,
+    };
     use crate::page::{PageHeader, PageType, encode_page};
     use std::cell::Cell;
 
@@ -5584,6 +5671,197 @@ mod tests {
                 &[],
             )
             .unwrap(),
+        }
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    #[test]
+    fn page_loader_reopens_and_reconstructs_one_two_and_eight_deltas_across_sources() {
+        for delta_count in [1u8, 2, 8] {
+            let directory = std::env::temp_dir().join(format!(
+                "dodb-paged-wal-load-{}-{delta_count}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            let checkpoint_directory = directory.join("packs");
+            let wal_directory = directory.join("segments");
+            let scratch_directory = directory.join("scratch");
+            let index_directory = directory.join("index");
+            std::fs::create_dir_all(&checkpoint_directory).unwrap();
+            std::fs::create_dir_all(&wal_directory).unwrap();
+            let store = StoreIdentity {
+                database_uuid: [58; 16],
+                wal_epoch: 9,
+            };
+            let page_id = PageId::new(5);
+            let resources = BlinkResourceManager::new(ResourceLimits {
+                global_bytes: 1_048_576,
+                per_tenant_bytes: 1_048_576,
+                progress_pool_bytes: 65_536,
+                max_tenants: 2,
+                max_pending_waiters: 8,
+                global_category_bytes: [1_048_576; 7],
+                per_tenant_category_bytes: [1_048_576; 7],
+            })
+            .unwrap();
+            let mut ancestry = Vec::new();
+            let mut previous_image =
+                crate::blink::test_blink_page_image(page_id, Lsn::new(10)).unwrap();
+            let mut previous_lsn = Lsn::new(10);
+            let mut previous_crc32c = crc32c::crc32c(&previous_image);
+            let mut latest_frame = None;
+            let mut latest_record_lsn = Lsn::ZERO;
+            for source_file_number in 1..=u64::from(delta_count) + 1 {
+                let source_header = format!("paged-source-{source_file_number}").into_bytes();
+                let source_identity = SourceIdentity {
+                    kind: SourceFileKind::WalSegment,
+                    file_number: source_file_number,
+                    header_identity: *blake3::hash(&source_header).as_bytes(),
+                };
+                let is_delta = source_file_number > 1;
+                let record_lsn = Lsn::new(9 + source_file_number * 2);
+                let image_lsn = if is_delta {
+                    Lsn::new(record_lsn.get() + 1)
+                } else {
+                    previous_lsn
+                };
+                let image = if is_delta {
+                    crate::blink::test_blink_page_image(page_id, image_lsn).unwrap()
+                } else {
+                    previous_image
+                };
+                let payload = if is_delta {
+                    encode_page_delta(page_id, &previous_image, &image).unwrap()
+                } else {
+                    encode_page_image(
+                        &WalPageImage { page_id, image },
+                        WalPageImageFormat::ExperimentalBlink,
+                    )
+                    .unwrap()
+                };
+                let frame_bytes = encode_frame(
+                    WAL_PAGE_IMAGE_FORMAT_VERSION,
+                    if is_delta {
+                        WalRecordType::PageDelta
+                    } else {
+                        WalRecordType::PageImage
+                    },
+                    record_lsn,
+                    source_file_number,
+                    0,
+                    &payload,
+                )
+                .unwrap();
+                let frame_offset = source_header.len() as u64;
+                let commit_frame_offset = frame_offset + frame_bytes.len() as u64;
+                let committed_prefix_length = commit_frame_offset + 4;
+                let frame = WalFrameLocator {
+                    source: source_identity,
+                    frame_offset,
+                    frame_length: frame_bytes.len() as u32,
+                    header_crc32c: crc32c::crc32c(&frame_bytes[..WAL_HEADER_SIZE]),
+                    payload_offset: frame_offset + WAL_HEADER_SIZE as u64,
+                    payload_length: payload.len() as u32,
+                    payload_crc32c: crc32c::crc32c(&payload),
+                    committed_prefix_length,
+                    commit_frame_offset,
+                    commit_lsn: Lsn::new(record_lsn.get() + 1),
+                };
+                let source_path =
+                    wal_directory.join(format!("segment-{source_file_number:020}.wal"));
+                let mut source_file = std::fs::File::create(source_path).unwrap();
+                use std::io::Write;
+                source_file.write_all(&source_header).unwrap();
+                source_file.write_all(&frame_bytes).unwrap();
+                source_file.write_all(&[0; 4]).unwrap();
+                let image_crc32c = crc32c::crc32c(&image);
+                if is_delta {
+                    ancestry.push(DeltaChainEntry::WalDelta {
+                        frame,
+                        record_lsn,
+                        base_lsn: previous_lsn,
+                        base_crc32c: previous_crc32c,
+                        image_lsn,
+                        image_crc32c,
+                    });
+                } else {
+                    ancestry.push(DeltaChainEntry::WalImage {
+                        frame,
+                        record_lsn,
+                        image_lsn,
+                        image_crc32c,
+                    });
+                }
+                latest_frame = Some(frame);
+                latest_record_lsn = record_lsn;
+                previous_image = image;
+                previous_lsn = image_lsn;
+                previous_crc32c = image_crc32c;
+            }
+            let chain = DeltaChain::new(page_id, ancestry).unwrap();
+            let index =
+                VersionIndex::open(&index_directory, store, resources.clone(), 1, 2).unwrap();
+            let chain_reference = index.delta_chains().write(2, &chain).unwrap();
+            let latest_frame = latest_frame.unwrap();
+            let root = index
+                .insert(
+                    index.empty_root(),
+                    page_id,
+                    VersionDescriptor {
+                        page_id,
+                        token: VersionToken::Wal {
+                            source_file_number: latest_frame.source.file_number,
+                            record_lsn: latest_record_lsn,
+                        },
+                        image_lsn: previous_lsn,
+                        image_crc32c: previous_crc32c,
+                        locator: VersionLocator::WalDelta {
+                            frame: latest_frame,
+                            chain: chain_reference,
+                            depth: delta_count,
+                        },
+                    },
+                )
+                .unwrap();
+            let sources = SourceManager::new(
+                SourceManagerConfig {
+                    store_identity: store,
+                    checkpoint_directory,
+                    wal_directory,
+                    scratch_directory,
+                    tenant_id: 1,
+                    maximum_open_handles: 1,
+                    maximum_roots: 2,
+                    handle_charge_bytes: 128,
+                    gc_reservation_bytes: 8192,
+                },
+                resources.clone(),
+            )
+            .unwrap();
+            let loader = PageLoader::new(
+                1,
+                resources,
+                PageLoaderConfig {
+                    maximum_cache_bytes: PAGE_SIZE as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: 1_048_576,
+                    maximum_concurrent_loads: 1,
+                    maximum_followers: 4,
+                },
+            )
+            .unwrap();
+            let loaded = loader
+                .load_version(&index, root, page_id, &sources, |source| {
+                    let file_number = source.file_number;
+                    Ok(format!("paged-source-{file_number}").len())
+                })
+                .unwrap();
+            assert_eq!(loaded.as_ref(), &previous_image);
+            drop(loaded);
+            std::fs::remove_dir_all(directory).unwrap();
         }
     }
 

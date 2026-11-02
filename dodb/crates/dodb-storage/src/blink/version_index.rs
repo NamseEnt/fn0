@@ -10,6 +10,7 @@ use dodb_core::{Error, Lsn, PageId, Result};
 use super::resource::{
     BlinkResourceManager, Reservation, ReservationClass, ResourceCategory, ResourceError,
 };
+use super::version_chain::{DeltaChainRef, DeltaChainStore};
 
 pub const VERSION_INDEX_NODE_BYTES: usize = 4096;
 const NODE_HEADER_BYTES: usize = 112;
@@ -21,7 +22,7 @@ const NODE_CACHE_RESERVATION_BYTES: u64 = 8192;
 const ROOT_PIN_RESERVATION_BYTES: u64 = 256;
 const MAX_RADIX_LEVEL: u8 = 15;
 const NODE_MAGIC: [u8; 8] = *b"DDBVIDX1";
-const NODE_FORMAT_VERSION: u16 = 1;
+const NODE_FORMAT_VERSION: u16 = 2;
 const NODE_KIND_DURABLE: u16 = 1;
 const NODE_KIND_SPILL: u16 = 2;
 const NODE_FILE_PREFIX: &str = "version-index-";
@@ -153,9 +154,7 @@ pub enum VersionLocator {
     },
     WalDelta {
         frame: WalFrameLocator,
-        base_lsn: Lsn,
-        base_crc32c: u32,
-        base: BaseFrameLocator,
+        chain: DeltaChainRef,
         depth: u8,
     },
 }
@@ -338,6 +337,7 @@ impl VersionIndexStore {
 
 pub struct VersionIndex {
     store: Arc<VersionIndexStore>,
+    delta_chains: DeltaChainStore,
     resources: BlinkResourceManager,
     tenant_id: u64,
     maximum_cached_nodes: usize,
@@ -359,6 +359,7 @@ impl VersionIndex {
         }
         Ok(Self {
             store: Arc::new(VersionIndexStore::open(directory, identity)?),
+            delta_chains: DeltaChainStore::open(directory, identity, resources.clone(), tenant_id)?,
             resources,
             tenant_id,
             maximum_cached_nodes,
@@ -375,6 +376,10 @@ impl VersionIndex {
 
     pub fn store_identity(&self) -> StoreIdentity {
         self.store.identity
+    }
+
+    pub fn delta_chains(&self) -> &DeltaChainStore {
+        &self.delta_chains
     }
 
     pub fn root_from_node_reference(&self, node_reference: NodeRef) -> Result<VersionIndexRoot> {
@@ -688,11 +693,12 @@ impl VersionIndex {
                             VersionLocator::WalImage { frame } => {
                                 visitor(SourceReachability::Exact(frame.source))?
                             }
-                            VersionLocator::WalDelta { frame, base, .. } => {
+                            VersionLocator::WalDelta { frame, chain, .. } => {
                                 visitor(SourceReachability::Exact(frame.source))?;
-                                visitor(SourceReachability::Exact(base.source))?;
-                                if base.source.kind == SourceFileKind::WalSegment {
-                                    visitor(SourceReachability::AllWalSegments)?;
+                                let ancestry =
+                                    index.delta_chains.read(chain, descriptor.page_id)?;
+                                for entry in ancestry.entries {
+                                    visitor(SourceReachability::Exact(entry.source_identity()))?;
                                 }
                             }
                         }
@@ -756,6 +762,43 @@ impl VersionIndex {
             ));
         }
         validate_descriptor(descriptor)?;
+        if let VersionLocator::WalDelta {
+            frame,
+            chain,
+            depth,
+        } = descriptor.locator
+        {
+            let ancestry = self.delta_chains.read(chain, page_id)?;
+            let latest_entry = ancestry.entries.last().copied();
+            let latest_token = descriptor.token;
+            let latest_matches = match (latest_entry, latest_token) {
+                (
+                    Some(super::version_chain::DeltaChainEntry::WalDelta {
+                        frame: latest_frame,
+                        record_lsn,
+                        image_lsn,
+                        image_crc32c,
+                        ..
+                    }),
+                    VersionToken::Wal {
+                        source_file_number,
+                        record_lsn: token_lsn,
+                    },
+                ) => {
+                    latest_frame == frame
+                        && record_lsn == token_lsn
+                        && source_file_number == frame.source.file_number
+                        && image_lsn == descriptor.image_lsn
+                        && image_crc32c == descriptor.image_crc32c
+                }
+                _ => false,
+            };
+            if !latest_matches || ancestry.entries.len().saturating_sub(1) != usize::from(depth) {
+                return Err(Error::corruption(
+                    "delta-chain sidecar does not match its index descriptor",
+                ));
+            }
+        }
         let generation = root
             .generation
             .checked_add(1)
@@ -1058,26 +1101,16 @@ fn validate_descriptor(descriptor: VersionDescriptor) -> Result<()> {
         }
         VersionLocator::WalDelta {
             frame,
-            base_lsn,
-            base_crc32c,
-            base,
+            chain,
             depth,
         } => {
             validate_frame(frame)?;
-            validate_source(base.source)?;
             validate_wal_version_source(descriptor.token, frame.source)?;
-            let base_end = base
-                .frame_offset
-                .checked_add(u64::from(base.frame_length))
-                .ok_or_else(|| Error::invalid_input("WAL delta base range overflows"))?;
-            if depth == 0
+            if chain.file_number == 0
+                || chain.offset != 0
+                || chain.checksum == [0; 32]
+                || depth == 0
                 || depth > 8
-                || base.frame_length == 0
-                || base_end <= base.frame_offset
-                || (base.source.kind == SourceFileKind::CheckpointPack
-                    && base.frame_length as usize != VERSION_INDEX_NODE_BYTES)
-                || base.image_lsn != base_lsn
-                || base.image_crc32c != base_crc32c
             {
                 return Err(Error::invalid_input(
                     "WAL delta locator metadata is inconsistent",
@@ -1386,24 +1419,15 @@ fn encode_descriptor(descriptor: VersionDescriptor, bytes: &mut [u8]) -> Result<
         }
         VersionLocator::WalDelta {
             frame,
-            base_lsn,
-            base_crc32c,
-            base,
+            chain,
             depth,
         } => {
             bytes[9] = 3;
             bytes[10] = depth;
             encode_frame_locator(frame, bytes)?;
-            bytes[144..152].copy_from_slice(&base_lsn.get().to_le_bytes());
-            bytes[152..156].copy_from_slice(&base_crc32c.to_le_bytes());
-            bytes[156] = base.source.kind as u8;
-            bytes[160..168].copy_from_slice(&base.source.file_number.to_le_bytes());
-            bytes[168..200].copy_from_slice(&base.source.header_identity);
-            bytes[200..208].copy_from_slice(&base.frame_offset.to_le_bytes());
-            bytes[208..212].copy_from_slice(&base.frame_length.to_le_bytes());
-            bytes[212..216].copy_from_slice(&base.header_crc32c.to_le_bytes());
-            bytes[216..224].copy_from_slice(&base.image_lsn.get().to_le_bytes());
-            bytes[224..228].copy_from_slice(&base.image_crc32c.to_le_bytes());
+            bytes[144..152].copy_from_slice(&chain.file_number.to_le_bytes());
+            bytes[152..160].copy_from_slice(&chain.offset.to_le_bytes());
+            bytes[160..192].copy_from_slice(&chain.checksum);
         }
     }
     Ok(())
@@ -1466,7 +1490,7 @@ fn decode_descriptor(bytes: &[u8]) -> Result<VersionDescriptor> {
             let source = decode_source(bytes)?;
             if bytes[96..104].iter().any(|byte| *byte != 0)
                 || bytes[128..144].iter().any(|byte| *byte != 0)
-                || bytes[144..228].iter().any(|byte| *byte != 0)
+                || bytes[144..].iter().any(|byte| *byte != 0)
                 || bytes[10] != 0
             {
                 return Err(Error::corruption("checkpoint locator has WAL-only fields"));
@@ -1487,21 +1511,12 @@ fn decode_descriptor(bytes: &[u8]) -> Result<VersionDescriptor> {
                 frame: decode_frame_locator(bytes)?,
             }
         }
-        3 => VersionLocator::WalDelta {
+        3 if bytes[192..].iter().all(|byte| *byte == 0) => VersionLocator::WalDelta {
             frame: decode_frame_locator(bytes)?,
-            base_lsn: Lsn::new(u64::from_le_bytes(bytes[144..152].try_into().unwrap())),
-            base_crc32c: u32::from_le_bytes(bytes[152..156].try_into().unwrap()),
-            base: BaseFrameLocator {
-                source: SourceIdentity {
-                    kind: decode_source_kind(bytes[156])?,
-                    file_number: u64::from_le_bytes(bytes[160..168].try_into().unwrap()),
-                    header_identity: bytes[168..200].try_into().unwrap(),
-                },
-                frame_offset: u64::from_le_bytes(bytes[200..208].try_into().unwrap()),
-                frame_length: u32::from_le_bytes(bytes[208..212].try_into().unwrap()),
-                header_crc32c: u32::from_le_bytes(bytes[212..216].try_into().unwrap()),
-                image_lsn: Lsn::new(u64::from_le_bytes(bytes[216..224].try_into().unwrap())),
-                image_crc32c: u32::from_le_bytes(bytes[224..228].try_into().unwrap()),
+            chain: DeltaChainRef {
+                file_number: u64::from_le_bytes(bytes[144..152].try_into().unwrap()),
+                offset: u64::from_le_bytes(bytes[152..160].try_into().unwrap()),
+                checksum: bytes[160..192].try_into().unwrap(),
             },
             depth: bytes[10],
         },
@@ -1560,7 +1575,7 @@ fn decode_frame_locator(bytes: &[u8]) -> Result<WalFrameLocator> {
 #[cfg(test)]
 mod tests {
     use super::{
-        BaseFrameLocator, SourceFileKind, SourceIdentity, VersionDescriptor, VersionIndex,
+        DeltaChainRef, SourceFileKind, SourceIdentity, VersionDescriptor, VersionIndex,
         VersionIndexRoot, VersionLocator, VersionToken, WalFrameLocator, decode_descriptor,
         encode_descriptor,
     };
@@ -1662,19 +1677,49 @@ mod tests {
             image_crc32c: 0x5566_7788,
             locator: VersionLocator::WalDelta {
                 frame: wal_frame(8),
-                base_lsn: Lsn::new(25),
-                base_crc32c: 0x3344_5566,
-                base: BaseFrameLocator {
-                    source: source(SourceFileKind::CheckpointPack, 4),
-                    frame_offset: 8192,
-                    frame_length: 4096,
-                    header_crc32c: 0xabcdef01,
-                    image_lsn: Lsn::new(25),
-                    image_crc32c: 0x3344_5566,
+                chain: DeltaChainRef {
+                    file_number: 9,
+                    offset: 0,
+                    checksum: [0x88; 32],
                 },
                 depth: 3,
             },
         }
+    }
+
+    fn indexed_wal_delta_descriptor(index: &VersionIndex, page_id: PageId) -> VersionDescriptor {
+        let mut descriptor = wal_delta_descriptor(page_id);
+        let VersionLocator::WalDelta { frame, .. } = descriptor.locator else {
+            unreachable!();
+        };
+        let chain = super::super::version_chain::DeltaChain::new(
+            page_id,
+            vec![
+                super::super::version_chain::DeltaChainEntry::CheckpointImage {
+                    source: source(SourceFileKind::CheckpointPack, 4),
+                    offset: 8192,
+                    source_length: 16384,
+                    image_lsn: Lsn::new(25),
+                    image_crc32c: 0x3344_5566,
+                },
+                super::super::version_chain::DeltaChainEntry::WalDelta {
+                    frame,
+                    record_lsn: Lsn::new(30),
+                    base_lsn: Lsn::new(25),
+                    base_crc32c: 0x3344_5566,
+                    image_lsn: Lsn::new(31),
+                    image_crc32c: 0x5566_7788,
+                },
+            ],
+        )
+        .unwrap();
+        let chain = index.delta_chains().write(1, &chain).unwrap();
+        descriptor.locator = VersionLocator::WalDelta {
+            frame,
+            chain,
+            depth: 1,
+        };
+        descriptor
     }
 
     fn resource_manager() -> BlinkResourceManager {
@@ -1818,8 +1863,8 @@ mod tests {
         for update_number in 0..28u64 {
             let page_value = update_number.wrapping_mul(0x9e37_79b9_7f4a_7c15);
             let page_id = PageId::new(page_value);
-            let descriptor = if update_number % 3 == 0 {
-                wal_delta_descriptor(page_id)
+            let descriptor = if page_id.get() >= 2 && update_number % 3 == 0 {
+                indexed_wal_delta_descriptor(&index, page_id)
             } else {
                 checkpoint_descriptor(page_id)
             };
