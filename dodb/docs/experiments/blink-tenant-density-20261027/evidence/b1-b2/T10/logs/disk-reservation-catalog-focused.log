@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-61add53ad8a69c71)
+
+running 2 tests
+test blink::source_catalog::tests::source_catalog_reclaims_only_pages_outside_protected_roots ... ok
+test blink::source_catalog::tests::source_catalog_streams_multi_page_marker_runs_and_rejects_corruption ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 304 filtered out; finished in 0.08s
+

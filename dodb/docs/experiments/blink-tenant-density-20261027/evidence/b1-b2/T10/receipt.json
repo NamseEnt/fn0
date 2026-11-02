@@ -16,7 +16,8 @@
     "03f01f45a982289258aee7b8bc92b024078223a4",
     "22a0e4a673",
     "e9b06076ed3b01e3daaa3605155f474cf0fe4323",
-    "fc6f974856750b6a0fadf70b76b48bed3e19504c"
+    "fc6f974856750b6a0fadf70b76b48bed3e19504c",
+    "a96a3155d23f9301f6a7126e8061afbe77593775"
   ],
   "push": {
     "remote": "origin",
@@ -45,26 +46,28 @@
     "dodb/crates/dodb-storage/src/blink/source_manager.rs",
     "dodb/crates/dodb-storage/src/blink/version_index.rs",
     "dodb/crates/dodb-storage/src/wal.rs",
-    "dodb/crates/dodb-storage/src/blink/source_catalog.rs"
+    "dodb/crates/dodb-storage/src/blink/source_catalog.rs",
+    "dodb/crates/dodb-storage/src/blink/resource.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "e4cf84b093fda9728bb43e272e47b8d432ce591733837291f7ecf607fd8ef886",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "483c9d89399c1ccf65a21bc9e5d037c2a6f3031fae55f95260f3109153d6d5ae",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "a4b1321c4793fb086fdf77900d3a33f7bfef51bd46fce9c2d3b83748247e461c",
     "dodb/crates/dodb-storage/src/blink/page_locator.rs": "80fbbdc6a569b379b563e8ad65b396c047bb4e63524240e3126c15710d59b48a",
     "dodb/crates/dodb-storage/src/bin/phase0-bench.rs": "2cf4d0a7d12caaa477046445f3a4675c861b85628105c81496115e2e03c50c81",
     "dodb/crates/dodb-storage/src/blink/durable_bases.rs": "26fd15c75154e71c42394f50e9f97b3bad8e6f7992e3161d35a6fd35ddaa9f08",
     "dodb/crates/dodb-storage/src/blink/version_index.rs": "08a36c1dee332255d12084831db88ad0ff540a448067d75d5584921f867836b8",
-    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "44c043486a6ff2901c7065b915db4436d58f7bec4d6af989a5cf3368d7597297",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "3b95f17b28b9383e8ab5f82dab761cf8ffa677cd00478351a3608b7e90a68e01",
     "dodb/crates/dodb-storage/src/wal.rs": "7fec7f957680ed1dc779ec355cd9b90018bc27ddb88023b6c446dd38763f601d",
     "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "e69d6062bfb9371d2e3a6b28ac3d114697642c4017d81f12666e8413fc46d366",
-    "dodb/crates/dodb-storage/src/blink/source_catalog.rs": "5b8414444f943659e314278a738b78d397622fb543197dfe47d48e21787c9d58"
+    "dodb/crates/dodb-storage/src/blink/source_catalog.rs": "c03109ba28ca3dd063b0d3a837be0d066c3648bb3c89b623a20a1bc8d746f3be",
+    "dodb/crates/dodb-storage/src/blink/resource.rs": "13f167ba3e2c1619147b1c2d73d42b00dff649fba8335427061db19d8304d6fe"
   },
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "fc6f974856750b6a0fadf70b76b48bed3e19504c"
+    "source_commit": "a96a3155d23f9301f6a7126e8061afbe77593775"
   },
   "features": [
     "blink-demand-paging",
@@ -1481,6 +1484,133 @@
         "sha256": "6d021716c2bfa203d203ecd0d9b66f860ddb6147553559fcc9680028f692c1fb"
       },
       "source_commit": "fc6f974856750b6a0fadf70b76b48bed3e19504c"
+    },
+    {
+      "name": "disk_resource_reservation_accounting_fixtures",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "blink::resource::tests::disk_reservations",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "2 passed; global, per-tenant, and category limits reject over-capacity reservations; release allows a later reservation; grow, shrink, transfer, and merge preserve counters.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/disk-reservation-core-final.log",
+        "sha256": "654a0dc4b1e90e84769c1b3c63154a6e4c109a922204cb06367c9fcd04fd36cf"
+      },
+      "source_commit": "a96a3155d23f9301f6a7126e8061afbe77593775"
+    },
+    {
+      "name": "paged_checkpoint_with_finite_disk_budget",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "paged_transaction_writer_publishes_complete_and_incremental_checkpoints",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed under a 128 KiB global and per-tenant disk cap; the writer retained output charges and measured peak usage stayed within the cap.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/disk-reservation-writer-limited-focused.log",
+        "sha256": "f724fbd489f87b3614c7be1f41812f78ce6704166ce6e12469d85620e09707b0"
+      },
+      "source_commit": "a96a3155d23f9301f6a7126e8061afbe77593775"
+    },
+    {
+      "name": "disk_reservation_feature_library_tests",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "302 passed, 0 failed, 4 ignored; finished in 60.91s.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/disk-reservation-feature-library-final2.log",
+        "sha256": "f1ffff3555aeaababf8b4eba1a462dd6261e95ef965a4840d067ded9ad33c3e3"
+      },
+      "source_commit": "a96a3155d23f9301f6a7126e8061afbe77593775"
+    },
+    {
+      "name": "disk_reservation_default_library_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "Default library compiled successfully.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/disk-reservation-default-check.log",
+        "sha256": "5c379b815463885218d31096bec07bfe1051023a38c8e5600ec686b392b2def0"
+      },
+      "source_commit": "a96a3155d23f9301f6a7126e8061afbe77593775"
+    },
+    {
+      "name": "disk_reservation_all_targets_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--all-targets",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "All targets compiled; existing benchmark harness dead-code warnings remain.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/disk-reservation-all-targets-final.log",
+        "sha256": "8439c3a9f881eae1ad7ff183d0d8465a23a4ea56f5403fe9f8170e243fa03622"
+      },
+      "source_commit": "a96a3155d23f9301f6a7126e8061afbe77593775"
+    },
+    {
+      "name": "disk_reservation_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 101,
+      "summary": "12 existing storage diagnostics remain; no diagnostic points to disk reservation or source accounting changes.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/disk-reservation-strict-clippy-final.log",
+        "sha256": "537df7357e318353a5705f65bdaab35acc9fdc76b36a13b12edff1e2d8c425d4"
+      },
+      "source_commit": "a96a3155d23f9301f6a7126e8061afbe77593775"
     }
   ],
   "acceptance_mapping": {
@@ -1491,8 +1621,8 @@
     "writes_after_target_capture": "passed for the serialized writer path: the next transaction enters the newly rotated WAL only after manifest publication and active-segment switch; the integration fixture commits after a complete checkpoint and then publishes an incremental checkpoint",
     "checkpoint_failure_and_old_reader_retention": "partial: an integrated fault before the manifest pointer leaves the prior generation selected after reopen and fences the writer after an uncertain result; incomplete-pack and pinned-reader tests pass, while pack/index/WAL I/O faults, process crash recovery, old-reader overlap through the writer API, and pinned-root capacity remain unverified",
     "complete_reopen_oracle": "partial: a disk-backed writer test publishes complete and incremental checkpoints, injects a failure before a later manifest pointer, reopens generation 3, and reads the exact generation-3 value; no process crash or pointer-write I/O fault is injected",
-    "bounded_memory_and_source_index_disk_reservations": "partial: pack output is bounded to 16 KiB coalesced or 4 KiB uncoalesced; checkpoint insertion and durable root promotion reserve 128 KiB each, and the writer integration uses a 512 KiB progress pool; required loader overlap and source/index disk reservations are not integrated",
-    "tiny_capacity_bounded_defer_and_eventual_progress": "partial: a 64 KiB progress pool rejects the 128 KiB checkpoint insertion unit before changing root or progress accounting; scheduler defer/wake and eventual progress after capacity release are not implemented",
+    "bounded_memory_and_source_index_disk_reservations": "partial: checkpoint pack size and source catalog page count are reserved before output creation; source directories are charged on open and reconciled before GC; version-index node output, active WAL append growth, and required loader overlap are not yet reserved together",
+    "tiny_capacity_bounded_defer_and_eventual_progress": "partial: disk accounting rejects over-capacity reservations and allows a later reservation after release; checkpoint writer stayed below a 128 KiB cap, but integrated overload-before-pack-creation and continuation progress after disk release remain unverified",
     "checkpoint_debt_and_time_above_threshold": "not implemented; no maintenance scheduler or tenant debt accounting exists yet",
     "resumable_bounded_slices": "passed within a single writer job: a one-page slice yields before completion, a later commit proceeds between slices while the pinned target remains fixed, the cursor visits descriptors in order with fixed-depth state, and a failed slice cannot be retried; fair tenant scheduling remains unimplemented",
     "persistent_source_catalog_and_restart_gc": "passed for the exercised checkpoint writer path: immutable catalogs are synced before manifest publication; reopen validates exact source identities and headers; GC protects durable and pending roots, retains the current catalog generation, and reclaims obsolete generations; process-kill boundaries and disk reservation limits remain open"
@@ -1603,13 +1733,19 @@
       "name": "source_catalog_all_targets_log_path_mismatch",
       "exit_status": 1,
       "reason": "The first compile capture used a repository-root-relative log path while the working directory was the dodb subdirectory. Cargo compilation itself succeeded; rerunning from the same code with the correct path captured a successful check. No raw failed capture was saved."
+    },
+    {
+      "name": "disk_reservation_first_feature_library_gc_reconciliation",
+      "exit_status": 101,
+      "reason": "The first complete feature suite found five source-GC fixtures that created files after SourceManager initialization, so GC released more bytes than had been charged. GC now reconciles the on-disk source directories before unlinking; the source-manager suite and final full feature suite pass.",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/disk-reservation-feature-library.log",
+      "sha256": "8a615c6d14b9b2e2e512a9e93c21bf873f3dfbd11ecc42541ad862e578e4952a"
     }
   ],
   "remaining_work": [
-    "Reserve source/index disk overlap and required loader memory together with checkpoint output and index promotion",
     "Resolve the eight-page pinned-root index-capacity attempt without increasing the cap to hide the bound; test defer and progress after capacity release",
     "Implement a fair multi-tenant continuation scheduler and bounded checkpoint debt/time-above-threshold accounting",
-    "Reserve source/index disk output capacity and bound checkpoint output overlap before file creation; process-kill recovery coverage for the paged writer remains open"
+    "Reserve version-index nodes and active WAL growth before file writes; prove the checkpoint pack is not created on quota rejection and resumes after release; reserve required loader memory with output/index promotion"
   ],
   "next_task": "T10"
 }

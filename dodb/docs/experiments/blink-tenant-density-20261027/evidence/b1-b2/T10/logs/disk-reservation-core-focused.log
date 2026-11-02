@@ -1,0 +1,10 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.88s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-61add53ad8a69c71)
+
+running 2 tests
+test blink::resource::tests::disk_reservations_enforce_global_tenant_and_category_limits ... ok
+test blink::resource::tests::disk_reservations_transfer_grow_shrink_and_merge_charges ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 304 filtered out; finished in 0.00s
+
