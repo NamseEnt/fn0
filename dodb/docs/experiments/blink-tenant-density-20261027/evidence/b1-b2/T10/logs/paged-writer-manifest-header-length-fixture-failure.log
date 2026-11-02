@@ -1,0 +1,7 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_transaction_writer_publishes_complete_and_incremental_checkpoints -- --nocapture
+Exit status: 101
+
+thread 'blink::tests::paged_transaction_writer_publishes_complete_and_incremental_checkpoints' panicked at dodb/crates/dodb-storage/src/blink/mod.rs:15973:14:
+called `Result::unwrap()` on an `Err` value: Corruption("paged source header is truncated")
+
+Cause: the fixture declared every source header as one page, while a new WAL segment's INIT header is shorter. The fixture now reports the WAL INIT frame length for WAL sources.

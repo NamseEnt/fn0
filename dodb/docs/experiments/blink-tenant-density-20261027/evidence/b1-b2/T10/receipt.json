@@ -6,7 +6,8 @@
   "implementation_commits": [
     "971bb8143",
     "e741dd19d",
-    "0bdce39d1"
+    "0bdce39d1",
+    "d99c3e465ca4a72d54e74caa723536a09b62cc02"
   ],
   "push": {
     "remote": "origin",
@@ -28,19 +29,23 @@
   "owned_paths": [
     "dodb/crates/dodb-storage/src/blink/mod.rs",
     "dodb/crates/dodb-storage/src/blink/durable_bases.rs",
-    "dodb/crates/dodb-storage/src/blink/version_index.rs"
+    "dodb/crates/dodb-storage/src/blink/version_index.rs",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs",
+    "dodb/crates/dodb-storage/src/wal.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "9c5ccc9e62b00331e18fbf9ec9f9d28178b2684874bf6a7e2aceff5138613273",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "69bb091b63cb83c5419f326e4418dbddbdafb67ccacf6f4499deda04d19eb4ea",
     "dodb/crates/dodb-storage/src/blink/durable_bases.rs": "26fd15c75154e71c42394f50e9f97b3bad8e6f7992e3161d35a6fd35ddaa9f08",
-    "dodb/crates/dodb-storage/src/blink/version_index.rs": "e60ab5bc5981aed2d216d28f28ff8710e0f68f61dfdb8f39561c181482ed3880"
+    "dodb/crates/dodb-storage/src/blink/version_index.rs": "e60ab5bc5981aed2d216d28f28ff8710e0f68f61dfdb8f39561c181482ed3880",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "dece389300575f090e393780fc1a9a31aaf6f2689774ec604677c0c3967d8a4f",
+    "dodb/crates/dodb-storage/src/wal.rs": "7fec7f957680ed1dc779ec355cd9b90018bc27ddb88023b6c446dd38763f601d"
   },
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
+    "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
   },
   "features": [
     "blink-demand-paging",
@@ -48,10 +53,10 @@
   ],
   "runtime_configuration": {
     "route": "storage-only PagedReadHandle snapshot and file-backed durable base pack; no service route activated",
-    "target": "immutable version-index generation with captured checkpoint LSN supplied by the snapshot owner",
+    "target": "The mutable PagedTransactionWriter captures its current committed LSN while excluding later transactions.",
     "pack_output": "sorted exact page images; coalesced buffer is four pages (16 KiB), uncoalesced buffer is one page (4 KiB)",
     "memory_reservation": "CheckpointValidation progress reservation is 6 pages for coalesced output or 3 pages for uncoalesced output; page loader separately charges decoded pages",
-    "publication": "pack is synced and validated in tests, but index-root and manifest publication/WAL boundary rotation are not integrated",
+    "publication": "Synced complete or incremental pack and durable index root, synced next WAL segment at the captured LSN, WAL directory sync, atomic PagedManifest pointer publication, then writer WAL/root switch; process-crash and publication-fault matrices remain unverified.",
     "service_route_activated": false,
     "defaults_changed": false,
     "oci_experiment": false,
@@ -560,17 +565,162 @@
         "sha256": "c709f18ae40efe139668911f8508982520bf392a4c28b971852fd7cfee335402"
       },
       "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
+    },
+    {
+      "name": "paged_writer_manifest_complete_incremental_reopen",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "--",
+        "--test-threads=1",
+        "paged_transaction_writer_publishes_complete_and_incremental_checkpoints"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; the writer publishes a complete checkpoint, commits into the rotated WAL, publishes an incremental checkpoint, reopens manifest generation 3, and reads the exact latest value",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-integration-focused.log",
+        "sha256": "f75226dcd3e80146796f7fd9b50c04fba4eb8070ebb9456f332faf3c1798670b"
+      },
+      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+    },
+    {
+      "name": "paged_writer_manifest_feature_library_tests_serial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "297 passed, 0 failed, 4 ignored in 125.43 seconds",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-feature-lib.log",
+        "sha256": "68790fbd6ce20dcbbed9c8109fe9cf9208bef4b84a5b9fa33d53ab0a7b16a31e"
+      },
+      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+    },
+    {
+      "name": "paged_writer_manifest_default_library_tests_serial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "221 passed, 0 failed, 4 ignored in 118.56 seconds",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-default-lib.log",
+        "sha256": "3b9ac8923df47228bf56175a4bb1afd97f2fefaa059a2bd733825a8b445b3049"
+      },
+      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+    },
+    {
+      "name": "paged_writer_manifest_default_library_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "passed without warnings",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-default-check.log",
+        "sha256": "5fbed9e3c5716d3d79a33a421d51ff90db76e5df9078a8befecbdb72050ec0d4"
+      },
+      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+    },
+    {
+      "name": "paged_writer_manifest_feature_library_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "passed without warnings",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-feature-check.log",
+        "sha256": "0ccdfb163f5bdd46d03951d388f3fd8254245d259a39c05375f2be26f8fcb480"
+      },
+      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+    },
+    {
+      "name": "paged_writer_manifest_format_check",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--check",
+        "-p",
+        "dodb-storage"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+    },
+    {
+      "name": "paged_writer_manifest_strict_clippy_all_targets",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--tests",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 101,
+      "summary": "32 existing crate findings; no diagnostic points to checkpoint_to_manifest, the integration fixture, WAL source-header identity, or the source-directory helper; no suppressions added",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-strict-clippy-all-targets.log",
+        "sha256": "a6679876aac80114d12fa9dfed15ee1cc3c02806b0661c9c0c913710ddb2fb25"
+      },
+      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
     }
   ],
   "acceptance_mapping": {
     "stream_exact_target_generation_images": "partial: VersionIndex::visit_descriptors streams sorted descriptors with bounded traversal state; exact captured generation pack is verified against every source page image after a newer writer commit",
-    "incremental_and_complete_checkpoints": "partial: complete and incremental pack output plus complete/incremental index transformations are implemented; an incremental component-level publication test syncs a next WAL segment, publishes a PagedManifest generation, reopens it, and reads exact old/new pack images, but no atomic PagedTransactionWriter/WAL capture integration or complete streamed-pack publication flow exists",
+    "incremental_and_complete_checkpoints": "partial: PagedTransactionWriter::checkpoint_to_manifest serializes target capture, complete or incremental pack/index construction, next WAL segment creation and sync at the exact captured LSN, manifest publication, and active writer switch; the disk-backed test covers both modes and a normal reopen, while process-crash boundaries and source-catalog/GC integration remain open",
     "coalesced_and_uncoalesced_output": "passed: both modes produce complete packs with matching page counts and exact images",
     "forced_cache_misses_larger_than_cache": "passed for the fixture: eight indexed pages stream through a two-page decoded cache and source-read count increases",
-    "writes_after_target_capture": "passed: the old reader generation is packed after a newer multi-key writer commit and all target bytes match the captured pages",
-    "checkpoint_failure_and_old_reader_retention": "partial: incomplete pack failure leaves no manifest publication; a pinned old reader remains readable and its exact pack is verified; low progress capacity is rejected before index mutation; publication crash boundaries and full-fixture pinned-root index capacity remain unverified",
-    "complete_reopen_oracle": "partial: incremental component-level manifest/WAL-boundary reopen reads exact source-backed pages; complete streamed-pack publication and process crash/reopen matrix remain unimplemented",
-    "bounded_memory_and_source_index_disk_reservations": "partial: output buffer is at most 16 KiB coalesced or 4 KiB uncoalesced; checkpoint insertion reserves 128 KiB progress and durable root promotion adds another 128 KiB, with a 256 KiB fixture pool; required loader overlap and source/index disk reservations are not integrated",
+    "writes_after_target_capture": "passed for the serialized writer path: the next transaction enters the newly rotated WAL only after manifest publication and active-segment switch; the integration fixture commits after a complete checkpoint and then publishes an incremental checkpoint",
+    "checkpoint_failure_and_old_reader_retention": "partial: pack and index work precede pointer publication, and uncertain publication disables the writer; existing incomplete-pack and pinned-reader tests pass, but integrated pointer/WAL fault injection, crash recovery, old-reader overlap through the writer API, and pinned-root capacity remain unverified",
+    "complete_reopen_oracle": "partial: a disk-backed writer test publishes complete and incremental checkpoints, reopens generation 3, and reads the exact latest value; no process crash or publication fault is injected",
+    "bounded_memory_and_source_index_disk_reservations": "partial: pack output is bounded to 16 KiB coalesced or 4 KiB uncoalesced; checkpoint insertion and durable root promotion reserve 128 KiB each, and the writer integration uses a 512 KiB progress pool; required loader overlap and source/index disk reservations are not integrated",
     "tiny_capacity_bounded_defer_and_eventual_progress": "partial: a 64 KiB progress pool rejects the 128 KiB checkpoint insertion unit before changing root or progress accounting; scheduler defer/wake and eventual progress after capacity release are not implemented",
     "checkpoint_debt_and_time_above_threshold": "not implemented; no maintenance scheduler or tenant debt accounting exists yet"
   },
@@ -627,12 +777,26 @@
       "reason": "default Clippy compilation found the feature-only PathBuf import unused; the request now uses a fully qualified PathBuf type and final default and feature checks pass without warnings",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-incremental-strict-clippy-final.log",
       "sha256": "1022f2894e0cd03556d980937b4be800483b380442b18070922b8fe38055121b"
+    },
+    {
+      "name": "paged_writer_manifest_zero_lsn_fixture",
+      "exit_status": 101,
+      "reason": "Initial integration fixture used an LSN-zero base page and the first delta was rejected by WAL delta-chain validation; the fixture now starts at a valid LSN-one checkpoint boundary.",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-zero-lsn-fixture-failure.log",
+      "sha256": "426dd3e2061b8cf110552d20b658b1313566de6d75ed8b6c5729d95c4731db61",
+      "preserved_artifact": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-paged-writer-checkpoint-26210-1793610603923672000"
+    },
+    {
+      "name": "paged_writer_manifest_wal_header_length_fixture",
+      "exit_status": 101,
+      "reason": "Initial integration fixture reported a page-sized header for a shorter WAL INIT frame; the fixture now reports the validated source-specific header length.",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-header-length-fixture-failure.log",
+      "sha256": "6893eb1adff3fab18a161aeeb4fc4910172476b76f887ecd9626c2403cc259c7",
+      "preserved_artifact": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-paged-writer-checkpoint-26259-1793610626036774000"
     }
   ],
   "remaining_work": [
-    "Integrate PagedReadHandle streaming with the atomic PagedTransactionWriter target capture and rotate/sync the next WAL boundary at exactly the captured LSN before newer writes enter it",
-    "Connect complete and incremental pack/index output, source registration, and PagedManifest publication in one recoverable checkpoint protocol; retain prior roots until publication is durable and pins release",
-    "Add pack, index, pointer, WAL-boundary, old-reader, GC, and process-crash/reopen fault oracles",
+    "Add pack, index, pointer, WAL-boundary, old-reader, GC, and process-crash/reopen fault oracles; integrate source-catalog registration and old-root GC retention",
     "Reserve source/index disk overlap and required loader memory together with checkpoint output and index promotion",
     "Resolve the eight-page pinned-root index-capacity attempt without increasing the cap to hide the bound; test defer and progress after capacity release",
     "Implement one-worker resumable slices, bounded checkpoint debt, and time-above-threshold accounting"

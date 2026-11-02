@@ -1,0 +1,7 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_transaction_writer_publishes_complete_and_incremental_checkpoints -- --nocapture
+Exit status: 101
+
+thread 'blink::tests::paged_transaction_writer_publishes_complete_and_incremental_checkpoints' panicked at dodb/crates/dodb-storage/src/blink/mod.rs:15947:14:
+called `Result::unwrap()` on an `Err` value: DurabilityFailure("paged transaction committed but version publication failed: corruption: WAL delta-chain entry is invalid")
+
+Cause: the test fixture used an LSN-zero base page for the first delta. The fixture now begins from a valid LSN-one checkpoint boundary.
