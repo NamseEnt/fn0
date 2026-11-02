@@ -672,7 +672,7 @@ impl LoadFailure {
     }
 }
 
-fn map_resource_error(error: ResourceError) -> Error {
+pub(super) fn map_resource_error(error: ResourceError) -> Error {
     match error {
         ResourceError::CapacityExceeded | ResourceError::TooManyTenants => {
             Error::overloaded("paged load resource capacity exceeded")

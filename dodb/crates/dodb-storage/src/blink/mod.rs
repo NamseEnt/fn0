@@ -1781,17 +1781,21 @@ pub struct PagedReadConfig {
     pub tenant_id: u64,
     pub root: version_index::VersionIndexRoot,
     pub root_page_id: PageId,
+    pub free_list_head: Option<PageId>,
     pub high_water_page_id: PageId,
     pub loader: page_cache::PageLoaderConfig,
 }
 
 #[cfg(feature = "blink-demand-paging")]
 pub struct PagedReadHandle {
+    tenant_id: u64,
     index: Arc<version_index::VersionIndex>,
     root: version_index::VersionIndexRoot,
     root_page_id: PageId,
+    free_list_head: Option<PageId>,
     high_water_page_id: PageId,
     loader: Arc<page_cache::PageLoader<page_cache::PageVersionKey, BlinkPage>>,
+    resources: resource::BlinkResourceManager,
     sources: source_manager::SourceManager,
     overlays: Vec<Arc<ImmutableOverlaySegment>>,
     header_length: Arc<dyn Fn(version_index::SourceIdentity) -> Result<usize> + Send + Sync>,
@@ -1812,16 +1816,17 @@ impl PagedReadHandle {
     {
         let loader = Arc::new(page_cache::PageLoader::new(
             config.tenant_id,
-            resources,
+            resources.clone(),
             config.loader,
         )?);
-        Self::with_shared_loader(config, index, loader, sources, header_length)
+        Self::with_shared_loader(config, index, loader, resources, sources, header_length)
     }
 
     pub(crate) fn with_shared_loader<F>(
         config: PagedReadConfig,
         index: Arc<version_index::VersionIndex>,
         loader: Arc<page_cache::PageLoader<page_cache::PageVersionKey, BlinkPage>>,
+        resources: resource::BlinkResourceManager,
         sources: source_manager::SourceManager,
         header_length: F,
     ) -> Result<Self>
@@ -1837,11 +1842,14 @@ impl PagedReadHandle {
         }
         let root_lease = sources.pin_root(&index, config.root)?;
         let handle = Self {
+            tenant_id: config.tenant_id,
             index,
             root: config.root,
             root_page_id: config.root_page_id,
+            free_list_head: config.free_list_head,
             high_water_page_id: config.high_water_page_id,
             loader,
+            resources,
             sources,
             overlays: Vec::new(),
             header_length: Arc::new(header_length),
@@ -1942,6 +1950,277 @@ impl PagedReadHandle {
     pub fn source_read_count(&self) -> u64 {
         self.loader.source_read_count()
     }
+
+    pub fn prepare_transaction(
+        &self,
+        request: &TransactionRequest,
+        limits: &StorageLimits,
+        maximum_working_pages: usize,
+        provisional_revision: Revision,
+    ) -> Result<PagedMutationPreparation> {
+        prepare_paged_mutation(
+            self,
+            request,
+            limits,
+            maximum_working_pages,
+            provisional_revision,
+        )
+    }
+
+    fn load_mutation_base_page(
+        &self,
+        page_id: PageId,
+    ) -> Result<Option<page_cache::PageGuard<BlinkPage>>> {
+        if page_id > self.high_water_page_id || self.index.lookup(self.root, page_id)?.is_none() {
+            return Ok(None);
+        }
+        self.loader
+            .load_version(&self.index, self.root, page_id, &self.sources, |source| {
+                (self.header_length)(source)
+            })
+            .map(Some)
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+struct PagedWorkingBlinkState<'base> {
+    base: &'base PagedReadHandle,
+    pages: BTreeMap<PageId, Arc<BlinkPage>>,
+    root_page_id: PageId,
+    free_list_head: Option<PageId>,
+    high_water_page_id: PageId,
+    allow_page_reuse: bool,
+    maximum_working_pages: usize,
+    exceeded_working_page_limit: bool,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl<'base> PagedWorkingBlinkState<'base> {
+    fn new(base: &'base PagedReadHandle, maximum_working_pages: usize) -> Result<Self> {
+        if maximum_working_pages == 0 {
+            return Err(Error::invalid_input(
+                "paged writer working-page limit must be nonzero",
+            ));
+        }
+        Ok(Self {
+            base,
+            pages: BTreeMap::new(),
+            root_page_id: base.root_page_id,
+            free_list_head: base.free_list_head,
+            high_water_page_id: base.high_water_page_id,
+            allow_page_reuse: false,
+            maximum_working_pages,
+            exceeded_working_page_limit: false,
+        })
+    }
+
+    fn validate_working_page_limit(&self) -> Result<()> {
+        if self.exceeded_working_page_limit {
+            Err(Error::overloaded(
+                "paged transaction exceeds its working-page limit",
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl BlinkMutationState for PagedWorkingBlinkState<'_> {
+    fn root_page_id(&self) -> PageId {
+        self.root_page_id
+    }
+
+    fn set_root_page_id(&mut self, value: PageId) {
+        self.root_page_id = value;
+    }
+
+    fn free_list_head(&self) -> Option<PageId> {
+        self.free_list_head
+    }
+
+    fn set_free_list_head(&mut self, value: Option<PageId>) {
+        self.free_list_head = value;
+    }
+
+    fn high_water_page_id(&self) -> PageId {
+        self.high_water_page_id
+    }
+
+    fn set_high_water_page_id(&mut self, value: PageId) {
+        self.high_water_page_id = value;
+    }
+
+    fn allow_page_reuse(&self) -> bool {
+        self.allow_page_reuse
+    }
+
+    fn page(&self, page_id: PageId) -> Result<Option<OwnedBlinkPageGuard>> {
+        self.validate_working_page_limit()?;
+        if let Some(page) = self.pages.get(&page_id) {
+            return Ok(Some(OwnedBlinkPageGuard::from(Arc::clone(page))));
+        }
+        Ok(self
+            .base
+            .load_mutation_base_page(page_id)?
+            .map(OwnedBlinkPageGuard::from))
+    }
+
+    fn insert_page(&mut self, page_id: PageId, page: BlinkPage) {
+        if !self.pages.contains_key(&page_id) && self.pages.len() >= self.maximum_working_pages {
+            self.exceeded_working_page_limit = true;
+            return;
+        }
+        self.pages.insert(page_id, Arc::new(page));
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+pub struct PagedMutationPreparation {
+    pages: BTreeMap<PageId, Arc<BlinkPage>>,
+    dirty: BTreeSet<PageId>,
+    root_page_id: PageId,
+    free_list_head: Option<PageId>,
+    high_water_page_id: PageId,
+    provisional_revision: Revision,
+    mutated_keys: BTreeSet<Vec<u8>>,
+    _reservations: Vec<resource::Reservation>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl PagedMutationPreparation {
+    pub fn dirty_page_ids(&self) -> impl Iterator<Item = PageId> + '_ {
+        self.dirty.iter().copied()
+    }
+
+    pub fn root_page_id(&self) -> PageId {
+        self.root_page_id
+    }
+
+    pub fn free_list_head(&self) -> Option<PageId> {
+        self.free_list_head
+    }
+
+    pub fn high_water_page_id(&self) -> PageId {
+        self.high_water_page_id
+    }
+
+    pub fn encode_commit_images(&self, commit_lsn: Lsn) -> Result<Vec<crate::wal::WalPageImage>> {
+        self.dirty
+            .iter()
+            .map(|page_id| {
+                let mut page = self
+                    .pages
+                    .get(page_id)
+                    .ok_or_else(|| Error::invariant("dirty paged mutation image is missing"))?
+                    .as_ref()
+                    .clone();
+                page.restamp(self.provisional_revision, commit_lsn, &self.mutated_keys);
+                Ok(crate::wal::WalPageImage {
+                    page_id: *page_id,
+                    image: encode_blink_page(*page_id, &page)?,
+                })
+            })
+            .collect()
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+fn prepare_paged_mutation(
+    base: &PagedReadHandle,
+    request: &TransactionRequest,
+    limits: &StorageLimits,
+    maximum_working_pages: usize,
+    provisional_revision: Revision,
+) -> Result<PagedMutationPreparation> {
+    request.validate()?;
+    if maximum_working_pages == 0 || provisional_revision == Revision::ZERO {
+        return Err(Error::invalid_input(
+            "paged transaction reservation or revision is invalid",
+        ));
+    }
+    if !base.overlays.is_empty() {
+        return Err(Error::overloaded(
+            "paged transaction requires committed overlays to be materialized",
+        ));
+    }
+    let encoded_keys = validate_and_encode_mutation_keys(request, limits)?;
+    validate_conditions(base, &request.conditions)?;
+    if request.mutations.is_empty() {
+        return Ok(PagedMutationPreparation {
+            pages: BTreeMap::new(),
+            dirty: BTreeSet::new(),
+            root_page_id: base.root_page_id,
+            free_list_head: base.free_list_head,
+            high_water_page_id: base.high_water_page_id,
+            provisional_revision,
+            mutated_keys: BTreeSet::new(),
+            _reservations: Vec::new(),
+        });
+    }
+    let working_page_bytes = u64::try_from(maximum_working_pages)
+        .ok()
+        .and_then(|page_count| page_count.checked_mul(PAGE_SIZE as u64))
+        .ok_or_else(|| Error::overloaded("paged working-set byte count overflows"))?;
+    let request_bytes = request.mutations.iter().zip(&encoded_keys).try_fold(
+        working_page_bytes,
+        |total, (mutation, encoded_key)| {
+            let value_bytes = match mutation {
+                TransactionMutation::Put { value, .. } => value.len(),
+                TransactionMutation::Delete { .. } => 0,
+            };
+            total
+                .checked_add(encoded_key.len() as u64)
+                .and_then(|bytes| bytes.checked_add(value_bytes as u64))
+                .ok_or_else(|| Error::overloaded("paged transaction byte count overflows"))
+        },
+    )?;
+    let preparation_reservation = base
+        .resources
+        .reserve(
+            base.tenant_id,
+            resource::ResourceCategory::WritePreparation,
+            resource::ReservationClass::Foreground,
+            request_bytes,
+        )
+        .map_err(page_cache::map_resource_error)?;
+    let dirty_reservation = base
+        .resources
+        .reserve(
+            base.tenant_id,
+            resource::ResourceCategory::DirtyImages,
+            resource::ReservationClass::Foreground,
+            working_page_bytes,
+        )
+        .map_err(page_cache::map_resource_error)?;
+    let mut working = PagedWorkingBlinkState::new(base, maximum_working_pages)?;
+    let mut dirty = BTreeSet::new();
+    let mut split_metrics = BlinkSplitMetrics::default();
+    for mutation in &request.mutations {
+        apply_mutation(
+            &mut working,
+            &mut dirty,
+            &mut split_metrics,
+            mutation,
+            provisional_revision,
+        )?;
+        working.validate_working_page_limit()?;
+    }
+    if !working.pages.keys().all(|page_id| dirty.contains(page_id)) {
+        return Err(Error::invariant(
+            "paged transaction working set contains a clean page",
+        ));
+    }
+    Ok(PagedMutationPreparation {
+        pages: working.pages,
+        dirty,
+        root_page_id: working.root_page_id,
+        free_list_head: working.free_list_head,
+        high_water_page_id: working.high_water_page_id,
+        provisional_revision,
+        mutated_keys: encoded_keys.into_iter().collect(),
+        _reservations: vec![preparation_reservation, dirty_reservation],
+    })
 }
 
 #[derive(Clone, Debug)]
@@ -12462,6 +12741,7 @@ mod tests {
                 tenant_id: 11,
                 root,
                 root_page_id,
+                free_list_head: None,
                 high_water_page_id,
                 loader: page_cache::PageLoaderConfig {
                     maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
@@ -12539,6 +12819,113 @@ mod tests {
                 .is_err()
         );
         assert!(handle.source_read_count() >= 3);
+        for mutation_width in [1, 4, 16] {
+            let request = TransactionRequest::new(
+                Vec::new(),
+                (0..mutation_width)
+                    .map(|row_index| TransactionMutation::Put {
+                        key: DocumentKey::new(
+                            b"p".to_vec(),
+                            format!("prepared-{mutation_width:02}-{row_index:02}").into_bytes(),
+                        ),
+                        value: format!("prepared-{row_index:02}").into_bytes(),
+                    })
+                    .collect(),
+            );
+            let preparation = handle
+                .prepare_transaction(
+                    &request,
+                    &StorageLimits::default(),
+                    32,
+                    Revision::new(1000 + mutation_width as u64),
+                )
+                .unwrap();
+            assert!(preparation.dirty_page_ids().next().is_some());
+            assert!(preparation.encode_commit_images(Lsn::new(1200)).is_ok());
+        }
+        let conditional_key = DocumentKey::new(b"p".to_vec(), b"prepared-conditional".to_vec());
+        let conditional_request = TransactionRequest::new(
+            vec![TransactionCondition::NotExists {
+                key: conditional_key.clone(),
+            }],
+            vec![TransactionMutation::Put {
+                key: conditional_key,
+                value: b"conditional".to_vec(),
+            }],
+        );
+        assert!(
+            handle
+                .prepare_transaction(
+                    &conditional_request,
+                    &StorageLimits::default(),
+                    8,
+                    Revision::new(1098),
+                )
+                .is_ok()
+        );
+        let overflow_delete_request = TransactionRequest::new(
+            Vec::new(),
+            vec![TransactionMutation::Delete { key: key_b.clone() }],
+        );
+        let overflow_delete = handle
+            .prepare_transaction(
+                &overflow_delete_request,
+                &StorageLimits::default(),
+                8,
+                Revision::new(1099),
+            )
+            .unwrap();
+        assert!(overflow_delete.dirty_page_ids().count() >= 2);
+        let oversized_request = TransactionRequest::new(
+            Vec::new(),
+            vec![TransactionMutation::Put {
+                key: DocumentKey::new(b"p".to_vec(), b"prepared-overflow".to_vec()),
+                value: vec![0x7a; 5000],
+            }],
+        );
+        let preparation_bytes_before = resources.snapshot().unwrap().current_by_category
+            [resource::ResourceCategory::WritePreparation as usize];
+        let dirty_bytes_before = resources.snapshot().unwrap().current_by_category
+            [resource::ResourceCategory::DirtyImages as usize];
+        assert!(
+            handle
+                .prepare_transaction(
+                    &oversized_request,
+                    &StorageLimits::default(),
+                    1,
+                    Revision::new(1100),
+                )
+                .is_err()
+        );
+        assert_eq!(
+            resources.snapshot().unwrap().current_by_category
+                [resource::ResourceCategory::WritePreparation as usize],
+            preparation_bytes_before
+        );
+        assert_eq!(
+            resources.snapshot().unwrap().current_by_category
+                [resource::ResourceCategory::DirtyImages as usize],
+            dirty_bytes_before
+        );
+        let conflict_request = TransactionRequest::new(
+            vec![TransactionCondition::RevisionEquals {
+                key: key_b.clone(),
+                expected_revision: Revision::new(9999),
+            }],
+            vec![TransactionMutation::Put {
+                key: key_b.clone(),
+                value: b"uncommitted".to_vec(),
+            }],
+        );
+        assert!(matches!(
+            handle.prepare_transaction(
+                &conflict_request,
+                &StorageLimits::default(),
+                8,
+                Revision::new(1101),
+            ),
+            Err(Error::Conflict(_))
+        ));
         let overlay_segment = Arc::new(
             ImmutableOverlaySegment::from_sorted_entries(vec![
                 (
@@ -12564,6 +12951,7 @@ mod tests {
                 tenant_id: 11,
                 root,
                 root_page_id,
+                free_list_head: None,
                 high_water_page_id,
                 loader: page_cache::PageLoaderConfig {
                     maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
@@ -12712,6 +13100,7 @@ mod tests {
                     tenant_id: 11,
                     root: current_root,
                     root_page_id,
+                    free_list_head: None,
                     high_water_page_id,
                     loader: page_cache::PageLoaderConfig {
                         maximum_cache_bytes: PAGE_SIZE as u64,
@@ -12782,6 +13171,7 @@ mod tests {
                 tenant_id: 11,
                 root,
                 root_page_id,
+                free_list_head: None,
                 high_water_page_id,
                 loader: page_cache::PageLoaderConfig {
                     maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
