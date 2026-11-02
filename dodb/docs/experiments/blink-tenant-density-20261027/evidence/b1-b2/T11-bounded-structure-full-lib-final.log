@@ -2,10 +2,10 @@
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on build directory
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.90s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.84s
      Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-70634b21c90c24df)
 
-running 316 tests
+running 317 tests
 test blink::page_cache::tests::all_pinned_cache_capacity_returns_overload ... ok
 test blink::page_cache::tests::cache_eviction_keeps_guard_charge_until_last_owner_drops ... ok
 test blink::page_cache::tests::cancelled_load_wakes_followers_and_releases_job_and_byte_reservations ... ok
@@ -100,6 +100,11 @@ test blink::source_manager::tests::pending_catalog_publication_protects_recovery
 test blink::source_manager::tests::retained_disk_usage_survives_manager_drop_and_reopen_without_double_counting ... ok
 test blink::source_manager::tests::source_gc_preserves_reachable_files_across_unlink_fault_boundaries ... ok
 test blink::source_manager::tests::source_gc_rejects_scratch_quota_before_creating_markers ... ok
+test blink::source_manager::tests::source_gc_survives_sigkill_before_and_after_unlink ...
+running 1 test
+
+running 1 test
+ok
 test blink::source_manager::tests::source_handles_and_roots_have_explicit_limits ... ok
 test blink::source_manager::tests::zero_reader_page_reuse_reservation_fences_new_roots_until_publication_slot_is_reserved ... ok
 test blink::tests::background_materialization_keeps_committing_and_preserves_newer_suffix ... ok
@@ -331,5 +336,5 @@ test wal::tests::trusted_internal_valid_images_are_byte_identical_to_strict_imag
 test wal::tests::unsupported_version_is_rejected ... ok
 test wal::tests::wrong_magic_is_rejected ... ok
 
-test result: ok. 312 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 128.31s
+test result: ok. 313 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 127.84s
 

@@ -8,13 +8,13 @@ The validator reserves three pages from `CheckpointValidation` and reserves one 
 
 The validator also checks internal child types and levels, separator/child fences, leaf and internal sibling continuity, overflow ownership and lengths, and free-list page types. A corrupt leaf not touched by the requested read fails validation. Test fixtures cover missing allocation, an omitted free list, a free-list cycle, multiply owned tree child, and scratch release. The validated-open arguments are grouped in `PagedValidatedOpenConfig`.
 
-Additional storage tests cover all four paged manifest pointer publication fault boundaries and real process `SIGKILL` at all four pointer stages and fail-closed delta-chain sidecar checks for wrong embedded identity, corrupted payload, truncation, and missing sidecar.
+Additional storage tests cover all four paged manifest pointer publication fault boundaries and real process `SIGKILL` at all four pointer stages; source GC is also killed before and after unlink, then reopened and retried and fail-closed delta-chain sidecar checks for wrong embedded identity, corrupted payload, truncation, and missing sidecar.
 
 ## Validation
 
 - `rustfmt --edition 2024 --check crates/dodb-storage/src/blink/paged_manifest.rs crates/dodb-storage/src/blink/version_chain.rs crates/dodb-storage/src/blink/mod.rs`: passed.
-- Focused paged validation, manifest validated-open, pointer fault-injection and `SIGKILL` boundaries, and delta-chain sidecar regressions: passed.
-- `cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1`: passed, 312 tests; 4 ignored.
+- Focused paged validation, manifest validated-open, pointer and source-GC `SIGKILL` boundaries, and delta-chain sidecar regressions: passed.
+- `cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1`: passed, 313 tests; 4 ignored.
 - `git diff --check`: passed.
 - Strict Clippy remains blocked by 12 diagnostics in existing code in `blink/mod.rs` and `wal.rs`; none point to the new validated-open API, bounded validator, or `source_manager.rs`. No lint suppression was added.
 
