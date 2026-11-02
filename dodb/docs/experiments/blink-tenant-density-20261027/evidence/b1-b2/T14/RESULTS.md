@@ -88,6 +88,8 @@ The source-manager test proves old-root pin release allows exact source unlinkin
 
 The service integration now covers the source-retention half through actual requests. `tests::paged_checkpoint_reclaims_old_reader_source_before_publication` writes 50 distinct 4 KiB values, pins the old service read root, publishes a checkpoint, confirms the old WAL file remains and the old value is readable, overwrites all 50 keys, releases the old root, and runs another checkpoint. Its source-collection phase unlinks the old WAL before the second checkpoint publishes; the service then shuts down, reopens, and verifies the new value. The separate capacity-wait test still covers waiter resumption and publication after synthetic disk-capacity release. Combining the old-reader source with the capacity waiter remains unproven.
 
+During a diagnostic run of that same fixture, the configured disk cap was 64 MiB and observed peak accounted disk usage was 25,719,300 bytes. The peak is a local correctness-fixture observation, not an SLO or density result.
+
 Validation after this integration addition:
 
 - `cargo test -p dodb-server --features blink-demand-paging --lib -- --test-threads=1`: 49 passed; full output is retained in `server-paging-library-old-reader-lifecycle.log`.

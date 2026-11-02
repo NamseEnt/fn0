@@ -17,8 +17,8 @@
   ],
   "source_hashes": {
     "dodb/crates/dodb-server/src/lib.rs": "1140ba19fe95ddb93803421fb8d7dd6c710e3ba02144cc155dc589ed02222876",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/RESULTS.md": "80f22a12e4b9b20d4de768e185b207570def526a332873ebdb795e034253dc4a",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-library-old-reader-lifecycle.log": "18dc912ad60c5c88d86b5f1f4d0ed93f543eb63516712d4b75a144e98a268ec4",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/RESULTS.md": "cae967866ada341be5a022bc48618354867b6df781e7fa634f3acf804442567b",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-library-old-reader-lifecycle.log": "69cd0df645e0a87eccbfe03cbd8567457cd4023138d770c1228db5dc1bb9a1a1",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-old-reader-capacity-probe-failures.log": "4598a4eb3eb9bd0c48bb8f3b8f771b9364b6b7a0a3d1476ab6c3354ac369c9c7"
   },
   "host": "local worktree / macOS",
@@ -63,7 +63,7 @@
     "performance, SLO, or tenant-capacity result": "None"
   },
   "ownership_peaks": {
-    "test service disk cap": "64 MiB configured; per-run peak not recorded in this test",
+    "test service disk cap": "64 MiB configured; diagnostic peak accounted disk usage was 25,719,300 bytes",
     "process RSS": "Not measured"
   },
   "failed_attempts": [
