@@ -2469,6 +2469,127 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
         )
     }
 
+    pub fn checkpoint_to_manifest(
+        &mut self,
+        manifest_store: &mut paged_manifest::PagedManifestStore,
+        mut pack_request: PagedCheckpointPackRequest,
+        next_wal_file_number: u64,
+        next_wal_file: F,
+        incremental: bool,
+    ) -> Result<Option<Lsn>> {
+        if let Some(message) = &self.broken {
+            return Err(Error::durability(format!(
+                "paged transaction writer is unavailable after an uncertain persistence failure: {message}"
+            )));
+        }
+        let previous_manifest = manifest_store.current();
+        let Some(checkpoint_lsn) = self.wal.last_commit_lsn() else {
+            return Ok(None);
+        };
+        if checkpoint_lsn <= previous_manifest.committed_prefix_lsn
+            || pack_request.identity != *self.wal.identity()
+            || pack_request.file_number == 0
+            || next_wal_file_number <= self.wal_source.file_number
+            || next_wal_file_number == 0
+            || pack_request.directory.as_path() != self.current.sources.checkpoint_directory()
+            || previous_manifest.recovery_wal_file_number != self.wal_source.file_number
+            || previous_manifest.identity != self.current.index.store_identity()
+        {
+            return Err(Error::invalid_input(
+                "paged checkpoint target, identity, or source number is invalid",
+            ));
+        }
+        let checkpoint_directory = pack_request.directory.clone();
+        pack_request.checkpoint_lsn = checkpoint_lsn;
+        pack_request.previous_checkpoint_lsn =
+            incremental.then_some(previous_manifest.committed_prefix_lsn);
+        let pack_output = if incremental {
+            self.current
+                .write_incremental_checkpoint_pack(pack_request, None)?
+        } else {
+            Some(self.current.write_checkpoint_pack(pack_request, None)?)
+        };
+        let Some(pack_output) = pack_output else {
+            return Ok(None);
+        };
+        let pack_path = durable_bases::pack_path(&checkpoint_directory, pack_output.entry.number);
+        let (checkpoint_root, _) = if incremental {
+            paged_recovery::build_incremental_checkpoint_index(
+                &self.current.index,
+                self.current.root,
+                &pack_path,
+                &pack_output.entry,
+                previous_manifest.committed_prefix_lsn,
+                self.wal.identity(),
+                self.current.high_water_page_id,
+            )?
+        } else {
+            paged_recovery::build_checkpoint_index(
+                &self.current.index,
+                self.current.root,
+                &pack_path,
+                &pack_output.entry,
+                pack_output.complete,
+                self.wal.identity(),
+                self.current.high_water_page_id,
+            )?
+        };
+        let mut next_wal = WalLog::open_with_segment_boundary(
+            next_wal_file,
+            self.wal.identity().clone(),
+            WalPageImageFormat::ExperimentalBlink,
+            checkpoint_lsn,
+            Some(self.wal.next_batch_id()),
+            true,
+            false,
+            None,
+        )?;
+        next_wal.sync_all()?;
+        self.current.sources.sync_wal_directory()?;
+        let recovery_offset = next_wal.file_length()?;
+        let source_header_identity = next_wal.source_header_identity();
+        let next_wal_source = version_index::SourceIdentity {
+            kind: version_index::SourceFileKind::WalSegment,
+            file_number: next_wal_file_number,
+            header_identity: source_header_identity,
+        };
+        let next_handle = self.current.fork_with_generation(
+            checkpoint_root,
+            self.current.root_page_id,
+            self.current.free_list_head,
+            self.current.high_water_page_id,
+        )?;
+        let manifest_generation = previous_manifest
+            .generation
+            .checked_add(1)
+            .ok_or_else(|| Error::invalid_input("paged manifest generation exhausted"))?;
+        let manifest = paged_manifest::PagedManifest {
+            identity: previous_manifest.identity,
+            generation: manifest_generation,
+            tree_root: self.current.root_page_id,
+            free_list_root: self.current.free_list_head,
+            high_water_page_id: self.current.high_water_page_id,
+            durable_index_root: checkpoint_root
+                .node_reference()
+                .ok_or_else(|| Error::invariant("checkpoint durable index root is empty"))?,
+            source_catalog_root: previous_manifest.source_catalog_root,
+            recovery_wal_file_number: next_wal_file_number,
+            recovery_offset,
+            committed_prefix_lsn: checkpoint_lsn,
+            previous_generation: previous_manifest.generation,
+        };
+        if let Err(error) = manifest_store.publish_with_index(manifest, &self.current.index) {
+            self.broken = Some(error.to_string());
+            return Err(error);
+        }
+        self.current = next_handle;
+        self.wal = next_wal;
+        self.wal_source = next_wal_source;
+        self.superblock.checkpoint_lsn = checkpoint_lsn;
+        self.superblock.checkpoint_sequence = checkpoint_lsn.get();
+        Ok(Some(checkpoint_lsn))
+    }
+
     pub fn transact(
         &mut self,
         request: &TransactionRequest,
@@ -15618,6 +15739,335 @@ mod tests {
         .unwrap();
         assert!(corrupted_handle.get(&key_b).is_err());
         drop(corrupted_handle);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    #[test]
+    fn paged_transaction_writer_publishes_complete_and_incremental_checkpoints() {
+        let directory = std::env::temp_dir().join(format!(
+            "dodb-paged-writer-checkpoint-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let checkpoint_directory = directory.join("packs");
+        let wal_directory = directory.join("segments");
+        let scratch_directory = directory.join("scratch");
+        let index_directory = directory.join("index");
+        std::fs::create_dir_all(&checkpoint_directory).unwrap();
+        std::fs::create_dir_all(&wal_directory).unwrap();
+        let store_identity = version_index::StoreIdentity {
+            database_uuid: [92; 16],
+            wal_epoch: 6,
+        };
+        let wal_identity = WalIdentity::new(
+            store_identity.database_uuid,
+            TenantId::new(7),
+            ShardId::new(1),
+            ShardEpoch::new(store_identity.wal_epoch),
+        );
+        let root_page_id = PageId::new(FIRST_DATA_PAGE);
+        let initial_image = encode_blink_page(
+            root_page_id,
+            &BlinkPage::Leaf {
+                lsn: Lsn::new(1),
+                high_key: None,
+                right_sibling: None,
+                entries: pack_leaf(&[]),
+            },
+        )
+        .unwrap();
+        let mut initial_pack = durable_bases::PagedBasePackJob {
+            directory: checkpoint_directory.clone(),
+            identity: wal_identity.clone(),
+            number: 1,
+            checkpoint_lsn: Lsn::new(1),
+            page_count: 1,
+            complete: true,
+            coalesce: true,
+        }
+        .begin(None)
+        .unwrap();
+        let initial_pack_output = initial_pack
+            .append_page(root_page_id, &initial_image)
+            .and_then(|()| initial_pack.finish())
+            .unwrap();
+        let initial_pack_path = durable_bases::pack_path(&checkpoint_directory, 1);
+        let initial_pack_header = std::fs::read(&initial_pack_path).unwrap();
+        let initial_pack_source = version_index::SourceIdentity {
+            kind: version_index::SourceFileKind::CheckpointPack,
+            file_number: 1,
+            header_identity: *blake3::hash(&initial_pack_header[..PAGE_SIZE]).as_bytes(),
+        };
+        let resources = resource::BlinkResourceManager::new(resource::ResourceLimits {
+            global_bytes: 4_194_304,
+            per_tenant_bytes: 4_194_304,
+            progress_pool_bytes: 524_288,
+            max_tenants: 2,
+            max_pending_waiters: 8,
+            global_category_bytes: [4_194_304; 7],
+            per_tenant_category_bytes: [4_194_304; 7],
+        })
+        .unwrap();
+        let index = Arc::new(
+            version_index::VersionIndex::open(
+                &index_directory,
+                store_identity,
+                resources.clone(),
+                7,
+                4,
+            )
+            .unwrap(),
+        );
+        let initial_root = index
+            .insert(
+                index.empty_root(),
+                root_page_id,
+                version_index::VersionDescriptor {
+                    page_id: root_page_id,
+                    token: version_index::VersionToken::Bootstrap {
+                        page_id: root_page_id,
+                    },
+                    image_lsn: Lsn::new(1),
+                    image_crc32c: crc32c::crc32c(&initial_image),
+                    locator: version_index::VersionLocator::CheckpointImage {
+                        source: initial_pack_source,
+                        offset: PAGE_SIZE as u64,
+                        source_length: initial_pack_output.entry.bytes,
+                        image_lsn: Lsn::new(1),
+                        image_crc32c: crc32c::crc32c(&initial_image),
+                    },
+                },
+            )
+            .unwrap();
+        let durable_initial_root = index.promote_root_to_durable(initial_root).unwrap();
+        let sources = source_manager::SourceManager::new(
+            source_manager::SourceManagerConfig {
+                store_identity,
+                checkpoint_directory: checkpoint_directory.clone(),
+                wal_directory: wal_directory.clone(),
+                scratch_directory: scratch_directory.clone(),
+                tenant_id: 7,
+                maximum_open_handles: 4,
+                maximum_roots: 6,
+                handle_charge_bytes: 128,
+                gc_reservation_bytes: 8192,
+            },
+            resources.clone(),
+        )
+        .unwrap();
+        let handle = PagedReadHandle::new(
+            PagedReadConfig {
+                tenant_id: 7,
+                root: durable_initial_root,
+                root_page_id,
+                free_list_head: None,
+                high_water_page_id: root_page_id,
+                loader: page_cache::PageLoaderConfig {
+                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 10) as u64,
+                    maximum_concurrent_loads: 2,
+                    maximum_followers: 8,
+                },
+            },
+            Arc::clone(&index),
+            resources.clone(),
+            sources.clone(),
+            |source| {
+                Ok(
+                    if source.kind == version_index::SourceFileKind::WalSegment {
+                        crate::wal::INIT_FRAME_SIZE
+                    } else {
+                        PAGE_SIZE
+                    },
+                )
+            },
+        )
+        .unwrap();
+        let first_wal_path = wal_directory.join("segment-00000000000000000001.wal");
+        let first_wal = WalLog::open_with_segment_boundary(
+            crate::durable_file::ProductionFile::open(&first_wal_path).unwrap(),
+            wal_identity.clone(),
+            WalPageImageFormat::ExperimentalBlink,
+            Lsn::new(1),
+            Some(1),
+            true,
+            false,
+            None,
+        )
+        .unwrap();
+        let first_wal_source = version_index::SourceIdentity {
+            kind: version_index::SourceFileKind::WalSegment,
+            file_number: 1,
+            header_identity: first_wal.source_header_identity(),
+        };
+        let mut superblock = BlinkSuperblock::new(
+            &DatabaseConfig {
+                database_uuid: store_identity.database_uuid,
+                tenant_id: TenantId::new(7),
+                shard_id: ShardId::new(1),
+                shard_epoch: ShardEpoch::new(store_identity.wal_epoch),
+                ..DatabaseConfig::default()
+            },
+            root_page_id,
+        );
+        superblock.high_water_page_id = root_page_id;
+        let superblock_image = encode_blink_superblock(&superblock).unwrap();
+        let mut writer = PagedTransactionWriter::new(
+            handle,
+            first_wal,
+            first_wal_source,
+            &superblock_image,
+            SuperblockSlot::A,
+            8,
+        )
+        .unwrap();
+        let database_path = directory.join("database");
+        let manifest = paged_manifest::PagedManifest {
+            identity: store_identity,
+            generation: 1,
+            tree_root: root_page_id,
+            free_list_root: None,
+            high_water_page_id: root_page_id,
+            durable_index_root: durable_initial_root.node_reference().unwrap(),
+            source_catalog_root: None,
+            recovery_wal_file_number: 1,
+            recovery_offset: writer.wal.file_length().unwrap(),
+            committed_prefix_lsn: Lsn::new(1),
+            previous_generation: 0,
+        };
+        let mut manifest_store =
+            paged_manifest::PagedManifestStore::create_with_index(&database_path, manifest, &index)
+                .unwrap();
+        let key = DocumentKey::new(b"checkpoint".to_vec(), b"item".to_vec());
+        let first_write = TransactionRequest::new(
+            vec![TransactionCondition::NotExists { key: key.clone() }],
+            vec![TransactionMutation::Put {
+                key: key.clone(),
+                value: b"complete".to_vec(),
+            }],
+        );
+        let first_result = writer
+            .transact(&first_write, &StorageLimits::default(), Revision::new(1))
+            .unwrap();
+        let first_checkpoint_lsn = first_result.commit_lsn.unwrap();
+        assert_eq!(
+            writer
+                .checkpoint_to_manifest(
+                    &mut manifest_store,
+                    PagedCheckpointPackRequest {
+                        directory: checkpoint_directory.clone(),
+                        file_number: 2,
+                        identity: wal_identity.clone(),
+                        checkpoint_lsn: Lsn::ZERO,
+                        previous_checkpoint_lsn: None,
+                        coalesce: true,
+                    },
+                    2,
+                    crate::durable_file::ProductionFile::open(
+                        wal_directory.join("segment-00000000000000000002.wal"),
+                    )
+                    .unwrap(),
+                    false,
+                )
+                .unwrap(),
+            Some(first_checkpoint_lsn)
+        );
+        assert_eq!(manifest_store.current().generation, 2);
+        assert_eq!(writer.wal.last_commit_lsn(), None);
+        assert_eq!(writer.wal.history_start_lsn(), first_checkpoint_lsn);
+        let second_write = TransactionRequest::new(
+            vec![TransactionCondition::Exists { key: key.clone() }],
+            vec![TransactionMutation::Put {
+                key: key.clone(),
+                value: b"incremental".to_vec(),
+            }],
+        );
+        let second_result = writer
+            .transact(&second_write, &StorageLimits::default(), Revision::new(2))
+            .unwrap();
+        let second_checkpoint_lsn = second_result.commit_lsn.unwrap();
+        assert_eq!(
+            writer
+                .checkpoint_to_manifest(
+                    &mut manifest_store,
+                    PagedCheckpointPackRequest {
+                        directory: checkpoint_directory.clone(),
+                        file_number: 3,
+                        identity: wal_identity,
+                        checkpoint_lsn: first_checkpoint_lsn,
+                        previous_checkpoint_lsn: Some(Lsn::ZERO),
+                        coalesce: true,
+                    },
+                    3,
+                    crate::durable_file::ProductionFile::open(
+                        wal_directory.join("segment-00000000000000000003.wal"),
+                    )
+                    .unwrap(),
+                    true,
+                )
+                .unwrap(),
+            Some(second_checkpoint_lsn)
+        );
+        assert_eq!(manifest_store.current().generation, 3);
+        assert_eq!(
+            manifest_store.current().committed_prefix_lsn,
+            second_checkpoint_lsn
+        );
+        assert_eq!(
+            std::fs::metadata(durable_bases::pack_path(&checkpoint_directory, 3))
+                .unwrap()
+                .len(),
+            durable_bases::encoded_size(1)
+        );
+        drop(writer);
+        drop(manifest_store);
+        let reopened_manifest = paged_manifest::PagedManifestStore::open_with_index(
+            &database_path,
+            store_identity,
+            &index,
+        )
+        .unwrap();
+        let reopened_root = index
+            .root_from_node_reference(reopened_manifest.current().durable_index_root)
+            .unwrap();
+        let reopened_handle = PagedReadHandle::new(
+            PagedReadConfig {
+                tenant_id: 7,
+                root: reopened_root,
+                root_page_id: reopened_manifest.current().tree_root,
+                free_list_head: reopened_manifest.current().free_list_root,
+                high_water_page_id: reopened_manifest.current().high_water_page_id,
+                loader: page_cache::PageLoaderConfig {
+                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 10) as u64,
+                    maximum_concurrent_loads: 2,
+                    maximum_followers: 8,
+                },
+            },
+            index,
+            resources,
+            sources,
+            |source| {
+                Ok(
+                    if source.kind == version_index::SourceFileKind::WalSegment {
+                        crate::wal::INIT_FRAME_SIZE
+                    } else {
+                        PAGE_SIZE
+                    },
+                )
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            reopened_handle.get(&key).unwrap().value(),
+            Some(&b"incremental"[..])
+        );
         std::fs::remove_dir_all(directory).unwrap();
     }
 

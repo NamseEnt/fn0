@@ -608,6 +608,15 @@ impl SourceManager {
         Ok(report)
     }
 
+    pub(crate) fn sync_wal_directory(&self) -> Result<()> {
+        File::open(&self.inner.wal_directory)?.sync_all()?;
+        Ok(())
+    }
+
+    pub(crate) fn checkpoint_directory(&self) -> &Path {
+        &self.inner.checkpoint_directory
+    }
+
     fn source_path(&self, identity: SourceIdentity) -> PathBuf {
         match identity.kind {
             SourceFileKind::CheckpointPack => self

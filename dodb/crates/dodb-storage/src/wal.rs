@@ -33,7 +33,7 @@ const LEGACY_WAL_FORMAT_VERSION: u16 = 1;
 const LEGACY_INIT_PAYLOAD_SIZE: usize = 44;
 const INIT_PAYLOAD_SIZE: usize = 52;
 const LOGICAL_INIT_PAYLOAD_SIZE: usize = 60;
-const INIT_FRAME_SIZE: usize = WAL_HEADER_SIZE + INIT_PAYLOAD_SIZE + WAL_TRAILER_SIZE;
+pub(crate) const INIT_FRAME_SIZE: usize = WAL_HEADER_SIZE + INIT_PAYLOAD_SIZE + WAL_TRAILER_SIZE;
 pub(crate) const LOGICAL_INIT_FRAME_SIZE: usize =
     WAL_HEADER_SIZE + LOGICAL_INIT_PAYLOAD_SIZE + WAL_TRAILER_SIZE;
 pub(crate) const MAX_LOGICAL_WAL_BYTES: u64 = 256 * 1024 * 1024;
@@ -604,6 +604,7 @@ pub struct WalLog<F: DurableFile> {
     group_write_nanos: u64,
     physical_write_calls: u64,
     page_image_format: WalPageImageFormat,
+    source_header_identity: [u8; 32],
 }
 
 impl<F: DurableFile> WalLog<F> {
@@ -762,6 +763,7 @@ impl<F: DurableFile> WalLog<F> {
             redo,
             mut report,
             valid_length,
+            source_header_identity,
             ..
         } = scan_wal(
             &mut file,
@@ -843,6 +845,7 @@ impl<F: DurableFile> WalLog<F> {
             group_write_nanos: 0,
             physical_write_calls: 0,
             page_image_format,
+            source_header_identity,
         })
     }
 
@@ -887,9 +890,12 @@ impl<F: DurableFile> WalLog<F> {
             group_write_nanos: 0,
             physical_write_calls: 0,
             page_image_format,
+            source_header_identity: [0; 32],
         };
         let payload = wal.identity_payload(start_after_lsn);
         wal.append_frame(WalRecordType::Init, Lsn::ZERO, 0, 0, &payload, &mut None)?;
+        wal.source_header_identity = read_exact_at(&mut wal.file, 0, INIT_FRAME_SIZE)
+            .map(|frame| *blake3::hash(&frame).as_bytes())?;
         if !defer_sync {
             wal.file
                 .sync_data()
@@ -1402,6 +1408,10 @@ impl<F: DurableFile> WalLog<F> {
         &self.identity
     }
 
+    pub fn source_header_identity(&self) -> [u8; 32] {
+        self.source_header_identity
+    }
+
     pub fn page_image_format(&self) -> WalPageImageFormat {
         self.page_image_format
     }
@@ -1499,6 +1509,8 @@ impl<F: DurableFile> WalLog<F> {
         self.file
             .sync_data()
             .map_err(|error| Error::checkpoint(format!("WAL reset sync failed: {error}")))?;
+        self.source_header_identity = read_exact_at(&mut self.file, 0, INIT_FRAME_SIZE)
+            .map(|frame| *blake3::hash(&frame).as_bytes())?;
         self.sync_count = self
             .sync_count
             .checked_add(1)
