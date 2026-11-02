@@ -1,0 +1,59 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+    Checking dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+warning: method `write_checkpoint_pack` is never used
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:2046:19
+     |
+1809 | impl PagedReadHandle {
+     | -------------------- method in this implementation
+...
+2046 |     pub(super) fn write_checkpoint_pack(
+     |                   ^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `PagedBasePackJob` is never constructed
+  --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:39:19
+   |
+39 | pub(super) struct PagedBasePackJob {
+   |                   ^^^^^^^^^^^^^^^^
+
+warning: struct `PagedBasePackWriter` is never constructed
+  --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:49:19
+   |
+49 | pub(super) struct PagedBasePackWriter {
+   |                   ^^^^^^^^^^^^^^^^^^^
+
+warning: struct `PagedBasePackOutput` is never constructed
+  --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:67:19
+   |
+67 | pub(crate) struct PagedBasePackOutput {
+   |                   ^^^^^^^^^^^^^^^^^^^
+
+warning: method `begin` is never used
+   --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:184:12
+    |
+183 | impl PagedBasePackJob {
+    | --------------------- method in this implementation
+184 |     pub fn begin(
+    |            ^^^^^
+
+warning: methods `append_page`, `flush_buffer`, and `finish` are never used
+   --> dodb/crates/dodb-storage/src/blink/durable_bases.rs:238:12
+    |
+237 | impl PagedBasePackWriter {
+    | ------------------------ methods in this implementation
+238 |     pub fn append_page(&mut self, page_id: PageId, image: &[u8; PAGE_SIZE]) -> Result<()> {
+    |            ^^^^^^^^^^^
+...
+266 |     fn flush_buffer(&mut self) -> Result<()> {
+    |        ^^^^^^^^^^^^
+...
+287 |     pub fn finish(mut self) -> Result<PagedBasePackOutput> {
+    |            ^^^^^^
+
+warning: `dodb-storage` (lib) generated 6 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.85s

@@ -1,0 +1,8 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages -- --test-threads=1
+Exit status: 101
+Observed failure:
+thread 'blink::tests::paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages' panicked at dodb/crates/dodb-storage/src/blink/mod.rs:14160:14:
+called `Result::unwrap()` on an `Err` value: Overloaded("paged load resource capacity exceeded")
+Cause: the initial coalescing attempt reserved 65 pages (266240 bytes), exceeding the fixture's 65536-byte progress pool.
+Correction: reduced the coalesced output buffer to four pages and reserved six pages including the current page and bounded traversal allowance.
+The corrected focused run is preserved in paged-streamed-pack-focused.log.

@@ -1,0 +1,8 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages -- --test-threads=1
+Exit status: 101
+Observed failure:
+thread 'blink::tests::paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages' panicked at dodb/crates/dodb-storage/src/blink/mod.rs:14315:14:
+called `Result::unwrap()` on an `Err` value: Overloaded("paged source root pin limit is exhausted")
+Cause: the test held an additional checkpoint snapshot alongside the existing pinned old reader, exceeding the fixture root limit during the next writer publication.
+Correction: reused the existing immutable old-reader generation as the checkpoint target, then streamed it after a newer writer commit and compared all output images to the captured generation.
+The corrected focused run is preserved in paged-streamed-pack-focused.log.

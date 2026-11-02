@@ -1,0 +1,5 @@
+Commands:
+cargo fmt --check -p dodb-storage
+git diff --check
+Exit status: 0
+Result: both checks passed with no output.
