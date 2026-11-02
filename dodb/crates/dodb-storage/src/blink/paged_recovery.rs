@@ -19,6 +19,22 @@ use super::version_index::{
     SourceFileKind, SourceIdentity, VersionDescriptor, VersionIndex, VersionIndexRoot,
     VersionLocator, VersionToken, WalFrameLocator,
 };
+#[cfg(feature = "blink-demand-paging")]
+use super::{PagedReadConfig, PagedReadHandle, page_cache, resource, source_manager};
+#[cfg(feature = "blink-demand-paging")]
+use std::sync::Arc;
+
+#[cfg(feature = "blink-demand-paging")]
+pub struct PagedRecoveryValidationConfig<F> {
+    pub tenant_id: u64,
+    pub root_page_id: dodb_core::PageId,
+    pub free_list_head: Option<dodb_core::PageId>,
+    pub high_water_page_id: dodb_core::PageId,
+    pub resources: resource::BlinkResourceManager,
+    pub sources: source_manager::SourceManager,
+    pub loader: page_cache::PageLoaderConfig,
+    pub header_length: F,
+}
 
 pub fn build_checkpoint_index(
     index: &VersionIndex,
@@ -362,6 +378,37 @@ impl<'index> PagedRecoveryIndexBuilder<'index> {
 
     pub fn current_root(&self) -> VersionIndexRoot {
         self.root
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    pub fn validate_recovered_pages<F>(
+        &self,
+        index: Arc<VersionIndex>,
+        config: PagedRecoveryValidationConfig<F>,
+    ) -> Result<u64>
+    where
+        F: Fn(SourceIdentity) -> Result<usize> + Send + Sync + 'static,
+    {
+        if !std::ptr::eq(Arc::as_ptr(&index), self.index) {
+            return Err(Error::invalid_input(
+                "paged recovery validation must use the builder index",
+            ));
+        }
+        let handle = PagedReadHandle::new(
+            PagedReadConfig {
+                tenant_id: config.tenant_id,
+                root: self.root,
+                root_page_id: config.root_page_id,
+                free_list_head: config.free_list_head,
+                high_water_page_id: config.high_water_page_id,
+                loader: config.loader,
+            },
+            index,
+            config.resources,
+            config.sources,
+            config.header_length,
+        )?;
+        handle.validate_all_indexed_pages()
     }
 
     pub fn apply_committed_locations<I>(&mut self, locations: I) -> Result<usize>
@@ -1014,25 +1061,35 @@ mod tests {
             wal_epoch: 11,
         };
         let index_directory = directory.path().join("index");
-        let index = VersionIndex::open(&index_directory, identity, resources(), 76, 2).unwrap();
+        let index =
+            Arc::new(VersionIndex::open(&index_directory, identity, resources(), 76, 2).unwrap());
         let page_id = PageId::new(2);
         let checkpoint_image = encode_blink_page(
             page_id,
-            &BlinkPage::Free {
+            &BlinkPage::Leaf {
                 lsn: Lsn::new(10),
-                next: None,
+                high_key: None,
+                right_sibling: None,
+                entries: super::super::LeafEntries::default(),
             },
         )
         .unwrap();
-        let second_page_id = PageId::new(5);
-        let second_checkpoint_image = encode_blink_page(
-            second_page_id,
-            &BlinkPage::Free {
-                lsn: Lsn::new(9),
-                next: None,
-            },
-        )
-        .unwrap();
+        let first_free_page_id = PageId::new(3);
+        let second_page_id = PageId::new(25);
+        let mut checkpoint_images = BTreeMap::from([(page_id, checkpoint_image)]);
+        for page_number in first_free_page_id.get()..=second_page_id.get() {
+            let free_page_id = PageId::new(page_number);
+            let next = (free_page_id < second_page_id).then(|| PageId::new(page_number + 1));
+            let free_image = encode_blink_page(
+                free_page_id,
+                &BlinkPage::Free {
+                    lsn: Lsn::new(9),
+                    next,
+                },
+            )
+            .unwrap();
+            checkpoint_images.insert(free_page_id, free_image);
+        }
         let pack_identity = wal_identity(identity);
         let mut pack_injector = None;
         let pack_output = BasePackJob {
@@ -1044,10 +1101,10 @@ mod tests {
             coalesce: true,
         }
         .run(
-            &BTreeMap::from([
-                (page_id, Arc::new(checkpoint_image)),
-                (second_page_id, Arc::new(second_checkpoint_image)),
-            ]),
+            &checkpoint_images
+                .iter()
+                .map(|(page_id, image)| (*page_id, Arc::new(*image)))
+                .collect(),
             &mut pack_injector,
         )
         .unwrap();
@@ -1069,7 +1126,7 @@ mod tests {
             file_number: 4,
             header_identity: [0x54; 32],
         };
-        let checkpoint_crc32c = crc32c::crc32c(&checkpoint_image);
+        let checkpoint_crc32c = crc32c::crc32c(&checkpoint_images[&page_id]);
         let base_root = index
             .insert(
                 index.empty_root(),
@@ -1132,7 +1189,7 @@ mod tests {
             identity,
             generation: 1,
             tree_root: page_id,
-            free_list_root: None,
+            free_list_root: Some(first_free_page_id),
             high_water_page_id: second_page_id,
             durable_index_root: checkpoint_root.node_reference().unwrap(),
             source_catalog_root: None,
@@ -1148,6 +1205,18 @@ mod tests {
         let wal_source_identity = wal_identity(identity);
         let wal_path = directory.path().join("wal");
         let wal_file = ProductionFile::open(&wal_path).unwrap();
+        let recovered_checkpoint_pages = checkpoint_images
+            .iter()
+            .map(|(checkpoint_page_id, checkpoint_page_image)| {
+                (
+                    *checkpoint_page_id,
+                    crate::wal::RecoveredWalPage {
+                        commit_lsn: Lsn::new(10),
+                        image: Box::new(*checkpoint_page_image),
+                    },
+                )
+            })
+            .collect();
         let mut wal = WalLog::open_with_segment_bases(
             wal_file,
             wal_source_identity,
@@ -1158,52 +1227,83 @@ mod tests {
                 truncate_torn_tail: true,
                 defer_initial_sync: false,
             },
-            std::collections::BTreeMap::from([(
-                page_id,
-                crate::wal::RecoveredWalPage {
-                    commit_lsn: Lsn::new(10),
-                    image: Box::new(checkpoint_image),
-                },
-            )]),
+            recovered_checkpoint_pages,
             None,
         )
         .unwrap();
-        let image = encode_blink_page(
+        let recovered_commit_lsn = Lsn::new(12);
+        let free_page_commit_lsn = Lsn::new(12 + (checkpoint_images.len() as u64 - 1) + 1);
+        let expected_image = encode_blink_page(
             page_id,
-            &BlinkPage::Free {
-                lsn: Lsn::new(12),
-                next: None,
+            &BlinkPage::Leaf {
+                lsn: recovered_commit_lsn,
+                high_key: None,
+                right_sibling: None,
+                entries: super::super::LeafEntries::default(),
             },
         )
         .unwrap();
-        let expected_image = image;
-        let eligible_commits = [true];
-        let mut base_source = |requested_page_id| {
-            (requested_page_id == page_id).then_some(Cow::Borrowed(&checkpoint_image))
-        };
+        let mut free_page_wal_images = Vec::with_capacity(checkpoint_images.len() - 1);
+        for (updated_page_id, checkpoint_page_image) in &checkpoint_images {
+            if *updated_page_id == page_id {
+                continue;
+            }
+            let decoded =
+                crate::blink::decode_blink_page(checkpoint_page_image, *updated_page_id).unwrap();
+            let BlinkPage::Free { next, .. } = decoded else {
+                panic!("unexpected paged recovery fixture page type");
+            };
+            let image = encode_blink_page(
+                *updated_page_id,
+                &BlinkPage::Free {
+                    lsn: free_page_commit_lsn,
+                    next,
+                },
+            )
+            .unwrap();
+            free_page_wal_images.push(WalPageImage {
+                page_id: *updated_page_id,
+                image,
+            });
+        }
+        let eligible_commits = [true, false];
+        let mut base_source =
+            |requested_page_id| checkpoint_images.get(&requested_page_id).map(Cow::Borrowed);
         let mut delta_request = WalDeltaRequest {
             eligible_commits: &eligible_commits,
             base_versions: None,
             base_source: &mut base_source,
         };
         wal.append_group_with_page_deltas(
-            &[WalCommit {
-                batch_id: 1,
-                commit_lsn: Lsn::new(12),
-                pages: vec![WalPageImage { page_id, image }],
-            }],
+            &[
+                WalCommit {
+                    batch_id: 1,
+                    commit_lsn: recovered_commit_lsn,
+                    pages: vec![WalPageImage {
+                        page_id,
+                        image: expected_image,
+                    }],
+                },
+                WalCommit {
+                    batch_id: 2,
+                    commit_lsn: free_page_commit_lsn,
+                    pages: free_page_wal_images,
+                },
+            ],
             &mut delta_request,
             None,
         )
         .unwrap();
         drop(wal);
         let wal_bytes = fs::read(&wal_path).unwrap();
+        assert!(wal_bytes.len() > crate::page::PAGE_SIZE * 2);
         let init_frame_length = u32::from_le_bytes(wal_bytes[8..12].try_into().unwrap()) as usize;
         let wal_header_identity = *blake3::hash(&wal_bytes[..init_frame_length]).as_bytes();
         let mut wal_file = ProductionFile::open(&wal_path).unwrap();
         drop(manifest_store);
         drop(index);
-        let index = VersionIndex::open(&index_directory, identity, resources(), 76, 2).unwrap();
+        let index =
+            Arc::new(VersionIndex::open(&index_directory, identity, resources(), 76, 2).unwrap());
         let mut manifest_store =
             PagedManifestStore::open_with_index(&manifest_database_path, identity, &index).unwrap();
         let manifest = manifest_store.current();
@@ -1281,7 +1381,7 @@ mod tests {
             .lookup(builder.current_root(), page_id)
             .unwrap()
             .unwrap();
-        assert_eq!(recovered.image_lsn, Lsn::new(12));
+        assert_eq!(recovered.image_lsn, recovered_commit_lsn);
         assert_eq!(recovered.image_crc32c, crc32c::crc32c(&expected_image));
         assert_eq!(
             recovered.token,
@@ -1290,9 +1390,59 @@ mod tests {
                 record_lsn: Lsn::new(11),
             }
         );
-        assert_eq!(summary.last_commit_lsn, Some(Lsn::new(12)));
+        assert_eq!(summary.last_commit_lsn, Some(free_page_commit_lsn));
         assert_eq!(summary.torn_tail_bytes, 0);
         assert_eq!(summary.source_header_identity, wal_header_identity);
+        let wal_source_path = directory
+            .path()
+            .join("segments/segment-00000000000000000001.wal");
+        fs::create_dir_all(wal_source_path.parent().unwrap()).unwrap();
+        fs::copy(&wal_path, &wal_source_path).unwrap();
+        let sources = SourceManager::new(
+            SourceManagerConfig {
+                store_identity: identity,
+                checkpoint_directory: directory.path().to_path_buf(),
+                wal_directory: wal_source_path.parent().unwrap().to_path_buf(),
+                scratch_directory: directory.path().join("validation-scratch"),
+                tenant_id: 76,
+                maximum_open_handles: 4,
+                maximum_roots: 4,
+                handle_charge_bytes: 128,
+                gc_reservation_bytes: 8192,
+            },
+            resources(),
+        )
+        .unwrap();
+        assert_eq!(
+            builder
+                .validate_recovered_pages(
+                    Arc::clone(&index),
+                    super::PagedRecoveryValidationConfig {
+                        tenant_id: 76,
+                        root_page_id: page_id,
+                        free_list_head: Some(first_free_page_id),
+                        high_water_page_id: second_page_id,
+                        resources: resources(),
+                        sources,
+                        loader: PageLoaderConfig {
+                            maximum_cache_bytes: (crate::page::PAGE_SIZE * 2) as u64,
+                            minimum_decoded_page_bytes: crate::page::PAGE_SIZE as u64,
+                            maximum_load_reconstruction_bytes: (crate::page::PAGE_SIZE * 4) as u64,
+                            maximum_concurrent_loads: 2,
+                            maximum_followers: 8,
+                        },
+                        header_length: |source: SourceIdentity| {
+                            Ok(if source.kind == SourceFileKind::WalSegment {
+                                crate::wal::INIT_FRAME_SIZE
+                            } else {
+                                crate::page::PAGE_SIZE
+                            })
+                        },
+                    },
+                )
+                .unwrap(),
+            24
+        );
         let restarted_wal = WalLog::open_with_segment_bases(
             ProductionFile::open(&wal_path).unwrap(),
             wal_identity(identity),
@@ -1307,7 +1457,7 @@ mod tests {
                 page_id,
                 crate::wal::RecoveredWalPage {
                     commit_lsn: Lsn::new(10),
-                    image: Box::new(checkpoint_image),
+                    image: Box::new(checkpoint_images[&page_id]),
                 },
             )]),
             None,
@@ -1355,7 +1505,7 @@ mod tests {
                     identity,
                     generation: 2,
                     tree_root: page_id,
-                    free_list_root: None,
+                    free_list_root: Some(first_free_page_id),
                     high_water_page_id: second_page_id,
                     durable_index_root: recovered_root.node_reference().unwrap(),
                     source_catalog_root: None,
