@@ -1021,11 +1021,24 @@ mod tests {
         let reference = store.write(8, &sample_chain()).unwrap();
         assert!(store.read(reference, PageId::new(6)).is_err());
         let path = directory.join("version-chain-00000000000000000001.bin");
-        let mut bytes = fs::read(&path).unwrap();
-        bytes[140] ^= 1;
-        fs::write(&path, &bytes).unwrap();
+        let original_bytes = fs::read(&path).unwrap();
+        let mut wrong_identity_bytes = original_bytes.clone();
+        wrong_identity_bytes[16] ^= 1;
+        let header_checksum = *blake3::hash(&wrong_identity_bytes[..80]).as_bytes();
+        wrong_identity_bytes[80..112].copy_from_slice(&header_checksum);
+        fs::write(&path, &wrong_identity_bytes).unwrap();
         assert!(store.read(reference, PageId::new(5)).is_err());
-        fs::write(&path, &bytes[..bytes.len() - 1]).unwrap();
+        let mut corrupted_bytes = original_bytes.clone();
+        corrupted_bytes[140] ^= 1;
+        fs::write(&path, &corrupted_bytes).unwrap();
+        assert!(store.read(reference, PageId::new(5)).is_err());
+        fs::write(&path, &original_bytes[..original_bytes.len() - 1]).unwrap();
+        assert!(store.read(reference, PageId::new(5)).is_err());
+        fs::write(&path, &original_bytes).unwrap();
+        let reopened_chain = store.read(reference, PageId::new(5)).unwrap();
+        assert_eq!(reopened_chain.page_id, sample_chain().page_id);
+        assert_eq!(reopened_chain.entries, sample_chain().entries);
+        fs::remove_file(&path).unwrap();
         assert!(store.read(reference, PageId::new(5)).is_err());
         fs::remove_dir_all(directory).unwrap();
     }

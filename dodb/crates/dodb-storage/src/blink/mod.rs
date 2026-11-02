@@ -17629,25 +17629,27 @@ mod tests {
             paged_manifest::PagedManifestStore::open_with_validated_pages(
                 &database_path,
                 store_identity,
-                Arc::clone(&reopened_index),
-                7,
-                resources.clone(),
-                reopened_sources.clone(),
-                page_cache::PageLoaderConfig {
-                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
-                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
-                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 10) as u64,
-                    maximum_concurrent_loads: 2,
-                    maximum_followers: 8,
-                },
-                |source| {
-                    Ok(
-                        if source.kind == version_index::SourceFileKind::WalSegment {
-                            crate::wal::INIT_FRAME_SIZE
-                        } else {
-                            PAGE_SIZE
-                        },
-                    )
+                paged_manifest::PagedValidatedOpenConfig {
+                    index: Arc::clone(&reopened_index),
+                    tenant_id: 7,
+                    resources: resources.clone(),
+                    sources: reopened_sources.clone(),
+                    loader: page_cache::PageLoaderConfig {
+                        maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                        minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                        maximum_load_reconstruction_bytes: (PAGE_SIZE * 10) as u64,
+                        maximum_concurrent_loads: 2,
+                        maximum_followers: 8,
+                    },
+                    header_length: |source: version_index::SourceIdentity| {
+                        Ok(
+                            if source.kind == version_index::SourceFileKind::WalSegment {
+                                crate::wal::INIT_FRAME_SIZE
+                            } else {
+                                PAGE_SIZE
+                            },
+                        )
+                    },
                 },
             )
             .unwrap();

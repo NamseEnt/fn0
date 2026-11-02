@@ -74,6 +74,15 @@ pub struct PagedManifestStore {
     broken: bool,
 }
 
+pub struct PagedValidatedOpenConfig<F> {
+    pub index: Arc<VersionIndex>,
+    pub tenant_id: u64,
+    pub resources: resource::BlinkResourceManager,
+    pub sources: source_manager::SourceManager,
+    pub loader: page_cache::PageLoaderConfig,
+    pub header_length: F,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum PagedManifestPointerStage {
     BeforeTemporaryCreate,
@@ -174,32 +183,29 @@ impl PagedManifestStore {
     pub fn open_with_validated_pages<F>(
         database_path: &Path,
         identity: StoreIdentity,
-        index: Arc<VersionIndex>,
-        tenant_id: u64,
-        resources: resource::BlinkResourceManager,
-        sources: source_manager::SourceManager,
-        loader: page_cache::PageLoaderConfig,
-        header_length: F,
+        config: PagedValidatedOpenConfig<F>,
     ) -> Result<(Self, PagedReadHandle)>
     where
         F: Fn(super::version_index::SourceIdentity) -> Result<usize> + Send + Sync + 'static,
     {
-        let store = Self::open_with_index(database_path, identity, &index)?;
+        let store = Self::open_with_index(database_path, identity, &config.index)?;
         let manifest = store.current;
-        let root = index.root_from_node_reference(manifest.durable_index_root)?;
+        let root = config
+            .index
+            .root_from_node_reference(manifest.durable_index_root)?;
         let handle = PagedReadHandle::open_with_indexed_page_validation(
             PagedReadConfig {
-                tenant_id,
+                tenant_id: config.tenant_id,
                 root,
                 root_page_id: manifest.tree_root,
                 free_list_head: manifest.free_list_root,
                 high_water_page_id: manifest.high_water_page_id,
-                loader,
+                loader: config.loader,
             },
-            index,
-            resources,
-            sources,
-            header_length,
+            config.index,
+            config.resources,
+            config.sources,
+            config.header_length,
         )?;
         Ok((store, handle))
     }
@@ -683,8 +689,8 @@ fn read_u64(bytes: &[u8], offset: usize) -> Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::{
-        CURRENT_POINTER_NAME, MANIFEST_BYTES, PagedManifest, PagedManifestStore, encode_manifest,
-        sidecar_directory, version_index_directory,
+        CURRENT_POINTER_NAME, MANIFEST_BYTES, PagedManifest, PagedManifestPointerStage,
+        PagedManifestStore, encode_manifest, sidecar_directory, version_index_directory,
     };
     use crate::blink::BlinkStore;
     use crate::blink::resource::{BlinkResourceManager, ResourceLimits};
@@ -889,6 +895,39 @@ mod tests {
         store.publish_with_hook(failed_manifest, || Ok(())).unwrap();
         assert_eq!(store.current().generation, 2);
         assert_eq!(store.current_file_number(), 3);
+    }
+
+    #[test]
+    fn pointer_publication_faults_cover_every_ordering_boundary() {
+        for stage in [
+            PagedManifestPointerStage::BeforeTemporaryCreate,
+            PagedManifestPointerStage::AfterTemporarySync,
+            PagedManifestPointerStage::AfterRename,
+            PagedManifestPointerStage::AfterDirectorySync,
+        ] {
+            let directory = TestDirectory::new("pointer-boundary");
+            let (identity, mut store) = write_manifest_store(&directory);
+            let next_manifest = manifest(identity, 2, 1);
+            let result =
+                store.publish_with_pointer_hook(next_manifest, || Ok(()), &mut |current_stage| {
+                    if current_stage == stage {
+                        Err(Error::durability("injected pointer ordering failure"))
+                    } else {
+                        Ok(())
+                    }
+                });
+            assert!(result.is_err(), "fault stage {stage:?} was not reached");
+            assert_eq!(store.current(), manifest(identity, 1, 0));
+            let reopened =
+                PagedManifestStore::open_unchecked(&directory.database_path(), identity).unwrap();
+            let expected_generation = match stage {
+                PagedManifestPointerStage::BeforeTemporaryCreate
+                | PagedManifestPointerStage::AfterTemporarySync => 1,
+                PagedManifestPointerStage::AfterRename
+                | PagedManifestPointerStage::AfterDirectorySync => 2,
+            };
+            assert_eq!(reopened.current().generation, expected_generation);
+        }
     }
 
     #[test]
