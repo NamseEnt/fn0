@@ -2,10 +2,10 @@
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on build directory
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.98s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.12s
      Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-70634b21c90c24df)
 
-running 317 tests
+running 319 tests
 test blink::page_cache::tests::all_pinned_cache_capacity_returns_overload ... ok
 test blink::page_cache::tests::cache_eviction_keeps_guard_charge_until_last_owner_drops ... ok
 test blink::page_cache::tests::cancelled_load_wakes_followers_and_releases_job_and_byte_reservations ... ok
@@ -36,7 +36,7 @@ test blink::paged_manifest::tests::durable_manifest_rejects_spill_nodes_and_reop
 test blink::paged_manifest::tests::failed_pointer_publication_keeps_selected_generation_and_orphan ... ok
 test blink::paged_manifest::tests::manifest_rejects_invalid_fields_before_writing ... ok
 test blink::paged_manifest::tests::marker_pointer_manifest_and_identity_corruption_fail_closed ... ok
-test blink::paged_manifest::tests::paged_manifest_pointer_publication_survives_sigkill ...
+test blink::paged_manifest::tests::paged_manifest_pointer_publication_survives_sigkill ... 
 running 1 test
 
 running 1 test
@@ -48,8 +48,14 @@ ok
 test blink::paged_manifest::tests::pointer_publication_faults_cover_every_ordering_boundary ... ok
 test blink::paged_manifest::tests::truncated_marker_pointer_and_manifest_fail_closed ... ok
 test blink::paged_manifest::tests::unknown_pointer_version_fails_closed ... ok
+test blink::paged_recovery::tests::active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit ... 
+running 1 test
+ok
 test blink::paged_recovery::tests::committed_images_and_deltas_stream_into_the_disk_index ... ok
 test blink::paged_recovery::tests::incremental_checkpoint_replaces_only_pages_newer_than_the_previous_checkpoint ... ok
+test blink::paged_recovery::tests::paged_base_pack_construction_survives_sigkill ... 
+running 1 test
+ok
 test blink::paged_recovery::tests::recovery_indexes_locations_from_an_actual_committed_wal ... ok
 test blink::paged_recovery::tests::recovery_rejects_locations_outside_the_manifest_or_committed_prefix ... ok
 test blink::resource::tests::bounded_wait_resumes_after_capacity_is_released ... ok
@@ -100,7 +106,7 @@ test blink::source_manager::tests::pending_catalog_publication_protects_recovery
 test blink::source_manager::tests::retained_disk_usage_survives_manager_drop_and_reopen_without_double_counting ... ok
 test blink::source_manager::tests::source_gc_preserves_reachable_files_across_unlink_fault_boundaries ... ok
 test blink::source_manager::tests::source_gc_rejects_scratch_quota_before_creating_markers ... ok
-test blink::source_manager::tests::source_gc_survives_sigkill_before_and_after_unlink ...
+test blink::source_manager::tests::source_gc_survives_sigkill_before_and_after_unlink ... 
 running 1 test
 
 running 1 test
@@ -336,4 +342,5 @@ test wal::tests::trusted_internal_valid_images_are_byte_identical_to_strict_imag
 test wal::tests::unsupported_version_is_rejected ... ok
 test wal::tests::wrong_magic_is_rejected ... ok
 
-test result: ok. 313 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 128.57s
+test result: ok. 315 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 128.64s
+

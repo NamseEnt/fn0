@@ -12,14 +12,15 @@
     "0c5104b3b",
     "72a88fb07",
     "72a88fb07",
-    "72a63c511"
+    "72a63c511",
+    "3f4847ed6"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "72a63c511"
+    "source_commit": "3f4847ed6"
   },
   "features": [
     "blink-demand-paging",
@@ -101,6 +102,30 @@
       "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' recovery_indexes_locations_from_an_actual_committed_wal -- --test-threads=1 --nocapture",
       "exit_status": 0,
       "result": "1 passed; actual WAL exceeds two-page cache, recovery indexes 24 pages, and bounded validation checks all allocated pages before publication"
+    },
+    {
+      "name": "active_wal_torn_tail_sigkill_recovery",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit -- --test-threads=1 --nocapture",
+      "exit_status": 0,
+      "result": "1 passed; child killed after page-image append before commit frame, reopen retained only the acknowledged commit and its image"
+    },
+    {
+      "name": "paged_base_pack_construction_sigkill",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_base_pack_construction_survives_sigkill -- --test-threads=1 --nocapture",
+      "exit_status": 0,
+      "result": "1 passed; child killed during checkpoint page write and scan_pack rejected the incomplete pack"
+    },
+    {
+      "name": "dodb_storage_full_library_suite_after_sigkill_cases",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1",
+      "exit_status": 0,
+      "result": "315 passed, 4 ignored; 0 failed"
+    },
+    {
+      "name": "background_materialization_timeout_focused_retry",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' background_materialization_keeps_committing_and_preserves_newer_suffix -- --test-threads=1",
+      "exit_status": 0,
+      "result": "1 passed after a full-suite attempt hit its five-second start timeout"
     }
   ],
   "source_hashes": {
@@ -108,7 +133,7 @@
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "20560bff3b3715642417335a71bd80e5990f8d157398dbbf4e1fa541dd7db6cd",
     "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "79623b7fe30e5c0337e167ce5032aef9b0c59e952893b0355f03c384e6becdc3",
     "dodb/crates/dodb-storage/src/blink/version_chain.rs": "819b7f9cff96ac9909d4f3e5e29433151328c33f25fd6c0ad4b212b0085cadad",
-    "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "15437248645f34824dabe117b94e073c5dcd1f2b8e844739415e3c2d2e7cb5e9"
+    "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "42c750672725f2ce591e01c6ce63e369c2e9d8d0f16f3c84b292993518dc4991"
   },
   "logs": [
     {
@@ -180,7 +205,7 @@
     {
       "name": "full_dodb_storage_library_suite_final",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-bounded-structure-full-lib-final.log",
-      "sha256": "117c2c82ccc1e8849e8bf09fa16ad7d1001a8154ea20b6fd8ceecef95830d54c",
+      "sha256": "4e963bf67a63749337c260589c210be0e5d55a1799b4828a8f97070b8a590080",
       "exit_status": 0
     },
     {
@@ -260,11 +285,53 @@
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/large-recovery-wal-page-count-failure.log",
       "sha256": "a82b602e145cf21b6a9b6c9e8f1b822a4e13ada20a9537684270e88ed6efb40d",
       "exit_status": 101
+    },
+    {
+      "name": "active_wal_torn_tail_sigkill",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-active-wal-sigkill.log",
+      "sha256": "6b6093b65b0af781d3a1574095a50977a38cf417018429705b1873cc9721fcb9",
+      "exit_status": 0
+    },
+    {
+      "name": "paged_base_pack_construction_sigkill",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-pack-construction-sigkill.log",
+      "sha256": "e7271e1e141c0b25262ebea1440728de68cb4bbcb84d12ba938db0e4c2197eec",
+      "exit_status": 0
+    },
+    {
+      "name": "background_materialization_focused_retry",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-background-materializer-retry.log",
+      "sha256": "911b0170d444121823906698d61efa7338c3a5be31268fe39dd1c35e24678d92",
+      "exit_status": 0
+    },
+    {
+      "name": "full_suite_background_materializer_timeout_preserved",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/full-suite-background-materializer-timeout.log",
+      "sha256": "f3d8f8cafffe9823f150fe4c1df7909f4196c45da41cf7a4df1d69e45548e5bc",
+      "exit_status": 101
+    },
+    {
+      "name": "active_wal_sigkill_initial_compile_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/active-wal-sigkill-initial-compile-failure.log",
+      "sha256": "ed87e35b4a08c3a78bdf0517018b662f20e085d36ad467db810d76255b06b022",
+      "exit_status": 101
+    },
+    {
+      "name": "active_wal_sigkill_tail_length_assertion_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/active-wal-sigkill-tail-length-failure.log",
+      "sha256": "688fb1d523c7ba0c1bd7926fdc2590a933765ed4e6ddf3ae792a679fe4cea648",
+      "exit_status": 101
+    },
+    {
+      "name": "pack_sigkill_initial_compile_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/pack-sigkill-initial-compile-failure.log",
+      "sha256": "e1fc528b5c927a2904e06ce3bae35ef7e9347af8a217bfe55eef1cc808b1dae1",
+      "exit_status": 101
     }
   ],
   "remaining_work": [
     "Route tenant service opening through complete bounded validation and prove failure cleanup as part of T12.",
-    "Complete real storage process-kill evidence for WAL-tail recovery, delta/base and pack construction, sidecar/index/manifest ordering, page reuse and pinned checkpoint races, and recovery-write-second-crash."
+    "Complete process-kill evidence for delta/base and sidecar/index/manifest ordering, page reuse and pinned checkpoint races, and recovery followed by a successful write and a second process crash."
   ],
   "next_task": "T11",
   "push": {

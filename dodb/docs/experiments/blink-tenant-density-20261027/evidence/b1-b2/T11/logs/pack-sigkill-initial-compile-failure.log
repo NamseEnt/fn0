@@ -1,0 +1,8 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_base_pack_construction_survives_sigkill -- --test-threads=1 --nocapture
+Exit status: 101
+error[E0107]: enum takes 2 generic arguments but 1 generic argument was supplied
+   --> dodb/crates/dodb-storage/src/blink/paged_recovery.rs:809:43
+    |
+809 |         fn hit(&mut self, point: &str) -> Result<()> {
+    |                                           ^^^^^^ -- supplied 1 generic argument
+error: could not compile `dodb-storage` (lib test) due to 1 previous error

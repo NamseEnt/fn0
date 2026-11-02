@@ -1,0 +1,6 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit -- --test-threads=1 --nocapture
+Exit status: 101
+thread 'blink::paged_recovery::tests::active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit' panicked:
+assertion `left == right` failed
+  left: 8484
+ right: 4328

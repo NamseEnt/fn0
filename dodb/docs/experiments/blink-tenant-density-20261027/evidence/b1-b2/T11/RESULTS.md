@@ -16,10 +16,10 @@ Storage tests cover all four paged manifest pointer publication fault boundaries
 
 - `rustfmt --edition 2024 --check crates/dodb-storage/src/blink/paged_recovery.rs crates/dodb-storage/src/blink/paged_manifest.rs crates/dodb-storage/src/blink/version_chain.rs crates/dodb-storage/src/blink/source_manager.rs crates/dodb-storage/src/blink/mod.rs`: passed.
 - Focused paged validation, recovery streaming validation, manifest validated-open, pointer and source-GC `SIGKILL` boundaries, and delta-chain sidecar regressions: passed.
-- `cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1`: passed, 313 tests; 4 ignored.
+- `cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1`: passed, 315 tests; 4 ignored. A preceding full-suite attempt hit the existing background-materialization test's five-second start timeout; its focused retry and this full-suite rerun passed.
 - `git diff --check`: passed.
 - Strict Clippy remains blocked by 12 diagnostics in existing code in `blink/mod.rs` and `wal.rs`; none point to the new recovery validation API, bounded validator, validated-open API, or `source_manager.rs`. No lint suppression was added.
 
 ## Remaining T11 Work
 
-The bounded checker is integrated with explicit paged manifest opening and WAL recovery validation. Service tenant opening will route through the validated path as part of T12. The remaining T11 gap is process-kill evidence for WAL-tail recovery, delta/base and pack construction, sidecar/index/manifest ordering, page reuse and pinned checkpoint races, and recovery followed by a write and a second process crash. Existing fault-injection tests are supporting coverage and do not replace those process-kill cases. T11 remains partial until those gates pass.
+The bounded checker is integrated with explicit paged manifest opening and WAL recovery validation. Service tenant opening will route through the validated path as part of T12. Additional process-kill cases now cover an active WAL interrupted before its commit frame and paged base-pack construction. The remaining T11 gap is process-kill evidence for delta/base and sidecar/index/manifest ordering, page reuse and pinned checkpoint races, and recovery followed by a write and a second process crash. Existing fault-injection tests are supporting coverage and do not replace those process-kill cases. T11 remains partial until those gates pass.

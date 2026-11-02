@@ -1,0 +1,11 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit -- --test-threads=1 --nocapture
+Exit status: 101
+warning: variable does not need to be mutable
+error[E0382]: use of moved value: `wal_identity`
+   --> dodb/crates/dodb-storage/src/blink/paged_recovery.rs:981:13
+    |
+917 |             wal_identity,
+    |             ------------ value moved here
+981 |             wal_identity,
+    |             ^^^^^^^^^^^^ value used here after move
+error: could not compile `dodb-storage` (lib test) due to 1 previous error
