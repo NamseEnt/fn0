@@ -1,0 +1,5 @@
+Test: tests::paged_service_rejects_missing_or_corrupt_reachable_checkpoint_sources
+Configuration: blink-demand-paging enabled; A1 disabled; SegmentedBases coalesce=false; writable paged service; one acknowledged key followed by a complete checkpoint
+Fault: flipped the final byte of the latest checkpoint pack
+Observed result: the service reopened and returned the acknowledged value, so the test correctly failed. The mutated final byte was not a reachable page frame and did not prove reachable-source corruption rejection.
+The database is preserved unchanged from the failed test process. The corrected test mutates a byte inside the first page frame and separately removes the reachable pack.

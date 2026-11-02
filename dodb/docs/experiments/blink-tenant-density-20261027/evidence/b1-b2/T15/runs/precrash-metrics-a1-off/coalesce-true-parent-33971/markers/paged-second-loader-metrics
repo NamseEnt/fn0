@@ -1,0 +1,11 @@
+cache_misses=140
+evictions=132
+source_reads=140
+wal_reconstructions=21
+cache_peak_bytes=32768
+active_loads=0
+active_followers=0
+memory_peak_total=1172958
+memory_peak_by_category=[32768, 1070848, 69692, 167, 131072, 0, 12288]
+disk_peak_total=3987049
+disk_peak_by_category=[300596, 0, 3227648, 2112, 458764]

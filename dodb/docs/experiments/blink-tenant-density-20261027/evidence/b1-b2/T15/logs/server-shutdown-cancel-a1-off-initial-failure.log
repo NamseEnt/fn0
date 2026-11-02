@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-300bb259f2fc591f)
+
+running 1 test
+checkpoint shutdown peaks coalesce=false: memory_total=348636 memory_categories=[4096, 267264, 5120, 312, 168764, 36864, 65536] disk_total=1327412 disk_categories=[8656, 1048320, 262144, 96, 8196]
+
+thread 'tests::paged_service_shutdown_cancels_checkpoint_waiting_for_disk_capacity' (444893443) panicked at dodb/crates/dodb-server/src/lib.rs:8042:13:
+paged checkpoint shutdown retained memory charges: ResourceSnapshot { current_by_category: [4096, 266752, 0, 0, 0, 0, 0], peak_by_category: [4096, 267264, 5120, 312, 168764, 36864, 65536], current_total: 270848, peak_total: 348636, current_progress: 0, peak_progress: 65536, active_tenants: 1, pending_waiters: 0, rejected_reservations: 0 }; database retained at /Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/runs/shutdown-cancel-failure-replay/.tmpfNgmBk
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::paged_service_shutdown_cancels_checkpoint_waiting_for_disk_capacity ... FAILED
+
+failures:
+
+failures:
+    tests::paged_service_shutdown_cancels_checkpoint_waiting_for_disk_capacity
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 52 filtered out; finished in 0.23s
+
+error: test failed, to rerun pass `-p dodb-server --lib`

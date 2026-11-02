@@ -1,0 +1,29 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.38s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-300bb259f2fc591f)
+
+running 6 tests
+test tests::paged_service_backpressures_writes_at_checkpoint_debt_limit ... ok
+test tests::paged_service_opens_recovered_store_for_get_query_and_scan ... ok
+test tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes ... 
+running 1 test
+paged service loader metrics: cache_misses=97 evictions=89 source_reads=97 wal_reconstructions=57 cache_peak_bytes=32768 active_loads=0 active_followers=0
+paged service resource peaks: memory_total=3184674 memory_categories=[32768, 2110976, 69692, 4383, 821248, 151552, 65536] disk_total=4052188 disk_categories=[325668, 155652, 3735552, 3552, 315400]
+
+running 1 test
+paged service loader metrics: cache_misses=140 evictions=132 source_reads=140 wal_reconstructions=21 cache_peak_bytes=32768 active_loads=0 active_followers=0
+paged service resource peaks: memory_total=1172958 memory_categories=[32768, 1070848, 69692, 167, 131072, 0, 12288] disk_total=3987049 disk_categories=[300596, 0, 3227648, 2112, 458764]
+
+running 1 test
+paged service loader metrics: cache_misses=97 evictions=89 source_reads=97 wal_reconstructions=57 cache_peak_bytes=32768 active_loads=0 active_followers=0
+paged service resource peaks: memory_total=3184674 memory_categories=[32768, 2110976, 69692, 4383, 821248, 151552, 65536] disk_total=4052188 disk_categories=[325668, 155652, 3735552, 3552, 315400]
+
+running 1 test
+paged service loader metrics: cache_misses=140 evictions=132 source_reads=140 wal_reconstructions=21 cache_peak_bytes=32768 active_loads=0 active_followers=0
+paged service resource peaks: memory_total=1172958 memory_categories=[32768, 1070848, 69692, 167, 131072, 0, 12288] disk_total=3987049 disk_categories=[300596, 0, 3227648, 2112, 458764]
+ok
+test tests::paged_service_query_keeps_one_snapshot_across_concurrent_multi_key_commit ... ok
+test tests::paged_service_rejects_missing_or_corrupt_reachable_checkpoint_sources ... ok
+test tests::paged_service_shutdown_cancels_checkpoint_waiting_for_disk_capacity ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 12.07s
+

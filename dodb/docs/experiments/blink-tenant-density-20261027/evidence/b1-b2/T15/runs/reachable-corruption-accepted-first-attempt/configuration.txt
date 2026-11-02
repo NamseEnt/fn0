@@ -1,0 +1,12 @@
+test_name=tests::paged_service_rejects_missing_or_corrupt_reachable_checkpoint_sources
+source_commit=dbb965abe
+features=blink-demand-paging
+A1=disabled
+tenant_id=760
+wal_layout=SegmentedBases
+coalesce=false
+checkpoint_policy=WalBytesThreshold(u64::MAX)
+checkpoint_execution=Background
+page_cache_bytes=2097152
+operation=put acknowledged value, checkpoint, shutdown, flip final byte of latest base pack, reopen, get same key
+observed=service returned the acknowledged value; the changed byte was outside the reachable page frame

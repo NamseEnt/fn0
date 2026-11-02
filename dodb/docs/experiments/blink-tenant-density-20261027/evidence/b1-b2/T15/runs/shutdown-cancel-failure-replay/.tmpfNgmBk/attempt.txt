@@ -1,0 +1,1 @@
+The real-service checkpoint shutdown case still had a 270848-byte memory charge after service shutdown because the test retained cloned shard and writable handles. Both references are dropped before asserting zero remaining charges in the corrected test.

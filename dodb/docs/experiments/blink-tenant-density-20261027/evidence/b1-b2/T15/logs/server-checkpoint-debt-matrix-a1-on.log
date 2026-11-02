@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-031d8b1dd7637aa0)
+
+running 1 test
+checkpoint debt recovery peaks coalesce=false: memory_total=570880 memory_categories=[8192, 538112, 4156, 301, 168730, 36864, 65536] disk_total=279092 disk_categories=[8656, 8196, 262144, 96, 20488]
+checkpoint debt recovery peaks coalesce=true: memory_total=570880 memory_categories=[8192, 538112, 4156, 301, 168730, 36864, 65536] disk_total=279092 disk_categories=[8656, 8196, 262144, 96, 20488]
+test tests::paged_service_backpressures_writes_at_checkpoint_debt_limit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 52 filtered out; finished in 0.78s
+

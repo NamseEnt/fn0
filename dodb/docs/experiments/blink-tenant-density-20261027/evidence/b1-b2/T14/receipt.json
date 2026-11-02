@@ -31,8 +31,8 @@
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-paging-library-source-reads-final.log"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-server/src/lib.rs": "be581b3f9c79fb01e72c7f5c9ed3d63c792036aca64d5bdb244c65fa569c577e",
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "19d8ee35c828b6e0f74084a4c1da4cebcb5f223cdcb5352c7a95341f35f458b8",
+    "dodb/crates/dodb-server/src/lib.rs": "a2097eeb25897a8dc0769ec36c7a59224fe16c9f5ad3e014881ad471c24a46ff",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "679ec3c80307b23aa105360b4cc4722b48aabea06879ec4cb99775cbf115fd3d",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "e267412905cb2f2e82138dfcc0fc4c21c5f899966557cf26e16dcd7e09a9cd29",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/RESULTS.md": "49fd36cff6c17ef46ab1dea441886479cc593643cd130aa15dcfbbded0b2ccc8",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-library-old-reader-lifecycle.log": "b1a4eb016d8cec1f9f30a8b3cd579e16d8d1cdd8abe7719d1b79ffdef26adc1d",
@@ -334,5 +334,5 @@
     "Do not start T17 comparison until T15 and T16 acceptance plus separate experiment execution authorization."
   ],
   "next_task": "T15",
-  "follow_up_source_commit": "9e31aa815fce94ec02991da45e20b2ccf85eab02"
+  "follow_up_source_commit": "0e4891e55"
 }

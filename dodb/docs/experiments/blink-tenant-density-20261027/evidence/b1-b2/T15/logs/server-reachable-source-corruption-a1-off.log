@@ -1,0 +1,19 @@
+   Compiling dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.41s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-300bb259f2fc591f)
+
+running 1 test
+
+thread 'tests::paged_service_rejects_missing_or_corrupt_reachable_checkpoint_sources' (444863214) panicked at dodb/crates/dodb-server/src/lib.rs:7783:21:
+paged service accepted a corrupt reachable source with coalesce=false; retained database at /var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/.tmpLpMFUH
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::paged_service_rejects_missing_or_corrupt_reachable_checkpoint_sources ... FAILED
+
+failures:
+
+failures:
+    tests::paged_service_rejects_missing_or_corrupt_reachable_checkpoint_sources
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 52 filtered out; finished in 0.55s
+
+error: test failed, to rerun pass `-p dodb-server --lib`
