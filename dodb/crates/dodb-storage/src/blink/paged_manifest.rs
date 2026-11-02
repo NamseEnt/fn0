@@ -1020,6 +1020,140 @@ mod tests {
     }
 
     #[test]
+    fn durable_index_nodes_before_manifest_pointer_survive_sigkill() {
+        const CHILD_DIRECTORY: &str = "DODB_INDEX_BEFORE_MANIFEST_SIGKILL_DIRECTORY";
+        const CHILD_READY: &str = "DODB_INDEX_BEFORE_MANIFEST_SIGKILL_READY";
+        let identity = StoreIdentity {
+            database_uuid: [0x35; 16],
+            wal_epoch: 21,
+        };
+        if let Ok(directory_path) = std::env::var(CHILD_DIRECTORY) {
+            let directory = TestDirectory(PathBuf::from(directory_path));
+            let index = VersionIndex::open(
+                &version_index_directory(&directory.database_path()),
+                identity,
+                resource_manager(),
+                71,
+                4,
+            )
+            .unwrap();
+            let mut manifest_store =
+                PagedManifestStore::open_with_index(&directory.database_path(), identity, &index)
+                    .unwrap();
+            let initial_node = manifest_store.current().durable_index_root;
+            let initial_root = index.root_from_node_reference(initial_node).unwrap();
+            let page_id = PageId::new(2);
+            let mut next_descriptor = index.lookup(initial_root, page_id).unwrap().unwrap();
+            next_descriptor.image_lsn = Lsn::new(11);
+            next_descriptor.image_crc32c = 100;
+            if let VersionLocator::CheckpointImage {
+                source,
+                offset,
+                source_length,
+                ..
+            } = next_descriptor.locator
+            {
+                next_descriptor.locator = VersionLocator::CheckpointImage {
+                    source,
+                    offset,
+                    source_length,
+                    image_lsn: Lsn::new(11),
+                    image_crc32c: 100,
+                };
+            } else {
+                panic!("initial descriptor does not reference a checkpoint image");
+            }
+            let next_root = index
+                .insert(initial_root, page_id, next_descriptor)
+                .unwrap();
+            let next_durable_root = index.promote_root_to_durable(next_root).unwrap();
+            let mut next_manifest = manifest(identity, 2, 1);
+            next_manifest.durable_index_root = next_durable_root.node_reference().unwrap();
+            let ready_path = PathBuf::from(std::env::var(CHILD_READY).unwrap());
+            let _ = manifest_store.publish_with_index_and_hook(next_manifest, &index, |stage| {
+                if stage == PagedManifestPointerStage::AfterTemporarySync {
+                    fs::write(&ready_path, b"ready")?;
+                    loop {
+                        thread::sleep(Duration::from_secs(1));
+                    }
+                }
+                Ok(())
+            });
+            panic!("child publication passed the pre-rename manifest boundary");
+        }
+
+        let directory = TestDirectory::new("index-before-manifest-sigkill");
+        let (index, _, initial_node) = build_index(&directory, identity);
+        let mut initial_manifest = manifest(identity, 1, 0);
+        initial_manifest.durable_index_root = initial_node;
+        PagedManifestStore::create_with_index(&directory.database_path(), initial_manifest, &index)
+            .unwrap();
+        drop(index);
+        let ready_path = directory.0.join("ready");
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "blink::paged_manifest::tests::durable_index_nodes_before_manifest_pointer_survive_sigkill",
+                "--nocapture",
+            ])
+            .env(CHILD_DIRECTORY, &directory.0)
+            .env(CHILD_READY, &ready_path)
+            .spawn()
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !ready_path.exists() && Instant::now() < deadline {
+            if let Some(status) = child.try_wait().unwrap() {
+                panic!("SIGKILL child exited before pre-rename pointer boundary: {status}");
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
+        assert!(
+            ready_path.exists(),
+            "child did not reach pre-rename pointer boundary"
+        );
+        assert_eq!(
+            unsafe { libc::kill(child.id() as libc::pid_t, libc::SIGKILL) },
+            0
+        );
+        let status = child.wait().unwrap();
+        use std::os::unix::process::ExitStatusExt;
+        assert_eq!(status.signal(), Some(libc::SIGKILL));
+
+        let index = VersionIndex::open(
+            &version_index_directory(&directory.database_path()),
+            identity,
+            resource_manager(),
+            71,
+            4,
+        )
+        .unwrap();
+        let reopened =
+            PagedManifestStore::open_with_index(&directory.database_path(), identity, &index)
+                .unwrap();
+        assert_eq!(reopened.current().generation, 1);
+        assert_eq!(reopened.current().durable_index_root, initial_node);
+        let selected_root = index
+            .root_from_node_reference(reopened.current().durable_index_root)
+            .unwrap();
+        assert_eq!(
+            index
+                .lookup(selected_root, PageId::new(2))
+                .unwrap()
+                .unwrap()
+                .image_lsn,
+            Lsn::ZERO
+        );
+        assert!(
+            fs::read_dir(version_index_directory(&directory.database_path()))
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_name().to_string_lossy().ends_with(".node"))
+                .count()
+                > 1
+        );
+    }
+
+    #[test]
     fn marker_pointer_manifest_and_identity_corruption_fail_closed() {
         let directory = TestDirectory::new("corruption");
         let (identity, store) = write_manifest_store(&directory);
