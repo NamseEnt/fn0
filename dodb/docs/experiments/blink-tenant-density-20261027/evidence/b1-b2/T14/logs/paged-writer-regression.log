@@ -1,0 +1,51 @@
+   Compiling dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.57s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-300bb259f2fc591f)
+
+running 1 test
+test tests::paged_writer_service_commits_and_recovers_service_requests ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out; finished in 0.31s
+
+     Running unittests src/main.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-bf77211b461419f6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/background_checkpoint.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/background_checkpoint-79f6f4d929499692)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/blink_wal_checkpoint.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/blink_wal_checkpoint-2dfeea053bccdda0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/blink_writer_pin_reuse.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/blink_writer_pin_reuse-b438049e43d18333)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/durable_base_checkpoint.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/durable_base_checkpoint-2851492cc7fb5bc8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/phase6_quic.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/phase6_quic-c17bcee5301b2748)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+     Running tests/startup_smoke.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/startup_smoke-eccfe0dfb3ff3734)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+

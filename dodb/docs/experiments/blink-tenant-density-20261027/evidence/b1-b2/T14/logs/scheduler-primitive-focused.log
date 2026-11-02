@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (target/debug/deps/dodb_server-5a83d6c3f6b87b47)
+
+running 2 tests
+test physical_checkpoint::tests::fair_ready_queue_drops_idle_failed_and_cancelled_tickets ... ok
+test physical_checkpoint::tests::fair_ready_queue_deduplicates_tickets_and_bounds_turn_wait ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
+

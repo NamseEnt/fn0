@@ -2380,7 +2380,6 @@ impl BlinkTenantService {
                             },
                             Arc::clone(&self.checkpoint_metrics),
                             Arc::clone(&self.coordinator_activity),
-                            #[cfg(feature = "blink-demand-paging")]
                             tenant.get(),
                             #[cfg(feature = "blink-demand-paging")]
                             self.shared_resources.clone(),
@@ -2656,7 +2655,7 @@ impl AsyncBlinkShard {
         physical_config: Option<physical_checkpoint::PhysicalCheckpointConfig>,
         checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
         activity: Arc<CoordinatorActivity>,
-        #[cfg(feature = "blink-demand-paging")] tenant_id: u64,
+        tenant_id: u64,
         #[cfg(feature = "blink-demand-paging")] foreground_resources: Option<
             dodb_storage::blink::resource::BlinkResourceManager,
         >,
@@ -2682,6 +2681,7 @@ impl AsyncBlinkShard {
                     physical_checkpoint::CoordinatorSettings {
                         grouping: config,
                         policy: checkpoint_policy,
+                        tenant_id,
                         physical: physical_config,
                         metrics: checkpoint_metrics,
                         activity: coordinator_activity,

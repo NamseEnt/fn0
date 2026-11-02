@@ -1,0 +1,12 @@
+   Compiling dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.60s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-5a83d6c3f6b87b47)
+
+running 4 tests
+test physical_checkpoint::tests::fair_ready_queue_drops_idle_failed_and_cancelled_tickets ... ok
+test physical_checkpoint::tests::fair_ready_queue_deduplicates_tickets_and_bounds_turn_wait ... ok
+test physical_checkpoint::tests::cancelled_checkpoint_waiter_releases_its_ready_ticket ... ok
+test physical_checkpoint::tests::shared_checkpoint_capacity_serves_waiters_in_ticket_order ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
+

@@ -1,8 +1,9 @@
 use super::*;
 use dodb_storage::{BlinkCheckpointOutput, BlinkCheckpointReport, BlinkStore};
+use std::collections::{HashSet, VecDeque};
 use std::sync::OnceLock;
 use std::sync::atomic::AtomicBool;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio::task::{JoinError, JoinHandle};
 
 type Store = BlinkStore<ProductionFile, ProductionFile>;
@@ -10,7 +11,172 @@ type WorkerResult = Result<Result<BlinkCheckpointOutput, Error>, JoinError>;
 
 static TASK_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
-static CHECKPOINT_CAPACITY: OnceLock<Arc<Semaphore>> = OnceLock::new();
+static CHECKPOINT_CAPACITY: OnceLock<Arc<FairCheckpointScheduler>> = OnceLock::new();
+
+#[derive(Default)]
+pub(super) struct FairTenantReadyQueue {
+    ready: VecDeque<u64>,
+    pending: HashSet<u64>,
+}
+
+impl FairTenantReadyQueue {
+    pub(super) fn enqueue(&mut self, tenant: u64) -> bool {
+        if !self.pending.insert(tenant) {
+            return false;
+        }
+        self.ready.push_back(tenant);
+        true
+    }
+
+    pub(super) fn take_next(&mut self) -> Option<u64> {
+        let tenant = self.ready.pop_front()?;
+        self.pending.remove(&tenant);
+        Some(tenant)
+    }
+
+    pub(super) fn cancel(&mut self, tenant: u64) -> bool {
+        if !self.pending.remove(&tenant) {
+            return false;
+        }
+        self.ready.retain(|ready_tenant| *ready_tenant != tenant);
+        true
+    }
+
+    #[cfg(test)]
+    fn is_pending(&self, tenant: u64) -> bool {
+        self.pending.contains(&tenant)
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.ready.len()
+    }
+
+    fn front(&self) -> Option<u64> {
+        self.ready.front().copied()
+    }
+}
+
+#[derive(Default)]
+struct FairCheckpointState {
+    ready: FairTenantReadyQueue,
+    active: Option<u64>,
+}
+
+struct FairCheckpointScheduler {
+    state: StdMutex<FairCheckpointState>,
+    generation: watch::Sender<u64>,
+}
+
+impl FairCheckpointScheduler {
+    fn new() -> Self {
+        let (generation, _) = watch::channel(0);
+        Self {
+            state: StdMutex::new(FairCheckpointState::default()),
+            generation,
+        }
+    }
+
+    fn signal(&self) {
+        self.generation.send_modify(|generation| {
+            *generation = generation.wrapping_add(1);
+        });
+    }
+
+    fn try_acquire(self: &Arc<Self>, tenant: u64) -> Option<CheckpointCapacityPermit> {
+        let mut state = self.state.lock().ok()?;
+        if state.active.is_some() || state.ready.len() > 0 {
+            return None;
+        }
+        state.active = Some(tenant);
+        Some(CheckpointCapacityPermit {
+            scheduler: Arc::clone(self),
+            tenant,
+        })
+    }
+
+    async fn acquire(self: &Arc<Self>, tenant: u64) -> Result<CheckpointCapacityPermit, Error> {
+        let mut generation = self.generation.subscribe();
+        {
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|_| Error::invariant("checkpoint scheduler lock poisoned"))?;
+            if !state.ready.enqueue(tenant) {
+                return Err(Error::invariant(
+                    "tenant already has a pending checkpoint ticket",
+                ));
+            }
+        }
+        self.signal();
+        let mut ticket = CheckpointWaitTicket {
+            scheduler: Arc::clone(self),
+            tenant,
+            pending: true,
+        };
+        loop {
+            let _ = *generation.borrow_and_update();
+            {
+                let mut state = self
+                    .state
+                    .lock()
+                    .map_err(|_| Error::invariant("checkpoint scheduler lock poisoned"))?;
+                if state.active.is_none() && state.ready.front() == Some(tenant) {
+                    let selected = state.ready.take_next();
+                    if selected != Some(tenant) {
+                        return Err(Error::invariant(
+                            "checkpoint scheduler selected a different tenant",
+                        ));
+                    }
+                    state.active = Some(tenant);
+                    ticket.pending = false;
+                    return Ok(CheckpointCapacityPermit {
+                        scheduler: Arc::clone(self),
+                        tenant,
+                    });
+                }
+            }
+            generation
+                .changed()
+                .await
+                .map_err(|_| Error::durability("checkpoint scheduler notification closed"))?;
+        }
+    }
+}
+
+struct CheckpointWaitTicket {
+    scheduler: Arc<FairCheckpointScheduler>,
+    tenant: u64,
+    pending: bool,
+}
+
+impl Drop for CheckpointWaitTicket {
+    fn drop(&mut self) {
+        if self.pending
+            && let Ok(mut state) = self.scheduler.state.lock()
+            && state.ready.cancel(self.tenant)
+        {
+            drop(state);
+            self.scheduler.signal();
+        }
+    }
+}
+
+struct CheckpointCapacityPermit {
+    scheduler: Arc<FairCheckpointScheduler>,
+    tenant: u64,
+}
+
+impl Drop for CheckpointCapacityPermit {
+    fn drop(&mut self) {
+        if let Ok(mut state) = self.scheduler.state.lock()
+            && state.active == Some(self.tenant)
+        {
+            state.active = None;
+            drop(state);
+            self.scheduler.signal();
+        }
+    }
+}
 
 pub(super) struct PhysicalCheckpointConfig {
     pub execution: BlinkCheckpointExecution,
@@ -20,6 +186,7 @@ pub(super) struct PhysicalCheckpointConfig {
 pub(super) struct CoordinatorSettings {
     pub grouping: CoordinatorConfig,
     pub policy: BlinkCheckpointPolicy,
+    pub tenant_id: u64,
     pub physical: PhysicalCheckpointConfig,
     pub metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
     pub activity: Arc<CoordinatorActivity>,
@@ -30,7 +197,7 @@ pub(super) struct CoordinatorSettings {
 
 struct RunningCheckpoint {
     worker: JoinHandle<Result<BlinkCheckpointOutput, Error>>,
-    _permit: OwnedSemaphorePermit,
+    _permit: CheckpointCapacityPermit,
     _activity: CoordinatorActivityGuard,
     started_unix_nanos: u128,
     started: Instant,
@@ -128,8 +295,8 @@ impl PhysicalCoordinator {
         self.metrics(|metrics| metrics.checkpoint_request_cancelled(wait_nanos));
     }
 
-    fn semaphore() -> Arc<Semaphore> {
-        Arc::clone(CHECKPOINT_CAPACITY.get_or_init(|| Arc::new(Semaphore::new(1))))
+    fn scheduler() -> Arc<FairCheckpointScheduler> {
+        Arc::clone(CHECKPOINT_CAPACITY.get_or_init(|| Arc::new(FairCheckpointScheduler::new())))
     }
 
     async fn run_loop(&mut self) -> Result<(), Error> {
@@ -143,12 +310,10 @@ impl PhysicalCoordinator {
             }
             if self.running.is_none() && self.requested {
                 if self.settings.physical.execution == BlinkCheckpointExecution::Sync {
-                    let permit = Self::semaphore()
-                        .acquire_owned()
-                        .await
-                        .map_err(|_| Error::durability("checkpoint capacity closed"))?;
+                    let permit = Self::scheduler().acquire(self.settings.tenant_id).await?;
                     self.start(permit).await?;
-                } else if let Ok(permit) = Self::semaphore().try_acquire_owned() {
+                } else if let Some(permit) = Self::scheduler().try_acquire(self.settings.tenant_id)
+                {
                     self.start(permit).await?;
                 }
             }
@@ -170,9 +335,10 @@ impl PhysicalCoordinator {
                     entry = self.requests.recv() => entry,
                 }
             } else if self.requested {
+                let scheduler = Self::scheduler();
                 tokio::select! {
-                    permit = Self::semaphore().acquire_owned() => {
-                        self.start(permit.map_err(|_| Error::durability("checkpoint capacity closed"))?).await?;
+                    permit = scheduler.acquire(self.settings.tenant_id) => {
+                        self.start(permit?).await?;
                         continue;
                     }
                     entry = self.requests.recv() => entry,
@@ -185,10 +351,7 @@ impl PhysicalCoordinator {
                     self.finish(None).await?;
                 }
                 if self.requested {
-                    let permit = Self::semaphore()
-                        .acquire_owned()
-                        .await
-                        .map_err(|_| Error::durability("checkpoint capacity closed"))?;
+                    let permit = Self::scheduler().acquire(self.settings.tenant_id).await?;
                     self.start(permit).await?;
                     if self.running.is_some() {
                         self.finish(None).await?;
@@ -213,10 +376,7 @@ impl PhysicalCoordinator {
                         if self.running.is_some() {
                             self.finish(None).await?;
                         } else {
-                            let permit = Self::semaphore()
-                                .acquire_owned()
-                                .await
-                                .map_err(|_| Error::durability("checkpoint capacity closed"))?;
+                            let permit = Self::scheduler().acquire(self.settings.tenant_id).await?;
                             self.start(permit).await?;
                             if self.running.is_some() {
                                 self.finish(None).await?;
@@ -360,7 +520,7 @@ impl PhysicalCoordinator {
         Ok(())
     }
 
-    async fn start(&mut self, permit: OwnedSemaphorePermit) -> Result<(), Error> {
+    async fn start(&mut self, permit: CheckpointCapacityPermit) -> Result<(), Error> {
         let started = Instant::now();
         let started_unix_nanos = unix_nanos();
         let mut store = self.store.take().unwrap();
@@ -552,4 +712,109 @@ fn unix_nanos() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |duration| duration.as_nanos())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{FairCheckpointScheduler, FairTenantReadyQueue};
+    use std::sync::Arc;
+
+    async fn wait_until_pending(scheduler: &FairCheckpointScheduler, tenant: u64) {
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                let pending = scheduler.state.lock().unwrap().ready.is_pending(tenant);
+                if pending {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+    }
+
+    #[test]
+    fn fair_ready_queue_deduplicates_tickets_and_bounds_turn_wait() {
+        let mut queue = FairTenantReadyQueue::default();
+        for tenant in [11, 22, 33, 44] {
+            assert!(queue.enqueue(tenant));
+        }
+        assert!(!queue.enqueue(22));
+        assert_eq!(queue.len(), 4);
+
+        for expected_tenant in [11, 22, 33, 44, 11, 22, 33, 44] {
+            let tenant = queue.take_next().unwrap();
+            assert_eq!(tenant, expected_tenant);
+            assert!(queue.enqueue(tenant));
+        }
+        assert_eq!(queue.len(), 4);
+    }
+
+    #[test]
+    fn fair_ready_queue_drops_idle_failed_and_cancelled_tickets() {
+        let mut queue = FairTenantReadyQueue::default();
+        assert!(queue.enqueue(51));
+        assert!(queue.enqueue(52));
+        assert_eq!(queue.take_next(), Some(51));
+        assert!(!queue.is_pending(51));
+        assert_eq!(queue.take_next(), Some(52));
+        assert!(queue.enqueue(52));
+        assert!(queue.cancel(52));
+        assert!(!queue.cancel(52));
+        assert!(!queue.is_pending(52));
+        assert_eq!(queue.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn shared_checkpoint_capacity_serves_waiters_in_ticket_order() {
+        let scheduler = Arc::new(FairCheckpointScheduler::new());
+        let running_permit = scheduler.try_acquire(61).unwrap();
+        let second_scheduler = Arc::clone(&scheduler);
+        let second_waiter =
+            tokio::spawn(async move { second_scheduler.acquire(62).await.unwrap() });
+        wait_until_pending(&scheduler, 62).await;
+        let third_scheduler = Arc::clone(&scheduler);
+        let third_waiter = tokio::spawn(async move { third_scheduler.acquire(63).await.unwrap() });
+        wait_until_pending(&scheduler, 63).await;
+
+        drop(running_permit);
+        let second_permit = tokio::time::timeout(std::time::Duration::from_secs(2), second_waiter)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(second_permit.tenant, 62);
+        drop(second_permit);
+        let third_permit = tokio::time::timeout(std::time::Duration::from_secs(2), third_waiter)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(third_permit.tenant, 63);
+    }
+
+    #[tokio::test]
+    async fn cancelled_checkpoint_waiter_releases_its_ready_ticket() {
+        let scheduler = Arc::new(FairCheckpointScheduler::new());
+        let running_permit = scheduler.try_acquire(71).unwrap();
+        let cancelled_scheduler = Arc::clone(&scheduler);
+        let cancelled_waiter =
+            tokio::spawn(async move { cancelled_scheduler.acquire(72).await.unwrap() });
+        wait_until_pending(&scheduler, 72).await;
+        cancelled_waiter.abort();
+        assert!(
+            cancelled_waiter
+                .await
+                .is_err_and(|error| error.is_cancelled())
+        );
+        assert_eq!(scheduler.state.lock().unwrap().ready.len(), 0);
+
+        let next_scheduler = Arc::clone(&scheduler);
+        let next_waiter = tokio::spawn(async move { next_scheduler.acquire(73).await.unwrap() });
+        wait_until_pending(&scheduler, 73).await;
+        drop(running_permit);
+        let next_permit = tokio::time::timeout(std::time::Duration::from_secs(2), next_waiter)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(next_permit.tenant, 73);
+    }
 }
