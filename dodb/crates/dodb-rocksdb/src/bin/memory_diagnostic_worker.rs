@@ -362,6 +362,38 @@ fn paged_resource_config(
 }
 
 #[cfg(feature = "blink-demand-paging")]
+fn page_loader_metrics_json(
+    metrics: &dodb_storage::blink::page_cache::PageLoaderMetrics,
+) -> serde_json::Value {
+    json!({
+        "cache_misses": metrics.cache_misses,
+        "evictions": metrics.evictions,
+        "source_reads": metrics.source_reads,
+        "wal_reconstructions": metrics.wal_reconstructions,
+        "coalesced_loads": metrics.coalesced_loads,
+        "chain_entries_inspected": metrics.chain_entries_inspected,
+        "maximum_chain_entries": metrics.maximum_chain_entries,
+        "current_cache_bytes": metrics.current_cache_bytes,
+        "peak_cache_bytes": metrics.peak_cache_bytes,
+        "active_loads": metrics.active_loads,
+        "active_followers": metrics.active_followers,
+    })
+}
+
+#[cfg(feature = "blink-demand-paging")]
+fn source_manager_metrics_json(
+    metrics: &dodb_storage::blink::source_manager::SourceManagerMetrics,
+) -> serde_json::Value {
+    json!({
+        "source_opens": metrics.source_opens,
+        "active_source_handles": metrics.active_source_handles,
+        "active_roots": metrics.active_roots,
+        "reserved_roots": metrics.reserved_roots,
+        "oldest_root_age_millis": metrics.oldest_root_age_millis,
+    })
+}
+
+#[cfg(feature = "blink-demand-paging")]
 fn paged_resource_snapshot_json(
     snapshot: dodb_server::BlinkPagedResourceSnapshot,
 ) -> serde_json::Value {
@@ -527,8 +559,8 @@ fn paged_resource_snapshot_json(
         },
         "per_tenant": snapshot.tenants.iter().map(|tenant| json!({
             "tenant_id": tenant.tenant_id,
-            "page_loader": tenant.page_loader,
-            "source_manager": tenant.source_manager,
+            "page_loader": page_loader_metrics_json(&tenant.page_loader),
+            "source_manager": source_manager_metrics_json(&tenant.source_manager),
         })).collect::<Vec<_>>(),
         "allocator_retained_bytes": null,
         "allocator_retained_bytes_reason": "allocator and representation-specific retained heap are not exposed",
