@@ -1,0 +1,21 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+   Compiling dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.59s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-300bb259f2fc591f)
+
+running 1 test
+source-retain tenant=726 category=RetainedSource path=/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/.tmpPNExrm/blink/tenant-726-shard-726.db.blink-paged/packs actual=421892
+
+thread 'tests::paged_checkpoint_reclaims_old_reader_source_before_publication' (444746341) panicked at dodb/crates/dodb-server/src/lib.rs:6739:13:
+checkpoint did not wait for old-reader source capacity: finished=true, metrics=BlinkWalCheckpointMetrics { policy: WalBytesThreshold { threshold_bytes: 18446744073709551615 }, threshold_bytes: Some(18446744073709551615), checkpoints_started: 1, checkpoints_completed: 1, checkpoints_failed: 1, checkpoint_total_nanos: 1200567458, checkpoint_max_nanos: 1185478500, wal_bytes_current: 1250304, wal_bytes_at_measurement_start: None, wal_bytes_at_measurement_end: None, wal_bytes_max: 1250304, checkpoint_debt_bytes_current: 1250303, checkpoint_debt_bytes_max: 1250303, threshold_excess_max_bytes: 1250303, threshold_excess_total_nanos: 1185447000, threshold_excess_current_nanos: 3188617000, threshold_excess_since_unix_nanos: Some(1793648851276569000), successful_mutation_transactions: 0, mutation_commit_groups: 0, transaction_group_histogram: [], transaction_group_count: 0, wal_syncs: 0, commit_wal_syncs: 0, checkpoint_wal_syncs: 0, omitted_checkpoint_events: 0, checkpoint_events: [], failed_message: Some("overloaded: paged WAL disk budget is exhausted while reconciling 2085008 bytes (accounted WAL 834704, total 66392064, retained sources 421892, scratch 41952108): CapacityExceeded"), execution: Background, writes_during_checkpoint: 0, merged_checkpoint_requests: 0, checkpoint_requests_queued: 0, checkpoint_requests_pending: 0, checkpoint_requests_cancelled: 1, checkpoint_request_wait_nanos_total: 193987833, checkpoint_request_wait_nanos_max: 178929875, capacity_wait_count: 0, capacity_wait_nanos: 0, coordinator_pause_nanos: 0, retained_image_bytes: 0, peak_retained_image_bytes: 0, tasks_running: 0, peak_tasks_running: 1, per_tenant: {726: BlinkTenantCheckpointMetrics { wal_bytes_current: 1250304, checkpoint_debt_bytes_current: 1250303, checkpoint_debt_bytes_max: 1250303, threshold_excess_total_nanos: 1185447000, threshold_excess_since_unix_nanos: Some(1793648851276569000), checkpoint_requests_queued: 0, checkpoint_requests_pending: 0, checkpoint_requests_cancelled: 1, checkpoint_request_wait_nanos_total: 193987833, checkpoint_request_wait_nanos_max: 178929875, service_slices: 3 }} }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::paged_checkpoint_reclaims_old_reader_source_before_publication ... FAILED
+
+failures:
+
+failures:
+    tests::paged_checkpoint_reclaims_old_reader_source_before_publication
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 48 filtered out; finished in 8.08s
+
+error: test failed, to rerun pass `-p dodb-server --lib`

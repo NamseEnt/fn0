@@ -1174,6 +1174,9 @@ impl SourceManager {
             )
             .map_err(|_| Error::overloaded("paged source disk budget is exhausted"))?;
         let wal_bytes = directory_file_bytes(&self.inner.wal_directory)?;
+        let disk_snapshot = self.inner.resources.disk().snapshot().map_err(|error| {
+            Error::invariant(format!("paged disk accounting snapshot failed: {error:?}"))
+        })?;
         self.inner
             .resources
             .disk()
@@ -1183,7 +1186,15 @@ impl SourceManager {
                 &self.inner.wal_disk_key,
                 wal_bytes,
             )
-            .map_err(|_| Error::overloaded("paged WAL disk budget is exhausted"))?;
+            .map_err(|error| {
+                Error::overloaded(format!(
+                    "paged WAL disk budget is exhausted while reconciling {wal_bytes} bytes (accounted WAL {}, total {}, retained sources {}, scratch {}): {error:?}",
+                    disk_snapshot.current_by_category[DiskCategory::Wal as usize],
+                    disk_snapshot.current_total,
+                    disk_snapshot.current_by_category[DiskCategory::RetainedSource as usize],
+                    disk_snapshot.current_by_category[DiskCategory::Scratch as usize]
+                ))
+            })?;
         Ok(())
     }
 

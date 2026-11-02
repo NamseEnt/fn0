@@ -2,8 +2,9 @@
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on build directory
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
    Compiling dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.32s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.34s
      Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-300bb259f2fc591f)
 
 running 49 tests
@@ -57,5 +58,5 @@ test tests::tenant_checkpoint_metrics_aggregate_debt_wait_and_service ... ok
 test tests::transport_classification_separates_disconnects_from_actionable_failures ... ok
 test tests::transport_metric_labels_are_bounded_and_only_actionable_events_raise_errors ... ok
 
-test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.68s
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.93s
 
