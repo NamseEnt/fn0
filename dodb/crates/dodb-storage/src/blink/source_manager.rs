@@ -1380,7 +1380,10 @@ mod tests {
         WalFrameLocator,
     };
     use dodb_core::{Lsn, PageId};
+    use std::process::Command;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::thread;
+    use std::time::{Duration, Instant};
 
     static TEST_DIRECTORY_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
@@ -2058,6 +2061,109 @@ mod tests {
         let foreign_path = directory.path().join("segments/foreign-retained.wal");
         fs::write(&foreign_path, b"unrecognized source artifact").unwrap();
         assert!(foreign_path.exists());
+    }
+
+    #[test]
+    fn source_gc_survives_sigkill_before_and_after_unlink() {
+        const CHILD_DIRECTORY: &str = "DODB_SOURCE_GC_SIGKILL_DIRECTORY";
+        const CHILD_STAGE: &str = "DODB_SOURCE_GC_SIGKILL_STAGE";
+        const CHILD_READY: &str = "DODB_SOURCE_GC_SIGKILL_READY";
+        let header = b"sigkill-wal-prefix";
+        if let Ok(directory_path) = std::env::var(CHILD_DIRECTORY) {
+            let stage_number = std::env::var(CHILD_STAGE).unwrap().parse::<u8>().unwrap();
+            let target_point = match stage_number {
+                0 => SourceGcFaultPoint::BeforeUnlink,
+                1 => SourceGcFaultPoint::AfterUnlink,
+                _ => panic!("invalid source GC stage number"),
+            };
+            let directory_path = PathBuf::from(directory_path);
+            let index = test_index(&directory_path);
+            let source_manager = manager(&directory_path);
+            let identity = source_identity(SourceFileKind::WalSegment, 5, header);
+            let _ = source_manager.collect_garbage(
+                &index,
+                [SourceCandidate {
+                    identity,
+                    header_bytes: header.len(),
+                }],
+                |point| {
+                    if point == target_point {
+                        fs::write(std::env::var(CHILD_READY).unwrap(), b"ready").unwrap();
+                        loop {
+                            thread::sleep(Duration::from_secs(1));
+                        }
+                    }
+                    Ok(())
+                },
+            );
+            panic!("child collection did not stop at the requested boundary");
+        }
+
+        for (stage_number, target_point) in [
+            SourceGcFaultPoint::BeforeUnlink,
+            SourceGcFaultPoint::AfterUnlink,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let directory = TestDirectory::new();
+            let index = test_index(directory.path());
+            let source_manager = manager(directory.path());
+            let identity = source_identity(SourceFileKind::WalSegment, 5, header);
+            let source_path = write_source(&source_manager, identity, header);
+            drop(source_manager);
+            drop(index);
+            let ready_path = directory.path().join(format!("ready-{stage_number}"));
+            let mut child = Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "blink::source_manager::tests::source_gc_survives_sigkill_before_and_after_unlink",
+                    "--nocapture",
+                ])
+                .env(CHILD_DIRECTORY, directory.path())
+                .env(CHILD_STAGE, stage_number.to_string())
+                .env(CHILD_READY, &ready_path)
+                .spawn()
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while !ready_path.exists() && Instant::now() < deadline {
+                if let Some(status) = child.try_wait().unwrap() {
+                    panic!("SIGKILL child exited before {target_point:?}: {status}");
+                }
+                thread::sleep(Duration::from_millis(1));
+            }
+            assert!(ready_path.exists(), "child did not reach {target_point:?}");
+            assert_eq!(
+                unsafe { libc::kill(child.id() as libc::pid_t, libc::SIGKILL) },
+                0
+            );
+            let status = child.wait().unwrap();
+            use std::os::unix::process::ExitStatusExt;
+            assert_eq!(status.signal(), Some(libc::SIGKILL));
+            assert_eq!(
+                source_path.exists(),
+                target_point == SourceGcFaultPoint::BeforeUnlink
+            );
+
+            let reopened_index = test_index(directory.path());
+            let reopened_manager = manager(directory.path());
+            let report = reopened_manager
+                .collect_garbage(
+                    &reopened_index,
+                    [SourceCandidate {
+                        identity,
+                        header_bytes: header.len(),
+                    }],
+                    |_| Ok(()),
+                )
+                .unwrap();
+            if target_point == SourceGcFaultPoint::BeforeUnlink {
+                assert_eq!(report.unlinked_sources, 1);
+            } else {
+                assert_eq!(report.unlinked_sources, 0);
+            }
+            assert!(!source_path.exists());
+        }
     }
 
     #[test]
