@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-70634b21c90c24df)
+
+running 12 tests
+test blink::version_index::tests::checkpoint_index_work_rejects_insufficient_progress_capacity_before_reserving ... ok
+test blink::version_index::tests::descriptor_encodings_round_trip_all_locator_variants ... ok
+test blink::version_index::tests::durable_root_promotion_syncs_the_full_reachable_tree ... ok
+test blink::version_index::tests::many_updates_match_reference_map_with_bounded_node_cache ... ok
+test blink::version_index::tests::page_reuse_keeps_distinct_tokens_in_pinned_roots ... ok
+test blink::version_index::tests::retained_root_pins_consume_the_shared_metadata_limit ... ok
+test blink::version_index::tests::sparse_page_ids_survive_reopen_and_old_roots_remain_immutable ... ok
+test blink::version_index::tests::truncated_node_and_generation_overflow_fail_closed ... ok
+test blink::version_index::tests::version_index_disk_usage_survives_store_drop_and_reopen_without_double_counting ... ok
+test blink::version_index::tests::version_index_gc_keeps_pinned_roots_and_reclaims_old_nodes ... ok
+test blink::version_index::tests::wrong_level_and_generation_ancestry_fail_closed ... ok
+test blink::version_index::tests::wrong_store_identity_and_corrupt_node_fail_closed ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 300 filtered out; finished in 0.99s
+
