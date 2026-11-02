@@ -1,0 +1,28 @@
+    Checking dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+error[E0425]: cannot find type `PathBuf` in this scope
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:1793:20
+     |
+1793 |     pub directory: PathBuf,
+     |                    ^^^^^^^ not found in this scope
+     |
+help: consider importing this struct
+     |
+   8 + use std::path::PathBuf;
+     |
+
+error[E0425]: cannot find type `PathBuf` in this scope
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:1793:20
+     |
+1793 |     pub directory: PathBuf,
+     |                    ^^^^^^^ not found in this scope
+     |
+     = note: struct `crate::blink::source_manager::tests::PathBuf` exists but is inaccessible
+help: consider importing this struct
+     |
+   8 + use std::path::PathBuf;
+     |
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `dodb-storage` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `dodb-storage` (lib test) due to 1 previous error

@@ -1,0 +1,45 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+error[E0382]: borrow of moved value: `old_reader`
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:14831:13
+      |
+14317 |         let old_reader = writer.snapshot().unwrap();
+      |             ---------- move occurs because `old_reader` has type `blink::PagedReadHandle`, which does not implement the `Copy` trait
+...
+14508 |         drop(old_reader);
+      |              ---------- value moved here
+...
+14831 |             old_reader.get(&writer_key).unwrap().value(),
+      |             ^^^^^^^^^^ value borrowed here after move
+      |
+note: if `blink::PagedReadHandle` implemented `Clone`, you could clone the value
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:1802:1
+      |
+ 1802 | pub struct PagedReadHandle {
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^ consider implementing `Clone` for this type
+...
+14508 |         drop(old_reader);
+      |              ---------- you could clone this value
+
+error[E0382]: borrow of moved value: `handle`
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:14832:13
+      |
+14084 |         let handle = PagedReadHandle::new(
+      |             ------ move occurs because `handle` has type `blink::PagedReadHandle`, which does not implement the `Copy` trait
+...
+14509 |         drop(handle);
+      |              ------ value moved here
+...
+14832 |             handle.get(&writer_key).unwrap().value()
+      |             ^^^^^^ value borrowed here after move
+      |
+note: if `blink::PagedReadHandle` implemented `Clone`, you could clone the value
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:1802:1
+      |
+ 1802 | pub struct PagedReadHandle {
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^ consider implementing `Clone` for this type
+...
+14509 |         drop(handle);
+      |              ------ you could clone this value
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `dodb-storage` (lib test) due to 2 previous errors
