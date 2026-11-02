@@ -16626,7 +16626,17 @@ mod tests {
             )
             .unwrap();
         assert_eq!(restarted_gc.protected_sources, 1);
+        assert!(restarted_gc.unlinked_catalog_pages > 0);
         assert!(recovery_wal_path.is_file());
+        let catalog_root = reopened_manifest.current().source_catalog_root.unwrap();
+        assert!(
+            checkpoint_directory
+                .join(format!(
+                    "source-catalog-{:020}.node",
+                    catalog_root.file_number
+                ))
+                .is_file()
+        );
         let reopened_root = reopened_index
             .root_from_node_reference(reopened_manifest.current().durable_index_root)
             .unwrap();

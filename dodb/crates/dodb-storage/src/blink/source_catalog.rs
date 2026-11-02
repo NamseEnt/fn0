@@ -226,9 +226,75 @@ impl SourceCatalogStore {
             {
                 return Err(Error::corruption("source catalog page link is invalid"));
             }
+            if next_reference.is_some() && record_count != RECORDS_PER_PAGE {
+                return Err(Error::corruption(
+                    "nonterminal source catalog page is not full",
+                ));
+            }
             current_reference = next_reference;
         }
         Ok(())
+    }
+
+    pub(super) fn reclaim_unreachable(
+        &self,
+        roots: impl IntoIterator<Item = NodeRef>,
+    ) -> Result<(u64, u64)> {
+        let mut retained_ranges = Vec::new();
+        for root in roots {
+            let mut record_count = 0u64;
+            self.visit(root, &mut |_| {
+                record_count = record_count
+                    .checked_add(1)
+                    .ok_or_else(|| Error::corruption("source catalog record count overflows"))?;
+                Ok(())
+            })?;
+            let page_count = record_count
+                .checked_add(RECORDS_PER_PAGE as u64 - 1)
+                .ok_or_else(|| Error::corruption("source catalog page count overflows"))?
+                / RECORDS_PER_PAGE as u64;
+            let last_file_number = root
+                .file_number
+                .checked_add(page_count - 1)
+                .ok_or_else(|| Error::corruption("source catalog file range overflows"))?;
+            retained_ranges.push((root.file_number, last_file_number));
+        }
+        retained_ranges.sort_unstable();
+        retained_ranges.dedup();
+        let mut unlinked_pages = 0u64;
+        let mut unlinked_bytes = 0u64;
+        for entry in fs::read_dir(&self.directory)? {
+            let entry = entry?;
+            let Some(file_name) = entry.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            let Some(file_number) = parse_catalog_file_number(&file_name)? else {
+                continue;
+            };
+            if retained_ranges
+                .iter()
+                .any(|(first, last)| (*first..=*last).contains(&file_number))
+            {
+                continue;
+            }
+            let metadata = entry.metadata()?;
+            if !metadata.is_file() {
+                return Err(Error::corruption(
+                    "unreachable source catalog path is not a file",
+                ));
+            }
+            fs::remove_file(entry.path())?;
+            unlinked_pages = unlinked_pages
+                .checked_add(1)
+                .ok_or_else(|| Error::invalid_input("source catalog GC page count overflows"))?;
+            unlinked_bytes = unlinked_bytes
+                .checked_add(metadata.len())
+                .ok_or_else(|| Error::invalid_input("source catalog GC byte count overflows"))?;
+        }
+        if unlinked_pages > 0 {
+            File::open(&self.directory)?.sync_all()?;
+        }
+        Ok((unlinked_pages, unlinked_bytes))
     }
 }
 
@@ -414,5 +480,65 @@ mod tests {
         middle_page[RECORDS_PER_PAGE + 200] ^= 1;
         fs::write(middle_page_path, middle_page).unwrap();
         assert!(store.visit(root, &mut |_| Ok(())).is_err());
+    }
+
+    #[test]
+    fn source_catalog_reclaims_only_pages_outside_protected_roots() {
+        let directory = TestDirectory::new();
+        let checkpoint_directory = directory.0.join("checkpoint");
+        let marker_directory = directory.0.join("markers");
+        fs::create_dir_all(&marker_directory).unwrap();
+        let identity = StoreIdentity {
+            database_uuid: [29; 16],
+            wal_epoch: 31,
+        };
+        for marker_number in 0..=(RECORDS_PER_PAGE as u64) {
+            let source = SourceIdentity {
+                kind: SourceFileKind::WalSegment,
+                file_number: marker_number + 1,
+                header_identity: *blake3::hash(&marker_number.to_le_bytes()).as_bytes(),
+            };
+            let mut marker =
+                File::create(marker_directory.join(format!("source-{marker_number:064x}")))
+                    .unwrap();
+            marker.write_all(&encode_source_record(source)).unwrap();
+        }
+        let store = SourceCatalogStore::open(&checkpoint_directory, identity).unwrap();
+        let obsolete_root = store.build_from_marker_run(&marker_directory).unwrap();
+        for entry in fs::read_dir(&marker_directory).unwrap() {
+            fs::remove_file(entry.unwrap().path()).unwrap();
+        }
+        let current_source = SourceIdentity {
+            kind: SourceFileKind::CheckpointPack,
+            file_number: 500,
+            header_identity: *blake3::hash(b"current source").as_bytes(),
+        };
+        let mut current_marker =
+            File::create(marker_directory.join(format!("source-{:064x}", 500))).unwrap();
+        current_marker
+            .write_all(&encode_source_record(current_source))
+            .unwrap();
+        let current_root = store.build_from_marker_run(&marker_directory).unwrap();
+
+        let (unlinked_pages, unlinked_bytes) = store.reclaim_unreachable([current_root]).unwrap();
+
+        assert_eq!(unlinked_pages, 2);
+        assert_eq!(unlinked_bytes, (2 * super::PAGE_BYTES) as u64);
+        assert!(
+            !checkpoint_directory
+                .join(format!(
+                    "source-catalog-{:020}.node",
+                    obsolete_root.file_number
+                ))
+                .exists()
+        );
+        assert!(
+            checkpoint_directory
+                .join(format!(
+                    "source-catalog-{:020}.node",
+                    current_root.file_number
+                ))
+                .is_file()
+        );
     }
 }

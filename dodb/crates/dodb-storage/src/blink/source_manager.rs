@@ -123,6 +123,8 @@ pub struct SourceGcReport {
     pub unlinked_sources: u64,
     pub unlinked_bytes: u64,
     pub unlinked_open_bytes: u64,
+    pub unlinked_catalog_pages: u64,
+    pub unlinked_catalog_bytes: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -825,6 +827,14 @@ impl SourceManager {
                 .ok_or_else(|| Error::invalid_input("paged source GC byte count overflow"))?;
             fault(SourceGcFaultPoint::AfterUnlink)?;
         }
+        let (unlinked_catalog_pages, unlinked_catalog_bytes) =
+            self.inner.source_catalog.reclaim_unreachable(
+                [durable_catalog_root, pending_catalog_root]
+                    .into_iter()
+                    .flatten(),
+            )?;
+        report.unlinked_catalog_pages = unlinked_catalog_pages;
+        report.unlinked_catalog_bytes = unlinked_catalog_bytes;
         Ok(report)
     }
 
