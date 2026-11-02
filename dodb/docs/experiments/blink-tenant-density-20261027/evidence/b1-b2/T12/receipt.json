@@ -1,7 +1,7 @@
 {
   "task_id": "T12",
   "scope": "Bounded B-link tenant open lifecycle progress",
-  "status": "partial",
+  "status": "complete",
   "parent_source_commit": "a122e574cd12c8156e4b5a2bc02754d173997700",
   "implementation_commits": [
     "54eaa434c43bd6b6faadb4ed5a4622d334b373e4",
@@ -11,14 +11,15 @@
     "67b5a2e8a",
     "93b9a218ab10f8233caee3b2b85b0d1b79e919ee",
     "f4b55941b7ef1535e6fb6e76a8e3d58d6aa70e81",
-    "3ed46960b17c643f7b1bdf64d719bac925e1c055"
+    "3ed46960b17c643f7b1bdf64d719bac925e1c055",
+    "149df0927c76a8aad5ec12f82c81474cfda37911"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "3ed46960b17c643f7b1bdf64d719bac925e1c055"
+    "source_commit": "149df0927c76a8aad5ec12f82c81474cfda37911"
   },
   "validated": [
     {
@@ -230,6 +231,42 @@
       "command": "cargo fmt --manifest-path crates/dodb-server/Cargo.toml --check",
       "exit_status": 0,
       "result": "passed"
+    },
+    {
+      "name": "paged_active_load_saturation_cancellation_shutdown",
+      "command": "cargo test -p dodb-server --features blink-demand-paging paged_service_opens_recovered_store_for_get_query_and_scan -- --nocapture",
+      "exit_status": 0,
+      "result": "1 passed; active blocking read held the only worker, concurrent read was rejected, request cancellation retained worker/activity ownership until read completion, and shutdown retry drained successfully"
+    },
+    {
+      "name": "server_library_tests_paged_active_load_shutdown",
+      "command": "cargo test -p dodb-server --features blink-demand-paging --lib",
+      "exit_status": 0,
+      "result": "21 passed, 0 failed"
+    },
+    {
+      "name": "server_library_tests_default_active_load_shutdown",
+      "command": "cargo test -p dodb-server --lib",
+      "exit_status": 0,
+      "result": "17 passed, 0 failed"
+    },
+    {
+      "name": "server_all_targets_check_default_active_load_shutdown",
+      "command": "cargo check -p dodb-server --all-targets",
+      "exit_status": 0,
+      "result": "passed"
+    },
+    {
+      "name": "server_all_targets_check_feature_active_load_shutdown",
+      "command": "cargo check -p dodb-server --all-targets --features blink-demand-paging",
+      "exit_status": 0,
+      "result": "passed"
+    },
+    {
+      "name": "server_format_active_load_shutdown",
+      "command": "cargo fmt --check",
+      "exit_status": 0,
+      "result": "passed"
     }
   ],
   "prerequisite_receipts": [
@@ -251,8 +288,8 @@
     "dodb/docs/experiments/blink-tenant-density-20261027/B1-B2-CONTRACTS.md"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-server/src/lib.rs": "61d8856ca4467f8057a8d1be01af54f7be3ab2eb7e73e2a3a5f1ffb3669c68b4",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "35790aed89c059d771f31fbe9b789a652c7837e66f394ee6050475b9b656fe2f",
+    "dodb/crates/dodb-server/src/lib.rs": "d6a3acc134fdc6f07ba6e9dffc20a87acc8849644d5b4a53deae3ff3ba9a9812",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "6d4ffda15b86206f7a7696f329dd0bb45b02ef1af5b57f5578c8ac74c8b8b195",
     "dodb/crates/dodb-server/Cargo.toml": "3a9164700687fd98dd554bd1a8ea300e574fdce383e4733f706dff05abc9c128",
     "crates/dodb-storage/src/blink/mod.rs": "87d877b2702776f5ab86380a855b1bf8707d4963cc91102bb11ce21d2787c09c",
     "crates/dodb-storage/src/blink/page_cache.rs": "2be518ae065e611398fe6e1f3f18da338240ecb4dbee95d8ac8f8982302c2d8e",
@@ -498,18 +535,48 @@
       "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-format-service-requests.log",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "exit_status": 0
+    },
+    {
+      "name": "server_library_tests_paged_active_load_shutdown",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-lib-tests-paged-active-load-shutdown.log",
+      "sha256": "f7d814b8e9ac586c1e4f1dcfd428c144ddcf56324306f22cf3b723dfdaacd0a2",
+      "exit_status": 0
+    },
+    {
+      "name": "server_library_tests_default_active_load_shutdown",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-lib-tests-default-active-load-shutdown.log",
+      "sha256": "0b1f0c625cbfd63ca482c12d43281d3add8f2161b2e32170d4576cc2ebe4ea18",
+      "exit_status": 0
+    },
+    {
+      "name": "server_all_targets_check_default_active_load_shutdown",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-check-default-active-load-shutdown.log",
+      "sha256": "77ca79425f2868f969bde6c33acfbe9e65234009146bf882fc77c2f1f0adb020",
+      "exit_status": 0
+    },
+    {
+      "name": "server_all_targets_check_feature_active_load_shutdown",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-check-feature-active-load-shutdown.log",
+      "sha256": "48ac3d3e111bd2df62b045ccc5824a77e01d5578d7c8f5116ee3052798a7323e",
+      "exit_status": 0
+    },
+    {
+      "name": "server_format_active_load_shutdown",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-format-active-load-shutdown.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_status": 0
     }
   ],
   "remaining_work": [
-    "Verify saturation and cancellation under concurrent page loads, plus shutdown while a blocking page load is active.",
-    "Implement the paged writer/coordinator path and operation-owned foreground charges in T13.",
-    "Complete fair maintenance scheduling, service crash acceptance, and experiment-ready handoff before any density matrix."
+    "Implement byte-bounded foreground admission and operation-owned request charges in T13.",
+    "Implement fair debt-driven checkpoint admission and release-aware scheduling in T14.",
+    "Complete real-service crash/write/crash acceptance and experiment-ready handoff in T15-T16 before any tenant-density performance matrix."
   ],
-  "next_task": "T12",
+  "next_task": "T13",
   "push": {
     "remote": "origin",
     "branch": "experiment/blink-tenant-density-20261027",
-    "status": "pushed"
+    "status": "pending"
   },
   "preserved_failures": [
     {
