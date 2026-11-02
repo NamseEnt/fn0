@@ -1,0 +1,174 @@
+{
+  "task_id": "T09",
+  "scope": "Bounded demand-loaded transaction mutation preparation",
+  "status": "partial",
+  "parent_source_commit": "81edcc6ca63d45d8edd47c8ce4a0ead60ed55ed3",
+  "implementation_commits": [
+    "3367fec8d796dd15c5fada6296a128e3db106a80",
+    "fa53e144bf9b39824c1e8dc48bc5dc0d823af3e6"
+  ],
+  "push": {
+    "remote": "origin",
+    "branch": "experiment/blink-tenant-density-20261027",
+    "status": "pushed"
+  },
+  "prerequisite_receipts": [
+    {
+      "task_id": "T06",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T06/receipt.json",
+      "sha256": "f73b4a07fc3bc27e7e0212fc4e335a3fe9a205560ad862da4aa46e2cc94cfabd"
+    },
+    {
+      "task_id": "T07",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T07/receipt.json",
+      "sha256": "9ca65a823e715476e726ddf99b3494f5b70446bcad0424451c468fd4bb67bd4c"
+    },
+    {
+      "task_id": "T08",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T08/receipt.json",
+      "sha256": "9e47f0a8991753af7aaad33797a8309932ec341cd690af4c315b1cf8280552e9"
+    }
+  ],
+  "owned_paths": [
+    "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "dodb/crates/dodb-storage/src/blink/page_cache.rs"
+  ],
+  "source_hashes": {
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "82fff2e00e0d49ee5612a7d9fea0e44f4c30052816db56c2f254304ab757a403",
+    "dodb/crates/dodb-storage/src/blink/page_cache.rs": "83d1ac6841a55cf5d6eefb11e68e5a2eece05882b49d5db11b4850013ae0a133"
+  },
+  "host": {
+    "os": "macOS arm64",
+    "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+    "branch": "experiment/blink-tenant-density-20261027"
+  },
+  "features": [
+    "blink-demand-paging"
+  ],
+  "runtime_configuration": {
+    "route": "isolated storage fixture using PagedReadHandle and bounded working-state preparation",
+    "wal_append_or_sync": false,
+    "version_index_publication": false,
+    "service_route_activated": false,
+    "defaults_changed": false,
+    "oci_experiment": false,
+    "performance_matrix_started": false
+  },
+  "checks": [
+    {
+      "name": "paged_mutation_preparation_test",
+      "argv": [
+        "cargo", "test", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml",
+        "--features", "blink-demand-paging", "--lib",
+        "paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages",
+        "--", "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "1 passed; test includes mutation preparation, reservations, conditions, overload, and overflow deletion",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-mutation-preparation-test.log",
+        "sha256": "50cf86645ada595f6dcc3089a8b197f3418edd0ff0d9280cd45dd3cb2bac34c0"
+      }
+    },
+    {
+      "name": "feature_storage_library_tests_serial",
+      "argv": [
+        "cargo", "test", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml",
+        "--features", "blink-demand-paging", "--lib", "--", "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "293 passed, 0 failed, 4 ignored; finished in 114.91s. Test-only reservation lifetime assertions were subsequently verified by the focused test.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/storage-feature-tests-serial.log.gz",
+        "sha256": "98f7ec16baf68d7a0864482d6596ed5a27206b9e0ca735e1d0ff7d8a237bdd00"
+      }
+    },
+    {
+      "name": "default_storage_library_check",
+      "argv": ["cargo", "check", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--lib"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/storage-default-lib-check.log",
+        "sha256": "41bbe80ee9a7202f5a1aae92be7f3a2d615a665b71020f2dc048e9f7f118bc98"
+      }
+    },
+    {
+      "name": "feature_storage_library_check",
+      "argv": ["cargo", "check", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--features", "blink-demand-paging", "--lib"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/storage-feature-lib-check.log",
+        "sha256": "c92508a29848820f033cd2ea015c85dde0953c88b07cc967ce34b7c08f610549"
+      }
+    },
+    {
+      "name": "package_format_check",
+      "argv": ["cargo", "fmt", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--", "--check"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/rustfmt-check.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "working_tree_diff_check",
+      "argv": ["git", "diff", "--check"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/git-diff-check.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "feature_strict_clippy",
+      "argv": ["cargo", "clippy", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--features", "blink-demand-paging", "--lib", "--", "-D", "warnings"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 101,
+      "summary": "12 existing findings in blink/mod.rs and wal.rs; no lint suppressions added",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/storage-feature-strict-clippy.log.gz",
+        "sha256": "a89548033dc733fefd0b255c37ee6e3fa29e1a3a4b7bf9cd7e086908b2903616"
+      }
+    }
+  ],
+  "acceptance_mapping": {
+    "bounded_required_base_pages_and_dirty_working_set": "partial: PagedWorkingBlinkState loads base pages through PagedReadHandle and caps changed page copies; integrated mutation widths 1, 4, and 16 are exercised",
+    "condition_conflict_multi_key_and_overflow_preparation": "partial: success and stale RevisionEquals conflict, multi-key widths, overflow allocation, and overflow deletion are covered; transaction result is not durably committed",
+    "planning_copy_dirty_image_reservations_before_mutation": "passed for preparation: maximum working-page and request byte reservations are acquired before mutation; test observes both categories live through encoding and verifies overload releases them",
+    "exact_committed_index_root_published_after_wal_sync": "not implemented",
+    "conditional_and_multikey_group_durability_and_recovery": "not implemented",
+    "expected_conflict_tombstone_aba_and_free_page_reuse": "partial or not implemented: expected conflict and overflow frees are covered in preparation; durable ABA and page reuse behavior are not implemented on this route",
+    "ninth_delta_emits_image_through_paged_writer": "not implemented by this preparation route; existing generic WAL test is not evidence for the paged writer",
+    "append_sync_and_publication_fault_boundaries": "not implemented",
+    "oversized_working_set_precommit_rejection_and_no_reservation_leak": "passed for preparation: bounded-page overload occurs before any WAL commit; reservation categories return to their prior values",
+    "production_service_activation": "not activated; remains gated for T12-T15"
+  },
+  "ownership_peaks": {
+    "test_maximum_working_pages": 32,
+    "test_dirty_image_reservation_bytes": 131072,
+    "test_resource_manager_global_and_tenant_bytes": 4194304,
+    "measured_live_reservation_categories": ["WritePreparation", "DirtyImages"],
+    "exact_peak_byte_snapshot": "not recorded; tests assert live category charges and bounded manager limits"
+  },
+  "failed_attempts": [],
+  "remaining_work": [
+    "T09 atomic WAL append/sync, exact location-to-index publication, and immutable generation handoff",
+    "T09 failure injection at append, sync, and index publication; committed-group recovery and ninth-delta image behavior",
+    "T09 page reuse and durable ABA/tombstone acceptance",
+    "T10-T16 checkpoint, recovery, service, resource, scheduling, and experiment-readiness gates",
+    "T17 remains separately authorized and was not started"
+  ],
+  "next_task": "T09"
+}
