@@ -7,6 +7,7 @@ description = "Storage engine for dodb, the fn0 document database"
 repository.workspace = true
 
 [dependencies]
+blake3.workspace = true
 crc32c.workspace = true
 dodb-core.workspace = true
 libc.workspace = true
