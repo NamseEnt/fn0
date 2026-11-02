@@ -3,7 +3,7 @@
   "scope": "Commit-gated WAL page location capture and read-only scan",
   "status": "partial",
   "parent_source_commit": "fa1262d015f97844efdefb137b2225d954d52aab",
-  "implementation_commit": "f95a8d5e0",
+  "implementation_commit": "479ac8402754d5995b924173907a8cf34671c842",
   "prerequisite_receipts": [
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T01/receipt.json"
   ],
@@ -12,7 +12,7 @@
     "dodb/crates/dodb-storage/src/lib.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/wal.rs": "bbd18568be057f0c75272cbd9f3ef67601b43d93d7c26faa246482ce49870933",
+    "dodb/crates/dodb-storage/src/wal.rs": "2840fe401bcc7cf15cd8c74b0a6a3d2b6f45b42713a87797795e59c1f2331db6",
     "dodb/crates/dodb-storage/src/lib.rs": "32386885640de44c9866feb5fdddb8880c816059f2406dbff60ffadf69d1a14a"
   },
   "host": "local worktree",
@@ -24,7 +24,7 @@
       "argv": ["cargo", "test", "-p", "dodb-storage", "--features", "blink-demand-paging", "wal::tests::", "--lib"],
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
       "exit_status": 0,
-      "result": "29 passed"
+      "result": "31 passed"
     },
     {
       "argv": ["rustfmt", "--check", "--edition", "2024", "--config", "skip_children=true", "dodb/crates/dodb-storage/src/wal.rs", "dodb/crates/dodb-storage/src/lib.rs"],
@@ -37,6 +37,7 @@
     "frame locations are exposed only after commit and digest validation": "Covered by commit-gated scanner tests",
     "active torn tail leaves committed prefix usable without mutation": "Covered by location scan tests",
     "scan result retains locations rather than after-images": "Returned pages map is cleared in Locations mode; temporary validation map remains during scan",
+    "re-reading a location validates exact source frame and whole transaction digest": "Covered by image, delta, source-mutation, and sibling-frame tests",
     "live append locations visible only after successful sync": "Not implemented",
     "exact image/delta reconstruction and source identity checks": "Not implemented",
     "remaining corruption, path replacement, concurrency, and delta-cap cases": "Not implemented"
