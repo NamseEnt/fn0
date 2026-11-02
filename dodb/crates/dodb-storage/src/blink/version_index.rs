@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use dodb_core::{Error, Lsn, PageId, Result};
 
 use super::resource::{
-    BlinkResourceManager, DiskCategory, DiskReservation, Reservation, ReservationClass,
+    BlinkDiskResourceManager, BlinkResourceManager, DiskCategory, Reservation, ReservationClass,
     ResourceCategory, ResourceError,
 };
 use super::version_chain::{DeltaChainRef, DeltaChainStore};
@@ -344,7 +344,10 @@ struct VersionIndexStore {
     directory: PathBuf,
     identity: StoreIdentity,
     next_file_number: AtomicU64,
-    disk_reservation: Mutex<DiskReservation>,
+    disk: BlinkDiskResourceManager,
+    disk_key: String,
+    tenant_id: u64,
+    node_disk_lock: Mutex<()>,
 }
 
 impl VersionIndexStore {
@@ -379,15 +382,24 @@ impl VersionIndexStore {
             .checked_add(1)
             .ok_or_else(|| Error::invalid_input("version-index file number exhausted"))?
             .max(1);
-        let disk_reservation = resources
+        let disk_key = fs::canonicalize(directory)?.to_string_lossy().into_owned();
+        resources
             .disk()
-            .reserve(tenant_id, DiskCategory::VersionIndex, existing_node_bytes)
+            .reconcile_persistent_usage(
+                tenant_id,
+                DiskCategory::VersionIndex,
+                &disk_key,
+                existing_node_bytes,
+            )
             .map_err(|_| Error::overloaded("version-index disk budget is exhausted"))?;
         Ok(Self {
             directory: directory.to_path_buf(),
             identity,
             next_file_number: AtomicU64::new(next_file_number),
-            disk_reservation: Mutex::new(disk_reservation),
+            disk: resources.disk(),
+            disk_key,
+            tenant_id,
+            node_disk_lock: Mutex::new(()),
         })
     }
 
@@ -397,7 +409,23 @@ impl VersionIndexStore {
         ))
     }
 
+    fn reconcile_disk_usage(&self, bytes: u64) -> Result<()> {
+        self.disk
+            .reconcile_persistent_usage(
+                self.tenant_id,
+                DiskCategory::VersionIndex,
+                &self.disk_key,
+                bytes,
+            )
+            .map_err(|_| Error::overloaded("version-index disk budget is exhausted"))?;
+        Ok(())
+    }
+
     fn write_node(&self, node: &IndexNode) -> Result<NodeRef> {
+        let _disk_lock = self
+            .node_disk_lock
+            .lock()
+            .map_err(|_| Error::invariant("version-index disk mutation lock poisoned"))?;
         let mut bytes = encode_node(node, self.identity, 1)?;
         loop {
             let file_number = self
@@ -415,36 +443,29 @@ impl VersionIndexStore {
             let node_checksum = *blake3::hash(&bytes[..NODE_CHECKSUM_OFFSET]).as_bytes();
             bytes[NODE_CHECKSUM_OFFSET..].copy_from_slice(&node_checksum);
             let path = self.node_path(file_number);
-            self.disk_reservation
-                .lock()
-                .map_err(|_| Error::invariant("version-index disk reservation lock poisoned"))?
-                .grow(VERSION_INDEX_NODE_BYTES as u64)
+            let reservation = self
+                .disk
+                .reserve(
+                    self.tenant_id,
+                    DiskCategory::VersionIndex,
+                    VERSION_INDEX_NODE_BYTES as u64,
+                )
                 .map_err(|_| Error::overloaded("version-index disk budget is exhausted"))?;
             match OpenOptions::new().write(true).create_new(true).open(path) {
                 Ok(mut file) => {
                     let write_result = file.write_all(&bytes).and_then(|()| file.flush());
-                    if let Err(error) = write_result {
-                        let actual_bytes = file
-                            .metadata()
-                            .map(|metadata| metadata.len())
-                            .unwrap_or(VERSION_INDEX_NODE_BYTES as u64);
-                        let unused_bytes =
-                            (VERSION_INDEX_NODE_BYTES as u64).saturating_sub(actual_bytes);
-                        if unused_bytes > 0 {
-                            self.disk_reservation
-                                .lock()
-                                .map_err(|_| {
-                                    Error::invariant("version-index disk reservation lock poisoned")
-                                })?
-                                .shrink(unused_bytes)
-                                .map_err(|_| {
-                                    Error::invariant(
-                                        "version-index disk reservation release failed",
-                                    )
-                                })?;
-                        }
-                        return Err(error.into());
-                    }
+                    let actual_bytes = file
+                        .metadata()
+                        .map(|metadata| metadata.len())
+                        .unwrap_or(VERSION_INDEX_NODE_BYTES as u64);
+                    self.disk
+                        .increase_persistent_usage_from_reservation(
+                            reservation,
+                            self.disk_key.clone(),
+                            actual_bytes,
+                        )
+                        .map_err(|_| Error::overloaded("version-index disk budget is exhausted"))?;
+                    write_result?;
                     return Ok(NodeRef {
                         file_number,
                         offset: 0,
@@ -452,29 +473,10 @@ impl VersionIndexStore {
                     });
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                    self.disk_reservation
-                        .lock()
-                        .map_err(|_| {
-                            Error::invariant("version-index disk reservation lock poisoned")
-                        })?
-                        .shrink(VERSION_INDEX_NODE_BYTES as u64)
-                        .map_err(|_| {
-                            Error::invariant("version-index disk reservation release failed")
-                        })?;
+                    drop(reservation);
                     continue;
                 }
-                Err(error) => {
-                    self.disk_reservation
-                        .lock()
-                        .map_err(|_| {
-                            Error::invariant("version-index disk reservation lock poisoned")
-                        })?
-                        .shrink(VERSION_INDEX_NODE_BYTES as u64)
-                        .map_err(|_| {
-                            Error::invariant("version-index disk reservation release failed")
-                        })?;
-                    return Err(error.into());
-                }
+                Err(error) => return Err(error.into()),
             }
         }
     }
@@ -584,6 +586,11 @@ impl VersionIndex {
         roots: &[VersionIndexRoot],
         marker_directory: &Path,
     ) -> Result<(u64, u64)> {
+        let _disk_lock = self
+            .store
+            .node_disk_lock
+            .lock()
+            .map_err(|_| Error::invariant("version-index disk mutation lock poisoned"))?;
         fn mark_node(
             index: &VersionIndex,
             node_reference: NodeRef,
@@ -655,6 +662,7 @@ impl VersionIndex {
 
         let mut unlinked_nodes = 0u64;
         let mut unlinked_bytes = 0u64;
+        let mut remaining_node_bytes = 0u64;
         for entry in fs::read_dir(&self.store.directory)? {
             let entry = entry?;
             let file_name = entry.file_name();
@@ -664,17 +672,20 @@ impl VersionIndex {
             let Some(file_number) = parse_node_file_number(file_name)? else {
                 continue;
             };
-            if marker_directory
-                .join(format!("version-index-{file_number:020}"))
-                .exists()
-            {
-                continue;
-            }
             let metadata = entry.metadata()?;
             if !metadata.is_file() {
                 return Err(Error::corruption(
                     "unreachable version-index node path is not a file",
                 ));
+            }
+            if marker_directory
+                .join(format!("version-index-{file_number:020}"))
+                .exists()
+            {
+                remaining_node_bytes = remaining_node_bytes
+                    .checked_add(metadata.len())
+                    .ok_or_else(|| Error::invalid_input("version-index GC byte count overflows"))?;
+                continue;
             }
             fs::remove_file(entry.path())?;
             unlinked_nodes = unlinked_nodes
@@ -686,13 +697,8 @@ impl VersionIndex {
         }
         if unlinked_nodes > 0 {
             self.store.sync_directory()?;
-            self.store
-                .disk_reservation
-                .lock()
-                .map_err(|_| Error::invariant("version-index disk reservation lock poisoned"))?
-                .shrink(unlinked_bytes)
-                .map_err(|_| Error::invariant("version-index disk reservation release failed"))?;
         }
+        self.store.reconcile_disk_usage(remaining_node_bytes)?;
         Ok((unlinked_nodes, unlinked_bytes))
     }
 
@@ -2060,7 +2066,9 @@ mod tests {
         VersionIndexRoot, VersionLocator, VersionToken, WalFrameLocator, decode_descriptor,
         encode_descriptor,
     };
-    use crate::blink::resource::{BlinkResourceManager, ResourceCategory, ResourceLimits};
+    use crate::blink::resource::{
+        BlinkResourceManager, DiskCategory, ResourceCategory, ResourceLimits,
+    };
     use dodb_core::{Lsn, PageId};
     use std::collections::BTreeMap;
     use std::fs;
@@ -2214,6 +2222,60 @@ mod tests {
             per_tenant_category_bytes: [2 * 1024 * 1024; 7],
         })
         .unwrap()
+    }
+
+    #[test]
+    fn version_index_disk_usage_survives_store_drop_and_reopen_without_double_counting() {
+        let directory = TestDirectory::new("persistent-disk-usage");
+        let index_directory = directory.path().join("index");
+        let resources = resource_manager();
+        let identity = ([0x93; 16], 34);
+        let index = open_index_with_manager(&index_directory, identity, 2, resources.clone());
+        let root = index
+            .insert(
+                index.empty_root(),
+                PageId::new(2),
+                checkpoint_descriptor(PageId::new(2)),
+            )
+            .unwrap();
+        let _durable_root = index.promote_root_to_durable(root).unwrap();
+        let initial_bytes = resources
+            .disk()
+            .tenant_snapshot(41)
+            .unwrap()
+            .unwrap()
+            .current_by_category[DiskCategory::VersionIndex as usize];
+        assert!(initial_bytes > 0);
+        drop(index);
+        assert_eq!(
+            resources
+                .disk()
+                .tenant_snapshot(41)
+                .unwrap()
+                .unwrap()
+                .current_by_category[DiskCategory::VersionIndex as usize],
+            initial_bytes
+        );
+        let reopened = open_index_with_manager(&index_directory, identity, 2, resources.clone());
+        assert_eq!(
+            resources
+                .disk()
+                .tenant_snapshot(41)
+                .unwrap()
+                .unwrap()
+                .current_by_category[DiskCategory::VersionIndex as usize],
+            initial_bytes
+        );
+        drop(reopened);
+        assert_eq!(
+            resources
+                .disk()
+                .tenant_snapshot(41)
+                .unwrap()
+                .unwrap()
+                .current_by_category[DiskCategory::VersionIndex as usize],
+            initial_bytes
+        );
     }
 
     #[test]

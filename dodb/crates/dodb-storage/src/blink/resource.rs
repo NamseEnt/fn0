@@ -346,8 +346,92 @@ impl BlinkDiskResourceManager {
         state.peak_total = state.peak_total.max(next_total);
         state.peak_by_category[category_index] =
             state.peak_by_category[category_index].max(next_category);
-        state.persistent_usage.insert(key, bytes);
+        if bytes == 0 {
+            state.persistent_usage.remove(&key);
+        } else {
+            state.persistent_usage.insert(key, bytes);
+        }
         charge.bytes = 0;
+        if next_tenant_total == 0 {
+            state.tenants.remove(&charge.tenant_id);
+        }
+        Ok(())
+    }
+
+    pub fn increase_persistent_usage_from_reservation(
+        &self,
+        mut reservation: DiskReservation,
+        key: impl Into<String>,
+        bytes: u64,
+    ) -> Result<(), ResourceError> {
+        let charge = Arc::get_mut(&mut reservation.charge).ok_or(ResourceError::SharedOwnership)?;
+        if !Arc::ptr_eq(&charge.inner, &self.inner) {
+            return Err(ResourceError::SharedOwnership);
+        }
+        let key = (charge.tenant_id, charge.category, key.into());
+        let mut state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| ResourceError::Poisoned)?;
+        let previous = state.persistent_usage.get(&key).copied().unwrap_or(0);
+        let next_persistent = previous
+            .checked_add(bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let next_total = state
+            .current_total
+            .checked_sub(charge.bytes)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let category_index = charge.category as usize;
+        let next_category = state.current_by_category[category_index]
+            .checked_sub(charge.bytes)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let tenant_state = state
+            .tenants
+            .get(&charge.tenant_id)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let next_tenant_total = tenant_state
+            .current_total
+            .checked_sub(charge.bytes)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let next_tenant_category = tenant_state.current_by_category[category_index]
+            .checked_sub(charge.bytes)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        if next_total > self.inner.limits.global_bytes
+            || next_category > self.inner.limits.global_category_bytes[category_index]
+            || next_tenant_total > self.inner.limits.per_tenant_bytes
+            || next_tenant_category > self.inner.limits.per_tenant_category_bytes[category_index]
+        {
+            state.rejected_reservations = state.rejected_reservations.saturating_add(1);
+            return Err(ResourceError::CapacityExceeded);
+        }
+        let tenant_state = state
+            .tenants
+            .get_mut(&charge.tenant_id)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        tenant_state.current_total = next_tenant_total;
+        tenant_state.current_by_category[category_index] = next_tenant_category;
+        tenant_state.peak_total = tenant_state.peak_total.max(next_tenant_total);
+        tenant_state.peak_by_category[category_index] =
+            tenant_state.peak_by_category[category_index].max(next_tenant_category);
+        state.current_total = next_total;
+        state.current_by_category[category_index] = next_category;
+        state.peak_total = state.peak_total.max(next_total);
+        state.peak_by_category[category_index] =
+            state.peak_by_category[category_index].max(next_category);
+        if next_persistent == 0 {
+            state.persistent_usage.remove(&key);
+        } else {
+            state.persistent_usage.insert(key, next_persistent);
+        }
+        charge.bytes = 0;
+        if next_tenant_total == 0 {
+            state.tenants.remove(&charge.tenant_id);
+        }
         Ok(())
     }
 
@@ -424,6 +508,9 @@ impl BlinkDiskResourceManager {
             state.persistent_usage.remove(&persistent_key);
         } else {
             state.persistent_usage.insert(persistent_key, bytes);
+        }
+        if next_tenant_total == 0 {
+            state.tenants.remove(&tenant_id);
         }
         Ok(())
     }
