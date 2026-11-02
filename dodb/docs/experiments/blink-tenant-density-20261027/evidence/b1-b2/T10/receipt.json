@@ -11,7 +11,8 @@
     "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b",
     "163961877f966e076c66d772dd3310724b2a1cbb",
     "70133a4f6885ea2b46904a54f5acb8c20c2ff760",
-    "445dce45c585abd9b2d795dd14c468e4e9463791"
+    "445dce45c585abd9b2d795dd14c468e4e9463791",
+    "560d185172d27c266b676d2a44e2508b28515335"
   ],
   "push": {
     "remote": "origin",
@@ -42,7 +43,7 @@
     "dodb/crates/dodb-storage/src/wal.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "5b0603bb863db40ed94d2edbabdfca956d7a3ce511b57a1ea90bc2e6d4a77be2",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "8629cb5e37beaeb96e6eaa0b111614aee4c0693eb98f726034375f8e99e2e29a",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "a4b1321c4793fb086fdf77900d3a33f7bfef51bd46fce9c2d3b83748247e461c",
     "dodb/crates/dodb-storage/src/blink/page_locator.rs": "80fbbdc6a569b379b563e8ad65b396c047bb4e63524240e3126c15710d59b48a",
     "dodb/crates/dodb-storage/src/bin/phase0-bench.rs": "2cf4d0a7d12caaa477046445f3a4675c861b85628105c81496115e2e03c50c81",
@@ -57,7 +58,7 @@
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "445dce45c585abd9b2d795dd14c468e4e9463791"
+    "source_commit": "560d185172d27c266b676d2a44e2508b28515335"
   },
   "features": [
     "blink-demand-paging",
@@ -999,6 +1000,27 @@
         "sha256": "f0fad39885bb275506ddcf1fbcfd493400b9d95fc1108503c69df5ab80911cf4"
       },
       "source_commit": "445dce45c585abd9b2d795dd14c468e4e9463791"
+    },
+    {
+      "name": "paged_writer_old_reader_gc_retention",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "paged_transaction_writer_publishes_complete_and_incremental_checkpoints"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "1 passed; an old reader returns its exact pre-checkpoint value after two publications, and source GC protects its WAL segment while the reader root remains pinned.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-old-reader-gc-focused.log",
+        "sha256": "1da960b436fad2113e48aa617e7c19b2ad87d5cc83da5407887d6f806d37f023"
+      },
+      "source_commit": "560d185172d27c266b676d2a44e2508b28515335"
     }
   ],
   "acceptance_mapping": {
@@ -1106,7 +1128,7 @@
     }
   ],
   "remaining_work": [
-    "Add process-kill checkpoint crash/reopen, old-reader, and GC retention oracles; integrate source-catalog registration and old-root collection",
+    "Persist the source catalog and test restart-time recovery-root/source retention plus background GC integration",
     "Reserve source/index disk overlap and required loader memory together with checkpoint output and index promotion",
     "Resolve the eight-page pinned-root index-capacity attempt without increasing the cap to hide the bound; test defer and progress after capacity release",
     "Implement resumable worker slices, bounded checkpoint debt, and time-above-threshold accounting"

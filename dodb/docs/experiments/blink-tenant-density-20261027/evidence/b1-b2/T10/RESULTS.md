@@ -84,3 +84,13 @@ T10 remains partial. The active-job guard does not yet provide resumable bounded
 - Raw logs: `logs/paged-checkpoint-pointer-fault-feature-lib.log`, `logs/paged-checkpoint-pointer-fault-all-targets-compile.log` (first compile warning), `logs/paged-checkpoint-pointer-fault-all-targets-compile-final.log`, and `logs/paged-checkpoint-pointer-fault-strict-clippy.log`.
 
 T10 remains partial. Process-kill crash/reopen, source-catalog and GC integration, source/index disk reservations, combined loader/index/output accounting, bounded defer with progress after capacity release, resumable slices, and checkpoint debt/time-above-threshold accounting remain open.
+
+## Completed substep: old-reader retention through checkpoint GC
+
+- The writer integration fixture now holds a pre-checkpoint reader through complete and incremental publication, reads its exact older value afterward, and runs source collection against its WAL segment.
+- The collected WAL is reported protected and remains present while the old reader root is pinned. This exercises the writer-created root leases and `SourceManager::collect_garbage` together.
+- Focused writer/reader/GC fixture: 1 passed. The complete feature suite had passed after the pointer fault-path change; this substep changes only the focused fixture.
+- Source commit: `560d185172d27c266b676d2a44e2508b28515335`.
+- Raw log: `logs/paged-writer-old-reader-gc-focused.log`.
+
+T10 remains partial. Persistent source-catalog publication, restart-time root/source retention, source/index disk reservations, combined loader/index/output accounting, bounded defer and progress after capacity release, resumable slices, and checkpoint debt/time-above-threshold accounting remain open.
