@@ -14,7 +14,8 @@
     "445dce45c585abd9b2d795dd14c468e4e9463791",
     "560d185172d27c266b676d2a44e2508b28515335",
     "03f01f45a982289258aee7b8bc92b024078223a4",
-    "22a0e4a673"
+    "22a0e4a673",
+    "e9b06076ed3b01e3daaa3605155f474cf0fe4323"
   ],
   "push": {
     "remote": "origin",
@@ -42,25 +43,27 @@
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs",
     "dodb/crates/dodb-storage/src/blink/version_index.rs",
-    "dodb/crates/dodb-storage/src/wal.rs"
+    "dodb/crates/dodb-storage/src/wal.rs",
+    "dodb/crates/dodb-storage/src/blink/source_catalog.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "32e1bac969163da97d0939da76ae77a5f1471ac24a631a7ad2137f7054305a51",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "3948e07d2aaafa6eacd15b3a2b44f8bf2c826a9da4d1aaae418f48c29de23454",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "a4b1321c4793fb086fdf77900d3a33f7bfef51bd46fce9c2d3b83748247e461c",
     "dodb/crates/dodb-storage/src/blink/page_locator.rs": "80fbbdc6a569b379b563e8ad65b396c047bb4e63524240e3126c15710d59b48a",
     "dodb/crates/dodb-storage/src/bin/phase0-bench.rs": "2cf4d0a7d12caaa477046445f3a4675c861b85628105c81496115e2e03c50c81",
     "dodb/crates/dodb-storage/src/blink/durable_bases.rs": "26fd15c75154e71c42394f50e9f97b3bad8e6f7992e3161d35a6fd35ddaa9f08",
     "dodb/crates/dodb-storage/src/blink/version_index.rs": "08a36c1dee332255d12084831db88ad0ff540a448067d75d5584921f867836b8",
-    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "dece389300575f090e393780fc1a9a31aaf6f2689774ec604677c0c3967d8a4f",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "06e24fee45dff4e55ebaece9010ef15f403b6837ba1ca856ac933e82028f8afe",
     "dodb/crates/dodb-storage/src/wal.rs": "7fec7f957680ed1dc779ec355cd9b90018bc27ddb88023b6c446dd38763f601d",
-    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "e69d6062bfb9371d2e3a6b28ac3d114697642c4017d81f12666e8413fc46d366"
+    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "e69d6062bfb9371d2e3a6b28ac3d114697642c4017d81f12666e8413fc46d366",
+    "dodb/crates/dodb-storage/src/blink/source_catalog.rs": "b4ee0e0802b85a3bad2256c1cf10a808f2680a7b4b68268e1a2d25d254fecd73"
   },
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "22a0e4a673f97ea96d714c88ff1c2b4532e1305b"
+    "source_commit": "e9b06076ed3b01e3daaa3605155f474cf0fe4323"
   },
   "features": [
     "blink-demand-paging",
@@ -1236,6 +1239,138 @@
         "sha256": "59fd173fe674d5e65dc16ce35c00ad7eb2e4a56eafdfaab9bca2f6656ae79f9f"
       },
       "source_commit": "22a0e4a673f97ea96d714c88ff1c2b4532e1305b"
+    },
+    {
+      "name": "source_catalog_multi_page_checksum_fixture",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "blink::source_catalog::tests::source_catalog_streams_multi_page_marker_runs_and_rejects_corruption",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; traversed a three-page catalog and rejected page corruption.",
+      "raw_log": {
+        "path": "docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/source-catalog-multipage-focused.log",
+        "sha256": "0c31a0ed704e542d45e0cbc79e85818c8dd081a63c8c059f2a0917402fffc16d"
+      },
+      "source_commit": "e9b06076ed3b01e3daaa3605155f474cf0fe4323"
+    },
+    {
+      "name": "source_catalog_pending_publication_gc_fixture",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "pending_catalog_publication_protects_recovery_wal_from_gc",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; GC is deferred during catalog construction, protects a pending unindexed recovery WAL, and can collect it after publication is abandoned.",
+      "raw_log": {
+        "path": "docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/source-catalog-pending-publication-focused.log",
+        "sha256": "607f2e43cad96180fa7aa90756fc34694ff66114b660367e7269c1ce9195bcd7"
+      },
+      "source_commit": "e9b06076ed3b01e3daaa3605155f474cf0fe4323"
+    },
+    {
+      "name": "source_catalog_restart_gc_writer_fixture",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "paged_transaction_writer_publishes_complete_and_incremental_checkpoints",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; reopened the manifest, validated the persisted source catalog against the durable index and source headers, and retained the recovery WAL through GC.",
+      "raw_log": {
+        "path": "docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/source-catalog-restart-gc-focused.log",
+        "sha256": "cf79b1e3e057840e77ffa3494b9e088011d52347d4773475a604bdbde4178f85"
+      },
+      "source_commit": "e9b06076ed3b01e3daaa3605155f474cf0fe4323"
+    },
+    {
+      "name": "source_catalog_feature_library_tests",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "299 passed, 0 failed, 4 ignored; finished in 61.09s.",
+      "raw_log": {
+        "path": "docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/source-catalog-feature-library-final2.log",
+        "sha256": "8e47459d966e0a231707cef32b9b1514793634acb32cf504aa4d5866f4db0b27"
+      },
+      "source_commit": "e9b06076ed3b01e3daaa3605155f474cf0fe4323"
+    },
+    {
+      "name": "source_catalog_all_targets_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--all-targets",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "All targets compiled; existing benchmark harness dead-code warnings remain.",
+      "raw_log": {
+        "path": "docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/source-catalog-all-targets-check-final3.log",
+        "sha256": "0b74c9db80fbd1cf674f924e13822705189bacf23ef80d1f0d46247a5030de24"
+      },
+      "source_commit": "e9b06076ed3b01e3daaa3605155f474cf0fe4323"
+    },
+    {
+      "name": "source_catalog_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 101,
+      "summary": "12 existing storage diagnostics remain; no diagnostic points to the source catalog or source lifecycle changes.",
+      "raw_log": {
+        "path": "docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/source-catalog-strict-clippy-final3.log",
+        "sha256": "6d021716c2bfa203d203ecd0d9b66f860ddb6147553559fcc9680028f692c1fb"
+      },
+      "source_commit": "e9b06076ed3b01e3daaa3605155f474cf0fe4323"
     }
   ],
   "acceptance_mapping": {
@@ -1249,7 +1384,8 @@
     "bounded_memory_and_source_index_disk_reservations": "partial: pack output is bounded to 16 KiB coalesced or 4 KiB uncoalesced; checkpoint insertion and durable root promotion reserve 128 KiB each, and the writer integration uses a 512 KiB progress pool; required loader overlap and source/index disk reservations are not integrated",
     "tiny_capacity_bounded_defer_and_eventual_progress": "partial: a 64 KiB progress pool rejects the 128 KiB checkpoint insertion unit before changing root or progress accounting; scheduler defer/wake and eventual progress after capacity release are not implemented",
     "checkpoint_debt_and_time_above_threshold": "not implemented; no maintenance scheduler or tenant debt accounting exists yet",
-    "resumable_bounded_slices": "passed within a single writer job: a one-page slice yields before completion, a later commit proceeds between slices while the pinned target remains fixed, the cursor visits descriptors in order with fixed-depth state, and a failed slice cannot be retried; fair tenant scheduling remains unimplemented"
+    "resumable_bounded_slices": "passed within a single writer job: a one-page slice yields before completion, a later commit proceeds between slices while the pinned target remains fixed, the cursor visits descriptors in order with fixed-depth state, and a failed slice cannot be retried; fair tenant scheduling remains unimplemented",
+    "persistent_source_catalog_and_restart_gc": "passed for the exercised checkpoint writer path: immutable multi-page catalog is synced before manifest publication; reopen validates its exact source identity set and headers; GC protects the manifest recovery WAL and pending catalog roots across publication; process-kill boundaries and catalog compaction remain open"
   },
   "ownership_peaks": {
     "coalesced_output_buffer_bytes": 16384,
@@ -1341,13 +1477,29 @@
       "reason": "Initial strict Clippy found excessive arguments and redundant Result wrapping in the new checkpoint generation function; moved the generation values into a request struct and returned the promoted root directly.",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-target-interleave-strict-clippy.log",
       "sha256": "6a25c216ffcde19c004cfb6eee17d69064964b8142917a8d84326b2e1062f3c2"
+    },
+    {
+      "name": "source_catalog_marker_run_initial_filename_collision",
+      "exit_status": 101,
+      "reason": "The temporary marker-run file matched the source marker prefix and was decoded as a source record; marker ingestion now accepts only 64-character hexadecimal source marker names. The test fixture cleaned its temporary directory and no raw failure log was captured."
+    },
+    {
+      "name": "source_catalog_initial_strict_clippy_collapsible_if",
+      "exit_status": 101,
+      "reason": "Strict Clippy found one new collapsible-if diagnostic in source catalog traversal; the condition was combined and the final run contains only the 12 existing storage diagnostics.",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/source-catalog-strict-clippy.log"
+    },
+    {
+      "name": "source_catalog_all_targets_log_path_mismatch",
+      "exit_status": 1,
+      "reason": "The first compile capture used a repository-root-relative log path while the working directory was the dodb subdirectory. Cargo compilation itself succeeded; rerunning from the same code with the correct path captured a successful check. No raw failed capture was saved."
     }
   ],
   "remaining_work": [
-    "Persist the source catalog and test restart-time recovery-root/source retention plus background GC integration",
     "Reserve source/index disk overlap and required loader memory together with checkpoint output and index promotion",
     "Resolve the eight-page pinned-root index-capacity attempt without increasing the cap to hide the bound; test defer and progress after capacity release",
-    "Implement a fair multi-tenant continuation scheduler and bounded checkpoint debt/time-above-threshold accounting"
+    "Implement a fair multi-tenant continuation scheduler and bounded checkpoint debt/time-above-threshold accounting",
+    "Bound catalog disk growth and reclaim unreachable catalog generations safely; add process-kill recovery coverage for the paged writer"
   ],
   "next_task": "T10"
 }
