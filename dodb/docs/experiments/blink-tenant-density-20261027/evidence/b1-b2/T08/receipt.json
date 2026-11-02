@@ -1,0 +1,162 @@
+{
+  "task_id": "T08",
+  "scope": "Demand-loaded Get, Query, Scan, overflow, cursor, and response-budget read route over immutable version-index roots",
+  "status": "accepted",
+  "parent_source_commit": "f4075c014",
+  "implementation_commits": [
+    "c84bca9f1a5c4bcd02142e18418e7f49878dcce0",
+    "81edcc6ca63d45d8edd47c8ce4a0ead60ed55ed3"
+  ],
+  "push": {
+    "remote": "origin",
+    "branch": "experiment/blink-tenant-density-20261027",
+    "status": "pushed"
+  },
+  "prerequisite_receipts": [
+    {
+      "task_id": "T06",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T06/receipt.json",
+      "sha256": "f73b4a07fc3bc27e7e0212fc4e335a3fe9a205560ad862da4aa46e2cc94cfabd"
+    },
+    {
+      "task_id": "T07",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T07/receipt.json",
+      "sha256": "9ca65a823e715476e726ddf99b3494f5b70446bcad0424451c468fd4bb67bd4c"
+    },
+    {
+      "task_id": "T00-delta-ancestry-amendment",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/B1-B2-CONTRACTS.md",
+      "sha256": "d9b9219af2fbae79ae80fc74c93cd9e6067728218e1f71f08bf0aae1b96774b1"
+    }
+  ],
+  "owned_paths": [
+    "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "dodb/crates/dodb-storage/src/blink/page_cache.rs",
+    "dodb/crates/dodb-storage/src/blink/leaf.rs",
+    "dodb/crates/dodb-storage/src/wal.rs"
+  ],
+  "source_hashes": {
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "6f8c63b43bd2560621c96171f7a4cab44729f1dbb4556d35c5b6733ea7d54cdc",
+    "dodb/crates/dodb-storage/src/blink/page_cache.rs": "977ee1626bc6273da0643966fb515b043f847bfe4477d22e79c20f34d69e5e30",
+    "dodb/crates/dodb-storage/src/blink/leaf.rs": "2d85114cb2724c085821ca67fb9407012dc5426ad2ba97f8f89b3d3ed378dcf3",
+    "dodb/crates/dodb-storage/src/wal.rs": "20f2b194c4c2ba8b62125b71ed04054aa95abe559c457590043f209ba0657312"
+  },
+  "host": {
+    "os": "macOS arm64",
+    "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+    "branch": "experiment/blink-tenant-density-20261027"
+  },
+  "features": [
+    "blink-demand-paging"
+  ],
+  "runtime_configuration": {
+    "route": "isolated storage tests using checkpoint packs, source manager, version index, and pinned generation handles",
+    "service_route_activated": false,
+    "defaults_changed": false,
+    "oci_experiment": false,
+    "performance_matrix_started": false
+  },
+  "checks": [
+    {
+      "name": "feature_storage_library_tests_serial",
+      "argv": [
+        "cargo", "test", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml",
+        "--features", "blink-demand-paging", "--lib", "--", "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "293 passed, 0 failed, 4 ignored; finished in 115.27s",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T08/logs/storage-feature-tests-serial.log.gz",
+        "sha256": "eb89ffcc8588175e4bfe569127ec3f35dfd4e4b4ffafa600c14e1f39c7c77b2c"
+      }
+    },
+    {
+      "name": "default_storage_library_check",
+      "argv": ["cargo", "check", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--lib"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T08/logs/storage-default-lib-check.log",
+        "sha256": "f1ec48a675da44183373365fd983e1dec9eae1a5c651ec7c3e6d060619596157"
+      }
+    },
+    {
+      "name": "feature_storage_library_check",
+      "argv": ["cargo", "check", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--features", "blink-demand-paging", "--lib"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T08/logs/storage-feature-lib-check.log",
+        "sha256": "4cf86278c1e6d659943a46a3d7e3da429ac15be90f0f17742e24ef85228e7d3e"
+      }
+    },
+    {
+      "name": "package_format_check",
+      "argv": ["cargo", "fmt", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--", "--check"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T08/logs/rustfmt-check.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "working_tree_diff_check",
+      "argv": ["git", "diff", "--check"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T08/logs/git-diff-check.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "feature_strict_clippy",
+      "argv": ["cargo", "clippy", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--features", "blink-demand-paging", "--lib", "--", "-D", "warnings"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 101,
+      "summary": "12 existing findings in blink/mod.rs and wal.rs, matching the T07 baseline; no lint suppressions added",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T08/logs/storage-feature-strict-clippy.log.gz",
+        "sha256": "a807c8609a825408d666adce8352f804e9e7812fc03ec82fe6ed5909ec5adc1f"
+      }
+    }
+  ],
+  "acceptance_mapping": {
+    "disk_page_read_route_without_full_page_payload_map_or_duplicate_owner_directory": "passed: PagedReadHandle stores an immutable version-index root, root lease, loader, source manager, and capped overlays; no BlinkState.pages ownership on this route",
+    "get_query_scan_overflow_cursor_and_response_budgets": "passed: blink::tests::paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages",
+    "seeded_reference_equivalence_sorted_16_row_query_multipage_scan_tombstones_missing_empty_cursor_and_response_rejection": "passed: named paged read route test",
+    "pinned_old_generation_during_split_overwrite_publication": "passed: old and current handles start at a barrier; old tree returns original overflow value while the new split tree returns replacement value and ordered query",
+    "four_times_dataset_to_decoded_cache_and_nonzero_source_reads": "passed: fixture indexes eight checkpoint pages with a two-page cache and asserts at least three source reads",
+    "source_corruption_on_cache_miss": "passed: source page bytes are changed after dropping prior handles; a fresh handle rejects the miss",
+    "bounded_decoded_and_metadata_retention": "passed by configured loader cache limits and page_cache tests for reservations, coalescing, all-pinned overload, and guard-owned charge; overlay segment count is capped",
+    "service_route_and_default_activation": "not activated by design; reserved for T09-T15"
+  },
+  "ownership_peaks": {
+    "fixture_indexed_pages": 8,
+    "configured_decoded_cache_bytes": 8192,
+    "configured_maximum_load_reconstruction_bytes": 8192,
+    "resource_manager_decoded_payload_limit_bytes": 16384,
+    "measured_peak_reservations": "not sampled in this integrated correctness fixture; cache and resource limits are enforced and independently exercised by page_cache/resource tests"
+  },
+  "failed_attempts": [
+    {
+      "scope": "test-only split fixture compile",
+      "observation": "An initial fixture expression consumed sort_key before using it to select its reference value (E0382). The fixture now clones the value before consuming the key; the focused test and final full suite pass.",
+      "classification": "transient compile failure; no experiment data or artifacts discarded"
+    }
+  ],
+  "remaining_work": [
+    "T09 demand-loaded atomic writer and bounded WAL chains",
+    "T10-T16 streaming checkpoint, recovery, service, resource, and experiment-readiness acceptance",
+    "T17 remains separately authorized and was not started"
+  ],
+  "next_task": "T09"
+}
