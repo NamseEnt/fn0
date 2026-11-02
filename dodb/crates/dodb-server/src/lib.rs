@@ -5482,6 +5482,59 @@ mod tests {
     }
 
     #[cfg(feature = "blink-demand-paging")]
+    fn paged_crash_record_loader_metrics(
+        service: &BlinkTenantService,
+        tenant: TenantId,
+        marker_path: &std::path::Path,
+    ) {
+        let loader_metrics = paged_crash_loader_metrics(service, tenant);
+        let resources = service.shared_resources.as_ref().unwrap();
+        let memory_peaks = resources.snapshot().unwrap();
+        let disk_peaks = resources.disk().snapshot().unwrap();
+        assert!(loader_metrics.cache_misses > 0);
+        assert!(loader_metrics.evictions > 0);
+        assert!(loader_metrics.wal_reconstructions > 0);
+        assert!(loader_metrics.peak_cache_bytes <= 8 * dodb_storage::PAGE_SIZE as u64);
+        assert_eq!(loader_metrics.active_loads, 0);
+        assert_eq!(loader_metrics.active_followers, 0);
+        std::fs::write(
+            marker_path,
+            format!(
+                "cache_misses={}\nevictions={}\nsource_reads={}\nwal_reconstructions={}\ncache_peak_bytes={}\nactive_loads={}\nactive_followers={}\nmemory_peak_total={}\nmemory_peak_by_category={:?}\ndisk_peak_total={}\ndisk_peak_by_category={:?}\n",
+                loader_metrics.cache_misses,
+                loader_metrics.evictions,
+                loader_metrics.source_reads,
+                loader_metrics.wal_reconstructions,
+                loader_metrics.peak_cache_bytes,
+                loader_metrics.active_loads,
+                loader_metrics.active_followers,
+                memory_peaks.peak_total,
+                memory_peaks.peak_by_category,
+                disk_peaks.peak_total,
+                disk_peaks.peak_by_category
+            ),
+        )
+        .unwrap();
+        eprintln!(
+            "paged service loader metrics: cache_misses={} evictions={} source_reads={} wal_reconstructions={} cache_peak_bytes={} active_loads={} active_followers={}",
+            loader_metrics.cache_misses,
+            loader_metrics.evictions,
+            loader_metrics.source_reads,
+            loader_metrics.wal_reconstructions,
+            loader_metrics.peak_cache_bytes,
+            loader_metrics.active_loads,
+            loader_metrics.active_followers
+        );
+        eprintln!(
+            "paged service resource peaks: memory_total={} memory_categories={:?} disk_total={} disk_categories={:?}",
+            memory_peaks.peak_total,
+            memory_peaks.peak_by_category,
+            disk_peaks.peak_total,
+            disk_peaks.peak_by_category
+        );
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
     fn paged_crash_current_manifest(
         service: &BlinkTenantService,
         tenant: TenantId,
@@ -5606,6 +5659,11 @@ mod tests {
                 b"acknowledged",
             )
             .unwrap();
+            paged_crash_record_loader_metrics(
+                &service,
+                tenant,
+                &marker_directory.join("paged-first-loader-metrics"),
+            );
         } else {
             let primary_revision = std::fs::read_to_string(
                 marker_directory.join("paged-second-acknowledged-revision"),
@@ -5629,11 +5687,28 @@ mod tests {
                 primary_revision,
             )
             .await;
+            for key_number in 0..16u32 {
+                assert_paged_crash_value_only(
+                    &service,
+                    tenant,
+                    DocumentKey::new(
+                        b"paged-crash-dataset".to_vec(),
+                        key_number.to_be_bytes().to_vec(),
+                    ),
+                    &vec![key_number.wrapping_add(20) as u8; 4_096],
+                )
+                .await;
+            }
             std::fs::write(
                 marker_directory.join("paged-second-write-verified"),
                 b"verified",
             )
             .unwrap();
+            paged_crash_record_loader_metrics(
+                &service,
+                tenant,
+                &marker_directory.join("paged-second-loader-metrics"),
+            );
         }
 
         let marker_path = marker_directory.join(format!("paged-{stage}-paused"));
@@ -5785,11 +5860,13 @@ mod tests {
                     vec![
                         marker_directory.join("paged-first-writes-acknowledged"),
                         marker_directory.join("paged-first-checkpoint-completed"),
+                        marker_directory.join("paged-first-loader-metrics"),
                         marker_directory.join("paged-first-paused"),
                     ]
                 } else {
                     vec![
                         marker_directory.join("paged-second-write-verified"),
+                        marker_directory.join("paged-second-loader-metrics"),
                         marker_directory.join("paged-second-paused"),
                     ]
                 };
@@ -6926,52 +7003,121 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "blink-demand-paging")]
     async fn paged_service_query_keeps_one_snapshot_across_concurrent_multi_key_commit() {
-        let directory = blink_test_directory();
-        let tenant = TenantId::new(713);
-        let service = Arc::new(
-            BlinkTenantService::new(LocalTenantServiceConfig {
-                data_dir: directory.path().to_path_buf(),
-                max_open_shards: 1,
-                blink_open_waiter_limit: 4,
-                blink_wal_layout: BlinkWalLayout::SegmentedBases {
-                    max_segment_bytes: 1_048_576,
-                    coalesce: true,
-                },
-                blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
-                    threshold_bytes: u64::MAX,
-                },
-                blink_checkpoint_execution: BlinkCheckpointExecution::Background,
-                blink_shared_resources: Some(writable_paged_blink_shared_resources()),
-                ..LocalTenantServiceConfig::default()
-            })
-            .unwrap(),
-        );
-        let database_path = service.database_path(tenant);
-        create_empty_paged_service_fixture(&database_path, tenant);
-        let page_read_gate = Arc::new(OneShotTestGate {
-            barrier: std::sync::Barrier::new(2),
-            blocks_next_worker: std::sync::atomic::AtomicBool::new(true),
-        });
-        service.set_page_read_test_gate(Arc::clone(&page_read_gate));
-        let first_key = dodb_core::DocumentKey::new(b"pk".to_vec(), b"a".to_vec());
-        let second_key = dodb_core::DocumentKey::new(b"pk".to_vec(), b"b".to_vec());
-        for (key, value) in [
-            (first_key.clone(), b"old-a".to_vec()),
-            (second_key.clone(), b"old-b".to_vec()),
-        ] {
-            service
-                .execute_request(
-                    tenant,
-                    Request::Put { key, value },
-                    ExecutionBudget::new(1024),
-                )
-                .await
-                .unwrap();
-        }
+        for coalesce in [false, true] {
+            let directory = blink_test_directory();
+            let tenant = TenantId::new(713 + u64::from(coalesce));
+            let service = Arc::new(
+                BlinkTenantService::new(LocalTenantServiceConfig {
+                    data_dir: directory.path().to_path_buf(),
+                    max_open_shards: 1,
+                    blink_open_waiter_limit: 4,
+                    blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                        max_segment_bytes: 1_048_576,
+                        coalesce,
+                    },
+                    blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                        threshold_bytes: u64::MAX,
+                    },
+                    blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+                    blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+                    ..LocalTenantServiceConfig::default()
+                })
+                .unwrap(),
+            );
+            let database_path = service.database_path(tenant);
+            create_empty_paged_service_fixture(&database_path, tenant);
+            let page_read_gate = Arc::new(OneShotTestGate {
+                barrier: std::sync::Barrier::new(2),
+                blocks_next_worker: std::sync::atomic::AtomicBool::new(true),
+            });
+            service.set_page_read_test_gate(Arc::clone(&page_read_gate));
+            let first_key = dodb_core::DocumentKey::new(b"pk".to_vec(), b"a".to_vec());
+            let second_key = dodb_core::DocumentKey::new(b"pk".to_vec(), b"b".to_vec());
+            for (key, value) in [
+                (first_key.clone(), b"old-a".to_vec()),
+                (second_key.clone(), b"old-b".to_vec()),
+            ] {
+                service
+                    .execute_request(
+                        tenant,
+                        Request::Put { key, value },
+                        ExecutionBudget::new(1024),
+                    )
+                    .await
+                    .unwrap();
+            }
 
-        let query_service = Arc::clone(&service);
-        let query_task = tokio::spawn(async move {
-            query_service
+            let query_service = Arc::clone(&service);
+            let query_task = tokio::spawn(async move {
+                query_service
+                    .execute_request(
+                        tenant,
+                        Request::Query {
+                            pk: dodb_core::PrimaryKey::new(b"pk".to_vec()),
+                            exclusive_after_sk: None,
+                            limit: 8,
+                        },
+                        ExecutionBudget::new(4096),
+                    )
+                    .await
+            });
+            tokio::time::timeout(std::time::Duration::from_secs(2), async {
+                loop {
+                    if !page_read_gate.blocks_next_worker.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+
+            let write_result = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                service.execute_request(
+                    tenant,
+                    Request::Transact {
+                        request: TransactionRequest::new(
+                            vec![
+                                TransactionCondition::Exists {
+                                    key: first_key.clone(),
+                                },
+                                TransactionCondition::Exists {
+                                    key: second_key.clone(),
+                                },
+                            ],
+                            vec![
+                                TransactionMutation::Put {
+                                    key: first_key.clone(),
+                                    value: b"new-a".to_vec(),
+                                },
+                                TransactionMutation::Put {
+                                    key: second_key.clone(),
+                                    value: b"new-b".to_vec(),
+                                },
+                            ],
+                        ),
+                    },
+                    ExecutionBudget::new(4096),
+                ),
+            )
+            .await
+            .expect("concurrent transaction did not complete while Query held its old snapshot")
+            .unwrap();
+            assert!(matches!(write_result, Response::Transact(_)));
+
+            page_read_gate.barrier.wait();
+            let old_query = query_task.await.unwrap().unwrap();
+            let Response::Query(old_rows) = old_query else {
+                panic!("expected a query response")
+            };
+            assert_eq!(old_rows.len(), 2);
+            assert_eq!(old_rows[0].key, first_key);
+            assert_eq!(old_rows[0].value, b"old-a");
+            assert_eq!(old_rows[1].key, second_key);
+            assert_eq!(old_rows[1].value, b"old-b");
+
+            let new_query = service
                 .execute_request(
                     tenant,
                     Request::Query {
@@ -6982,85 +7128,18 @@ mod tests {
                     ExecutionBudget::new(4096),
                 )
                 .await
-        });
-        tokio::time::timeout(std::time::Duration::from_secs(2), async {
-            loop {
-                if !page_read_gate.blocks_next_worker.load(Ordering::SeqCst) {
-                    break;
-                }
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
-
-        let write_result = tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            service.execute_request(
-                tenant,
-                Request::Transact {
-                    request: TransactionRequest::new(
-                        vec![
-                            TransactionCondition::Exists {
-                                key: first_key.clone(),
-                            },
-                            TransactionCondition::Exists {
-                                key: second_key.clone(),
-                            },
-                        ],
-                        vec![
-                            TransactionMutation::Put {
-                                key: first_key.clone(),
-                                value: b"new-a".to_vec(),
-                            },
-                            TransactionMutation::Put {
-                                key: second_key.clone(),
-                                value: b"new-b".to_vec(),
-                            },
-                        ],
-                    ),
-                },
-                ExecutionBudget::new(4096),
-            ),
-        )
-        .await
-        .expect("concurrent transaction did not complete while Query held its old snapshot")
-        .unwrap();
-        assert!(matches!(write_result, Response::Transact(_)));
-
-        page_read_gate.barrier.wait();
-        let old_query = query_task.await.unwrap().unwrap();
-        let Response::Query(old_rows) = old_query else {
-            panic!("expected a query response")
-        };
-        assert_eq!(old_rows.len(), 2);
-        assert_eq!(old_rows[0].key, first_key);
-        assert_eq!(old_rows[0].value, b"old-a");
-        assert_eq!(old_rows[1].key, second_key);
-        assert_eq!(old_rows[1].value, b"old-b");
-
-        let new_query = service
-            .execute_request(
-                tenant,
-                Request::Query {
-                    pk: dodb_core::PrimaryKey::new(b"pk".to_vec()),
-                    exclusive_after_sk: None,
-                    limit: 8,
-                },
-                ExecutionBudget::new(4096),
-            )
-            .await
-            .unwrap();
-        let Response::Query(new_rows) = new_query else {
-            panic!("expected a query response")
-        };
-        assert_eq!(new_rows.len(), 2);
-        assert_eq!(new_rows[0].key, first_key);
-        assert_eq!(new_rows[0].value, b"new-a");
-        assert_eq!(new_rows[1].key, second_key);
-        assert_eq!(new_rows[1].value, b"new-b");
-        assert_eq!(new_rows[0].revision, new_rows[1].revision);
-        service.shutdown_checked().await.unwrap();
+                .unwrap();
+            let Response::Query(new_rows) = new_query else {
+                panic!("expected a query response")
+            };
+            assert_eq!(new_rows.len(), 2);
+            assert_eq!(new_rows[0].key, first_key);
+            assert_eq!(new_rows[0].value, b"new-a");
+            assert_eq!(new_rows[1].key, second_key);
+            assert_eq!(new_rows[1].value, b"new-b");
+            assert_eq!(new_rows[0].revision, new_rows[1].revision);
+            service.shutdown_checked().await.unwrap();
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -7153,106 +7232,115 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "blink-demand-paging")]
     async fn cancelled_paged_write_keeps_charges_until_shutdown_drain() {
-        let directory = blink_test_directory();
-        let tenant = TenantId::new(719);
-        let service = Arc::new(
-            BlinkTenantService::new(LocalTenantServiceConfig {
-                data_dir: directory.path().to_path_buf(),
-                max_open_shards: 1,
-                blink_open_waiter_limit: 4,
-                blink_wal_layout: BlinkWalLayout::SegmentedBases {
-                    max_segment_bytes: 1_048_576,
-                    coalesce: true,
-                },
-                blink_shared_resources: Some(writable_paged_blink_shared_resources()),
-                ..LocalTenantServiceConfig::default()
-            })
-            .unwrap(),
-        );
-        create_empty_paged_service_fixture(&service.database_path(tenant), tenant);
-        let commit_gate = Arc::new(OneShotTestGate {
-            barrier: std::sync::Barrier::new(2),
-            blocks_next_worker: std::sync::atomic::AtomicBool::new(true),
-        });
-        service.set_commit_test_gate(Arc::clone(&commit_gate));
-        let write_service = Arc::clone(&service);
-        let write_task = tokio::spawn(async move {
-            write_service
-                .execute_request(
-                    tenant,
-                    Request::Put {
-                        key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"shutdown".to_vec()),
-                        value: b"durable-on-drain".to_vec(),
+        for coalesce in [false, true] {
+            let directory = blink_test_directory();
+            let tenant = TenantId::new(719 + u64::from(coalesce));
+            let service = Arc::new(
+                BlinkTenantService::new(LocalTenantServiceConfig {
+                    data_dir: directory.path().to_path_buf(),
+                    max_open_shards: 1,
+                    blink_open_waiter_limit: 4,
+                    blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                        max_segment_bytes: 1_048_576,
+                        coalesce,
                     },
-                    ExecutionBudget::new(1024),
-                )
-                .await
-        });
-        let resources = service.shared_resources.as_ref().unwrap();
-        tokio::time::timeout(std::time::Duration::from_secs(2), async {
-            loop {
-                let snapshot = resources.snapshot().unwrap();
-                if service.coordinator_activity.active.load(Ordering::SeqCst) > 0
-                    && snapshot.current_by_category
-                        [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize]
-                        > 0
-                    && snapshot.current_by_category
-                        [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize]
-                        > 0
-                {
-                    break;
+                    blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+                    ..LocalTenantServiceConfig::default()
+                })
+                .unwrap(),
+            );
+            create_empty_paged_service_fixture(&service.database_path(tenant), tenant);
+            let commit_gate = Arc::new(OneShotTestGate {
+                barrier: std::sync::Barrier::new(2),
+                blocks_next_worker: std::sync::atomic::AtomicBool::new(true),
+            });
+            service.set_commit_test_gate(Arc::clone(&commit_gate));
+            let write_service = Arc::clone(&service);
+            let write_task = tokio::spawn(async move {
+                write_service
+                    .execute_request(
+                        tenant,
+                        Request::Put {
+                            key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"shutdown".to_vec()),
+                            value: b"durable-on-drain".to_vec(),
+                        },
+                        ExecutionBudget::new(1024),
+                    )
+                    .await
+            });
+            let resources = service.shared_resources.as_ref().unwrap().clone();
+            tokio::time::timeout(std::time::Duration::from_secs(2), async {
+                loop {
+                    let snapshot = resources.snapshot().unwrap();
+                    if service.coordinator_activity.active.load(Ordering::SeqCst) > 0
+                        && snapshot.current_by_category
+                            [dodb_storage::blink::resource::ResourceCategory::QueuedForeground
+                                as usize]
+                            > 0
+                        && snapshot.current_by_category
+                            [dodb_storage::blink::resource::ResourceCategory::WritePreparation
+                                as usize]
+                            > 0
+                    {
+                        break;
+                    }
+                    tokio::task::yield_now().await;
                 }
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
-        let gate_release = tokio::task::spawn_blocking({
-            let commit_gate = Arc::clone(&commit_gate);
-            move || commit_gate.barrier.wait()
-        });
-        write_task.abort();
-        assert!(write_task.await.unwrap_err().is_cancelled());
-        let held_snapshot = resources.snapshot().unwrap();
-        assert!(
-            held_snapshot.current_by_category
-                [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize]
-                > 0
-        );
-        assert!(
-            held_snapshot.current_by_category
-                [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize]
-                > 0
-        );
-        let shutdown_service = Arc::clone(&service);
-        let shutdown_task = tokio::spawn(async move { shutdown_service.shutdown_checked().await });
-        tokio::time::timeout(std::time::Duration::from_secs(2), async {
-            loop {
-                if service.shards.lock().unwrap().shutting_down {
-                    break;
+            })
+            .await
+            .unwrap();
+            let gate_release = tokio::task::spawn_blocking({
+                let commit_gate = Arc::clone(&commit_gate);
+                move || commit_gate.barrier.wait()
+            });
+            write_task.abort();
+            assert!(write_task.await.unwrap_err().is_cancelled());
+            let held_snapshot = resources.snapshot().unwrap();
+            assert!(
+                held_snapshot.current_by_category
+                    [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize]
+                    > 0
+            );
+            assert!(
+                held_snapshot.current_by_category
+                    [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize]
+                    > 0
+            );
+            let shutdown_service = Arc::clone(&service);
+            let shutdown_task =
+                tokio::spawn(async move { shutdown_service.shutdown_checked().await });
+            tokio::time::timeout(std::time::Duration::from_secs(2), async {
+                loop {
+                    if service.shards.lock().unwrap().shutting_down {
+                        break;
+                    }
+                    tokio::task::yield_now().await;
                 }
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
-        gate_release.await.unwrap();
-        shutdown_task.await.unwrap().unwrap();
-        tokio::time::timeout(std::time::Duration::from_secs(2), async {
-            loop {
-                if resources.snapshot().unwrap().current_total == 0 {
-                    break;
+            })
+            .await
+            .unwrap();
+            gate_release.await.unwrap();
+            shutdown_task.await.unwrap().unwrap();
+            tokio::time::timeout(std::time::Duration::from_secs(2), async {
+                loop {
+                    if resources.snapshot().unwrap().current_total == 0 {
+                        break;
+                    }
+                    tokio::task::yield_now().await;
                 }
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
-        let drained_resources = resources.snapshot().unwrap();
-        assert_eq!(
-            drained_resources.current_total, 0,
-            "remaining resources after cancelled paged write shutdown: {drained_resources:?}"
-        );
+            })
+            .await
+            .unwrap();
+            let drained_resources = resources.snapshot().unwrap();
+            assert_eq!(
+                drained_resources.current_total, 0,
+                "remaining resources after cancelled paged write shutdown: {drained_resources:?}"
+            );
+            eprintln!(
+                "cancelled write shutdown peaks coalesce={coalesce}: memory_total={} memory_categories={:?}",
+                drained_resources.peak_total, drained_resources.peak_by_category
+            );
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -7425,288 +7513,305 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "blink-demand-paging")]
     async fn paged_checkpoint_resumes_after_disk_capacity_release() {
-        let directory = blink_test_directory();
-        let tenant = TenantId::new(721);
-        let mut shared_resources = writable_paged_blink_shared_resources();
-        let output_category = dodb_storage::blink::resource::DiskCategory::CheckpointOutput;
-        let output_limit = 1024 * 1024;
-        shared_resources.disk.global_category_bytes[output_category as usize] = output_limit;
-        shared_resources.disk.per_tenant_category_bytes[output_category as usize] = output_limit;
-        let config = LocalTenantServiceConfig {
-            data_dir: directory.path().to_path_buf(),
-            max_open_shards: 1,
-            blink_open_waiter_limit: 4,
-            blink_wal_layout: BlinkWalLayout::SegmentedBases {
-                max_segment_bytes: 1_048_576,
-                coalesce: true,
-            },
-            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
-                threshold_bytes: u64::MAX,
-            },
-            blink_checkpoint_execution: BlinkCheckpointExecution::Background,
-            blink_shared_resources: Some(shared_resources),
-            ..LocalTenantServiceConfig::default()
-        };
-        let service = BlinkTenantService::new(config.clone()).unwrap();
-        let database_path = service.database_path(tenant);
-        create_empty_paged_service_fixture(&database_path, tenant);
-        service
-            .execute_request(
-                tenant,
-                Request::Put {
-                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"sk".to_vec()),
-                    value: b"capacity-release-checkpoint".to_vec(),
+        for coalesce in [false, true] {
+            let directory = blink_test_directory();
+            let tenant = TenantId::new(721 + u64::from(coalesce));
+            let mut shared_resources = writable_paged_blink_shared_resources();
+            let output_category = dodb_storage::blink::resource::DiskCategory::CheckpointOutput;
+            let output_limit = 1024 * 1024;
+            shared_resources.disk.global_category_bytes[output_category as usize] = output_limit;
+            shared_resources.disk.per_tenant_category_bytes[output_category as usize] =
+                output_limit;
+            let config = LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                max_open_shards: 1,
+                blink_open_waiter_limit: 4,
+                blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                    max_segment_bytes: 1_048_576,
+                    coalesce,
                 },
-                ExecutionBudget::new(1024),
-            )
-            .await
-            .unwrap();
-        let shard = service
-            .shards
-            .lock()
-            .unwrap()
-            .shards
-            .get(&tenant)
-            .cloned()
-            .unwrap();
-        let writable = match &shard.read_handle {
-            BlinkShardReadHandle::Paged {
-                writable: Some(writable),
-                ..
-            } => Arc::clone(writable),
-            BlinkShardReadHandle::Resident(_) | BlinkShardReadHandle::Paged { .. } => {
-                panic!("expected the writable paged service route")
-            }
-        };
-        let resources = service.shared_resources.as_ref().unwrap().clone();
-        let disk = resources.disk();
-        let tenant_disk = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
-        let disk_headroom = 256;
-        let blocker_bytes = output_limit
-            .saturating_sub(tenant_disk.current_by_category[output_category as usize])
-            .saturating_sub(disk_headroom);
-        assert!(blocker_bytes > 0);
-        let blocker = disk
-            .reserve(tenant.get(), output_category, blocker_bytes)
-            .unwrap();
-        let checkpoint = {
-            let writable = Arc::clone(&writable);
-            tokio::spawn(async move { writable.run_threshold_checkpoint(1).await })
-        };
-        tokio::time::timeout(std::time::Duration::from_secs(2), async {
-            loop {
-                if disk.snapshot().unwrap().pending_waiters == 1 {
-                    break;
+                blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                    threshold_bytes: u64::MAX,
+                },
+                blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+                blink_shared_resources: Some(shared_resources),
+                ..LocalTenantServiceConfig::default()
+            };
+            let service = BlinkTenantService::new(config.clone()).unwrap();
+            let database_path = service.database_path(tenant);
+            create_empty_paged_service_fixture(&database_path, tenant);
+            service
+                .execute_request(
+                    tenant,
+                    Request::Put {
+                        key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"sk".to_vec()),
+                        value: b"capacity-release-checkpoint".to_vec(),
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .unwrap();
+            let shard = service
+                .shards
+                .lock()
+                .unwrap()
+                .shards
+                .get(&tenant)
+                .cloned()
+                .unwrap();
+            let writable = match &shard.read_handle {
+                BlinkShardReadHandle::Paged {
+                    writable: Some(writable),
+                    ..
+                } => Arc::clone(writable),
+                BlinkShardReadHandle::Resident(_) | BlinkShardReadHandle::Paged { .. } => {
+                    panic!("expected the writable paged service route")
                 }
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| {
-            panic!(
-                "checkpoint capacity wait did not start: finished={}, metrics={:?}",
-                checkpoint.is_finished(),
-                service.checkpoint_metrics_snapshot()
-            )
-        });
-        drop(blocker);
-        checkpoint.await.unwrap().unwrap();
-        let disk_snapshot = disk.snapshot().unwrap();
-        assert_eq!(disk_snapshot.pending_waiters, 0);
-        let metrics = service.checkpoint_metrics_snapshot();
-        assert_eq!(metrics.checkpoints_completed, 1);
-        assert_eq!(metrics.checkpoints_failed, 0);
-        service.shutdown_checked().await.unwrap();
+            };
+            let resources = service.shared_resources.as_ref().unwrap().clone();
+            let disk = resources.disk();
+            let tenant_disk = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
+            let disk_headroom = 256;
+            let blocker_bytes = output_limit
+                .saturating_sub(tenant_disk.current_by_category[output_category as usize])
+                .saturating_sub(disk_headroom);
+            assert!(blocker_bytes > 0);
+            let blocker = disk
+                .reserve(tenant.get(), output_category, blocker_bytes)
+                .unwrap();
+            let checkpoint = {
+                let writable = Arc::clone(&writable);
+                tokio::spawn(async move { writable.run_threshold_checkpoint(1).await })
+            };
+            tokio::time::timeout(std::time::Duration::from_secs(2), async {
+                loop {
+                    if disk.snapshot().unwrap().pending_waiters == 1 {
+                        break;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap_or_else(|_| {
+                panic!(
+                    "checkpoint capacity wait did not start: finished={}, metrics={:?}",
+                    checkpoint.is_finished(),
+                    service.checkpoint_metrics_snapshot()
+                )
+            });
+            drop(blocker);
+            checkpoint.await.unwrap().unwrap();
+            let disk_snapshot = disk.snapshot().unwrap();
+            assert_eq!(disk_snapshot.pending_waiters, 0);
+            let metrics = service.checkpoint_metrics_snapshot();
+            assert_eq!(metrics.checkpoints_completed, 1);
+            assert_eq!(metrics.checkpoints_failed, 0);
+            service.shutdown_checked().await.unwrap();
+            drop(writable);
+            drop(shard);
+            let memory_peaks = resources.snapshot().unwrap();
+            let disk_peaks = disk.snapshot().unwrap();
+            eprintln!(
+                "checkpoint capacity release peaks coalesce={coalesce}: memory_total={} memory_categories={:?} disk_total={} disk_categories={:?}",
+                memory_peaks.peak_total,
+                memory_peaks.peak_by_category,
+                disk_peaks.peak_total,
+                disk_peaks.peak_by_category
+            );
+            assert_eq!(memory_peaks.current_total, 0);
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "blink-demand-paging")]
     async fn paged_checkpoint_reclaims_old_reader_source_before_publication() {
-        let directory = blink_test_directory();
-        let tenant = TenantId::new(726);
-        let mut shared_resources = writable_paged_blink_shared_resources();
-        let disk_capacity = 256 * 1024 * 1024;
-        shared_resources.disk.global_bytes = disk_capacity;
-        shared_resources.disk.per_tenant_bytes = disk_capacity;
-        shared_resources.disk.global_category_bytes = [disk_capacity; 5];
-        shared_resources.disk.per_tenant_category_bytes = [disk_capacity; 5];
-        shared_resources.maximum_working_pages = 16;
-        shared_resources.maximum_checkpoint_debt_bytes_global = 1024 * 1024;
-        shared_resources.maximum_checkpoint_debt_bytes_per_tenant = 1024 * 1024;
-        let config = LocalTenantServiceConfig {
-            data_dir: directory.path().to_path_buf(),
-            max_open_shards: 1,
-            blink_open_waiter_limit: 4,
-            blink_wal_layout: BlinkWalLayout::SegmentedBases {
-                max_segment_bytes: 1_048_576,
-                coalesce: true,
-            },
-            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
-                threshold_bytes: u64::MAX,
-            },
-            blink_checkpoint_execution: BlinkCheckpointExecution::Background,
-            blink_shared_resources: Some(shared_resources),
-            ..LocalTenantServiceConfig::default()
-        };
-        let service = BlinkTenantService::new(config.clone()).unwrap();
-        let database_path = service.database_path(tenant);
-        create_empty_paged_service_fixture(&database_path, tenant);
-        let wal_directory =
-            dodb_storage::blink::paged_manifest::PagedManifestStore::sidecar_directory(
-                &database_path,
-            )
-            .join("segments");
-        let wal_directory_bytes = || {
-            std::fs::read_dir(&wal_directory)
+        for coalesce in [false, true] {
+            let directory = blink_test_directory();
+            let tenant = TenantId::new(726 + u64::from(coalesce));
+            let mut shared_resources = writable_paged_blink_shared_resources();
+            let disk_capacity = 256 * 1024 * 1024;
+            shared_resources.disk.global_bytes = disk_capacity;
+            shared_resources.disk.per_tenant_bytes = disk_capacity;
+            shared_resources.disk.global_category_bytes = [disk_capacity; 5];
+            shared_resources.disk.per_tenant_category_bytes = [disk_capacity; 5];
+            shared_resources.maximum_working_pages = 16;
+            shared_resources.maximum_checkpoint_debt_bytes_global = 1024 * 1024;
+            shared_resources.maximum_checkpoint_debt_bytes_per_tenant = 1024 * 1024;
+            let config = LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                max_open_shards: 1,
+                blink_open_waiter_limit: 4,
+                blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                    max_segment_bytes: 1_048_576,
+                    coalesce,
+                },
+                blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                    threshold_bytes: u64::MAX,
+                },
+                blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+                blink_shared_resources: Some(shared_resources),
+                ..LocalTenantServiceConfig::default()
+            };
+            let service = BlinkTenantService::new(config.clone()).unwrap();
+            let database_path = service.database_path(tenant);
+            create_empty_paged_service_fixture(&database_path, tenant);
+            let wal_directory =
+                dodb_storage::blink::paged_manifest::PagedManifestStore::sidecar_directory(
+                    &database_path,
+                )
+                .join("segments");
+            let wal_directory_bytes = || {
+                std::fs::read_dir(&wal_directory)
+                    .unwrap()
+                    .flatten()
+                    .map(|entry| entry.metadata().unwrap().len())
+                    .sum::<u64>()
+            };
+            let disk = service.shared_resources.as_ref().unwrap().disk();
+            let keys = (0u32..100)
+                .map(|key_number| {
+                    dodb_core::DocumentKey::new(
+                        b"pinned-reader".to_vec(),
+                        key_number.to_le_bytes().to_vec(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let key = keys[0].clone();
+            let value_for_key = |key_number: u32, seed: u64| {
+                let mut state = seed ^ (u64::from(key_number).wrapping_mul(0x9e3779b97f4a7c15));
+                (0..8_192)
+                    .map(|_| {
+                        state ^= state << 13;
+                        state ^= state >> 7;
+                        state ^= state << 17;
+                        state as u8
+                    })
+                    .collect::<Vec<_>>()
+            };
+            let old_values = (0..100u32)
+                .map(|key_number| value_for_key(key_number, 17))
+                .collect::<Vec<_>>();
+            let new_values = (0..100u32)
+                .map(|key_number| value_for_key(key_number, 29))
+                .collect::<Vec<_>>();
+            let old_value = old_values[0].clone();
+            for (write_key, old_value) in keys.iter().zip(&old_values) {
+                service
+                    .execute_request(
+                        tenant,
+                        Request::Put {
+                            key: write_key.clone(),
+                            value: old_value.clone(),
+                        },
+                        ExecutionBudget::new(16 * 1024),
+                    )
+                    .await
+                    .unwrap();
+            }
+            let disk_usage_after_seed = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
+            assert_eq!(
+                disk_usage_after_seed.current_by_category
+                    [dodb_storage::blink::resource::DiskCategory::Wal as usize],
+                wal_directory_bytes(),
+                "service transaction groups must account their complete WAL directory"
+            );
+            let shard = service
+                .shards
+                .lock()
+                .unwrap()
+                .shards
+                .get(&tenant)
+                .cloned()
+                .unwrap();
+            let writable = match &shard.read_handle {
+                BlinkShardReadHandle::Paged {
+                    writable: Some(writable),
+                    ..
+                } => Arc::clone(writable),
+                BlinkShardReadHandle::Resident(_) | BlinkShardReadHandle::Paged { .. } => {
+                    panic!("expected the writable paged service route")
+                }
+            };
+            let old_reader = writable.snapshot().unwrap();
+            let old_reader_value = old_reader.get(&key).unwrap();
+            assert_eq!(old_reader_value.value(), Some(old_value.as_slice()));
+            drop(old_reader_value);
+            let wal_paths_before_checkpoint = std::fs::read_dir(&wal_directory)
                 .unwrap()
                 .flatten()
-                .map(|entry| entry.metadata().unwrap().len())
-                .sum::<u64>()
-        };
-        let disk = service.shared_resources.as_ref().unwrap().disk();
-        let keys = (0u32..100)
-            .map(|key_number| {
-                dodb_core::DocumentKey::new(
-                    b"pinned-reader".to_vec(),
-                    key_number.to_le_bytes().to_vec(),
-                )
-            })
-            .collect::<Vec<_>>();
-        let key = keys[0].clone();
-        let value_for_key = |key_number: u32, seed: u64| {
-            let mut state = seed ^ (u64::from(key_number).wrapping_mul(0x9e3779b97f4a7c15));
-            (0..8_192)
-                .map(|_| {
-                    state ^= state << 13;
-                    state ^= state >> 7;
-                    state ^= state << 17;
-                    state as u8
-                })
-                .collect::<Vec<_>>()
-        };
-        let old_values = (0..100u32)
-            .map(|key_number| value_for_key(key_number, 17))
-            .collect::<Vec<_>>();
-        let new_values = (0..100u32)
-            .map(|key_number| value_for_key(key_number, 29))
-            .collect::<Vec<_>>();
-        let old_value = old_values[0].clone();
-        for (write_key, old_value) in keys.iter().zip(&old_values) {
-            service
-                .execute_request(
-                    tenant,
-                    Request::Put {
-                        key: write_key.clone(),
-                        value: old_value.clone(),
-                    },
-                    ExecutionBudget::new(16 * 1024),
-                )
-                .await
-                .unwrap();
-        }
-        let disk_usage_after_seed = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
-        assert_eq!(
-            disk_usage_after_seed.current_by_category
-                [dodb_storage::blink::resource::DiskCategory::Wal as usize],
-            wal_directory_bytes(),
-            "service transaction groups must account their complete WAL directory"
-        );
-        let shard = service
-            .shards
-            .lock()
-            .unwrap()
-            .shards
-            .get(&tenant)
-            .cloned()
-            .unwrap();
-        let writable = match &shard.read_handle {
-            BlinkShardReadHandle::Paged {
-                writable: Some(writable),
-                ..
-            } => Arc::clone(writable),
-            BlinkShardReadHandle::Resident(_) | BlinkShardReadHandle::Paged { .. } => {
-                panic!("expected the writable paged service route")
-            }
-        };
-        let old_reader = writable.snapshot().unwrap();
-        let old_reader_value = old_reader.get(&key).unwrap();
-        assert_eq!(old_reader_value.value(), Some(old_value.as_slice()));
-        drop(old_reader_value);
-        let wal_paths_before_checkpoint = std::fs::read_dir(&wal_directory)
-            .unwrap()
-            .flatten()
-            .map(|entry| entry.path())
-            .filter(|path| path.extension().is_some_and(|extension| extension == "wal"))
-            .collect::<Vec<_>>();
-        writable.run_threshold_checkpoint(1).await.unwrap();
-        let retained_old_wal_paths = wal_paths_before_checkpoint
-            .into_iter()
-            .filter(|path| path.is_file())
-            .collect::<Vec<_>>();
-        assert!(
-            !retained_old_wal_paths.is_empty(),
-            "old reader should retain at least one WAL source after checkpoint publication"
-        );
-        assert_eq!(
-            old_reader.get(&key).unwrap().value(),
-            Some(old_value.as_slice())
-        );
+                .map(|entry| entry.path())
+                .filter(|path| path.extension().is_some_and(|extension| extension == "wal"))
+                .collect::<Vec<_>>();
+            writable.run_threshold_checkpoint(1).await.unwrap();
+            let retained_old_wal_paths = wal_paths_before_checkpoint
+                .into_iter()
+                .filter(|path| path.is_file())
+                .collect::<Vec<_>>();
+            assert!(
+                !retained_old_wal_paths.is_empty(),
+                "old reader should retain at least one WAL source after checkpoint publication"
+            );
+            assert_eq!(
+                old_reader.get(&key).unwrap().value(),
+                Some(old_value.as_slice())
+            );
 
-        for (write_key, new_value) in keys.iter().zip(&new_values) {
-            service
+            for (write_key, new_value) in keys.iter().zip(&new_values) {
+                service
+                    .execute_request(
+                        tenant,
+                        Request::Put {
+                            key: write_key.clone(),
+                            value: new_value.clone(),
+                        },
+                        ExecutionBudget::new(16 * 1024),
+                    )
+                    .await
+                    .unwrap();
+            }
+            let disk_usage_after_overwrites = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
+            assert_eq!(
+                disk_usage_after_overwrites.current_by_category
+                    [dodb_storage::blink::resource::DiskCategory::Wal as usize],
+                wal_directory_bytes(),
+                "post-checkpoint transaction groups must account their new WAL segment"
+            );
+            assert!(retained_old_wal_paths.iter().any(|path| path.is_file()));
+            assert_eq!(
+                old_reader.get(&key).unwrap().value(),
+                Some(old_value.as_slice())
+            );
+            let checkpoint = {
+                let writable = Arc::clone(&writable);
+                tokio::spawn(async move { writable.run_threshold_checkpoint(1).await })
+            };
+            checkpoint.await.unwrap().unwrap();
+            assert!(retained_old_wal_paths.iter().any(|path| path.is_file()));
+            assert_eq!(
+                old_reader.get(&key).unwrap().value(),
+                Some(old_value.as_slice())
+            );
+            drop(old_reader);
+            assert_eq!(disk.snapshot().unwrap().pending_waiters, 0);
+            let metrics = service.checkpoint_metrics_snapshot();
+            assert_eq!(metrics.checkpoints_completed, 2);
+            assert_eq!(metrics.checkpoints_failed, 0);
+            service.shutdown_checked().await.unwrap();
+            let reopened_service = BlinkTenantService::new(config).unwrap();
+            match reopened_service
                 .execute_request(
                     tenant,
-                    Request::Put {
-                        key: write_key.clone(),
-                        value: new_value.clone(),
-                    },
+                    Request::Get { key },
                     ExecutionBudget::new(16 * 1024),
                 )
                 .await
-                .unwrap();
+                .unwrap()
+            {
+                Response::Get(state) => assert_eq!(state.value(), Some(new_values[0].as_slice())),
+                response => panic!("unexpected response: {response:?}"),
+            }
+            reopened_service.shutdown_checked().await.unwrap();
         }
-        let disk_usage_after_overwrites = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
-        assert_eq!(
-            disk_usage_after_overwrites.current_by_category
-                [dodb_storage::blink::resource::DiskCategory::Wal as usize],
-            wal_directory_bytes(),
-            "post-checkpoint transaction groups must account their new WAL segment"
-        );
-        assert!(retained_old_wal_paths.iter().any(|path| path.is_file()));
-        assert_eq!(
-            old_reader.get(&key).unwrap().value(),
-            Some(old_value.as_slice())
-        );
-        let checkpoint = {
-            let writable = Arc::clone(&writable);
-            tokio::spawn(async move { writable.run_threshold_checkpoint(1).await })
-        };
-        checkpoint.await.unwrap().unwrap();
-        assert!(retained_old_wal_paths.iter().any(|path| path.is_file()));
-        assert_eq!(
-            old_reader.get(&key).unwrap().value(),
-            Some(old_value.as_slice())
-        );
-        drop(old_reader);
-        assert_eq!(disk.snapshot().unwrap().pending_waiters, 0);
-        let metrics = service.checkpoint_metrics_snapshot();
-        assert_eq!(metrics.checkpoints_completed, 2);
-        assert_eq!(metrics.checkpoints_failed, 0);
-        service.shutdown_checked().await.unwrap();
-        let reopened_service = BlinkTenantService::new(config).unwrap();
-        match reopened_service
-            .execute_request(
-                tenant,
-                Request::Get { key },
-                ExecutionBudget::new(16 * 1024),
-            )
-            .await
-            .unwrap()
-        {
-            Response::Get(state) => assert_eq!(state.value(), Some(new_values[0].as_slice())),
-            response => panic!("unexpected response: {response:?}"),
-        }
-        reopened_service.shutdown_checked().await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -7847,90 +7952,117 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "blink-demand-paging")]
     async fn paged_service_shutdown_cancels_checkpoint_waiting_for_disk_capacity() {
-        let directory = blink_test_directory();
-        let tenant = TenantId::new(724);
-        let mut shared_resources = writable_paged_blink_shared_resources();
-        let output_category = dodb_storage::blink::resource::DiskCategory::CheckpointOutput;
-        let output_limit = 1024 * 1024;
-        shared_resources.disk.global_category_bytes[output_category as usize] = output_limit;
-        shared_resources.disk.per_tenant_category_bytes[output_category as usize] = output_limit;
-        let config = LocalTenantServiceConfig {
-            data_dir: directory.path().to_path_buf(),
-            max_open_shards: 1,
-            blink_open_waiter_limit: 4,
-            blink_wal_layout: BlinkWalLayout::SegmentedBases {
-                max_segment_bytes: 1_048_576,
-                coalesce: true,
-            },
-            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
-                threshold_bytes: u64::MAX,
-            },
-            blink_checkpoint_execution: BlinkCheckpointExecution::Background,
-            blink_shared_resources: Some(shared_resources),
-            ..LocalTenantServiceConfig::default()
-        };
-        let service = BlinkTenantService::new(config).unwrap();
-        let database_path = service.database_path(tenant);
-        create_empty_paged_service_fixture(&database_path, tenant);
-        service
-            .execute_request(
-                tenant,
-                Request::Put {
-                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"shutdown-wait".to_vec()),
-                    value: b"shutdown-capacity-wait-checkpoint".to_vec(),
-                },
-                ExecutionBudget::new(1024),
+        for coalesce in [false, true] {
+            let directory = blink_test_directory();
+            let tenant = TenantId::new(724 + u64::from(coalesce));
+            std::fs::write(
+                directory.path().join("configuration.txt"),
+                format!("coalesce={coalesce}\ncheckpoint_output_limit=1048576\n"),
             )
+            .unwrap();
+            let mut shared_resources = writable_paged_blink_shared_resources();
+            let output_category = dodb_storage::blink::resource::DiskCategory::CheckpointOutput;
+            let output_limit = 1024 * 1024;
+            shared_resources.disk.global_category_bytes[output_category as usize] = output_limit;
+            shared_resources.disk.per_tenant_category_bytes[output_category as usize] =
+                output_limit;
+            let config = LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                max_open_shards: 1,
+                blink_open_waiter_limit: 4,
+                blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                    max_segment_bytes: 1_048_576,
+                    coalesce,
+                },
+                blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                    threshold_bytes: u64::MAX,
+                },
+                blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+                blink_shared_resources: Some(shared_resources),
+                ..LocalTenantServiceConfig::default()
+            };
+            let service = BlinkTenantService::new(config).unwrap();
+            let database_path = service.database_path(tenant);
+            create_empty_paged_service_fixture(&database_path, tenant);
+            service
+                .execute_request(
+                    tenant,
+                    Request::Put {
+                        key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"shutdown-wait".to_vec()),
+                        value: b"shutdown-capacity-wait-checkpoint".to_vec(),
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .unwrap();
+            let shard = service
+                .shards
+                .lock()
+                .unwrap()
+                .shards
+                .get(&tenant)
+                .cloned()
+                .unwrap();
+            let writable = match &shard.read_handle {
+                BlinkShardReadHandle::Paged {
+                    writable: Some(writable),
+                    ..
+                } => Arc::clone(writable),
+                BlinkShardReadHandle::Resident(_) | BlinkShardReadHandle::Paged { .. } => {
+                    panic!("expected the writable paged service route")
+                }
+            };
+            let resources = service.shared_resources.as_ref().unwrap().clone();
+            let disk = resources.disk();
+            let tenant_disk = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
+            let disk_headroom = 256;
+            let blocker_bytes = output_limit
+                .saturating_sub(tenant_disk.current_by_category[output_category as usize])
+                .saturating_sub(disk_headroom);
+            assert!(blocker_bytes > 0);
+            let blocker = disk
+                .reserve(tenant.get(), output_category, blocker_bytes)
+                .unwrap();
+            let checkpoint = {
+                let writable = Arc::clone(&writable);
+                tokio::spawn(async move { writable.run_threshold_checkpoint(1).await })
+            };
+            tokio::time::timeout(std::time::Duration::from_secs(2), async {
+                loop {
+                    if disk.snapshot().unwrap().pending_waiters == 1 {
+                        break;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
             .await
             .unwrap();
-        let shard = service
-            .shards
-            .lock()
-            .unwrap()
-            .shards
-            .get(&tenant)
-            .cloned()
-            .unwrap();
-        let writable = match &shard.read_handle {
-            BlinkShardReadHandle::Paged {
-                writable: Some(writable),
-                ..
-            } => Arc::clone(writable),
-            BlinkShardReadHandle::Resident(_) | BlinkShardReadHandle::Paged { .. } => {
-                panic!("expected the writable paged service route")
-            }
-        };
-        let resources = service.shared_resources.as_ref().unwrap().clone();
-        let disk = resources.disk();
-        let tenant_disk = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
-        let disk_headroom = 256;
-        let blocker_bytes = output_limit
-            .saturating_sub(tenant_disk.current_by_category[output_category as usize])
-            .saturating_sub(disk_headroom);
-        assert!(blocker_bytes > 0);
-        let blocker = disk
-            .reserve(tenant.get(), output_category, blocker_bytes)
-            .unwrap();
-        let checkpoint = {
-            let writable = Arc::clone(&writable);
-            tokio::spawn(async move { writable.run_threshold_checkpoint(1).await })
-        };
-        tokio::time::timeout(std::time::Duration::from_secs(2), async {
-            loop {
-                if disk.snapshot().unwrap().pending_waiters == 1 {
-                    break;
-                }
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
 
-        service.shutdown_checked().await.unwrap();
-        checkpoint.await.unwrap().unwrap();
-        assert_eq!(disk.snapshot().unwrap().pending_waiters, 0);
-        assert_eq!(service.checkpoint_metrics_snapshot().checkpoints_failed, 0);
-        drop(blocker);
+            service.shutdown_checked().await.unwrap();
+            checkpoint.await.unwrap().unwrap();
+            assert_eq!(disk.snapshot().unwrap().pending_waiters, 0);
+            assert_eq!(service.checkpoint_metrics_snapshot().checkpoints_failed, 0);
+            drop(blocker);
+            drop(writable);
+            drop(shard);
+            let memory_peaks = resources.snapshot().unwrap();
+            let disk_peaks = disk.snapshot().unwrap();
+            eprintln!(
+                "checkpoint shutdown peaks coalesce={coalesce}: memory_total={} memory_categories={:?} disk_total={} disk_categories={:?}",
+                memory_peaks.peak_total,
+                memory_peaks.peak_by_category,
+                disk_peaks.peak_total,
+                disk_peaks.peak_by_category
+            );
+            if memory_peaks.current_total != 0 {
+                let retained_path = directory.keep();
+                panic!(
+                    "paged checkpoint shutdown retained memory charges: {:?}; database retained at {}",
+                    memory_peaks,
+                    retained_path.display()
+                );
+            }
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -8024,112 +8156,125 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "blink-demand-paging")]
     async fn paged_service_backpressures_writes_at_checkpoint_debt_limit() {
-        let directory = blink_test_directory();
-        let tenant = TenantId::new(722);
-        let mut resources = writable_paged_blink_shared_resources();
-        let debt_limit = dodb_storage::blink::maximum_paged_transaction_wal_append_bytes(
-            resources.maximum_working_pages,
-        )
-        .unwrap();
-        resources.maximum_checkpoint_debt_bytes_per_tenant = debt_limit;
-        resources.maximum_checkpoint_debt_bytes_global = debt_limit.saturating_mul(2);
-        let service = BlinkTenantService::new(LocalTenantServiceConfig {
-            data_dir: directory.path().to_path_buf(),
-            max_open_shards: 1,
-            blink_open_waiter_limit: 4,
-            blink_wal_layout: BlinkWalLayout::SegmentedBases {
-                max_segment_bytes: 1_048_576,
-                coalesce: true,
-            },
-            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
-                threshold_bytes: 1,
-            },
-            blink_checkpoint_execution: BlinkCheckpointExecution::Background,
-            blink_shared_resources: Some(resources),
-            ..LocalTenantServiceConfig::default()
-        })
-        .unwrap();
-        let database_path = service.database_path(tenant);
-        create_empty_paged_service_fixture(&database_path, tenant);
-        service.open_shard(tenant).await.unwrap();
-        let progress_started = Arc::new(AtomicBool::new(false));
-        let progress_barrier = Arc::new(std::sync::Barrier::new(2));
-        let progress_started_by_worker = Arc::clone(&progress_started);
-        let progress_barrier_for_worker = Arc::clone(&progress_barrier);
-        let blocked_progress = physical_checkpoint::submit_checkpoint_progress(move || {
-            progress_started_by_worker.store(true, Ordering::Release);
-            progress_barrier_for_worker.wait();
-        })
-        .unwrap();
-        tokio::time::timeout(std::time::Duration::from_secs(2), async {
-            while !progress_started.load(Ordering::Acquire) {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
-        service
-            .execute_request(
-                tenant,
-                Request::Put {
-                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"first".to_vec()),
-                    value: b"first-debt-bearing-value".to_vec(),
-                },
-                ExecutionBudget::new(1024),
+        for coalesce in [false, true] {
+            let directory = blink_test_directory();
+            let tenant = TenantId::new(722 + u64::from(coalesce));
+            let mut resources = writable_paged_blink_shared_resources();
+            let debt_limit = dodb_storage::blink::maximum_paged_transaction_wal_append_bytes(
+                resources.maximum_working_pages,
             )
+            .unwrap();
+            resources.maximum_checkpoint_debt_bytes_per_tenant = debt_limit;
+            resources.maximum_checkpoint_debt_bytes_global = debt_limit.saturating_mul(2);
+            let service = BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                max_open_shards: 1,
+                blink_open_waiter_limit: 4,
+                blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                    max_segment_bytes: 1_048_576,
+                    coalesce,
+                },
+                blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                    threshold_bytes: 1,
+                },
+                blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+                blink_shared_resources: Some(resources),
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap();
+            let database_path = service.database_path(tenant);
+            create_empty_paged_service_fixture(&database_path, tenant);
+            service.open_shard(tenant).await.unwrap();
+            let progress_started = Arc::new(AtomicBool::new(false));
+            let progress_barrier = Arc::new(std::sync::Barrier::new(2));
+            let progress_started_by_worker = Arc::clone(&progress_started);
+            let progress_barrier_for_worker = Arc::clone(&progress_barrier);
+            let blocked_progress = physical_checkpoint::submit_checkpoint_progress(move || {
+                progress_started_by_worker.store(true, Ordering::Release);
+                progress_barrier_for_worker.wait();
+            })
+            .unwrap();
+            tokio::time::timeout(std::time::Duration::from_secs(2), async {
+                while !progress_started.load(Ordering::Acquire) {
+                    tokio::task::yield_now().await;
+                }
+            })
             .await
             .unwrap();
-        tokio::time::timeout(std::time::Duration::from_secs(2), async {
-            loop {
-                if service
-                    .checkpoint_metrics_snapshot()
-                    .per_tenant
-                    .get(&tenant.get())
-                    .is_some_and(|metrics| metrics.checkpoint_requests_queued == 1)
-                {
-                    break;
+            service
+                .execute_request(
+                    tenant,
+                    Request::Put {
+                        key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"first".to_vec()),
+                        value: b"first-debt-bearing-value".to_vec(),
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .unwrap();
+            tokio::time::timeout(std::time::Duration::from_secs(2), async {
+                loop {
+                    if service
+                        .checkpoint_metrics_snapshot()
+                        .per_tenant
+                        .get(&tenant.get())
+                        .is_some_and(|metrics| metrics.checkpoint_requests_queued == 1)
+                    {
+                        break;
+                    }
+                    tokio::task::yield_now().await;
                 }
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
-        assert!(
-            service.checkpoint_metrics_snapshot().per_tenant[&tenant.get()]
-                .checkpoint_debt_bytes_current
-                <= debt_limit
-        );
-        let rejected = service
-            .execute_request(
-                tenant,
-                Request::Put {
-                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"second".to_vec()),
-                    value: b"must-wait-for-checkpoint-debt".to_vec(),
-                },
-                ExecutionBudget::new(1024),
-            )
+            })
             .await
-            .unwrap_err();
-        assert!(
-            rejected
-                .to_string()
-                .contains("checkpoint debt admission limit")
-        );
-        tokio::task::spawn_blocking({
-            let progress_barrier = Arc::clone(&progress_barrier);
-            move || progress_barrier.wait()
-        })
-        .await
-        .unwrap();
-        blocked_progress.await.unwrap();
-        service
-            .checkpoint_metrics_handle()
-            .wait_for_coordinators_idle()
-            .await;
-        let metrics = service.checkpoint_metrics_snapshot();
-        assert_eq!(metrics.checkpoints_completed, 1);
-        assert!(metrics.per_tenant[&tenant.get()].checkpoint_debt_bytes_current == 0);
-        service.shutdown_checked().await.unwrap();
+            .unwrap();
+            assert!(
+                service.checkpoint_metrics_snapshot().per_tenant[&tenant.get()]
+                    .checkpoint_debt_bytes_current
+                    <= debt_limit
+            );
+            let rejected = service
+                .execute_request(
+                    tenant,
+                    Request::Put {
+                        key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"second".to_vec()),
+                        value: b"must-wait-for-checkpoint-debt".to_vec(),
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .unwrap_err();
+            assert!(
+                rejected
+                    .to_string()
+                    .contains("checkpoint debt admission limit")
+            );
+            tokio::task::spawn_blocking({
+                let progress_barrier = Arc::clone(&progress_barrier);
+                move || progress_barrier.wait()
+            })
+            .await
+            .unwrap();
+            blocked_progress.await.unwrap();
+            service
+                .checkpoint_metrics_handle()
+                .wait_for_coordinators_idle()
+                .await;
+            let metrics = service.checkpoint_metrics_snapshot();
+            assert_eq!(metrics.checkpoints_completed, 1);
+            assert!(metrics.per_tenant[&tenant.get()].checkpoint_debt_bytes_current == 0);
+            let resources = service.shared_resources.as_ref().unwrap().clone();
+            let memory_peaks = resources.snapshot().unwrap();
+            let disk_peaks = resources.disk().snapshot().unwrap();
+            eprintln!(
+                "checkpoint debt recovery peaks coalesce={coalesce}: memory_total={} memory_categories={:?} disk_total={} disk_categories={:?}",
+                memory_peaks.peak_total,
+                memory_peaks.peak_by_category,
+                disk_peaks.peak_total,
+                disk_peaks.peak_by_category
+            );
+            service.shutdown_checked().await.unwrap();
+            assert_eq!(resources.snapshot().unwrap().current_total, 0);
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
