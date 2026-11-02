@@ -9,6 +9,7 @@ use dodb_core::{Error, Result};
 
 use super::paged_manifest::PagedManifestStore;
 use super::resource::{BlinkResourceManager, Reservation, ReservationClass, ResourceCategory};
+use super::source_catalog::{SourceCatalogRecord, SourceCatalogStore, encode_source_record};
 use super::version_index::{
     SourceFileKind, SourceIdentity, SourceReachability, StoreIdentity, VersionIndex,
     VersionIndexRoot, VersionIndexRootPin,
@@ -31,6 +32,9 @@ struct SourceState {
     next_root_id: u64,
     reserved_roots: usize,
     page_reuse_root: Option<VersionIndexRoot>,
+    durable_catalog_root: Option<super::version_index::NodeRef>,
+    pending_catalog_root: Option<super::version_index::NodeRef>,
+    catalog_publication_active: bool,
     garbage_collection_active: bool,
 }
 
@@ -45,6 +49,7 @@ struct SourceManagerInner {
     maximum_roots: usize,
     handle_charge_bytes: u64,
     gc_reservation_bytes: u64,
+    source_catalog: SourceCatalogStore,
     state: Mutex<SourceState>,
 }
 
@@ -68,6 +73,17 @@ pub struct SourceManagerConfig {
 pub struct SourceRootLease {
     manager: SourceManager,
     root_id: u64,
+}
+
+pub struct SourceCatalogPublicationLease {
+    manager: SourceManager,
+    root: super::version_index::NodeRef,
+    active: bool,
+}
+
+pub struct SourceCatalogBuildLease {
+    manager: SourceManager,
+    active: bool,
 }
 
 pub struct SourceRootReservation {
@@ -147,6 +163,8 @@ impl SourceManager {
             ));
         }
         fs::create_dir_all(&config.scratch_directory)?;
+        let source_catalog =
+            SourceCatalogStore::open(&config.checkpoint_directory, config.store_identity)?;
         Ok(Self {
             inner: Arc::new(SourceManagerInner {
                 store_identity: config.store_identity,
@@ -159,12 +177,16 @@ impl SourceManager {
                 maximum_roots: config.maximum_roots,
                 handle_charge_bytes: config.handle_charge_bytes,
                 gc_reservation_bytes: config.gc_reservation_bytes,
+                source_catalog,
                 state: Mutex::new(SourceState {
                     roots: HashMap::new(),
                     active_handles: HashMap::new(),
                     next_root_id: 0,
                     reserved_roots: 0,
                     page_reuse_root: None,
+                    durable_catalog_root: None,
+                    pending_catalog_root: None,
+                    catalog_publication_active: false,
                     garbage_collection_active: false,
                 }),
             }),
@@ -385,7 +407,191 @@ impl SourceManager {
     ) -> Result<SourceRootLease> {
         let manifest = manifest_store.current();
         let root = index.root_from_node_reference(manifest.durable_index_root)?;
-        self.pin_root(index, root)
+        if let Some(catalog_root) = manifest.source_catalog_root {
+            self.validate_manifest_source_catalog(index, manifest, catalog_root)?;
+        }
+        let lease = self.pin_root(index, root)?;
+        self.inner
+            .state
+            .lock()
+            .map_err(|_| Error::invariant("paged source manager lock poisoned"))?
+            .durable_catalog_root = manifest.source_catalog_root;
+        Ok(lease)
+    }
+
+    pub(super) fn write_source_catalog(
+        &self,
+        index: &VersionIndex,
+        root: VersionIndexRoot,
+        recovery_source: SourceIdentity,
+    ) -> Result<super::version_index::NodeRef> {
+        if index.store_identity() != self.inner.store_identity
+            || recovery_source.kind != SourceFileKind::WalSegment
+            || recovery_source.file_number == 0
+        {
+            return Err(Error::invalid_input(
+                "source catalog target identity is invalid",
+            ));
+        }
+        let run_id = GC_RUN_SEQUENCE
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+                current.checked_add(1)
+            })
+            .map_err(|_| Error::invalid_input("source catalog run id exhausted"))?;
+        let marker_directory = self.inner.scratch_directory.join(format!(
+            "source-catalog-{}-{run_id:020}",
+            std::process::id()
+        ));
+        fs::create_dir(&marker_directory)?;
+        let _scratch = GcScratch {
+            path: marker_directory.clone(),
+        };
+        index.visit_sources(root, &mut |source| match source {
+            SourceReachability::Exact(identity) => write_source_marker(&marker_directory, identity),
+            SourceReachability::AllWalSegments => {
+                OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(marker_directory.join("retain-all-wal-segments"))?;
+                Ok(())
+            }
+        })?;
+        write_source_marker(&marker_directory, recovery_source)?;
+        let catalog_root = self
+            .inner
+            .source_catalog
+            .build_from_marker_run(&marker_directory)?;
+        self.inner
+            .source_catalog
+            .visit(catalog_root, &mut |_| Ok(()))?;
+        Ok(catalog_root)
+    }
+
+    pub(super) fn begin_source_catalog_publication(&self) -> Result<SourceCatalogBuildLease> {
+        let mut state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| Error::invariant("paged source manager lock poisoned"))?;
+        if state.garbage_collection_active
+            || state.pending_catalog_root.is_some()
+            || state.catalog_publication_active
+        {
+            return Err(Error::overloaded(
+                "paged source catalog publication is already active",
+            ));
+        }
+        state.catalog_publication_active = true;
+        Ok(SourceCatalogBuildLease {
+            manager: self.clone(),
+            active: true,
+        })
+    }
+
+    pub(super) fn install_source_catalog_root(
+        &self,
+        mut publication: SourceCatalogPublicationLease,
+    ) -> Result<()> {
+        if !Arc::ptr_eq(&self.inner, &publication.manager.inner) {
+            return Err(Error::corruption(
+                "paged source catalog publication belongs to another manager",
+            ));
+        }
+        let mut state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| Error::invariant("paged source manager lock poisoned"))?;
+        if state.pending_catalog_root != Some(publication.root) {
+            return Err(Error::invariant(
+                "paged source catalog publication lost its pending root",
+            ));
+        }
+        state.durable_catalog_root = Some(publication.root);
+        state.pending_catalog_root = None;
+        publication.active = false;
+        Ok(())
+    }
+
+    fn validate_manifest_source_catalog(
+        &self,
+        index: &VersionIndex,
+        manifest: super::paged_manifest::PagedManifest,
+        catalog_root: super::version_index::NodeRef,
+    ) -> Result<()> {
+        let run_id = GC_RUN_SEQUENCE
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+                current.checked_add(1)
+            })
+            .map_err(|_| Error::invalid_input("source catalog validation id exhausted"))?;
+        let scratch_path = self.inner.scratch_directory.join(format!(
+            "source-catalog-validation-{}-{run_id:020}",
+            std::process::id()
+        ));
+        let expected_path = scratch_path.join("expected");
+        let actual_path = scratch_path.join("actual");
+        fs::create_dir_all(&expected_path)?;
+        fs::create_dir(&actual_path)?;
+        let _scratch = GcScratch { path: scratch_path };
+        let root = index.root_from_node_reference(manifest.durable_index_root)?;
+        index.visit_sources(root, &mut |source| match source {
+            SourceReachability::Exact(identity) => write_source_marker(&expected_path, identity),
+            SourceReachability::AllWalSegments => write_all_wal_marker(&expected_path),
+        })?;
+        let recovery_wal = self.source_identity_from_file(
+            SourceFileKind::WalSegment,
+            manifest.recovery_wal_file_number,
+        )?;
+        write_source_marker(&expected_path, recovery_wal)?;
+        self.inner
+            .source_catalog
+            .visit(catalog_root, &mut |record| match record {
+                SourceCatalogRecord::Exact(identity) => {
+                    let _source = open_verified_source(
+                        &self.source_path(identity),
+                        identity,
+                        source_header_bytes(identity.kind),
+                    )?;
+                    write_source_marker(&actual_path, identity)
+                }
+                SourceCatalogRecord::AllWalSegments => write_all_wal_marker(&actual_path),
+            })?;
+        compare_source_marker_sets(&expected_path, &actual_path)
+    }
+
+    fn source_identity_from_file(
+        &self,
+        kind: SourceFileKind,
+        file_number: u64,
+    ) -> Result<SourceIdentity> {
+        if file_number == 0 {
+            return Err(Error::corruption("manifest recovery WAL number is zero"));
+        }
+        let path = self.source_path(SourceIdentity {
+            kind,
+            file_number,
+            header_identity: [0; 32],
+        });
+        let mut file = File::open(path).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                Error::corruption("manifest recovery WAL source is missing")
+            } else {
+                Error::from(error)
+            }
+        })?;
+        let header_bytes = source_header_bytes(kind);
+        if file.metadata()?.len() < header_bytes as u64 {
+            return Err(Error::corruption(
+                "manifest recovery WAL header is truncated",
+            ));
+        }
+        let mut header = vec![0u8; header_bytes];
+        file.read_exact(&mut header)?;
+        Ok(SourceIdentity {
+            kind,
+            file_number,
+            header_identity: *blake3::hash(&header).as_bytes(),
+        })
     }
 
     pub fn acquire(&self, identity: SourceIdentity, header_bytes: usize) -> Result<SourceLease> {
@@ -456,7 +662,7 @@ impl SourceManager {
                 self.inner.gc_reservation_bytes,
             )
             .map_err(|_| Error::overloaded("paged source GC progress budget is exhausted"))?;
-        let roots = {
+        let (roots, durable_catalog_root, pending_catalog_root) = {
             let mut state = self
                 .inner
                 .state
@@ -467,17 +673,26 @@ impl SourceManager {
                     "paged source collection is already active",
                 ));
             }
+            if state.catalog_publication_active {
+                return Err(Error::overloaded(
+                    "paged source collection is deferred during catalog publication",
+                ));
+            }
             if state.reserved_roots != 0 || state.page_reuse_root.is_some() {
                 return Err(Error::overloaded(
                     "paged source collection is deferred by a reader generation reservation",
                 ));
             }
             state.garbage_collection_active = true;
-            state
-                .roots
-                .values()
-                .map(|entry| entry.root)
-                .collect::<Vec<_>>()
+            (
+                state
+                    .roots
+                    .values()
+                    .map(|entry| entry.root)
+                    .collect::<Vec<_>>(),
+                state.durable_catalog_root,
+                state.pending_catalog_root,
+            )
         };
         let _gate = GcGate {
             manager: self.clone(),
@@ -497,22 +712,7 @@ impl SourceManager {
         };
         for root in roots {
             index.visit_sources(root, &mut |source| match source {
-                SourceReachability::Exact(identity) => {
-                    let marker_path = scratch_path.join(source_mark_name(identity));
-                    match OpenOptions::new()
-                        .write(true)
-                        .create_new(true)
-                        .open(marker_path)
-                    {
-                        Ok(mut marker) => {
-                            marker.write_all(&identity.file_number.to_le_bytes())?;
-                            marker.write_all(&identity.header_identity)?;
-                            Ok(())
-                        }
-                        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
-                        Err(error) => Err(error.into()),
-                    }
-                }
+                SourceReachability::Exact(identity) => write_source_marker(&scratch_path, identity),
                 SourceReachability::AllWalSegments => {
                     OpenOptions::new()
                         .write(true)
@@ -522,6 +722,26 @@ impl SourceManager {
                     Ok(())
                 }
             })?;
+        }
+        for catalog_root in [durable_catalog_root, pending_catalog_root]
+            .into_iter()
+            .flatten()
+        {
+            self.inner
+                .source_catalog
+                .visit(catalog_root, &mut |record| match record {
+                    SourceCatalogRecord::Exact(identity) => {
+                        write_source_marker(&scratch_path, identity)
+                    }
+                    SourceCatalogRecord::AllWalSegments => {
+                        OpenOptions::new()
+                            .write(true)
+                            .create(true)
+                            .truncate(false)
+                            .open(scratch_path.join("retain-all-wal-segments"))?;
+                        Ok(())
+                    }
+                })?;
         }
 
         let mut report = SourceGcReport::default();
@@ -674,6 +894,57 @@ impl Drop for SourceRootLease {
     }
 }
 
+impl Drop for SourceCatalogPublicationLease {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        if let Ok(mut state) = self.manager.inner.state.lock()
+            && state.pending_catalog_root == Some(self.root)
+        {
+            state.pending_catalog_root = None;
+        }
+    }
+}
+
+impl SourceCatalogBuildLease {
+    pub(super) fn reserve_root(
+        mut self,
+        root: super::version_index::NodeRef,
+    ) -> Result<SourceCatalogPublicationLease> {
+        let mut state = self
+            .manager
+            .inner
+            .state
+            .lock()
+            .map_err(|_| Error::invariant("paged source manager lock poisoned"))?;
+        if !state.catalog_publication_active || state.pending_catalog_root.is_some() {
+            return Err(Error::invariant(
+                "paged source catalog build lease lost its publication fence",
+            ));
+        }
+        state.catalog_publication_active = false;
+        state.pending_catalog_root = Some(root);
+        self.active = false;
+        Ok(SourceCatalogPublicationLease {
+            manager: self.manager.clone(),
+            root,
+            active: true,
+        })
+    }
+}
+
+impl Drop for SourceCatalogBuildLease {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        if let Ok(mut state) = self.manager.inner.state.lock() {
+            state.catalog_publication_active = false;
+        }
+    }
+}
+
 impl Drop for SourceRootReservation {
     fn drop(&mut self) {
         if !self.slot_reserved {
@@ -743,10 +1014,69 @@ fn open_verified_source(
 }
 
 fn source_mark_name(identity: SourceIdentity) -> String {
-    let mut bytes = [0u8; 9];
+    let mut bytes = [0u8; 41];
     bytes[0] = identity.kind as u8;
     bytes[1..9].copy_from_slice(&identity.file_number.to_le_bytes());
+    bytes[9..41].copy_from_slice(&identity.header_identity);
     format!("source-{}", blake3::hash(&bytes).to_hex())
+}
+
+fn source_header_bytes(kind: SourceFileKind) -> usize {
+    match kind {
+        SourceFileKind::CheckpointPack => super::PAGE_SIZE,
+        SourceFileKind::WalSegment => crate::wal::INIT_FRAME_SIZE,
+    }
+}
+
+fn write_all_wal_marker(directory: &Path) -> Result<()> {
+    OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(directory.join("retain-all-wal-segments"))?;
+    Ok(())
+}
+
+fn compare_source_marker_sets(expected: &Path, actual: &Path) -> Result<()> {
+    for (source_directory, other_directory) in [(expected, actual), (actual, expected)] {
+        for entry in fs::read_dir(source_directory)? {
+            let entry = entry?;
+            let file_name = entry.file_name();
+            if !other_directory.join(file_name).try_exists()? {
+                return Err(Error::corruption(
+                    "source catalog does not match the durable version index",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn write_source_marker(directory: &Path, identity: SourceIdentity) -> Result<()> {
+    if identity.file_number == 0 {
+        return Err(Error::corruption(
+            "paged source identity has file number zero",
+        ));
+    }
+    let path = directory.join(source_mark_name(identity));
+    let encoded_identity = encode_source_record(identity);
+    match OpenOptions::new().write(true).create_new(true).open(&path) {
+        Ok(mut marker) => {
+            marker.write_all(&encoded_identity)?;
+            Ok(())
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            let existing = fs::read(path)?;
+            if existing.as_slice() == encoded_identity {
+                Ok(())
+            } else {
+                Err(Error::corruption(
+                    "paged source marker identity collides with existing marker",
+                ))
+            }
+        }
+        Err(error) => Err(error.into()),
+    }
 }
 
 #[cfg(test)]
@@ -1462,5 +1792,70 @@ mod tests {
                 )
                 .is_err()
         );
+    }
+
+    #[test]
+    fn pending_catalog_publication_protects_recovery_wal_from_gc() {
+        let directory = TestDirectory::new();
+        let index = test_index(directory.path());
+        let manager = manager(directory.path());
+        let (checkpoint_source, checkpoint_header_bytes) =
+            write_checkpoint_page(&manager, 1, 31, 41);
+        let root = insert_checkpoint_page(
+            &index,
+            index.empty_root(),
+            checkpoint_source,
+            (checkpoint_header_bytes + 4096) as u64,
+            1,
+            2,
+        );
+        let _root_lease = manager.pin_root(&index, root).unwrap();
+        let recovery_header = b"recovery-wal-header";
+        let recovery_source = source_identity(SourceFileKind::WalSegment, 2, recovery_header);
+        let recovery_path = write_source(&manager, recovery_source, recovery_header);
+        let catalog_build = manager.begin_source_catalog_publication().unwrap();
+        assert!(
+            manager
+                .collect_garbage(
+                    &index,
+                    [SourceCandidate {
+                        identity: recovery_source,
+                        header_bytes: recovery_header.len(),
+                    }],
+                    |_| Ok(()),
+                )
+                .is_err()
+        );
+        let catalog_root = manager
+            .write_source_catalog(&index, root, recovery_source)
+            .unwrap();
+        let catalog_publication = catalog_build.reserve_root(catalog_root).unwrap();
+
+        let protected = manager
+            .collect_garbage(
+                &index,
+                [SourceCandidate {
+                    identity: recovery_source,
+                    header_bytes: recovery_header.len(),
+                }],
+                |_| Ok(()),
+            )
+            .unwrap();
+        assert_eq!(protected.protected_sources, 1);
+        assert!(recovery_path.is_file());
+
+        drop(catalog_publication);
+        let orphaned = manager
+            .collect_garbage(
+                &index,
+                [SourceCandidate {
+                    identity: recovery_source,
+                    header_bytes: recovery_header.len(),
+                }],
+                |_| Ok(()),
+            )
+            .unwrap();
+        assert_eq!(orphaned.unlinked_sources, 1);
+        assert!(!recovery_path.exists());
     }
 }

@@ -40,6 +40,8 @@ mod physical_checkpoint;
 pub mod resource;
 pub mod segmented_wal;
 #[cfg(feature = "blink-demand-paging")]
+mod source_catalog;
+#[cfg(feature = "blink-demand-paging")]
 pub mod source_manager;
 #[cfg(feature = "blink-demand-paging")]
 pub mod version_chain;
@@ -2812,6 +2814,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
                 high_water_page_id: job.target.high_water_page_id,
             },
         )?;
+        let catalog_build = self.current.sources.begin_source_catalog_publication()?;
         let mut next_wal = WalLog::open_with_segment_boundary(
             next_wal_file,
             self.wal.identity().clone(),
@@ -2831,6 +2834,12 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             file_number: next_wal_file_number,
             header_identity: source_header_identity,
         };
+        let source_catalog_root = self.current.sources.write_source_catalog(
+            &self.current.index,
+            checkpoint_root,
+            next_wal_source,
+        )?;
+        let catalog_publication = catalog_build.reserve_root(source_catalog_root)?;
         let next_handle = self.current.fork_with_generation(
             checkpoint_root,
             self.current.root_page_id,
@@ -2850,7 +2859,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             durable_index_root: checkpoint_root
                 .node_reference()
                 .ok_or_else(|| Error::invariant("checkpoint durable index root is empty"))?,
-            source_catalog_root: previous_manifest.source_catalog_root,
+            source_catalog_root: Some(source_catalog_root),
             recovery_wal_file_number: next_wal_file_number,
             recovery_offset,
             committed_prefix_lsn: latest_lsn,
@@ -2878,6 +2887,14 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
                 Ok(())
             });
         if let Err(error) = publication_result {
+            self.broken = Some(error.to_string());
+            return Err(error);
+        }
+        if let Err(error) = self
+            .current
+            .sources
+            .install_source_catalog_root(catalog_publication)
+        {
             self.broken = Some(error.to_string());
             return Err(error);
         }
@@ -16558,7 +16575,59 @@ mod tests {
             reopened_manifest.current().committed_prefix_lsn,
             fourth_checkpoint_lsn
         );
-        let reopened_root = index
+        drop(old_reader);
+        let reopened_index = Arc::new(
+            version_index::VersionIndex::open(
+                &index_directory,
+                store_identity,
+                resources.clone(),
+                7,
+                4,
+            )
+            .unwrap(),
+        );
+        let reopened_sources = source_manager::SourceManager::new(
+            source_manager::SourceManagerConfig {
+                store_identity,
+                checkpoint_directory: checkpoint_directory.clone(),
+                wal_directory: wal_directory.clone(),
+                scratch_directory: scratch_directory.clone(),
+                tenant_id: 7,
+                maximum_open_handles: 4,
+                maximum_roots: 6,
+                handle_charge_bytes: 128,
+                gc_reservation_bytes: 8192,
+            },
+            resources.clone(),
+        )
+        .unwrap();
+        let _restarted_catalog_lease = reopened_sources
+            .pin_manifest_root(&reopened_index, &reopened_manifest)
+            .unwrap();
+        let recovery_wal_path = wal_directory.join(format!(
+            "segment-{:020}.wal",
+            reopened_manifest.current().recovery_wal_file_number
+        ));
+        let recovery_wal_bytes = std::fs::read(&recovery_wal_path).unwrap();
+        let recovery_wal_source = version_index::SourceIdentity {
+            kind: version_index::SourceFileKind::WalSegment,
+            file_number: reopened_manifest.current().recovery_wal_file_number,
+            header_identity: *blake3::hash(&recovery_wal_bytes[..crate::wal::INIT_FRAME_SIZE])
+                .as_bytes(),
+        };
+        let restarted_gc = reopened_sources
+            .collect_garbage(
+                &reopened_index,
+                [source_manager::SourceCandidate {
+                    identity: recovery_wal_source,
+                    header_bytes: crate::wal::INIT_FRAME_SIZE,
+                }],
+                |_| Ok(()),
+            )
+            .unwrap();
+        assert_eq!(restarted_gc.protected_sources, 1);
+        assert!(recovery_wal_path.is_file());
+        let reopened_root = reopened_index
             .root_from_node_reference(reopened_manifest.current().durable_index_root)
             .unwrap();
         let reopened_handle = PagedReadHandle::new(
@@ -16576,9 +16645,9 @@ mod tests {
                     maximum_followers: 8,
                 },
             },
-            index,
+            reopened_index,
             resources,
-            sources,
+            reopened_sources,
             |source| {
                 Ok(
                     if source.kind == version_index::SourceFileKind::WalSegment {
