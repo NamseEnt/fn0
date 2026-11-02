@@ -86,6 +86,98 @@ pub fn build_checkpoint_index(
     Ok((index.promote_root_to_durable(root)?, source))
 }
 
+pub fn build_incremental_checkpoint_index(
+    index: &VersionIndex,
+    target_root: VersionIndexRoot,
+    pack_path: &Path,
+    pack_entry: &BasePackEntry,
+    previous_checkpoint_lsn: Lsn,
+    wal_identity: &WalIdentity,
+    high_water_page_id: dodb_core::PageId,
+) -> Result<(VersionIndexRoot, SourceIdentity)> {
+    if pack_entry.checkpoint_lsn <= previous_checkpoint_lsn || pack_entry.page_count == 0 {
+        return Err(Error::invalid_input(
+            "incremental checkpoint pack target or page count is invalid",
+        ));
+    }
+    let mut expected_page_count = 0u64;
+    index.visit_descriptors(target_root, &mut |descriptor| {
+        if descriptor.image_lsn > pack_entry.checkpoint_lsn {
+            return Err(Error::corruption(
+                "incremental checkpoint target precedes an indexed page image",
+            ));
+        }
+        if descriptor.image_lsn > previous_checkpoint_lsn {
+            expected_page_count = expected_page_count
+                .checked_add(1)
+                .ok_or_else(|| Error::corruption("incremental checkpoint count overflows"))?;
+        }
+        Ok(())
+    })?;
+    if expected_page_count != pack_entry.page_count {
+        return Err(Error::corruption(
+            "incremental checkpoint pack omits or adds target-generation pages",
+        ));
+    }
+    let mut file = File::open(pack_path)?;
+    let mut header = [0u8; crate::page::PAGE_SIZE];
+    file.read_exact(&mut header)?;
+    let source = SourceIdentity {
+        kind: SourceFileKind::CheckpointPack,
+        file_number: pack_entry.number,
+        header_identity: *blake3::hash(&header).as_bytes(),
+    };
+    let mut root = target_root;
+    let mut indexed_page_count = 0u64;
+    scan_pack(
+        &mut file,
+        pack_entry,
+        wal_identity,
+        high_water_page_id,
+        |page_id, image_lsn, offset, image| {
+            let image_crc32c = crc32c::crc32c(image);
+            let previous = index
+                .lookup(root, page_id)?
+                .ok_or_else(|| Error::corruption("incremental pack page is absent from target"))?;
+            if image_lsn <= previous_checkpoint_lsn
+                || previous.image_lsn != image_lsn
+                || previous.image_crc32c != image_crc32c
+            {
+                return Err(Error::corruption(
+                    "incremental checkpoint image differs from its target descriptor",
+                ));
+            }
+            root = index.insert(
+                root,
+                page_id,
+                VersionDescriptor {
+                    page_id,
+                    token: previous.token,
+                    image_lsn,
+                    image_crc32c,
+                    locator: VersionLocator::CheckpointImage {
+                        source,
+                        offset,
+                        source_length: pack_entry.bytes,
+                        image_lsn,
+                        image_crc32c,
+                    },
+                },
+            )?;
+            indexed_page_count = indexed_page_count
+                .checked_add(1)
+                .ok_or_else(|| Error::corruption("incremental checkpoint count overflows"))?;
+            Ok(())
+        },
+    )?;
+    if indexed_page_count != expected_page_count {
+        return Err(Error::corruption(
+            "incremental checkpoint scan count differs from the target",
+        ));
+    }
+    Ok((index.promote_root_to_durable(root)?, source))
+}
+
 pub struct PagedRecoveryIndexBuilder<'index> {
     index: &'index VersionIndex,
     root: VersionIndexRoot,
@@ -456,7 +548,9 @@ fn is_superblock_page(page_id: dodb_core::PageId) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{PagedRecoveryIndexBuilder, build_checkpoint_index};
+    use super::{
+        PagedRecoveryIndexBuilder, build_checkpoint_index, build_incremental_checkpoint_index,
+    };
     use crate::blink::durable_bases::{BasePackJob, pack_path};
     use crate::blink::paged_manifest::{PagedManifest, PagedManifestStore};
     use crate::blink::resource::{BlinkResourceManager, ResourceLimits};
@@ -1142,5 +1236,135 @@ mod tests {
             reopened_descriptor.image_crc32c,
             crc32c::crc32c(&expected_image)
         );
+    }
+
+    #[test]
+    fn incremental_checkpoint_replaces_only_pages_newer_than_the_previous_checkpoint() {
+        let directory = TestDirectory::new();
+        let identity = StoreIdentity {
+            database_uuid: [0x7a; 16],
+            wal_epoch: 21,
+        };
+        let index = VersionIndex::open(
+            &directory.path().join("index"),
+            identity,
+            resources(),
+            79,
+            2,
+        )
+        .unwrap();
+        let unchanged_page_id = PageId::new(2);
+        let changed_page_id = PageId::new(3);
+        let previous_source = SourceIdentity {
+            kind: SourceFileKind::CheckpointPack,
+            file_number: 1,
+            header_identity: [0x21; 32],
+        };
+        let previous_image = encode_blink_page(
+            unchanged_page_id,
+            &BlinkPage::Free {
+                lsn: Lsn::new(10),
+                next: None,
+            },
+        )
+        .unwrap();
+        let previous_crc = crc32c::crc32c(&previous_image);
+        let unchanged_descriptor = VersionDescriptor {
+            page_id: unchanged_page_id,
+            token: VersionToken::Bootstrap {
+                page_id: unchanged_page_id,
+            },
+            image_lsn: Lsn::new(10),
+            image_crc32c: previous_crc,
+            locator: VersionLocator::CheckpointImage {
+                source: previous_source,
+                offset: 4096,
+                source_length: 8196,
+                image_lsn: Lsn::new(10),
+                image_crc32c: previous_crc,
+            },
+        };
+        let previous_root = index
+            .insert(index.empty_root(), unchanged_page_id, unchanged_descriptor)
+            .unwrap();
+        let changed_image = encode_blink_page(
+            changed_page_id,
+            &BlinkPage::Free {
+                lsn: Lsn::new(12),
+                next: None,
+            },
+        )
+        .unwrap();
+        let previous_changed_descriptor = VersionDescriptor {
+            page_id: changed_page_id,
+            token: VersionToken::Wal {
+                source_file_number: 4,
+                record_lsn: Lsn::new(12),
+            },
+            image_lsn: Lsn::new(12),
+            image_crc32c: crc32c::crc32c(&changed_image),
+            locator: VersionLocator::WalImage {
+                frame: WalFrameLocator {
+                    source: SourceIdentity {
+                        kind: SourceFileKind::WalSegment,
+                        file_number: 4,
+                        header_identity: [0x24; 32],
+                    },
+                    frame_offset: 100,
+                    frame_length: 4156,
+                    header_crc32c: 0x1010_1010,
+                    payload_offset: 148,
+                    payload_length: 4104,
+                    payload_crc32c: 0x2020_2020,
+                    committed_prefix_length: 4324,
+                    commit_frame_offset: 4256,
+                    commit_lsn: Lsn::new(12),
+                },
+            },
+        };
+        let target_root = index
+            .insert(previous_root, changed_page_id, previous_changed_descriptor)
+            .unwrap();
+        let pack_identity = wal_identity(identity);
+        let mut writer = super::super::durable_bases::PagedBasePackJob {
+            directory: directory.path().to_path_buf(),
+            identity: pack_identity.clone(),
+            number: 2,
+            checkpoint_lsn: Lsn::new(12),
+            page_count: 1,
+            complete: false,
+            coalesce: true,
+        }
+        .begin(None)
+        .unwrap();
+        writer.append_page(changed_page_id, &changed_image).unwrap();
+        let output = writer.finish().unwrap();
+        assert!(!output.complete);
+        let (checkpoint_root, checkpoint_source) = build_incremental_checkpoint_index(
+            &index,
+            target_root,
+            &pack_path(directory.path(), output.entry.number),
+            &output.entry,
+            Lsn::new(10),
+            &pack_identity,
+            changed_page_id,
+        )
+        .unwrap();
+        let unchanged_after = index
+            .lookup(checkpoint_root, unchanged_page_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(unchanged_after, unchanged_descriptor);
+        let changed_after = index
+            .lookup(checkpoint_root, changed_page_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(changed_after.token, previous_changed_descriptor.token);
+        assert_eq!(changed_after.image_lsn, Lsn::new(12));
+        assert!(matches!(
+            changed_after.locator,
+            VersionLocator::CheckpointImage { source, .. } if source == checkpoint_source
+        ));
+        index.validate_durable_root(checkpoint_root).unwrap();
     }
 }

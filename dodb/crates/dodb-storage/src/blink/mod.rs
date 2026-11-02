@@ -1789,6 +1789,16 @@ pub struct PagedReadConfig {
 }
 
 #[cfg(feature = "blink-demand-paging")]
+pub struct PagedCheckpointPackRequest {
+    pub directory: std::path::PathBuf,
+    pub file_number: u64,
+    pub identity: WalIdentity,
+    pub checkpoint_lsn: Lsn,
+    pub previous_checkpoint_lsn: Option<Lsn>,
+    pub coalesce: bool,
+}
+
+#[cfg(feature = "blink-demand-paging")]
 pub struct PagedReadHandle {
     tenant_id: u64,
     index: Arc<version_index::VersionIndex>,
@@ -2045,22 +2055,48 @@ impl PagedReadHandle {
 
     pub fn write_checkpoint_pack(
         &self,
-        directory: &Path,
-        file_number: u64,
-        identity: WalIdentity,
-        checkpoint_lsn: Lsn,
-        coalesce: bool,
+        request: PagedCheckpointPackRequest,
         injector: Option<Box<dyn FaultInjector + Send>>,
     ) -> Result<durable_bases::PagedBasePackOutput> {
-        if file_number == 0
-            || identity.database_uuid != self.index.store_identity().database_uuid
-            || identity.shard_epoch.get() != self.index.store_identity().wal_epoch
+        if request.previous_checkpoint_lsn.is_some() {
+            return Err(Error::invalid_input(
+                "complete paged checkpoint pack request has an incremental start LSN",
+            ));
+        }
+        self.write_checkpoint_pack_request(request, injector)?
+            .ok_or_else(|| Error::corruption("complete paged checkpoint pack is empty"))
+    }
+
+    pub fn write_incremental_checkpoint_pack(
+        &self,
+        request: PagedCheckpointPackRequest,
+        injector: Option<Box<dyn FaultInjector + Send>>,
+    ) -> Result<Option<durable_bases::PagedBasePackOutput>> {
+        if request
+            .previous_checkpoint_lsn
+            .is_none_or(|previous_lsn| previous_lsn >= request.checkpoint_lsn)
+        {
+            return Err(Error::invalid_input(
+                "incremental checkpoint target must advance the previous checkpoint",
+            ));
+        }
+        self.write_checkpoint_pack_request(request, injector)
+    }
+
+    fn write_checkpoint_pack_request(
+        &self,
+        request: PagedCheckpointPackRequest,
+        injector: Option<Box<dyn FaultInjector + Send>>,
+    ) -> Result<Option<durable_bases::PagedBasePackOutput>> {
+        if request.file_number == 0
+            || request.identity.database_uuid != self.index.store_identity().database_uuid
+            || request.identity.shard_epoch.get() != self.index.store_identity().wal_epoch
         {
             return Err(Error::invalid_input(
                 "paged checkpoint identity or source number is invalid",
             ));
         }
-        let buffer_page_count = if coalesce { 6 } else { 3 };
+        let buffer_page_count = if request.coalesce { 6 } else { 3 };
         let reservation_bytes = u64::try_from(buffer_page_count)
             .ok()
             .and_then(|page_count| page_count.checked_mul(PAGE_SIZE as u64))
@@ -2075,27 +2111,44 @@ impl PagedReadHandle {
             )
             .map_err(page_cache::map_resource_error)?;
         let mut page_count = 0u64;
-        self.index.visit_descriptors(self.root, &mut |_| {
+        self.index.visit_descriptors(self.root, &mut |descriptor| {
+            if request
+                .previous_checkpoint_lsn
+                .is_some_and(|previous_lsn| descriptor.image_lsn <= previous_lsn)
+            {
+                return Ok(());
+            }
             page_count = page_count
                 .checked_add(1)
                 .ok_or_else(|| Error::overloaded("paged checkpoint page count overflows"))?;
             Ok(())
         })?;
         if page_count == 0 {
-            return Err(Error::corruption(
-                "paged checkpoint index contains no page images",
-            ));
+            return if request.previous_checkpoint_lsn.is_some() {
+                Ok(None)
+            } else {
+                Err(Error::corruption(
+                    "paged checkpoint index contains no page images",
+                ))
+            };
         }
         let job = durable_bases::PagedBasePackJob {
-            directory: directory.to_path_buf(),
-            identity,
-            number: file_number,
-            checkpoint_lsn,
+            directory: request.directory.clone(),
+            identity: request.identity,
+            number: request.file_number,
+            checkpoint_lsn: request.checkpoint_lsn,
             page_count,
-            coalesce,
+            complete: request.previous_checkpoint_lsn.is_none(),
+            coalesce: request.coalesce,
         };
         let mut pack_writer = job.begin(injector)?;
         self.index.visit_descriptors(self.root, &mut |descriptor| {
+            if request
+                .previous_checkpoint_lsn
+                .is_some_and(|previous_lsn| descriptor.image_lsn <= previous_lsn)
+            {
+                return Ok(());
+            }
             let page = self
                 .load_mutation_base_page(descriptor.page_id)?
                 .ok_or_else(|| Error::corruption("paged checkpoint page image is missing"))?;
@@ -2109,7 +2162,7 @@ impl PagedReadHandle {
             }
             pack_writer.append_page(descriptor.page_id, &image)
         })?;
-        pack_writer.finish()
+        pack_writer.finish().map(Some)
     }
 }
 
@@ -14150,11 +14203,14 @@ mod tests {
         let checkpoint_source_reads_before = handle.source_read_count();
         let checkpoint_output = handle
             .write_checkpoint_pack(
-                &checkpoint_directory,
-                99,
-                wal_identity.clone(),
-                Lsn::new(1),
-                true,
+                PagedCheckpointPackRequest {
+                    directory: checkpoint_directory.clone(),
+                    file_number: 99,
+                    identity: wal_identity.clone(),
+                    checkpoint_lsn: Lsn::new(1),
+                    previous_checkpoint_lsn: None,
+                    coalesce: true,
+                },
                 None,
             )
             .unwrap();
@@ -14182,11 +14238,14 @@ mod tests {
             assert_eq!(streamed_checkpoint_pages.get(page_id), Some(expected_image));
         }
         let failed_checkpoint = handle.write_checkpoint_pack(
-            &checkpoint_directory,
-            101,
-            wal_identity.clone(),
-            Lsn::new(1),
-            false,
+            PagedCheckpointPackRequest {
+                directory: checkpoint_directory.clone(),
+                file_number: 101,
+                identity: wal_identity.clone(),
+                checkpoint_lsn: Lsn::new(1),
+                previous_checkpoint_lsn: None,
+                coalesce: false,
+            },
             Some(Box::new(FailOnOccurrence {
                 point: "during_checkpoint_page_write",
                 remaining: 1,
@@ -14201,11 +14260,14 @@ mod tests {
         );
         let uncoalesced_checkpoint_output = handle
             .write_checkpoint_pack(
-                &checkpoint_directory,
-                100,
-                wal_identity.clone(),
-                Lsn::new(1),
-                false,
+                PagedCheckpointPackRequest {
+                    directory: checkpoint_directory.clone(),
+                    file_number: 100,
+                    identity: wal_identity.clone(),
+                    checkpoint_lsn: Lsn::new(1),
+                    previous_checkpoint_lsn: None,
+                    coalesce: false,
+                },
                 None,
             )
             .unwrap();
@@ -14313,6 +14375,55 @@ mod tests {
             )
             .unwrap();
         assert!(writer_result.commit_lsn.is_some());
+        let incremental_target_lsn = writer_result.commit_lsn.unwrap();
+        let incremental_checkpoint = writer
+            .current()
+            .write_incremental_checkpoint_pack(
+                PagedCheckpointPackRequest {
+                    directory: checkpoint_directory.clone(),
+                    file_number: 103,
+                    identity: wal_identity.clone(),
+                    checkpoint_lsn: incremental_target_lsn,
+                    previous_checkpoint_lsn: Some(Lsn::new(1)),
+                    coalesce: true,
+                },
+                None,
+            )
+            .unwrap()
+            .unwrap();
+        assert!(!incremental_checkpoint.complete);
+        assert!(incremental_checkpoint.entry.page_count > 0);
+        assert!(incremental_checkpoint.entry.page_count < page_images.len() as u64);
+        let mut incremental_pages = BTreeMap::new();
+        durable_bases::scan_pack(
+            &mut std::fs::File::open(durable_bases::pack_path(
+                &checkpoint_directory,
+                incremental_checkpoint.entry.number,
+            ))
+            .unwrap(),
+            &incremental_checkpoint.entry,
+            &wal_identity,
+            high_water_page_id,
+            |page_id, image_lsn, _, image| {
+                incremental_pages.insert(page_id, (image_lsn, *image));
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            incremental_pages.len() as u64,
+            incremental_checkpoint.entry.page_count
+        );
+        for (page_id, (image_lsn, image)) in incremental_pages {
+            let descriptor = writer
+                .current()
+                .index
+                .lookup(writer.current().root, page_id)
+                .unwrap()
+                .unwrap();
+            assert_eq!(descriptor.image_lsn, image_lsn);
+            assert_eq!(descriptor.image_crc32c, crc32c::crc32c(&image));
+        }
         let writer_key_leaf =
             find_leaf_with_metrics(writer.current(), &writer_key.encode(), &mut 0, None).unwrap();
         let delta_location = writer
@@ -14359,11 +14470,14 @@ mod tests {
         );
         let target_pack = old_reader
             .write_checkpoint_pack(
-                &checkpoint_directory,
-                102,
-                wal_identity.clone(),
-                Lsn::new(1),
-                true,
+                PagedCheckpointPackRequest {
+                    directory: checkpoint_directory.clone(),
+                    file_number: 102,
+                    identity: wal_identity.clone(),
+                    checkpoint_lsn: Lsn::new(1),
+                    previous_checkpoint_lsn: None,
+                    coalesce: true,
+                },
                 None,
             )
             .unwrap();

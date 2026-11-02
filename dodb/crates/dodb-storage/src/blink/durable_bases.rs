@@ -42,6 +42,7 @@ pub(super) struct PagedBasePackJob {
     pub number: u64,
     pub checkpoint_lsn: Lsn,
     pub page_count: u64,
+    pub complete: bool,
     pub coalesce: bool,
 }
 
@@ -50,6 +51,7 @@ pub(super) struct PagedBasePackWriter {
     directory: PathBuf,
     file: fs::File,
     entry: BasePackEntry,
+    complete: bool,
     expected_page_count: u64,
     written_page_count: u64,
     previous_page_id: Option<PageId>,
@@ -218,6 +220,7 @@ impl PagedBasePackJob {
                 bytes: encoded_size(self.page_count),
                 checksum: crc32c::crc32c(&header),
             },
+            complete: self.complete,
             expected_page_count: self.page_count,
             written_page_count: 0,
             previous_page_id: None,
@@ -308,7 +311,7 @@ impl PagedBasePackWriter {
         let page_nanos = elapsed_nanos(self.started).saturating_sub(self.sync_nanos);
         Ok(PagedBasePackOutput {
             entry: self.entry,
-            complete: true,
+            complete: self.complete,
             write_calls: self.write_calls,
             phase_timings: [
                 page_nanos,
