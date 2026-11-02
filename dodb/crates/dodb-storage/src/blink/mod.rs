@@ -16483,7 +16483,54 @@ mod tests {
                 )
                 .is_err()
         );
+        let mut checkpoint_page_ids = Vec::new();
+        let mut first_checkpoint_page_id = None;
+        complete_job
+            .target
+            .index
+            .visit_descriptors(complete_job.target.root, &mut |descriptor| {
+                first_checkpoint_page_id.get_or_insert(descriptor.page_id);
+                checkpoint_page_ids.push(page_cache::PageVersionKey::from_descriptor(
+                    store_identity,
+                    descriptor,
+                ));
+                Ok(())
+            })
+            .unwrap();
+        for page_version in checkpoint_page_ids {
+            complete_job.target.loader.evict(&page_version).unwrap();
+        }
+        let first_checkpoint_page_id = first_checkpoint_page_id.unwrap();
+        let source_reads_before_checkpoint_slice = complete_job.target.source_read_count();
         assert!(!complete_job.write_pack_slice(1, None).unwrap());
+        let checkpoint_output_reservation_bytes = complete_job
+            ._checkpoint_reservation
+            .as_ref()
+            .map(resource::Reservation::bytes)
+            .unwrap_or(0);
+        assert!(checkpoint_output_reservation_bytes > 0);
+        assert!(
+            complete_job.target.source_read_count() > source_reads_before_checkpoint_slice,
+            "checkpoint slice must reload an evicted target page"
+        );
+        let checkpoint_loader_guard = complete_job
+            .target
+            .load_mutation_base_page(first_checkpoint_page_id)
+            .unwrap()
+            .unwrap();
+        let checkpoint_slice_resources = resources.snapshot().unwrap();
+        assert!(
+            checkpoint_slice_resources.current_by_category
+                [resource::ResourceCategory::CheckpointValidation as usize]
+                >= checkpoint_output_reservation_bytes
+        );
+        assert!(
+            checkpoint_slice_resources.current_by_category
+                [resource::ResourceCategory::DecodedPayload as usize]
+                >= PAGE_SIZE as u64
+        );
+        assert!(checkpoint_slice_resources.current_total <= 4_194_304);
+        assert!(checkpoint_slice_resources.current_progress <= 524_288);
         let second_write = TransactionRequest::new(
             vec![TransactionCondition::Exists { key: key.clone() }],
             vec![TransactionMutation::Put {
@@ -16511,6 +16558,20 @@ mod tests {
                 .unwrap(),
             Some(second_checkpoint_lsn)
         );
+        let checkpoint_promotion_resources = resources.snapshot().unwrap();
+        assert!(
+            checkpoint_promotion_resources.peak_progress > checkpoint_output_reservation_bytes,
+            "checkpoint index promotion must overlap the retained output reservation"
+        );
+        assert!(
+            checkpoint_promotion_resources.current_by_category
+                [resource::ResourceCategory::DecodedPayload as usize]
+                >= PAGE_SIZE as u64,
+            "a loader page guard must remain live through checkpoint index promotion"
+        );
+        assert!(checkpoint_promotion_resources.peak_total <= 4_194_304);
+        assert!(checkpoint_promotion_resources.peak_progress <= 524_288);
+        drop(checkpoint_loader_guard);
         assert_eq!(manifest_store.current().generation, 2);
         assert_eq!(writer.wal.last_commit_lsn(), None);
         assert_eq!(writer.wal.history_start_lsn(), second_checkpoint_lsn);
