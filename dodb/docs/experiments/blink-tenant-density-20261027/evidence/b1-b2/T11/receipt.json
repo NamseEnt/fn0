@@ -8,14 +8,15 @@
     "866261924",
     "3640e74c3",
     "9729a5f07",
-    "b8e57e68d"
+    "b8e57e68d",
+    "0c5104b3b"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "b8e57e68d"
+    "source_commit": "0c5104b3b"
   },
   "features": [
     "blink-demand-paging",
@@ -33,12 +34,6 @@
       "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages -- --test-threads=1",
       "exit_status": 0,
       "result": "1 passed; covers unrequested corruption, missing allocation, missing free list, free-list cycle, duplicate tree child, and scratch release"
-    },
-    {
-      "name": "dodb_storage_full_library_suite",
-      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1",
-      "exit_status": 0,
-      "result": "311 passed, 4 ignored"
     },
     {
       "name": "strict_clippy",
@@ -73,12 +68,24 @@
       "name": "git_diff_check",
       "command": "git diff --check",
       "exit_status": 0
+    },
+    {
+      "name": "dodb_storage_full_library_suite",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1",
+      "exit_status": 0,
+      "result": "312 passed, 4 ignored"
+    },
+    {
+      "name": "paged_manifest_pointer_sigkill_boundaries",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_manifest_pointer_publication_survives_sigkill -- --test-threads=1 --nocapture",
+      "exit_status": 0,
+      "result": "1 passed; child processes were SIGKILLed at four pointer publication boundaries and reopened generation matched the durable pointer state"
     }
   ],
   "source_hashes": {
     "dodb/crates/dodb-storage/src/blink/mod.rs": "e3c91c56e60c17de54088c1caf90f358ddde88c74d00d0f8b8d06918fe24d788",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "830b50eaa186f014496497aba3438979e1c27cc896ab2026bab9e65ff0491dd5",
-    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "25c433aa6bdfabc526bd29c1e9f72b27d79a2dee8d74109c634ce8c14fb55f90",
+    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "79623b7fe30e5c0337e167ce5032aef9b0c59e952893b0355f03c384e6becdc3",
     "dodb/crates/dodb-storage/src/blink/version_chain.rs": "819b7f9cff96ac9909d4f3e5e29433151328c33f25fd6c0ad4b212b0085cadad"
   },
   "logs": [
@@ -151,7 +158,7 @@
     {
       "name": "full_dodb_storage_library_suite_final",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-bounded-structure-full-lib-final.log",
-      "sha256": "25d48b4582aafdc51464d6be0f707870abe2f2e6022b12bec6fdb0300fc6f737",
+      "sha256": "6627e0293480af73f8150db25480ce2fe30a902f7d2a49bc9cca3c107bee406b",
       "exit_status": 0
     },
     {
@@ -176,6 +183,12 @@
       "name": "delta_chain_sidecar_validation",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-delta-chain-sidecar-validation.log",
       "sha256": "dfb622a6ea718644270f81e4a8432d36d7c97795b86fcfecd56b988c1c9e2b68",
+      "exit_status": 0
+    },
+    {
+      "name": "paged_manifest_pointer_sigkill_boundaries",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-pointer-publication-sigkill.log",
+      "sha256": "748a465a6be786a80b96850c9b6bc99827dd00f84d4806b6e0c11a41c3f24f39",
       "exit_status": 0
     }
   ],

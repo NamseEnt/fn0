@@ -2,11 +2,10 @@
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on build directory
-   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.81s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.90s
      Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-70634b21c90c24df)
 
-running 315 tests
+running 316 tests
 test blink::page_cache::tests::all_pinned_cache_capacity_returns_overload ... ok
 test blink::page_cache::tests::cache_eviction_keeps_guard_charge_until_last_owner_drops ... ok
 test blink::page_cache::tests::cancelled_load_wakes_followers_and_releases_job_and_byte_reservations ... ok
@@ -37,6 +36,15 @@ test blink::paged_manifest::tests::durable_manifest_rejects_spill_nodes_and_reop
 test blink::paged_manifest::tests::failed_pointer_publication_keeps_selected_generation_and_orphan ... ok
 test blink::paged_manifest::tests::manifest_rejects_invalid_fields_before_writing ... ok
 test blink::paged_manifest::tests::marker_pointer_manifest_and_identity_corruption_fail_closed ... ok
+test blink::paged_manifest::tests::paged_manifest_pointer_publication_survives_sigkill ...
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+ok
 test blink::paged_manifest::tests::pointer_publication_faults_cover_every_ordering_boundary ... ok
 test blink::paged_manifest::tests::truncated_marker_pointer_and_manifest_fail_closed ... ok
 test blink::paged_manifest::tests::unknown_pointer_version_fails_closed ... ok
@@ -323,5 +331,5 @@ test wal::tests::trusted_internal_valid_images_are_byte_identical_to_strict_imag
 test wal::tests::unsupported_version_is_rejected ... ok
 test wal::tests::wrong_magic_is_rejected ... ok
 
-test result: ok. 311 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 128.38s
+test result: ok. 312 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 128.31s
 
