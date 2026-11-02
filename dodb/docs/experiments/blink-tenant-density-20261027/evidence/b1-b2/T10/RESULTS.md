@@ -104,3 +104,14 @@ T10 remains partial. Persistent source-catalog publication, restart-time root/so
 - Raw logs: `logs/paged-writer-pack-failure-focused.log`, `logs/paged-checkpoint-faults-reader-gc-feature-lib.log`, `logs/paged-checkpoint-faults-reader-gc-all-targets-compile.log`, and `logs/paged-checkpoint-faults-reader-gc-strict-clippy.log`.
 
 T10 remains partial. Persistent source-catalog publication and restart-time root/source retention, source/index disk reservations, combined loader/index/output accounting, bounded defer and progress after capacity release, resumable slices, and checkpoint debt/time-above-threshold accounting remain open.
+
+## Completed substep: resumable bounded pack slices
+
+- Source commit: `22a0e4a673f97ea96d714c88ff1c2b4532e1305b`.
+- Added a fixed-depth `VersionIndexDescriptorCursor` that yields one ordered descriptor at a time without retaining loaded node guards. Its sequence is checked against the existing traversal for a sparse randomized index while the node cache is bounded to two nodes.
+- Added `PagedCheckpointJob::write_pack_slice`. The job retains its charged output reservation, cursor, and pack writer between calls; each call emits at most the requested number of page images. Existing `write_pack` drains the same cursor to completion. A later transaction is committed between two one-page slices while output still reads the pinned target. A slice fault preserves the incomplete pack, prevents retrying the failed job, and leaves the manifest unpublished.
+- Focused writer test: 1 passed. Default library suite: 221 passed, 0 failed, 4 ignored. Full feature suite: storage library 297 passed, 0 failed, 4 ignored; benchmark binary 8 passed; phase0 binary 42 passed; all remaining binaries and doc tests passed; checkpoint/recovery integration tests passed, including SIGKILL suites. Feature all-target check and targeted format/diff checks passed.
+- Strict feature Clippy exits 101 with the same 12 existing storage diagnostics; none point to the cursor or sliced checkpoint code. Existing harness dead-code warnings remain in all-target compilation.
+- Raw logs: `logs/paged-checkpoint-resumable-slices-focused.log`, `logs/paged-checkpoint-resumable-slices-default-suite.log`, `logs/paged-checkpoint-resumable-slices-feature-suite.log`, `logs/paged-checkpoint-resumable-slices-all-targets-check.log`, and `logs/paged-checkpoint-resumable-slices-strict-clippy.log`.
+
+T10 remains partial. Slices are resumable within one active writer job, but no fair multi-tenant continuation scheduler or debt/time-above-threshold accounting exists. Persistent source-catalog publication and restart-time retention, source/index disk reservations, combined loader/index/output accounting, tiny-capacity defer/wake, process-crash coverage of this paged checkpoint writer, and the complete resource acceptance matrix remain outstanding. The paged service route remains inactive and T17 remains unstarted.

@@ -13,7 +13,8 @@
     "70133a4f6885ea2b46904a54f5acb8c20c2ff760",
     "445dce45c585abd9b2d795dd14c468e4e9463791",
     "560d185172d27c266b676d2a44e2508b28515335",
-    "03f01f45a982289258aee7b8bc92b024078223a4"
+    "03f01f45a982289258aee7b8bc92b024078223a4",
+    "22a0e4a673"
   ],
   "push": {
     "remote": "origin",
@@ -44,12 +45,12 @@
     "dodb/crates/dodb-storage/src/wal.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "6375763914ea352bc59d28541017283b061f24de9e09dd3c051bb6a581e484aa",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "32e1bac969163da97d0939da76ae77a5f1471ac24a631a7ad2137f7054305a51",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "a4b1321c4793fb086fdf77900d3a33f7bfef51bd46fce9c2d3b83748247e461c",
     "dodb/crates/dodb-storage/src/blink/page_locator.rs": "80fbbdc6a569b379b563e8ad65b396c047bb4e63524240e3126c15710d59b48a",
     "dodb/crates/dodb-storage/src/bin/phase0-bench.rs": "2cf4d0a7d12caaa477046445f3a4675c861b85628105c81496115e2e03c50c81",
     "dodb/crates/dodb-storage/src/blink/durable_bases.rs": "26fd15c75154e71c42394f50e9f97b3bad8e6f7992e3161d35a6fd35ddaa9f08",
-    "dodb/crates/dodb-storage/src/blink/version_index.rs": "e60ab5bc5981aed2d216d28f28ff8710e0f68f61dfdb8f39561c181482ed3880",
+    "dodb/crates/dodb-storage/src/blink/version_index.rs": "08a36c1dee332255d12084831db88ad0ff540a448067d75d5584921f867836b8",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "dece389300575f090e393780fc1a9a31aaf6f2689774ec604677c0c3967d8a4f",
     "dodb/crates/dodb-storage/src/wal.rs": "7fec7f957680ed1dc779ec355cd9b90018bc27ddb88023b6c446dd38763f601d",
     "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "e69d6062bfb9371d2e3a6b28ac3d114697642c4017d81f12666e8413fc46d366"
@@ -59,7 +60,7 @@
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "03f01f45a982289258aee7b8bc92b024078223a4"
+    "source_commit": "22a0e4a673f97ea96d714c88ff1c2b4532e1305b"
   },
   "features": [
     "blink-demand-paging",
@@ -68,14 +69,14 @@
   "runtime_configuration": {
     "route": "storage-only PagedReadHandle snapshot and file-backed durable base pack; no service route activated",
     "target": "The writer pins a synced committed target; pack streaming accepts later commits, and publication merges only matching target images while retaining newer WAL locators.",
-    "pack_output": "sorted exact page images; coalesced buffer is four pages (16 KiB), uncoalesced buffer is one page (4 KiB)",
+    "pack_output": "sorted exact page images streamed through a resumable fixed-depth descriptor cursor; each slice emits at most its configured page count; coalesced buffer is four pages (16 KiB), uncoalesced buffer is one page (4 KiB)",
     "memory_reservation": "CheckpointValidation progress reservation is 6 pages for coalesced output or 3 pages for uncoalesced output; page loader separately charges decoded pages",
     "publication": "Sync complete or incremental pack; validate it against the pinned target; merge into the latest root without overwriting later writes; sync a next WAL segment at the latest committed LSN; sync WAL directory; publish manifest pointer; then switch writer generation. Process-crash and actual pointer-write faults remain unverified.",
     "service_route_activated": false,
     "defaults_changed": false,
     "oci_experiment": false,
     "performance_matrix_started": false,
-    "checkpoint_worker": "One active checkpoint job per PagedTransactionWriter; overlapping jobs are rejected, and job drop or publication releases the slot.",
+    "checkpoint_worker": "One active checkpoint job per PagedTransactionWriter; a job retains its output reservation and cursor between slices; overlapping jobs are rejected and job drop or publication releases the worker slot; fair cross-tenant scheduling is not implemented.",
     "pointer_faults": "Injectable boundaries exist before pointer temporary creation, after temporary-file sync, after atomic rename, and after directory sync; the exercised writer path fails after temporary-file sync.",
     "pack_failure": "Checkpoint jobs accept a storage fault injector; a page-write failure keeps the manifest selected and releases the single active worker lease when the failed job is dropped."
   },
@@ -1109,6 +1110,132 @@
         "sha256": "03424de7e5a97fb082939f80f90ef7c204ec08412e410cbcd43dd3e40294c35c"
       },
       "source_commit": "03f01f45a982289258aee7b8bc92b024078223a4"
+    },
+    {
+      "name": "paged_checkpoint_resumable_slices_focused",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "blink::tests::paged_transaction_writer_publishes_complete_and_incremental_checkpoints",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; sliced checkpoint output interleaves a later commit and failed slices cannot be retried.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-resumable-slices-focused.log",
+        "sha256": "f162f1ceeab8b048d553ee6f6367dfeff82fb7d33dcd3a8b563a3144aba109b4"
+      },
+      "source_commit": "22a0e4a673f97ea96d714c88ff1c2b4532e1305b"
+    },
+    {
+      "name": "paged_checkpoint_resumable_slices_default_library",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "221 passed, 0 failed, 4 ignored.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-resumable-slices-default-suite.log",
+        "sha256": "6ab0e5981c7a1adf7485814a9c615aa38f6287ad2a024fbd9965a40e389068c5"
+      },
+      "source_commit": "22a0e4a673f97ea96d714c88ff1c2b4532e1305b"
+    },
+    {
+      "name": "paged_checkpoint_resumable_slices_feature_all_targets",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "Storage library 297 passed, 0 failed, 4 ignored; benchmark binary 8 passed; phase0 binary 42 passed; all other binaries, integration tests including SIGKILL recovery, and doc tests passed.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-resumable-slices-feature-suite.log",
+        "sha256": "b1a378ba3425d3ba50d06b6de3027360f2c544d7c4f74202cbf245a8f60c5897"
+      },
+      "source_commit": "22a0e4a673f97ea96d714c88ff1c2b4532e1305b"
+    },
+    {
+      "name": "paged_checkpoint_resumable_slices_all_targets_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--all-targets",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "All targets compiled; existing benchmark harness dead-code warnings remain.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-resumable-slices-all-targets-check.log",
+        "sha256": "d8fff43568de2775ad66e1996890e184d41277f6975ce28f30b589184d713f55"
+      },
+      "source_commit": "22a0e4a673f97ea96d714c88ff1c2b4532e1305b"
+    },
+    {
+      "name": "paged_checkpoint_resumable_slices_rustfmt",
+      "argv": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "--config",
+        "skip_children=true",
+        "crates/dodb-storage/src/blink/mod.rs",
+        "crates/dodb-storage/src/blink/version_index.rs"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "Both changed Rust files pass rustfmt check.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-resumable-slices-format.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source_commit": "22a0e4a673f97ea96d714c88ff1c2b4532e1305b"
+    },
+    {
+      "name": "paged_checkpoint_resumable_slices_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "--message-format",
+        "short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 101,
+      "summary": "12 pre-existing crate diagnostics remain; none point to the descriptor cursor or sliced checkpoint implementation.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-resumable-slices-strict-clippy.log",
+        "sha256": "59fd173fe674d5e65dc16ce35c00ad7eb2e4a56eafdfaab9bca2f6656ae79f9f"
+      },
+      "source_commit": "22a0e4a673f97ea96d714c88ff1c2b4532e1305b"
     }
   ],
   "acceptance_mapping": {
@@ -1121,7 +1248,8 @@
     "complete_reopen_oracle": "partial: a disk-backed writer test publishes complete and incremental checkpoints, injects a failure before a later manifest pointer, reopens generation 3, and reads the exact generation-3 value; no process crash or pointer-write I/O fault is injected",
     "bounded_memory_and_source_index_disk_reservations": "partial: pack output is bounded to 16 KiB coalesced or 4 KiB uncoalesced; checkpoint insertion and durable root promotion reserve 128 KiB each, and the writer integration uses a 512 KiB progress pool; required loader overlap and source/index disk reservations are not integrated",
     "tiny_capacity_bounded_defer_and_eventual_progress": "partial: a 64 KiB progress pool rejects the 128 KiB checkpoint insertion unit before changing root or progress accounting; scheduler defer/wake and eventual progress after capacity release are not implemented",
-    "checkpoint_debt_and_time_above_threshold": "not implemented; no maintenance scheduler or tenant debt accounting exists yet"
+    "checkpoint_debt_and_time_above_threshold": "not implemented; no maintenance scheduler or tenant debt accounting exists yet",
+    "resumable_bounded_slices": "passed within a single writer job: a one-page slice yields before completion, a later commit proceeds between slices while the pinned target remains fixed, the cursor visits descriptors in order with fixed-depth state, and a failed slice cannot be retried; fair tenant scheduling remains unimplemented"
   },
   "ownership_peaks": {
     "coalesced_output_buffer_bytes": 16384,
@@ -1219,7 +1347,7 @@
     "Persist the source catalog and test restart-time recovery-root/source retention plus background GC integration",
     "Reserve source/index disk overlap and required loader memory together with checkpoint output and index promotion",
     "Resolve the eight-page pinned-root index-capacity attempt without increasing the cap to hide the bound; test defer and progress after capacity release",
-    "Implement resumable worker slices, bounded checkpoint debt, and time-above-threshold accounting"
+    "Implement a fair multi-tenant continuation scheduler and bounded checkpoint debt/time-above-threshold accounting"
   ],
   "next_task": "T10"
 }
