@@ -964,6 +964,9 @@ pub struct BlinkSharedResourceConfig {
     pub maximum_roots_per_tenant: usize,
     pub source_handle_charge_bytes: u64,
     pub source_gc_reservation_bytes: u64,
+    pub checkpoint_capacity_wait_timeout: std::time::Duration,
+    pub maximum_checkpoint_debt_bytes_global: u64,
+    pub maximum_checkpoint_debt_bytes_per_tenant: u64,
 }
 
 #[cfg(feature = "blink-demand-paging")]
@@ -1012,6 +1015,19 @@ fn valid_paged_open_config(config: BlinkSharedResourceConfig) -> bool {
         && config.maximum_roots_per_tenant > 0
         && config.source_handle_charge_bytes > 0
         && config.source_gc_reservation_bytes > 0
+        && !config.checkpoint_capacity_wait_timeout.is_zero()
+        && config.maximum_checkpoint_debt_bytes_global > 0
+        && config.maximum_checkpoint_debt_bytes_per_tenant > 0
+        && config.maximum_checkpoint_debt_bytes_per_tenant
+            <= config.maximum_checkpoint_debt_bytes_global
+        && config.maximum_checkpoint_debt_bytes_global <= config.disk.global_bytes
+        && config.maximum_checkpoint_debt_bytes_per_tenant <= config.disk.per_tenant_bytes
+        && dodb_storage::blink::maximum_paged_transaction_wal_append_bytes(
+            config.maximum_working_pages,
+        )
+        .is_ok_and(|maximum_append_bytes| {
+            maximum_append_bytes <= config.maximum_checkpoint_debt_bytes_per_tenant
+        })
         && metadata_bytes
             <= memory_category_limit(dodb_storage::blink::resource::ResourceCategory::Metadata)
         && config.page_loader.maximum_cache_bytes
@@ -1480,6 +1496,8 @@ pub struct BlinkTenantService {
     open_tenant_metadata_bytes: u64,
     #[cfg(feature = "blink-demand-paging")]
     paged_open_config: Option<BlinkSharedResourceConfig>,
+    #[cfg(feature = "blink-demand-paging")]
+    checkpoint_debt_ledger: Option<Arc<CheckpointDebtLedger>>,
     shards: Arc<StdMutex<BlinkShardRegistry>>,
     fault_injector_factory: Mutex<Option<FaultInjectorFactory>>,
     #[cfg(test)]
@@ -1608,6 +1626,159 @@ enum BlinkShardReadHandle {
 }
 
 #[cfg(feature = "blink-demand-paging")]
+#[derive(Default)]
+struct CheckpointDebtState {
+    actual_by_tenant: BTreeMap<u64, u64>,
+    reserved_by_tenant: BTreeMap<u64, u64>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+struct CheckpointDebtLedger {
+    global_limit: u64,
+    per_tenant_limit: u64,
+    state: StdMutex<CheckpointDebtState>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+struct CheckpointDebtReservation {
+    ledger: Arc<CheckpointDebtLedger>,
+    tenant_id: u64,
+    bytes: u64,
+    active: bool,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl CheckpointDebtLedger {
+    fn new(global_limit: u64, per_tenant_limit: u64) -> Arc<Self> {
+        Arc::new(Self {
+            global_limit,
+            per_tenant_limit,
+            state: StdMutex::new(CheckpointDebtState::default()),
+        })
+    }
+
+    fn reserve(
+        self: &Arc<Self>,
+        tenant_id: u64,
+        bytes: u64,
+    ) -> Result<CheckpointDebtReservation, Error> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| Error::invariant("checkpoint debt ledger lock poisoned"))?;
+        let actual_tenant = state.actual_by_tenant.get(&tenant_id).copied().unwrap_or(0);
+        let reserved_tenant = state
+            .reserved_by_tenant
+            .get(&tenant_id)
+            .copied()
+            .unwrap_or(0);
+        let next_tenant = actual_tenant
+            .checked_add(reserved_tenant)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or_else(|| Error::overloaded("per-tenant checkpoint debt overflows"))?;
+        let current_global = state
+            .actual_by_tenant
+            .values()
+            .chain(state.reserved_by_tenant.values())
+            .try_fold(0u64, |total, tenant_bytes| total.checked_add(*tenant_bytes))
+            .ok_or_else(|| Error::overloaded("global checkpoint debt overflows"))?;
+        let next_global = current_global
+            .checked_add(bytes)
+            .ok_or_else(|| Error::overloaded("global checkpoint debt overflows"))?;
+        if next_tenant > self.per_tenant_limit || next_global > self.global_limit {
+            return Err(Error::overloaded(
+                "B-link checkpoint debt admission limit is exhausted",
+            ));
+        }
+        state.reserved_by_tenant.insert(
+            tenant_id,
+            reserved_tenant
+                .checked_add(bytes)
+                .ok_or_else(|| Error::overloaded("per-tenant checkpoint debt overflows"))?,
+        );
+        Ok(CheckpointDebtReservation {
+            ledger: Arc::clone(self),
+            tenant_id,
+            bytes,
+            active: true,
+        })
+    }
+
+    fn set_tenant_debt(&self, tenant_id: u64, bytes: u64) -> Result<(), Error> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| Error::invariant("checkpoint debt ledger lock poisoned"))?;
+        if bytes == 0 {
+            state.actual_by_tenant.remove(&tenant_id);
+        } else {
+            state.actual_by_tenant.insert(tenant_id, bytes);
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl CheckpointDebtReservation {
+    fn commit(mut self, actual_debt_bytes: u64) -> Result<(), Error> {
+        let mut state = self
+            .ledger
+            .state
+            .lock()
+            .map_err(|_| Error::invariant("checkpoint debt ledger lock poisoned"))?;
+        let reserved_tenant = state
+            .reserved_by_tenant
+            .get(&self.tenant_id)
+            .copied()
+            .unwrap_or(0);
+        let remaining_reserved = reserved_tenant
+            .checked_sub(self.bytes)
+            .ok_or_else(|| Error::invariant("checkpoint debt reservation underflow"))?;
+        if remaining_reserved == 0 {
+            state.reserved_by_tenant.remove(&self.tenant_id);
+        } else {
+            state
+                .reserved_by_tenant
+                .insert(self.tenant_id, remaining_reserved);
+        }
+        if actual_debt_bytes == 0 {
+            state.actual_by_tenant.remove(&self.tenant_id);
+        } else {
+            state
+                .actual_by_tenant
+                .insert(self.tenant_id, actual_debt_bytes);
+        }
+        self.active = false;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl Drop for CheckpointDebtReservation {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        let Ok(mut state) = self.ledger.state.lock() else {
+            return;
+        };
+        let reserved_tenant = state
+            .reserved_by_tenant
+            .get(&self.tenant_id)
+            .copied()
+            .unwrap_or(0);
+        let remaining_reserved = reserved_tenant.saturating_sub(self.bytes);
+        if remaining_reserved == 0 {
+            state.reserved_by_tenant.remove(&self.tenant_id);
+        } else {
+            state
+                .reserved_by_tenant
+                .insert(self.tenant_id, remaining_reserved);
+        }
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
 struct PagedWritableShard {
     writer: StdMutex<dodb_storage::blink::PagedTransactionWriter<ProductionFile>>,
     manifest_store: StdMutex<dodb_storage::blink::paged_manifest::PagedManifestStore>,
@@ -1619,6 +1790,9 @@ struct PagedWritableShard {
     checkpoint_execution: BlinkCheckpointExecution,
     checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
     activity: Arc<CoordinatorActivity>,
+    checkpoint_capacity_wait_timeout: std::time::Duration,
+    maximum_transaction_wal_append_bytes: u64,
+    checkpoint_debt_ledger: Arc<CheckpointDebtLedger>,
     checkpoint_pending: AtomicBool,
     latest: StdRwLock<Arc<dodb_storage::blink::PagedReadHandle>>,
     transaction_worker: Arc<Semaphore>,
@@ -1638,6 +1812,9 @@ struct PagedWritableShardOpenConfig {
     checkpoint_execution: BlinkCheckpointExecution,
     checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
     activity: Arc<CoordinatorActivity>,
+    checkpoint_capacity_wait_timeout: std::time::Duration,
+    maximum_transaction_wal_append_bytes: u64,
+    checkpoint_debt_ledger: Arc<CheckpointDebtLedger>,
 }
 
 #[cfg(feature = "blink-demand-paging")]
@@ -1716,7 +1893,23 @@ impl PagedWritableShard {
             checkpoint_execution,
             checkpoint_metrics,
             activity,
+            checkpoint_capacity_wait_timeout,
+            maximum_transaction_wal_append_bytes,
+            checkpoint_debt_ledger,
         } = config;
+        let wal_bytes = writer.wal_metrics()?.wal_bytes;
+        let has_uncheckpointed_commits =
+            writer.has_commits_after(manifest_store.current().committed_prefix_lsn);
+        let initial_debt_bytes = match checkpoint_policy {
+            BlinkCheckpointPolicy::Disabled => 0,
+            BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes }
+                if has_uncheckpointed_commits =>
+            {
+                wal_bytes.saturating_sub(threshold_bytes)
+            }
+            BlinkCheckpointPolicy::WalBytesThreshold { .. } => 0,
+        };
+        checkpoint_debt_ledger.set_tenant_debt(tenant_id, initial_debt_bytes)?;
         let latest = Arc::new(writer.snapshot()?);
         Ok(Arc::new(Self {
             writer: StdMutex::new(writer),
@@ -1729,6 +1922,9 @@ impl PagedWritableShard {
             checkpoint_execution,
             checkpoint_metrics,
             activity,
+            checkpoint_capacity_wait_timeout,
+            maximum_transaction_wal_append_bytes,
+            checkpoint_debt_ledger,
             checkpoint_pending: AtomicBool::new(false),
             latest: StdRwLock::new(latest),
             transaction_worker: Arc::new(Semaphore::new(1)),
@@ -1792,6 +1988,36 @@ impl PagedWritableShard {
         Some(result_receiver)
     }
 
+    async fn reschedule_checkpoint_for_debt_pressure(
+        self: &Arc<Self>,
+    ) -> Result<Option<tokio::sync::oneshot::Receiver<Result<(), Error>>>, Error> {
+        let writable = Arc::clone(self);
+        let (wal_bytes, has_uncheckpointed_commits) = tokio::task::spawn_blocking(move || {
+            let _activity_guard = writable.activity.enter();
+            let writer = writable
+                .writer
+                .lock()
+                .map_err(|_| Error::invariant("paged writer lock poisoned"))?;
+            let manifest_store = writable
+                .manifest_store
+                .lock()
+                .map_err(|_| Error::invariant("paged manifest lock poisoned"))?;
+            let wal_bytes = writer.wal_metrics()?.wal_bytes;
+            let has_uncheckpointed =
+                writer.has_commits_after(manifest_store.current().committed_prefix_lsn);
+            Ok::<_, Error>((wal_bytes, has_uncheckpointed))
+        })
+        .await
+        .map_err(|error| {
+            Error::durability(format!("paged debt-pressure worker failed: {error}"))
+        })??;
+        Ok(self.schedule_checkpoint_after_commit(
+            wal_bytes,
+            has_uncheckpointed_commits,
+            &tokio::runtime::Handle::current(),
+        ))
+    }
+
     async fn run_threshold_checkpoint(self: &Arc<Self>, threshold_bytes: u64) -> Result<(), Error> {
         let _activity_guard = self.activity.enter();
         let checkpoint_started = Instant::now();
@@ -1817,16 +2043,18 @@ impl PagedWritableShard {
                 Error::durability(format!("paged WAL metric worker failed: {error}"))
             })??
         };
+        let current_debt_bytes = if has_uncheckpointed_commits {
+            current_wal_bytes.saturating_sub(threshold_bytes)
+        } else {
+            0
+        };
+        self.checkpoint_debt_ledger
+            .set_tenant_debt(self.tenant_id, current_debt_bytes)?;
         if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
-            let debt_bytes = if has_uncheckpointed_commits {
-                current_wal_bytes.saturating_sub(threshold_bytes)
-            } else {
-                0
-            };
             metrics.observe_tenant_checkpoint_state(
                 self.tenant_id,
                 current_wal_bytes,
-                debt_bytes,
+                current_debt_bytes,
                 current_unix_nanos(),
             );
         }
@@ -1840,6 +2068,15 @@ impl PagedWritableShard {
             pending: true,
         };
         let checkpoint_result = self.run_checkpoint_slices(request_metrics_guard).await;
+        if let Ok(Some((wal_bytes, has_uncheckpointed))) = &checkpoint_result {
+            let debt_bytes = if *has_uncheckpointed {
+                wal_bytes.saturating_sub(threshold_bytes)
+            } else {
+                0
+            };
+            self.checkpoint_debt_ledger
+                .set_tenant_debt(self.tenant_id, debt_bytes)?;
+        }
         let duration_nanos = checkpoint_started
             .elapsed()
             .as_nanos()
@@ -1880,10 +2117,6 @@ impl PagedWritableShard {
     ) -> Result<Option<(u64, bool)>, Error> {
         let initial_permit =
             physical_checkpoint::acquire_fair_checkpoint_slice(self.tenant_id).await?;
-        request_metrics_guard.started();
-        if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
-            metrics.tenant_checkpoint_slice_completed(self.tenant_id);
-        }
         let writable = Arc::clone(self);
         let pack_number = next_paged_checkpoint_pack_number(&self.checkpoint_directory)?;
         let mut job = physical_checkpoint::submit_checkpoint_progress(move || {
@@ -1918,9 +2151,15 @@ impl PagedWritableShard {
         .map_err(|error| {
             Error::durability(format!("paged checkpoint begin worker failed: {error}"))
         })??;
-        let Some(job) = job.take() else {
+        let Some(mut job) = job.take() else {
             return Ok(None);
         };
+        job.reserve_disk_capacity(self.checkpoint_capacity_wait_timeout)
+            .await?;
+        request_metrics_guard.started();
+        if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
+            metrics.tenant_checkpoint_slice_completed(self.tenant_id);
+        }
         if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
             metrics.checkpoints_started = metrics.checkpoints_started.saturating_add(1);
             metrics.tasks_running = metrics.tasks_running.saturating_add(1);
@@ -2016,6 +2255,38 @@ impl PagedWritableShard {
         blocking_workers: Arc<Semaphore>,
         activity: Arc<CoordinatorActivity>,
     ) -> Result<TransactionResult, Error> {
+        let debt_reservation = if request.mutations.is_empty()
+            || self.checkpoint_policy == BlinkCheckpointPolicy::Disabled
+        {
+            None
+        } else {
+            match self
+                .checkpoint_debt_ledger
+                .reserve(self.tenant_id, self.maximum_transaction_wal_append_bytes)
+            {
+                Ok(reservation) => Some(reservation),
+                Err(debt_limit_error) => {
+                    let checkpoint_waiter = self.reschedule_checkpoint_for_debt_pressure().await?;
+                    if self.checkpoint_execution == BlinkCheckpointExecution::Sync
+                        && let Some(checkpoint_waiter) = checkpoint_waiter
+                    {
+                        checkpoint_waiter.await.map_err(|error| {
+                            Error::durability(format!(
+                                "paged debt-pressure checkpoint task dropped its result: {error}"
+                            ))
+                        })??;
+                        Some(
+                            self.checkpoint_debt_ledger.reserve(
+                                self.tenant_id,
+                                self.maximum_transaction_wal_append_bytes,
+                            )?,
+                        )
+                    } else {
+                        return Err(debt_limit_error);
+                    }
+                }
+            }
+        };
         let worker_permit = blocking_workers
             .try_acquire_owned()
             .map_err(|_| Error::overloaded("paged writer worker capacity is full"))?;
@@ -2034,6 +2305,7 @@ impl PagedWritableShard {
                 let _activity_guard = activity_guard;
                 let _queued_reservation = queued_reservation;
                 let _preparation_reservation = preparation_reservation;
+                let mut debt_reservation = debt_reservation;
                 #[cfg(all(test, feature = "blink-demand-paging"))]
                 wait_for_one_shot_test_gate(writable.commit_test_gate.clone());
                 let mut writer = writable
@@ -2050,19 +2322,6 @@ impl PagedWritableShard {
                     transaction_results.into_iter().next().ok_or_else(|| {
                         Error::invariant("paged writer returned no transaction result")
                     })?;
-                if transaction_result
-                    .as_ref()
-                    .is_ok_and(|result| result.commit_lsn.is_some())
-                {
-                    let next_snapshot = Arc::new(writer.snapshot().map_err(|error| {
-                    Error::durability(format!(
-                        "paged transaction committed but its read root could not be pinned: {error}"
-                    ))
-                })?);
-                    *writable.latest.write().map_err(|_| {
-                        Error::durability("paged committed root lock is poisoned")
-                    })? = next_snapshot;
-                }
                 let checkpoint_waiter = if transaction_result
                     .as_ref()
                     .is_ok_and(|result| result.commit_lsn.is_some())
@@ -2082,6 +2341,21 @@ impl PagedWritableShard {
                     })?;
                     let has_uncheckpointed_commits =
                         writer.has_commits_after(manifest_store.current().committed_prefix_lsn);
+                    let debt_bytes = match writable.checkpoint_policy {
+                        BlinkCheckpointPolicy::Disabled => 0,
+                        BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes }
+                            if has_uncheckpointed_commits =>
+                        {
+                            wal_bytes.saturating_sub(threshold_bytes)
+                        }
+                        BlinkCheckpointPolicy::WalBytesThreshold { .. } => 0,
+                    };
+                    if let Some(reservation) = debt_reservation.take() {
+                        reservation.commit(debt_bytes)?;
+                    }
+                    writable
+                        .checkpoint_debt_ledger
+                        .set_tenant_debt(writable.tenant_id, debt_bytes)?;
                     writable.schedule_checkpoint_after_commit(
                         wal_bytes,
                         has_uncheckpointed_commits,
@@ -2090,6 +2364,19 @@ impl PagedWritableShard {
                 } else {
                     None
                 };
+                if transaction_result
+                    .as_ref()
+                    .is_ok_and(|result| result.commit_lsn.is_some())
+                {
+                    let next_snapshot = Arc::new(writer.snapshot().map_err(|error| {
+                    Error::durability(format!(
+                        "paged transaction committed but its read root could not be pinned: {error}"
+                    ))
+                })?);
+                    *writable.latest.write().map_err(|_| {
+                        Error::durability("paged committed root lock is poisoned")
+                    })? = next_snapshot;
+                }
                 Ok::<_, Error>((transaction_result, checkpoint_waiter))
             })
             .await
@@ -2433,6 +2720,13 @@ impl BlinkTenantService {
             open_tenant_metadata_bytes,
             #[cfg(feature = "blink-demand-paging")]
             paged_open_config,
+            #[cfg(feature = "blink-demand-paging")]
+            checkpoint_debt_ledger: paged_open_config.map(|resource_config| {
+                CheckpointDebtLedger::new(
+                    resource_config.maximum_checkpoint_debt_bytes_global,
+                    resource_config.maximum_checkpoint_debt_bytes_per_tenant,
+                )
+            }),
             shards: Arc::new(StdMutex::new(BlinkShardRegistry {
                 shards: BTreeMap::new(),
                 opening: HashSet::new(),
@@ -2982,6 +3276,29 @@ impl BlinkTenantService {
                                 checkpoint_execution: self.checkpoint_execution,
                                 checkpoint_metrics: Arc::clone(&self.checkpoint_metrics),
                                 activity: Arc::clone(&self.coordinator_activity),
+                                checkpoint_capacity_wait_timeout: self
+                                    .paged_open_config
+                                    .ok_or_else(|| {
+                                        Error::invariant(
+                                            "paged checkpoint capacity wait limit is missing",
+                                        )
+                                    })?
+                                    .checkpoint_capacity_wait_timeout,
+                                maximum_transaction_wal_append_bytes:
+                                    dodb_storage::blink::maximum_paged_transaction_wal_append_bytes(
+                                        self.paged_open_config
+                                            .ok_or_else(|| {
+                                                Error::invariant(
+                                                    "paged checkpoint debt limits are missing",
+                                                )
+                                            })?
+                                            .maximum_working_pages,
+                                    )?,
+                                checkpoint_debt_ledger: Arc::clone(
+                                    self.checkpoint_debt_ledger.as_ref().ok_or_else(|| {
+                                        Error::invariant("paged checkpoint debt ledger is missing")
+                                    })?,
+                                ),
                             },
                             #[cfg(all(test, feature = "blink-demand-paging"))]
                             commit_test_gate,
@@ -4510,6 +4827,25 @@ mod tests {
 
     #[test]
     #[cfg(feature = "blink-demand-paging")]
+    fn checkpoint_debt_admission_enforces_global_and_tenant_limits() {
+        let ledger = CheckpointDebtLedger::new(100, 60);
+        let reservation = ledger.reserve(1, 50).unwrap();
+        assert!(ledger.reserve(1, 11).is_err());
+        assert!(ledger.reserve(2, 51).is_err());
+        reservation.commit(40).unwrap();
+        assert!(ledger.reserve(1, 21).is_err());
+        ledger.set_tenant_debt(1, 0).unwrap();
+        let released_after_failure = ledger.reserve(2, 60).unwrap();
+        drop(released_after_failure);
+        let released_after_cancellation = ledger.reserve(1, 60).unwrap();
+        drop(released_after_cancellation);
+        ledger.set_tenant_debt(1, 0).unwrap();
+        ledger.set_tenant_debt(2, 0).unwrap();
+        assert!(ledger.reserve(2, 100).is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "blink-demand-paging")]
     fn abandoned_checkpoint_request_clears_tenant_pending_metrics() {
         let metrics = Arc::new(StdMutex::new(BlinkWalCheckpointMetrics::default()));
         metrics.lock().unwrap().tenant_checkpoint_request_queued(5);
@@ -4568,6 +4904,9 @@ mod tests {
             maximum_roots_per_tenant: 64,
             source_handle_charge_bytes: 256,
             source_gc_reservation_bytes: 65_536,
+            checkpoint_capacity_wait_timeout: std::time::Duration::from_secs(30),
+            maximum_checkpoint_debt_bytes_global: 64 * 1024 * 1024,
+            maximum_checkpoint_debt_bytes_per_tenant: 32 * 1024 * 1024,
         }
     }
 
@@ -4609,6 +4948,31 @@ mod tests {
         }
     }
 
+    #[test]
+    #[cfg(feature = "blink-demand-paging")]
+    fn paged_open_rejects_checkpoint_debt_cap_below_one_worst_case_transaction() {
+        let directory = blink_test_directory();
+        let data_dir = directory.path().join("undersized-checkpoint-debt-cap");
+        let mut resources = writable_paged_blink_shared_resources();
+        let maximum_transaction_bytes =
+            dodb_storage::blink::maximum_paged_transaction_wal_append_bytes(
+                resources.maximum_working_pages,
+            )
+            .unwrap();
+        resources.maximum_checkpoint_debt_bytes_per_tenant =
+            maximum_transaction_bytes.saturating_sub(1);
+        resources.maximum_checkpoint_debt_bytes_global = maximum_transaction_bytes;
+        assert!(
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: data_dir.clone(),
+                blink_shared_resources: Some(resources),
+                ..LocalTenantServiceConfig::default()
+            })
+            .is_err()
+        );
+        assert!(!data_dir.exists());
+    }
+
     #[cfg(feature = "blink-demand-paging")]
     fn paged_blink_shared_resources() -> BlinkSharedResourceConfig {
         BlinkSharedResourceConfig {
@@ -4644,6 +5008,9 @@ mod tests {
             maximum_roots_per_tenant: 64,
             source_handle_charge_bytes: 256,
             source_gc_reservation_bytes: 65_536,
+            checkpoint_capacity_wait_timeout: std::time::Duration::from_secs(30),
+            maximum_checkpoint_debt_bytes_global: 64 * 1024 * 1024,
+            maximum_checkpoint_debt_bytes_per_tenant: 32 * 1024 * 1024,
         }
     }
 
@@ -6040,6 +6407,209 @@ mod tests {
             response => panic!("unexpected response: {response:?}"),
         }
         reopened_service.shutdown_checked().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_checkpoint_resumes_after_disk_capacity_release() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(721);
+        let config = LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            max_open_shards: 1,
+            blink_open_waiter_limit: 4,
+            blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce: true,
+            },
+            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                threshold_bytes: u64::MAX,
+            },
+            blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+            blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+            ..LocalTenantServiceConfig::default()
+        };
+        let service = BlinkTenantService::new(config).unwrap();
+        let database_path = service.database_path(tenant);
+        create_empty_paged_service_fixture(&database_path, tenant);
+        service
+            .execute_request(
+                tenant,
+                Request::Put {
+                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"sk".to_vec()),
+                    value: b"capacity-release-checkpoint".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap();
+        let shard = service
+            .shards
+            .lock()
+            .unwrap()
+            .shards
+            .get(&tenant)
+            .cloned()
+            .unwrap();
+        let writable = match &shard.read_handle {
+            BlinkShardReadHandle::Paged {
+                writable: Some(writable),
+                ..
+            } => Arc::clone(writable),
+            BlinkShardReadHandle::Resident(_) | BlinkShardReadHandle::Paged { .. } => {
+                panic!("expected the writable paged service route")
+            }
+        };
+        let resources = service.shared_resources.as_ref().unwrap().clone();
+        let disk = resources.disk();
+        let tenant_disk = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
+        let disk_headroom = 256;
+        let blocker_bytes = writable_paged_blink_shared_resources()
+            .disk
+            .per_tenant_bytes
+            .saturating_sub(tenant_disk.current_total)
+            .saturating_sub(disk_headroom);
+        assert!(blocker_bytes > 0);
+        let blocker = disk
+            .reserve(
+                tenant.get(),
+                dodb_storage::blink::resource::DiskCategory::RetainedSource,
+                blocker_bytes,
+            )
+            .unwrap();
+        let checkpoint = {
+            let writable = Arc::clone(&writable);
+            tokio::spawn(async move { writable.run_threshold_checkpoint(1).await })
+        };
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if disk.snapshot().unwrap().pending_waiters == 1 {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        drop(blocker);
+        checkpoint.await.unwrap().unwrap();
+        let disk_snapshot = disk.snapshot().unwrap();
+        assert_eq!(disk_snapshot.pending_waiters, 0);
+        let metrics = service.checkpoint_metrics_snapshot();
+        assert_eq!(metrics.checkpoints_completed, 1);
+        assert_eq!(metrics.checkpoints_failed, 0);
+        service.shutdown_checked().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_service_backpressures_writes_at_checkpoint_debt_limit() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(722);
+        let mut resources = writable_paged_blink_shared_resources();
+        let debt_limit = dodb_storage::blink::maximum_paged_transaction_wal_append_bytes(
+            resources.maximum_working_pages,
+        )
+        .unwrap();
+        resources.maximum_checkpoint_debt_bytes_per_tenant = debt_limit;
+        resources.maximum_checkpoint_debt_bytes_global = debt_limit.saturating_mul(2);
+        let service = BlinkTenantService::new(LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            max_open_shards: 1,
+            blink_open_waiter_limit: 4,
+            blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce: true,
+            },
+            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                threshold_bytes: 1,
+            },
+            blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+            blink_shared_resources: Some(resources),
+            ..LocalTenantServiceConfig::default()
+        })
+        .unwrap();
+        let database_path = service.database_path(tenant);
+        create_empty_paged_service_fixture(&database_path, tenant);
+        service.open_shard(tenant).await.unwrap();
+        let progress_started = Arc::new(AtomicBool::new(false));
+        let progress_barrier = Arc::new(std::sync::Barrier::new(2));
+        let progress_started_by_worker = Arc::clone(&progress_started);
+        let progress_barrier_for_worker = Arc::clone(&progress_barrier);
+        let blocked_progress = physical_checkpoint::submit_checkpoint_progress(move || {
+            progress_started_by_worker.store(true, Ordering::Release);
+            progress_barrier_for_worker.wait();
+        })
+        .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            while !progress_started.load(Ordering::Acquire) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        service
+            .execute_request(
+                tenant,
+                Request::Put {
+                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"first".to_vec()),
+                    value: b"first-debt-bearing-value".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if service
+                    .checkpoint_metrics_snapshot()
+                    .per_tenant
+                    .get(&tenant.get())
+                    .is_some_and(|metrics| metrics.checkpoint_requests_queued == 1)
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(
+            service.checkpoint_metrics_snapshot().per_tenant[&tenant.get()]
+                .checkpoint_debt_bytes_current
+                <= debt_limit
+        );
+        let rejected = service
+            .execute_request(
+                tenant,
+                Request::Put {
+                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"second".to_vec()),
+                    value: b"must-wait-for-checkpoint-debt".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap_err();
+        assert!(
+            rejected
+                .to_string()
+                .contains("checkpoint debt admission limit")
+        );
+        tokio::task::spawn_blocking({
+            let progress_barrier = Arc::clone(&progress_barrier);
+            move || progress_barrier.wait()
+        })
+        .await
+        .unwrap();
+        blocked_progress.await.unwrap();
+        service
+            .checkpoint_metrics_handle()
+            .wait_for_coordinators_idle()
+            .await;
+        let metrics = service.checkpoint_metrics_snapshot();
+        assert_eq!(metrics.checkpoints_completed, 1);
+        assert!(metrics.per_tenant[&tenant.get()].checkpoint_debt_bytes_current == 0);
+        service.shutdown_checked().await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

@@ -6,4 +6,3 @@ test physical_checkpoint::tests::fair_ready_queue_drops_idle_failed_and_cancelle
 test physical_checkpoint::tests::fair_ready_queue_deduplicates_tickets_and_bounds_turn_wait ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
-

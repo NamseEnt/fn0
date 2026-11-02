@@ -9,4 +9,3 @@ test physical_checkpoint::tests::cancelled_checkpoint_waiter_releases_its_ready_
 test physical_checkpoint::tests::shared_checkpoint_capacity_serves_waiters_in_ticket_order ... ok
 
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
-

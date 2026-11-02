@@ -99,6 +99,7 @@ pub struct DiskResourceSnapshot {
     pub current_total: u64,
     pub peak_total: u64,
     pub active_tenants: usize,
+    pub pending_waiters: usize,
     pub rejected_reservations: u64,
 }
 
@@ -154,6 +155,7 @@ struct DiskState {
     current_total: u64,
     peak_total: u64,
     rejected_reservations: u64,
+    pending_waiters: usize,
     tenants: BTreeMap<u64, DiskTenantState>,
     persistent_usage: BTreeMap<(u64, DiskCategory, String), u64>,
 }
@@ -167,10 +169,15 @@ struct Inner {
 struct DiskInner {
     limits: DiskResourceLimits,
     state: Mutex<DiskState>,
+    capacity_changed: Notify,
 }
 
 struct WaiterRegistration {
     inner: Arc<Inner>,
+}
+
+struct DiskWaiterRegistration {
+    inner: Arc<DiskInner>,
 }
 
 #[derive(Clone)]
@@ -260,6 +267,7 @@ impl BlinkResourceManager {
                 inner: Arc::new(DiskInner {
                     limits: disk_limits,
                     state: Mutex::new(DiskState::default()),
+                    capacity_changed: Notify::new(),
                 }),
             },
         })
@@ -271,6 +279,53 @@ impl BlinkResourceManager {
 }
 
 impl BlinkDiskResourceManager {
+    pub async fn reserve_wait(
+        &self,
+        tenant_id: u64,
+        category: DiskCategory,
+        bytes: u64,
+        wait_limit: Duration,
+    ) -> Result<DiskReservation, ResourceError> {
+        let category_index = category as usize;
+        if bytes > self.inner.limits.global_bytes
+            || bytes > self.inner.limits.per_tenant_bytes
+            || bytes > self.inner.limits.global_category_bytes[category_index]
+            || bytes > self.inner.limits.per_tenant_category_bytes[category_index]
+        {
+            return Err(ResourceError::CapacityExceeded);
+        }
+        let _waiter_registration = self.register_waiter()?;
+        let deadline = tokio::time::Instant::now() + wait_limit;
+        loop {
+            let capacity_changed = self.inner.capacity_changed.notified();
+            tokio::pin!(capacity_changed);
+            capacity_changed.as_mut().enable();
+            match self.reserve(tenant_id, category, bytes) {
+                Ok(reservation) => return Ok(reservation),
+                Err(ResourceError::CapacityExceeded | ResourceError::TooManyTenants) => {}
+                Err(error) => return Err(error),
+            }
+            tokio::time::timeout_at(deadline, capacity_changed)
+                .await
+                .map_err(|_| ResourceError::WaitTimedOut)?;
+        }
+    }
+
+    fn register_waiter(&self) -> Result<DiskWaiterRegistration, ResourceError> {
+        let mut state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| ResourceError::Poisoned)?;
+        if state.pending_waiters == self.inner.limits.max_tenants {
+            return Err(ResourceError::TooManyWaiters);
+        }
+        state.pending_waiters += 1;
+        Ok(DiskWaiterRegistration {
+            inner: Arc::clone(&self.inner),
+        })
+    }
+
     pub fn reconcile_persistent_usage(
         &self,
         tenant_id: u64,
@@ -355,6 +410,8 @@ impl BlinkDiskResourceManager {
         if next_tenant_total == 0 {
             state.tenants.remove(&charge.tenant_id);
         }
+        drop(state);
+        self.inner.capacity_changed.notify_waiters();
         Ok(())
     }
 
@@ -432,6 +489,8 @@ impl BlinkDiskResourceManager {
         if next_tenant_total == 0 {
             state.tenants.remove(&charge.tenant_id);
         }
+        drop(state);
+        self.inner.capacity_changed.notify_waiters();
         Ok(())
     }
 
@@ -511,6 +570,10 @@ impl BlinkDiskResourceManager {
         }
         if next_tenant_total == 0 {
             state.tenants.remove(&tenant_id);
+        }
+        drop(state);
+        if bytes < previous {
+            self.inner.capacity_changed.notify_waiters();
         }
         Ok(())
     }
@@ -592,6 +655,7 @@ impl BlinkDiskResourceManager {
             current_total: state.current_total,
             peak_total: state.peak_total,
             active_tenants: state.tenants.len(),
+            pending_waiters: state.pending_waiters,
             rejected_reservations: state.rejected_reservations,
         })
     }
@@ -614,6 +678,14 @@ impl BlinkDiskResourceManager {
                 current_total: tenant_state.current_total,
                 peak_total: tenant_state.peak_total,
             }))
+    }
+}
+
+impl Drop for DiskWaiterRegistration {
+    fn drop(&mut self) {
+        if let Ok(mut state) = self.inner.state.lock() {
+            state.pending_waiters = state.pending_waiters.saturating_sub(1);
+        }
     }
 }
 
@@ -854,6 +926,8 @@ impl Reservation {
         state.current_by_category[new_index] = new_global;
         state.peak_by_category[new_index] = state.peak_by_category[new_index].max(new_global);
         charge.category = category;
+        drop(state);
+        charge.inner.capacity_changed.notify_waiters();
         Ok(())
     }
 }
@@ -926,6 +1000,8 @@ impl DiskReservation {
         if remove_tenant {
             state.tenants.remove(&charge.tenant_id);
         }
+        drop(state);
+        charge.inner.capacity_changed.notify_waiters();
         Ok(())
     }
 
@@ -1038,6 +1114,8 @@ impl Drop for DiskCharge {
         if remove_tenant {
             state.tenants.remove(&self.tenant_id);
         }
+        drop(state);
+        self.inner.capacity_changed.notify_waiters();
     }
 }
 
@@ -1100,6 +1178,89 @@ mod tests {
         assert_eq!(manager.snapshot().unwrap().current_total, 0);
         let later_reservation = manager.reserve(2, DiskCategory::Wal, 40).unwrap();
         assert_eq!(later_reservation.bytes(), 40);
+    }
+
+    #[tokio::test]
+    async fn disk_capacity_waiter_resumes_after_retained_source_release() {
+        let manager = disk_manager().disk();
+        manager
+            .reconcile_persistent_usage(1, DiskCategory::RetainedSource, "/tenant-1", 60)
+            .unwrap();
+        let waiting_manager = manager.clone();
+        let waiter = tokio::spawn(async move {
+            waiting_manager
+                .reserve_wait(
+                    2,
+                    DiskCategory::CheckpointOutput,
+                    50,
+                    Duration::from_secs(1),
+                )
+                .await
+        });
+        tokio::task::yield_now().await;
+        assert_eq!(manager.snapshot().unwrap().pending_waiters, 1);
+        manager
+            .reconcile_persistent_usage(1, DiskCategory::RetainedSource, "/tenant-1", 40)
+            .unwrap();
+        let reservation = waiter.await.unwrap().unwrap();
+        assert_eq!(reservation.bytes(), 50);
+        let snapshot = manager.snapshot().unwrap();
+        assert_eq!(snapshot.current_total, 90);
+        assert_eq!(snapshot.pending_waiters, 0);
+    }
+
+    #[tokio::test]
+    async fn disk_capacity_waiters_are_bounded_and_cancellation_releases_a_slot() {
+        let manager = disk_manager().disk();
+        manager
+            .reconcile_persistent_usage(1, DiskCategory::RetainedSource, "/tenant-1", 80)
+            .unwrap();
+        let first_manager = manager.clone();
+        let first_waiter = tokio::spawn(async move {
+            first_manager
+                .reserve_wait(
+                    2,
+                    DiskCategory::CheckpointOutput,
+                    30,
+                    Duration::from_secs(1),
+                )
+                .await
+        });
+        let second_manager = manager.clone();
+        let second_waiter = tokio::spawn(async move {
+            second_manager
+                .reserve_wait(
+                    2,
+                    DiskCategory::CheckpointOutput,
+                    30,
+                    Duration::from_secs(1),
+                )
+                .await
+        });
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if manager.snapshot().unwrap().pending_waiters == 2 {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(matches!(
+            manager
+                .reserve_wait(3, DiskCategory::CheckpointOutput, 1, Duration::from_secs(1),)
+                .await,
+            Err(ResourceError::TooManyWaiters)
+        ));
+        first_waiter.abort();
+        assert!(first_waiter.await.is_err_and(|error| error.is_cancelled()));
+        assert_eq!(manager.snapshot().unwrap().pending_waiters, 1);
+        manager
+            .reconcile_persistent_usage(1, DiskCategory::RetainedSource, "/tenant-1", 0)
+            .unwrap();
+        assert_eq!(second_waiter.await.unwrap().unwrap().bytes(), 30);
+        assert_eq!(manager.snapshot().unwrap().pending_waiters, 0);
     }
 
     #[test]

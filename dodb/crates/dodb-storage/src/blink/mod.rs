@@ -1818,6 +1818,7 @@ pub struct PagedCheckpointJob {
     pack_written: bool,
     pack_failed: bool,
     pack_output: Option<durable_bases::PagedBasePackOutput>,
+    pack_page_count: Option<u64>,
     descriptor_cursor: Option<version_index::VersionIndexDescriptorCursor>,
     pack_writer: Option<durable_bases::PagedBasePackWriter>,
     _checkpoint_reservation: Option<resource::Reservation>,
@@ -1851,6 +1852,52 @@ impl Drop for PagedCheckpointWorkerLease {
 impl PagedCheckpointJob {
     pub fn target_lsn(&self) -> Lsn {
         self.target_lsn
+    }
+
+    pub async fn reserve_disk_capacity(&mut self, wait_limit: std::time::Duration) -> Result<()> {
+        if self.disk_reservation.is_some() {
+            return Ok(());
+        }
+        let index = Arc::clone(&self.target.index);
+        let root = self.target.root;
+        let previous_checkpoint_lsn = self.request.previous_checkpoint_lsn;
+        let page_count = tokio::task::spawn_blocking(move || {
+            let mut page_count = 0u64;
+            index.visit_descriptors(root, &mut |descriptor| {
+                if previous_checkpoint_lsn
+                    .is_some_and(|previous_lsn| descriptor.image_lsn <= previous_lsn)
+                {
+                    return Ok(());
+                }
+                page_count = page_count
+                    .checked_add(1)
+                    .ok_or_else(|| Error::overloaded("paged checkpoint page count overflows"))?;
+                Ok(())
+            })?;
+            Ok::<_, Error>(page_count)
+        })
+        .await
+        .map_err(|error| {
+            Error::durability(format!("paged checkpoint capacity scan failed: {error}"))
+        })??;
+        self.pack_page_count = Some(page_count);
+        if page_count == 0 {
+            return Ok(());
+        }
+        self.disk_reservation = Some(
+            self.target
+                .resources
+                .disk()
+                .reserve_wait(
+                    self.target.tenant_id,
+                    resource::DiskCategory::RetainedSource,
+                    durable_bases::encoded_size(page_count),
+                    wait_limit,
+                )
+                .await
+                .map_err(page_cache::map_resource_error)?,
+        );
+        Ok(())
     }
 
     pub fn write_pack(&mut self) -> Result<bool> {
@@ -1962,21 +2009,28 @@ impl PagedCheckpointJob {
                 )
                 .map_err(page_cache::map_resource_error)?,
         );
-        let mut page_count = 0u64;
-        self.target
-            .index
-            .visit_descriptors(self.target.root, &mut |descriptor| {
-                if request
-                    .previous_checkpoint_lsn
-                    .is_some_and(|previous_lsn| descriptor.image_lsn <= previous_lsn)
-                {
-                    return Ok(());
-                }
-                page_count = page_count
-                    .checked_add(1)
-                    .ok_or_else(|| Error::overloaded("paged checkpoint page count overflows"))?;
-                Ok(())
-            })?;
+        let page_count = match self.pack_page_count {
+            Some(page_count) => page_count,
+            None => {
+                let mut page_count = 0u64;
+                self.target
+                    .index
+                    .visit_descriptors(self.target.root, &mut |descriptor| {
+                        if request
+                            .previous_checkpoint_lsn
+                            .is_some_and(|previous_lsn| descriptor.image_lsn <= previous_lsn)
+                        {
+                            return Ok(());
+                        }
+                        page_count = page_count.checked_add(1).ok_or_else(|| {
+                            Error::overloaded("paged checkpoint page count overflows")
+                        })?;
+                        Ok(())
+                    })?;
+                self.pack_page_count = Some(page_count);
+                page_count
+            }
+        };
         if page_count == 0 {
             if request.previous_checkpoint_lsn.is_none() {
                 return Err(Error::corruption(
@@ -1986,17 +2040,30 @@ impl PagedCheckpointJob {
             self._checkpoint_reservation = None;
             return Ok(());
         }
-        self.disk_reservation = Some(
-            self.target
-                .resources
-                .disk()
-                .reserve(
-                    self.target.tenant_id,
-                    resource::DiskCategory::RetainedSource,
-                    durable_bases::encoded_size(page_count),
-                )
-                .map_err(|_| Error::overloaded("paged checkpoint disk budget is exhausted"))?,
-        );
+        let required_disk_bytes = durable_bases::encoded_size(page_count);
+        match &self.disk_reservation {
+            Some(reservation) if reservation.bytes() >= required_disk_bytes => {}
+            Some(_) => {
+                return Err(Error::invariant(
+                    "paged checkpoint disk reservation is below its output size",
+                ));
+            }
+            None => {
+                self.disk_reservation = Some(
+                    self.target
+                        .resources
+                        .disk()
+                        .reserve(
+                            self.target.tenant_id,
+                            resource::DiskCategory::RetainedSource,
+                            required_disk_bytes,
+                        )
+                        .map_err(|_| {
+                            Error::overloaded("paged checkpoint disk budget is exhausted")
+                        })?,
+                );
+            }
+        }
         let pack_writer = durable_bases::PagedBasePackJob {
             directory: request.directory,
             identity: request.identity,
@@ -3215,6 +3282,16 @@ fn paged_wal_append_bound(page_count: usize) -> Result<u64> {
 }
 
 #[cfg(feature = "blink-demand-paging")]
+pub fn maximum_paged_transaction_wal_append_bytes(maximum_working_pages: usize) -> Result<u64> {
+    let maximum_page_count = maximum_working_pages
+        .checked_add(1)
+        .ok_or_else(|| Error::overloaded("paged transaction page count overflows"))?;
+    paged_wal_append_bound(maximum_page_count)?
+        .checked_add(crate::wal::INIT_FRAME_SIZE as u64)
+        .ok_or_else(|| Error::overloaded("paged transaction WAL reservation overflows"))
+}
+
+#[cfg(feature = "blink-demand-paging")]
 impl<F: DurableFile> PagedTransactionWriter<F> {
     pub fn open_from_recovered_manifest(
         current: PagedReadHandle,
@@ -3413,6 +3490,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             pack_written: false,
             pack_failed: false,
             pack_output: None,
+            pack_page_count: None,
             descriptor_cursor: None,
             pack_writer: None,
             _checkpoint_reservation: None,
@@ -12692,6 +12770,21 @@ mod tests {
 
     static COUNT_READ_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
     static READ_ALLOCATION_COUNT: AtomicU64 = AtomicU64::new(0);
+
+    #[cfg(feature = "blink-demand-paging")]
+    #[test]
+    fn maximum_paged_transaction_wal_reservation_includes_images_and_segment_header() {
+        let maximum_working_pages = 4usize;
+        let expected_page_frame_count = (maximum_working_pages + 1) as u64;
+        let expected_bytes = expected_page_frame_count
+            * (crate::wal::WAL_MIN_FRAME_SIZE + crate::wal::PAGE_IMAGE_PAYLOAD_SIZE) as u64
+            + (crate::wal::WAL_MIN_FRAME_SIZE + 16) as u64
+            + crate::wal::INIT_FRAME_SIZE as u64;
+        assert_eq!(
+            maximum_paged_transaction_wal_append_bytes(maximum_working_pages).unwrap(),
+            expected_bytes
+        );
+    }
 
     struct ReadCountingAllocator;
 
