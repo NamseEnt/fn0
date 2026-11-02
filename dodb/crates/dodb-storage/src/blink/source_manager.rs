@@ -53,7 +53,7 @@ struct SourceManagerInner {
     handle_charge_bytes: u64,
     gc_reservation_bytes: u64,
     source_catalog: SourceCatalogStore,
-    retained_disk_reservation: Mutex<DiskReservation>,
+    retained_disk_key: String,
     state: Mutex<SourceState>,
 }
 
@@ -177,11 +177,17 @@ impl SourceManager {
         let retained_disk_bytes = directory_file_bytes(&config.checkpoint_directory)?
             .checked_add(directory_file_bytes(&config.wal_directory)?)
             .ok_or_else(|| Error::invalid_input("paged source disk byte count overflows"))?;
-        let retained_disk_reservation = resources
+        let retained_disk_key = format!(
+            "{}|{}",
+            fs::canonicalize(&config.checkpoint_directory)?.display(),
+            fs::canonicalize(&config.wal_directory)?.display()
+        );
+        resources
             .disk()
-            .reserve(
+            .reconcile_persistent_usage(
                 config.tenant_id,
                 DiskCategory::RetainedSource,
+                &retained_disk_key,
                 retained_disk_bytes,
             )
             .map_err(|_| Error::overloaded("paged source disk budget is exhausted"))?;
@@ -198,7 +204,7 @@ impl SourceManager {
                 handle_charge_bytes: config.handle_charge_bytes,
                 gc_reservation_bytes: config.gc_reservation_bytes,
                 source_catalog,
-                retained_disk_reservation: Mutex::new(retained_disk_reservation),
+                retained_disk_key,
                 state: Mutex::new(SourceState {
                     roots: HashMap::new(),
                     active_handles: HashMap::new(),
@@ -511,7 +517,18 @@ impl SourceManager {
                 .shrink(unused_bytes)
                 .map_err(|_| Error::invariant("source catalog disk reservation shrink failed"))?;
         }
-        self.retain_disk_reservation(disk_reservation)?;
+        let actual_bytes = directory_file_bytes(&self.inner.checkpoint_directory)?
+            .checked_add(directory_file_bytes(&self.inner.wal_directory)?)
+            .ok_or_else(|| Error::invalid_input("paged source disk byte count overflows"))?;
+        self.inner
+            .resources
+            .disk()
+            .replace_persistent_usage_from_reservation(
+                disk_reservation,
+                self.inner.retained_disk_key.clone(),
+                actual_bytes,
+            )
+            .map_err(|_| Error::overloaded("paged source disk budget is exhausted"))?;
         let catalog_root = catalog_build?;
         self.inner
             .source_catalog
@@ -546,14 +563,18 @@ impl SourceManager {
                 "paged source disk reservation has the wrong category",
             ));
         }
-        let mut retained = self
-            .inner
-            .retained_disk_reservation
-            .lock()
-            .map_err(|_| Error::invariant("paged source disk reservation lock poisoned"))?;
-        retained
-            .merge(reservation)
-            .map_err(|_| Error::invariant("paged source disk reservation cannot be merged"))?;
+        let actual_bytes = directory_file_bytes(&self.inner.checkpoint_directory)?
+            .checked_add(directory_file_bytes(&self.inner.wal_directory)?)
+            .ok_or_else(|| Error::invalid_input("paged source disk byte count overflows"))?;
+        self.inner
+            .resources
+            .disk()
+            .replace_persistent_usage_from_reservation(
+                reservation,
+                self.inner.retained_disk_key.clone(),
+                actual_bytes,
+            )
+            .map_err(|_| Error::overloaded("paged source disk budget is exhausted"))?;
         Ok(())
     }
 
@@ -909,16 +930,7 @@ impl SourceManager {
             )?;
         report.unlinked_catalog_pages = unlinked_catalog_pages;
         report.unlinked_catalog_bytes = unlinked_catalog_bytes;
-        let reclaimed_bytes = report
-            .unlinked_bytes
-            .checked_add(report.unlinked_catalog_bytes)
-            .ok_or_else(|| Error::invalid_input("paged source reclaimed byte count overflows"))?;
-        self.inner
-            .retained_disk_reservation
-            .lock()
-            .map_err(|_| Error::invariant("paged source disk reservation lock poisoned"))?
-            .shrink(reclaimed_bytes)
-            .map_err(|_| Error::invariant("paged source disk reservation release failed"))?;
+        self.reconcile_retained_disk_usage()?;
         Ok(report)
     }
 
@@ -948,21 +960,16 @@ impl SourceManager {
         let actual_bytes = directory_file_bytes(&self.inner.checkpoint_directory)?
             .checked_add(directory_file_bytes(&self.inner.wal_directory)?)
             .ok_or_else(|| Error::invalid_input("paged source disk byte count overflows"))?;
-        let mut reservation = self
-            .inner
-            .retained_disk_reservation
-            .lock()
-            .map_err(|_| Error::invariant("paged source disk reservation lock poisoned"))?;
-        let reserved_bytes = reservation.bytes();
-        if actual_bytes > reserved_bytes {
-            reservation
-                .grow(actual_bytes - reserved_bytes)
-                .map_err(|_| Error::overloaded("paged source disk budget is exhausted"))?;
-        } else if actual_bytes < reserved_bytes {
-            reservation
-                .shrink(reserved_bytes - actual_bytes)
-                .map_err(|_| Error::invariant("paged source disk reconciliation failed"))?;
-        }
+        self.inner
+            .resources
+            .disk()
+            .reconcile_persistent_usage(
+                self.inner.tenant_id,
+                DiskCategory::RetainedSource,
+                &self.inner.retained_disk_key,
+                actual_bytes,
+            )
+            .map_err(|_| Error::overloaded("paged source disk budget is exhausted"))?;
         Ok(())
     }
 
@@ -1301,6 +1308,44 @@ mod tests {
             test_resources(),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn retained_disk_usage_survives_manager_drop_and_reopen_without_double_counting() {
+        let directory = TestDirectory::new();
+        let resources = test_resources();
+        let config = || SourceManagerConfig {
+            store_identity: StoreIdentity {
+                database_uuid: [19; 16],
+                wal_epoch: 3,
+            },
+            checkpoint_directory: directory.path().join("packs"),
+            wal_directory: directory.path().join("segments"),
+            scratch_directory: directory.path().join("scratch"),
+            tenant_id: 9,
+            maximum_open_handles: 2,
+            maximum_roots: 4,
+            handle_charge_bytes: 128,
+            gc_reservation_bytes: 8192,
+        };
+        let first = SourceManager::new(config(), resources.clone()).unwrap();
+        let identity = source_identity(SourceFileKind::WalSegment, 1, b"retained-segment");
+        let path = write_source(&first, identity, b"retained-segment");
+        first.reconcile_retained_disk_usage().unwrap();
+        drop(first);
+        let disk = resources.disk().snapshot().unwrap();
+        let actual_bytes = fs::metadata(path).unwrap().len();
+        assert_eq!(disk.current_total, actual_bytes);
+        let reopened = SourceManager::new(config(), resources.clone()).unwrap();
+        assert_eq!(
+            resources.disk().snapshot().unwrap().current_total,
+            actual_bytes
+        );
+        drop(reopened);
+        assert_eq!(
+            resources.disk().snapshot().unwrap().current_total,
+            actual_bytes
+        );
     }
 
     fn insert_checkpoint_page(

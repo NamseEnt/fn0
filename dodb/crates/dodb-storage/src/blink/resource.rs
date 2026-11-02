@@ -155,6 +155,7 @@ struct DiskState {
     peak_total: u64,
     rejected_reservations: u64,
     tenants: BTreeMap<u64, DiskTenantState>,
+    persistent_usage: BTreeMap<(u64, DiskCategory, String), u64>,
 }
 
 struct Inner {
@@ -270,6 +271,163 @@ impl BlinkResourceManager {
 }
 
 impl BlinkDiskResourceManager {
+    pub fn reconcile_persistent_usage(
+        &self,
+        tenant_id: u64,
+        category: DiskCategory,
+        key: impl Into<String>,
+        bytes: u64,
+    ) -> Result<(), ResourceError> {
+        self.update_persistent_usage(tenant_id, category, key.into(), bytes)
+    }
+
+    pub fn replace_persistent_usage_from_reservation(
+        &self,
+        mut reservation: DiskReservation,
+        key: impl Into<String>,
+        bytes: u64,
+    ) -> Result<(), ResourceError> {
+        let charge = Arc::get_mut(&mut reservation.charge).ok_or(ResourceError::SharedOwnership)?;
+        if !Arc::ptr_eq(&charge.inner, &self.inner) {
+            return Err(ResourceError::SharedOwnership);
+        }
+        let key = (charge.tenant_id, charge.category, key.into());
+        let mut state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| ResourceError::Poisoned)?;
+        let previous = state.persistent_usage.get(&key).copied().unwrap_or(0);
+        let removed = previous
+            .checked_add(charge.bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let next_total = state
+            .current_total
+            .checked_sub(removed)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let category_index = charge.category as usize;
+        let next_category = state.current_by_category[category_index]
+            .checked_sub(removed)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let tenant_state = state
+            .tenants
+            .get(&charge.tenant_id)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let next_tenant_total = tenant_state
+            .current_total
+            .checked_sub(removed)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let next_tenant_category = tenant_state.current_by_category[category_index]
+            .checked_sub(removed)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        if next_total > self.inner.limits.global_bytes
+            || next_category > self.inner.limits.global_category_bytes[category_index]
+            || next_tenant_total > self.inner.limits.per_tenant_bytes
+            || next_tenant_category > self.inner.limits.per_tenant_category_bytes[category_index]
+        {
+            state.rejected_reservations = state.rejected_reservations.saturating_add(1);
+            return Err(ResourceError::CapacityExceeded);
+        }
+        let tenant_state = state
+            .tenants
+            .get_mut(&charge.tenant_id)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        tenant_state.current_total = next_tenant_total;
+        tenant_state.current_by_category[category_index] = next_tenant_category;
+        tenant_state.peak_total = tenant_state.peak_total.max(next_tenant_total);
+        tenant_state.peak_by_category[category_index] =
+            tenant_state.peak_by_category[category_index].max(next_tenant_category);
+        state.current_total = next_total;
+        state.current_by_category[category_index] = next_category;
+        state.peak_total = state.peak_total.max(next_total);
+        state.peak_by_category[category_index] =
+            state.peak_by_category[category_index].max(next_category);
+        state.persistent_usage.insert(key, bytes);
+        charge.bytes = 0;
+        Ok(())
+    }
+
+    fn update_persistent_usage(
+        &self,
+        tenant_id: u64,
+        category: DiskCategory,
+        key: String,
+        bytes: u64,
+    ) -> Result<(), ResourceError> {
+        let mut state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| ResourceError::Poisoned)?;
+        let persistent_key = (tenant_id, category, key);
+        let previous = state
+            .persistent_usage
+            .get(&persistent_key)
+            .copied()
+            .unwrap_or(0);
+        let category_index = category as usize;
+        let next_total = state
+            .current_total
+            .checked_sub(previous)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let next_category = state.current_by_category[category_index]
+            .checked_sub(previous)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let tenant_total = state
+            .tenants
+            .get(&tenant_id)
+            .map_or(0, |entry| entry.current_total);
+        let tenant_category = state
+            .tenants
+            .get(&tenant_id)
+            .map_or(0, |entry| entry.current_by_category[category_index]);
+        let next_tenant_total = tenant_total
+            .checked_sub(previous)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let next_tenant_category = tenant_category
+            .checked_sub(previous)
+            .and_then(|current| current.checked_add(bytes))
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        if next_total > self.inner.limits.global_bytes
+            || next_category > self.inner.limits.global_category_bytes[category_index]
+            || next_tenant_total > self.inner.limits.per_tenant_bytes
+            || next_tenant_category > self.inner.limits.per_tenant_category_bytes[category_index]
+        {
+            state.rejected_reservations = state.rejected_reservations.saturating_add(1);
+            return Err(ResourceError::CapacityExceeded);
+        }
+        if !state.tenants.contains_key(&tenant_id)
+            && state.tenants.len() == self.inner.limits.max_tenants
+        {
+            state.rejected_reservations = state.rejected_reservations.saturating_add(1);
+            return Err(ResourceError::TooManyTenants);
+        }
+        let tenant_state = state.tenants.entry(tenant_id).or_default();
+        tenant_state.current_total = next_tenant_total;
+        tenant_state.current_by_category[category_index] = next_tenant_category;
+        tenant_state.peak_total = tenant_state.peak_total.max(next_tenant_total);
+        tenant_state.peak_by_category[category_index] =
+            tenant_state.peak_by_category[category_index].max(next_tenant_category);
+        state.current_total = next_total;
+        state.current_by_category[category_index] = next_category;
+        state.peak_total = state.peak_total.max(next_total);
+        state.peak_by_category[category_index] =
+            state.peak_by_category[category_index].max(next_category);
+        if bytes == 0 {
+            state.persistent_usage.remove(&persistent_key);
+        } else {
+            state.persistent_usage.insert(persistent_key, bytes);
+        }
+        Ok(())
+    }
+
     pub fn reserve(
         &self,
         tenant_id: u64,
@@ -879,6 +1037,46 @@ mod tests {
         );
         drop(output);
         assert_eq!(manager.snapshot().unwrap().current_total, 0);
+    }
+
+    #[test]
+    fn persistent_disk_usage_survives_owner_drop_and_reconciles_idempotently() {
+        let manager = disk_manager().disk();
+        manager
+            .reconcile_persistent_usage(7, DiskCategory::RetainedSource, "/store", 60)
+            .unwrap();
+        assert_eq!(manager.snapshot().unwrap().current_total, 60);
+        manager
+            .reconcile_persistent_usage(7, DiskCategory::RetainedSource, "/store", 60)
+            .unwrap();
+        assert_eq!(manager.snapshot().unwrap().current_total, 60);
+        manager
+            .reconcile_persistent_usage(7, DiskCategory::RetainedSource, "/store", 35)
+            .unwrap();
+        assert_eq!(manager.snapshot().unwrap().current_total, 35);
+        manager
+            .reconcile_persistent_usage(7, DiskCategory::RetainedSource, "/store", 0)
+            .unwrap();
+        assert_eq!(manager.snapshot().unwrap().current_total, 0);
+    }
+
+    #[test]
+    fn disk_reservation_can_be_atomically_converted_to_persistent_usage() {
+        let manager = disk_manager().disk();
+        manager
+            .reconcile_persistent_usage(7, DiskCategory::RetainedSource, "/store", 40)
+            .unwrap();
+        let output = manager
+            .reserve(7, DiskCategory::RetainedSource, 25)
+            .unwrap();
+        manager
+            .replace_persistent_usage_from_reservation(output, "/store", 65)
+            .unwrap();
+        assert_eq!(manager.snapshot().unwrap().current_total, 65);
+        manager
+            .reconcile_persistent_usage(7, DiskCategory::RetainedSource, "/store", 50)
+            .unwrap();
+        assert_eq!(manager.snapshot().unwrap().current_total, 50);
     }
 
     #[test]
