@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 #[path = "support/blink_checkpoint.rs"]
 mod blink_checkpoint;
 #[path = "support/pressure_observations.rs"]
