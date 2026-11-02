@@ -27,10 +27,11 @@
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-library-final-stabilized.log",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-old-reader-pin-retention.log",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-old-reader-256k-headroom.log",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-old-reader-zero-headroom.log"
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-old-reader-zero-headroom.log",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-paging-library-source-reads-final.log"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-server/src/lib.rs": "cd42ad0383d01486b09778acdee3127080cb6f51cbc0e3bda87f61f4fb1183e7",
+    "dodb/crates/dodb-server/src/lib.rs": "e5d606d7736f6416580ba9f89e2d809a06ad9c3570d50557721252319c145069",
     "dodb/crates/dodb-storage/src/blink/mod.rs": "19d8ee35c828b6e0f74084a4c1da4cebcb5f223cdcb5352c7a95341f35f458b8",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "e267412905cb2f2e82138dfcc0fc4c21c5f899966557cf26e16dcd7e09a9cd29",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/RESULTS.md": "49fd36cff6c17ef46ab1dea441886479cc593643cd130aa15dcfbbded0b2ccc8",
@@ -278,6 +279,25 @@
       "result": "1 passed; old-reader source remained readable through both checkpoint publications",
       "log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-old-reader-pin-retention.log",
       "sha256": "d5689f1563788b972d4fd045354c13c21094f15d27b669b0a212f2143203cb62"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-server",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "52 passed; 0 failed; final T15 source, includes T14 fairness, old-reader and separate capacity-resume tests",
+      "log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-paging-library-source-reads-final.log",
+      "sha256": "aef86799568100a109955a3610efa506f2e2fdbd878359c4af447920c62477c2",
+      "source_commit": "afd854613"
     }
   ],
   "acceptance_mapping": {
@@ -314,5 +334,5 @@
     "Do not start T17 comparison until T15 and T16 acceptance plus separate experiment execution authorization."
   ],
   "next_task": "T15",
-  "follow_up_source_commit": "e3cc11b5e"
+  "follow_up_source_commit": "afd854613"
 }

@@ -3,7 +3,7 @@
   "scope": "Real-service paging crash/write/crash recovery progress",
   "status": "partial",
   "parent_source_commit": "cd95c810b",
-  "implementation_commit": "e3cc11b5e",
+  "implementation_commit": "afd854613",
   "prerequisite_receipts": [
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/receipt.json",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T13/receipt.json"
@@ -18,21 +18,26 @@
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-default-library-final.log",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/storage-paging-library-final.log",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/paged-crash-a1-on-final.log",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-paging-clippy-final.log"
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-paging-clippy-final.log",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-paging-library-source-reads-final.log",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/paged-crash-a1-off-source-reads-final.log",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/paged-crash-a1-on-source-reads-final.log",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-query-consistency-final.log",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-paging-clippy-source-reads-final.log"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-server/src/lib.rs": "cd42ad0383d01486b09778acdee3127080cb6f51cbc0e3bda87f61f4fb1183e7",
+    "dodb/crates/dodb-server/src/lib.rs": "e5d606d7736f6416580ba9f89e2d809a06ad9c3570d50557721252319c145069",
     "dodb/crates/dodb-storage/src/blink/mod.rs": "19d8ee35c828b6e0f74084a4c1da4cebcb5f223cdcb5352c7a95341f35f458b8",
     "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "d6b1375cc071a4578c442ae0121e12e0adf08402a54d336896776c92d148d805",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "c12218c139c8271ace189a7311ed91b4a415d2920f65fc710cb05cf5a439c1b3",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/RESULTS.md": "b31b6bcca9b98167f8182e48f388257a40ba5fc36bd9d0e25ec49fe479f73fe9"
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/RESULTS.md": "158af232ff5fa12668c9f2fca8bfea6ab0649517615662b34b374a75154baeb6"
   },
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "e3cc11b5e"
+    "source_commit": "afd854613"
   },
   "features": [
     "blink-demand-paging",
@@ -136,6 +141,114 @@
       "result": "passed",
       "log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-paging-clippy-final.log",
       "sha256": "033c6972c8047da6dae828c551bfd9955f8bf84cf9ceff1445754d496990e054"
+    },
+    {
+      "name": "server_paging_final",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-server",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "52 passed; 0 failed; final source commit",
+      "log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-paging-library-source-reads-final.log",
+      "sha256": "aef86799568100a109955a3610efa506f2e2fdbd878359c4af447920c62477c2",
+      "source_commit": "afd854613"
+    },
+    {
+      "name": "crash_write_crash_a1_off_final",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-server",
+        "--features",
+        "blink-demand-paging",
+        "tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes",
+        "--lib",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "1 passed; coalesce=false/true; source reload assertion passed",
+      "log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/paged-crash-a1-off-source-reads-final.log",
+      "sha256": "e917254cb995c5cff9bc974e32b1a99ebc456d1ebbc449fae3bcaf833ed7849d",
+      "source_commit": "afd854613"
+    },
+    {
+      "name": "crash_write_crash_a1_on_final",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-server",
+        "--features",
+        "blink-demand-paging,dodb-storage/blink-writer-pin-reuse",
+        "tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes",
+        "--lib",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "1 passed; coalesce=false/true; source reload assertion passed",
+      "log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/paged-crash-a1-on-source-reads-final.log",
+      "sha256": "511d35f978bb25ce456641792c3f91178a3f43ed614078af6bb78857d004b8eb",
+      "source_commit": "afd854613"
+    },
+    {
+      "name": "query_snapshot_consistency",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-server",
+        "--features",
+        "blink-demand-paging",
+        "tests::paged_service_query_keeps_one_snapshot_across_concurrent_multi_key_commit",
+        "--lib",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "1 passed; paused Query returned the complete old pair and next Query returned the committed pair",
+      "log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-query-consistency-final.log",
+      "sha256": "de08bdc40392840f95fc423a3f9b8d587a70ce0ae2de7e9ee602e981001e3dbd",
+      "source_commit": "afd854613"
+    },
+    {
+      "name": "server_paging_strict_clippy_final",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-server",
+        "--features",
+        "blink-demand-paging",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "passed after source reload assertions and Query snapshot test",
+      "log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/logs/server-paging-clippy-source-reads-final.log",
+      "sha256": "9fff417d3fba531ea98e13a22c8f6f860b56e527ce690783f777bcc621ce0959",
+      "source_commit": "afd854613"
     }
   ],
   "acceptance_mapping": {
@@ -144,7 +257,9 @@
     "conditional multi-key write is acknowledged between crashes and survives second recovery": "Passed with logical revision verification in the same service subprocess test",
     "both durable-base coalesce modes": "Passed with coalesce=false and coalesce=true in each focused test invocation",
     "A1 off/on crash recovery": "Passed; A1 off in 51-test paging server suite, A1 on in focused final run",
-    "complete T15 matrix: query consistency, old operation pins, page-ID reuse, missing/corrupt sources, overload recovery, cancellation, shutdown, bounded resource peaks, and nonzero eviction/miss/reconstruction counters": "Not complete; see remaining_work"
+    "complete T15 matrix: query consistency, old operation pins, page-ID reuse, missing/corrupt sources, overload recovery, cancellation, shutdown, bounded resource peaks, and nonzero eviction/miss/reconstruction counters": "Not complete; see remaining_work",
+    "concurrent Query consistency across a conditional multi-key commit": "Passed by tests::paged_service_query_keeps_one_snapshot_across_concurrent_multi_key_commit; a barrier holds the old paged snapshot across the commit",
+    "nonzero durable source reload after recovery": "Passed for both A1 settings; reading all 16 checkpointed records increases the PagedReadHandle source_read_count; this is not an eviction count"
   },
   "ownership_peaks": {
     "paged cache": "8 pages configured in crash fixture",
@@ -165,7 +280,6 @@
     }
   ],
   "remaining_work": [
-    "Add service-level concurrent Query consistency and old-operation-pin/checkpoint/reload acceptance.",
     "Prove page-ID reuse across recovery and a second crash at the service boundary.",
     "Exercise missing/corrupt reachable sources, overload and resource recovery, cancellation, and full shutdown with bounded live category peaks and no leaked tasks or charges.",
     "Record nonzero eviction, cache-miss, and WAL-reconstruction counters and full resource peaks for crash runs.",
@@ -181,5 +295,8 @@
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/runs/coalesce-false-parent-25627",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/runs/coalesce-true-parent-25567",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T15/runs/coalesce-true-parent-25627"
+  ],
+  "additional_implementation_commits": [
+    "e3cc11b5e"
   ]
 }

@@ -10,16 +10,19 @@ The first service recovery attempt found a stale-root failure: a committed WAL s
 
 The T14 old-reader service test was also made non-flaky by separating source-retention acceptance from capacity-wait acceptance. It retains a reader across overwrite and a second checkpoint. Capacity-wait resumption remains covered by the separate `paged_checkpoint_resumes_after_disk_capacity_release` test. Two rejected same-fixture headroom probes remain preserved in T14 logs.
 
+A barrier-defined service Query test captures one paged snapshot, commits a conditional two-key update while the Query is paused, then verifies that the paused Query returns both old values and the next Query returns both new values at the same revision. The crash test also rereads all 16 checkpointed dataset keys after recovery and asserts the durable-source read count increased; this is source-reload evidence, not an eviction counter.
+
 ## Validation
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Paging server library suite, serial | 51 passed, 0 failed | `T14/logs/server-paging-library-final-stabilized.log` |
+| Paging server library suite, serial, final source | 52 passed, 0 failed | `T15/logs/server-paging-library-source-reads-final.log` |
 | Default server library suite, serial | 26 passed, 0 failed | `T15/logs/server-default-library-final.log` |
 | Storage library suite with paging, serial | 324 passed, 0 failed, 4 ignored | `T15/logs/storage-paging-library-final.log` |
-| Crash/write/crash subprocess matrix, A1 disabled | Passed within the 51-test paging suite; both durable-base output modes exercised | `T14/logs/server-paging-library-final-stabilized.log` |
-| Crash/write/crash subprocess matrix, A1 enabled | 1 passed; both durable-base output modes exercised | `T15/logs/paged-crash-a1-on-final.log` |
-| Paging server strict Clippy, all targets | Passed | `T15/logs/server-paging-clippy-final.log` |
+| Crash/write/crash subprocess matrix, A1 disabled | 1 passed; both durable-base output modes and source-reload assertion exercised in final focused run | `T15/logs/paged-crash-a1-off-source-reads-final.log` |
+| Crash/write/crash subprocess matrix, A1 enabled | 1 passed; both durable-base output modes and source-reload assertion exercised | `T15/logs/paged-crash-a1-on-source-reads-final.log` |
+| Concurrent Query snapshot consistency | 1 passed; old snapshot returned the complete prior pair while the next Query returned the complete committed pair | `T15/logs/server-query-consistency-final.log` |
+| Paging server strict Clippy, all targets | Passed after the Query and source-reload tests | `T15/logs/server-paging-clippy-source-reads-final.log` |
 | Formatting and source whitespace | Passed after the final code edit with `cargo fmt -p dodb-server -p dodb-storage -- --check` and `git diff --check` | Raw test logs retain their original captured whitespace |
 
 The local macOS runs establish correctness only. They do not establish performance, an SLO, maximum tenant count, physical-read behavior, or backend superiority.
@@ -28,7 +31,7 @@ Earlier accepted subprocess attempts with an absolute evidence path preserve the
 
 ## Remaining T15 Gates
 
-- Add service-level concurrent Query consistency and old-operation-pin/checkpoint/reload coverage.
+- Add old-operation-pin/checkpoint/reload coverage across service restart.
 - Prove page-ID reuse across recovery and second crash at the service boundary.
 - Exercise missing/corrupt reachable sources, overload and resource recovery, cancellation, and complete shutdown with bounded category peaks and no leaked tasks or charges.
 - Record actual nonzero eviction, cache-miss, and WAL-reconstruction counters and full live category peaks for the crash scenario.
