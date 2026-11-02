@@ -25,13 +25,22 @@ const MAX_SEGMENTS: usize = 65_536;
 static TEMPORARY_FILE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 const SEGMENT_DIRECTORY_SUFFIX: &str = "segments";
 const SEGMENT_MANIFEST_SUFFIX: &str = "segments.manifest";
+const PAGED_DIRECTORY_SUFFIX: &str = "blink-paged";
+const PAGED_FORMAT_MARKER_SUFFIX: &str = "blink-paged.format";
 
 pub(crate) fn manifest_exists(database_path: &Path) -> bool {
     sidecar_path(database_path, SEGMENT_MANIFEST_SUFFIX).is_file()
 }
 
 pub(crate) fn artifacts_exist(database_path: &Path) -> bool {
-    manifest_exists(database_path) || sidecar_path(database_path, SEGMENT_DIRECTORY_SUFFIX).exists()
+    manifest_exists(database_path)
+        || sidecar_path(database_path, SEGMENT_DIRECTORY_SUFFIX).exists()
+        || paged_manifest_artifacts_exist(database_path)
+}
+
+pub(crate) fn paged_manifest_artifacts_exist(database_path: &Path) -> bool {
+    sidecar_path(database_path, PAGED_FORMAT_MARKER_SUFFIX).exists()
+        || sidecar_path(database_path, PAGED_DIRECTORY_SUFFIX).exists()
 }
 
 pub(crate) struct SegmentedWal {
@@ -56,6 +65,11 @@ impl SegmentedWal {
         max_segment_bytes: u64,
         durable_bases: bool,
     ) -> Result<Self> {
+        if paged_manifest_artifacts_exist(database_path) {
+            return Err(Error::unsupported_format(
+                "paged Blink database cannot use the resident segmented WAL route",
+            ));
+        }
         let manifest_path = sidecar_path(database_path, SEGMENT_MANIFEST_SUFFIX);
         let segment_directory = sidecar_path(database_path, SEGMENT_DIRECTORY_SUFFIX);
         if manifest_path.exists() || segment_directory.exists() {
@@ -119,6 +133,11 @@ impl SegmentedWal {
         max_segment_bytes: u64,
         durable_bases: bool,
     ) -> Result<(Self, BTreeMap<PageId, RecoveredWalPage>)> {
+        if paged_manifest_artifacts_exist(database_path) {
+            return Err(Error::unsupported_format(
+                "paged Blink database cannot use the resident segmented WAL route",
+            ));
+        }
         let manifest_path = sidecar_path(database_path, SEGMENT_MANIFEST_SUFFIX);
         let segment_directory = sidecar_path(database_path, SEGMENT_DIRECTORY_SUFFIX);
         let manifest = SegmentedWalManifest::read(&manifest_path)?;
@@ -1204,6 +1223,9 @@ fn sync_directory(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blink::BlinkStore;
+    use crate::btree::DatabaseConfig;
+    use crate::durable_file::ProductionFile;
 
     fn manifest() -> SegmentedWalManifest {
         SegmentedWalManifest {
@@ -1250,6 +1272,40 @@ mod tests {
             SegmentedWalManifest::decode(&expected.encode().unwrap()).unwrap(),
             expected
         );
+    }
+
+    #[test]
+    fn resident_open_rejects_paged_marker_without_creating_the_database() {
+        let unique_suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "dodb-paged-marker-resident-open-{}-{unique_suffix}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&directory).unwrap();
+        let database_path = directory.join("tenant.db");
+        let marker_path = sidecar_path(&database_path, PAGED_FORMAT_MARKER_SUFFIX);
+        File::create(&marker_path).unwrap();
+
+        assert!(
+            BlinkStore::<ProductionFile, ProductionFile>::open_path(
+                &database_path,
+                DatabaseConfig::default()
+            )
+            .is_err()
+        );
+        assert!(
+            BlinkStore::<ProductionFile, ProductionFile>::open_segmented_path(
+                &database_path,
+                DatabaseConfig::default(),
+                1024 * 1024
+            )
+            .is_err()
+        );
+        assert!(!database_path.exists());
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

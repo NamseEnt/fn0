@@ -29,6 +29,10 @@ pub mod durable_bases;
 mod leaf;
 #[cfg(feature = "blink-checkpoint-locators")]
 pub mod page_locator;
+#[cfg(feature = "blink-demand-paging")]
+pub mod paged_manifest;
+#[cfg(feature = "blink-demand-paging")]
+pub mod paged_recovery;
 mod physical_checkpoint;
 #[cfg(feature = "blink-demand-paging")]
 pub mod resource;
@@ -1941,6 +1945,11 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
         config: DatabaseConfig,
     ) -> Result<BlinkStore<ProductionFile, ProductionFile>> {
         let path = path.as_ref();
+        if segmented_wal::paged_manifest_artifacts_exist(path) {
+            return Err(Error::unsupported_format(
+                "paged Blink database requires the explicit paged path opener",
+            ));
+        }
         if segmented_wal::artifacts_exist(path) {
             return Err(Error::unsupported_format(
                 "segmented WAL database requires segmented path opening",
@@ -1979,6 +1988,11 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
     ) -> Result<BlinkStore<ProductionFile, ProductionFile>> {
         if max_segment_bytes == 0 {
             return Err(Error::invalid_input("segmented WAL size limit is zero"));
+        }
+        if segmented_wal::paged_manifest_artifacts_exist(path) {
+            return Err(Error::unsupported_format(
+                "paged Blink database cannot be opened through the resident segmented route",
+            ));
         }
         let identity = WalIdentity::new(
             config.database_uuid,

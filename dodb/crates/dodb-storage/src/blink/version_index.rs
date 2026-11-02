@@ -323,6 +323,11 @@ impl VersionIndexStore {
         File::open(self.node_path(file_number))?.sync_data()?;
         Ok(())
     }
+
+    fn sync_directory(&self) -> Result<()> {
+        File::open(&self.directory)?.sync_all()?;
+        Ok(())
+    }
 }
 
 pub struct VersionIndex {
@@ -360,6 +365,17 @@ impl VersionIndex {
 
     pub fn empty_root(&self) -> VersionIndexRoot {
         VersionIndexRoot::empty()
+    }
+
+    pub fn root_from_node_reference(&self, node_reference: NodeRef) -> Result<VersionIndexRoot> {
+        let cached = self.load_node(node_reference)?;
+        if cached.node.level != MAX_RADIX_LEVEL || cached.node.generation == 0 {
+            return Err(Error::corruption("version-index root node is invalid"));
+        }
+        Ok(VersionIndexRoot {
+            generation: cached.node.generation,
+            node: Some(node_reference),
+        })
     }
 
     pub fn cached_node_count(&self) -> Result<usize> {
@@ -416,6 +432,151 @@ impl VersionIndex {
             root,
             _reservation: reservation,
         })
+    }
+
+    pub fn promote_root_to_durable(&self, root: VersionIndexRoot) -> Result<VersionIndexRoot> {
+        if root.generation == 0 || root.node.is_none() {
+            return Err(Error::invalid_input(
+                "empty version-index root cannot be made durable",
+            ));
+        }
+        let _write_reservation = self
+            .resources
+            .reserve(
+                self.tenant_id,
+                ResourceCategory::WritePreparation,
+                ReservationClass::Progress,
+                u64::from(MAX_RADIX_LEVEL + 1) * NODE_CACHE_RESERVATION_BYTES,
+            )
+            .map_err(map_resource_error)?;
+        let durable_root = self.copy_node_to_durable(
+            root.node.unwrap(),
+            MAX_RADIX_LEVEL,
+            root.generation,
+            root.generation,
+        )?;
+        self.store.sync_directory()?;
+        Ok(VersionIndexRoot {
+            generation: root.generation,
+            node: Some(durable_root),
+        })
+    }
+
+    pub fn validate_durable_root(&self, root: VersionIndexRoot) -> Result<()> {
+        let Some(node_reference) = root.node else {
+            return Err(Error::corruption("durable version-index root is empty"));
+        };
+        if root.generation == 0 {
+            return Err(Error::corruption(
+                "durable version-index generation is zero",
+            ));
+        }
+        let _walk_reservation = self
+            .resources
+            .reserve(
+                self.tenant_id,
+                ResourceCategory::Metadata,
+                ReservationClass::Progress,
+                NODE_CACHE_RESERVATION_BYTES,
+            )
+            .map_err(map_resource_error)?;
+        self.validate_durable_node(
+            node_reference,
+            MAX_RADIX_LEVEL,
+            root.generation,
+            root.generation,
+        )
+    }
+
+    fn copy_node_to_durable(
+        &self,
+        node_reference: NodeRef,
+        expected_level: u8,
+        parent_generation: u64,
+        root_generation: u64,
+    ) -> Result<NodeRef> {
+        let cached = self.load_node(node_reference)?;
+        if cached.node.level != expected_level
+            || cached.node.generation > parent_generation
+            || cached.node.generation > root_generation
+        {
+            return Err(Error::corruption(
+                "version-index durable copy found invalid ancestry",
+            ));
+        }
+        let mut node = cached.node.clone();
+        drop(cached);
+        match &mut node.content {
+            NodeContent::Internal(children) if expected_level > 0 => {
+                for child in children.iter_mut().flatten() {
+                    *child = self.copy_node_to_durable(
+                        *child,
+                        expected_level - 1,
+                        node.generation,
+                        root_generation,
+                    )?;
+                }
+            }
+            NodeContent::Leaf(descriptors) if expected_level == 0 => {
+                for (slot, descriptor) in descriptors.iter().enumerate() {
+                    if let Some(descriptor) = descriptor
+                        && page_nibble(descriptor.page_id, 0) != slot
+                    {
+                        return Err(Error::corruption(
+                            "version-index durable copy found a mismatched leaf key",
+                        ));
+                    }
+                }
+            }
+            _ => {
+                return Err(Error::corruption(
+                    "version-index durable copy found a wrong node kind",
+                ));
+            }
+        }
+        node.kind = NodeFileKind::Durable;
+        let durable_reference = self.store.write_node(&node)?;
+        self.store.sync_node(durable_reference.file_number)?;
+        Ok(durable_reference)
+    }
+
+    fn validate_durable_node(
+        &self,
+        node_reference: NodeRef,
+        expected_level: u8,
+        parent_generation: u64,
+        root_generation: u64,
+    ) -> Result<()> {
+        let cached = self.load_node(node_reference)?;
+        if cached.node.level != expected_level
+            || cached.node.generation > parent_generation
+            || cached.node.generation > root_generation
+            || cached.node.kind != NodeFileKind::Durable
+        {
+            return Err(Error::corruption(
+                "durable version-index node or ancestry is invalid",
+            ));
+        }
+        match &cached.node.content {
+            NodeContent::Internal(children) if expected_level > 0 => {
+                let generation = cached.node.generation;
+                let child_references = children.iter().flatten().copied().collect::<Vec<_>>();
+                drop(cached);
+                for child_reference in child_references {
+                    self.validate_durable_node(
+                        child_reference,
+                        expected_level - 1,
+                        generation,
+                        root_generation,
+                    )?;
+                }
+                Ok(())
+            }
+            NodeContent::Leaf(_) if expected_level == 0 => Ok(()),
+            _ => Err(Error::corruption(
+                "durable version-index node has a wrong level",
+            )),
+        }
     }
 
     pub fn lookup(
@@ -1617,6 +1778,41 @@ mod tests {
             resources.snapshot().unwrap().current_by_category[ResourceCategory::Metadata as usize],
             super::NODE_CACHE_RESERVATION_BYTES,
         );
+    }
+
+    #[test]
+    fn durable_root_promotion_syncs_the_full_reachable_tree() {
+        let directory = TestDirectory::new("durable-root");
+        let identity = ([7; 16], 31);
+        let index = open_index(directory.path(), identity, 2);
+        let mut spill_root = index.empty_root();
+        for page_value in [0x0123_4567_89ab_cdef, u64::MAX] {
+            let page_id = PageId::new(page_value);
+            spill_root = index
+                .insert(spill_root, page_id, checkpoint_descriptor(page_id))
+                .unwrap();
+        }
+        assert!(index.validate_durable_root(spill_root).is_err());
+        let durable_root = index.promote_root_to_durable(spill_root).unwrap();
+        index.validate_durable_root(durable_root).unwrap();
+        for page_value in [0x0123_4567_89ab_cdef, u64::MAX] {
+            let page_id = PageId::new(page_value);
+            assert_eq!(
+                index.lookup(durable_root, page_id).unwrap(),
+                Some(checkpoint_descriptor(page_id))
+            );
+            assert_eq!(
+                index.lookup(spill_root, page_id).unwrap(),
+                Some(checkpoint_descriptor(page_id))
+            );
+        }
+        let durable_reference = durable_root.node_reference().unwrap();
+        drop(index);
+        let reopened = open_index(directory.path(), identity, 1);
+        let reopened_root =
+            VersionIndexRoot::from_node_reference(durable_root.generation(), durable_reference)
+                .unwrap();
+        reopened.validate_durable_root(reopened_root).unwrap();
     }
 
     #[test]
