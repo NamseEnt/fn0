@@ -35,7 +35,9 @@ The opt-in resource configuration rejects Legacy and non-base segmented WAL layo
 
 ## Remaining T12 work
 
-T12 remains partial. Service opening does not yet dispatch experimental paged manifests through complete validated page opening, and the shared manager is not yet consumed by the paged index, source manager, loader, and read path. General operation-owned charges and per-shard validated paging configuration remain open. No tenant-density performance matrix was run.
+The service now selects an explicit opt-in `paged_read_only` route for the experimental marker, uses the shared manager for its index, source manager, and page loader, replays the recovery WAL, validates every indexed page, and serves Get/Query/Scan on bounded blocking workers. Writes fail as unsupported while the route is read-only. The route follows the sidecar directory convention now recorded in `B1-B2-CONTRACTS.md`.
+
+T12 remains partial pending a successful service request against a complete paged fixture, resource and worker release checks under concurrent page loads, and shutdown behavior while page loads are active. Operation-owned request and write charges belong to T13. No tenant-density performance matrix was run.
 
 ## Recovery-aware paged storage open substep
 
@@ -48,4 +50,8 @@ The checkpoint publication failure regression now reopens through this path and 
 - `cargo fmt --manifest-path crates/dodb-storage/Cargo.toml --check`: passed.
 - `cargo clippy --manifest-path crates/dodb-storage/Cargo.toml --lib --features blink-demand-paging -- -D warnings`: blocked by 12 existing Clippy findings in unrelated Blink/WAL functions; no lint suppressions were added. The full output is preserved in `logs/storage-clippy-paged-recovery.log`.
 
-This remains a storage open API only; `BlinkTenantService` does not yet select it for tenant requests. No tenant-density performance matrix was run.
+The server now calls this path during tenant opening. A focused service test verifies that an incomplete manifest is rejected before the index, packs, WAL, or scratch directories are created and that its tenant metadata reservation is released.
+
+- `cargo test -p dodb-server --features blink-demand-paging --lib -- --test-threads=1`: 20 passed, 0 failed.
+- `cargo test -p dodb-server --lib -- --test-threads=1`: 17 passed, 0 failed; the default resident route remains unchanged.
+- The storage recovery-open regression passed again after switching recovery WAL access to open-existing semantics.

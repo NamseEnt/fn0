@@ -114,12 +114,53 @@ impl PagedManifestStore {
         validate_marker(&format_marker_path(database_path), identity)
     }
 
+    pub fn validate_current_manifest(
+        database_path: &Path,
+        identity: StoreIdentity,
+    ) -> Result<PagedManifest> {
+        validate_marker(&format_marker_path(database_path), identity)?;
+        let directory = sidecar_directory(database_path);
+        let pointer_path = directory.join(CURRENT_POINTER_NAME);
+        let (manifest_file_number, generation) = read_pointer(&pointer_path, identity)?;
+        let manifest = read_manifest(&manifest_path(&directory, manifest_file_number), identity)?;
+        if manifest.generation != generation {
+            return Err(Error::corruption(
+                "paged manifest pointer generation differs from its manifest",
+            ));
+        }
+        Ok(manifest)
+    }
+
     pub fn has_format_marker(database_path: &Path) -> bool {
         format_marker_path(database_path).is_file()
     }
 
+    #[cfg(feature = "blink-demand-paging")]
+    pub fn recovery_source_identity(
+        wal_path: &Path,
+        file_number: u64,
+    ) -> Result<super::version_index::SourceIdentity> {
+        if file_number == 0 {
+            return Err(Error::invalid_input(
+                "paged recovery WAL file number must be nonzero",
+            ));
+        }
+        let mut file = File::open(wal_path)?;
+        let mut header = vec![0; crate::wal::INIT_FRAME_SIZE];
+        file.read_exact(&mut header)?;
+        Ok(super::version_index::SourceIdentity {
+            kind: super::version_index::SourceFileKind::WalSegment,
+            file_number,
+            header_identity: *blake3::hash(&header).as_bytes(),
+        })
+    }
+
     pub fn sidecar_directory(database_path: &Path) -> PathBuf {
         sidecar_directory(database_path)
+    }
+
+    pub fn version_index_directory(database_path: &Path) -> PathBuf {
+        version_index_directory(database_path)
     }
 
     pub fn prepare_format(database_path: &Path, identity: StoreIdentity) -> Result<()> {
@@ -283,7 +324,7 @@ impl PagedManifestStore {
         if !config.recovery_wal_path.is_file() {
             return Err(Error::corruption("paged recovery WAL segment is missing"));
         }
-        let mut wal = ProductionFile::open(&config.recovery_wal_path)?;
+        let mut wal = ProductionFile::open_existing(&config.recovery_wal_path)?;
         let committed_prefix_length = wal.len()?;
         let mut builder = super::paged_recovery::PagedRecoveryIndexBuilder::new(
             &config.index,

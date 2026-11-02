@@ -41,6 +41,11 @@ impl ProductionFile {
         Ok(Self { file })
     }
 
+    pub fn open_existing(path: impl AsRef<Path>) -> Result<Self> {
+        let file = OpenOptions::new().read(true).write(true).open(path)?;
+        Ok(Self { file })
+    }
+
     pub fn from_file(file: File) -> Self {
         Self { file }
     }

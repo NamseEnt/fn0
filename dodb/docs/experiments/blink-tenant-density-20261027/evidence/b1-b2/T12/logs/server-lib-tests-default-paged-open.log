@@ -1,0 +1,24 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-5a83d6c3f6b87b47)
+
+running 17 tests
+test tests::absent_blink_reads_preserve_capacity_and_do_not_cache_absence ... ok
+test tests::blink_open_limits_must_be_nonzero ... ok
+test tests::blink_open_waiters_and_inflight_tenants_obey_configured_limits ... ok
+test tests::blink_shutdown_bounds_wait_for_inflight_open_and_drains_it ... ok
+test tests::blocked_blink_open_does_not_hold_registry_and_same_tenant_open_coalesces ... ok
+test tests::cached_blink_reads_do_not_depend_on_repeated_path_checks ... ok
+test tests::cancelled_blink_open_releases_reservation_and_worker_capacity ... ok
+test tests::checkpoint_debt_metrics_track_excess_time_and_request_wait ... ok
+test tests::database_uuid_includes_all_shard_bits ... ok
+test tests::failed_blink_open_releases_tenant_reservation ... ok
+test tests::logical_database_uuid_is_stable_for_reopen ... ok
+test tests::peer_stream_reset_and_stop_are_benign_diagnostic_events ... ok
+test tests::racing_blink_read_and_open_share_one_shard ... ok
+test tests::request_latency_histogram_records_cumulative_operation_buckets ... ok
+test tests::storage_metrics_count_database_wal_and_persisted_files_separately_from_open_shards ... ok
+test tests::transport_classification_separates_disconnects_from_actionable_failures ... ok
+test tests::transport_metric_labels_are_bounded_and_only_actionable_events_raise_errors ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
