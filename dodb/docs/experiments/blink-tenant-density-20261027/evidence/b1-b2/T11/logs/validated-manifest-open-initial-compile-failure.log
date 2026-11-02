@@ -1,0 +1,18 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_transaction_writer_publishes_complete_and_incremental_checkpoints -- --test-threads=1
+Exit status: 101
+error[E0282]: type annotations needed
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:17644:37
+      |
+17644 |                     header_length: |source| {
+      |                                     ^^^^^^
+17645 |                         Ok(
+17646 |                             if source.kind == version_index::SourceFileKind::WalSegment {
+      |                                ------ type must be known at this point
+      |
+help: consider giving this closure parameter an explicit type
+      |
+17644 |                     header_length: |source: /* Type */| {
+      |                                           ++++++++++++
+
+For more information about this error, try `rustc --explain E0282`.
+error: could not compile `dodb-storage` (lib test) due to 1 previous error

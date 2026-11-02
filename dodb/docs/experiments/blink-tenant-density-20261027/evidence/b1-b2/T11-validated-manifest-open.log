@@ -1,7 +1,20 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
-     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-70634b21c90c24df)
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+error[E0282]: type annotations needed
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:17644:37
+      |
+17644 |                     header_length: |source| {
+      |                                     ^^^^^^
+17645 |                         Ok(
+17646 |                             if source.kind == version_index::SourceFileKind::WalSegment {
+      |                                ------ type must be known at this point
+      |
+help: consider giving this closure parameter an explicit type
+      |
+17644 |                     header_length: |source: /* Type */| {
+      |                                           ++++++++++++
 
-running 1 test
-test blink::tests::paged_transaction_writer_publishes_complete_and_incremental_checkpoints ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 313 filtered out; finished in 1.16s
+For more information about this error, try `rustc --explain E0282`.
+error: could not compile `dodb-storage` (lib test) due to 1 previous error

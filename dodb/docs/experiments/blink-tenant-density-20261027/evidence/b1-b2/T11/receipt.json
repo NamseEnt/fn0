@@ -7,14 +7,15 @@
     "98544131a",
     "866261924",
     "3640e74c3",
-    "9729a5f07"
+    "9729a5f07",
+    "b8e57e68d"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "9729a5f07"
+    "source_commit": "b8e57e68d"
   },
   "features": [
     "blink-demand-paging",
@@ -22,20 +23,10 @@
   ],
   "validated": [
     {
-      "name": "rustfmt_check",
-      "command": "rustfmt --edition 2024 --check crates/dodb-storage/src/blink/mod.rs",
-      "exit_status": 0
-    },
-    {
       "name": "paged_indexed_image_validation_regression",
       "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages -- --test-threads=1",
       "exit_status": 0,
       "result": "1 passed"
-    },
-    {
-      "name": "git_diff_check",
-      "command": "git diff --check",
-      "exit_status": 0
     },
     {
       "name": "paged_bounded_structural_validation_regression",
@@ -47,25 +38,48 @@
       "name": "dodb_storage_full_library_suite",
       "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1",
       "exit_status": 0,
-      "result": "310 passed, 4 ignored"
+      "result": "311 passed, 4 ignored"
     },
     {
       "name": "strict_clippy",
       "command": "cargo clippy -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- -D warnings",
       "exit_status": 101,
-      "result": "12 existing diagnostics in blink/mod.rs and wal.rs; none in the new validator or source_manager.rs"
+      "result": "12 existing diagnostics in blink/mod.rs and wal.rs; none in the new validated open API, bounded validator, or source_manager.rs"
     },
     {
       "name": "manifest_open_returns_fully_validated_reader",
       "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_transaction_writer_publishes_complete_and_incremental_checkpoints -- --test-threads=1",
       "exit_status": 0,
-      "result": "1 passed; reopened manifest creates the returned reader through full bounded validation"
+      "result": "1 passed; reopened manifest creates the returned reader through full bounded validation using PagedValidatedOpenConfig"
+    },
+    {
+      "name": "pointer_publication_crash_boundaries",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' pointer_publication_faults_cover_every_ordering_boundary -- --test-threads=1",
+      "exit_status": 0,
+      "result": "1 passed; selected generation is old before rename and new after rename"
+    },
+    {
+      "name": "delta_chain_sidecar_validation",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' chain_read_rejects_foreign_identity_corruption_and_truncation -- --test-threads=1",
+      "exit_status": 0,
+      "result": "1 passed; wrong identity, corrupted payload, truncation, and missing sidecar fail closed"
+    },
+    {
+      "name": "rustfmt_check",
+      "command": "rustfmt --edition 2024 --check crates/dodb-storage/src/blink/paged_manifest.rs crates/dodb-storage/src/blink/version_chain.rs crates/dodb-storage/src/blink/mod.rs",
+      "exit_status": 0
+    },
+    {
+      "name": "git_diff_check",
+      "command": "git diff --check",
+      "exit_status": 0
     }
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "a1309bfd59d7e4d6f4c76b45c0fde898a6e8bcc26d6b9c31e755cb4eef0fb63f",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "e3c91c56e60c17de54088c1caf90f358ddde88c74d00d0f8b8d06918fe24d788",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "830b50eaa186f014496497aba3438979e1c27cc896ab2026bab9e65ff0491dd5",
-    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "338456f77f26f19314d27be0dc5a6e0b42cfa9ce77ffb9873496325875daadf7"
+    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "25c433aa6bdfabc526bd29c1e9f72b27d79a2dee8d74109c634ce8c14fb55f90",
+    "dodb/crates/dodb-storage/src/blink/version_chain.rs": "819b7f9cff96ac9909d4f3e5e29433151328c33f25fd6c0ad4b212b0085cadad"
   },
   "logs": [
     {
@@ -125,14 +139,50 @@
     {
       "name": "validated_manifest_open_regression",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-validated-manifest-open.log",
-      "sha256": "3592e5613521880b43b07c9706245eaf43610fbc79cf7278e0cfbc861912221f",
+      "sha256": "1829b6fb9f4551968c37c9c354117e391675c8ac71f268e0ee959efe9e8f4de2",
+      "exit_status": 0
+    },
+    {
+      "name": "validated_manifest_open_initial_compile_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/validated-manifest-open-initial-compile-failure.log",
+      "sha256": "b953a43d076c0f8980d5336bb123afe8431245902ac62e3b0c4b462712eee531",
+      "exit_status": 101
+    },
+    {
+      "name": "full_dodb_storage_library_suite_final",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-bounded-structure-full-lib-final.log",
+      "sha256": "25d48b4582aafdc51464d6be0f707870abe2f2e6022b12bec6fdb0300fc6f737",
+      "exit_status": 0
+    },
+    {
+      "name": "strict_clippy_existing_findings_final",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-clippy-final.log",
+      "sha256": "e431f2be3834e352a539b2db7c8e68dc1d43af44b100cbd9f0a9c26fb844406b",
+      "exit_status": 101
+    },
+    {
+      "name": "validated_manifest_open_regression_final",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-validated-manifest-open.log",
+      "sha256": "1829b6fb9f4551968c37c9c354117e391675c8ac71f268e0ee959efe9e8f4de2",
+      "exit_status": 0
+    },
+    {
+      "name": "pointer_publication_boundaries",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-pointer-publication-boundaries.log",
+      "sha256": "a8c2ba4e4625e6762f1080661f9f93c9a4730aca8ad95878eee8191a69ec4c5d",
+      "exit_status": 0
+    },
+    {
+      "name": "delta_chain_sidecar_validation",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-delta-chain-sidecar-validation.log",
+      "sha256": "dfb622a6ea718644270f81e4a8432d36d7c97795b86fcfecd56b988c1c9e2b68",
       "exit_status": 0
     }
   ],
   "remaining_work": [
     "Integrate bounded full validation into the paged recovery and service open path.",
     "Add above-cache reopen and large-WAL replay validation with the complete validator.",
-    "Complete the T11 storage SIGKILL and crash-boundary matrix for torn active tails, corrupt closed tails, invalid delta/base, delta-chain sidecars, sidecar/index/manifest ordering, pack construction, publication and GC, page reuse, pinned-version checkpoint races, and recovery-write-second-crash recovery."
+    "Complete real storage process-kill and crash-boundary evidence for torn active tails, corrupt closed tails, invalid delta/base, sidecar/index/manifest ordering, pack construction failure, publication and GC, page-ID reuse, pinned-version checkpoint races, and recovery-write-second-crash recovery."
   ],
   "next_task": "T11",
   "push": {
