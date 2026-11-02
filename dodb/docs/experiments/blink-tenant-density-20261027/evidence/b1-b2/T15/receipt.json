@@ -405,7 +405,8 @@
     "complete T15 matrix: query consistency, old operation pins, page-ID reuse, missing/corrupt sources, overload recovery, cancellation, shutdown, bounded resource peaks, and nonzero eviction/miss/reconstruction counters": "Not complete; page reuse and concurrent Query consistency passed; remaining gates are listed in remaining_work.",
     "concurrent Query consistency across a conditional multi-key commit": "Passed by tests::paged_service_query_keeps_one_snapshot_across_concurrent_multi_key_commit; a barrier holds the old paged snapshot across the commit",
     "nonzero durable source reload after recovery": "Passed for both A1 settings; reading all 16 checkpointed records increases the PagedReadHandle source_read_count; this is not an eviction count",
-    "page-ID reuse after recovery and before a second crash": "Passed for A1 enabled and observed for A1 disabled, for both coalesce modes; both retained high-water 40 after delete/reinsert, recheckpoint, and final second-crash recovery."
+    "page-ID reuse after recovery and before a second crash": "Passed for A1 enabled and observed for A1 disabled, for both coalesce modes; both retained high-water 40 after delete/reinsert, recheckpoint, and final second-crash recovery.",
+    "old operation pin across overwrite, checkpoint, and reload": "Covered by T14 tests::paged_checkpoint_reclaims_old_reader_source_before_publication and tests::paged_checkpoint_resumes_after_disk_capacity_release: the in-flight old snapshot remains readable across overwrite and two checkpoints, is then released, and service shutdown/reopen reads the latest acknowledged value. Runtime pins are not restored across restart."
   },
   "ownership_peaks": {
     "paged cache": "8 pages configured in crash fixture",
@@ -441,7 +442,6 @@
     }
   ],
   "remaining_work": [
-    "Add old-operation-pin/checkpoint/reload coverage across service restart.",
     "Exercise missing/corrupt reachable sources, overload and resource recovery, cancellation, and complete shutdown with bounded category peaks and no leaked tasks or charges.",
     "Record nonzero eviction, cache-miss, and WAL-reconstruction counters and full live category peaks for crash runs.",
     "Complete the A1-off/on and durable-base-mode matrix for all remaining T15 acceptance cases.",
