@@ -6,6 +6,9 @@ license = "MIT"
 description = "Server for dodb, the fn0 document database"
 repository.workspace = true
 
+[features]
+blink-demand-paging = ["dodb-storage/blink-demand-paging"]
+
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 dodb-core.workspace = true

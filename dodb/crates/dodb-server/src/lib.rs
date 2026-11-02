@@ -941,6 +941,16 @@ pub struct LocalTenantServiceConfig {
     pub blink_wal_layout: BlinkWalLayout,
     pub blink_checkpoint_execution: BlinkCheckpointExecution,
     pub blink_checkpoint_retention_bytes: u64,
+    #[cfg(feature = "blink-demand-paging")]
+    pub blink_shared_resources: Option<BlinkSharedResourceConfig>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BlinkSharedResourceConfig {
+    pub memory: dodb_storage::blink::resource::ResourceLimits,
+    pub disk: dodb_storage::blink::resource::DiskResourceLimits,
+    pub open_tenant_metadata_bytes: u64,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -1196,6 +1206,8 @@ impl Default for LocalTenantServiceConfig {
             blink_wal_layout: BlinkWalLayout::Legacy,
             blink_checkpoint_execution: BlinkCheckpointExecution::Sync,
             blink_checkpoint_retention_bytes: 512 * 1024 * 1024,
+            #[cfg(feature = "blink-demand-paging")]
+            blink_shared_resources: None,
         }
     }
 }
@@ -1238,6 +1250,10 @@ pub struct BlinkTenantService {
     checkpoint_retention_bytes: u64,
     checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
     coordinator_activity: Arc<CoordinatorActivity>,
+    #[cfg(feature = "blink-demand-paging")]
+    shared_resources: Option<dodb_storage::blink::resource::BlinkResourceManager>,
+    #[cfg(feature = "blink-demand-paging")]
+    open_tenant_metadata_bytes: u64,
     shards: Arc<StdMutex<BlinkShardRegistry>>,
     fault_injector_factory: Mutex<Option<FaultInjectorFactory>>,
     #[cfg(test)]
@@ -1340,6 +1356,8 @@ struct AsyncBlinkShard {
     coordinator_task: Mutex<Option<tokio::task::JoinHandle<()>>>,
     failed_message: Arc<StdMutex<Option<String>>>,
     activity: Arc<CoordinatorActivity>,
+    #[cfg(feature = "blink-demand-paging")]
+    _metadata_reservation: Option<dodb_storage::blink::resource::Reservation>,
 }
 
 struct QueuedBlinkTransaction {
@@ -1381,6 +1399,17 @@ impl BlinkTenantService {
                 "B-link WAL segment size must be positive",
             ));
         }
+        #[cfg(feature = "blink-demand-paging")]
+        if config.blink_shared_resources.is_some()
+            && !matches!(
+                config.blink_wal_layout,
+                BlinkWalLayout::SegmentedBases { .. }
+            )
+        {
+            return Err(Error::invalid_request(
+                "B-link demand paging requires segmented WAL with durable bases",
+            ));
+        }
         if config.blink_checkpoint_execution == BlinkCheckpointExecution::Background
             && config.blink_wal_layout == BlinkWalLayout::Legacy
         {
@@ -1395,6 +1424,30 @@ impl BlinkTenantService {
                 "checkpoint retention budget is too small",
             ));
         }
+        #[cfg(feature = "blink-demand-paging")]
+        let (shared_resources, open_tenant_metadata_bytes) = match config.blink_shared_resources {
+            Some(resource_config) => {
+                if resource_config.open_tenant_metadata_bytes == 0
+                    || resource_config.memory.max_tenants < config.max_open_shards
+                    || resource_config.memory.max_pending_waiters < config.blink_open_waiter_limit
+                    || resource_config.disk.max_tenants < config.max_open_shards
+                {
+                    return Err(Error::invalid_request(
+                        "B-link shared resource limits do not cover configured tenant opens",
+                    ));
+                }
+                let manager =
+                    dodb_storage::blink::resource::BlinkResourceManager::new_with_disk_limits(
+                        resource_config.memory,
+                        resource_config.disk,
+                    )
+                    .map_err(|_| {
+                        Error::invalid_request("B-link shared resource limits are invalid")
+                    })?;
+                (Some(manager), resource_config.open_tenant_metadata_bytes)
+            }
+            None => (None, 0),
+        };
         std::fs::create_dir_all(config.data_dir.join("blink"))?;
         let checkpoint_metrics = Arc::new(StdMutex::new(BlinkWalCheckpointMetrics {
             policy: config.blink_checkpoint_policy,
@@ -1423,6 +1476,10 @@ impl BlinkTenantService {
             checkpoint_retention_bytes: config.blink_checkpoint_retention_bytes,
             checkpoint_metrics,
             coordinator_activity,
+            #[cfg(feature = "blink-demand-paging")]
+            shared_resources,
+            #[cfg(feature = "blink-demand-paging")]
+            open_tenant_metadata_bytes,
             shards: Arc::new(StdMutex::new(BlinkShardRegistry {
                 shards: BTreeMap::new(),
                 opening: HashSet::new(),
@@ -1708,6 +1765,22 @@ impl BlinkTenantService {
                     .clone()
                     .try_acquire_owned()
                     .map_err(|_| Error::overloaded("B-link open worker capacity is full"))?;
+                #[cfg(feature = "blink-demand-paging")]
+                let metadata_reservation = match &self.shared_resources {
+                    Some(resources) => Some(
+                        resources
+                            .reserve(
+                                tenant.get(),
+                                dodb_storage::blink::resource::ResourceCategory::Metadata,
+                                dodb_storage::blink::resource::ReservationClass::Foreground,
+                                self.open_tenant_metadata_bytes,
+                            )
+                            .map_err(|_| {
+                                Error::overloaded("B-link shared metadata budget is exhausted")
+                            })?,
+                    ),
+                    None => None,
+                };
                 #[cfg(test)]
                 self.wait_for_test_open_gate(tenant).await?;
                 let shard_id = ShardId::new(tenant.get());
@@ -1761,6 +1834,8 @@ impl BlinkTenantService {
                     },
                     Arc::clone(&self.checkpoint_metrics),
                     Arc::clone(&self.coordinator_activity),
+                    #[cfg(feature = "blink-demand-paging")]
+                    metadata_reservation,
                 ));
                 attempt.finish(Some(Arc::clone(&shard)))?;
                 return Ok(shard);
@@ -1865,6 +1940,9 @@ impl AsyncBlinkShard {
         physical_config: Option<physical_checkpoint::PhysicalCheckpointConfig>,
         checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
         activity: Arc<CoordinatorActivity>,
+        #[cfg(feature = "blink-demand-paging")] metadata_reservation: Option<
+            dodb_storage::blink::resource::Reservation,
+        >,
     ) -> Self {
         let read_handle = store.versioned_read_handle();
         let (request_tx, mut request_rx) =
@@ -2202,6 +2280,8 @@ impl AsyncBlinkShard {
             coordinator_task: Mutex::new(Some(coordinator_task)),
             failed_message,
             activity,
+            #[cfg(feature = "blink-demand-paging")]
+            _metadata_reservation: metadata_reservation,
         }
     }
 
@@ -2307,6 +2387,12 @@ impl LocalTenantService {
     pub fn new(config: LocalTenantServiceConfig) -> Result<Self, Error> {
         if config.max_open_shards == 0 {
             return Err(Error::invalid_request("max_open_shards must be nonzero"));
+        }
+        #[cfg(feature = "blink-demand-paging")]
+        if config.blink_shared_resources.is_some() {
+            return Err(Error::invalid_request(
+                "B-link shared paging resources are unsupported by the B-tree service",
+            ));
         }
         if config.blink_wal_layout != BlinkWalLayout::Legacy
             || config.blink_checkpoint_execution != BlinkCheckpointExecution::Sync
@@ -2792,6 +2878,29 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "blink-demand-paging")]
+    fn constrained_blink_shared_resources() -> BlinkSharedResourceConfig {
+        BlinkSharedResourceConfig {
+            memory: dodb_storage::blink::resource::ResourceLimits {
+                global_bytes: 16_384,
+                per_tenant_bytes: 8_192,
+                progress_pool_bytes: 1_024,
+                max_tenants: 3,
+                max_pending_waiters: 4,
+                global_category_bytes: [16_384; 7],
+                per_tenant_category_bytes: [8_192; 7],
+            },
+            disk: dodb_storage::blink::resource::DiskResourceLimits {
+                global_bytes: 1_048_576,
+                per_tenant_bytes: 524_288,
+                max_tenants: 3,
+                global_category_bytes: [1_048_576; 5],
+                per_tenant_category_bytes: [524_288; 5],
+            },
+            open_tenant_metadata_bytes: 7_000,
+        }
+    }
+
     #[tokio::test]
     async fn cached_blink_reads_do_not_depend_on_repeated_path_checks() {
         for wal_layout in [
@@ -2962,6 +3071,78 @@ mod tests {
         ] {
             assert!(BlinkTenantService::new(config).is_err());
         }
+    }
+
+    #[test]
+    #[cfg(feature = "blink-demand-paging")]
+    fn shared_paging_resources_reject_incompatible_layout_before_filesystem_access() {
+        let directory = blink_test_directory();
+        for (tenant_path, wal_layout) in [
+            ("legacy", BlinkWalLayout::Legacy),
+            (
+                "segmented-without-bases",
+                BlinkWalLayout::Segmented {
+                    max_segment_bytes: 1_048_576,
+                },
+            ),
+        ] {
+            let data_path = directory.path().join(tenant_path);
+            assert!(
+                BlinkTenantService::new(LocalTenantServiceConfig {
+                    data_dir: data_path.clone(),
+                    blink_wal_layout: wal_layout,
+                    blink_shared_resources: Some(constrained_blink_shared_resources()),
+                    ..LocalTenantServiceConfig::default()
+                })
+                .is_err()
+            );
+            assert!(!data_path.exists());
+        }
+        let btree_path = directory.path().join("btree");
+        assert!(
+            LocalTenantService::new(LocalTenantServiceConfig {
+                data_dir: btree_path.clone(),
+                blink_shared_resources: Some(constrained_blink_shared_resources()),
+                ..LocalTenantServiceConfig::default()
+            })
+            .is_err()
+        );
+        assert!(!btree_path.exists());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn shared_blink_metadata_budget_precedes_open_and_releases_on_shutdown() {
+        let directory = blink_test_directory();
+        let service = BlinkTenantService::new(LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            max_open_shards: 3,
+            blink_open_waiter_limit: 4,
+            blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce: true,
+            },
+            blink_shared_resources: Some(constrained_blink_shared_resources()),
+            ..LocalTenantServiceConfig::default()
+        })
+        .unwrap();
+        service.open_shard(TenantId::new(301)).await.unwrap();
+        service.open_shard(TenantId::new(302)).await.unwrap();
+        let third_tenant_path = service.database_path(TenantId::new(303));
+        assert!(service.open_shard(TenantId::new(303)).await.is_err());
+        assert!(!third_tenant_path.exists());
+        let manager = service.shared_resources.as_ref().unwrap();
+        assert_eq!(
+            manager.snapshot().unwrap().current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::Metadata as usize],
+            14_000
+        );
+        service.shutdown_checked().await.unwrap();
+        assert_eq!(manager.snapshot().unwrap().current_total, 0);
+        service.open_shard(TenantId::new(303)).await.unwrap();
+        assert!(third_tenant_path.exists());
+        service.shutdown_checked().await.unwrap();
+        assert_eq!(manager.snapshot().unwrap().current_total, 0);
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

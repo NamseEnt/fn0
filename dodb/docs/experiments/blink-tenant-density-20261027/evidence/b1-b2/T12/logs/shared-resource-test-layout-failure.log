@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-300bb259f2fc591f)
+
+running 1 test
+test tests::shared_blink_metadata_budget_precedes_open_and_releases_on_shutdown ... FAILED
+
+failures:
+
+---- tests::shared_blink_metadata_budget_precedes_open_and_releases_on_shutdown stdout ----
+
+thread 'tests::shared_blink_metadata_budget_precedes_open_and_releases_on_shutdown' (444297449) panicked at dodb/crates/dodb-server/src/lib.rs:3124:10:
+called `Result::unwrap()` on an `Err` value: InvalidRequest("B-link demand paging requires segmented WAL with durable bases")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::shared_blink_metadata_budget_precedes_open_and_releases_on_shutdown
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p dodb-server --lib`
