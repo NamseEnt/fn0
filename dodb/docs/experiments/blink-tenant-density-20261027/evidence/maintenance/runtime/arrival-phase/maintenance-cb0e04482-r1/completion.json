@@ -1,0 +1,273 @@
+{
+  "capacity_after": {
+    "arc": {
+      "c": 5713788928,
+      "c_max": 5713788928,
+      "c_min": 357111808,
+      "memory_throttle_count": 0,
+      "size": 5654211032
+    },
+    "boot_free_bytes": 5174476800,
+    "cpu_stat": [
+      "cpu  10467719 323169 5591743 548629804 1357078 355316 188562 1771156 0 0",
+      "cpu0 5248036 152884 2797826 274308895 689141 176499 95117 872329 0 0",
+      "cpu1 5219683 170285 2793916 274320909 667936 178816 93445 898826 0 0"
+    ],
+    "device_stat": "11509606       15 486119944 14414089 121691025   208677 6218893036 195431778        0 57216152 209856502     1098      384 1961318615    10634        0        0",
+    "memory_bytes": {
+      "Dirty": 10518528,
+      "MemAvailable": 4959277056,
+      "MemTotal": 11427577856,
+      "SwapFree": 3945607168,
+      "SwapTotal": 4294963200,
+      "Writeback": 0
+    },
+    "timestamp_unix_seconds": 1793580556.280094,
+    "zfs_free_bytes": 26778771456
+  },
+  "cases_attempted": 6,
+  "completed": true,
+  "failure": null,
+  "processes": [
+    {
+      "pid": 2646273,
+      "process_group_id": 2646273,
+      "role": "harness-process",
+      "same_live_process": false,
+      "start_time_ticks": 284023258,
+      "start_time_unix_ms": 1793578561249
+    },
+    {
+      "pid": 2646278,
+      "process_group_id": 2646273,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284023273,
+      "start_time_unix_ms": 1793578561310
+    },
+    {
+      "pid": 2646298,
+      "process_group_id": 2646273,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284024451,
+      "start_time_unix_ms": 1793578573088
+    },
+    {
+      "pid": 2646711,
+      "process_group_id": 2646273,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284054516,
+      "start_time_unix_ms": 1793578873738
+    },
+    {
+      "pid": 2646718,
+      "process_group_id": 2646273,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284055478,
+      "start_time_unix_ms": 1793578883359
+    },
+    {
+      "pid": 2646723,
+      "process_group_id": 2646723,
+      "role": "harness-process",
+      "same_live_process": false,
+      "start_time_ticks": 284056529,
+      "start_time_unix_ms": 1793578893944
+    },
+    {
+      "pid": 2646728,
+      "process_group_id": 2646723,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284056542,
+      "start_time_unix_ms": 1793578894005
+    },
+    {
+      "pid": 2647149,
+      "process_group_id": 2646723,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284057148,
+      "start_time_unix_ms": 1793578900056
+    },
+    {
+      "pid": 2648458,
+      "process_group_id": 2646723,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284087233,
+      "start_time_unix_ms": 1793579200913
+    },
+    {
+      "pid": 2648831,
+      "process_group_id": 2646723,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284088450,
+      "start_time_unix_ms": 1793579213081
+    },
+    {
+      "pid": 2649205,
+      "process_group_id": 2649205,
+      "role": "harness-process",
+      "same_live_process": false,
+      "start_time_ticks": 284089822,
+      "start_time_unix_ms": 1793579226871
+    },
+    {
+      "pid": 2649210,
+      "process_group_id": 2649205,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284089835,
+      "start_time_unix_ms": 1793579226933
+    },
+    {
+      "pid": 2649590,
+      "process_group_id": 2649205,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284090434,
+      "start_time_unix_ms": 1793579232918
+    },
+    {
+      "pid": 2650438,
+      "process_group_id": 2649205,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284120520,
+      "start_time_unix_ms": 1793579533781
+    },
+    {
+      "pid": 2650849,
+      "process_group_id": 2649205,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284121730,
+      "start_time_unix_ms": 1793579545880
+    },
+    {
+      "pid": 2651226,
+      "process_group_id": 2651226,
+      "role": "harness-process",
+      "same_live_process": false,
+      "start_time_ticks": 284123112,
+      "start_time_unix_ms": 1793579559769
+    },
+    {
+      "pid": 2651231,
+      "process_group_id": 2651226,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284123125,
+      "start_time_unix_ms": 1793579559831
+    },
+    {
+      "pid": 2651250,
+      "process_group_id": 2651226,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284124242,
+      "start_time_unix_ms": 1793579570998
+    },
+    {
+      "pid": 2651623,
+      "process_group_id": 2651226,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284154306,
+      "start_time_unix_ms": 1793579871643
+    },
+    {
+      "pid": 2651631,
+      "process_group_id": 2651226,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284155194,
+      "start_time_unix_ms": 1793579880523
+    },
+    {
+      "pid": 2651672,
+      "process_group_id": 2651672,
+      "role": "harness-process",
+      "same_live_process": false,
+      "start_time_ticks": 284156186,
+      "start_time_unix_ms": 1793579890507
+    },
+    {
+      "pid": 2651677,
+      "process_group_id": 2651672,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284156199,
+      "start_time_unix_ms": 1793579890569
+    },
+    {
+      "pid": 2651732,
+      "process_group_id": 2651672,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284157327,
+      "start_time_unix_ms": 1793579901851
+    },
+    {
+      "pid": 2652034,
+      "process_group_id": 2651672,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284187394,
+      "start_time_unix_ms": 1793580202524
+    },
+    {
+      "pid": 2652040,
+      "process_group_id": 2651672,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284188337,
+      "start_time_unix_ms": 1793580211953
+    },
+    {
+      "pid": 2652045,
+      "process_group_id": 2652045,
+      "role": "harness-process",
+      "same_live_process": false,
+      "start_time_ticks": 284189261,
+      "start_time_unix_ms": 1793580221261
+    },
+    {
+      "pid": 2652050,
+      "process_group_id": 2652045,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284189274,
+      "start_time_unix_ms": 1793580221322
+    },
+    {
+      "pid": 2652430,
+      "process_group_id": 2652045,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284189875,
+      "start_time_unix_ms": 1793580227328
+    },
+    {
+      "pid": 2653154,
+      "process_group_id": 2652045,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284219961,
+      "start_time_unix_ms": 1793580528195
+    },
+    {
+      "pid": 2653527,
+      "process_group_id": 2652045,
+      "role": "backend-process",
+      "same_live_process": false,
+      "start_time_ticks": 284221195,
+      "start_time_unix_ms": 1793580540526
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 Tracking issue: https://github.com/NamseEnt/fn0/issues/126
 
-Status: assessment after bounded capacity, shutdown diagnostics, and completed matched arrival-phase controls and the bounded staggered resident frontier. Unfinished cells are not accepted.
+Status: assessment after bounded capacity, shutdown diagnostics, completed matched arrival controls, the bounded staggered resident frontier, and three matched five-minute N24 maintenance pairs. Unfinished conditions are not accepted.
 
 The evidence does not support adopting the current B-link implementation for greater active-tenant density or practical disk efficiency. Keep defaults unchanged. This is a decision about the measured implementation and policies, not a general B-tree versus LSM conclusion.
 
@@ -24,6 +24,8 @@ The bounded staggered follow-up then confirmed B-link at twenty-four active tena
 
 File allocation snapshots also remain relevant to the goal. They measure reachable files at named phase boundaries. They do not measure continuous peak space, unlinked-open files, physical space returned after deletion, or steady-state write amplification. Do not replace the disk-efficiency question with a throughput comparison or infer disk reclamation from checkpoint completion.
 
+The subsequent [matched N24 maintenance cohort](E4-COMMON-POPULATION-RESULTS.md) passed three five-minute cells on each route: 2,160,000 successful requests, twelve full/reopen oracles, and matched input fingerprints. B-link completed 216 measurement-worker checkpoints per cell. Its whole-cell charged peaks were 60.38-62.32 MiB versus 97.60-101.02 MiB for the reference; its post-reopen reachable-file allocations were 92.75-92.76 MiB versus 43.63-44.01 MiB. The reference also had a lower worst-tenant write-p99 histogram edge (8.388608 versus 16.777216 ms), while both met SLO. Charged memory rose during all windows, so this is finite maintenance acceptance rather than a memory/debt plateau. It does not extend the prior population frontier or support B-link adoption for the stated density/disk goal.
+
 ## Structure confirmed in source
 
 Current B-link opens and retains the complete decoded tree. Its reader obtains resident page objects; it has no page-miss reconstruction and eviction path. The cache-capacity field does not bound this residency. Generation catalogs, dirty encoded images, snapshot references, request/preparation buffers, and allocator costs can coexist with the current pages. Normalized checkpoint image bytes are not a heap measurement.
@@ -34,10 +36,10 @@ These facts explain why larger-than-resident activity would require the B1/B2 ar
 
 ## What remains before a stronger claim or another implementation
 
-- Locate the stopped measurement worker using [SHUTDOWN-DIAGNOSTIC-PLAN.md](SHUTDOWN-DIAGNOSTIC-PLAN.md). Preserve the completed raw-observation cells and original stop; do not silently resume its omitted matrix or relax deadlines.
-- Treat a non-reconfirmed E2 boundary as unresolved for the new cohort. A current-host large-population source control or matched profiling would be needed to attribute a difference to source; do not tune load, cadence, or SLO thresholds to obtain a pass.
+- Preserve the stopped shutdown/pressure cohorts and their located kernel wait evidence. Unique allocator/representation attribution remains unproven; do not resume omitted cells or relax deadlines to obtain acceptance.
+- Keep the historical and current-source frontier cohorts distinct. The latest matched maintenance accepts N24 for five-minute windows; it does not reconfirm N28 for B-link or attribute historical differences to source. Do not tune the load, cadence, or SLO to obtain a pass.
 - A larger-than-backend-budget dataset would still leave ARC and previously charged shared file pages outside this limit. A physical disk-miss or total-machine-density claim needs an explicit host-cache policy and measured reads. None follows from the current small read coverage.
-- Longer maintenance, growing distinct-key churn, staggered checkpoint demand, reader retention, and physical disk-return work remain separate gates. Three-minute fixed-key maintenance is not steady state.
+- Longer steady-state/debt bounds, growing distinct-key churn, reader retention, and physical disk-return work remain separate gates. The completed five-minute fixed-key/staggered maintenance windows do not establish those properties.
 - If the product still requires many continuously active tenants above aggregate resident memory, evaluate B1/B2 as a separate storage/recovery architecture project. Preserve durable page reconstruction, version/pin reachability, byte accounting, fairness, and the real-service crash/write/crash recovery gate. Avoid further small hot-path changes as a substitute for that requirement.
 
 Issue #126 remains open. No default promotion, production capacity promise, engine-only ranking, or B1/B2 implementation acceptance is implied.

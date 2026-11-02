@@ -1,0 +1,601 @@
+{
+  "accepted_run": true,
+  "all_recorded_processes_exited": true,
+  "archive": {
+    "bytes": 14588171,
+    "path": "/home/opc/tenant-density-harness-20261027/maintenance/maintenance-cb0e04482-r1.tar.gz",
+    "sha256": "7bd588c9bee02f7b81d6662bd894d3367391f74ec3b302d404c2b13eb5bbc30b"
+  },
+  "capacity_after": {
+    "arc": {
+      "c": 5713788928,
+      "c_max": 5713788928,
+      "c_min": 357111808,
+      "memory_throttle_count": 0,
+      "size": 5649484608
+    },
+    "boot_free_bytes": 5174472704,
+    "cpu_stat": [
+      "cpu  10467930 323169 5592005 548637430 1357080 355319 188565 1771159 0 0",
+      "cpu0 5248179 152884 2797990 274312637 689142 176501 95118 872332 0 0",
+      "cpu1 5219751 170285 2794015 274324792 667938 178817 93446 898826 0 0"
+    ],
+    "device_stat": "11509607       15 486119952 14414090 121691025   208677 6218893036 195431778        0 57216152 209856503     1098      384 1961318615    10634        0        0",
+    "memory_bytes": {
+      "Dirty": 229376,
+      "MemAvailable": 4988465152,
+      "MemTotal": 11427577856,
+      "SwapFree": 3945607168,
+      "SwapTotal": 4294963200,
+      "Writeback": 0
+    },
+    "timestamp_unix_seconds": 1793580596.8509784,
+    "zfs_free_bytes": 26778771456
+  },
+  "cgroups": [
+    {
+      "memory_high": "max",
+      "memory_max": "max",
+      "memory_swap_max": "max",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r1-blink",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r1-blink/measurement",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r1-blink/oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r1-blink/reopen-oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r1-blink/setup",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r1-shared",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r1-shared/measurement",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r1-shared/oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r1-shared/reopen-oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r1-shared/setup",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r2-blink",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r2-blink/measurement",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r2-blink/oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r2-blink/reopen-oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r2-blink/setup",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r2-shared",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r2-shared/measurement",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r2-shared/oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r2-shared/reopen-oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r2-shared/setup",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r3-blink",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r3-blink/measurement",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r3-blink/oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r3-blink/reopen-oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r3-blink/setup",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r3-shared",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r3-shared/measurement",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r3-shared/oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r3-shared/reopen-oracle",
+      "processes_empty": true
+    },
+    {
+      "memory_high": "201326592",
+      "memory_max": "268435456",
+      "memory_swap_max": "0",
+      "path": "/sys/fs/cgroup/dodb-density-maintenance-cb0e04482-r1/maintenance-n24-r3-shared/setup",
+      "processes_empty": true
+    }
+  ],
+  "collector_sha256": "6010c06f3af1573b73b3a02ae3242adbccc382667a9d6895c9722f3179751c53",
+  "completed_run_evidence_valid": true,
+  "databases": [
+    {
+      "case": "maintenance-n24-r1-blink",
+      "file_count": 288,
+      "path": "/bench/zfs/db/tenant-density-harness-20261027/maintenance-cb0e04482-r1/maintenance-n24-r1-blink",
+      "preserved": true,
+      "total_file_bytes": 93243562
+    },
+    {
+      "case": "maintenance-n24-r1-shared",
+      "file_count": 408,
+      "path": "/bench/zfs/db/tenant-density-harness-20261027/maintenance-cb0e04482-r1/maintenance-n24-r1-shared",
+      "preserved": true,
+      "total_file_bytes": 42506259
+    },
+    {
+      "case": "maintenance-n24-r2-blink",
+      "file_count": 288,
+      "path": "/bench/zfs/db/tenant-density-harness-20261027/maintenance-cb0e04482-r1/maintenance-n24-r2-blink",
+      "preserved": true,
+      "total_file_bytes": 93250750
+    },
+    {
+      "case": "maintenance-n24-r2-shared",
+      "file_count": 408,
+      "path": "/bench/zfs/db/tenant-density-harness-20261027/maintenance-cb0e04482-r1/maintenance-n24-r2-shared",
+      "preserved": true,
+      "total_file_bytes": 42506221
+    },
+    {
+      "case": "maintenance-n24-r3-blink",
+      "file_count": 288,
+      "path": "/bench/zfs/db/tenant-density-harness-20261027/maintenance-cb0e04482-r1/maintenance-n24-r3-blink",
+      "preserved": true,
+      "total_file_bytes": 93240915
+    },
+    {
+      "case": "maintenance-n24-r3-shared",
+      "file_count": 408,
+      "path": "/bench/zfs/db/tenant-density-harness-20261027/maintenance-cb0e04482-r1/maintenance-n24-r3-shared",
+      "preserved": true,
+      "total_file_bytes": 42506226
+    }
+  ],
+  "file_manifest": [
+    {
+      "bytes": 17232672,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/bin/memory_diagnostic_worker",
+      "sha256": "631ff543aacfa9544cf900e0f8bbabbb0680fad0125e5cb97412a63c6d47e291"
+    },
+    {
+      "bytes": 16651064,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/bin/tenant_density_workload",
+      "sha256": "7b1044090563f414f4502e5cf7b99206ddac9001fb3f2f3cf9b3c53d318a8614"
+    },
+    {
+      "bytes": 7514,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/completion.json",
+      "sha256": "1cab200987de2865ad989164ee5d679155a089f4b66ef5e34cc6c265e0d8619b"
+    },
+    {
+      "bytes": 28662,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/final-review.json",
+      "sha256": "f6c1eda8b6b3135148a9b78f7e15dcf9e7f0610c0271cd62d949cb36f3341a1e"
+    },
+    {
+      "bytes": 2592,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r1-blink-command.json",
+      "sha256": "3219059b494a4c02e8fbe0ded233cf942df064c035efd5e84025d0cc1528fbb4"
+    },
+    {
+      "bytes": 152778,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r1-blink-host-samples.json",
+      "sha256": "ae529000b3d5fcad28f898b7a30c138105e093485a2ecce88bf04363dcf62833"
+    },
+    {
+      "bytes": 366457,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r1-blink-status.json",
+      "sha256": "4af56447df5076f1844de6319e69daeaef5e7250c255a55de9a7aa96a2e0e6a0"
+    },
+    {
+      "bytes": 1995853,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r1-blink.json",
+      "sha256": "97ae19479c3d0ca4021ef893dff84c74192c8dbd8493099cf605bc0f1f85de00"
+    },
+    {
+      "bytes": 13379,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r1-blink.log",
+      "sha256": "78cb7cfcc9a5fe282d191e77ceddc1fdc034ff6d65f70195ca7476db123bbee3"
+    },
+    {
+      "bytes": 2679,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r1-shared-command.json",
+      "sha256": "a88d343f134b36fb215c8e6b24657007479b0ffc86697dac3517d23ce9bb968b"
+    },
+    {
+      "bytes": 152772,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r1-shared-host-samples.json",
+      "sha256": "f317a2f955828fe87870c1d5a3224e2f1cb1123102f0350aaa80f83f3cbcff3b"
+    },
+    {
+      "bytes": 249520,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r1-shared-status.json",
+      "sha256": "715b51d3d4f457ba3abbfe1d0c3f33ee3f5c60826c8b1c3495b0094d57758583"
+    },
+    {
+      "bytes": 8130790,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r1-shared.json",
+      "sha256": "1ce3cd4f25721c839140f2fe2e5689980f3f575cfeef018b23031d274bc14877"
+    },
+    {
+      "bytes": 13379,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r1-shared.log",
+      "sha256": "aa762a19afc0cf08a041fea5f48a6062db76c891eed30140c5d65a55b47cd93f"
+    },
+    {
+      "bytes": 2591,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r2-blink-command.json",
+      "sha256": "bb19bbe5e9708d93edc84145a51c7653d3396b377339a319e394e74bb3938323"
+    },
+    {
+      "bytes": 151772,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r2-blink-host-samples.json",
+      "sha256": "f3a22995b26945f962628285f93c79acd73a508e949873008abc10b517d94b13"
+    },
+    {
+      "bytes": 365641,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r2-blink-status.json",
+      "sha256": "8c66683df6f0873d5377ddf17745ba3ca88d7c1748fa8aea444a3181b8a2cfc2"
+    },
+    {
+      "bytes": 1983545,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r2-blink.json",
+      "sha256": "a332e4aa8fa48e3b1707013da2b3f943799b6ae9b12d2215fde8526ae0c04b94"
+    },
+    {
+      "bytes": 13379,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r2-blink.log",
+      "sha256": "3963e37839c4a6eb7abcabc1a6eb8404d84679262bbfd6f3073d84d98c61d3a0"
+    },
+    {
+      "bytes": 2678,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r2-shared-command.json",
+      "sha256": "f8fddbb594bbf0a8e3b8700368aa218a91eb498cec6b35ea2a0b2933a0f099e1"
+    },
+    {
+      "bytes": 152767,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r2-shared-host-samples.json",
+      "sha256": "8ad58e5091e24e78add12fb03e8e6196e74329bdef63a74c5e41f6e705844309"
+    },
+    {
+      "bytes": 249110,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r2-shared-status.json",
+      "sha256": "94dbdc71e661f25b3e5d2ea90dc2403e9ea8d6deaf662eaa1a47f7551c10bbef"
+    },
+    {
+      "bytes": 8130502,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r2-shared.json",
+      "sha256": "5a46908f3e70067441786bff2563b859542124b975306a0812c5b62e0f36eb82"
+    },
+    {
+      "bytes": 13379,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r2-shared.log",
+      "sha256": "5c7c5a090f2eab7933f046fbdb2c05fb142e74b72ab8bcffba30b88836fea151"
+    },
+    {
+      "bytes": 2591,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r3-blink-command.json",
+      "sha256": "7da33b6d823c13c94d4ce2d28526cff051fdaa1692bf0cd3c18b68392fd5e7f8"
+    },
+    {
+      "bytes": 151814,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r3-blink-host-samples.json",
+      "sha256": "0682ccb84d78ab945281c4aeef0554a769b7f20846cc497898de060ffd735941"
+    },
+    {
+      "bytes": 365643,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r3-blink-status.json",
+      "sha256": "e4a8f558bfa4dc659a48f13672d494be0a568b4cd57ce7b477e828bc3352efe4"
+    },
+    {
+      "bytes": 1994097,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r3-blink.json",
+      "sha256": "782af1954af750d3b72830781c10b7a9319ff5ef8c56c5330439f74557cfc687"
+    },
+    {
+      "bytes": 13379,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r3-blink.log",
+      "sha256": "02e3998d5ff43bcaa684ccc62ed13632e9d0fdbd3c9c30f46866cb54d6b3a7dd"
+    },
+    {
+      "bytes": 2679,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r3-shared-command.json",
+      "sha256": "c3ec7b4d22800ed3e6ba5bf0b02162d001d20f97adf7aba7ec74581b3fe69ca7"
+    },
+    {
+      "bytes": 152772,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r3-shared-host-samples.json",
+      "sha256": "76b7a0f629409073f5feafd9beb34b1568e91913c86bc05c51b329a52ab94d08"
+    },
+    {
+      "bytes": 249514,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r3-shared-status.json",
+      "sha256": "1dcc8c0ae306b5c13ccbc0fed65eb7a992c74f8ab431ad755ae3a88f5b747423"
+    },
+    {
+      "bytes": 8116670,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r3-shared.json",
+      "sha256": "9b17610ce8274fbbffd3488a0dfb6a2428f6aa0bb0bb0c3a6f59ea51dd6a2bdb"
+    },
+    {
+      "bytes": 13379,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/maintenance-n24-r3-shared.log",
+      "sha256": "94b9f42d3a6608f916fa9c74d494ef7ab2ece7410544678e21230e4992423e2d"
+    },
+    {
+      "bytes": 36882,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/provenance.json",
+      "sha256": "6b66c719b8150748aa09becc7cb41697d8423a668bfc4c9c35ee6b633f151b88"
+    },
+    {
+      "bytes": 58233,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/review-r2.json",
+      "sha256": "c3b7a362e72dcec88cf50f39598e09096486d40553995b8d835800d413d883bd"
+    },
+    {
+      "bytes": 1981930,
+      "path": "arrival-phase/maintenance-cb0e04482-r1/summary.json",
+      "sha256": "33a11b6a879c320be688d0c709cbf0ed0953239b482860044a6b4932a023947c"
+    },
+    {
+      "bytes": 15136,
+      "path": "arrival_review.py",
+      "sha256": "1f6f7a1c4a86787c46be08c7af24c0d9f9d3cf27f18ee44a031764e76dd2696b"
+    },
+    {
+      "bytes": 12810,
+      "path": "capacity_review.py",
+      "sha256": "d03cd663fa4dd4a1b2f87d716937ba8566d7c205032286853d876f416333ad57"
+    },
+    {
+      "bytes": 12810,
+      "path": "maintenance/476c69218/evidence/capacity/capacity_review.py",
+      "sha256": "d03cd663fa4dd4a1b2f87d716937ba8566d7c205032286853d876f416333ad57"
+    },
+    {
+      "bytes": 18915,
+      "path": "maintenance/476c69218/evidence/maintenance/oci_maintenance.py",
+      "sha256": "23a50f7cac9ca6416af77743a449c7b3d81aa909da4841b6f003985d2ee527a9"
+    },
+    {
+      "bytes": 4477,
+      "path": "maintenance/476c69218/evidence/maintenance/test_maintenance.py",
+      "sha256": "52c2d319c993930ddf4ade33324a690cf110685f87985eec8014e8cc1a70b115"
+    },
+    {
+      "bytes": 38784,
+      "path": "maintenance/476c69218/evidence/resident-frontier/oci_resident_frontier.py",
+      "sha256": "fbb07d16dc5614db8a596f199940144ea0b2ba19f2e0cfbf70c34b702481e8aa"
+    },
+    {
+      "bytes": 32674,
+      "path": "maintenance/476c69218/evidence/resident-frontier/resident_frontier_review.py",
+      "sha256": "6bd65facde7695c8e1357f32eae1a0252ac352449fa4c298a1e042b6439a0ee5"
+    },
+    {
+      "bytes": 549,
+      "path": "maintenance/476c69218/launcher.json",
+      "sha256": "25429d96704420104b34ed10a29c414791c07244db51aae69a9399ac308eba7c"
+    },
+    {
+      "bytes": 1371,
+      "path": "maintenance/476c69218/launcher.log",
+      "sha256": "115a8e6bf8302fab14ddcf77d1fc339b12830fbe7b841254641886253ce2ec63"
+    },
+    {
+      "bytes": 1924,
+      "path": "maintenance/476c69218/preflight.log",
+      "sha256": "32cda314e0dc1851c47dd9236952d35dc226dfed8af85440a0be10d26357f76e"
+    },
+    {
+      "bytes": 0,
+      "path": "maintenance/67119c8c5/collection.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 12810,
+      "path": "maintenance/67119c8c5/evidence/capacity/capacity_review.py",
+      "sha256": "d03cd663fa4dd4a1b2f87d716937ba8566d7c205032286853d876f416333ad57"
+    },
+    {
+      "bytes": 9554,
+      "path": "maintenance/67119c8c5/evidence/maintenance/collect_maintenance.py",
+      "sha256": "6010c06f3af1573b73b3a02ae3242adbccc382667a9d6895c9722f3179751c53"
+    },
+    {
+      "bytes": 19005,
+      "path": "maintenance/67119c8c5/evidence/maintenance/oci_maintenance.py",
+      "sha256": "12289e208bc05d3c641f9fdec95e0155fc866be281fc1429d8480c0dc565e2bf"
+    },
+    {
+      "bytes": 4928,
+      "path": "maintenance/67119c8c5/evidence/maintenance/test_maintenance.py",
+      "sha256": "d800e563f0dd32449df0c583666f0191eaa33df22202156ffbb0f52a0b94f708"
+    },
+    {
+      "bytes": 38784,
+      "path": "maintenance/67119c8c5/evidence/resident-frontier/oci_resident_frontier.py",
+      "sha256": "fbb07d16dc5614db8a596f199940144ea0b2ba19f2e0cfbf70c34b702481e8aa"
+    },
+    {
+      "bytes": 32674,
+      "path": "maintenance/67119c8c5/evidence/resident-frontier/resident_frontier_review.py",
+      "sha256": "6bd65facde7695c8e1357f32eae1a0252ac352449fa4c298a1e042b6439a0ee5"
+    },
+    {
+      "bytes": 33308,
+      "path": "oci_arrival_controls.py",
+      "sha256": "97b26bb9d18a6b772e4044c3ccd5f985f655d2e42d1273d13260357b255867a0"
+    },
+    {
+      "bytes": 19667,
+      "path": "oci_arrival_validate.py",
+      "sha256": "07e2cbad6bde30a52efe8a0b7ca00811b32320b10dc8572365a3fe582009e2bb"
+    },
+    {
+      "bytes": 16150,
+      "path": "oci_capacity.py",
+      "sha256": "e97065f5d5aeb89d9a59cb67d28b9b1f94ca2a652ef80e096fed26bd3957b238"
+    }
+  ],
+  "process_count": 30,
+  "review_path": "/home/opc/tenant-density-harness-20261027/arrival-phase/maintenance-cb0e04482-r1/review-r2.json",
+  "review_sha256": "c3b7a362e72dcec88cf50f39598e09096486d40553995b8d835800d413d883bd",
+  "reviewer_sha256": "12289e208bc05d3c641f9fdec95e0155fc866be281fc1429d8480c0dc565e2bf",
+  "source_native": {
+    "native_archive_bytes_before": 1199825562,
+    "native_archive_sha256_before": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+    "native_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+    "resolved_target_directory_before": "/bench/zfs/db/tenant-density-build-cache-20261029/target",
+    "source_commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d",
+    "source_status": "",
+    "target_symlink_before": "/bench/zfs/db/tenant-density-build-cache-20261029/target"
+  },
+  "timestamp_unix_seconds": 1793580602.051356
+}

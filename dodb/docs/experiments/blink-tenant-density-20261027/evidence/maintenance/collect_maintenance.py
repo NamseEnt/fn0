@@ -106,8 +106,23 @@ def verify_local(evidence_directory):
             raise AssertionError(f'extracted archive file differs: {record["path"]}')
     run_directory = runtime / 'arrival-phase' / maintenance.RUN_NAME
     review_path = run_directory / 'review-r2.json'
-    if maintenance.digest(review_path) != receipt['review_sha256']:
+    if (maintenance.digest(review_path) != receipt['review_sha256']
+            or maintenance.digest(evidence_directory / 'final-review.json') != receipt['review_sha256']):
         raise AssertionError('corrected review hash differs')
+    provenance = maintenance.read_json(run_directory / 'provenance.json')
+    launcher = maintenance.read_json(runtime / 'maintenance/476c69218/launcher.json')
+    original_script = runtime / 'maintenance/476c69218/evidence/maintenance/oci_maintenance.py'
+    corrected_script = runtime / 'maintenance/67119c8c5/evidence/maintenance/oci_maintenance.py'
+    collector_script = runtime / 'maintenance/67119c8c5/evidence/maintenance/collect_maintenance.py'
+    if (maintenance.digest(original_script) != provenance['controller_sha256']
+            or maintenance.digest(original_script) != launcher['controller_sha256']
+            or maintenance.digest(corrected_script) != receipt['reviewer_sha256']
+            or maintenance.digest(collector_script) != receipt['collector_sha256']):
+        raise AssertionError('controller/launcher or corrected review/collection source differs')
+    for binary_name, identity in provenance['validated_binaries'].items():
+        binary = run_directory / 'bin' / binary_name
+        if binary.stat().st_size != identity['bytes'] or maintenance.digest(binary) != identity['sha256']:
+            raise AssertionError('extracted binary differs from validated provenance')
     review = maintenance.read_json(review_path)
     _, reviewer, capacity_review, _ = maintenance.dependencies()
     maintenance.configure_reviewer(reviewer)
@@ -145,6 +160,9 @@ def verify_local(evidence_directory):
               'completed_run_evidence_valid': review['completed_run_evidence_valid'],
               'accepted_run': review['accepted_run'], 'slo_passes_by_backend': review['slo_passes_by_backend'],
               'successful_requests': review['successful_requests'], 'oracle_count': review['oracle_count'],
+              'controller_launcher_provenance_verified': True,
+              'corrected_reviewer_and_collector_hashes_verified': True,
+              'validated_binaries_verified': True,
               'verification_passed': True}
     maintenance.write_json(evidence_directory / 'collection-verification.json', output)
     print(json.dumps(output, sort_keys=True))

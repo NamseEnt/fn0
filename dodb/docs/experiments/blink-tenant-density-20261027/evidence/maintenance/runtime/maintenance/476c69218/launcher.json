@@ -1,0 +1,16 @@
+{
+  "controller_commit": "476c692186e4736a5b314c10e5034cb0320d01db",
+  "plan_commit": "a01f6e2d7ce3411366bf9b97a9a3addf4b12e614",
+  "command": [
+    "sudo",
+    "-n",
+    "env",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "python3",
+    "/home/opc/tenant-density-harness-20261027/maintenance/476c69218/evidence/maintenance/oci_maintenance.py"
+  ],
+  "controller_sha256": "23a50f7cac9ca6416af77743a449c7b3d81aa909da4841b6f003985d2ee527a9",
+  "timestamp_unix_seconds": 1793578557.9819875,
+  "launcher_pid": 2646243,
+  "launcher_start_time_ticks": 284022940
+}

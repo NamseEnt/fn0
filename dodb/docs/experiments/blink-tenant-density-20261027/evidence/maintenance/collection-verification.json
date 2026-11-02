@@ -1,0 +1,18 @@
+{
+  "accepted_run": true,
+  "archive_sha256": "7bd588c9bee02f7b81d6662bd894d3367391f74ec3b302d404c2b13eb5bbc30b",
+  "completed_run_evidence_valid": true,
+  "controller_launcher_provenance_verified": true,
+  "corrected_reviewer_and_collector_hashes_verified": true,
+  "file_count": 57,
+  "locally_reduced_cells": 6,
+  "matched_pairs": 3,
+  "oracle_count": 12,
+  "slo_passes_by_backend": {
+    "blink": 3,
+    "minimal-native-shared": 3
+  },
+  "successful_requests": 2160000,
+  "validated_binaries_verified": true,
+  "verification_passed": true
+}

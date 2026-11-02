@@ -1,0 +1,7 @@
+{"case": "maintenance-n24-r1-blink", "operational_pass": true, "slo_pass": true}
+{"case": "maintenance-n24-r1-shared", "operational_pass": true, "slo_pass": true}
+{"case": "maintenance-n24-r2-shared", "operational_pass": true, "slo_pass": true}
+{"case": "maintenance-n24-r2-blink", "operational_pass": true, "slo_pass": true}
+{"case": "maintenance-n24-r3-blink", "operational_pass": true, "slo_pass": true}
+{"case": "maintenance-n24-r3-shared", "operational_pass": true, "slo_pass": true}
+{"accepted_run": false, "all_recorded_processes_exited": true, "blink_multiple_cycle_coverage": true, "completed_run_evidence_valid": false, "failures": [{"case": "maintenance-n24-r1-shared", "error": "KeyError: 'checkpoints_completed'"}, {"case": "maintenance-n24-r2-shared", "error": "KeyError: 'checkpoints_completed'"}, {"case": "maintenance-n24-r3-shared", "error": "KeyError: 'checkpoints_completed'"}], "omitted_cases": [], "operationally_valid_cell_count": 3, "oracle_count": 6, "plan_commit": "a01f6e2d7ce3411366bf9b97a9a3addf4b12e614", "provenance_sha256": "6b66c719b8150748aa09becc7cb41697d8423a668bfc4c9c35ee6b633f151b88", "slo_passes_by_backend": {"blink": 3, "minimal-native-shared": 0}, "source_commit": "cb0e0448270c1da3d9a214fb008ec01406d8e40d", "successful_requests": 1080000, "terminal_sha256": "1cab200987de2865ad989164ee5d679155a089f4b66ef5e34cc6c265e0d8619b"}
