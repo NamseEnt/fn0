@@ -1,0 +1,21 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.79s
+     Running unittests src/lib.rs (target/debug/deps/dodb_storage-70634b21c90c24df)
+
+running 1 test
+test blink::paged_recovery::tests::active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit ... 
+running 1 test
+
+thread 'blink::paged_recovery::tests::active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit' (444200789) panicked at dodb/crates/dodb-storage/src/blink/paged_recovery.rs:1043:14:
+called `Result::unwrap()` on an `Err` value: InternalInvariantViolation("WAL commit LSN 14, expected 15")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    blink::paged_recovery::tests::active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 321 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `-p dodb-storage --lib`

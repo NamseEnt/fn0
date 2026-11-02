@@ -16,14 +16,15 @@
     "3f4847ed6",
     "a5a54e533",
     "969be9876",
-    "71483f8b2"
+    "71483f8b2",
+    "432ef0585"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "71483f8b2"
+    "source_commit": "432ef0585"
   },
   "features": [
     "blink-demand-paging",
@@ -147,6 +148,12 @@
       "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' synced_delta_chain_before_index_publication_survives_sigkill_as_orphan -- --test-threads=1 --nocapture",
       "exit_status": 0,
       "result": "1 passed; child killed after sidecar file and directory sync before index insertion; reopen selected the old checkpoint-image descriptor and the complete sidecar remained unreferenced"
+    },
+    {
+      "name": "wal_recovery_successful_write_then_second_sigkill",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit -- --test-threads=1 --nocapture",
+      "exit_status": 0,
+      "result": "1 passed; after reopening the first torn-tail crash, a new append succeeds, a second child is SIGKILLed before commit, and the next reopen retains both acknowledged commits with no partial third commit"
     }
   ],
   "source_hashes": {
@@ -154,7 +161,7 @@
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "20560bff3b3715642417335a71bd80e5990f8d157398dbbf4e1fa541dd7db6cd",
     "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "fead0f023fb9eace22359d72b81a09bdd846e3af3d29e8855ca3b926ab2138c7",
     "dodb/crates/dodb-storage/src/blink/version_chain.rs": "c86233ee1715992282fb272f449017aef79223eb1affe6cc60531ba6f3dadfe5",
-    "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "42c750672725f2ce591e01c6ce63e369c2e9d8d0f16f3c84b292993518dc4991"
+    "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "8c54f05017041260d50b6a2a322b51c70893adf91f602a684c3d2ff942e2c529"
   },
   "logs": [
     {
@@ -226,7 +233,7 @@
     {
       "name": "full_dodb_storage_library_suite_final",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-bounded-structure-full-lib-final.log",
-      "sha256": "d6d4755c27979c0ed1f0c7390ac47a8b76113efa1fca6c7f9523a56fb0aa5137",
+      "sha256": "2ddb1693bdbf01a8e0cf2acc84ea44c496644bb0d6b98f27bf6288484100ed0b",
       "exit_status": 0
     },
     {
@@ -390,11 +397,29 @@
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/synced-sidecar-before-index-base-lsn-failure.log",
       "sha256": "46743ab3dc585bdfe7bc2cf94e82a05220bbe7eb16186d9eba225ef9411e9846",
       "exit_status": 101
+    },
+    {
+      "name": "wal_recovery_successful_write_then_second_sigkill",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-recovery-write-second-sigkill.log",
+      "sha256": "57a0824e5c8bf60ec19824a7f66aa60a383cb1185abafcb5551903e7c2f130cd",
+      "exit_status": 0
+    },
+    {
+      "name": "wal_recovery_second_crash_initial_batch_id_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/recovery-write-second-batch-id-failure.log",
+      "sha256": "44b8651a0af37605f0af56f165c5add67f484cd0a2be79a20b9610ed1750b43f",
+      "exit_status": 101
+    },
+    {
+      "name": "wal_recovery_second_crash_initial_commit_lsn_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/recovery-write-second-commit-lsn-failure.log",
+      "sha256": "527deff587fdce5267e5efebccb67152a78fa14f96f5b8e406e876ab2ac9eafd",
+      "exit_status": 101
     }
   ],
   "remaining_work": [
     "Route tenant service opening through complete bounded validation and prove failure cleanup as part of T12.",
-    "Complete process-kill coverage for page-ID reuse and pinned-version/checkpoint races, and recovery followed by a successful write and a second process crash."
+    "Complete process-kill coverage for page-ID reuse and pinned-version/checkpoint races. The storage WAL recovery-write-second-crash check passes; T15 remains responsible for the real-service form."
   ],
   "next_task": "T11",
   "push": {

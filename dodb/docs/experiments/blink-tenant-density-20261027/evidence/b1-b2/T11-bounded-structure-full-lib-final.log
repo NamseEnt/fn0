@@ -52,6 +52,8 @@ test blink::paged_manifest::tests::truncated_marker_pointer_and_manifest_fail_cl
 test blink::paged_manifest::tests::unknown_pointer_version_fails_closed ... ok
 test blink::paged_recovery::tests::active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit ... 
 running 1 test
+
+running 1 test
 ok
 test blink::paged_recovery::tests::committed_images_and_deltas_stream_into_the_disk_index ... ok
 test blink::paged_recovery::tests::incremental_checkpoint_replaces_only_pages_newer_than_the_previous_checkpoint ... ok
@@ -351,5 +353,5 @@ test wal::tests::trusted_internal_valid_images_are_byte_identical_to_strict_imag
 test wal::tests::unsupported_version_is_rejected ... ok
 test wal::tests::wrong_magic_is_rejected ... ok
 
-test result: ok. 318 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 129.24s
+test result: ok. 318 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 129.21s
 
