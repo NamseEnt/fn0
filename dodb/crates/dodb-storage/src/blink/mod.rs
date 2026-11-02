@@ -56,6 +56,8 @@ use crate::page::encode_page;
 use crate::page::{
     PAGE_HEADER_SIZE, PAGE_SIZE, PageHeader, PageType, decode_page_at, finalize_encoded_page,
 };
+#[cfg(feature = "blink-demand-paging")]
+use crate::wal::WalDeltaBase;
 use crate::wal::{
     LOGICAL_INIT_FRAME_SIZE, LogicalWalLog, LogicalWalMutation, LogicalWalTransaction,
     PAGE_IMAGE_PAYLOAD_SIZE, PreparedWalCommit, PreparedWalRecord, PreparedWalRedo,
@@ -2142,8 +2144,11 @@ pub struct PagedMutationPreparation {
     high_water_page_id: PageId,
     provisional_revision: Revision,
     mutated_keys: BTreeSet<Vec<u8>>,
+    base_images: BTreeMap<PageId, [u8; PAGE_SIZE]>,
+    base_versions: HashMap<PageId, WalDeltaBase>,
     publication_reservation: Option<resource::Reservation>,
     root_reservation: Option<source_manager::SourceRootReservation>,
+    chain_write_reservations: Vec<resource::Reservation>,
     _reservations: Vec<resource::Reservation>,
 }
 
@@ -2340,17 +2345,19 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
         };
         let publication_reservation = preparation
             .publication_reservation
-            .as_ref()
+            .take()
             .ok_or_else(|| Error::invariant("paged transaction publication was not reserved"))?;
         let root_reservation = preparation
             .root_reservation
             .take()
             .ok_or_else(|| Error::invariant("paged source root publication was not reserved"))?;
-        let eligible_commits = [false];
+        let eligible_commits = [true];
         let append_result = {
-            let mut base_source = |_| None;
+            let mut base_source =
+                |page_id| preparation.base_images.get(&page_id).map(Cow::Borrowed);
             let mut delta_request = WalDeltaRequest {
                 eligible_commits: &eligible_commits,
+                base_versions: Some(&preparation.base_versions),
                 base_source: &mut base_source,
             };
             self.wal.append_group_trusted_internal_with_page_deltas(
@@ -2376,69 +2383,158 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
                 return Err(error);
             }
         };
-        let mut next_root = self.current.root;
         if let Some(injector) = &mut self.publication_fault_injector
             && let Err(error) = injector.hit("before_paged_generation_publication")
         {
             self.broken = Some(error.to_string());
             return Err(error);
         }
-        for location in self.wal.recent_committed_page_locations() {
-            if location.page_id.get() < FIRST_DATA_PAGE {
-                continue;
-            }
-            let image_lsn = match location.image_lsn {
-                Some(image_lsn) if location.record_type == crate::wal::WalRecordType::PageImage => {
-                    image_lsn
+        let publication_result = (|| -> Result<version_index::VersionIndexRoot> {
+            let mut next_root = self.current.root;
+            for location in self.wal.recent_committed_page_locations() {
+                if location.page_id.get() < FIRST_DATA_PAGE {
+                    continue;
                 }
-                _ => {
-                    self.broken = Some("paged writer received an unsupported WAL locator".into());
-                    return Err(Error::invariant(
-                        "paged writer received an unsupported WAL locator",
-                    ));
-                }
-            };
-            let image_crc32c = location
-                .image_crc32c
-                .ok_or_else(|| Error::invariant("paged WAL image checksum is missing"))?;
-            let descriptor = version_index::VersionDescriptor {
-                page_id: location.page_id,
-                token: version_index::VersionToken::Wal {
-                    source_file_number: self.wal_source.file_number,
-                    record_lsn: location.record_lsn,
-                },
-                image_lsn,
-                image_crc32c,
-                locator: version_index::VersionLocator::WalImage {
-                    frame: version_index::WalFrameLocator {
-                        source: self.wal_source,
-                        frame_offset: location.frame_offset,
-                        frame_length: location.frame_length,
-                        header_crc32c: location.header_crc32c,
-                        payload_offset: location.payload_offset,
-                        payload_length: location.payload_length,
-                        payload_crc32c: location.payload_crc32c,
-                        committed_prefix_length,
-                        commit_frame_offset: location.commit_frame_offset,
-                        commit_lsn: location.commit_lsn,
+                let image_lsn = location
+                    .image_lsn
+                    .ok_or_else(|| Error::invariant("paged WAL image LSN is missing"))?;
+                let image_crc32c = location
+                    .image_crc32c
+                    .ok_or_else(|| Error::invariant("paged WAL image checksum is missing"))?;
+                let frame = version_index::WalFrameLocator {
+                    source: self.wal_source,
+                    frame_offset: location.frame_offset,
+                    frame_length: location.frame_length,
+                    header_crc32c: location.header_crc32c,
+                    payload_offset: location.payload_offset,
+                    payload_length: location.payload_length,
+                    payload_crc32c: location.payload_crc32c,
+                    committed_prefix_length,
+                    commit_frame_offset: location.commit_frame_offset,
+                    commit_lsn: location.commit_lsn,
+                };
+                let locator = match location.record_type {
+                    crate::wal::WalRecordType::PageImage => {
+                        if location.delta_depth != 0 {
+                            return Err(Error::invariant(
+                                "paged WAL image has a nonzero delta depth",
+                            ));
+                        }
+                        version_index::VersionLocator::WalImage { frame }
+                    }
+                    crate::wal::WalRecordType::PageDelta => {
+                        let previous = self
+                            .current
+                            .index
+                            .lookup(self.current.root, location.page_id)?
+                            .ok_or_else(|| {
+                                Error::corruption("paged WAL delta has no indexed predecessor")
+                            })?;
+                        let base_lsn = location.base_page_lsn.ok_or_else(|| {
+                            Error::invariant("paged WAL delta base LSN is missing")
+                        })?;
+                        let base_crc32c = location.base_image_crc32c.ok_or_else(|| {
+                            Error::invariant("paged WAL delta base checksum is missing")
+                        })?;
+                        let mut ancestry = match previous.locator {
+                            version_index::VersionLocator::CheckpointImage {
+                                source,
+                                offset,
+                                source_length,
+                                image_lsn,
+                                image_crc32c,
+                            } => vec![version_chain::DeltaChainEntry::CheckpointImage {
+                                source,
+                                offset,
+                                source_length,
+                                image_lsn,
+                                image_crc32c,
+                            }],
+                            version_index::VersionLocator::WalImage { frame } => {
+                                let version_index::VersionToken::Wal { record_lsn, .. } =
+                                    previous.token
+                                else {
+                                    return Err(Error::corruption(
+                                        "paged WAL image has a non-WAL version token",
+                                    ));
+                                };
+                                vec![version_chain::DeltaChainEntry::WalImage {
+                                    frame,
+                                    record_lsn,
+                                    image_lsn: previous.image_lsn,
+                                    image_crc32c: previous.image_crc32c,
+                                }]
+                            }
+                            version_index::VersionLocator::WalDelta { chain, .. } => {
+                                self.current
+                                    .index
+                                    .delta_chains()
+                                    .read(chain, location.page_id)?
+                                    .entries
+                            }
+                        };
+                        ancestry.push(version_chain::DeltaChainEntry::WalDelta {
+                            frame,
+                            record_lsn: location.record_lsn,
+                            base_lsn,
+                            base_crc32c,
+                            image_lsn,
+                            image_crc32c,
+                        });
+                        let chain = version_chain::DeltaChain::new(location.page_id, ancestry)?;
+                        let chain_reservation =
+                            preparation.chain_write_reservations.pop().ok_or_else(|| {
+                                Error::invariant("delta-chain output was not reserved")
+                            })?;
+                        let generation =
+                            next_root.generation().checked_add(1).ok_or_else(|| {
+                                Error::durability("version-index generation exhausted")
+                            })?;
+                        let chain_reference = self.current.index.delta_chains().write_reserved(
+                            generation,
+                            &chain,
+                            chain_reservation,
+                        )?;
+                        version_index::VersionLocator::WalDelta {
+                            frame,
+                            chain: chain_reference,
+                            depth: location.delta_depth,
+                        }
+                    }
+                    _ => {
+                        return Err(Error::invariant(
+                            "paged WAL writer received an unsupported record type",
+                        ));
+                    }
+                };
+                let descriptor = version_index::VersionDescriptor {
+                    page_id: location.page_id,
+                    token: version_index::VersionToken::Wal {
+                        source_file_number: self.wal_source.file_number,
+                        record_lsn: location.record_lsn,
                     },
-                },
-            };
-            next_root = match self.current.index.insert_reserved(
-                next_root,
-                location.page_id,
-                descriptor,
-                publication_reservation,
-            ) {
-                Ok(root) => root,
-                Err(error) => {
-                    self.broken = Some(error.to_string());
-                    return Err(Error::durability(format!(
-                        "paged transaction committed but version publication failed: {error}"
-                    )));
-                }
-            };
-        }
+                    image_lsn,
+                    image_crc32c,
+                    locator,
+                };
+                next_root = self.current.index.insert_reserved(
+                    next_root,
+                    location.page_id,
+                    descriptor,
+                    &publication_reservation,
+                )?;
+            }
+            Ok(next_root)
+        })();
+        let next_root = match publication_result {
+            Ok(root) => root,
+            Err(error) => {
+                self.broken = Some(error.to_string());
+                return Err(Error::durability(format!(
+                    "paged transaction committed but version publication failed: {error}"
+                )));
+            }
+        };
         let next_handle = match self.current.fork_with_generation_reserved(
             next_root,
             preparation.root_page_id(),
@@ -2496,8 +2592,11 @@ fn prepare_paged_mutation(
             high_water_page_id: base.high_water_page_id,
             provisional_revision,
             mutated_keys: BTreeSet::new(),
+            base_images: BTreeMap::new(),
+            base_versions: HashMap::new(),
             publication_reservation: None,
             root_reservation: None,
+            chain_write_reservations: Vec::new(),
             _reservations: Vec::new(),
         });
     }
@@ -2575,6 +2674,47 @@ fn prepare_paged_mutation(
             wal_buffer_bytes,
         )
         .map_err(page_cache::map_resource_error)?;
+    let base_image_bytes = u64::try_from(dirty.len())
+        .ok()
+        .and_then(|page_count| page_count.checked_mul(PAGE_SIZE as u64))
+        .ok_or_else(|| Error::overloaded("paged base-image reservation overflows"))?;
+    let base_image_reservation = base
+        .resources
+        .reserve(
+            base.tenant_id,
+            resource::ResourceCategory::DirtyImages,
+            resource::ReservationClass::Foreground,
+            base_image_bytes,
+        )
+        .map_err(page_cache::map_resource_error)?;
+    let mut base_images = BTreeMap::new();
+    let mut base_versions = HashMap::new();
+    base_versions
+        .try_reserve(dirty.len())
+        .map_err(|_| Error::overloaded("paged base-version map capacity is exhausted"))?;
+    for page_id in &dirty {
+        let Some(descriptor) = base.index.lookup(base.root, *page_id)? else {
+            continue;
+        };
+        let base_page = base
+            .load_mutation_base_page(*page_id)?
+            .ok_or_else(|| Error::corruption("paged mutation base page is missing"))?;
+        base_images.insert(*page_id, encode_blink_page(*page_id, base_page.as_ref())?);
+        let delta_depth = match descriptor.locator {
+            version_index::VersionLocator::WalDelta { depth, .. } => depth,
+            version_index::VersionLocator::CheckpointImage { .. }
+            | version_index::VersionLocator::WalImage { .. } => 0,
+        };
+        base_versions.insert(
+            *page_id,
+            WalDeltaBase {
+                page_lsn: descriptor.image_lsn,
+                image_crc32c: descriptor.image_crc32c,
+                delta_depth,
+            },
+        );
+    }
+    let chain_write_reservations = base.index.delta_chains().reserve_write_work(dirty.len())?;
     let publication_reservation = if dirty.is_empty() {
         None
     } else {
@@ -2593,12 +2733,16 @@ fn prepare_paged_mutation(
         high_water_page_id: working.high_water_page_id,
         provisional_revision,
         mutated_keys: encoded_keys.into_iter().collect(),
+        base_images,
+        base_versions,
         publication_reservation,
         root_reservation,
+        chain_write_reservations,
         _reservations: vec![
             preparation_reservation,
             dirty_reservation,
             wal_buffer_reservation,
+            base_image_reservation,
         ],
     })
 }
@@ -4412,6 +4556,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             };
             let mut delta_request = WalDeltaRequest {
                 eligible_commits: &eligible_commits,
+                base_versions: None,
                 base_source: &mut base_source,
             };
             // Each WAL image above comes from this execution's successful
@@ -4450,6 +4595,7 @@ impl<F: DurableFile, W: DurableFile> BlinkStore<F, W> {
             };
             let mut delta_request = WalDeltaRequest {
                 eligible_commits: &eligible_commits,
+                base_versions: None,
                 base_source: &mut base_source,
             };
             let _wal_append_site = churn::enter(ChurnSite::WalAppend);
@@ -13288,9 +13434,81 @@ mod tests {
             )
             .unwrap();
         assert!(writer_result.commit_lsn.is_some());
+        let delta_location = writer
+            .wal
+            .recent_committed_page_locations()
+            .iter()
+            .find(|location| location.record_type == crate::wal::WalRecordType::PageDelta)
+            .unwrap();
+        let delta_page_id = delta_location.page_id;
+        assert!(matches!(
+            writer
+                .current()
+                .index
+                .lookup(writer.current().root, delta_page_id)
+                .unwrap()
+                .unwrap()
+                .locator,
+            version_index::VersionLocator::WalDelta { depth: 1, .. }
+        ));
         assert_eq!(
             writer.current().get(&writer_key).unwrap().value(),
             Some(&b"writer-updated"[..])
+        );
+        for update_number in 2..=9 {
+            let updated_value = format!("writer-updated-{update_number:02}").into_bytes();
+            let update_request = TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: writer_key.clone(),
+                    value: updated_value,
+                }],
+            );
+            writer
+                .transact(
+                    &update_request,
+                    &StorageLimits::default(),
+                    Revision::new(2000 + update_number),
+                )
+                .unwrap();
+            let latest_location = writer
+                .wal
+                .recent_committed_page_locations()
+                .iter()
+                .find(|location| location.page_id == delta_page_id)
+                .unwrap();
+            let latest_descriptor = writer
+                .current()
+                .index
+                .lookup(writer.current().root, delta_page_id)
+                .unwrap()
+                .unwrap();
+            if update_number < 9 {
+                assert_eq!(
+                    latest_location.record_type,
+                    crate::wal::WalRecordType::PageDelta
+                );
+                assert_eq!(latest_location.delta_depth, update_number as u8);
+                assert!(matches!(
+                    latest_descriptor.locator,
+                    version_index::VersionLocator::WalDelta { depth, .. }
+                        if depth == update_number as u8
+                ));
+            } else {
+                assert_eq!(
+                    latest_location.record_type,
+                    crate::wal::WalRecordType::PageImage
+                );
+                assert_eq!(latest_location.delta_depth, 0);
+                assert!(matches!(
+                    latest_descriptor.locator,
+                    version_index::VersionLocator::WalImage { .. }
+                ));
+            }
+        }
+        assert_eq!(
+            writer.current().get(&writer_key).unwrap().value(),
+            Some(&b"writer-updated-09"[..])
         );
         assert_eq!(
             old_reader.get(&writer_key).unwrap().value(),
@@ -13314,7 +13532,7 @@ mod tests {
                 .transact(
                     &failed_request,
                     &StorageLimits::default(),
-                    Revision::new(2001),
+                    Revision::new(2010),
                 )
                 .is_err()
         );
@@ -13327,7 +13545,7 @@ mod tests {
                 .transact(
                     &failed_request,
                     &StorageLimits::default(),
-                    Revision::new(2002),
+                    Revision::new(2011),
                 )
                 .is_err()
         );
@@ -19228,6 +19446,7 @@ mod tests {
         let mut source = |page_id: PageId| bases.get(&page_id).map(Cow::Borrowed);
         let mut request = WalDeltaRequest {
             eligible_commits: &eligible,
+            base_versions: None,
             base_source: &mut source,
         };
         wal.append_group_with_page_deltas(commits, &mut request, None)
@@ -19402,6 +19621,7 @@ mod tests {
         let mut source = |page_id: PageId| bases.get(&page_id).map(Cow::Borrowed);
         let mut request = WalDeltaRequest {
             eligible_commits: &eligible,
+            base_versions: None,
             base_source: &mut source,
         };
         wal.append_group_with_page_deltas(&commits, &mut request, None)

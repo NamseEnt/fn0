@@ -567,11 +567,38 @@ impl DeltaChainStore {
     }
 
     pub fn write(&self, generation: u64, chain: &DeltaChain) -> Result<DeltaChainRef> {
+        let reservation = self.reserve_chain_bytes()?;
+        self.write_reserved(generation, chain, reservation)
+    }
+
+    pub(crate) fn reserve_write_work(&self, chain_count: usize) -> Result<Vec<Reservation>> {
+        let mut reservations = Vec::new();
+        reservations
+            .try_reserve(chain_count)
+            .map_err(|_| Error::overloaded("delta-chain reservation list is exhausted"))?;
+        for _chain_number in 0..chain_count {
+            reservations.push(self.reserve_chain_bytes()?);
+        }
+        Ok(reservations)
+    }
+
+    pub(crate) fn write_reserved(
+        &self,
+        generation: u64,
+        chain: &DeltaChain,
+        output_charge: Reservation,
+    ) -> Result<DeltaChainRef> {
         chain.validate()?;
         if generation == 0 {
             return Err(Error::invalid_input("delta-chain generation is zero"));
         }
-        let output_charge = self.reserve_chain_bytes()?;
+        if output_charge.category() != ResourceCategory::Metadata
+            || output_charge.bytes() < MAX_CHAIN_FILE_BYTES as u64
+        {
+            return Err(Error::invariant(
+                "delta-chain output reservation is insufficient",
+            ));
+        }
         loop {
             let file_number = self
                 .inner

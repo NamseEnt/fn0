@@ -940,6 +940,7 @@ mod tests {
         };
         let mut delta_request = WalDeltaRequest {
             eligible_commits: &eligible_commits,
+            base_versions: None,
             base_source: &mut base_source,
         };
         wal.append_group_with_page_deltas(

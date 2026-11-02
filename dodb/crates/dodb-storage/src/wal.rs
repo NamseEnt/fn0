@@ -201,7 +201,15 @@ pub(crate) struct WalSegmentBoundary {
 
 pub(crate) struct WalDeltaRequest<'request, 'source, 'base> {
     pub eligible_commits: &'request [bool],
+    pub base_versions: Option<&'request HashMap<PageId, WalDeltaBase>>,
     pub base_source: &'request mut WalDeltaBaseSource<'source, 'base>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct WalDeltaBase {
+    pub page_lsn: Lsn,
+    pub image_crc32c: u32,
+    pub delta_depth: u8,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -1043,6 +1051,7 @@ impl<F: DurableFile> WalLog<F> {
         &self,
         locations: &[WalPageLocation],
         append_offset: u64,
+        base_versions: Option<&HashMap<PageId, WalDeltaBase>>,
     ) -> Result<Vec<WalPageLocation>> {
         let mut current_versions = self
             .page_chain
@@ -1062,6 +1071,14 @@ impl<F: DurableFile> WalLog<F> {
                         location.delta_depth,
                     ),
                 );
+            }
+        }
+        if let Some(base_versions) = base_versions {
+            for (page_id, base) in base_versions {
+                current_versions
+                    .entry(*page_id)
+                    .and_modify(|current| current.3 = base.delta_depth)
+                    .or_insert((base.page_lsn, base.image_crc32c, None, base.delta_depth));
             }
         }
         let mut resolved = Vec::with_capacity(locations.len());
@@ -1665,6 +1682,7 @@ impl<F: DurableFile> WalLog<F> {
         let append_started = Instant::now();
         hit(&mut injector, "before_wal_append")?;
         let plan_started = Instant::now();
+        let base_versions = delta.as_ref().and_then(|request| request.base_versions);
         let plan = self.plan_redo(commits, delta)?;
         let plan_nanos = elapsed_nanos(plan_started)?;
         self.redo_plan_nanos = self.redo_plan_nanos.saturating_add(plan_nanos);
@@ -1688,7 +1706,8 @@ impl<F: DurableFile> WalLog<F> {
             let write_started = Instant::now();
             let write_result = (|| {
                 let offset = self.file.len()?;
-                let locations = self.resolve_append_locations(&encoded.locations, offset)?;
+                let locations =
+                    self.resolve_append_locations(&encoded.locations, offset, base_versions)?;
                 write_all_at_counted(
                     &mut self.file,
                     offset,
@@ -1846,7 +1865,7 @@ impl<F: DurableFile> WalLog<F> {
             let write_started = Instant::now();
             let write_result = (|| {
                 let offset = self.file.len()?;
-                let locations = self.resolve_append_locations(&encoded.locations, offset)?;
+                let locations = self.resolve_append_locations(&encoded.locations, offset, None)?;
                 write_all_at_counted(
                     &mut self.file,
                     offset,
@@ -2419,6 +2438,13 @@ impl<F: DurableFile> WalLog<F> {
                             .get(&page.page_id)
                             .map(|location| location.delta_depth)
                     })
+                    .or_else(|| {
+                        delta
+                            .as_deref()
+                            .and_then(|request| request.base_versions)
+                            .and_then(|base_versions| base_versions.get(&page.page_id))
+                            .map(|base| base.delta_depth)
+                    })
                     .unwrap_or(0);
                 let planned = if superblock {
                     stats.image_superblock += 1;
@@ -2436,7 +2462,21 @@ impl<F: DurableFile> WalLog<F> {
                             None => self
                                 .page_chain
                                 .get(&page.page_id)
-                                .map(|entry| (*entry, None)),
+                                .map(|entry| (*entry, None))
+                                .or_else(|| {
+                                    request
+                                        .base_versions
+                                        .and_then(|base_versions| base_versions.get(&page.page_id))
+                                        .map(|base| {
+                                            (
+                                                PageChainEntry {
+                                                    page_lsn: base.page_lsn,
+                                                    image_crc: base.image_crc32c,
+                                                },
+                                                None,
+                                            )
+                                        })
+                                }),
                         };
                         match known {
                             None => {
@@ -2458,7 +2498,8 @@ impl<F: DurableFile> WalLog<F> {
                                         PlannedRedo::Image
                                     }
                                     Some(base) => {
-                                        if self.page_locations.is_some()
+                                        if (self.page_locations.is_some()
+                                            || request.base_versions.is_some())
                                             && prior_delta_depth >= MAX_RECONSTRUCTION_DELTAS as u8
                                         {
                                             stats.image_delta_chain_limit += 1;
@@ -5991,6 +6032,7 @@ mod tests {
         };
         let mut delta_request = WalDeltaRequest {
             eligible_commits: &eligible_commits,
+            base_versions: None,
             base_source: &mut base_source,
         };
         wal.append_group_with_page_deltas(
@@ -6121,6 +6163,7 @@ mod tests {
         };
         let mut delta_request = WalDeltaRequest {
             eligible_commits: &eligible_commits,
+            base_versions: None,
             base_source: &mut base_source,
         };
         wal.append_group_with_page_deltas(
@@ -6213,6 +6256,7 @@ mod tests {
             };
             let mut delta_request = WalDeltaRequest {
                 eligible_commits: &eligible_commits,
+                base_versions: None,
                 base_source: &mut base_source,
             };
             wal.append_group_with_page_deltas(
@@ -6385,6 +6429,7 @@ mod tests {
         };
         let mut delta_request = WalDeltaRequest {
             eligible_commits: &eligible_commits,
+            base_versions: None,
             base_source: &mut base_source,
         };
         wal.append_group_with_page_deltas(&[delta_commit], &mut delta_request, None)
@@ -6402,6 +6447,7 @@ mod tests {
         };
         let mut second_delta_request = WalDeltaRequest {
             eligible_commits: &eligible_commits,
+            base_versions: None,
             base_source: &mut second_base_source,
         };
         wal.append_group_with_page_deltas(&[third_commit], &mut second_delta_request, None)
@@ -6635,6 +6681,7 @@ mod tests {
         };
         let mut delta_request = WalDeltaRequest {
             eligible_commits: &eligible_commits,
+            base_versions: None,
             base_source: &mut base_source,
         };
         wal.append_group_with_page_deltas(&[commit], &mut delta_request, None)

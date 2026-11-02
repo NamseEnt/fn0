@@ -898,6 +898,7 @@ impl<F: DurableFile, W: DurableFile> BTreeStore<F, W> {
                 };
                 let mut delta = WalDeltaRequest {
                     eligible_commits: &eligible_commits,
+                    base_versions: None,
                     base_source: &mut base_source,
                 };
                 wal.append_group_trusted_internal_with_page_deltas(
