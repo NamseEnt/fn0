@@ -417,7 +417,7 @@ impl PageLoader<PageVersionKey, super::BlinkPage> {
         root: VersionIndexRoot,
         page_id: PageId,
         sources: &SourceManager,
-        mut header_length: F,
+        header_length: F,
     ) -> Result<PageGuard<super::BlinkPage>>
     where
         F: FnMut(SourceIdentity) -> Result<usize>,
@@ -425,6 +425,20 @@ impl PageLoader<PageVersionKey, super::BlinkPage> {
         let descriptor = index
             .lookup(root, page_id)?
             .ok_or_else(|| Error::corruption("version index has no page descriptor"))?;
+        self.load_descriptor(index, descriptor, sources, header_length)
+    }
+
+    pub(crate) fn load_descriptor<F>(
+        &self,
+        index: &VersionIndex,
+        descriptor: VersionDescriptor,
+        sources: &SourceManager,
+        mut header_length: F,
+    ) -> Result<PageGuard<super::BlinkPage>>
+    where
+        F: FnMut(SourceIdentity) -> Result<usize>,
+    {
+        let page_id = descriptor.page_id;
         let chain = match descriptor.locator {
             VersionLocator::CheckpointImage {
                 source,

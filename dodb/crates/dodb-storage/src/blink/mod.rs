@@ -2812,6 +2812,33 @@ impl PagedReadHandle {
             .map(Some)
     }
 
+    pub fn load_indexed_version_image(
+        &self,
+        descriptor: version_index::VersionDescriptor,
+    ) -> Result<crate::wal::WalPageImage> {
+        if descriptor.page_id > self.high_water_page_id {
+            return Err(Error::corruption(
+                "indexed page version exceeds the generation high-water mark",
+            ));
+        }
+        let page =
+            self.loader
+                .load_descriptor(&self.index, descriptor, &self.sources, |source| {
+                    (self.header_length)(source)
+                })?;
+        let page = page.as_ref();
+        let image = encode_blink_page(descriptor.page_id, page)?;
+        if page.lsn() != descriptor.image_lsn || crc32c::crc32c(&image) != descriptor.image_crc32c {
+            return Err(Error::corruption(
+                "loaded page bytes differ from the requested indexed version",
+            ));
+        }
+        Ok(crate::wal::WalPageImage {
+            page_id: descriptor.page_id,
+            image,
+        })
+    }
+
     pub fn write_checkpoint_pack(
         &self,
         request: PagedCheckpointPackRequest,
@@ -12566,6 +12593,7 @@ mod tests {
     use super::*;
     use std::alloc::{GlobalAlloc, Layout, System};
     use std::io::{BufRead, BufReader, Write};
+    #[cfg(feature = "blink-demand-paging")]
     use std::process::Command;
     use std::sync::atomic::AtomicBool;
     #[cfg(feature = "blink-demand-paging")]
@@ -17754,10 +17782,10 @@ mod tests {
             disk_snapshot.current_by_category[resource::DiskCategory::VersionIndex as usize] > 0
         );
         let (validated_manifest, reopened_handle) =
-            paged_manifest::PagedManifestStore::open_with_validated_pages(
+            paged_manifest::PagedManifestStore::open_with_recovered_pages(
                 &database_path,
                 store_identity,
-                paged_manifest::PagedValidatedOpenConfig {
+                paged_manifest::PagedRecoveryOpenConfig {
                     index: Arc::clone(&reopened_index),
                     tenant_id: 7,
                     resources: resources.clone(),
@@ -17778,6 +17806,9 @@ mod tests {
                             },
                         )
                     },
+                    recovery_wal_path,
+                    recovery_source: recovery_wal_source,
+                    wal_identity: wal_identity.clone(),
                 },
             )
             .unwrap();
@@ -17788,7 +17819,7 @@ mod tests {
         assert!(reopened_handle.validate_all_indexed_pages().unwrap() > 0);
         assert_eq!(
             reopened_handle.get(&key).unwrap().value(),
-            Some(&b"after-incremental-target"[..])
+            Some(&b"not-published"[..])
         );
         std::fs::remove_dir_all(directory).unwrap();
     }
@@ -17981,11 +18012,13 @@ mod tests {
         remaining: usize,
     }
 
+    #[cfg(feature = "blink-demand-paging")]
     struct PauseAt {
         point: &'static str,
         ready_path: std::path::PathBuf,
     }
 
+    #[cfg(feature = "blink-demand-paging")]
     impl FaultInjector for PauseAt {
         fn hit(&mut self, point: &str) -> Result<()> {
             if point == self.point {

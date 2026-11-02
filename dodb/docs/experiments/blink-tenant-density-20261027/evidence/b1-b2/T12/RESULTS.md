@@ -36,3 +36,16 @@ The opt-in resource configuration rejects Legacy and non-base segmented WAL layo
 ## Remaining T12 work
 
 T12 remains partial. Service opening does not yet dispatch experimental paged manifests through complete validated page opening, and the shared manager is not yet consumed by the paged index, source manager, loader, and read path. General operation-owned charges and per-shard validated paging configuration remain open. No tenant-density performance matrix was run.
+
+## Recovery-aware paged storage open substep
+
+Added `PagedManifestStore::open_with_recovered_pages` for the opt-in paged route. It validates the marker, manifest, durable index, source catalog, and recovery source identity; pins the durable checkpoint root; streams the recovery WAL into the version index; then opens a handle only after complete indexed-page validation. Missing recovery WAL files fail before an open can create or change them. The page resolver can load an exact indexed version while replay is building a newer root, including versions written earlier in the same WAL.
+
+The checkpoint publication failure regression now reopens through this path and verifies that a synced commit newer than the selected checkpoint is recovered (`not-published`). This covers the acknowledged-WAL boundary that a manifest-only open would miss.
+
+- `cargo test --manifest-path crates/dodb-storage/Cargo.toml --features blink-demand-paging --lib`: 319 passed, 0 failed, 4 ignored.
+- `cargo check --manifest-path crates/dodb-storage/Cargo.toml --all-targets` and the same command with `--features blink-demand-paging`: passed.
+- `cargo fmt --manifest-path crates/dodb-storage/Cargo.toml --check`: passed.
+- `cargo clippy --manifest-path crates/dodb-storage/Cargo.toml --lib --features blink-demand-paging -- -D warnings`: blocked by 12 existing Clippy findings in unrelated Blink/WAL functions; no lint suppressions were added. The full output is preserved in `logs/storage-clippy-paged-recovery.log`.
+
+This remains a storage open API only; `BlinkTenantService` does not yet select it for tenant requests. No tenant-density performance matrix was run.

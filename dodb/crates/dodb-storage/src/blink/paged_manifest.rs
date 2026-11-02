@@ -6,6 +6,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use dodb_core::{Error, Lsn, PageId, Result};
 
+#[cfg(feature = "blink-demand-paging")]
+use crate::durable_file::{DurableFile, ProductionFile};
+#[cfg(feature = "blink-demand-paging")]
+use crate::wal::{WalIdentity, WalPageImageFormat};
+
 use super::version_index::{NodeRef, StoreIdentity, VersionIndex};
 use super::{PagedReadConfig, PagedReadHandle, page_cache, resource, source_manager};
 
@@ -83,6 +88,19 @@ pub struct PagedValidatedOpenConfig<F> {
     pub header_length: F,
 }
 
+#[cfg(feature = "blink-demand-paging")]
+pub struct PagedRecoveryOpenConfig<F> {
+    pub index: Arc<VersionIndex>,
+    pub tenant_id: u64,
+    pub resources: resource::BlinkResourceManager,
+    pub sources: source_manager::SourceManager,
+    pub loader: page_cache::PageLoaderConfig,
+    pub header_length: F,
+    pub recovery_wal_path: PathBuf,
+    pub recovery_source: super::version_index::SourceIdentity,
+    pub wal_identity: WalIdentity,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum PagedManifestPointerStage {
     BeforeTemporaryCreate,
@@ -92,6 +110,18 @@ pub(crate) enum PagedManifestPointerStage {
 }
 
 impl PagedManifestStore {
+    pub fn validate_format_marker(database_path: &Path, identity: StoreIdentity) -> Result<()> {
+        validate_marker(&format_marker_path(database_path), identity)
+    }
+
+    pub fn has_format_marker(database_path: &Path) -> bool {
+        format_marker_path(database_path).is_file()
+    }
+
+    pub fn sidecar_directory(database_path: &Path) -> PathBuf {
+        sidecar_directory(database_path)
+    }
+
     pub fn prepare_format(database_path: &Path, identity: StoreIdentity) -> Result<()> {
         let marker_path = format_marker_path(database_path);
         let directory = sidecar_directory(database_path);
@@ -206,6 +236,87 @@ impl PagedManifestStore {
             config.resources,
             config.sources,
             config.header_length,
+        )?;
+        Ok((store, handle))
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    pub fn open_with_recovered_pages<F>(
+        database_path: &Path,
+        identity: StoreIdentity,
+        config: PagedRecoveryOpenConfig<F>,
+    ) -> Result<(Self, PagedReadHandle)>
+    where
+        F: Fn(super::version_index::SourceIdentity) -> Result<usize> + Send + Sync + 'static,
+    {
+        let store = Self::open_with_index(database_path, identity, &config.index)?;
+        let manifest = store.current;
+        if config.recovery_source.kind != super::version_index::SourceFileKind::WalSegment
+            || config.recovery_source.file_number != manifest.recovery_wal_file_number
+            || config.wal_identity.database_uuid != identity.database_uuid
+            || config.wal_identity.shard_epoch.get() != identity.wal_epoch
+        {
+            return Err(Error::invalid_input(
+                "paged recovery source differs from the manifest identity or boundary",
+            ));
+        }
+        let root = config
+            .index
+            .root_from_node_reference(manifest.durable_index_root)?;
+        let _checkpoint_root_lease = config.sources.pin_manifest_root(&config.index, &store)?;
+        let header_length = Arc::new(config.header_length);
+        let checkpoint_header_length = Arc::clone(&header_length);
+        let checkpoint_handle = PagedReadHandle::new(
+            PagedReadConfig {
+                tenant_id: config.tenant_id,
+                root,
+                root_page_id: manifest.tree_root,
+                free_list_head: manifest.free_list_root,
+                high_water_page_id: manifest.high_water_page_id,
+                loader: config.loader,
+            },
+            Arc::clone(&config.index),
+            config.resources.clone(),
+            config.sources.clone(),
+            move |source| checkpoint_header_length(source),
+        )?;
+        if !config.recovery_wal_path.is_file() {
+            return Err(Error::corruption("paged recovery WAL segment is missing"));
+        }
+        let mut wal = ProductionFile::open(&config.recovery_wal_path)?;
+        let committed_prefix_length = wal.len()?;
+        let mut builder = super::paged_recovery::PagedRecoveryIndexBuilder::new(
+            &config.index,
+            manifest,
+            config.recovery_source,
+            committed_prefix_length,
+        )?;
+        let mut resolve_page =
+            |descriptor| checkpoint_handle.load_indexed_version_image(descriptor);
+        let summary = builder.replay_wal(
+            &mut wal,
+            &config.wal_identity,
+            WalPageImageFormat::ExperimentalBlink,
+            &mut resolve_page,
+        )?;
+        if summary.source_header_identity != config.recovery_source.header_identity {
+            return Err(Error::corruption(
+                "paged recovery WAL header identity differs from its source identity",
+            ));
+        }
+        let handle = PagedReadHandle::open_with_indexed_page_validation(
+            PagedReadConfig {
+                tenant_id: config.tenant_id,
+                root: builder.current_root(),
+                root_page_id: manifest.tree_root,
+                free_list_head: manifest.free_list_root,
+                high_water_page_id: manifest.high_water_page_id,
+                loader: config.loader,
+            },
+            config.index,
+            config.resources,
+            config.sources,
+            move |source| header_length(source),
         )?;
         Ok((store, handle))
     }
