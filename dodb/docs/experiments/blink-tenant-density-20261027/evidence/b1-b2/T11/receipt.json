@@ -2,14 +2,17 @@
   "task_id": "T11",
   "scope": "Streaming full validation and storage crash matrix",
   "status": "partial",
-  "parent_source_commit": "0b85b89e66daa45e210bacdff080bbdab6eb842d",
-  "implementation_commits": [],
+  "parent_source_commit": "98544131a",
+  "implementation_commits": [
+    "98544131a",
+    "866261924"
+  ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "0b85b89e66daa45e210bacdff080bbdab6eb842d"
+    "source_commit": "866261924"
   },
   "features": [
     "blink-demand-paging",
@@ -34,7 +37,7 @@
     }
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "c4f6301aa63d7bea01ae1ab0f35683eddb62202011965022d0ae26682b2219d9"
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "60be66a671fa31ab0ab4bd7f5a67015a40295b30ef3962f7450dc749a2cb0d43"
   },
   "logs": [
     {
@@ -53,6 +56,12 @@
       "name": "focused_regression_after_format_check",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-paged-validation-focused-r2.log",
       "sha256": "068b5c4b729f58d335d9d4886dbf388be5950418bf45d393b0a88b50525764ad",
+      "exit_status": 0
+    },
+    {
+      "name": "paged_allocation_gap_detection",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-paged-validation-r3.log",
+      "sha256": "72116aea7b08585caf90f8356ebf3b2db61281b68ff1970439a925a99ac70d19",
       "exit_status": 0
     }
   ],
