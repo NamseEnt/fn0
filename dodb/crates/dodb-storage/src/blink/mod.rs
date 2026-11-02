@@ -2400,6 +2400,10 @@ impl PagedReadHandle {
         self.sources.metrics()
     }
 
+    pub fn source_reachability_metrics(&self) -> Result<source_manager::SourceReachabilityMetrics> {
+        self.sources.measure_reachable_sources(&self.index)
+    }
+
     pub fn validate_all_indexed_pages(&self) -> Result<u64> {
         let reservation_bytes = (PAGE_SIZE as u64)
             .checked_mul(3)

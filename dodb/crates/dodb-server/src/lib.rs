@@ -973,6 +973,8 @@ pub struct BlinkPagedTenantMetrics {
     pub tenant_id: u64,
     pub page_loader: dodb_storage::blink::page_cache::PageLoaderMetrics,
     pub source_manager: dodb_storage::blink::source_manager::SourceManagerMetrics,
+    pub source_reachability: Option<dodb_storage::blink::source_manager::SourceReachabilityMetrics>,
+    pub source_reachability_reason: Option<String>,
 }
 
 #[cfg(feature = "blink-demand-paging")]
@@ -2448,13 +2450,9 @@ impl BlinkShardReadHandle {
     #[cfg(feature = "blink-demand-paging")]
     fn paged_metrics(
         &self,
-    ) -> Result<
-        Option<(
-            dodb_storage::blink::page_cache::PageLoaderMetrics,
-            dodb_storage::blink::source_manager::SourceManagerMetrics,
-        )>,
-        Error,
-    > {
+        tenant_id: u64,
+        include_reachability: bool,
+    ) -> Result<Option<BlinkPagedTenantMetrics>, Error> {
         let Self::Paged {
             handle, writable, ..
         } = self
@@ -2467,10 +2465,23 @@ impl BlinkShardReadHandle {
         };
         snapshot
             .map(|snapshot| {
-                Ok((
-                    snapshot.page_loader_metrics()?,
-                    snapshot.source_manager_metrics()?,
-                ))
+                let page_loader = snapshot.page_loader_metrics()?;
+                let source_manager = snapshot.source_manager_metrics()?;
+                let (source_reachability, source_reachability_reason) = if include_reachability {
+                    match snapshot.source_reachability_metrics() {
+                        Ok(metrics) => (Some(metrics), None),
+                        Err(error) => (None, Some(error.to_string())),
+                    }
+                } else {
+                    (None, None)
+                };
+                Ok(BlinkPagedTenantMetrics {
+                    tenant_id,
+                    page_loader,
+                    source_manager,
+                    source_reachability,
+                    source_reachability_reason,
+                })
             })
             .transpose()
     }
@@ -2845,7 +2856,10 @@ impl BlinkTenantService {
     }
 
     #[cfg(feature = "blink-demand-paging")]
-    pub fn paged_resource_snapshot(&self) -> Result<Option<BlinkPagedResourceSnapshot>, Error> {
+    pub fn paged_resource_snapshot(
+        &self,
+        include_reachability: bool,
+    ) -> Result<Option<BlinkPagedResourceSnapshot>, Error> {
         let Some(resources) = &self.shared_resources else {
             return Ok(None);
         };
@@ -2858,12 +2872,11 @@ impl BlinkTenantService {
             .lock()
             .map_err(|_| Error::invariant("B-link shard registry lock poisoned"))?;
         for (tenant, shard) in &registry.shards {
-            if let Some((page_loader, source_manager)) = shard.read_handle.paged_metrics()? {
-                tenants.push(BlinkPagedTenantMetrics {
-                    tenant_id: tenant.get(),
-                    page_loader,
-                    source_manager,
-                });
+            if let Some(tenant_metrics) = shard
+                .read_handle
+                .paged_metrics(tenant.get(), include_reachability)?
+            {
+                tenants.push(tenant_metrics);
             }
         }
         let memory = resources.snapshot().map_err(|error| {
@@ -5940,6 +5953,12 @@ mod tests {
             )
         );
         assert_paged_crash_value(&service, tenant, key.clone(), &value, revision).await;
+        let resource_snapshot = service.paged_resource_snapshot(true).unwrap().unwrap();
+        assert_eq!(resource_snapshot.tenants.len(), 1);
+        let reachability = resource_snapshot.tenants[0].source_reachability.unwrap();
+        assert!(reachability.reachable_source_files > 0);
+        assert!(reachability.reachable_source_bytes > 0);
+        assert!(reachability.walk_duration_nanos > 0);
         let revised_value = b"fresh paged tenant conditional value".to_vec();
         match service
             .execute_request(

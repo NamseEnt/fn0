@@ -353,7 +353,7 @@ fn encode_retain_all_wal_record() -> [u8; RECORD_BYTES] {
     bytes
 }
 
-fn decode_source_record(bytes: &[u8; RECORD_BYTES]) -> Result<SourceCatalogRecord> {
+pub(super) fn decode_source_record(bytes: &[u8; RECORD_BYTES]) -> Result<SourceCatalogRecord> {
     if bytes[1..8].iter().any(|byte| *byte != 0) {
         return Err(Error::corruption(
             "source catalog record padding is not zero",

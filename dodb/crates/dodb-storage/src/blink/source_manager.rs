@@ -12,7 +12,9 @@ use super::resource::{
     BlinkResourceManager, DiskCategory, DiskReservation, Reservation, ReservationClass,
     ResourceCategory,
 };
-use super::source_catalog::{SourceCatalogRecord, SourceCatalogStore, encode_source_record};
+use super::source_catalog::{
+    SourceCatalogRecord, SourceCatalogStore, decode_source_record, encode_source_record,
+};
 use super::version_index::{
     SourceFileKind, SourceIdentity, SourceReachability, StoreIdentity, VersionIndex,
     VersionIndexRoot, VersionIndexRootPin,
@@ -74,6 +76,13 @@ pub struct SourceManagerMetrics {
     pub active_roots: usize,
     pub reserved_roots: usize,
     pub oldest_root_age_millis: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct SourceReachabilityMetrics {
+    pub reachable_source_files: u64,
+    pub reachable_source_bytes: u64,
+    pub walk_duration_nanos: u64,
 }
 
 pub struct SourceManagerConfig {
@@ -966,6 +975,213 @@ impl SourceManager {
         })
     }
 
+    pub fn measure_reachable_sources(
+        &self,
+        index: &VersionIndex,
+    ) -> Result<SourceReachabilityMetrics> {
+        if index.store_identity() != self.inner.store_identity {
+            return Err(Error::corruption(
+                "paged source reachability index belongs to another store",
+            ));
+        }
+        let started_at = std::time::Instant::now();
+        let _gc_reservation = self
+            .inner
+            .resources
+            .reserve(
+                self.inner.tenant_id,
+                ResourceCategory::CheckpointValidation,
+                ReservationClass::Progress,
+                self.inner.gc_reservation_bytes,
+            )
+            .map_err(|_| Error::overloaded("paged source reachability budget is exhausted"))?;
+        let (roots, catalog_roots) = {
+            let mut state = self
+                .inner
+                .state
+                .lock()
+                .map_err(|_| Error::invariant("paged source manager lock poisoned"))?;
+            if state.garbage_collection_active {
+                return Err(Error::overloaded(
+                    "paged source reachability walk is already active",
+                ));
+            }
+            if state.catalog_publication_active {
+                return Err(Error::overloaded(
+                    "paged source reachability walk is deferred during catalog publication",
+                ));
+            }
+            if state.reserved_roots != 0 || state.page_reuse_root.is_some() {
+                return Err(Error::overloaded(
+                    "paged source reachability walk is deferred by a root reservation",
+                ));
+            }
+            state.garbage_collection_active = true;
+            (
+                state
+                    .roots
+                    .values()
+                    .map(|entry| entry.root)
+                    .collect::<Vec<_>>(),
+                [state.durable_catalog_root, state.pending_catalog_root],
+            )
+        };
+        let _gate = GcGate {
+            manager: self.clone(),
+        };
+        let marker_count = self.count_gc_markers(index, &roots, catalog_roots)?;
+        if marker_count == 0 {
+            return Ok(SourceReachabilityMetrics {
+                walk_duration_nanos: started_at.elapsed().as_nanos().min(u64::MAX as u128) as u64,
+                ..SourceReachabilityMetrics::default()
+            });
+        }
+        let scratch_reservation = self.reserve_marker_scratch(marker_count)?;
+        let run_id = GC_RUN_SEQUENCE
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+                current.checked_add(1)
+            })
+            .map_err(|_| Error::invalid_input("paged source reachability id exhausted"))?;
+        let scratch_path = self.inner.scratch_directory.join(format!(
+            "source-reachability-{}-{run_id:020}",
+            std::process::id()
+        ));
+        fs::create_dir(&scratch_path)?;
+        let _scratch = GcScratch {
+            path: scratch_path.clone(),
+            _reservation: Some(scratch_reservation),
+        };
+        self.write_reachability_markers(index, &roots, catalog_roots, &scratch_path)?;
+        let retains_all_wal = scratch_path.join("retain-all-wal-segments").exists();
+        let mut metrics = self.measure_source_markers(&scratch_path, retains_all_wal)?;
+        if retains_all_wal {
+            self.measure_all_wal_segments(&mut metrics)?;
+        }
+        metrics.walk_duration_nanos = started_at.elapsed().as_nanos().min(u64::MAX as u128) as u64;
+        Ok(metrics)
+    }
+
+    fn write_reachability_markers(
+        &self,
+        index: &VersionIndex,
+        roots: &[VersionIndexRoot],
+        catalog_roots: [Option<super::version_index::NodeRef>; 2],
+        scratch_path: &Path,
+    ) -> Result<()> {
+        for root in roots {
+            index.visit_sources(*root, &mut |source| match source {
+                SourceReachability::Exact(identity) => write_source_marker(scratch_path, identity),
+                SourceReachability::AllWalSegments => write_all_wal_marker(scratch_path),
+            })?;
+        }
+        for catalog_root in catalog_roots.into_iter().flatten() {
+            self.inner
+                .source_catalog
+                .visit(catalog_root, &mut |record| match record {
+                    SourceCatalogRecord::Exact(identity) => {
+                        write_source_marker(scratch_path, identity)
+                    }
+                    SourceCatalogRecord::AllWalSegments => write_all_wal_marker(scratch_path),
+                })?;
+        }
+        Ok(())
+    }
+
+    fn measure_source_markers(
+        &self,
+        scratch_path: &Path,
+        retains_all_wal: bool,
+    ) -> Result<SourceReachabilityMetrics> {
+        let mut metrics = SourceReachabilityMetrics::default();
+        for entry in fs::read_dir(scratch_path)? {
+            let entry = entry?;
+            let Some(marker_name) = entry.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            let Some(source_hash) = marker_name.strip_prefix("source-") else {
+                continue;
+            };
+            if source_hash.len() != 64 || !source_hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+            {
+                continue;
+            }
+            let mut encoded_identity = [0u8; 48];
+            let mut marker = File::open(entry.path())?;
+            marker.read_exact(&mut encoded_identity)?;
+            if marker.metadata()?.len() != encoded_identity.len() as u64 {
+                return Err(Error::corruption(
+                    "paged source reachability marker is invalid",
+                ));
+            }
+            let identity = match decode_source_record(&encoded_identity)? {
+                SourceCatalogRecord::Exact(identity) => identity,
+                SourceCatalogRecord::AllWalSegments => {
+                    return Err(Error::corruption(
+                        "paged source identity marker encodes a WAL wildcard",
+                    ));
+                }
+            };
+            if source_mark_name(identity) != marker_name {
+                return Err(Error::corruption(
+                    "paged source reachability marker identity does not match its name",
+                ));
+            }
+            let source = open_verified_source(
+                &self.source_path(identity),
+                identity,
+                source_header_bytes(identity.kind),
+            )?;
+            let source_bytes = source.metadata()?.len();
+            if !retains_all_wal || identity.kind != SourceFileKind::WalSegment {
+                metrics.reachable_source_files = metrics
+                    .reachable_source_files
+                    .checked_add(1)
+                    .ok_or_else(|| Error::invalid_input("reachable source count overflows"))?;
+                metrics.reachable_source_bytes = metrics
+                    .reachable_source_bytes
+                    .checked_add(source_bytes)
+                    .ok_or_else(|| Error::invalid_input("reachable source bytes overflow"))?;
+            }
+        }
+        Ok(metrics)
+    }
+
+    fn measure_all_wal_segments(&self, metrics: &mut SourceReachabilityMetrics) -> Result<()> {
+        for entry in fs::read_dir(&self.inner.wal_directory)? {
+            let entry = entry?;
+            if !entry.file_type()?.is_file() {
+                continue;
+            }
+            let Some(file_name) = entry.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            let Some(number_text) = file_name
+                .strip_prefix("segment-")
+                .and_then(|stem| stem.strip_suffix(".wal"))
+            else {
+                continue;
+            };
+            let file_number = number_text.parse::<u64>().map_err(|_| {
+                Error::corruption("paged WAL filename contains an invalid file number")
+            })?;
+            if file_number == 0 {
+                return Err(Error::corruption(
+                    "paged WAL filename contains file number zero",
+                ));
+            }
+            let source_bytes = entry.metadata()?.len();
+            metrics.reachable_source_files = metrics
+                .reachable_source_files
+                .checked_add(1)
+                .ok_or_else(|| Error::invalid_input("reachable source count overflows"))?;
+            metrics.reachable_source_bytes = metrics
+                .reachable_source_bytes
+                .checked_add(source_bytes)
+                .ok_or_else(|| Error::invalid_input("reachable source bytes overflow"))?;
+        }
+        Ok(())
+    }
+
     pub fn collect_garbage<I, F>(
         &self,
         index: &VersionIndex,
@@ -1760,6 +1976,49 @@ mod tests {
         file.write_all(&header).unwrap();
         file.write_all(&vec![image_byte; 4096]).unwrap();
         (identity, header.len())
+    }
+
+    #[test]
+    fn reachable_source_measurement_counts_unique_index_sources() {
+        let directory = TestDirectory::new();
+        let index = test_index(directory.path());
+        let manager = manager(directory.path());
+        let (source, _) = write_checkpoint_page(&manager, 1, 21, 73);
+        let first_root = insert_checkpoint_page(&index, index.empty_root(), source, 8192, 1, 3);
+        let root = index
+            .insert(
+                first_root,
+                PageId::new(3),
+                VersionDescriptor {
+                    page_id: PageId::new(3),
+                    token: VersionToken::Bootstrap {
+                        page_id: PageId::new(3),
+                    },
+                    image_lsn: Lsn::new(1),
+                    image_crc32c: 4,
+                    locator: VersionLocator::CheckpointImage {
+                        source,
+                        offset: 4096,
+                        source_length: 8192,
+                        image_lsn: Lsn::new(1),
+                        image_crc32c: 4,
+                    },
+                },
+            )
+            .unwrap();
+        let _root_lease = manager.pin_root(&index, root).unwrap();
+
+        let metrics = manager.measure_reachable_sources(&index).unwrap();
+
+        assert_eq!(metrics.reachable_source_files, 1);
+        assert_eq!(metrics.reachable_source_bytes, 8192);
+        assert!(metrics.walk_duration_nanos > 0);
+        assert_eq!(
+            fs::read_dir(directory.path().join("scratch"))
+                .unwrap()
+                .count(),
+            0
+        );
     }
 
     fn write_source(manager: &SourceManager, identity: SourceIdentity, header: &[u8]) -> PathBuf {

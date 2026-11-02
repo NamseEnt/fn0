@@ -396,6 +396,7 @@ fn source_manager_metrics_json(
 #[cfg(feature = "blink-demand-paging")]
 fn paged_resource_snapshot_json(
     snapshot: dodb_server::BlinkPagedResourceSnapshot,
+    include_reachability: bool,
 ) -> serde_json::Value {
     let memory_current = snapshot.memory.current_by_category;
     let memory_peak = snapshot.memory.peak_by_category;
@@ -449,6 +450,42 @@ fn paged_resource_snapshot_json(
         .iter()
         .filter_map(|tenant| tenant.source_manager.oldest_root_age_millis)
         .max();
+    let mut reachable_source_files = Some(0u64);
+    let mut reachable_source_bytes = Some(0u64);
+    let mut reachability_walk_nanos = Some(0u64);
+    let mut reachability_reason = None;
+    if include_reachability {
+        for tenant in &snapshot.tenants {
+            match tenant.source_reachability {
+                Some(metrics) => {
+                    reachable_source_files = reachable_source_files
+                        .and_then(|total| total.checked_add(metrics.reachable_source_files));
+                    reachable_source_bytes = reachable_source_bytes
+                        .and_then(|total| total.checked_add(metrics.reachable_source_bytes));
+                    reachability_walk_nanos = reachability_walk_nanos
+                        .and_then(|total| total.checked_add(metrics.walk_duration_nanos));
+                }
+                None => {
+                    reachable_source_files = None;
+                    reachable_source_bytes = None;
+                    reachability_walk_nanos = None;
+                    reachability_reason = tenant.source_reachability_reason.clone();
+                }
+            }
+        }
+        if reachable_source_files.is_none()
+            || reachable_source_bytes.is_none()
+            || reachability_walk_nanos.is_none()
+        {
+            reachability_reason
+                .get_or_insert_with(|| "reachable source metric aggregation overflowed".to_owned());
+        }
+    } else {
+        reachable_source_files = None;
+        reachable_source_bytes = None;
+        reachability_walk_nanos = None;
+        reachability_reason = Some("reachability walk omitted from periodic sample".to_owned());
+    }
     json!({
         "status": "sampled",
         "maximum_open_shards": snapshot.maximum_open_shards,
@@ -530,8 +567,11 @@ fn paged_resource_snapshot_json(
             "rejected_reservations": snapshot.disk.rejected_reservations,
         },
         "disk_bytes": {
-            "reachable_source_bytes": null,
-            "reachable_source_bytes_reason": "the service does not expose a bounded reachability walk in periodic snapshots",
+            "reachable_source_files": reachable_source_files,
+            "reachable_source_bytes": reachable_source_bytes,
+            "reachable_source_bytes_reason": reachability_reason,
+            "reachable_source_byte_measurement": "sum of logical file lengths for unique reachable checkpoint packs and WAL segments; allocated blocks are reported separately by filesystem observations",
+            "reachability_walk_duration_nanos": reachability_walk_nanos,
             "retained_source_bytes": disk_current[4],
             "temporary_checkpoint_and_scratch_bytes": disk_current[1] + disk_current[3],
         },
@@ -684,10 +724,10 @@ impl BackendService {
     }
 
     #[cfg(feature = "blink-demand-paging")]
-    fn blink_paged_resource_snapshot(&self) -> serde_json::Value {
+    fn blink_paged_resource_snapshot(&self, include_reachability: bool) -> serde_json::Value {
         match self {
-            Self::Blink(service) => match service.paged_resource_snapshot() {
-                Ok(Some(snapshot)) => paged_resource_snapshot_json(snapshot),
+            Self::Blink(service) => match service.paged_resource_snapshot(include_reachability) {
+                Ok(Some(snapshot)) => paged_resource_snapshot_json(snapshot, include_reachability),
                 Ok(None) => json!({
                     "status": "resident",
                     "reason": "paged resources were not requested",
@@ -702,7 +742,7 @@ impl BackendService {
     }
 
     #[cfg(not(feature = "blink-demand-paging"))]
-    fn blink_paged_resource_snapshot(&self) -> serde_json::Value {
+    fn blink_paged_resource_snapshot(&self, _include_reachability: bool) -> serde_json::Value {
         match self {
             Self::Blink(_) => json!({
                 "status": "resident",
@@ -841,7 +881,7 @@ async fn run(
                         "shared_resources": backend.shared_resource_snapshot(),
                         "rocksdb_properties": backend.engine_health_observer().map(|observer| observer.sample()),
                         "blink_checkpoints": backend.periodic_blink_checkpoint_metrics(),
-                        "blink_paged_resources": backend.blink_paged_resource_snapshot(),
+                        "blink_paged_resources": backend.blink_paged_resource_snapshot(false),
                     });
                     pressure_samples.record(&sample)?;
                 } else { pressure_samples.mark_truncated(); }
@@ -853,7 +893,7 @@ async fn run(
                 trace.emit("command_received_start_measurement");
                 pressure_phase = "measurement-including-drain";
                 shared_measurement_start = backend.shared_resource_snapshot();
-                paged_measurement_start = backend.blink_paged_resource_snapshot();
+                paged_measurement_start = backend.blink_paged_resource_snapshot(true);
                 health_sampler = if arguments.engine_health_interval_ms == 0 {
                     None
                 } else {
@@ -873,7 +913,7 @@ async fn run(
                 trace.emit("final_sampler_capture_start");
                 pressure_phase = "after-measurement";
                 shared_measurement_end = backend.shared_resource_snapshot();
-                paged_measurement_end = backend.blink_paged_resource_snapshot();
+                paged_measurement_end = backend.blink_paged_resource_snapshot(true);
                 let final_sampler_capture = match health_sampler.take() {
                     Some(sampler) => sampler.finish(),
                     None if arguments.engine_health_interval_ms == 0 => {
@@ -919,7 +959,7 @@ async fn run(
         |observer| observer.sample(),
     );
     let shared_before_shutdown = backend.shared_resource_snapshot();
-    let paged_resources_before_shutdown = backend.blink_paged_resource_snapshot();
+    let paged_resources_before_shutdown = backend.blink_paged_resource_snapshot(true);
     trace.emit("final_property_capture_end");
     trace.emit("async_server_shutdown_start");
     let shutdown = tokio::time::timeout(Duration::from_secs(15), async {
