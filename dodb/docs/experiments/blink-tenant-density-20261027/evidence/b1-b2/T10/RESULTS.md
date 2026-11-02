@@ -234,3 +234,12 @@ T10 remains partial. Aggregate debt/time and queue observability are implemented
 - Raw logs: `logs/checkpoint-loader-index-overlap-focused.log`, `logs/checkpoint-loader-index-overlap-format-check.log`, and `logs/checkpoint-loader-index-overlap-initial-reservation-order-failure.log` (reconstructed from captured tool output after the first tee file was overwritten).
 
 T10 remains partial. The checkpoint loader/output/index memory overlap now has an integrated bounded-peak assertion. Active WAL bytes still lack a distinct persistent `Wal` category; fair per-tenant scheduling and debt attribution remain for T14. T11 storage validation and crash/reopen gates are not started.
+
+## Partial substep: separate WAL and retained-source disk accounting
+
+- Source commit: `1f2e3b82c040569f5e0a6278cf498f01e13ee6a8`.
+- WAL directory bytes and append reservations now use the `Wal` disk category; checkpoint packs and source catalogs use `RetainedSource`. Reopen and source GC reconcile each canonical directory independently. The focused source-manager test verifies both category totals persist across manager drop/reopen without double counting.
+- Source-manager tests: 12 passed. Complete/incremental checkpoint writer integration: 1 passed. Full feature library suite: 310 passed, 0 failed, 4 ignored. Formatting passed. Strict Clippy still reports 12 existing findings elsewhere in `dodb-storage`; no finding points to this accounting change.
+- Raw logs: `logs/wal-disk-category-source-manager-tests.log`, `logs/wal-disk-category-writer-integration.log`, `logs/wal-disk-category-feature-library.log`, `logs/wal-disk-category-format-check.log`, and `logs/wal-disk-category-strict-clippy.log`.
+
+T10 remains partial. Disk categories now separate WAL from retained checkpoint/catalog sources, and loader/output/index overlap has a bounded integrated assertion. T11 full-tree validation and crash/reopen coverage remain unstarted; T14 fair tenant scheduling and per-tenant debt attribution remain later work.
