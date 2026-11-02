@@ -71,4 +71,15 @@ T09 remains partial. Grouped transaction recovery, durable tombstone/ABA and pag
 - Focused fixture: 1 passed. Full feature library suite: 293 passed, 0 failed, 4 ignored in 121.87 seconds. Targeted rustfmt and `git diff --check` passed. Two failed readback attempts and their logs are preserved.
 - Source commit: `231e402f68ced94e3f7716feee285739be11d6b0`.
 
-T09 remains partial. Physical free-page reuse, grouped WAL transaction boundaries, split/overflow writer readback, delta-chain reconstruction across close/reopen and WAL rotation, and full readback of width-16 commits remain outstanding. No service activation or performance experiment occurred.
+T09 remains partial. Physical free-page reuse, grouped WAL transaction boundaries, split/overflow writer readback, full process restart with index rebuild, and full readback of width-16 commits remain outstanding. No service activation or performance experiment occurred.
+
+
+## Delta reconstruction across writer close and WAL rotation (2026-11-02)
+
+- Split the eight-delta ancestry across two WAL segments: three deltas in segment 1 and five in segment 4. The version-chain sidecar contains one checkpoint base followed by all eight WAL deltas, with source identities checked across the rotation.
+- At depth eight, captured the expected page image, LSN, and CRC, dropped the segment-4 writer, reopened that segment using the exact page state after segment 1, and compared the recovered page byte-for-byte and by LSN/CRC. Rebuilt a writer from the reopened WAL and confirmed the ninth update emits a full image.
+- This proves storage-layer WAL close/reopen and rotation recovery while reusing the in-process version-index root. Full process restart and rebuilding the index from durable metadata plus WAL remain unproven.
+- Focused test: 1 passed. Full feature library suite: 293 passed, 0 failed, 4 ignored in 121.80 seconds. The initial compile failure is preserved in its raw log.
+- Source commit: `b259815d12f010dc0686488fc7fb3cc197f11430`.
+
+T09 remains partial. Grouped transaction boundaries, zero-reader page reuse, split/overflow writer readback, full width-16 readback, and full process restart with index rebuild remain outstanding. No service activation or performance experiment occurred.
