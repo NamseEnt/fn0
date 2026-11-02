@@ -1795,6 +1795,7 @@ pub struct PagedReadHandle {
     free_list_head: Option<PageId>,
     high_water_page_id: PageId,
     loader: Arc<page_cache::PageLoader<page_cache::PageVersionKey, BlinkPage>>,
+    loader_config: page_cache::PageLoaderConfig,
     resources: resource::BlinkResourceManager,
     sources: source_manager::SourceManager,
     overlays: Vec<Arc<ImmutableOverlaySegment>>,
@@ -1849,6 +1850,7 @@ impl PagedReadHandle {
             free_list_head: config.free_list_head,
             high_water_page_id: config.high_water_page_id,
             loader,
+            loader_config: config.loader,
             resources,
             sources,
             overlays: Vec::new(),
@@ -1964,6 +1966,31 @@ impl PagedReadHandle {
             limits,
             maximum_working_pages,
             provisional_revision,
+        )
+    }
+
+    pub(crate) fn fork_with_generation(
+        &self,
+        root: version_index::VersionIndexRoot,
+        root_page_id: PageId,
+        free_list_head: Option<PageId>,
+        high_water_page_id: PageId,
+    ) -> Result<Self> {
+        let header_length = Arc::clone(&self.header_length);
+        Self::with_shared_loader(
+            PagedReadConfig {
+                tenant_id: self.tenant_id,
+                root,
+                root_page_id,
+                free_list_head,
+                high_water_page_id,
+                loader: self.loader_config,
+            },
+            Arc::clone(&self.index),
+            Arc::clone(&self.loader),
+            self.resources.clone(),
+            self.sources.clone(),
+            move |source| header_length(source),
         )
     }
 
@@ -2122,6 +2149,271 @@ impl PagedMutationPreparation {
                 })
             })
             .collect()
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+pub struct PagedTransactionWriter<F: DurableFile> {
+    current: PagedReadHandle,
+    wal: WalLog<F>,
+    wal_source: version_index::SourceIdentity,
+    superblock: BlinkSuperblock,
+    active_slot: SuperblockSlot,
+    maximum_working_pages: usize,
+    broken: Option<String>,
+    publication_fault_injector: Option<Box<dyn FaultInjector + Send>>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl<F: DurableFile> PagedTransactionWriter<F> {
+    pub fn new(
+        current: PagedReadHandle,
+        wal: WalLog<F>,
+        wal_source: version_index::SourceIdentity,
+        superblock_image: &[u8; PAGE_SIZE],
+        active_slot: SuperblockSlot,
+        maximum_working_pages: usize,
+    ) -> Result<Self> {
+        let superblock = decode_blink_superblock_image(superblock_image)?;
+        let wal_identity = wal.identity();
+        if wal_source.kind != version_index::SourceFileKind::WalSegment
+            || wal_source.file_number == 0
+            || maximum_working_pages == 0
+            || wal.page_image_format() != WalPageImageFormat::ExperimentalBlink
+            || wal_identity.database_uuid != superblock.database_uuid
+            || wal_identity.tenant_id != superblock.tenant_id
+            || wal_identity.shard_id != superblock.shard_id
+            || wal_identity.shard_epoch != superblock.shard_epoch
+            || superblock.root_page_id != current.root_page_id
+            || superblock.free_list_head != current.free_list_head
+            || superblock.high_water_page_id != current.high_water_page_id
+        {
+            return Err(Error::invalid_input(
+                "paged transaction writer identity or limits are invalid",
+            ));
+        }
+        Ok(Self {
+            current,
+            wal,
+            wal_source,
+            superblock,
+            active_slot,
+            maximum_working_pages,
+            broken: None,
+            publication_fault_injector: None,
+        })
+    }
+
+    pub fn current(&self) -> &PagedReadHandle {
+        &self.current
+    }
+
+    pub fn set_boxed_publication_fault_injector(
+        &mut self,
+        injector: Box<dyn FaultInjector + Send>,
+    ) {
+        self.publication_fault_injector = Some(injector);
+    }
+
+    pub fn snapshot(&self) -> Result<PagedReadHandle> {
+        self.current.fork_with_generation(
+            self.current.root,
+            self.current.root_page_id,
+            self.current.free_list_head,
+            self.current.high_water_page_id,
+        )
+    }
+
+    pub fn transact(
+        &mut self,
+        request: &TransactionRequest,
+        limits: &StorageLimits,
+        provisional_revision: Revision,
+    ) -> Result<TransactionResult> {
+        if let Some(message) = &self.broken {
+            return Err(Error::durability(format!(
+                "paged transaction writer is unavailable after an uncertain persistence failure: {message}"
+            )));
+        }
+        let preparation = self.current.prepare_transaction(
+            request,
+            limits,
+            self.maximum_working_pages,
+            provisional_revision,
+        )?;
+        if request.mutations.is_empty() {
+            return Ok(TransactionResult {
+                commit_lsn: None,
+                revision: None,
+            });
+        }
+
+        let metadata_changed = preparation.root_page_id() != self.current.root_page_id
+            || preparation.free_list_head() != self.current.free_list_head
+            || preparation.high_water_page_id() != self.current.high_water_page_id;
+        let next_slot = match self.active_slot {
+            SuperblockSlot::A => SuperblockSlot::B,
+            SuperblockSlot::B => SuperblockSlot::A,
+        };
+        let page_count = preparation
+            .dirty_page_ids()
+            .count()
+            .checked_add(usize::from(metadata_changed))
+            .ok_or_else(|| Error::overloaded("paged transaction WAL page count overflows"))?;
+        let commit_lsn = self
+            .wal
+            .next_lsn()
+            .get()
+            .checked_add(u64::try_from(page_count).map_err(|_| {
+                Error::overloaded("paged transaction WAL page count does not fit u64")
+            })?)
+            .map(Lsn::new)
+            .ok_or_else(|| Error::durability("paged transaction WAL LSN is exhausted"))?;
+        let mut pages = preparation.encode_commit_images(commit_lsn)?;
+        let mut next_superblock = self.superblock.clone();
+        if metadata_changed {
+            next_superblock.generation = match next_superblock.generation.checked_add(1) {
+                Some(generation) => generation,
+                None => {
+                    return Err(Error::durability(
+                        "paged superblock generation is exhausted",
+                    ));
+                }
+            };
+            next_superblock.root_page_id = preparation.root_page_id();
+            next_superblock.free_list_head = preparation.free_list_head();
+            next_superblock.high_water_page_id = preparation.high_water_page_id();
+            let superblock_page_id = match next_slot {
+                SuperblockSlot::A => PageId::ZERO,
+                SuperblockSlot::B => PageId::new(1),
+            };
+            let image = encode_blink_superblock(&next_superblock)?;
+            pages.push(WalPageImage {
+                page_id: superblock_page_id,
+                image,
+            });
+        }
+
+        let commit = WalCommit {
+            batch_id: self.wal.next_batch_id(),
+            commit_lsn,
+            pages,
+        };
+        let eligible_commits = [false];
+        let append_result = {
+            let mut base_source = |_| None;
+            let mut delta_request = WalDeltaRequest {
+                eligible_commits: &eligible_commits,
+                base_source: &mut base_source,
+            };
+            self.wal.append_group_trusted_internal_with_page_deltas(
+                std::slice::from_ref(&commit),
+                &mut delta_request,
+                None,
+            )
+        };
+        let reports = match append_result {
+            Ok(reports) => reports,
+            Err(error) => {
+                self.broken = Some(error.to_string());
+                return Err(error);
+            }
+        };
+        let report = reports
+            .first()
+            .ok_or_else(|| Error::invariant("paged transaction WAL returned no report"))?;
+        let committed_prefix_length = match self.wal.file_length() {
+            Ok(length) => length,
+            Err(error) => {
+                self.broken = Some(error.to_string());
+                return Err(error);
+            }
+        };
+        let mut next_root = self.current.root;
+        if let Some(injector) = &mut self.publication_fault_injector
+            && let Err(error) = injector.hit("before_paged_generation_publication")
+        {
+            self.broken = Some(error.to_string());
+            return Err(error);
+        }
+        for location in self.wal.recent_committed_page_locations() {
+            if location.page_id.get() < FIRST_DATA_PAGE {
+                continue;
+            }
+            let image_lsn = match location.image_lsn {
+                Some(image_lsn) if location.record_type == crate::wal::WalRecordType::PageImage => {
+                    image_lsn
+                }
+                _ => {
+                    self.broken = Some("paged writer received an unsupported WAL locator".into());
+                    return Err(Error::invariant(
+                        "paged writer received an unsupported WAL locator",
+                    ));
+                }
+            };
+            let image_crc32c = location
+                .image_crc32c
+                .ok_or_else(|| Error::invariant("paged WAL image checksum is missing"))?;
+            let descriptor = version_index::VersionDescriptor {
+                page_id: location.page_id,
+                token: version_index::VersionToken::Wal {
+                    source_file_number: self.wal_source.file_number,
+                    record_lsn: location.record_lsn,
+                },
+                image_lsn,
+                image_crc32c,
+                locator: version_index::VersionLocator::WalImage {
+                    frame: version_index::WalFrameLocator {
+                        source: self.wal_source,
+                        frame_offset: location.frame_offset,
+                        frame_length: location.frame_length,
+                        header_crc32c: location.header_crc32c,
+                        payload_offset: location.payload_offset,
+                        payload_length: location.payload_length,
+                        payload_crc32c: location.payload_crc32c,
+                        committed_prefix_length,
+                        commit_frame_offset: location.commit_frame_offset,
+                        commit_lsn: location.commit_lsn,
+                    },
+                },
+            };
+            next_root = match self
+                .current
+                .index
+                .insert(next_root, location.page_id, descriptor)
+            {
+                Ok(root) => root,
+                Err(error) => {
+                    self.broken = Some(error.to_string());
+                    return Err(Error::durability(format!(
+                        "paged transaction committed but version publication failed: {error}"
+                    )));
+                }
+            };
+        }
+        let next_handle = match self.current.fork_with_generation(
+            next_root,
+            preparation.root_page_id(),
+            preparation.free_list_head(),
+            preparation.high_water_page_id(),
+        ) {
+            Ok(handle) => handle,
+            Err(error) => {
+                self.broken = Some(error.to_string());
+                return Err(Error::durability(format!(
+                    "paged transaction committed but reader generation publication failed: {error}"
+                )));
+            }
+        };
+        self.current = next_handle;
+        if metadata_changed {
+            self.superblock = next_superblock;
+            self.active_slot = next_slot;
+        }
+        Ok(TransactionResult {
+            commit_lsn: Some(report.commit_lsn),
+            revision: Some(provisional_revision),
+        })
     }
 }
 
@@ -2340,7 +2632,7 @@ struct PlannedExecutionPreparation<'a> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SuperblockSlot {
+pub enum SuperblockSlot {
     A,
     B,
 }
@@ -12729,7 +13021,7 @@ mod tests {
                 scratch_directory: scratch_directory.clone(),
                 tenant_id: 11,
                 maximum_open_handles: 2,
-                maximum_roots: 2,
+                maximum_roots: 4,
                 handle_charge_bytes: 128,
                 gc_reservation_bytes: 8192,
             },
@@ -12754,7 +13046,28 @@ mod tests {
             Arc::clone(&index),
             resources.clone(),
             sources.clone(),
-            |_| Ok(PAGE_SIZE),
+            {
+                let wal_directory = wal_directory.clone();
+                move |source| {
+                    if source.kind == version_index::SourceFileKind::WalSegment {
+                        let path =
+                            wal_directory.join(format!("segment-{:020}.wal", source.file_number));
+                        let bytes = std::fs::read(path)?;
+                        let frame_length = u32::from_le_bytes(
+                            bytes
+                                .get(8..12)
+                                .ok_or_else(|| Error::corruption("WAL INIT header is truncated"))?
+                                .try_into()
+                                .unwrap(),
+                        );
+                        usize::try_from(frame_length).map_err(|_| {
+                            Error::corruption("WAL INIT frame length does not fit usize")
+                        })
+                    } else {
+                        Ok(PAGE_SIZE)
+                    }
+                }
+            },
         )
         .unwrap();
         let primary_key = PrimaryKey::new(b"p".to_vec());
@@ -12819,6 +13132,117 @@ mod tests {
                 .is_err()
         );
         assert!(handle.source_read_count() >= 3);
+        let forked_handle = handle
+            .fork_with_generation(root, root_page_id, None, high_water_page_id)
+            .unwrap();
+        assert_eq!(
+            forked_handle.get(&key_b).unwrap(),
+            handle.get(&key_b).unwrap()
+        );
+        drop(forked_handle);
+        let wal_path = wal_directory.join("segment-00000000000000000001.wal");
+        let wal_identity = WalIdentity::new(
+            store_identity.database_uuid,
+            TenantId::new(11),
+            ShardId::new(1),
+            ShardEpoch::new(store_identity.wal_epoch),
+        );
+        let wal = WalLog::open_with_page_image_format(
+            crate::durable_file::ProductionFile::open(&wal_path).unwrap(),
+            wal_identity,
+            WalPageImageFormat::ExperimentalBlink,
+        )
+        .unwrap();
+        let wal_bytes = std::fs::read(&wal_path).unwrap();
+        let init_frame_length = u32::from_le_bytes(wal_bytes[8..12].try_into().unwrap()) as usize;
+        let wal_source = version_index::SourceIdentity {
+            kind: version_index::SourceFileKind::WalSegment,
+            file_number: 1,
+            header_identity: *blake3::hash(&wal_bytes[..init_frame_length]).as_bytes(),
+        };
+        let mut superblock = BlinkSuperblock::new(
+            &DatabaseConfig {
+                database_uuid: store_identity.database_uuid,
+                tenant_id: TenantId::new(11),
+                shard_id: ShardId::new(1),
+                shard_epoch: ShardEpoch::new(store_identity.wal_epoch),
+                ..DatabaseConfig::default()
+            },
+            root_page_id,
+        );
+        superblock.high_water_page_id = high_water_page_id;
+        let superblock_image = encode_blink_superblock(&superblock).unwrap();
+        let mut writer = PagedTransactionWriter::new(
+            handle
+                .fork_with_generation(root, root_page_id, None, high_water_page_id)
+                .unwrap(),
+            wal,
+            wal_source,
+            &superblock_image,
+            SuperblockSlot::B,
+            32,
+        )
+        .unwrap();
+        let old_reader = writer.snapshot().unwrap();
+        let writer_key = DocumentKey::new(b"p".to_vec(), b"k00".to_vec());
+        let writer_request = TransactionRequest::new(
+            Vec::new(),
+            vec![TransactionMutation::Put {
+                key: writer_key.clone(),
+                value: b"writer-updated".to_vec(),
+            }],
+        );
+        let writer_result = writer
+            .transact(
+                &writer_request,
+                &StorageLimits::default(),
+                Revision::new(2000),
+            )
+            .unwrap();
+        assert!(writer_result.commit_lsn.is_some());
+        assert_eq!(
+            writer.current().get(&writer_key).unwrap().value(),
+            Some(&b"writer-updated"[..])
+        );
+        assert_eq!(
+            old_reader.get(&writer_key).unwrap().value(),
+            Some(randomized_values["k00"].as_slice())
+        );
+        drop(old_reader);
+        writer.set_boxed_publication_fault_injector(Box::new(FailOnOccurrence {
+            point: "before_paged_generation_publication",
+            remaining: 1,
+        }));
+        let failed_key = DocumentKey::new(b"p".to_vec(), b"k01".to_vec());
+        let failed_request = TransactionRequest::new(
+            Vec::new(),
+            vec![TransactionMutation::Put {
+                key: failed_key.clone(),
+                value: b"not-published".to_vec(),
+            }],
+        );
+        assert!(
+            writer
+                .transact(
+                    &failed_request,
+                    &StorageLimits::default(),
+                    Revision::new(2001),
+                )
+                .is_err()
+        );
+        assert_eq!(
+            writer.current().get(&failed_key).unwrap().value(),
+            Some(randomized_values["k01"].as_slice())
+        );
+        assert!(
+            writer
+                .transact(
+                    &failed_request,
+                    &StorageLimits::default(),
+                    Revision::new(2002),
+                )
+                .is_err()
+        );
         for mutation_width in [1, 4, 16] {
             let request = TransactionRequest::new(
                 Vec::new(),

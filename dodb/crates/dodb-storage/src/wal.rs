@@ -582,6 +582,8 @@ pub struct WalLog<F: DurableFile> {
     page_chain: HashMap<PageId, PageChainEntry>,
     page_locations: Option<Vec<WalPageLocation>>,
     latest_page_locations: HashMap<PageId, WalPageLocation>,
+    #[cfg(feature = "blink-demand-paging")]
+    recent_committed_page_locations: Vec<WalPageLocation>,
     redo_stats: WalRedoStats,
     redo_plan_nanos: u64,
     scan_report: WalScanReport,
@@ -819,6 +821,8 @@ impl<F: DurableFile> WalLog<F> {
             page_chain,
             page_locations: None,
             latest_page_locations: HashMap::new(),
+            #[cfg(feature = "blink-demand-paging")]
+            recent_committed_page_locations: Vec::new(),
             redo_stats: redo,
             redo_plan_nanos: 0,
             scan_report: report,
@@ -861,6 +865,8 @@ impl<F: DurableFile> WalLog<F> {
             page_chain: HashMap::new(),
             page_locations: None,
             latest_page_locations: HashMap::new(),
+            #[cfg(feature = "blink-demand-paging")]
+            recent_committed_page_locations: Vec::new(),
             redo_stats: WalRedoStats::default(),
             redo_plan_nanos: 0,
             scan_report: WalScanReport::default(),
@@ -1026,6 +1032,11 @@ impl<F: DurableFile> WalLog<F> {
 
     pub fn committed_page_locations(&self) -> Option<&[WalPageLocation]> {
         self.page_locations.as_deref()
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    pub(crate) fn recent_committed_page_locations(&self) -> &[WalPageLocation] {
+        &self.recent_committed_page_locations
     }
 
     fn resolve_append_locations(
@@ -1370,6 +1381,19 @@ impl<F: DurableFile> WalLog<F> {
         self.next_lsn
     }
 
+    pub fn identity(&self) -> &WalIdentity {
+        &self.identity
+    }
+
+    pub fn page_image_format(&self) -> WalPageImageFormat {
+        self.page_image_format
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    pub(crate) fn file_length(&self) -> Result<u64> {
+        self.file.len()
+    }
+
     pub fn next_batch_id(&self) -> u64 {
         self.next_batch_id
     }
@@ -1664,11 +1688,7 @@ impl<F: DurableFile> WalLog<F> {
             let write_started = Instant::now();
             let write_result = (|| {
                 let offset = self.file.len()?;
-                let locations = if self.page_locations.is_some() {
-                    self.resolve_append_locations(&encoded.locations, offset)?
-                } else {
-                    Vec::new()
-                };
+                let locations = self.resolve_append_locations(&encoded.locations, offset)?;
                 write_all_at_counted(
                     &mut self.file,
                     offset,
@@ -1742,6 +1762,10 @@ impl<F: DurableFile> WalLog<F> {
             .ok_or_else(|| Error::invariant("WAL sync count overflow"))?;
         hit(injector, "after_wal_sync")?;
 
+        #[cfg(feature = "blink-demand-paging")]
+        {
+            self.recent_committed_page_locations = outcome.locations.clone();
+        }
         self.last_commit_lsn = Some(outcome.last_commit_lsn);
         self.next_lsn = outcome.next_lsn;
         self.next_batch_id = outcome.next_batch_id;
@@ -1822,11 +1846,7 @@ impl<F: DurableFile> WalLog<F> {
             let write_started = Instant::now();
             let write_result = (|| {
                 let offset = self.file.len()?;
-                let locations = if self.page_locations.is_some() {
-                    self.resolve_append_locations(&encoded.locations, offset)?
-                } else {
-                    Vec::new()
-                };
+                let locations = self.resolve_append_locations(&encoded.locations, offset)?;
                 write_all_at_counted(
                     &mut self.file,
                     offset,
@@ -2126,7 +2146,7 @@ impl<F: DurableFile> WalLog<F> {
                     &payload_parts,
                     &mut attribution,
                 )?;
-                if self.page_locations.is_some() {
+                {
                     let payload_length = payload_parts[0]
                         .len()
                         .checked_add(payload_parts[1].len())
@@ -2191,11 +2211,9 @@ impl<F: DurableFile> WalLog<F> {
                 &commit_payload,
                 &mut attribution,
             )?;
-            if self.page_locations.is_some() {
-                for location in &mut locations[batch_location_start..] {
-                    location.commit_lsn = commit.commit_lsn;
-                    location.commit_frame_offset = commit_frame_offset;
-                }
+            for location in &mut locations[batch_location_start..] {
+                location.commit_lsn = commit.commit_lsn;
+                location.commit_frame_offset = commit_frame_offset;
             }
             bytes_written = bytes_written
                 .checked_add(commit_frame_length)
@@ -2669,7 +2687,7 @@ impl<F: DurableFile> WalLog<F> {
                     &payload_parts,
                     &mut attribution,
                 )?;
-                if self.page_locations.is_some() {
+                {
                     let payload_length = payload_parts[0]
                         .len()
                         .checked_add(payload_parts[1].len())
@@ -2741,11 +2759,9 @@ impl<F: DurableFile> WalLog<F> {
                 &commit_payload,
                 &mut attribution,
             )?;
-            if self.page_locations.is_some() {
-                for location in &mut locations[batch_location_start..] {
-                    location.commit_lsn = commit.commit_lsn;
-                    location.commit_frame_offset = commit_frame_offset;
-                }
+            for location in &mut locations[batch_location_start..] {
+                location.commit_lsn = commit.commit_lsn;
+                location.commit_frame_offset = commit_frame_offset;
             }
             bytes_written = bytes_written
                 .checked_add(commit_frame_length)
