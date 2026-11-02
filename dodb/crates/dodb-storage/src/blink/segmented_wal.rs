@@ -1287,7 +1287,13 @@ mod tests {
         fs::create_dir_all(&directory).unwrap();
         let database_path = directory.join("tenant.db");
         let marker_path = sidecar_path(&database_path, PAGED_FORMAT_MARKER_SUFFIX);
-        File::create(&marker_path).unwrap();
+        let sidecar_directory = sidecar_path(&database_path, PAGED_DIRECTORY_SUFFIX);
+        let pointer_path = sidecar_directory.join("blink-paged.current");
+        fs::create_dir_all(&sidecar_directory).unwrap();
+        fs::write(&marker_path, b"paged-format-marker-sentinel").unwrap();
+        fs::write(&pointer_path, b"paged-pointer-sentinel").unwrap();
+        let mut snapshot_paths = vec![marker_path.clone(), pointer_path.clone()];
+        let initial_snapshot = file_snapshot(&snapshot_paths);
 
         assert!(
             BlinkStore::<ProductionFile, ProductionFile>::open_path(
@@ -1305,7 +1311,41 @@ mod tests {
             .is_err()
         );
         assert!(!database_path.exists());
+        assert_eq!(file_snapshot(&snapshot_paths), initial_snapshot);
+
+        fs::write(&database_path, b"existing-database-sentinel").unwrap();
+        snapshot_paths.push(database_path.clone());
+        let existing_database_snapshot = file_snapshot(&snapshot_paths);
+        assert!(
+            BlinkStore::<ProductionFile, ProductionFile>::open_path(
+                &database_path,
+                DatabaseConfig::default()
+            )
+            .is_err()
+        );
+        assert!(
+            BlinkStore::<ProductionFile, ProductionFile>::open_segmented_path(
+                &database_path,
+                DatabaseConfig::default(),
+                1024 * 1024
+            )
+            .is_err()
+        );
+        assert_eq!(file_snapshot(&snapshot_paths), existing_database_snapshot);
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    fn file_snapshot(paths: &[PathBuf]) -> Vec<(u64, [u8; 32])> {
+        paths
+            .iter()
+            .map(|path| {
+                let contents = fs::read(path).unwrap();
+                (
+                    fs::metadata(path).unwrap().len(),
+                    *blake3::hash(&contents).as_bytes(),
+                )
+            })
+            .collect()
     }
 
     #[test]

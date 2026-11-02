@@ -1,12 +1,88 @@
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+
 use dodb_core::{Error, Lsn, Result};
 
-use crate::wal::{WalPageLocation, WalRecordType};
+use crate::durable_file::DurableFile;
+use crate::wal::{
+    WalIdentity, WalLocationRecoverySink, WalLocationScanSummary, WalLog, WalPageImage,
+    WalPageImageFormat, WalPageLocation, WalPageRecoveryBase, WalRecordType,
+};
 
+use super::decode_blink_page;
+use super::durable_bases::{BasePackEntry, scan_pack};
 use super::paged_manifest::PagedManifest;
 use super::version_index::{
     BaseFrameLocator, SourceFileKind, SourceIdentity, VersionDescriptor, VersionIndex,
     VersionIndexRoot, VersionLocator, VersionToken, WalFrameLocator,
 };
+
+pub fn build_checkpoint_index(
+    index: &VersionIndex,
+    base_root: VersionIndexRoot,
+    pack_path: &Path,
+    pack_entry: &BasePackEntry,
+    complete: bool,
+    wal_identity: &WalIdentity,
+    high_water_page_id: dodb_core::PageId,
+) -> Result<(VersionIndexRoot, SourceIdentity)> {
+    if !complete {
+        return Err(Error::invalid_input(
+            "paged checkpoint index requires a complete pack",
+        ));
+    }
+    let mut file = File::open(pack_path)?;
+    let mut header = [0u8; crate::page::PAGE_SIZE];
+    file.read_exact(&mut header)?;
+    let source = SourceIdentity {
+        kind: SourceFileKind::CheckpointPack,
+        file_number: pack_entry.number,
+        header_identity: *blake3::hash(&header).as_bytes(),
+    };
+    let mut root = base_root;
+    scan_pack(
+        &mut file,
+        pack_entry,
+        wal_identity,
+        high_water_page_id,
+        |page_id, image_lsn, offset, image| {
+            let image_crc32c = crc32c::crc32c(image);
+            let token = match index.lookup(root, page_id)? {
+                Some(previous)
+                    if previous.image_lsn == image_lsn && previous.image_crc32c == image_crc32c =>
+                {
+                    previous.token
+                }
+                Some(_) => {
+                    return Err(Error::corruption(
+                        "checkpoint page differs from its indexed source version",
+                    ));
+                }
+                None => VersionToken::Bootstrap { page_id },
+            };
+            root = index.insert(
+                root,
+                page_id,
+                VersionDescriptor {
+                    page_id,
+                    token,
+                    image_lsn,
+                    image_crc32c,
+                    locator: VersionLocator::CheckpointImage {
+                        source,
+                        offset,
+                        source_length: pack_entry.bytes,
+                        image_lsn,
+                        image_crc32c,
+                    },
+                },
+            )?;
+            Ok(())
+        },
+    )?;
+    Ok((index.promote_root_to_durable(root)?, source))
+}
 
 pub struct PagedRecoveryIndexBuilder<'index> {
     index: &'index VersionIndex,
@@ -54,19 +130,73 @@ impl<'index> PagedRecoveryIndexBuilder<'index> {
     where
         I: IntoIterator<Item = WalPageLocation>,
     {
-        let mut indexed_pages = 0usize;
-        for location in locations {
-            self.validate_committed_location(&location)?;
-            if location.page_id.get() < 2 {
-                continue;
+        let starting_state = self.staging_state();
+        let result = (|| {
+            let mut indexed_pages = 0usize;
+            for location in locations {
+                self.validate_committed_location(&location)?;
+                if location.page_id.get() < 2 {
+                    continue;
+                }
+                let descriptor = self.descriptor_for_location(&location)?;
+                self.root = self.index.insert(self.root, location.page_id, descriptor)?;
+                indexed_pages = indexed_pages
+                    .checked_add(1)
+                    .ok_or_else(|| Error::invariant("paged recovery page count overflow"))?;
             }
-            let descriptor = self.descriptor_for_location(&location)?;
-            self.root = self.index.insert(self.root, location.page_id, descriptor)?;
-            indexed_pages = indexed_pages
-                .checked_add(1)
-                .ok_or_else(|| Error::invariant("paged recovery page count overflow"))?;
+            Ok(indexed_pages)
+        })();
+        if result.is_err() {
+            self.restore_staging_state(starting_state);
         }
-        Ok(indexed_pages)
+        result
+    }
+
+    pub fn replay_wal<F, R>(
+        &mut self,
+        file: &mut F,
+        identity: &WalIdentity,
+        page_image_format: WalPageImageFormat,
+        resolve_page: &mut R,
+    ) -> Result<WalLocationScanSummary>
+    where
+        F: DurableFile,
+        R: FnMut(VersionDescriptor) -> Result<WalPageImage>,
+    {
+        let starting_state = self.staging_state();
+        let result = {
+            let mut sink = PagedRecoverySink {
+                builder: self,
+                resolve_page,
+            };
+            WalLog::<F>::scan_committed_page_locations_streaming(
+                file,
+                identity,
+                page_image_format,
+                None,
+                &mut sink,
+            )
+        };
+        if result.is_err() {
+            self.restore_staging_state(starting_state);
+        }
+        result
+    }
+
+    fn staging_state(&self) -> (VersionIndexRoot, u64, Option<Lsn>, Option<Lsn>) {
+        (
+            self.root,
+            self.committed_prefix_length,
+            self.last_record_lsn,
+            self.last_commit_lsn,
+        )
+    }
+
+    fn restore_staging_state(&mut self, state: (VersionIndexRoot, u64, Option<Lsn>, Option<Lsn>)) {
+        self.root = state.0;
+        self.committed_prefix_length = state.1;
+        self.last_record_lsn = state.2;
+        self.last_commit_lsn = state.3;
     }
 
     fn validate_committed_location(&mut self, location: &WalPageLocation) -> Result<()> {
@@ -193,6 +323,87 @@ impl<'index> PagedRecoveryIndexBuilder<'index> {
     }
 }
 
+struct PagedRecoverySink<'builder, 'index, 'resolver, R> {
+    builder: &'builder mut PagedRecoveryIndexBuilder<'index>,
+    resolve_page: &'resolver mut R,
+}
+
+impl<R> WalLocationRecoverySink for PagedRecoverySink<'_, '_, '_, R>
+where
+    R: FnMut(VersionDescriptor) -> Result<WalPageImage>,
+{
+    fn begin_scan(
+        &mut self,
+        committed_prefix_length: u64,
+        source_header_identity: [u8; 32],
+    ) -> Result<()> {
+        if self.builder.source.header_identity != source_header_identity {
+            return Err(Error::corruption(
+                "paged recovery WAL source header identity differs",
+            ));
+        }
+        self.builder.committed_prefix_length = committed_prefix_length;
+        Ok(())
+    }
+
+    fn current_page(&mut self, page_id: dodb_core::PageId) -> Result<Option<WalPageRecoveryBase>> {
+        let Some(descriptor) = self.builder.index.lookup(self.builder.root, page_id)? else {
+            return Ok(None);
+        };
+        let page = (self.resolve_page)(descriptor)?;
+        let decoded = decode_blink_page(&page.image, page_id)?;
+        let image_crc32c = crc32c::crc32c(&page.image[..]);
+        if page.page_id != page_id
+            || decoded.lsn() != descriptor.image_lsn
+            || image_crc32c != descriptor.image_crc32c
+        {
+            return Err(Error::corruption(
+                "paged recovery resolver returned bytes that differ from the indexed version",
+            ));
+        }
+        let (predecessor_frame_offset, delta_depth) = match descriptor.locator {
+            VersionLocator::CheckpointImage { .. } => (None, 0),
+            VersionLocator::WalImage { frame } => (Some(frame.frame_offset), 0),
+            VersionLocator::WalDelta { frame, depth, .. } => (Some(frame.frame_offset), depth),
+        };
+        Ok(Some(WalPageRecoveryBase {
+            page,
+            image_crc32c,
+            predecessor_frame_offset,
+            delta_depth,
+        }))
+    }
+
+    fn accept_committed_page(
+        &mut self,
+        location: WalPageLocation,
+        page: WalPageImage,
+    ) -> Result<()> {
+        if page.page_id != location.page_id
+            || Some(crc32c::crc32c(&page.image[..])) != location.image_crc32c
+            || (!is_superblock_page(location.page_id)
+                && Some(decode_blink_page(&page.image, page.page_id)?.lsn()) != location.image_lsn)
+        {
+            return Err(Error::corruption(
+                "streamed WAL page differs from its committed location metadata",
+            ));
+        }
+        self.builder.validate_committed_location(&location)?;
+        if location.page_id.get() >= 2 {
+            let descriptor = self.builder.descriptor_for_location(&location)?;
+            self.builder.root =
+                self.builder
+                    .index
+                    .insert(self.builder.root, location.page_id, descriptor)?;
+        }
+        Ok(())
+    }
+}
+
+fn is_superblock_page(page_id: dodb_core::PageId) -> bool {
+    page_id.get() < 2
+}
+
 fn base_locator(descriptor: VersionDescriptor) -> Result<BaseFrameLocator> {
     match descriptor.locator {
         VersionLocator::CheckpointImage {
@@ -224,21 +435,27 @@ fn base_locator(descriptor: VersionDescriptor) -> Result<BaseFrameLocator> {
 
 #[cfg(test)]
 mod tests {
-    use super::PagedRecoveryIndexBuilder;
+    use super::{PagedRecoveryIndexBuilder, build_checkpoint_index};
+    use crate::blink::durable_bases::{BasePackJob, pack_path};
     use crate::blink::paged_manifest::PagedManifest;
     use crate::blink::resource::{BlinkResourceManager, ResourceLimits};
     use crate::blink::version_index::{
         SourceFileKind, SourceIdentity, StoreIdentity, VersionDescriptor, VersionIndex,
-        VersionLocator, VersionToken,
+        VersionLocator, VersionToken, WalFrameLocator,
     };
+    use crate::blink::{BlinkPage, encode_blink_page};
     use crate::durable_file::ProductionFile;
-    use crate::page::{PageHeader, PageType, encode_page};
     use crate::wal::{
-        WalIdentity, WalLog, WalPageImage, WalPageImageFormat, WalPageLocation, WalRecordType,
+        WalCommit, WalDeltaRequest, WalIdentity, WalLog, WalPageImage, WalPageImageFormat,
+        WalPageLocation, WalRecordType, WalSegmentBoundary,
     };
-    use dodb_core::{Lsn, PageId, ShardEpoch, ShardId, TenantId};
+    use dodb_core::{Error, Lsn, PageId, ShardEpoch, ShardId, TenantId};
+    use std::borrow::Cow;
+    use std::collections::BTreeMap;
     use std::fs;
+    use std::io::{Read, Seek, SeekFrom};
     use std::path::{Path, PathBuf};
+    use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static DIRECTORY_SEQUENCE: AtomicU64 = AtomicU64::new(1);
@@ -497,6 +714,23 @@ mod tests {
         outside_prefix.commit_frame_offset = 550;
         assert!(builder.apply_committed_locations([outside_prefix]).is_err());
         assert_eq!(builder.current_root(), root);
+
+        let mut valid_location = committed_image_location(&wal_identity(identity), page_id);
+        valid_location.frame_offset = 200;
+        valid_location.payload_offset = 232;
+        valid_location.commit_frame_offset = 400;
+        let mut invalid_after_valid =
+            committed_image_location(&wal_identity(identity), PageId::new(3));
+        invalid_after_valid.frame_offset = 200;
+        invalid_after_valid.payload_offset = 232;
+        invalid_after_valid.commit_frame_offset = 400;
+        invalid_after_valid.source_identity.database_uuid = [0xff; 16];
+        assert!(
+            builder
+                .apply_committed_locations([valid_location, invalid_after_valid])
+                .is_err()
+        );
+        assert_eq!(builder.current_root(), root);
     }
 
     #[test]
@@ -515,16 +749,124 @@ mod tests {
         )
         .unwrap();
         let page_id = PageId::new(2);
-        let checkpoint_root = index
-            .insert(index.empty_root(), page_id, base_descriptor(page_id))
+        let checkpoint_image = encode_blink_page(
+            page_id,
+            &BlinkPage::Free {
+                lsn: Lsn::new(10),
+                next: None,
+            },
+        )
+        .unwrap();
+        let second_page_id = PageId::new(5);
+        let second_checkpoint_image = encode_blink_page(
+            second_page_id,
+            &BlinkPage::Free {
+                lsn: Lsn::new(9),
+                next: None,
+            },
+        )
+        .unwrap();
+        let pack_identity = wal_identity(identity);
+        let mut pack_injector = None;
+        let pack_output = BasePackJob {
+            directory: directory.path().to_path_buf(),
+            identity: pack_identity.clone(),
+            number: 5,
+            checkpoint_lsn: Lsn::new(10),
+            complete: true,
+            coalesce: true,
+        }
+        .run(
+            &BTreeMap::from([
+                (page_id, Arc::new(checkpoint_image)),
+                (second_page_id, Arc::new(second_checkpoint_image)),
+            ]),
+            &mut pack_injector,
+        )
+        .unwrap();
+        let checkpoint_pack_path = pack_path(directory.path(), pack_output.entry.number);
+        assert!(
+            build_checkpoint_index(
+                &index,
+                index.empty_root(),
+                &checkpoint_pack_path,
+                &pack_output.entry,
+                false,
+                &pack_identity,
+                second_page_id,
+            )
+            .is_err()
+        );
+        let checkpoint_wal_source = SourceIdentity {
+            kind: SourceFileKind::WalSegment,
+            file_number: 4,
+            header_identity: [0x54; 32],
+        };
+        let checkpoint_crc32c = crc32c::crc32c(&checkpoint_image);
+        let base_root = index
+            .insert(
+                index.empty_root(),
+                page_id,
+                VersionDescriptor {
+                    page_id,
+                    token: VersionToken::Wal {
+                        source_file_number: checkpoint_wal_source.file_number,
+                        record_lsn: Lsn::new(9),
+                    },
+                    image_lsn: Lsn::new(10),
+                    image_crc32c: checkpoint_crc32c,
+                    locator: VersionLocator::WalImage {
+                        frame: WalFrameLocator {
+                            source: checkpoint_wal_source,
+                            frame_offset: 100,
+                            frame_length: 4156,
+                            header_crc32c: 0x1010_1010,
+                            payload_offset: 148,
+                            payload_length: 4104,
+                            payload_crc32c: 0x2020_2020,
+                            committed_prefix_length: 4324,
+                            commit_frame_offset: 4256,
+                            commit_lsn: Lsn::new(10),
+                        },
+                    },
+                },
+            )
             .unwrap();
-        let checkpoint_root = index.promote_root_to_durable(checkpoint_root).unwrap();
+        let (checkpoint_root, checkpoint_source) = build_checkpoint_index(
+            &index,
+            base_root,
+            &checkpoint_pack_path,
+            &pack_output.entry,
+            pack_output.complete,
+            &pack_identity,
+            second_page_id,
+        )
+        .unwrap();
+        let checkpoint_descriptor = index.lookup(checkpoint_root, page_id).unwrap().unwrap();
+        assert_eq!(
+            checkpoint_descriptor.token,
+            VersionToken::Wal {
+                source_file_number: checkpoint_wal_source.file_number,
+                record_lsn: Lsn::new(9),
+            }
+        );
+        assert_eq!(
+            index
+                .lookup(checkpoint_root, second_page_id)
+                .unwrap()
+                .unwrap()
+                .token,
+            VersionToken::Bootstrap {
+                page_id: second_page_id
+            }
+        );
+        index.validate_durable_root(checkpoint_root).unwrap();
         let manifest = PagedManifest {
             identity,
             generation: 1,
             tree_root: page_id,
             free_list_root: None,
-            high_water_page_id: page_id,
+            high_water_page_id: second_page_id,
             durable_index_root: checkpoint_root.node_reference().unwrap(),
             source_catalog_root: None,
             recovery_wal_file_number: 1,
@@ -535,27 +877,58 @@ mod tests {
         let wal_source_identity = wal_identity(identity);
         let wal_path = directory.path().join("wal");
         let wal_file = ProductionFile::open(&wal_path).unwrap();
-        let mut wal = WalLog::open_with_page_image_format(
+        let mut wal = WalLog::open_with_segment_bases(
             wal_file,
             wal_source_identity,
-            WalPageImageFormat::ExperimentalBtree,
-        )
-        .unwrap();
-        let image =
-            encode_page(PageHeader::new(PageType::Leaf, page_id, Lsn::new(2)), &[]).unwrap();
-        wal.append_commit(1, Lsn::new(2), &[WalPageImage { page_id, image }], None)
-            .unwrap();
-        drop(wal);
-        let mut wal_file = ProductionFile::open(&wal_path).unwrap();
-        let scan = WalLog::scan_committed_page_locations(
-            &mut wal_file,
-            &wal_identity(identity),
-            WalPageImageFormat::ExperimentalBtree,
+            WalPageImageFormat::ExperimentalBlink,
+            WalSegmentBoundary {
+                start_after_lsn: Lsn::new(10),
+                start_batch_id: None,
+                truncate_torn_tail: true,
+                defer_initial_sync: false,
+            },
+            std::collections::BTreeMap::from([(
+                page_id,
+                crate::wal::RecoveredWalPage {
+                    commit_lsn: Lsn::new(10),
+                    image: Box::new(checkpoint_image),
+                },
+            )]),
             None,
-            std::collections::BTreeMap::new(),
         )
         .unwrap();
-        let mut builder = PagedRecoveryIndexBuilder::new(
+        let image = encode_blink_page(
+            page_id,
+            &BlinkPage::Free {
+                lsn: Lsn::new(12),
+                next: None,
+            },
+        )
+        .unwrap();
+        let eligible_commits = [true];
+        let mut base_source = |requested_page_id| {
+            (requested_page_id == page_id).then(|| Cow::Borrowed(&checkpoint_image))
+        };
+        let mut delta_request = WalDeltaRequest {
+            eligible_commits: &eligible_commits,
+            base_source: &mut base_source,
+        };
+        wal.append_group_with_page_deltas(
+            &[WalCommit {
+                batch_id: 1,
+                commit_lsn: Lsn::new(12),
+                pages: vec![WalPageImage { page_id, image }],
+            }],
+            &mut delta_request,
+            None,
+        )
+        .unwrap();
+        drop(wal);
+        let wal_bytes = fs::read(&wal_path).unwrap();
+        let init_frame_length = u32::from_le_bytes(wal_bytes[8..12].try_into().unwrap()) as usize;
+        let wal_header_identity = *blake3::hash(&wal_bytes[..init_frame_length]).as_bytes();
+        let mut wal_file = ProductionFile::open(&wal_path).unwrap();
+        let mut wrong_source_builder = PagedRecoveryIndexBuilder::new(
             &index,
             manifest,
             SourceIdentity {
@@ -563,25 +936,105 @@ mod tests {
                 file_number: 1,
                 header_identity: [0x93; 32],
             },
-            scan.committed_prefix_length,
+            0,
         )
         .unwrap();
-        let record_lsn = scan.locations[0].record_lsn;
-        assert_eq!(
-            builder.apply_committed_locations(scan.locations).unwrap(),
-            1
+        let mut unused_resolver =
+            |_: VersionDescriptor| Err(Error::corruption("unexpected paged recovery source"));
+        assert!(
+            wrong_source_builder
+                .replay_wal(
+                    &mut wal_file,
+                    &wal_identity(identity),
+                    WalPageImageFormat::ExperimentalBlink,
+                    &mut unused_resolver,
+                )
+                .is_err()
         );
+        assert_eq!(wrong_source_builder.current_root(), checkpoint_root);
+        let mut builder = PagedRecoveryIndexBuilder::new(
+            &index,
+            manifest,
+            SourceIdentity {
+                kind: SourceFileKind::WalSegment,
+                file_number: 1,
+                header_identity: wal_header_identity,
+            },
+            0,
+        )
+        .unwrap();
+        let mut checkpoint_file = fs::File::open(&checkpoint_pack_path).unwrap();
+        let mut resolver = |descriptor: VersionDescriptor| {
+            let VersionLocator::CheckpointImage {
+                source,
+                offset,
+                source_length,
+                image_lsn,
+                image_crc32c,
+            } = descriptor.locator
+            else {
+                return Err(Error::corruption("unexpected paged recovery source"));
+            };
+            if source != checkpoint_source
+                || source_length != pack_output.entry.bytes
+                || image_lsn != descriptor.image_lsn
+                || image_crc32c != descriptor.image_crc32c
+            {
+                return Err(Error::corruption("checkpoint source identity differs"));
+            }
+            let mut image = [0; crate::page::PAGE_SIZE];
+            checkpoint_file.seek(SeekFrom::Start(offset))?;
+            checkpoint_file.read_exact(&mut image)?;
+            Ok(WalPageImage {
+                page_id: descriptor.page_id,
+                image,
+            })
+        };
+        let summary = builder
+            .replay_wal(
+                &mut wal_file,
+                &wal_identity(identity),
+                WalPageImageFormat::ExperimentalBlink,
+                &mut resolver,
+            )
+            .unwrap();
         let recovered = index
             .lookup(builder.current_root(), page_id)
             .unwrap()
             .unwrap();
-        assert_eq!(recovered.image_lsn, Lsn::new(2));
+        assert_eq!(recovered.image_lsn, Lsn::new(12));
         assert_eq!(
             recovered.token,
             VersionToken::Wal {
                 source_file_number: 1,
-                record_lsn,
+                record_lsn: Lsn::new(11),
             }
         );
+        assert_eq!(summary.last_commit_lsn, Some(Lsn::new(12)));
+        assert_eq!(summary.torn_tail_bytes, 0);
+        assert_eq!(summary.source_header_identity, wal_header_identity);
+        assert_eq!(
+            builder.committed_prefix_length,
+            summary.committed_prefix_length
+        );
+        assert_eq!(
+            index.lookup(checkpoint_root, page_id).unwrap().unwrap(),
+            checkpoint_descriptor
+        );
+        let VersionLocator::WalDelta {
+            base_lsn,
+            base_crc32c,
+            base,
+            depth,
+            ..
+        } = recovered.locator
+        else {
+            panic!("committed WAL delta was not retained as a delta locator");
+        };
+        assert_eq!(base_lsn, Lsn::new(10));
+        assert_eq!(base_crc32c, checkpoint_descriptor.image_crc32c);
+        assert_eq!(base.source, checkpoint_source);
+        assert_eq!(base.image_lsn, Lsn::new(10));
+        assert_eq!(depth, 1);
     }
 }

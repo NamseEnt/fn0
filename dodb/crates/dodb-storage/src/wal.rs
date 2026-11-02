@@ -378,6 +378,8 @@ enum PendingRedo {
 struct PendingBatch {
     batch_id: u64,
     first_record_lsn: Lsn,
+    first_record_offset: u64,
+    record_count: usize,
     records: Vec<PendingRedo>,
     locations: Vec<WalPageLocation>,
     digest: u32,
@@ -424,6 +426,38 @@ pub struct WalLocationScan {
     pub committed_prefix_length: u64,
     pub last_commit_lsn: Option<Lsn>,
     pub torn_tail_bytes: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WalPageRecoveryBase {
+    pub page: WalPageImage,
+    pub image_crc32c: u32,
+    pub predecessor_frame_offset: Option<u64>,
+    pub delta_depth: u8,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WalLocationScanSummary {
+    pub committed_prefix_length: u64,
+    pub last_commit_lsn: Option<Lsn>,
+    pub torn_tail_bytes: u64,
+    pub source_header_identity: [u8; 32],
+}
+
+pub trait WalLocationRecoverySink {
+    fn begin_scan(
+        &mut self,
+        committed_prefix_length: u64,
+        source_header_identity: [u8; 32],
+    ) -> Result<()>;
+
+    fn current_page(&mut self, page_id: PageId) -> Result<Option<WalPageRecoveryBase>>;
+
+    fn accept_committed_page(
+        &mut self,
+        location: WalPageLocation,
+        page: WalPageImage,
+    ) -> Result<()>;
 }
 
 #[derive(Clone, Debug)]
@@ -488,6 +522,7 @@ struct WalScanOutput {
     report: WalScanReport,
     valid_length: u64,
     locations: Vec<WalPageLocation>,
+    source_header_identity: [u8; 32],
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -496,6 +531,8 @@ enum ScanMaterialization {
     #[cfg(test)]
     Batches,
     Locations,
+    StreamingLocations,
+    StreamingValidateOnly,
     ValidateOnly,
 }
 
@@ -715,7 +752,7 @@ impl<F: DurableFile> WalLog<F> {
             redo,
             mut report,
             valid_length,
-            locations: _,
+            ..
         } = scan_wal(
             &mut file,
             &identity,
@@ -916,6 +953,48 @@ impl<F: DurableFile> WalLog<F> {
             committed_prefix_length: scan.valid_length,
             last_commit_lsn: scan.last_commit_lsn,
             torn_tail_bytes: file_length.saturating_sub(scan.valid_length),
+        })
+    }
+
+    pub fn scan_committed_page_locations_streaming(
+        file: &mut F,
+        identity: &WalIdentity,
+        page_image_format: WalPageImageFormat,
+        start_batch_id: Option<u64>,
+        sink: &mut dyn WalLocationRecoverySink,
+    ) -> Result<WalLocationScanSummary> {
+        let file_length = file.len()?;
+        let validated = scan_wal(
+            file,
+            identity,
+            page_image_format,
+            ScanMaterialization::StreamingValidateOnly,
+            start_batch_id,
+            BTreeMap::new(),
+        )?;
+        sink.begin_scan(validated.valid_length, validated.source_header_identity)?;
+        let scan = scan_wal_with_sink(
+            file,
+            identity,
+            page_image_format,
+            ScanMaterialization::StreamingLocations,
+            start_batch_id,
+            BTreeMap::new(),
+            Some(sink),
+        )?;
+        if scan.valid_length != validated.valid_length
+            || scan.last_commit_lsn != validated.last_commit_lsn
+            || scan.source_header_identity != validated.source_header_identity
+        {
+            return Err(Error::corruption(
+                "WAL changed between streaming recovery validation and replay",
+            ));
+        }
+        Ok(WalLocationScanSummary {
+            committed_prefix_length: scan.valid_length,
+            last_commit_lsn: scan.last_commit_lsn,
+            torn_tail_bytes: file_length.saturating_sub(scan.valid_length),
+            source_header_identity: scan.source_header_identity,
         })
     }
 
@@ -3517,7 +3596,7 @@ fn scan_logical_wal<F: DurableFile>(
             offset + (WAL_HEADER_SIZE + payload_length) as u64,
             WAL_TRAILER_SIZE,
         )?;
-        if u32::from_le_bytes(trailer.try_into().unwrap()) != frame_length as u32 {
+        if u32::from_le_bytes(trailer.as_slice().try_into().unwrap()) != frame_length as u32 {
             return Err(Error::corruption("logical WAL trailing length mismatch"));
         }
         if previous_lsn.is_some_and(|previous| raw_lsn <= previous) {
@@ -3894,13 +3973,42 @@ fn elapsed_nanos(started: Instant) -> Result<u64> {
         .map_err(|_| Error::invariant("WAL timing does not fit u64"))
 }
 
+fn next_wal_batch_record_count(record_count: usize) -> Result<usize> {
+    let next_count = record_count
+        .checked_add(1)
+        .ok_or_else(|| Error::corruption("WAL batch record count overflows"))?;
+    u32::try_from(next_count)
+        .map_err(|_| Error::corruption("WAL batch record count exceeds u32"))?;
+    Ok(next_count)
+}
+
 fn scan_wal<F: DurableFile>(
     file: &mut F,
     identity: &WalIdentity,
     page_image_format: WalPageImageFormat,
     materialization: ScanMaterialization,
     start_batch_id: Option<u64>,
+    pages: BTreeMap<PageId, RecoveredWalPage>,
+) -> Result<WalScanOutput> {
+    scan_wal_with_sink(
+        file,
+        identity,
+        page_image_format,
+        materialization,
+        start_batch_id,
+        pages,
+        None,
+    )
+}
+
+fn scan_wal_with_sink<F: DurableFile>(
+    file: &mut F,
+    identity: &WalIdentity,
+    page_image_format: WalPageImageFormat,
+    materialization: ScanMaterialization,
+    start_batch_id: Option<u64>,
     mut pages: BTreeMap<PageId, RecoveredWalPage>,
+    mut sink: Option<&mut dyn WalLocationRecoverySink>,
 ) -> Result<WalScanOutput> {
     let length = file.len()?;
     let mut offset = 0u64;
@@ -3916,15 +4024,28 @@ fn scan_wal<F: DurableFile>(
     let mut last_commit_lsn = None;
     let mut last_commit_batch_id = None;
     let mut committed_length = 0;
+    let mut source_header_identity = None;
     let mut locations = Vec::new();
     let mut latest_location_by_page: HashMap<PageId, (u64, Lsn, u32, u8)> = HashMap::new();
+    let track_locations = matches!(
+        materialization,
+        ScanMaterialization::Locations | ScanMaterialization::StreamingLocations
+    );
+    let stream_locations = materialization == ScanMaterialization::StreamingLocations;
+    let stream_records = matches!(
+        materialization,
+        ScanMaterialization::StreamingLocations | ScanMaterialization::StreamingValidateOnly
+    );
     let blink = page_image_format == WalPageImageFormat::ExperimentalBlink;
     let compact = page_image_format != WalPageImageFormat::Baseline;
     let keep_batches = match materialization {
         ScanMaterialization::Recovery => !blink,
         #[cfg(test)]
         ScanMaterialization::Batches => true,
-        ScanMaterialization::Locations | ScanMaterialization::ValidateOnly => false,
+        ScanMaterialization::Locations
+        | ScanMaterialization::StreamingLocations
+        | ScanMaterialization::StreamingValidateOnly
+        | ScanMaterialization::ValidateOnly => false,
     };
     while offset < length {
         let frame_offset = offset;
@@ -3974,7 +4095,7 @@ fn scan_wal<F: DurableFile>(
                 .ok_or_else(|| Error::corruption("WAL trailer offset overflows"))?,
             WAL_TRAILER_SIZE,
         )?;
-        if u32::from_le_bytes(trailer.try_into().unwrap()) != frame_length as u32 {
+        if u32::from_le_bytes(trailer.as_slice().try_into().unwrap()) != frame_length as u32 {
             return Err(Error::corruption(format!(
                 "WAL trailing length mismatch at offset {offset}"
             )));
@@ -4005,6 +4126,11 @@ fn scan_wal<F: DurableFile>(
                 format_version,
                 verify_identity(format_version, &payload, identity)?,
             ));
+            let mut source_hasher = blake3::Hasher::new();
+            source_hasher.update(&header_bytes);
+            source_hasher.update(&payload);
+            source_hasher.update(&trailer);
+            source_header_identity = Some(*source_hasher.finalize().as_bytes());
             committed_length = offset;
             continue;
         };
@@ -4057,13 +4183,17 @@ fn scan_wal<F: DurableFile>(
                     pending = Some(PendingBatch {
                         batch_id,
                         first_record_lsn: record_lsn,
+                        first_record_offset: frame_offset,
+                        record_count: 0,
                         records: Vec::new(),
                         locations: Vec::new(),
                         digest: 0,
                     });
                 }
                 let current = pending.as_mut().expect("pending batch was created");
-                if record_index != current.records.len() as u32 {
+                let expected_record_index = u32::try_from(current.record_count)
+                    .map_err(|_| Error::corruption("WAL batch record count exceeds u32"))?;
+                if record_index != expected_record_index {
                     return Err(Error::corruption(
                         "WAL page-image record index is not contiguous",
                     ));
@@ -4075,10 +4205,13 @@ fn scan_wal<F: DurableFile>(
                     record_index,
                     &[&payload],
                 );
-                current.records.push(match image {
-                    Some(page) => PendingRedo::Image(Box::new(page)),
-                    None => PendingRedo::Delta(payload),
-                });
+                current.record_count = next_wal_batch_record_count(current.record_count)?;
+                if !stream_records {
+                    current.records.push(match image {
+                        Some(page) => PendingRedo::Image(Box::new(page)),
+                        None => PendingRedo::Delta(payload),
+                    });
+                }
                 if materialization == ScanMaterialization::Locations {
                     current.locations.push(WalPageLocation {
                         source_identity: identity.clone(),
@@ -4112,14 +4245,16 @@ fn scan_wal<F: DurableFile>(
                 let current = pending.take().ok_or_else(|| {
                     Error::corruption("WAL commit has no matching page-image records")
                 })?;
-                if current.batch_id != batch_id || record_index != current.records.len() as u32 {
+                let expected_record_index = u32::try_from(current.record_count)
+                    .map_err(|_| Error::corruption("WAL batch record count exceeds u32"))?;
+                if current.batch_id != batch_id || record_index != expected_record_index {
                     return Err(Error::corruption(
                         "WAL commit does not match its page-image sequence",
                     ));
                 }
                 let (first_lsn, page_count, digest) = decode_commit_payload(&payload)?;
                 if first_lsn != current.first_record_lsn
-                    || page_count != current.records.len()
+                    || page_count != current.record_count
                     || current.digest != digest
                 {
                     return Err(Error::corruption(
@@ -4133,8 +4268,94 @@ fn scan_wal<F: DurableFile>(
                 }
                 let mut batch_pages = Vec::new();
                 let mut batch_kinds = Vec::new();
-                for (record_position, record) in current.records.into_iter().enumerate() {
-                    if materialization == ScanMaterialization::ValidateOnly {
+                let record_count = current.record_count;
+                let mut resident_records = current.records.into_iter();
+                let mut streamed_record_offset = current.first_record_offset;
+                let mut streamed_digest = 0u32;
+                for record_position in 0..record_count {
+                    let (record, mut location) = if stream_records {
+                        let frame = read_exact_frame(file, streamed_record_offset, offset)?;
+                        if frame.batch_id != batch_id
+                            || frame.record_index != record_position as u32
+                            || !matches!(
+                                frame.record_type,
+                                WalRecordType::PageImage | WalRecordType::PageDelta
+                            )
+                        {
+                            return Err(Error::corruption(
+                                "streamed WAL batch record sequence changed during replay",
+                            ));
+                        }
+                        if record_position == 0 && Lsn::new(frame.record_lsn) != first_lsn {
+                            return Err(Error::corruption(
+                                "streamed WAL first-record LSN changed during replay",
+                            ));
+                        }
+                        streamed_digest = update_record_digest(
+                            streamed_digest,
+                            frame.format_version,
+                            frame.record_type,
+                            frame.record_index,
+                            &[&frame.payload],
+                        );
+                        let page_id = match frame.record_type {
+                            WalRecordType::PageImage => decode_page_image(&frame.payload)?.page_id,
+                            WalRecordType::PageDelta => decode_page_delta(&frame.payload)?.page_id,
+                            _ => unreachable!(),
+                        };
+                        let payload_length = frame.payload.len();
+                        let payload_crc32c = crc32c::crc32c(&frame.payload);
+                        let record_offset = streamed_record_offset;
+                        streamed_record_offset = streamed_record_offset
+                            .checked_add(u64::try_from(frame.frame_length).map_err(|_| {
+                                Error::corruption("WAL frame length does not fit u64")
+                            })?)
+                            .ok_or_else(|| Error::corruption("WAL frame offset overflows"))?;
+                        let location = WalPageLocation {
+                            source_identity: identity.clone(),
+                            page_id,
+                            record_lsn: Lsn::new(frame.record_lsn),
+                            batch_id,
+                            record_index: frame.record_index,
+                            record_type: frame.record_type,
+                            frame_offset: record_offset,
+                            frame_length: u32::try_from(frame.frame_length)
+                                .map_err(|_| Error::corruption("WAL frame length exceeds u32"))?,
+                            header_crc32c: frame.header_crc32c,
+                            payload_offset: record_offset
+                                .checked_add(WAL_HEADER_SIZE as u64)
+                                .ok_or_else(|| Error::corruption("WAL payload offset overflows"))?,
+                            payload_length: u32::try_from(payload_length)
+                                .map_err(|_| Error::corruption("WAL payload length exceeds u32"))?,
+                            payload_crc32c,
+                            base_page_lsn: None,
+                            base_image_crc32c: None,
+                            predecessor_frame_offset: None,
+                            image_lsn: None,
+                            image_crc32c: None,
+                            delta_depth: 0,
+                            commit_lsn: record_lsn,
+                            commit_frame_offset: frame_offset,
+                        };
+                        let record = match frame.record_type {
+                            WalRecordType::PageImage => {
+                                PendingRedo::Image(Box::new(decode_page_image(&frame.payload)?))
+                            }
+                            WalRecordType::PageDelta => PendingRedo::Delta(frame.payload),
+                            _ => unreachable!(),
+                        };
+                        (record, Some(location))
+                    } else {
+                        (
+                            resident_records.next().ok_or_else(|| {
+                                Error::corruption("WAL pending record is missing")
+                            })?,
+                            None,
+                        )
+                    };
+                    if materialization == ScanMaterialization::ValidateOnly
+                        || materialization == ScanMaterialization::StreamingValidateOnly
+                    {
                         match record {
                             PendingRedo::Image(page) => {
                                 validate_page_image_lsn(&page, record_lsn)?;
@@ -4159,16 +4380,63 @@ fn scan_wal<F: DurableFile>(
                         }
                         PendingRedo::Delta(delta_payload) => {
                             let view = decode_page_delta(&delta_payload)?;
-                            let base = pages.get(&view.page_id).ok_or_else(|| {
-                                Error::corruption(format!(
-                                    "WAL page delta for page {} has no full-image base in this WAL history",
-                                    view.page_id
+                            let streaming_base = if stream_locations {
+                                Some(
+                                    sink.as_deref_mut()
+                                        .ok_or_else(|| {
+                                            Error::invariant(
+                                                "streaming WAL scan has no recovery sink",
+                                            )
+                                        })?
+                                        .current_page(view.page_id)?
+                                        .ok_or_else(|| {
+                                            Error::corruption(format!(
+                                                "WAL page delta for page {} has no indexed base",
+                                                view.page_id
+                                            ))
+                                        })?,
+                                )
+                            } else {
+                                None
+                            };
+                            let base_image: &[u8; PAGE_SIZE] = match streaming_base.as_ref() {
+                                Some(base) => &base.page.image,
+                                None => &pages
+                                    .get(&view.page_id)
+                                    .ok_or_else(|| {
+                                        Error::corruption(format!(
+                                            "WAL page delta for page {} has no full-image base in this WAL history",
+                                            view.page_id
+                                        ))
+                                    })?
+                                    .image,
+                            };
+                            let base_image_crc32c = crc32c::crc32c(base_image);
+                            let predecessor = if let Some(base) = streaming_base.as_ref() {
+                                if base.image_crc32c != base_image_crc32c {
+                                    return Err(Error::corruption(
+                                        "streaming WAL recovery base checksum differs from its page",
+                                    ));
+                                }
+                                Some((
+                                    base.predecessor_frame_offset,
+                                    page_lsn_of(base_image),
+                                    base_image_crc32c,
+                                    base.delta_depth,
                                 ))
-                            })?;
-                            let base_image_crc32c = crc32c::crc32c(&base.image[..]);
-                            let predecessor = latest_location_by_page.get(&view.page_id).copied();
-                            if materialization == ScanMaterialization::Locations
-                                && let Some((_, predecessor_lsn, predecessor_crc, _)) = predecessor
+                            } else {
+                                latest_location_by_page.get(&view.page_id).map(
+                                    |(frame_offset, image_lsn, image_crc32c, delta_depth)| {
+                                        (
+                                            Some(*frame_offset),
+                                            *image_lsn,
+                                            *image_crc32c,
+                                            *delta_depth,
+                                        )
+                                    },
+                                )
+                            };
+                            if let Some((_, predecessor_lsn, predecessor_crc, _)) = predecessor
                                 && (predecessor_lsn != view.base_page_lsn
                                     || predecessor_crc != base_image_crc32c)
                             {
@@ -4178,7 +4446,7 @@ fn scan_wal<F: DurableFile>(
                             }
                             let page = WalPageImage {
                                 page_id: view.page_id,
-                                image: apply_page_delta(&base.image, &view)?,
+                                image: apply_page_delta(base_image, &view)?,
                             };
                             validate_page_image(&page, page_image_format)?;
                             validate_page_image_lsn(&page, record_lsn)?;
@@ -4189,9 +4457,7 @@ fn scan_wal<F: DurableFile>(
                             let delta_depth = predecessor
                                 .map(|(_, _, _, previous_depth)| previous_depth.saturating_add(1))
                                 .unwrap_or(1);
-                            if materialization == ScanMaterialization::Locations
-                                && delta_depth > MAX_RECONSTRUCTION_DELTAS as u8
-                            {
+                            if track_locations && delta_depth > MAX_RECONSTRUCTION_DELTAS as u8 {
                                 return Err(Error::corruption(
                                     "WAL page delta chain exceeds the reconstruction limit",
                                 ));
@@ -4202,7 +4468,7 @@ fn scan_wal<F: DurableFile>(
                                 Some((
                                     view.base_page_lsn,
                                     base_image_crc32c,
-                                    predecessor.map(|(frame_offset, _, _, _)| frame_offset),
+                                    predecessor.and_then(|(frame_offset, _, _, _)| frame_offset),
                                     delta_depth,
                                 )),
                             )
@@ -4214,10 +4480,16 @@ fn scan_wal<F: DurableFile>(
                         Some(page_lsn_of(&page.image))
                     };
                     let image_crc32c = crc32c::crc32c(&page.image[..]);
-                    if materialization == ScanMaterialization::Locations {
-                        let location = batch_locations
-                            .get_mut(record_position)
-                            .ok_or_else(|| Error::corruption("WAL location record is missing"))?;
+                    if track_locations {
+                        let location = if stream_locations {
+                            location.as_mut().ok_or_else(|| {
+                                Error::corruption("streamed WAL location is missing")
+                            })?
+                        } else {
+                            batch_locations.get_mut(record_position).ok_or_else(|| {
+                                Error::corruption("WAL location record is missing")
+                            })?
+                        };
                         if location.page_id != page.page_id {
                             return Err(Error::corruption(
                                 "WAL location page ID does not match its redo record",
@@ -4237,18 +4509,26 @@ fn scan_wal<F: DurableFile>(
                         }
                         location.image_lsn = image_lsn;
                         location.image_crc32c = Some(image_crc32c);
-                        latest_location_by_page.insert(
-                            page.page_id,
-                            (
-                                location.frame_offset,
-                                record_lsn,
-                                image_crc32c,
-                                location.delta_depth,
-                            ),
-                        );
+                        if stream_locations {
+                            sink.as_deref_mut()
+                                .ok_or_else(|| {
+                                    Error::invariant("streaming WAL scan has no recovery sink")
+                                })?
+                                .accept_committed_page(location.clone(), page.clone())?;
+                        } else {
+                            latest_location_by_page.insert(
+                                page.page_id,
+                                (
+                                    location.frame_offset,
+                                    record_lsn,
+                                    image_crc32c,
+                                    location.delta_depth,
+                                ),
+                            );
+                        }
                     }
                     report.replayable_pages += 1;
-                    if compact {
+                    if compact && !stream_records {
                         match pages.get_mut(&page.page_id) {
                             Some(recovered) => {
                                 recovered.commit_lsn = record_lsn;
@@ -4269,6 +4549,13 @@ fn scan_wal<F: DurableFile>(
                         batch_pages.push(page);
                         batch_kinds.push(kind);
                     }
+                }
+                if stream_records
+                    && (streamed_digest != digest || streamed_record_offset != frame_offset)
+                {
+                    return Err(Error::corruption(
+                        "streamed WAL batch differs from its validated commit sequence",
+                    ));
                 }
                 if materialization == ScanMaterialization::Locations {
                     locations.extend(batch_locations);
@@ -4320,7 +4607,7 @@ fn scan_wal<F: DurableFile>(
         history_start_lsn,
         last_commit_lsn,
         batches,
-        pages: if materialization == ScanMaterialization::Locations {
+        pages: if stream_records {
             BTreeMap::new()
         } else {
             pages
@@ -4330,13 +4617,18 @@ fn scan_wal<F: DurableFile>(
         valid_length: if start_batch_id.is_some()
             || matches!(
                 materialization,
-                ScanMaterialization::ValidateOnly | ScanMaterialization::Locations
+                ScanMaterialization::ValidateOnly
+                    | ScanMaterialization::Locations
+                    | ScanMaterialization::StreamingLocations
+                    | ScanMaterialization::StreamingValidateOnly
             ) {
             committed_length
         } else {
             offset
         },
         locations,
+        source_header_identity: source_header_identity
+            .ok_or_else(|| Error::corruption("WAL initialization identity is missing"))?,
     })
 }
 
@@ -5062,6 +5354,69 @@ mod tests {
         max_write: Option<usize>,
     }
 
+    #[derive(Default)]
+    struct StreamingRecoverySink {
+        current: Option<WalPageRecoveryBase>,
+        accepted_locations: Vec<WalPageLocation>,
+        committed_prefix_length: Option<u64>,
+        source_header_identity: Option<[u8; 32]>,
+    }
+
+    impl WalLocationRecoverySink for StreamingRecoverySink {
+        fn begin_scan(
+            &mut self,
+            committed_prefix_length: u64,
+            source_header_identity: [u8; 32],
+        ) -> Result<()> {
+            self.committed_prefix_length = Some(committed_prefix_length);
+            self.source_header_identity = Some(source_header_identity);
+            Ok(())
+        }
+
+        fn current_page(&mut self, page_id: PageId) -> Result<Option<WalPageRecoveryBase>> {
+            Ok(self
+                .current
+                .as_ref()
+                .filter(|base| base.page.page_id == page_id)
+                .cloned())
+        }
+
+        fn accept_committed_page(
+            &mut self,
+            location: WalPageLocation,
+            page: WalPageImage,
+        ) -> Result<()> {
+            self.current = Some(WalPageRecoveryBase {
+                image_crc32c: crc32c::crc32c(&page.image[..]),
+                predecessor_frame_offset: Some(location.frame_offset),
+                delta_depth: location.delta_depth,
+                page,
+            });
+            self.accepted_locations.push(location);
+            Ok(())
+        }
+    }
+
+    #[derive(Default)]
+    struct CountingRecoverySink {
+        accepted_pages: usize,
+    }
+
+    impl WalLocationRecoverySink for CountingRecoverySink {
+        fn begin_scan(&mut self, _: u64, _: [u8; 32]) -> Result<()> {
+            Ok(())
+        }
+
+        fn current_page(&mut self, _: PageId) -> Result<Option<WalPageRecoveryBase>> {
+            Ok(None)
+        }
+
+        fn accept_committed_page(&mut self, _: WalPageLocation, _: WalPageImage) -> Result<()> {
+            self.accepted_pages += 1;
+            Ok(())
+        }
+    }
+
     impl CountingFile {
         fn new(max_write: Option<usize>) -> Self {
             Self {
@@ -5320,6 +5675,132 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn streaming_committed_location_scan_replays_deltas_without_history_vectors() {
+        let page_id = PageId::new(23);
+        let mut base_page = page_at_lsn(page_id.get(), Lsn::new(2));
+        let mut wal = WalLog::open_with_page_image_format(
+            MemoryFile::default(),
+            identity(),
+            WalPageImageFormat::ExperimentalBtree,
+        )
+        .unwrap();
+        wal.append_commit(1, Lsn::new(2), std::slice::from_ref(&base_page), None)
+            .unwrap();
+        let commit_lsn = Lsn::new(wal.next_lsn().get() + 1);
+        let next_page = page_at_lsn(page_id.get(), commit_lsn);
+        let eligible_commits = [true];
+        let mut base_source = |requested_page_id| {
+            (requested_page_id == page_id).then(|| Cow::Borrowed(&base_page.image))
+        };
+        let mut delta_request = WalDeltaRequest {
+            eligible_commits: &eligible_commits,
+            base_source: &mut base_source,
+        };
+        wal.append_group_with_page_deltas(
+            &[WalCommit {
+                batch_id: wal.next_batch_id(),
+                commit_lsn,
+                pages: vec![next_page.clone()],
+            }],
+            &mut delta_request,
+            None,
+        )
+        .unwrap();
+        base_page = next_page.clone();
+        let mut file = wal.into_file();
+        let committed_length = file.len().unwrap();
+        file.0.extend_from_slice(&[0xd1, 0xa2, 0xc3]);
+        let mut sink = StreamingRecoverySink::default();
+        let summary = WalLog::scan_committed_page_locations_streaming(
+            &mut file,
+            &identity(),
+            WalPageImageFormat::ExperimentalBtree,
+            None,
+            &mut sink,
+        )
+        .unwrap();
+        assert_eq!(summary.torn_tail_bytes, 3);
+        assert_eq!(summary.committed_prefix_length, committed_length);
+        assert_eq!(
+            sink.committed_prefix_length,
+            Some(summary.committed_prefix_length)
+        );
+        assert_eq!(sink.accepted_locations.len(), 2);
+        assert_eq!(
+            sink.accepted_locations[1].record_type,
+            WalRecordType::PageDelta
+        );
+        assert_eq!(sink.accepted_locations[1].delta_depth, 1);
+        assert_eq!(sink.current.as_ref().unwrap().page, base_page);
+    }
+
+    #[test]
+    fn streaming_location_scan_does_not_deliver_a_batch_without_its_commit_frame() {
+        let mut wal = WalLog::open_with_page_image_format(
+            MemoryFile::default(),
+            identity(),
+            WalPageImageFormat::ExperimentalBtree,
+        )
+        .unwrap();
+        wal.append_commit(1, Lsn::new(2), &[page_at_lsn(23, Lsn::new(2))], None)
+            .unwrap();
+        let mut file = wal.into_file();
+        let complete_length = file.len().unwrap();
+        file.0.truncate(
+            usize::try_from(complete_length)
+                .unwrap()
+                .saturating_sub(WAL_MIN_FRAME_SIZE + COMMIT_PAYLOAD_SIZE),
+        );
+        let mut sink = StreamingRecoverySink::default();
+        let summary = WalLog::scan_committed_page_locations_streaming(
+            &mut file,
+            &identity(),
+            WalPageImageFormat::ExperimentalBtree,
+            None,
+            &mut sink,
+        )
+        .unwrap();
+        assert!(sink.accepted_locations.is_empty());
+        assert_eq!(summary.last_commit_lsn, None);
+        assert_eq!(summary.committed_prefix_length, INIT_FRAME_SIZE as u64);
+        assert_eq!(
+            summary.torn_tail_bytes,
+            file.len().unwrap() - INIT_FRAME_SIZE as u64
+        );
+    }
+
+    #[test]
+    fn streaming_scan_replays_a_large_single_commit_without_retained_record_vectors() {
+        let page_count = 2_048usize;
+        let commit_lsn = Lsn::new(page_count as u64 + 1);
+        let pages = (0..page_count)
+            .map(|page_position| page_at_lsn(page_position as u64 + 2, commit_lsn))
+            .collect::<Vec<_>>();
+        let mut wal = WalLog::open_with_page_image_format(
+            MemoryFile::default(),
+            identity(),
+            WalPageImageFormat::ExperimentalBtree,
+        )
+        .unwrap();
+        wal.append_commit(1, commit_lsn, &pages, None).unwrap();
+        let mut file = wal.into_file();
+        let committed_length = file.len().unwrap();
+        let mut sink = CountingRecoverySink::default();
+        let summary = WalLog::scan_committed_page_locations_streaming(
+            &mut file,
+            &identity(),
+            WalPageImageFormat::ExperimentalBtree,
+            None,
+            &mut sink,
+        )
+        .unwrap();
+        assert_eq!(sink.accepted_pages, page_count);
+        assert_eq!(summary.last_commit_lsn, Some(commit_lsn));
+        assert_eq!(summary.committed_prefix_length, committed_length);
+        assert_eq!(summary.torn_tail_bytes, 0);
     }
 
     #[test]
