@@ -758,6 +758,7 @@ mod tests {
     #[cfg(feature = "blink-demand-paging")]
     use crate::blink::{PagedReadConfig, PagedReadHandle};
     use crate::durable_file::ProductionFile;
+    use crate::fault::FaultInjector;
     use crate::wal::{
         WalCommit, WalDeltaRequest, WalIdentity, WalLog, WalPageImage, WalPageImageFormat,
         WalPageLocation, WalRecordType, WalSegmentBoundary,
@@ -768,8 +769,11 @@ mod tests {
     use std::fs;
     use std::io::{Read, Seek, SeekFrom};
     use std::path::{Path, PathBuf};
+    use std::process::Command;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::thread;
+    use std::time::{Duration, Instant};
 
     static DIRECTORY_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
@@ -795,6 +799,304 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    struct PauseBasePackAtPageWrite {
+        ready_path: PathBuf,
+    }
+
+    impl FaultInjector for PauseBasePackAtPageWrite {
+        fn hit(&mut self, point: &str) -> dodb_core::Result<()> {
+            if point == "during_checkpoint_page_write" {
+                fs::write(&self.ready_path, b"ready")?;
+                loop {
+                    thread::sleep(Duration::from_secs(1));
+                }
+            }
+            Ok(())
+        }
+    }
+
+    struct PauseWalBeforeCommit {
+        ready_path: PathBuf,
+    }
+
+    impl FaultInjector for PauseWalBeforeCommit {
+        fn hit(&mut self, point: &str) -> dodb_core::Result<()> {
+            if point == "after_page_images_written" {
+                fs::write(&self.ready_path, b"ready")?;
+                loop {
+                    thread::sleep(Duration::from_secs(1));
+                }
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit() {
+        const CHILD_WAL_PATH: &str = "DODB_TORN_WAL_SIGKILL_PATH";
+        const CHILD_READY: &str = "DODB_TORN_WAL_SIGKILL_READY";
+        let page_id = PageId::new(2);
+        let identity = StoreIdentity {
+            database_uuid: [0x78; 16],
+            wal_epoch: 14,
+        };
+        let wal_identity = wal_identity(identity);
+        let checkpoint_image = encode_blink_page(
+            page_id,
+            &BlinkPage::Leaf {
+                lsn: Lsn::new(10),
+                high_key: None,
+                right_sibling: None,
+                entries: super::super::LeafEntries::default(),
+            },
+        )
+        .unwrap();
+        if let Ok(wal_path) = std::env::var(CHILD_WAL_PATH) {
+            let mut wal = WalLog::open_with_segment_bases(
+                ProductionFile::open(&wal_path).unwrap(),
+                wal_identity,
+                WalPageImageFormat::ExperimentalBlink,
+                WalSegmentBoundary {
+                    start_after_lsn: Lsn::new(10),
+                    start_batch_id: None,
+                    truncate_torn_tail: true,
+                    defer_initial_sync: false,
+                },
+                BTreeMap::from([(
+                    page_id,
+                    crate::wal::RecoveredWalPage {
+                        commit_lsn: Lsn::new(10),
+                        image: Box::new(checkpoint_image),
+                    },
+                )]),
+                None,
+            )
+            .unwrap();
+            let incomplete_image = encode_blink_page(
+                page_id,
+                &BlinkPage::Leaf {
+                    lsn: Lsn::new(14),
+                    high_key: None,
+                    right_sibling: None,
+                    entries: super::super::LeafEntries::default(),
+                },
+            )
+            .unwrap();
+            let _ = wal.append_group(
+                &[WalCommit {
+                    batch_id: 2,
+                    commit_lsn: Lsn::new(14),
+                    pages: vec![WalPageImage {
+                        page_id,
+                        image: incomplete_image,
+                    }],
+                }],
+                Some(&mut PauseWalBeforeCommit {
+                    ready_path: PathBuf::from(std::env::var(CHILD_READY).unwrap()),
+                }),
+            );
+            panic!("child WAL append did not stop before its commit frame");
+        }
+
+        let directory = TestDirectory::new();
+        let wal_path = directory.path().join("active.wal");
+        let acknowledged_image = encode_blink_page(
+            page_id,
+            &BlinkPage::Leaf {
+                lsn: Lsn::new(12),
+                high_key: None,
+                right_sibling: None,
+                entries: super::super::LeafEntries::default(),
+            },
+        )
+        .unwrap();
+        let mut wal = WalLog::open_with_segment_bases(
+            ProductionFile::open(&wal_path).unwrap(),
+            wal_identity.clone(),
+            WalPageImageFormat::ExperimentalBlink,
+            WalSegmentBoundary {
+                start_after_lsn: Lsn::new(10),
+                start_batch_id: None,
+                truncate_torn_tail: true,
+                defer_initial_sync: false,
+            },
+            BTreeMap::from([(
+                page_id,
+                crate::wal::RecoveredWalPage {
+                    commit_lsn: Lsn::new(10),
+                    image: Box::new(checkpoint_image),
+                },
+            )]),
+            None,
+        )
+        .unwrap();
+        wal.append_group(
+            &[WalCommit {
+                batch_id: 1,
+                commit_lsn: Lsn::new(12),
+                pages: vec![WalPageImage {
+                    page_id,
+                    image: acknowledged_image,
+                }],
+            }],
+            None,
+        )
+        .unwrap();
+        drop(wal);
+        let committed_length = fs::metadata(&wal_path).unwrap().len();
+        let ready_path = directory.path().join("ready");
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "blink::paged_recovery::tests::active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit",
+                "--nocapture",
+            ])
+            .env(CHILD_WAL_PATH, &wal_path)
+            .env(CHILD_READY, &ready_path)
+            .spawn()
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !ready_path.exists() && Instant::now() < deadline {
+            if let Some(status) = child.try_wait().unwrap() {
+                panic!("SIGKILL child exited before incomplete page append: {status}");
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
+        assert!(
+            ready_path.exists(),
+            "child did not reach incomplete WAL append"
+        );
+        assert_eq!(
+            unsafe { libc::kill(child.id() as libc::pid_t, libc::SIGKILL) },
+            0
+        );
+        let status = child.wait().unwrap();
+        use std::os::unix::process::ExitStatusExt;
+        assert_eq!(status.signal(), Some(libc::SIGKILL));
+
+        let reopened = WalLog::open_with_segment_bases(
+            ProductionFile::open(&wal_path).unwrap(),
+            wal_identity,
+            WalPageImageFormat::ExperimentalBlink,
+            WalSegmentBoundary {
+                start_after_lsn: Lsn::new(10),
+                start_batch_id: None,
+                truncate_torn_tail: true,
+                defer_initial_sync: false,
+            },
+            BTreeMap::from([(
+                page_id,
+                crate::wal::RecoveredWalPage {
+                    commit_lsn: Lsn::new(10),
+                    image: Box::new(checkpoint_image),
+                },
+            )]),
+            None,
+        )
+        .unwrap();
+        assert_eq!(reopened.last_commit_lsn(), Some(Lsn::new(12)));
+        assert_eq!(
+            reopened
+                .recovery_pages()
+                .get(&page_id)
+                .unwrap()
+                .image
+                .as_ref(),
+            &acknowledged_image
+        );
+        assert_eq!(reopened.committed_batch_count(), 1);
+        assert!(fs::metadata(&wal_path).unwrap().len() >= committed_length);
+    }
+
+    #[test]
+    fn paged_base_pack_construction_survives_sigkill() {
+        const CHILD_DIRECTORY: &str = "DODB_PAGED_BASE_PACK_SIGKILL_DIRECTORY";
+        const CHILD_READY: &str = "DODB_PAGED_BASE_PACK_SIGKILL_READY";
+        if let Ok(directory_path) = std::env::var(CHILD_DIRECTORY) {
+            let directory = PathBuf::from(directory_path);
+            let identity = StoreIdentity {
+                database_uuid: [0x77; 16],
+                wal_epoch: 13,
+            };
+            let page_id = PageId::new(2);
+            let image = encode_blink_page(
+                page_id,
+                &BlinkPage::Free {
+                    lsn: Lsn::new(10),
+                    next: None,
+                },
+            )
+            .unwrap();
+            let mut writer = super::super::durable_bases::PagedBasePackJob {
+                directory,
+                identity: wal_identity(identity),
+                number: 5,
+                checkpoint_lsn: Lsn::new(10),
+                page_count: 1,
+                complete: true,
+                coalesce: true,
+            }
+            .begin(Some(Box::new(PauseBasePackAtPageWrite {
+                ready_path: PathBuf::from(std::env::var(CHILD_READY).unwrap()),
+            })))
+            .unwrap();
+            let _ = writer.append_page(page_id, &image);
+            panic!("child pack writer did not stop at the page-write boundary");
+        }
+
+        let directory = TestDirectory::new();
+        let identity = StoreIdentity {
+            database_uuid: [0x77; 16],
+            wal_epoch: 13,
+        };
+        let ready_path = directory.path().join("ready");
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "blink::paged_recovery::tests::paged_base_pack_construction_survives_sigkill",
+                "--nocapture",
+            ])
+            .env(CHILD_DIRECTORY, directory.path())
+            .env(CHILD_READY, &ready_path)
+            .spawn()
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !ready_path.exists() && Instant::now() < deadline {
+            if let Some(status) = child.try_wait().unwrap() {
+                panic!("SIGKILL child exited before page write: {status}");
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
+        assert!(ready_path.exists(), "child did not reach page write");
+        assert_eq!(
+            unsafe { libc::kill(child.id() as libc::pid_t, libc::SIGKILL) },
+            0
+        );
+        let status = child.wait().unwrap();
+        use std::os::unix::process::ExitStatusExt;
+        assert_eq!(status.signal(), Some(libc::SIGKILL));
+        let pack_path = pack_path(directory.path(), 5);
+        assert!(pack_path.exists());
+        let entry = super::super::durable_bases::BasePackEntry {
+            number: 5,
+            checkpoint_lsn: Lsn::new(10),
+            page_count: 1,
+            bytes: super::super::durable_bases::encoded_size(1),
+            checksum: 0,
+        };
+        let mut pack_file = fs::File::open(pack_path).unwrap();
+        assert!(
+            super::super::durable_bases::scan_pack(
+                &mut pack_file,
+                &entry,
+                &wal_identity(identity),
+                PageId::new(2),
+                |_, _, _, _| Ok(()),
+            )
+            .is_err()
+        );
     }
 
     fn resources() -> BlinkResourceManager {
