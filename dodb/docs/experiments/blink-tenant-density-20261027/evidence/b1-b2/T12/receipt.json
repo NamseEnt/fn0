@@ -7,14 +7,15 @@
     "54eaa434c43bd6b6faadb4ed5a4622d334b373e4",
     "8f636469b1af80e44caf7221166721e9fabd4f62",
     "53d6451f91836dda6b3079c871abf737766e2d9d",
-    "ab526c8b245075358b71b4ca5729461b8ac4a468"
+    "ab526c8b245075358b71b4ca5729461b8ac4a468",
+    "67b5a2e8a"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "ab526c8b245075358b71b4ca5729461b8ac4a468"
+    "source_commit": "67b5a2e8a"
   },
   "validated": [
     {
@@ -82,6 +83,48 @@
       "command": "cargo check -p dodb-server --all-targets",
       "exit_status": 0,
       "result": "passed"
+    },
+    {
+      "name": "server_library_tests_with_demand_paging_feature",
+      "command": "cargo test -p dodb-server --features blink-demand-paging --lib -- --test-threads=1",
+      "exit_status": 0,
+      "result": "19 passed, 0 failed; includes shared tenant metadata budget lifecycle and unsupported layout rejection"
+    },
+    {
+      "name": "server_library_tests_default_after_shared_resource_change",
+      "command": "cargo test -p dodb-server --lib -- --test-threads=1",
+      "exit_status": 0,
+      "result": "17 passed, 0 failed; feature-disabled default route remains unchanged"
+    },
+    {
+      "name": "server_all_targets_check_default_after_shared_resource_change",
+      "command": "cargo check -p dodb-server --all-targets",
+      "exit_status": 0,
+      "result": "passed"
+    },
+    {
+      "name": "server_all_targets_check_demand_paging_feature",
+      "command": "cargo check -p dodb-server --all-targets --features blink-demand-paging",
+      "exit_status": 0,
+      "result": "passed"
+    },
+    {
+      "name": "server_format_after_shared_resource_change",
+      "command": "cargo fmt --check -p dodb-server",
+      "exit_status": 0,
+      "result": "passed"
+    },
+    {
+      "name": "shared_resource_capacity_lifecycle",
+      "command": "cargo test -p dodb-server --features blink-demand-paging shared_blink_metadata_budget_precedes_open_and_releases_on_shutdown --lib -- --test-threads=1",
+      "exit_status": 0,
+      "result": "1 passed; third open rejected before tenant file creation at shared budget, shutdown released charges, and retry succeeded"
+    },
+    {
+      "name": "unsupported_paging_layout_rejected_before_filesystem_access",
+      "command": "cargo test -p dodb-server --features blink-demand-paging shared_paging_resources_reject_incompatible_layout_before_filesystem_access --lib -- --test-threads=1",
+      "exit_status": 0,
+      "result": "1 passed; Legacy, non-base segmented WAL, and B-tree service combinations rejected before creating their data directories"
     }
   ],
   "prerequisite_receipts": [
@@ -97,8 +140,9 @@
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/receipt.json"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-server/src/lib.rs": "24656529c3ab450f68cb9e4133d049a092f370f0df13c7ee943e3dce640fe651",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "fb86ad7a3eb2edbddf5640a8fdbb5aa5001bffedfd9babcabdcb73f0034498ad"
+    "dodb/crates/dodb-server/src/lib.rs": "3bf748d664262057b7022f77e58d8f2a04385fd823008973fde9b33a9fa28b1f",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "34d06aed28c34142bbf0a33d12efdc3f518080558e34933667933e59f8d30505",
+    "dodb/crates/dodb-server/Cargo.toml": "3a9164700687fd98dd554bd1a8ea300e574fdce383e4733f706dff05abc9c128"
   },
   "logs": [
     {
@@ -196,6 +240,36 @@
       "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-format-after-open-limits.log",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "exit_status": 0
+    },
+    {
+      "name": "shared_resource_test_layout_failure_preserved",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/shared-resource-test-layout-failure.log",
+      "sha256": "b533860b53f3fd835ec35bf110dd05afcbfb773b4a564c18a7f7630221790ab5",
+      "exit_status": 101
+    },
+    {
+      "name": "server_library_tests_with_demand_paging_feature",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-lib-tests-shared-resource-feature.log",
+      "sha256": "e1e6ec9c36322a7289ad8c328cc317230826c1f0925f219aacbb92f0a55b7d8a",
+      "exit_status": 0
+    },
+    {
+      "name": "server_library_tests_default_after_shared_resource_change",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-lib-tests-shared-resource-default.log",
+      "sha256": "ccca00fd450b614f1aea0a2175cf47ed1eb5dd7f49cce4aedd1415ceeb610bfd",
+      "exit_status": 0
+    },
+    {
+      "name": "server_all_targets_check_default_after_shared_resource_change",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-all-targets-check-shared-resource-default.log",
+      "sha256": "76360aa5066b49c95c97062393d258df59badad75dc68424030aa20a8d950a05",
+      "exit_status": 0
+    },
+    {
+      "name": "server_all_targets_check_demand_paging_feature",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-all-targets-check-shared-resource-feature.log",
+      "sha256": "0b120f9ed5949fb8550eda75d9eb81cc391664025503b4013f770bc697aacc14",
+      "exit_status": 0
     }
   ],
   "remaining_work": [
@@ -221,6 +295,11 @@
       "name": "cancelled_open_initial_compile_failure",
       "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/cancelled-open-initial-compile-failure.log",
       "reason": "The test used unwrap_err, which required the successful AsyncBlinkShard result type to implement Debug; the assertion was changed to inspect JoinError directly."
+    },
+    {
+      "name": "shared_resource_test_initial_layout_failure",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/shared-resource-test-layout-failure.log",
+      "reason": "The test requested shared demand-paging resources with the default Legacy WAL layout; the fixture was corrected to use segmented WAL with durable bases."
     }
   ]
 }
