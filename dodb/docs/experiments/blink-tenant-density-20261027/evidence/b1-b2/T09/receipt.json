@@ -43,7 +43,7 @@
     "dodb/crates/dodb-storage/src/btree/mod.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "3504a1b5c7129499a9a761d24571afdcdbcece6e7c8f2a9a648990f23e17c150",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "ab0f21edfbfb280722a06e414b94fe26e57b4a88c80b81882174294debe0edbb",
     "dodb/crates/dodb-storage/src/blink/page_cache.rs": "83d1ac6841a55cf5d6eefb11e68e5a2eece05882b49d5db11b4850013ae0a133",
     "dodb/crates/dodb-storage/src/wal.rs": "8270097336b983145f651e4206688c826f5d4d3d244dc7c4b8f82790b621475e",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "8f077ed1e82932247bcf986f0b3c95c846cc48188525775380c3375a4f90c86e",
@@ -594,6 +594,69 @@
         "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-delta-package-tests.log.gz",
         "sha256": "561e230b16d84dc5ba782b88213a8f9305ad041800455711ffa8c0c1ef239703"
       }
+    },
+    {
+      "name": "paged_writer_fault_reopen_oracle",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "blink::tests::paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; pre-commit append failure recovers unchanged checkpoint pages, injected sync failure recovers a changed committed page, and every recovered page LSN validates",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-reopen-fault-oracle-final.log",
+        "sha256": "0a412613dccb8031d128851d54ce14e6529f1c8f50f45b5a2b8478568507abbb"
+      }
+    },
+    {
+      "name": "paged_writer_reopen_feature_library_tests_serial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "293 passed, 0 failed, 4 ignored; finished in 122.14s",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-reopen-feature-lib.log",
+        "sha256": "f58fd5214c99b9387bbac341c155a66303d27326f2ee81bf859039705a6ac4e2"
+      }
+    },
+    {
+      "name": "paged_writer_reopen_rustfmt_and_diff_check",
+      "argv": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "--config",
+        "skip_children=true",
+        "dodb/crates/dodb-storage/src/blink/mod.rs",
+        "&&",
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "targeted rustfmt check and working-tree diff check passed"
     }
   ],
   "acceptance_mapping": {
@@ -604,7 +667,7 @@
     "conditional_and_multikey_group_durability_and_recovery": "partial: preparation validates conditions and multi-key requests; writer currently appends one logical transaction per WAL commit; group recovery not implemented",
     "expected_conflict_tombstone_aba_and_free_page_reuse": "partial or not implemented: expected conflict and overflow frees are covered in preparation; durable ABA and page reuse behavior are not implemented on this route",
     "ninth_delta_emits_image_through_paged_writer": "passed in the focused writer fixture: depths 1 through 8 use delta locators and the ninth update is a full image; paged-writer crash/reopen across rotation remains outstanding",
-    "append_sync_and_publication_fault_boundaries": "partial: append, sync, and publication failures keep the prior generation visible and fail-stop the writer; complete-or-absent recovery after reopen remains outstanding",
+    "append_sync_and_publication_fault_boundaries": "partial: append, sync, and publication failures keep the prior generation visible and fail-stop; WAL-level reopen oracle now proves the append failure absent and the injected sync-failure transaction present as complete recovered page state; full store/service and grouped recovery remain outstanding",
     "oversized_working_set_precommit_rejection_and_no_reservation_leak": "passed for preparation: bounded-page overload occurs before any WAL commit; reservation categories return to their prior values",
     "production_service_activation": "not activated; remains gated for T12-T15"
   },
@@ -630,11 +693,25 @@
       "exit_status": 101,
       "reason": "existing phase0-bench.rs initializer omits WalRedoStats::image_delta_chain_limit",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-delta-package-tests.log.gz"
+    },
+    {
+      "name": "paged_writer_reopen_oracle_seeded_first_delta_page_only",
+      "exit_status": 101,
+      "reason": "reopen seeded only the first delta page (page 2), while the fault transaction also had a delta for page 3; the fixture now seeds every existing checkpoint page",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-reopen-fault-oracle.log",
+      "preserved_artifact": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/failures/paged-writer-reopen-base-mismatch/"
+    },
+    {
+      "name": "paged_writer_reopen_oracle_incomplete_seed_after_first_fix",
+      "exit_status": 101,
+      "reason": "reopen still lacked the second existing delta base page; corrected by seeding the full checkpoint page set",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-reopen-fault-oracle-corrected.log",
+      "preserved_artifact": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/failures/paged-writer-reopen-with-base-mismatch/"
     }
   ],
   "remaining_work": [
-    "T09 preserve transaction boundaries for grouped requests and prove complete-or-absent WAL recovery after injected append and sync failures",
-    "T09 complete dirty-page page-reuse, tombstone/ABA, split/overflow, condition, and multi-key writer acceptance",
+    "T09 implement grouped transaction boundaries and prove grouped complete-or-absent recovery",
+    "T09 complete dirty-page page reuse, durable tombstone/ABA, split/overflow, condition, and multi-key writer acceptance",
     "T09 prove writer delta-chain reconstruction after close/reopen and WAL rotation using exact intermediate LSN and CRC checks",
     "T10-T16 checkpoint, recovery, service, resource, scheduling, crash, and experiment-readiness gates",
     "T17 remains separately authorized and was not started"
