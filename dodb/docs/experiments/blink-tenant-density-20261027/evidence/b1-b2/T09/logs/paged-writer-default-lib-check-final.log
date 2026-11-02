@@ -1,0 +1,31 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+    Checking dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+error[E0658]: attributes on expressions are experimental
+    --> dodb/crates/dodb-storage/src/wal.rs:1765:9
+     |
+1765 |         #[cfg(feature = "blink-demand-paging")]
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: see issue #15701 <https://github.com/rust-lang/rust/issues/15701> for more information
+
+error: removing an expression is not supported in this position
+    --> dodb/crates/dodb-storage/src/wal.rs:1765:9
+     |
+1765 |         #[cfg(feature = "blink-demand-paging")]
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0609]: no field `recent_committed_page_locations` on type `&mut WalLog<F>`
+    --> dodb/crates/dodb-storage/src/wal.rs:1766:14
+     |
+1766 |         self.recent_committed_page_locations = outcome.locations.clone();
+     |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `file`, `identity`, `format_version`, `next_lsn`, `next_batch_id` ... and 20 others
+
+Some errors have detailed explanations: E0609, E0658.
+For more information about an error, try `rustc --explain E0609`.
+error: could not compile `dodb-storage` (lib) due to 3 previous errors
