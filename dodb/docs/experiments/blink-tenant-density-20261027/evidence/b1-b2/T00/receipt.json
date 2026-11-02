@@ -1,31 +1,46 @@
 {
   "task_id": "T00",
   "scope": "Freeze B1/B2 contracts, formats, and failure ordering",
-  "status": "specification-drafted",
-  "parent_source_commit": "6f7389d1836aad7e710b18c5d986010df9b83373",
-  "implementation_commit": null,
+  "status": "accepted",
+  "parent_source_commit": "8c4e39ec4f6e2a50685bcabd617defc1760f4d45",
+  "implementation_commit": "8a239d42e81d5b8984f15d84153c6b3ae6a04688",
   "prerequisite_receipts": [],
   "owned_paths": [
     "dodb/docs/experiments/blink-tenant-density-20261027/B1-B2-CONTRACTS.md",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T00/RESULTS.md",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T00/receipt.json"
   ],
-  "source_hashes": {},
+  "source_hashes": {
+    "dodb/docs/experiments/blink-tenant-density-20261027/B1-B2-CONTRACTS.md": "a364ae52dc9b0eabf910b780decf69c9c3b0ac1754c78796e19bcaab34a5c861",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T00/RESULTS.md": "94b0478f9fe85aeb933c2d8250781ffe5150eaf0675be99d81c5925bf60ae04d"
+  },
   "host": "local worktree",
   "toolchain": "not used",
   "features": [],
   "runtime_configuration": "none",
-  "checks": [],
+  "checks": [
+    {
+      "argv": ["manual contract review", "section 3", "deterministic correctness fixture specification", "mandatory acceptance matrix", "T00 task card"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "accepted; missing numeric fixture values added; no implementation or experimental claims"
+    },
+    {
+      "argv": ["git", "diff", "--check"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "passed"
+    }
+  ],
   "acceptance_mapping": {
-    "compatibility, identity, formats, WAL, retention, resource, lock, fairness, and transition contracts": "Specified in B1-B2-CONTRACTS.md; not yet independently reviewed",
+    "compatibility, identity, formats, WAL, retention, resource, lock, fairness, and transition contracts": "Independently reviewed against plan section 3, acceptance matrix, and task cards; exact numeric fixtures frozen in B1-B2-CONTRACTS.md",
     "existing integration points": "Mapped to current Rust symbols in B1-B2-CONTRACTS.md",
     "implementation claims": "None"
   },
   "ownership_peaks": {},
   "failed_attempts": [],
   "remaining_work": [
-    "Review and freeze the contract in its own commit before T01",
-    "Implement and validate T01 through T16",
+    "Implement and validate T14 through T16",
     "Freeze and separately authorize the T17 comparison matrix"
   ],
   "next_task": "T01"
