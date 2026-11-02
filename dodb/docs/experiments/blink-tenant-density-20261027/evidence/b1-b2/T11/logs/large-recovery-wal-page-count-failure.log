@@ -1,0 +1,6 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' recovery_indexes_locations_from_an_actual_committed_wal -- --test-threads=1 --nocapture
+Exit status: 101
+thread 'blink::paged_recovery::tests::recovery_indexes_locations_from_an_actual_committed_wal' panicked:
+assertion `left == right` failed
+  left: 24
+ right: 4

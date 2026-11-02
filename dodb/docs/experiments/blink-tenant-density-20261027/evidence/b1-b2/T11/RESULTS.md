@@ -8,16 +8,18 @@ The validator reserves three pages from `CheckpointValidation` and reserves one 
 
 The validator also checks internal child types and levels, separator/child fences, leaf and internal sibling continuity, overflow ownership and lengths, and free-list page types. A corrupt leaf not touched by the requested read fails validation. Test fixtures cover missing allocation, an omitted free list, a free-list cycle, multiply owned tree child, and scratch release. The validated-open arguments are grouped in `PagedValidatedOpenConfig`.
 
-Additional storage tests cover all four paged manifest pointer publication fault boundaries and real process `SIGKILL` at all four pointer stages; source GC is also killed before and after unlink, then reopened and retried; source GC is also killed before and after unlink, then reopened and retried and fail-closed delta-chain sidecar checks for wrong embedded identity, corrupted payload, truncation, and missing sidecar.
+Recovery now exposes `PagedRecoveryIndexBuilder::validate_recovered_pages`, which validates the builder's recovered index root before publication. The integration test replays a WAL larger than the two-page cache, validates all 24 allocated pages, and reopens the published generation.
+
+Storage tests cover all four paged manifest pointer publication fault boundaries and real process `SIGKILL` at each pointer stage. Source GC is killed before and after unlink, then reopened and retried. Delta-chain sidecar tests reject wrong embedded identity, corrupted payload, truncation, and missing sidecar.
 
 ## Validation
 
-- `rustfmt --edition 2024 --check crates/dodb-storage/src/blink/paged_manifest.rs crates/dodb-storage/src/blink/version_chain.rs crates/dodb-storage/src/blink/mod.rs`: passed.
-- Focused paged validation, manifest validated-open, pointer and source-GC `SIGKILL` boundaries, and delta-chain sidecar regressions: passed.
+- `rustfmt --edition 2024 --check crates/dodb-storage/src/blink/paged_recovery.rs crates/dodb-storage/src/blink/paged_manifest.rs crates/dodb-storage/src/blink/version_chain.rs crates/dodb-storage/src/blink/source_manager.rs crates/dodb-storage/src/blink/mod.rs`: passed.
+- Focused paged validation, recovery streaming validation, manifest validated-open, pointer and source-GC `SIGKILL` boundaries, and delta-chain sidecar regressions: passed.
 - `cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1`: passed, 313 tests; 4 ignored.
 - `git diff --check`: passed.
-- Strict Clippy remains blocked by 12 diagnostics in existing code in `blink/mod.rs` and `wal.rs`; none point to the new validated-open API, bounded validator, or `source_manager.rs`. No lint suppression was added.
+- Strict Clippy remains blocked by 12 diagnostics in existing code in `blink/mod.rs` and `wal.rs`; none point to the new recovery validation API, bounded validator, validated-open API, or `source_manager.rs`. No lint suppression was added.
 
 ## Remaining T11 Work
 
-The bounded structural checker is implemented for explicit paged validation opens and the manifest-plus-reader open helper. Route recovery and service opens through this helper or validate the recovered root before publication. Above-cache reopen with a large WAL and the required storage process-kill/crash-boundary matrix remain. Existing fault-injection and WAL recovery unit tests do not replace the required process-kill evidence. T11 remains partial until those gates pass.
+The bounded checker is integrated with explicit paged manifest opening and WAL recovery validation. Service tenant opening will route through the validated path as part of T12. The remaining T11 gap is process-kill evidence for WAL-tail recovery, delta/base and pack construction, sidecar/index/manifest ordering, page reuse and pinned checkpoint races, and recovery followed by a write and a second process crash. Existing fault-injection tests are supporting coverage and do not replace those process-kill cases. T11 remains partial until those gates pass.

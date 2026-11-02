@@ -1,0 +1,5 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' recovery_indexes_locations_from_an_actual_committed_wal -- --test-threads=1 --nocapture
+Exit status: 101
+thread 'blink::paged_recovery::tests::recovery_indexes_locations_from_an_actual_committed_wal' panicked at dodb/crates/dodb-storage/src/blink/paged_recovery.rs:1286:10:
+called `Result::unwrap()` on an `Err` value: InternalInvariantViolation("WAL commit LSN 12, expected 35")
+error: test failed, to rerun pass `-p dodb-storage --lib`

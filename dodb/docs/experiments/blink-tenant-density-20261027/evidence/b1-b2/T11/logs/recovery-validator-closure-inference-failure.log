@@ -1,0 +1,10 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' recovery_indexes_locations_from_an_actual_committed_wal -- --test-threads=1 --nocapture
+Exit status: 101
+error[E0282]: type annotations needed
+    --> dodb/crates/dodb-storage/src/blink/paged_recovery.rs:1407:41
+     |
+1407 |                         header_length: |source| {
+     |                                         ^^^^^^
+1408 |                             Ok(if source.kind == SourceFileKind::WalSegment {
+     |                                   ------ type must be known at this point
+error: could not compile `dodb-storage` (lib test) due to 1 previous error

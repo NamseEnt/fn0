@@ -11,14 +11,15 @@
     "b8e57e68d",
     "0c5104b3b",
     "72a88fb07",
-    "72a88fb07"
+    "72a88fb07",
+    "72a63c511"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "72a88fb07"
+    "source_commit": "72a63c511"
   },
   "features": [
     "blink-demand-paging",
@@ -84,23 +85,30 @@
       "result": "1 passed; before-unlink kill retained the candidate and retry removed it; after-unlink kill left it absent and retry was clean"
     },
     {
+      "name": "source_gc_sigkill_boundaries",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' source_gc_survives_sigkill_before_and_after_unlink -- --test-threads=1 --nocapture",
+      "exit_status": 0,
+      "result": "1 passed; before-unlink kill retained the candidate and retry removed it; after-unlink kill left it absent and retry was clean"
+    },
+    {
       "name": "dodb_storage_full_library_suite",
       "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1",
       "exit_status": 0,
       "result": "313 passed, 4 ignored"
     },
     {
-      "name": "source_gc_sigkill_boundaries",
-      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' source_gc_survives_sigkill_before_and_after_unlink -- --test-threads=1 --nocapture",
+      "name": "paged_recovery_streaming_full_validation",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' recovery_indexes_locations_from_an_actual_committed_wal -- --test-threads=1 --nocapture",
       "exit_status": 0,
-      "result": "1 passed; before-unlink kill retained the candidate and retry removed it; after-unlink kill left it absent and retry was clean"
+      "result": "1 passed; actual WAL exceeds two-page cache, recovery indexes 24 pages, and bounded validation checks all allocated pages before publication"
     }
   ],
   "source_hashes": {
     "dodb/crates/dodb-storage/src/blink/mod.rs": "e3c91c56e60c17de54088c1caf90f358ddde88c74d00d0f8b8d06918fe24d788",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "20560bff3b3715642417335a71bd80e5990f8d157398dbbf4e1fa541dd7db6cd",
     "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "79623b7fe30e5c0337e167ce5032aef9b0c59e952893b0355f03c384e6becdc3",
-    "dodb/crates/dodb-storage/src/blink/version_chain.rs": "819b7f9cff96ac9909d4f3e5e29433151328c33f25fd6c0ad4b212b0085cadad"
+    "dodb/crates/dodb-storage/src/blink/version_chain.rs": "819b7f9cff96ac9909d4f3e5e29433151328c33f25fd6c0ad4b212b0085cadad",
+    "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "15437248645f34824dabe117b94e073c5dcd1f2b8e844739415e3c2d2e7cb5e9"
   },
   "logs": [
     {
@@ -172,7 +180,7 @@
     {
       "name": "full_dodb_storage_library_suite_final",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-bounded-structure-full-lib-final.log",
-      "sha256": "a92a670dbdff65ce656687b87fcb8e5c9ea775372c655592a0e9aeab08b6f82f",
+      "sha256": "117c2c82ccc1e8849e8bf09fa16ad7d1001a8154ea20b6fd8ceecef95830d54c",
       "exit_status": 0
     },
     {
@@ -216,12 +224,47 @@
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-source-gc-sigkill.log",
       "sha256": "5eaaf73ac81f4427c71fe1ede2b05a03a07c9f08a5d953cabce36c9cdb9c65f7",
       "exit_status": 0
+    },
+    {
+      "name": "paged_recovery_streaming_full_validation",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-recovery-streaming-validator.log",
+      "sha256": "893dc97de8e43001f2274db70e12d71cb3afca3d8f80aa73eb6f94ac54c23fef",
+      "exit_status": 0
+    },
+    {
+      "name": "recovery_validator_initial_compile_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/recovery-validator-initial-compile-failure.log",
+      "sha256": "b042c7a5f5e539447018e1f5bf12a13e86000674c6f74b2c89c0403e4e744ac8",
+      "exit_status": 101
+    },
+    {
+      "name": "recovery_validator_closure_inference_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/recovery-validator-closure-inference-failure.log",
+      "sha256": "97876a084307b4eabb254893472e3cf52273a4102f52b9cd676d3e26d0fe671c",
+      "exit_status": 101
+    },
+    {
+      "name": "large_recovery_wal_lsn_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/large-recovery-wal-lsn-failure.log",
+      "sha256": "9a989cb61090aff1e3c4194fb4be4bc0d86c3fe58803e2b37b072ac78c5b28aa",
+      "exit_status": 101
+    },
+    {
+      "name": "large_recovery_wal_size_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/large-recovery-wal-size-failure.log",
+      "sha256": "e525a0bd7deabd264b21d4b4fdcfede90b86c6a55231fe3f458a37ad3e310552",
+      "exit_status": 101
+    },
+    {
+      "name": "large_recovery_wal_page_count_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/large-recovery-wal-page-count-failure.log",
+      "sha256": "a82b602e145cf21b6a9b6c9e8f1b822a4e13ada20a9537684270e88ed6efb40d",
+      "exit_status": 101
     }
   ],
   "remaining_work": [
-    "Integrate bounded full validation into the paged recovery and service open path.",
-    "Add above-cache reopen and large-WAL replay validation with the complete validator.",
-    "Complete real storage process-kill and crash-boundary evidence for torn active tails, corrupt closed tails, invalid delta/base, sidecar/index/manifest ordering, pack construction failure, publication and GC, page-ID reuse, pinned-version checkpoint races, and recovery-write-second-crash recovery."
+    "Route tenant service opening through complete bounded validation and prove failure cleanup as part of T12.",
+    "Complete real storage process-kill evidence for WAL-tail recovery, delta/base and pack construction, sidecar/index/manifest ordering, page reuse and pinned checkpoint races, and recovery-write-second-crash."
   ],
   "next_task": "T11",
   "push": {

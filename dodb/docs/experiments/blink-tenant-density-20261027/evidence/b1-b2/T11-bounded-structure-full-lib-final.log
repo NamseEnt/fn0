@@ -2,7 +2,7 @@
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on build directory
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.84s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.98s
      Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-70634b21c90c24df)
 
 running 317 tests
@@ -336,5 +336,4 @@ test wal::tests::trusted_internal_valid_images_are_byte_identical_to_strict_imag
 test wal::tests::unsupported_version_is_rejected ... ok
 test wal::tests::wrong_magic_is_rejected ... ok
 
-test result: ok. 313 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 127.84s
-
+test result: ok. 313 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 128.57s
