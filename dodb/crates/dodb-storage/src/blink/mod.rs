@@ -1789,6 +1789,7 @@ pub struct PagedReadConfig {
 }
 
 #[cfg(feature = "blink-demand-paging")]
+#[derive(Clone)]
 pub struct PagedCheckpointPackRequest {
     pub directory: std::path::PathBuf,
     pub file_number: u64,
@@ -1796,6 +1797,52 @@ pub struct PagedCheckpointPackRequest {
     pub checkpoint_lsn: Lsn,
     pub previous_checkpoint_lsn: Option<Lsn>,
     pub coalesce: bool,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+pub struct PagedCheckpointJob {
+    target: PagedReadHandle,
+    request: PagedCheckpointPackRequest,
+    target_lsn: Lsn,
+    previous_checkpoint_lsn: Lsn,
+    manifest_generation: u64,
+    pack_output: Option<durable_bases::PagedBasePackOutput>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl PagedCheckpointJob {
+    pub fn target_lsn(&self) -> Lsn {
+        self.target_lsn
+    }
+
+    pub fn write_pack(&mut self) -> Result<bool> {
+        if self.pack_output.is_some() {
+            return Err(Error::invalid_input(
+                "paged checkpoint job already has a completed pack",
+            ));
+        }
+        let output = if self.request.previous_checkpoint_lsn.is_some() {
+            self.target.write_incremental_checkpoint_pack(
+                PagedCheckpointPackRequest {
+                    checkpoint_lsn: self.target_lsn,
+                    previous_checkpoint_lsn: Some(self.previous_checkpoint_lsn),
+                    ..self.request.clone()
+                },
+                None,
+            )?
+        } else {
+            Some(self.target.write_checkpoint_pack(
+                PagedCheckpointPackRequest {
+                    checkpoint_lsn: self.target_lsn,
+                    previous_checkpoint_lsn: None,
+                    ..self.request.clone()
+                },
+                None,
+            )?)
+        };
+        self.pack_output = output;
+        Ok(self.pack_output.is_some())
+    }
 }
 
 #[cfg(feature = "blink-demand-paging")]
@@ -2469,13 +2516,55 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
         )
     }
 
-    pub fn checkpoint_to_manifest(
+    pub fn begin_checkpoint(
+        &mut self,
+        manifest_store: &paged_manifest::PagedManifestStore,
+        mut pack_request: PagedCheckpointPackRequest,
+        incremental: bool,
+    ) -> Result<Option<PagedCheckpointJob>> {
+        if let Some(message) = &self.broken {
+            return Err(Error::durability(format!(
+                "paged transaction writer is unavailable after an uncertain persistence failure: {message}"
+            )));
+        }
+        let previous_manifest = manifest_store.current();
+        if pack_request.identity != *self.wal.identity()
+            || pack_request.file_number == 0
+            || pack_request.directory.as_path() != self.current.sources.checkpoint_directory()
+            || previous_manifest.recovery_wal_file_number != self.wal_source.file_number
+            || previous_manifest.identity != self.current.index.store_identity()
+        {
+            return Err(Error::invalid_input(
+                "paged checkpoint identity, directory, or source number is invalid",
+            ));
+        }
+        let Some(target_lsn) = self.wal.last_commit_lsn() else {
+            return Ok(None);
+        };
+        if target_lsn <= previous_manifest.committed_prefix_lsn {
+            return Ok(None);
+        }
+        self.wal.sync_all()?;
+        let target = self.snapshot()?;
+        pack_request.checkpoint_lsn = target_lsn;
+        pack_request.previous_checkpoint_lsn =
+            incremental.then_some(previous_manifest.committed_prefix_lsn);
+        Ok(Some(PagedCheckpointJob {
+            target,
+            request: pack_request,
+            target_lsn,
+            previous_checkpoint_lsn: previous_manifest.committed_prefix_lsn,
+            manifest_generation: previous_manifest.generation,
+            pack_output: None,
+        }))
+    }
+
+    pub fn publish_checkpoint(
         &mut self,
         manifest_store: &mut paged_manifest::PagedManifestStore,
-        mut pack_request: PagedCheckpointPackRequest,
+        mut job: PagedCheckpointJob,
         next_wal_file_number: u64,
         next_wal_file: F,
-        incremental: bool,
     ) -> Result<Option<Lsn>> {
         if let Some(message) = &self.broken {
             return Err(Error::durability(format!(
@@ -2483,62 +2572,53 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             )));
         }
         let previous_manifest = manifest_store.current();
-        let Some(checkpoint_lsn) = self.wal.last_commit_lsn() else {
-            return Ok(None);
+        let Some(pack_output) = job.pack_output.take() else {
+            return Err(Error::invalid_input(
+                "paged checkpoint pack must finish before publication",
+            ));
         };
-        if checkpoint_lsn <= previous_manifest.committed_prefix_lsn
-            || pack_request.identity != *self.wal.identity()
-            || pack_request.file_number == 0
-            || next_wal_file_number <= self.wal_source.file_number
-            || next_wal_file_number == 0
-            || pack_request.directory.as_path() != self.current.sources.checkpoint_directory()
+        if previous_manifest.generation != job.manifest_generation
             || previous_manifest.recovery_wal_file_number != self.wal_source.file_number
             || previous_manifest.identity != self.current.index.store_identity()
+            || job.request.identity != *self.wal.identity()
+            || pack_output.entry.checkpoint_lsn != job.target_lsn
+            || next_wal_file_number <= self.wal_source.file_number
+            || next_wal_file_number == 0
+            || job.request.directory.as_path() != self.current.sources.checkpoint_directory()
         {
             return Err(Error::invalid_input(
-                "paged checkpoint target, identity, or source number is invalid",
+                "paged checkpoint publication target, identity, or source number is invalid",
             ));
         }
-        let checkpoint_directory = pack_request.directory.clone();
-        pack_request.checkpoint_lsn = checkpoint_lsn;
-        pack_request.previous_checkpoint_lsn =
-            incremental.then_some(previous_manifest.committed_prefix_lsn);
-        let pack_output = if incremental {
-            self.current
-                .write_incremental_checkpoint_pack(pack_request, None)?
-        } else {
-            Some(self.current.write_checkpoint_pack(pack_request, None)?)
+        let Some(latest_lsn) = self.wal.last_commit_lsn() else {
+            return Err(Error::invariant(
+                "paged writer lost its committed WAL prefix during checkpoint",
+            ));
         };
-        let Some(pack_output) = pack_output else {
-            return Ok(None);
-        };
-        let pack_path = durable_bases::pack_path(&checkpoint_directory, pack_output.entry.number);
-        let (checkpoint_root, _) = if incremental {
-            paged_recovery::build_incremental_checkpoint_index(
-                &self.current.index,
-                self.current.root,
-                &pack_path,
-                &pack_output.entry,
-                previous_manifest.committed_prefix_lsn,
-                self.wal.identity(),
-                self.current.high_water_page_id,
-            )?
-        } else {
-            paged_recovery::build_checkpoint_index(
-                &self.current.index,
-                self.current.root,
-                &pack_path,
-                &pack_output.entry,
-                pack_output.complete,
-                self.wal.identity(),
-                self.current.high_water_page_id,
-            )?
-        };
+        if latest_lsn < job.target_lsn {
+            return Err(Error::invariant(
+                "paged writer WAL moved behind its checkpoint target",
+            ));
+        }
+        let pack_path = durable_bases::pack_path(&job.request.directory, pack_output.entry.number);
+        let checkpoint_root = paged_recovery::build_checkpoint_index_for_generation(
+            &self.current.index,
+            paged_recovery::PagedCheckpointGeneration {
+                target_root: job.target.root,
+                latest_root: self.current.root,
+                pack_path: &pack_path,
+                pack_entry: &pack_output.entry,
+                complete: job.request.previous_checkpoint_lsn.is_none(),
+                previous_checkpoint_lsn: job.request.previous_checkpoint_lsn,
+                wal_identity: &job.request.identity,
+                high_water_page_id: job.target.high_water_page_id,
+            },
+        )?;
         let mut next_wal = WalLog::open_with_segment_boundary(
             next_wal_file,
             self.wal.identity().clone(),
             WalPageImageFormat::ExperimentalBlink,
-            checkpoint_lsn,
+            latest_lsn,
             Some(self.wal.next_batch_id()),
             true,
             false,
@@ -2575,7 +2655,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             source_catalog_root: previous_manifest.source_catalog_root,
             recovery_wal_file_number: next_wal_file_number,
             recovery_offset,
-            committed_prefix_lsn: checkpoint_lsn,
+            committed_prefix_lsn: latest_lsn,
             previous_generation: previous_manifest.generation,
         };
         let publication_result =
@@ -2592,9 +2672,27 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
         self.current = next_handle;
         self.wal = next_wal;
         self.wal_source = next_wal_source;
-        self.superblock.checkpoint_lsn = checkpoint_lsn;
-        self.superblock.checkpoint_sequence = checkpoint_lsn.get();
-        Ok(Some(checkpoint_lsn))
+        self.superblock.checkpoint_lsn = latest_lsn;
+        self.superblock.checkpoint_sequence = latest_lsn.get();
+        Ok(Some(latest_lsn))
+    }
+
+    pub fn checkpoint_to_manifest(
+        &mut self,
+        manifest_store: &mut paged_manifest::PagedManifestStore,
+        pack_request: PagedCheckpointPackRequest,
+        next_wal_file_number: u64,
+        next_wal_file: F,
+        incremental: bool,
+    ) -> Result<Option<Lsn>> {
+        let Some(mut job) = self.begin_checkpoint(manifest_store, pack_request, incremental)?
+        else {
+            return Ok(None);
+        };
+        if !job.write_pack()? {
+            return Ok(None);
+        }
+        self.publish_checkpoint(manifest_store, job, next_wal_file_number, next_wal_file)
     }
 
     pub fn transact(
@@ -15962,36 +16060,28 @@ mod tests {
             .transact(&first_write, &StorageLimits::default(), Revision::new(1))
             .unwrap();
         let first_checkpoint_lsn = first_result.commit_lsn.unwrap();
-        assert_eq!(
-            writer
-                .checkpoint_to_manifest(
-                    &mut manifest_store,
-                    PagedCheckpointPackRequest {
-                        directory: checkpoint_directory.clone(),
-                        file_number: 2,
-                        identity: wal_identity.clone(),
-                        checkpoint_lsn: Lsn::ZERO,
-                        previous_checkpoint_lsn: None,
-                        coalesce: true,
-                    },
-                    2,
-                    crate::durable_file::ProductionFile::open(
-                        wal_directory.join("segment-00000000000000000002.wal"),
-                    )
-                    .unwrap(),
-                    false,
-                )
-                .unwrap(),
-            Some(first_checkpoint_lsn)
-        );
-        assert_eq!(manifest_store.current().generation, 2);
-        assert_eq!(writer.wal.last_commit_lsn(), None);
-        assert_eq!(writer.wal.history_start_lsn(), first_checkpoint_lsn);
+        let mut complete_job = writer
+            .begin_checkpoint(
+                &manifest_store,
+                PagedCheckpointPackRequest {
+                    directory: checkpoint_directory.clone(),
+                    file_number: 2,
+                    identity: wal_identity.clone(),
+                    checkpoint_lsn: Lsn::ZERO,
+                    previous_checkpoint_lsn: None,
+                    coalesce: true,
+                },
+                false,
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(complete_job.target_lsn(), first_checkpoint_lsn);
+        assert!(complete_job.write_pack().unwrap());
         let second_write = TransactionRequest::new(
             vec![TransactionCondition::Exists { key: key.clone() }],
             vec![TransactionMutation::Put {
                 key: key.clone(),
-                value: b"incremental".to_vec(),
+                value: b"after-complete-target".to_vec(),
             }],
         );
         let second_result = writer
@@ -16000,30 +16090,82 @@ mod tests {
         let second_checkpoint_lsn = second_result.commit_lsn.unwrap();
         assert_eq!(
             writer
-                .checkpoint_to_manifest(
+                .publish_checkpoint(
                     &mut manifest_store,
-                    PagedCheckpointPackRequest {
-                        directory: checkpoint_directory.clone(),
-                        file_number: 3,
-                        identity: wal_identity.clone(),
-                        checkpoint_lsn: first_checkpoint_lsn,
-                        previous_checkpoint_lsn: Some(Lsn::ZERO),
-                        coalesce: true,
-                    },
+                    complete_job,
+                    2,
+                    crate::durable_file::ProductionFile::open(
+                        wal_directory.join("segment-00000000000000000002.wal"),
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+            Some(second_checkpoint_lsn)
+        );
+        assert_eq!(manifest_store.current().generation, 2);
+        assert_eq!(writer.wal.last_commit_lsn(), None);
+        assert_eq!(writer.wal.history_start_lsn(), second_checkpoint_lsn);
+        assert_eq!(
+            writer.current().get(&key).unwrap().value(),
+            Some(&b"after-complete-target"[..])
+        );
+        let third_write = TransactionRequest::new(
+            vec![TransactionCondition::Exists { key: key.clone() }],
+            vec![TransactionMutation::Put {
+                key: key.clone(),
+                value: b"incremental-target".to_vec(),
+            }],
+        );
+        writer
+            .transact(&third_write, &StorageLimits::default(), Revision::new(3))
+            .unwrap();
+        let third_checkpoint_lsn = writer.wal.last_commit_lsn().unwrap();
+        let mut incremental_job = writer
+            .begin_checkpoint(
+                &manifest_store,
+                PagedCheckpointPackRequest {
+                    directory: checkpoint_directory.clone(),
+                    file_number: 3,
+                    identity: wal_identity.clone(),
+                    checkpoint_lsn: second_checkpoint_lsn,
+                    previous_checkpoint_lsn: Some(Lsn::ZERO),
+                    coalesce: true,
+                },
+                true,
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(incremental_job.target_lsn(), third_checkpoint_lsn);
+        assert!(incremental_job.write_pack().unwrap());
+        let fourth_write = TransactionRequest::new(
+            vec![TransactionCondition::Exists { key: key.clone() }],
+            vec![TransactionMutation::Put {
+                key: key.clone(),
+                value: b"after-incremental-target".to_vec(),
+            }],
+        );
+        let fourth_result = writer
+            .transact(&fourth_write, &StorageLimits::default(), Revision::new(4))
+            .unwrap();
+        let fourth_checkpoint_lsn = fourth_result.commit_lsn.unwrap();
+        assert_eq!(
+            writer
+                .publish_checkpoint(
+                    &mut manifest_store,
+                    incremental_job,
                     3,
                     crate::durable_file::ProductionFile::open(
                         wal_directory.join("segment-00000000000000000003.wal"),
                     )
                     .unwrap(),
-                    true,
                 )
                 .unwrap(),
-            Some(second_checkpoint_lsn)
+            Some(fourth_checkpoint_lsn)
         );
         assert_eq!(manifest_store.current().generation, 3);
         assert_eq!(
             manifest_store.current().committed_prefix_lsn,
-            second_checkpoint_lsn
+            fourth_checkpoint_lsn
         );
         assert_eq!(
             std::fs::metadata(durable_bases::pack_path(&checkpoint_directory, 3))
@@ -16031,7 +16173,7 @@ mod tests {
                 .len(),
             durable_bases::encoded_size(1)
         );
-        let third_write = TransactionRequest::new(
+        let fifth_write = TransactionRequest::new(
             vec![TransactionCondition::Exists { key: key.clone() }],
             vec![TransactionMutation::Put {
                 key: key.clone(),
@@ -16039,30 +16181,38 @@ mod tests {
             }],
         );
         writer
-            .transact(&third_write, &StorageLimits::default(), Revision::new(3))
+            .transact(&fifth_write, &StorageLimits::default(), Revision::new(5))
             .unwrap();
         writer.set_boxed_publication_fault_injector(Box::new(FailOnOccurrence {
             point: "before_paged_checkpoint_manifest_pointer",
             remaining: 1,
         }));
+        let mut fault_job = writer
+            .begin_checkpoint(
+                &manifest_store,
+                PagedCheckpointPackRequest {
+                    directory: checkpoint_directory.clone(),
+                    file_number: 4,
+                    identity: wal_identity.clone(),
+                    checkpoint_lsn: fourth_checkpoint_lsn,
+                    previous_checkpoint_lsn: Some(second_checkpoint_lsn),
+                    coalesce: true,
+                },
+                true,
+            )
+            .unwrap()
+            .unwrap();
+        assert!(fault_job.write_pack().unwrap());
         assert!(
             writer
-                .checkpoint_to_manifest(
+                .publish_checkpoint(
                     &mut manifest_store,
-                    PagedCheckpointPackRequest {
-                        directory: checkpoint_directory.clone(),
-                        file_number: 4,
-                        identity: wal_identity.clone(),
-                        checkpoint_lsn: second_checkpoint_lsn,
-                        previous_checkpoint_lsn: Some(first_checkpoint_lsn),
-                        coalesce: true,
-                    },
+                    fault_job,
                     4,
                     crate::durable_file::ProductionFile::open(
                         wal_directory.join("segment-00000000000000000004.wal"),
                     )
                     .unwrap(),
-                    true,
                 )
                 .is_err()
         );
@@ -16087,7 +16237,7 @@ mod tests {
         assert_eq!(reopened_manifest.current().generation, 3);
         assert_eq!(
             reopened_manifest.current().committed_prefix_lsn,
-            second_checkpoint_lsn
+            fourth_checkpoint_lsn
         );
         let reopened_root = index
             .root_from_node_reference(reopened_manifest.current().durable_index_root)
@@ -16123,7 +16273,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             reopened_handle.get(&key).unwrap().value(),
-            Some(&b"incremental"[..])
+            Some(&b"after-incremental-target"[..])
         );
         std::fs::remove_dir_all(directory).unwrap();
     }

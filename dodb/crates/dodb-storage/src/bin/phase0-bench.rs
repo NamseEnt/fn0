@@ -4817,6 +4817,10 @@ fn redo_delta(after: &WalRedoStats, before: &WalRedoStats) -> WalRedoStats {
         image_first_touch: u64::saturating_sub(after.image_first_touch, before.image_first_touch),
         image_no_base: u64::saturating_sub(after.image_no_base, before.image_no_base),
         image_not_smaller: u64::saturating_sub(after.image_not_smaller, before.image_not_smaller),
+        image_delta_chain_limit: u64::saturating_sub(
+            after.image_delta_chain_limit,
+            before.image_delta_chain_limit,
+        ),
     }
 }
 

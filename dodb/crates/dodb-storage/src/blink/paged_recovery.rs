@@ -182,6 +182,143 @@ pub fn build_incremental_checkpoint_index(
     Ok((index.promote_root_to_durable(root)?, source))
 }
 
+pub struct PagedCheckpointGeneration<'generation> {
+    pub target_root: VersionIndexRoot,
+    pub latest_root: VersionIndexRoot,
+    pub pack_path: &'generation Path,
+    pub pack_entry: &'generation BasePackEntry,
+    pub complete: bool,
+    pub previous_checkpoint_lsn: Option<Lsn>,
+    pub wal_identity: &'generation WalIdentity,
+    pub high_water_page_id: dodb_core::PageId,
+}
+
+pub fn build_checkpoint_index_for_generation(
+    index: &VersionIndex,
+    generation: PagedCheckpointGeneration<'_>,
+) -> Result<VersionIndexRoot> {
+    let PagedCheckpointGeneration {
+        target_root,
+        latest_root,
+        pack_path,
+        pack_entry,
+        complete,
+        previous_checkpoint_lsn,
+        wal_identity,
+        high_water_page_id,
+    } = generation;
+    if pack_entry.page_count == 0
+        || complete != previous_checkpoint_lsn.is_none()
+        || previous_checkpoint_lsn
+            .is_some_and(|previous_lsn| pack_entry.checkpoint_lsn <= previous_lsn)
+    {
+        return Err(Error::invalid_input(
+            "checkpoint generation mode, target, or page count is invalid",
+        ));
+    }
+    let checkpoint_insert_reservation = index.reserve_checkpoint_insert_work()?;
+    let mut expected_page_count = 0u64;
+    index.visit_descriptors(target_root, &mut |descriptor| {
+        if descriptor.image_lsn > pack_entry.checkpoint_lsn {
+            return Err(Error::corruption(
+                "checkpoint pack target precedes an indexed page image",
+            ));
+        }
+        if complete
+            || previous_checkpoint_lsn
+                .is_some_and(|previous_lsn| descriptor.image_lsn > previous_lsn)
+        {
+            expected_page_count = expected_page_count
+                .checked_add(1)
+                .ok_or_else(|| Error::corruption("checkpoint page count overflows"))?;
+        }
+        Ok(())
+    })?;
+    if expected_page_count != pack_entry.page_count {
+        return Err(Error::corruption(
+            "checkpoint pack omits or adds target-generation pages",
+        ));
+    }
+    let mut file = File::open(pack_path)?;
+    let mut header = [0u8; crate::page::PAGE_SIZE];
+    file.read_exact(&mut header)?;
+    let source = SourceIdentity {
+        kind: SourceFileKind::CheckpointPack,
+        file_number: pack_entry.number,
+        header_identity: *blake3::hash(&header).as_bytes(),
+    };
+    let mut root = latest_root;
+    let mut packed_page_count = 0u64;
+    scan_pack(
+        &mut file,
+        pack_entry,
+        wal_identity,
+        high_water_page_id,
+        |page_id, image_lsn, offset, image| {
+            let image_crc32c = crc32c::crc32c(image);
+            let target = index
+                .lookup(target_root, page_id)?
+                .ok_or_else(|| Error::corruption("checkpoint page is absent from target"))?;
+            if target.image_lsn != image_lsn || target.image_crc32c != image_crc32c {
+                return Err(Error::corruption(
+                    "checkpoint image differs from its captured target version",
+                ));
+            }
+            if previous_checkpoint_lsn.is_some_and(|previous_lsn| image_lsn <= previous_lsn) {
+                return Err(Error::corruption(
+                    "incremental checkpoint pack contains an old page version",
+                ));
+            }
+            let latest = index
+                .lookup(root, page_id)?
+                .ok_or_else(|| Error::corruption("checkpoint page is absent from latest root"))?;
+            match latest.image_lsn.cmp(&image_lsn) {
+                std::cmp::Ordering::Greater => {}
+                std::cmp::Ordering::Equal => {
+                    if latest.token != target.token || latest.image_crc32c != image_crc32c {
+                        return Err(Error::corruption(
+                            "latest page version differs from the captured target token",
+                        ));
+                    }
+                    root = index.insert_reserved(
+                        root,
+                        page_id,
+                        VersionDescriptor {
+                            page_id,
+                            token: target.token,
+                            image_lsn,
+                            image_crc32c,
+                            locator: VersionLocator::CheckpointImage {
+                                source,
+                                offset,
+                                source_length: pack_entry.bytes,
+                                image_lsn,
+                                image_crc32c,
+                            },
+                        },
+                        &checkpoint_insert_reservation,
+                    )?;
+                }
+                std::cmp::Ordering::Less => {
+                    return Err(Error::corruption(
+                        "latest page version precedes the captured checkpoint image",
+                    ));
+                }
+            }
+            packed_page_count = packed_page_count
+                .checked_add(1)
+                .ok_or_else(|| Error::corruption("checkpoint scan count overflows"))?;
+            Ok(())
+        },
+    )?;
+    if packed_page_count != expected_page_count {
+        return Err(Error::corruption(
+            "checkpoint scan count differs from the captured target",
+        ));
+    }
+    index.promote_root_to_durable(root)
+}
+
 pub struct PagedRecoveryIndexBuilder<'index> {
     index: &'index VersionIndex,
     root: VersionIndexRoot,

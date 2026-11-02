@@ -140,6 +140,7 @@ mod tests {
     use std::fs::{self, OpenOptions};
     use std::io::Write;
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::thread;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -149,6 +150,8 @@ mod tests {
     use crate::blink::durable_bases::{BasePackJob, read_pack};
     use crate::blink::leaf::LeafEntries;
     use crate::blink::{BlinkPage, encode_blink_page};
+
+    static NEXT_FIXTURE_ID: AtomicU64 = AtomicU64::new(1);
 
     struct Fixture {
         directory: PathBuf,
@@ -163,9 +166,10 @@ mod tests {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_nanos();
+            let fixture_sequence = NEXT_FIXTURE_ID.fetch_add(1, Ordering::Relaxed);
             let directory = std::env::temp_dir().join(format!(
-                "dodb-checkpoint-locator-{}-{nonce}",
-                std::process::id()
+                "dodb-checkpoint-locator-{}-{nonce}-{fixture_sequence}",
+                std::process::id(),
             ));
             fs::create_dir(&directory).unwrap();
             let identity = WalIdentity::new(
