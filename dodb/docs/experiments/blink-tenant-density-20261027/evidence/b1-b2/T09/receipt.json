@@ -6,7 +6,8 @@
   "implementation_commits": [
     "3367fec8d796dd15c5fada6296a128e3db106a80",
     "fa53e144bf9b39824c1e8dc48bc5dc0d823af3e6",
-    "7f480c3f649d63f87f3dca365bf4db0681a4e185"
+    "7f480c3f649d63f87f3dca365bf4db0681a4e185",
+    "2aaf794b4e9372ecdc81e93da0a2d5fd460f51cf"
   ],
   "push": {
     "remote": "origin",
@@ -33,12 +34,16 @@
   "owned_paths": [
     "dodb/crates/dodb-storage/src/blink/mod.rs",
     "dodb/crates/dodb-storage/src/blink/page_cache.rs",
-    "dodb/crates/dodb-storage/src/wal.rs"
+    "dodb/crates/dodb-storage/src/wal.rs",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs",
+    "dodb/crates/dodb-storage/src/blink/version_index.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "5f8c5c87e86958cd9b0a9629db1b62ffe5b5028411ac0b308bee07d5741a2280",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "7dc801011e7f352900c53f866e4910e819c92bf109a2dbdf651c5780faef890f",
     "dodb/crates/dodb-storage/src/blink/page_cache.rs": "83d1ac6841a55cf5d6eefb11e68e5a2eece05882b49d5db11b4850013ae0a133",
-    "dodb/crates/dodb-storage/src/wal.rs": "3c69db54f5ca33e9deb55db540b8a0f4e827df434fa5cdf3b01e956a63fd98bf"
+    "dodb/crates/dodb-storage/src/wal.rs": "3c69db54f5ca33e9deb55db540b8a0f4e827df434fa5cdf3b01e956a63fd98bf",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "8f077ed1e82932247bcf986f0b3c95c846cc48188525775380c3375a4f90c86e",
+    "dodb/crates/dodb-storage/src/blink/version_index.rs": "c5766389322b006e58b30c7fc3f2603cd6f71b0f696d7dd8d28e5e0fcf8b0a1a"
   },
   "host": {
     "os": "macOS arm64",
@@ -53,7 +58,7 @@
   "runtime_configuration": {
     "route": "isolated storage fixture using PagedReadHandle and bounded working-state preparation",
     "wal_append_or_sync": "single-commit append and sync enabled",
-    "version_index_publication": "exact full-image locator insertion after sync; grouped recovery and pre-reserved publication remain incomplete",
+    "version_index_publication": "full-image locators are inserted after sync; WAL buffers, index insertion budget, and source-root registration are reserved before append; grouped recovery and bounded WAL-delta ancestry remain incomplete",
     "service_route_activated": false,
     "defaults_changed": false,
     "oci_experiment": false,
@@ -326,17 +331,135 @@
         "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-package-check.log",
         "sha256": "886eac4cd06e7c128baa90a918939b63d39f1e7b2533e077106d717ca391f898"
       }
+    },
+    {
+      "name": "paged_writer_feature_library_tests_current",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "293 passed, 0 failed, 4 ignored; finished in 57.57s",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-feature-lib.log.gz",
+        "sha256": "e611518e55da624fb42931bd08b5239dfcd3ebec34737df52cb52bf7d39f35b8"
+      }
+    },
+    {
+      "name": "paged_writer_append_sync_publication_test",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "1 passed; append, sync, and publication failures preserve the current generation and fail-stop the affected writer; successful commit preserves the pinned old reader",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-append-sync-publication.log.gz",
+        "sha256": "0fca271841f5e44357654ef37ff00ae1a8ac82b6c59434ef60bcddcc73e74354"
+      }
+    },
+    {
+      "name": "paged_writer_default_library_check_current",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-default-check.log.gz",
+        "sha256": "4965a33e0232ab2592f74fc01fe6e99273fb2ab4e1630ce35491a2420257fef6"
+      }
+    },
+    {
+      "name": "paged_writer_feature_library_check_current",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-feature-check.log.gz",
+        "sha256": "03c7bf058507ead9c93d9de48dd0925d416e939a6831e2d4d43f4cd5211755e0"
+      }
+    },
+    {
+      "name": "paged_writer_rustfmt_check_current",
+      "argv": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "--config",
+        "skip_children=true",
+        "dodb/crates/dodb-storage/src/blink/mod.rs",
+        "dodb/crates/dodb-storage/src/blink/source_manager.rs",
+        "dodb/crates/dodb-storage/src/blink/version_index.rs"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-rustfmt-check.log.gz",
+        "sha256": "59869db34853933b239f1e2219cf7d431da006aa919635478511fabbfc8849d2"
+      }
+    },
+    {
+      "name": "paged_writer_strict_clippy_current",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 101,
+      "summary": "12 existing findings in blink/mod.rs and wal.rs; no new findings from this change; no lint suppressions added",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-feature-clippy.log.gz",
+        "sha256": "fe29a763063ad18652ed7434136bdb3eca1b79ea80e613043f9142c8789d6eed"
+      }
     }
   ],
   "acceptance_mapping": {
     "bounded_required_base_pages_and_dirty_working_set": "partial: PagedWorkingBlinkState loads base pages through PagedReadHandle and caps changed page copies; integrated mutation widths 1, 4, and 16 are exercised",
     "condition_conflict_multi_key_and_overflow_preparation": "partial: success and stale RevisionEquals conflict, multi-key widths, overflow allocation, and overflow deletion are covered; transaction result is not durably committed",
     "planning_copy_dirty_image_reservations_before_mutation": "passed for preparation: maximum working-page and request byte reservations are acquired before mutation; test observes both categories live through encoding and verifies overload releases them",
-    "exact_committed_index_root_published_after_wal_sync": "partial: single-transaction full-image locators are inserted after sync, then a new pinned read generation is created; multi-transaction grouping and pre-reserved publication remain incomplete",
+    "exact_committed_index_root_published_after_wal_sync": "partial: full-image locations are published after sync through a copy-on-write index root; WAL buffers, index insertion budget, and source-root registration are reserved before append; grouped durability and recovery remain incomplete",
     "conditional_and_multikey_group_durability_and_recovery": "partial: preparation validates conditions and multi-key requests; writer currently appends one logical transaction per WAL commit; group recovery not implemented",
     "expected_conflict_tombstone_aba_and_free_page_reuse": "partial or not implemented: expected conflict and overflow frees are covered in preparation; durable ABA and page reuse behavior are not implemented on this route",
     "ninth_delta_emits_image_through_paged_writer": "not implemented: paged writer currently emits full images for every dirty page",
-    "append_sync_and_publication_fault_boundaries": "partial: publication fault after sync is tested and keeps the old generation visible; append and sync fault injection through the paged writer are not implemented",
+    "append_sync_and_publication_fault_boundaries": "partial: paged-writer fault injection covers append, sync, and publication failure; every failure leaves the previous generation visible and fail-stops the writer; reopen durability oracle remains outstanding",
     "oversized_working_set_precommit_rejection_and_no_reservation_leak": "passed for preparation: bounded-page overload occurs before any WAL commit; reservation categories return to their prior values",
     "production_service_activation": "not activated; remains gated for T12-T15"
   },
@@ -359,9 +482,9 @@
     }
   ],
   "remaining_work": [
-    "T09 reserve WAL buffers and index/source-root publication before sync; add append and sync fault tests through the paged writer",
-    "T09 implement grouped transaction boundaries, durable recovery, ninth-delta image selection, tombstone/ABA, and page-reuse gates",
-    "T09 integrate bounded WAL delta ancestry without the full tracking collector",
+    "T09 preserve transaction boundaries for grouped requests and prove complete-or-absent WAL recovery after injected append and sync failures",
+    "T09 emit a full image on the ninth would-be delta and integrate bounded WAL ancestry without the full tracking collector",
+    "T09 complete tombstone/ABA, page reuse, split/overflow, and resource-exhaustion acceptance on the writer route",
     "T10-T16 checkpoint, recovery, service, resource, scheduling, crash, and experiment-readiness gates",
     "T17 remains separately authorized and was not started"
   ],

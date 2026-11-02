@@ -30,3 +30,12 @@ No production service route or default was changed. No OCI or performance experi
 ## Remaining T09 acceptance
 
 T09 remains partial. The writer currently emits full images, commits one logical transaction per append, and does not inject append or WAL sync faults through the paged writer. The ninth-delta decision is not exercised by this writer. Publication preparation is not reserved before sync, and durable ABA/page-reuse, grouped transaction recovery, and full crash/reopen acceptance remain outstanding. The route is not connected to `dodb-server`; defaults remain unchanged. No OCI or performance experiment was run.
+
+## Continued writer preparation and failure boundaries (2026-11-02)
+
+- Before WAL append, the writer now reserves WAL buffer bytes, the bounded version-index insertion budget, and a source-root registration slot. The source-root reservation also reserves the root registry's hash capacity and root ID, and source collection defers while a generation reservation is active. Ordinary root pinning still validates the referenced index node.
+- Added paged-writer append and sync fault injection. The focused file-backed fixture covers append failure, sync failure, and post-sync publication failure: each keeps the old reader generation visible and puts the failed writer into fail-stop. The successful transaction still publishes an exact full-image locator after sync and preserves the pinned old reader's value.
+- Source commit: `2aaf794b4e9372ecdc81e93da0a2d5fd460f51cf`.
+- Current feature library suite: 293 passed, 0 failed, 4 ignored. Default and feature library checks and targeted rustfmt passed. Strict feature Clippy still reports the same 12 existing findings, with no new findings from this change.
+
+T09 remains partial. The writer still emits full images, commits one transaction per append, and lacks the complete-or-absent reopen oracle, grouped transaction durability, ninth-delta image selection, and durable tombstone/ABA and page-reuse acceptance. The paged route remains disconnected from `dodb-server`; defaults remain unchanged. No OCI or performance experiment was run.
