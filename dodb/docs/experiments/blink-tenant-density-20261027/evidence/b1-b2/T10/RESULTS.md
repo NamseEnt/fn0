@@ -156,3 +156,12 @@ T10 remains partial. Version-index node output and active WAL growth are not res
 - Raw logs: `logs/version-index-disk-feature-library.log`, `logs/version-index-disk-writer-focused.log`, `logs/version-index-disk-default-check.log`, `logs/version-index-disk-all-targets-check.log`, and `logs/version-index-disk-strict-clippy.log`.
 
 T10 remains partial. Version-index output is now bounded before each node file, but partial promotions can leave charged unreachable nodes and there is no index-node GC yet. Active WAL growth, whole checkpoint/index preflight, loader overlap, small-capacity retry after release, fair maintenance slices, debt/time-above-threshold accounting, and paged-writer process-kill recovery remain open. Defaults and service routing remain unchanged; T17 was not started.
+
+## Partial substep: reclaim unreachable version-index nodes
+
+- Source commit: `8039b0edb32990a357e87e04acd945135fa4d9ea`.
+- Source GC now walks every registered version-index root, marks its reachable node files in bounded-depth traversal scratch, unlinks unmarked node files, syncs the index directory, and releases the reclaimed byte charge. It validates each root through descriptor traversal before deleting nodes. Pinned roots remain intact; a second pass with only the current root reclaims nodes unique to the older generation.
+- Focused version-index GC: 1 passed. Source-manager GC suite: 10 passed. Checkpoint restart/GC fixture: 1 passed. Full feature library suite: 303 passed, 0 failed, 4 ignored. Default library check and all-target feature check passed; rustfmt and `git diff --check` passed. Strict feature Clippy remains at 12 existing diagnostics with no new index-GC finding.
+- Raw logs: `logs/version-index-gc-pinned-roots-focused.log`, `logs/version-index-gc-source-manager-focused.log`, `logs/version-index-gc-restart-focused.log`, `logs/version-index-gc-feature-library.log`, `logs/version-index-gc-default-check.log`, `logs/version-index-gc-all-targets-check.log`, and `logs/version-index-gc-strict-clippy.log`.
+
+T10 remains partial. Active WAL growth and GC scratch disk are not reserved before writes, and disk charges currently follow manager lifetimes rather than a persistent per-tenant registry. Checkpoint-wide quota preflight, explicit no-pack-on-rejection and retry-after-release tests, required loader overlap, fair maintenance slices, debt/time-above-threshold accounting, and paged-writer process-kill recovery remain open. Defaults and service routing remain unchanged; T17 was not started.

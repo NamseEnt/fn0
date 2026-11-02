@@ -1,0 +1,18 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.66s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-61add53ad8a69c71)
+
+running 10 tests
+test blink::source_manager::tests::active_read_lease_blocks_retirement_and_reopen_checks_exact_header ... ok
+test blink::source_manager::tests::delta_roots_retain_only_exact_ancestry_sources ... ok
+test blink::source_manager::tests::indexed_and_pinned_sources_are_retained_until_every_root_drops ... ok
+test blink::source_manager::tests::load_acquisition_racing_retirement_never_reads_an_unlinked_source ... ok
+test blink::source_manager::tests::manifest_roots_keep_old_reader_sources_across_checkpoint_publication ... ok
+test blink::source_manager::tests::missing_index_reachable_source_is_corruption ... ok
+test blink::source_manager::tests::pending_catalog_publication_protects_recovery_wal_from_gc ... ok
+test blink::source_manager::tests::source_gc_preserves_reachable_files_across_unlink_fault_boundaries ... ok
+test blink::source_manager::tests::source_handles_and_roots_have_explicit_limits ... ok
+test blink::source_manager::tests::zero_reader_page_reuse_reservation_fences_new_roots_until_publication_slot_is_reserved ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 297 filtered out; finished in 0.67s
+

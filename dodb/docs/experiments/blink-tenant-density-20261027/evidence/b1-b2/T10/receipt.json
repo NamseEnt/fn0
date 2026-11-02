@@ -18,7 +18,8 @@
     "e9b06076ed3b01e3daaa3605155f474cf0fe4323",
     "fc6f974856750b6a0fadf70b76b48bed3e19504c",
     "a96a3155d23f9301f6a7126e8061afbe77593775",
-    "58faa228edf8252cc83e4579c2df85fb15bf6828"
+    "58faa228edf8252cc83e4579c2df85fb15bf6828",
+    "8039b0edb32990a357e87e04acd945135fa4d9ea"
   ],
   "push": {
     "remote": "origin",
@@ -51,13 +52,13 @@
     "dodb/crates/dodb-storage/src/blink/resource.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "483c9d89399c1ccf65a21bc9e5d037c2a6f3031fae55f95260f3109153d6d5ae",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "920ee85d559438528544cfef5efa1d2d3c608a935a6930a230fdeadbdda61aee",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "a4b1321c4793fb086fdf77900d3a33f7bfef51bd46fce9c2d3b83748247e461c",
     "dodb/crates/dodb-storage/src/blink/page_locator.rs": "80fbbdc6a569b379b563e8ad65b396c047bb4e63524240e3126c15710d59b48a",
     "dodb/crates/dodb-storage/src/bin/phase0-bench.rs": "2cf4d0a7d12caaa477046445f3a4675c861b85628105c81496115e2e03c50c81",
     "dodb/crates/dodb-storage/src/blink/durable_bases.rs": "26fd15c75154e71c42394f50e9f97b3bad8e6f7992e3161d35a6fd35ddaa9f08",
-    "dodb/crates/dodb-storage/src/blink/version_index.rs": "ece75da8e514151915461cd095f23fdf4a4c035c9cd71e7d6380ec8494a150f5",
-    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "3b95f17b28b9383e8ab5f82dab761cf8ffa677cd00478351a3608b7e90a68e01",
+    "dodb/crates/dodb-storage/src/blink/version_index.rs": "03dc7d4b1f321fdb6cdd7af6963f991d44fefefdc9ea5aa366989a61a5946418",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "f694729960b0b8bc67309774e3134c18043f6268390fb5229fac9ec108aaf863",
     "dodb/crates/dodb-storage/src/wal.rs": "7fec7f957680ed1dc779ec355cd9b90018bc27ddb88023b6c446dd38763f601d",
     "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "e69d6062bfb9371d2e3a6b28ac3d114697642c4017d81f12666e8413fc46d366",
     "dodb/crates/dodb-storage/src/blink/source_catalog.rs": "c03109ba28ca3dd063b0d3a837be0d066c3648bb3c89b623a20a1bc8d746f3be",
@@ -68,7 +69,7 @@
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "58faa228edf8252cc83e4579c2df85fb15bf6828"
+    "source_commit": "8039b0edb32990a357e87e04acd945135fa4d9ea"
   },
   "features": [
     "blink-demand-paging",
@@ -1716,6 +1717,156 @@
         "sha256": "537df7357e318353a5705f65bdaab35acc9fdc76b36a13b12edff1e2d8c425d4"
       },
       "source_commit": "58faa228edf8252cc83e4579c2df85fb15bf6828"
+    },
+    {
+      "name": "version_index_pinned_root_gc_fixture",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "version_index_gc_keeps_pinned_roots_and_reclaims_old_nodes",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; both pinned roots were preserved, then obsolete nodes were removed when only the current root remained; disk charges matched remaining node file bytes.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/version-index-gc-pinned-roots-focused.log",
+        "sha256": "3adb40795f553a87886ca154594b0e65598f8595ed35f411527e9f3ccd10c565"
+      },
+      "source_commit": "8039b0edb32990a357e87e04acd945135fa4d9ea"
+    },
+    {
+      "name": "version_index_source_manager_gc_fixtures",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "blink::source_manager::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "10 passed; source collection integrates with index node reclamation.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/version-index-gc-source-manager-focused.log",
+        "sha256": "8a13bdb23675da48233b5562e3ed4fcea2642c1072289e80ecd30dc1b763395e"
+      },
+      "source_commit": "8039b0edb32990a357e87e04acd945135fa4d9ea"
+    },
+    {
+      "name": "version_index_checkpoint_restart_gc_fixture",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "paged_transaction_writer_publishes_complete_and_incremental_checkpoints",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; after reopen, GC retained the manifest index root and reclaimed old index nodes and catalog generations.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/version-index-gc-restart-focused.log",
+        "sha256": "bdff8dfbf5e11019780d9d326c416c78044c9647b7dfa7521e0ca9f9913c20a8"
+      },
+      "source_commit": "8039b0edb32990a357e87e04acd945135fa4d9ea"
+    },
+    {
+      "name": "version_index_gc_feature_library",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "303 passed, 0 failed, 4 ignored; finished in 61.75s.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/version-index-gc-feature-library.log",
+        "sha256": "fd2737a779c86f81646594bccb0b2c03e352e15ee929a2b460c50c38d488083b"
+      },
+      "source_commit": "8039b0edb32990a357e87e04acd945135fa4d9ea"
+    },
+    {
+      "name": "version_index_gc_default_library_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "Default library compiled successfully.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/version-index-gc-default-check.log",
+        "sha256": "41bbe80ee9a7202f5a1aae92be7f3a2d615a665b71020f2dc048e9f7f118bc98"
+      },
+      "source_commit": "8039b0edb32990a357e87e04acd945135fa4d9ea"
+    },
+    {
+      "name": "version_index_gc_all_targets_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--all-targets",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "All targets compiled; existing benchmark harness dead-code warnings remain.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/version-index-gc-all-targets-check.log",
+        "sha256": "33323663e170804954f52a9a9b0a14e2952eb1ddf4ff9aa6de386c88c9e11787"
+      },
+      "source_commit": "8039b0edb32990a357e87e04acd945135fa4d9ea"
+    },
+    {
+      "name": "version_index_gc_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 101,
+      "summary": "12 existing storage diagnostics remain; no diagnostic points to version-index garbage collection.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/version-index-gc-strict-clippy.log",
+        "sha256": "537df7357e318353a5705f65bdaab35acc9fdc76b36a13b12edff1e2d8c425d4"
+      },
+      "source_commit": "8039b0edb32990a357e87e04acd945135fa4d9ea"
     }
   ],
   "acceptance_mapping": {
@@ -1726,8 +1877,8 @@
     "writes_after_target_capture": "passed for the serialized writer path: the next transaction enters the newly rotated WAL only after manifest publication and active-segment switch; the integration fixture commits after a complete checkpoint and then publishes an incremental checkpoint",
     "checkpoint_failure_and_old_reader_retention": "partial: an integrated fault before the manifest pointer leaves the prior generation selected after reopen and fences the writer after an uncertain result; incomplete-pack and pinned-reader tests pass, while pack/index/WAL I/O faults, process crash recovery, old-reader overlap through the writer API, and pinned-root capacity remain unverified",
     "complete_reopen_oracle": "partial: a disk-backed writer test publishes complete and incremental checkpoints, injects a failure before a later manifest pointer, reopens generation 3, and reads the exact generation-3 value; no process crash or pointer-write I/O fault is injected",
-    "bounded_memory_and_source_index_disk_reservations": "partial: existing source directory bytes and checkpoint pack/catalog outputs are charged; VersionIndexStore charges existing node files and reserves each new 4096-byte node before creation. Active WAL append growth, whole-promotion preflight, and required loader overlap remain unimplemented",
-    "tiny_capacity_bounded_defer_and_eventual_progress": "partial: the 128 KiB integrated fixture correctly rejected reopen after combining index and source usage, and the 2 MiB writer fixture passed. A checkpoint-level rejection-before-pack test, index output cleanup after partial promotion, and integrated progress after capacity release remain open",
+    "bounded_memory_and_source_index_disk_reservations": "partial: checkpoint pack and source catalog output are reserved before creation; existing source and index files are charged on open; version-index nodes reserve each write and source GC marks live roots, reclaims unreachable nodes, and releases their charges. Active WAL append growth, checkpoint-wide output preflight, scratch-disk reservations, loader overlap, and retained charges across manager teardown remain open",
+    "tiny_capacity_bounded_defer_and_eventual_progress": "partial: disk reservation primitives reject over-capacity work and release allows a later reservation; the 128 KiB reopen fixture exposed combined source/index usage and the 2 MiB checkpoint fixture passed. A checkpoint-specific no-pack-on-rejection and integrated retry after release remain unverified",
     "checkpoint_debt_and_time_above_threshold": "not implemented; no maintenance scheduler or tenant debt accounting exists yet",
     "resumable_bounded_slices": "passed within a single writer job: a one-page slice yields before completion, a later commit proceeds between slices while the pinned target remains fixed, the cursor visits descriptors in order with fixed-depth state, and a failed slice cannot be retried; fair tenant scheduling remains unimplemented",
     "persistent_source_catalog_and_restart_gc": "passed for the exercised checkpoint writer path: immutable catalogs are synced before manifest publication; reopen validates exact source identities and headers; GC protects durable and pending roots, retains the current catalog generation, and reclaims obsolete generations; process-kill boundaries and disk reservation limits remain open"
@@ -1856,7 +2007,7 @@
   "remaining_work": [
     "Resolve the eight-page pinned-root index-capacity attempt without increasing the cap to hide the bound; test defer and progress after capacity release",
     "Implement a fair multi-tenant continuation scheduler and bounded checkpoint debt/time-above-threshold accounting",
-    "Reclaim unreachable version-index nodes and release their disk charges; reserve active WAL growth before writes; prove checkpoint-level defer before pack creation and progress after capacity release; reserve loader memory with index promotion"
+    "Reserve active WAL growth before writes and scratch disk before marking; make retained disk charges survive per-tenant manager teardown without double counting on reopen; prove no pack creation on checkpoint quota rejection and progress after release; reserve loader memory with index promotion"
   ],
   "next_task": "T10"
 }
