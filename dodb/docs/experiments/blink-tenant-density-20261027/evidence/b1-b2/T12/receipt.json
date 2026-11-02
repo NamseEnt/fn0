@@ -5,14 +5,15 @@
   "parent_source_commit": "a122e574cd12c8156e4b5a2bc02754d173997700",
   "implementation_commits": [
     "54eaa434c43bd6b6faadb4ed5a4622d334b373e4",
-    "8f636469b1af80e44caf7221166721e9fabd4f62"
+    "8f636469b1af80e44caf7221166721e9fabd4f62",
+    "53d6451f91836dda6b3079c871abf737766e2d9d"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "8f636469b1af80e44caf7221166721e9fabd4f62"
+    "source_commit": "53d6451f91836dda6b3079c871abf737766e2d9d"
   },
   "validated": [
     {
@@ -44,6 +45,24 @@
       "command": "cargo check -p dodb-server --all-targets",
       "exit_status": 0,
       "result": "passed"
+    },
+    {
+      "name": "cancelled_open_reservation_and_worker_release",
+      "command": "cargo test -p dodb-server cancelled_blink_open_releases_reservation_and_worker_capacity --lib -- --test-threads=1",
+      "exit_status": 0,
+      "result": "1 passed; a blocked open was cancelled, its reservation cleared, and a retry opened with one worker"
+    },
+    {
+      "name": "server_library_tests_after_cancellation",
+      "command": "cargo test -p dodb-server --lib -- --test-threads=1",
+      "exit_status": 0,
+      "result": "16 passed, 0 failed"
+    },
+    {
+      "name": "server_all_targets_check_after_cancellation",
+      "command": "cargo check -p dodb-server --all-targets",
+      "exit_status": 0,
+      "result": "passed"
     }
   ],
   "prerequisite_receipts": [
@@ -59,8 +78,8 @@
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/receipt.json"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-server/src/lib.rs": "9272406c1912727366c09d8f9e1e86e759220c1cc57bd76f999bf3c6becf1d7b",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "9aa1196cc5b1e8c3529abaaffa5b600af1ff7efc679aae517402ca05f5dcac7b"
+    "dodb/crates/dodb-server/src/lib.rs": "53e7d623364bfead66a133df916780caa274d17f3cef13558ac0039a2b0144d7",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "3b9d3a0aee378760be8b3a498f2eb7975a68b278221a180550f3add1ce4255f0"
   },
   "logs": [
     {
@@ -104,6 +123,36 @@
       "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/workspace-all-targets-check-missing-rocksdb-dir.log",
       "sha256": "937272db2e81db51f98558132d06c002ed1a9d8a5bac88d2c8b8f0af09a8090c",
       "exit_status": 101
+    },
+    {
+      "name": "cancelled_open_initial_compile_failure",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/cancelled-open-initial-compile-failure.log",
+      "sha256": "e5ec4c1e667baadd2be5eac2ff0e531d41f7fbd3f9ce47b051280a841efe3785",
+      "exit_status": 101
+    },
+    {
+      "name": "cancelled_open_focused",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/cancelled-open-focused.log",
+      "sha256": "db99e4b0850426ec3bfd6214df4b77e1a56b991531a1f8e95bfe7c0cb4cbc37d",
+      "exit_status": 0
+    },
+    {
+      "name": "server_library_tests_after_cancellation",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-lib-tests-after-cancellation.log",
+      "sha256": "4091a30a1769f9be4c42d28bfa2113a59ddbdf2ce977b9d22ee37794f8e99cb6",
+      "exit_status": 0
+    },
+    {
+      "name": "server_all_targets_check_after_cancellation",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-all-targets-check-after-cancellation.log",
+      "sha256": "0585dc3013e14488da873283f432c2ff253e0a274fc7a624d93a90635c2a5657",
+      "exit_status": 0
+    },
+    {
+      "name": "server_format_after_cancellation",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-format-after-cancellation.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_status": 0
     }
   ],
   "remaining_work": [
@@ -124,6 +173,11 @@
       "name": "workspace_all_targets_check_requires_rocksdb_build",
       "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/workspace-all-targets-check-missing-rocksdb-dir.log",
       "reason": "DODB_ROCKSDB_DIR is not set to the required RocksDB 11.8.1 build"
+    },
+    {
+      "name": "cancelled_open_initial_compile_failure",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/cancelled-open-initial-compile-failure.log",
+      "reason": "The test used unwrap_err, which required the successful AsyncBlinkShard result type to implement Debug; the assertion was changed to inspect JoinError directly."
     }
   ]
 }
