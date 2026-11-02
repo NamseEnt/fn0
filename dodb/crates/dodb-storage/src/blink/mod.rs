@@ -1806,7 +1806,31 @@ pub struct PagedCheckpointJob {
     target_lsn: Lsn,
     previous_checkpoint_lsn: Lsn,
     manifest_generation: u64,
+    pack_written: bool,
     pack_output: Option<durable_bases::PagedBasePackOutput>,
+    _worker_lease: PagedCheckpointWorkerLease,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+struct PagedCheckpointWorkerLease {
+    active: Arc<AtomicBool>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl PagedCheckpointWorkerLease {
+    fn acquire(active: Arc<AtomicBool>) -> Result<Self> {
+        active
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .map_err(|_| Error::overloaded("paged checkpoint worker is already active"))?;
+        Ok(Self { active })
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl Drop for PagedCheckpointWorkerLease {
+    fn drop(&mut self) {
+        self.active.store(false, Ordering::Release);
+    }
 }
 
 #[cfg(feature = "blink-demand-paging")]
@@ -1816,11 +1840,12 @@ impl PagedCheckpointJob {
     }
 
     pub fn write_pack(&mut self) -> Result<bool> {
-        if self.pack_output.is_some() {
+        if self.pack_written {
             return Err(Error::invalid_input(
-                "paged checkpoint job already has a completed pack",
+                "paged checkpoint pack output has already been attempted",
             ));
         }
+        self.pack_written = true;
         let output = if self.request.previous_checkpoint_lsn.is_some() {
             self.target.write_incremental_checkpoint_pack(
                 PagedCheckpointPackRequest {
@@ -2449,6 +2474,7 @@ pub struct PagedTransactionWriter<F: DurableFile> {
     broken: Option<String>,
     wal_fault_injector: Option<Box<dyn FaultInjector + Send>>,
     publication_fault_injector: Option<Box<dyn FaultInjector + Send>>,
+    checkpoint_worker_active: Arc<AtomicBool>,
 }
 
 #[cfg(feature = "blink-demand-paging")]
@@ -2489,6 +2515,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             broken: None,
             wal_fault_injector: None,
             publication_fault_injector: None,
+            checkpoint_worker_active: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -2544,6 +2571,8 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
         if target_lsn <= previous_manifest.committed_prefix_lsn {
             return Ok(None);
         }
+        let worker_lease =
+            PagedCheckpointWorkerLease::acquire(Arc::clone(&self.checkpoint_worker_active))?;
         self.wal.sync_all()?;
         let target = self.snapshot()?;
         pack_request.checkpoint_lsn = target_lsn;
@@ -2555,7 +2584,9 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             target_lsn,
             previous_checkpoint_lsn: previous_manifest.committed_prefix_lsn,
             manifest_generation: previous_manifest.generation,
+            pack_written: false,
             pack_output: None,
+            _worker_lease: worker_lease,
         }))
     }
 
@@ -16076,7 +16107,24 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(complete_job.target_lsn(), first_checkpoint_lsn);
+        assert!(
+            writer
+                .begin_checkpoint(
+                    &manifest_store,
+                    PagedCheckpointPackRequest {
+                        directory: checkpoint_directory.clone(),
+                        file_number: 90,
+                        identity: wal_identity.clone(),
+                        checkpoint_lsn: Lsn::ZERO,
+                        previous_checkpoint_lsn: None,
+                        coalesce: true,
+                    },
+                    false,
+                )
+                .is_err()
+        );
         assert!(complete_job.write_pack().unwrap());
+        assert!(complete_job.write_pack().is_err());
         let second_write = TransactionRequest::new(
             vec![TransactionCondition::Exists { key: key.clone() }],
             vec![TransactionMutation::Put {
