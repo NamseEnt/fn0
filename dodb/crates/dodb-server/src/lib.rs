@@ -51,7 +51,7 @@ use quinn::{
     Connection, ConnectionError, Endpoint, Incoming, ReadError, ReadExactError,
     ServerConfig as QuinnServerConfig, VarInt, WriteError,
 };
-use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
+use tokio::sync::{Mutex, Notify, OwnedSemaphorePermit, Semaphore};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum TransportStage {
@@ -932,6 +932,9 @@ async fn send_protocol_error(
 pub struct LocalTenantServiceConfig {
     pub data_dir: PathBuf,
     pub max_open_shards: usize,
+    pub blink_open_worker_count: usize,
+    pub blink_open_waiter_limit: usize,
+    pub blink_open_shutdown_timeout: std::time::Duration,
     pub database_config: DatabaseConfig,
     pub coordinator_config: CoordinatorConfig,
     pub blink_checkpoint_policy: BlinkCheckpointPolicy,
@@ -1184,6 +1187,9 @@ impl Default for LocalTenantServiceConfig {
         Self {
             data_dir: PathBuf::from("."),
             max_open_shards: 1_024,
+            blink_open_worker_count: 4,
+            blink_open_waiter_limit: 128,
+            blink_open_shutdown_timeout: std::time::Duration::from_secs(30),
             database_config: DatabaseConfig::default(),
             coordinator_config: CoordinatorConfig::default(),
             blink_checkpoint_policy: BlinkCheckpointPolicy::Disabled,
@@ -1220,6 +1226,10 @@ pub struct LocalTenantService {
 pub struct BlinkTenantService {
     data_dir: PathBuf,
     max_open_shards: usize,
+    open_workers: Arc<Semaphore>,
+    open_waiters: Arc<Semaphore>,
+    open_changed: Arc<Notify>,
+    open_shutdown_timeout: std::time::Duration,
     database_config: DatabaseConfig,
     coordinator_config: CoordinatorConfig,
     checkpoint_policy: BlinkCheckpointPolicy,
@@ -1228,8 +1238,57 @@ pub struct BlinkTenantService {
     checkpoint_retention_bytes: u64,
     checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
     coordinator_activity: Arc<CoordinatorActivity>,
-    shards: Mutex<BTreeMap<TenantId, Arc<AsyncBlinkShard>>>,
+    shards: Arc<StdMutex<BlinkShardRegistry>>,
     fault_injector_factory: Mutex<Option<FaultInjectorFactory>>,
+    #[cfg(test)]
+    open_test_gate: StdMutex<Option<(TenantId, Arc<Semaphore>)>>,
+}
+
+struct BlinkShardRegistry {
+    shards: BTreeMap<TenantId, Arc<AsyncBlinkShard>>,
+    opening: HashSet<TenantId>,
+    shutting_down: bool,
+}
+
+struct BlinkOpenAttempt {
+    tenant: TenantId,
+    registry: Arc<StdMutex<BlinkShardRegistry>>,
+    changed: Arc<Notify>,
+    active: bool,
+}
+
+impl BlinkOpenAttempt {
+    fn finish(mut self, shard: Option<Arc<AsyncBlinkShard>>) -> Result<(), Error> {
+        let mut registry = self
+            .registry
+            .lock()
+            .map_err(|_| Error::invariant("B-link tenant registry lock poisoned"))?;
+        registry.opening.remove(&self.tenant);
+        let result = if registry.shutting_down {
+            Err(Error::overloaded("tenant service is shutting down"))
+        } else if let Some(shard) = shard {
+            registry.shards.insert(self.tenant, shard);
+            Ok(())
+        } else {
+            Ok(())
+        };
+        self.active = false;
+        drop(registry);
+        self.changed.notify_waiters();
+        result
+    }
+}
+
+impl Drop for BlinkOpenAttempt {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        if let Ok(mut registry) = self.registry.lock() {
+            registry.opening.remove(&self.tenant);
+        }
+        self.changed.notify_waiters();
+    }
 }
 
 struct CoordinatorActivity {
@@ -1293,6 +1352,14 @@ impl BlinkTenantService {
         if config.max_open_shards == 0 {
             return Err(Error::invalid_request("max_open_shards must be nonzero"));
         }
+        if config.blink_open_worker_count == 0
+            || config.blink_open_waiter_limit == 0
+            || config.blink_open_shutdown_timeout.is_zero()
+        {
+            return Err(Error::invalid_request(
+                "B-link open worker, waiter, and shutdown limits must be nonzero",
+            ));
+        }
         if matches!(
             config.blink_checkpoint_policy,
             BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes: 0 }
@@ -1344,6 +1411,10 @@ impl BlinkTenantService {
         Ok(Self {
             data_dir: config.data_dir,
             max_open_shards: config.max_open_shards,
+            open_workers: Arc::new(Semaphore::new(config.blink_open_worker_count)),
+            open_waiters: Arc::new(Semaphore::new(config.blink_open_waiter_limit)),
+            open_changed: Arc::new(Notify::new()),
+            open_shutdown_timeout: config.blink_open_shutdown_timeout,
             database_config: config.database_config,
             coordinator_config: config.coordinator_config,
             checkpoint_policy: config.blink_checkpoint_policy,
@@ -1352,8 +1423,14 @@ impl BlinkTenantService {
             checkpoint_retention_bytes: config.blink_checkpoint_retention_bytes,
             checkpoint_metrics,
             coordinator_activity,
-            shards: Mutex::new(BTreeMap::new()),
+            shards: Arc::new(StdMutex::new(BlinkShardRegistry {
+                shards: BTreeMap::new(),
+                opening: HashSet::new(),
+                shutting_down: false,
+            })),
             fault_injector_factory: Mutex::new(None),
+            #[cfg(test)]
+            open_test_gate: StdMutex::new(None),
         })
     }
 
@@ -1387,10 +1464,9 @@ impl BlinkTenantService {
         let shards = self
             .shards
             .lock()
-            .await
-            .values()
-            .cloned()
-            .collect::<Vec<_>>();
+            .ok()
+            .map(|registry| registry.shards.values().cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
         for shard in shards {
             shard.activity.wait_until_idle().await;
         }
@@ -1402,11 +1478,39 @@ impl BlinkTenantService {
 
     pub async fn shutdown_checked(&self) -> Result<(), Error> {
         let shards = {
-            let mut shards = self.shards.lock().await;
-            let open_shards = shards.values().cloned().collect::<Vec<_>>();
-            shards.clear();
-            open_shards
+            let mut registry = self
+                .shards
+                .lock()
+                .map_err(|_| Error::invariant("B-link tenant registry lock poisoned"))?;
+            registry.shutting_down = true;
+            std::mem::take(&mut registry.shards)
+                .into_values()
+                .collect::<Vec<_>>()
         };
+        let deadline = tokio::time::Instant::now() + self.open_shutdown_timeout;
+        loop {
+            let changed = self.open_changed.notified();
+            tokio::pin!(changed);
+            changed.as_mut().enable();
+            let opening_count = self
+                .shards
+                .lock()
+                .map_err(|_| Error::invariant("B-link tenant registry lock poisoned"))?
+                .opening
+                .len();
+            if opening_count == 0 {
+                break;
+            }
+            tokio::time::timeout_at(deadline, changed)
+                .await
+                .map_err(|_| {
+                    Error::overloaded("B-link tenant opens did not drain before shutdown")
+                })?;
+        }
+        self.shards
+            .lock()
+            .map_err(|_| Error::invariant("B-link tenant registry lock poisoned"))?
+            .shutting_down = false;
         let mut failure = None;
         for shard in shards {
             if let Err(error) = shard.shutdown().await {
@@ -1540,8 +1644,21 @@ impl BlinkTenantService {
     }
 
     async fn read_shard(&self, tenant: TenantId) -> Result<Option<Arc<AsyncBlinkShard>>, Error> {
-        if let Some(shard) = self.shards.lock().await.get(&tenant).cloned() {
+        let (shard, opening) = {
+            let registry = self
+                .shards
+                .lock()
+                .map_err(|_| Error::invariant("B-link tenant registry lock poisoned"))?;
+            (
+                registry.shards.get(&tenant).cloned(),
+                registry.opening.contains(&tenant),
+            )
+        };
+        if let Some(shard) = shard {
             return Ok(Some(shard));
+        }
+        if opening {
+            return self.open_shard(tenant).await.map(Some);
         }
         let path = self.database_path(tenant);
         if !path.exists() && !path.with_extension("wal").exists() {
@@ -1551,66 +1668,135 @@ impl BlinkTenantService {
     }
 
     async fn open_shard(&self, tenant: TenantId) -> Result<Arc<AsyncBlinkShard>, Error> {
-        let mut shards = self.shards.lock().await;
-        if let Some(shard) = shards.get(&tenant) {
-            return Ok(Arc::clone(shard));
-        }
-        if shards.len() >= self.max_open_shards {
-            return Err(Error::overloaded("open shard cache is full"));
-        }
-        let shard_id = ShardId::new(tenant.get());
-        let database_path = self.database_path(tenant);
-        let mut database_config = self.database_config.clone();
-        database_config.tenant_id = tenant;
-        database_config.shard_id = shard_id;
-        database_config.database_uuid = database_uuid(tenant, shard_id);
-        let mut store = match self.wal_layout {
-            BlinkWalLayout::Legacy => {
-                dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_path(
-                    &database_path,
-                    database_config,
-                )?
-            }
-            BlinkWalLayout::Segmented { max_segment_bytes } => {
-                dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_segmented_path(
-                    &database_path,
-                    database_config,
-                    max_segment_bytes,
-                )?
-            }
-            BlinkWalLayout::SegmentedBases { max_segment_bytes, coalesce } => {
-                dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_segmented_base_path(
-                    &database_path, database_config, max_segment_bytes, coalesce,
-                )?
-            }
-        };
-        let factory = self.fault_injector_factory.lock().await.clone();
-        if let Some(factory) = &factory {
-            store.set_boxed_fault_injector(factory(tenant, shard_id));
-        }
-        let physical_config = match self.wal_layout {
-            BlinkWalLayout::Legacy => None,
-            BlinkWalLayout::Segmented { .. } | BlinkWalLayout::SegmentedBases { .. } => {
-                if self.checkpoint_policy != BlinkCheckpointPolicy::Disabled {
-                    store.set_checkpoint_retention_limit(self.checkpoint_retention_bytes)?;
+        let mut waiter_permit = None;
+        loop {
+            let changed = self.open_changed.notified();
+            tokio::pin!(changed);
+            changed.as_mut().enable();
+            let reservation = {
+                let mut registry = self
+                    .shards
+                    .lock()
+                    .map_err(|_| Error::invariant("B-link tenant registry lock poisoned"))?;
+                if registry.shutting_down {
+                    return Err(Error::overloaded("tenant service is shutting down"));
                 }
-                Some(physical_checkpoint::PhysicalCheckpointConfig {
-                    execution: self.checkpoint_execution,
-                    injector_factory: factory.map(|factory| (factory, tenant, shard_id)),
+                if let Some(shard) = registry.shards.get(&tenant) {
+                    return Ok(Arc::clone(shard));
+                }
+                if registry.opening.contains(&tenant) {
+                    None
+                } else {
+                    if registry.shards.len() + registry.opening.len() >= self.max_open_shards {
+                        return Err(Error::overloaded("open shard cache is full"));
+                    }
+                    registry.opening.insert(tenant);
+                    Some(BlinkOpenAttempt {
+                        tenant,
+                        registry: Arc::clone(&self.shards),
+                        changed: Arc::clone(&self.open_changed),
+                        active: true,
+                    })
+                }
+            };
+            if let Some(attempt) = reservation {
+                let worker_permit = self
+                    .open_workers
+                    .clone()
+                    .try_acquire_owned()
+                    .map_err(|_| Error::overloaded("B-link open worker capacity is full"))?;
+                #[cfg(test)]
+                self.wait_for_test_open_gate(tenant).await?;
+                let shard_id = ShardId::new(tenant.get());
+                let database_path = self.database_path(tenant);
+                let mut database_config = self.database_config.clone();
+                database_config.tenant_id = tenant;
+                database_config.shard_id = shard_id;
+                database_config.database_uuid = database_uuid(tenant, shard_id);
+                let wal_layout = self.wal_layout;
+                let checkpoint_policy = self.checkpoint_policy;
+                let checkpoint_retention_bytes = self.checkpoint_retention_bytes;
+                let checkpoint_execution = self.checkpoint_execution;
+                let factory = self.fault_injector_factory.lock().await.clone();
+                let open_factory = factory.clone();
+                let open_result = tokio::task::spawn_blocking(move || {
+                    let _worker_permit = worker_permit;
+                    open_blink_store(
+                        database_path,
+                        database_config,
+                        wal_layout,
+                        checkpoint_policy,
+                        checkpoint_retention_bytes,
+                        open_factory,
+                        tenant,
+                        shard_id,
+                    )
                 })
+                .await
+                .map_err(|error| Error::invariant(format!("B-link open worker failed: {error}")))?;
+                let store = match open_result {
+                    Ok(store) => store,
+                    Err(error) => {
+                        attempt.finish(None)?;
+                        return Err(error);
+                    }
+                };
+                let shard = Arc::new(AsyncBlinkShard::start(
+                    store,
+                    self.coordinator_config,
+                    self.checkpoint_policy,
+                    match wal_layout {
+                        BlinkWalLayout::Legacy => None,
+                        BlinkWalLayout::Segmented { .. }
+                        | BlinkWalLayout::SegmentedBases { .. } => {
+                            Some(physical_checkpoint::PhysicalCheckpointConfig {
+                                execution: checkpoint_execution,
+                                injector_factory: factory
+                                    .map(|factory| (factory, tenant, shard_id)),
+                            })
+                        }
+                    },
+                    Arc::clone(&self.checkpoint_metrics),
+                    Arc::clone(&self.coordinator_activity),
+                ));
+                attempt.finish(Some(Arc::clone(&shard)))?;
+                return Ok(shard);
             }
-        };
-        store.enable_planned_execution();
-        let shard = Arc::new(AsyncBlinkShard::start(
-            store,
-            self.coordinator_config,
-            self.checkpoint_policy,
-            physical_config,
-            Arc::clone(&self.checkpoint_metrics),
-            Arc::clone(&self.coordinator_activity),
-        ));
-        shards.insert(tenant, Arc::clone(&shard));
-        Ok(shard)
+            if waiter_permit.is_none() {
+                waiter_permit = Some(
+                    self.open_waiters
+                        .clone()
+                        .try_acquire_owned()
+                        .map_err(|_| Error::overloaded("B-link open waiter capacity is full"))?,
+                );
+            }
+            changed.await;
+        }
+    }
+
+    #[cfg(test)]
+    fn set_open_test_gate(&self, tenant: TenantId, gate: Arc<Semaphore>) {
+        if let Ok(mut current) = self.open_test_gate.lock() {
+            *current = Some((tenant, gate));
+        }
+    }
+
+    #[cfg(test)]
+    async fn wait_for_test_open_gate(&self, tenant: TenantId) -> Result<(), Error> {
+        let gate = self
+            .open_test_gate
+            .lock()
+            .map_err(|_| Error::invariant("B-link test gate lock poisoned"))?
+            .as_ref()
+            .filter(|(gated_tenant, _)| *gated_tenant == tenant)
+            .map(|(_, gate)| Arc::clone(gate));
+        if let Some(gate) = gate {
+            gate.acquire()
+                .await
+                .map_err(|_| Error::invariant("B-link test gate closed"))?
+                .forget();
+        }
+        Ok(())
     }
 
     fn database_path(&self, tenant: TenantId) -> PathBuf {
@@ -1620,6 +1806,52 @@ impl BlinkTenantService {
             tenant.get()
         ))
     }
+}
+
+fn open_blink_store(
+    database_path: PathBuf,
+    database_config: DatabaseConfig,
+    wal_layout: BlinkWalLayout,
+    checkpoint_policy: BlinkCheckpointPolicy,
+    checkpoint_retention_bytes: u64,
+    factory: Option<FaultInjectorFactory>,
+    tenant: TenantId,
+    shard_id: ShardId,
+) -> Result<dodb_storage::BlinkStore<ProductionFile, ProductionFile>, Error> {
+    let mut store = match wal_layout {
+        BlinkWalLayout::Legacy => {
+            dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_path(
+                &database_path,
+                database_config,
+            )?
+        }
+        BlinkWalLayout::Segmented { max_segment_bytes } => {
+            dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_segmented_path(
+                &database_path,
+                database_config,
+                max_segment_bytes,
+            )?
+        }
+        BlinkWalLayout::SegmentedBases {
+            max_segment_bytes,
+            coalesce,
+        } => dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_segmented_base_path(
+            &database_path,
+            database_config,
+            max_segment_bytes,
+            coalesce,
+        )?,
+    };
+    if let Some(factory) = &factory {
+        store.set_boxed_fault_injector(factory(tenant, shard_id));
+    }
+    if !matches!(wal_layout, BlinkWalLayout::Legacy)
+        && checkpoint_policy != BlinkCheckpointPolicy::Disabled
+    {
+        store.set_checkpoint_retention_limit(checkpoint_retention_bytes)?;
+    }
+    store.enable_planned_execution();
+    Ok(store)
 }
 
 impl AsyncBlinkShard {
@@ -2705,8 +2937,156 @@ mod tests {
                 assert!(Arc::ptr_eq(&opened, &shard));
             }
         }
-        assert_eq!(service.shards.lock().await.len(), 1);
+        assert_eq!(service.shards.lock().unwrap().shards.len(), 1);
         service.shutdown_checked().await.unwrap();
+    }
+
+    #[test]
+    fn blink_open_limits_must_be_nonzero() {
+        for config in [
+            LocalTenantServiceConfig {
+                blink_open_worker_count: 0,
+                ..LocalTenantServiceConfig::default()
+            },
+            LocalTenantServiceConfig {
+                blink_open_waiter_limit: 0,
+                ..LocalTenantServiceConfig::default()
+            },
+            LocalTenantServiceConfig {
+                blink_open_shutdown_timeout: std::time::Duration::ZERO,
+                ..LocalTenantServiceConfig::default()
+            },
+        ] {
+            assert!(BlinkTenantService::new(config).is_err());
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn blocked_blink_open_does_not_hold_registry_and_same_tenant_open_coalesces() {
+        let directory = blink_test_directory();
+        let service = Arc::new(
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                blink_open_worker_count: 2,
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap(),
+        );
+        let gated_tenant = TenantId::new(101);
+        service.set_open_test_gate(gated_tenant, Arc::new(Semaphore::new(0)));
+        let leader_service = Arc::clone(&service);
+        let leader = tokio::spawn(async move { leader_service.open_shard(gated_tenant).await });
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if service
+                    .shards
+                    .lock()
+                    .unwrap()
+                    .opening
+                    .contains(&gated_tenant)
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let mut coalesced = Vec::new();
+        for _waiter_number in 0..6 {
+            let waiter_service = Arc::clone(&service);
+            coalesced.push(tokio::spawn(async move {
+                waiter_service.open_shard(gated_tenant).await
+            }));
+        }
+        let reader_service = Arc::clone(&service);
+        let reader = tokio::spawn(async move { reader_service.read_shard(gated_tenant).await });
+        let unrelated = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            service.open_shard(TenantId::new(102)),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let gate = service
+            .open_test_gate
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .1
+            .clone();
+        gate.add_permits(1);
+        let opened = leader.await.unwrap().unwrap();
+        assert!(!Arc::ptr_eq(&opened, &unrelated));
+        for waiter in coalesced {
+            assert!(Arc::ptr_eq(&opened, &waiter.await.unwrap().unwrap()));
+        }
+        assert!(Arc::ptr_eq(
+            &opened,
+            &reader.await.unwrap().unwrap().unwrap()
+        ));
+        assert_eq!(service.shards.lock().unwrap().opening.len(), 0);
+        service.shutdown_checked().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn failed_blink_open_releases_tenant_reservation() {
+        let directory = blink_test_directory();
+        let service = BlinkTenantService::new(LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            ..LocalTenantServiceConfig::default()
+        })
+        .unwrap();
+        let tenant = TenantId::new(103);
+        let database_path = service.database_path(tenant);
+        std::fs::create_dir_all(database_path.parent().unwrap()).unwrap();
+        std::fs::write(&database_path, b"corrupt database").unwrap();
+        assert!(service.open_shard(tenant).await.is_err());
+        assert!(service.shards.lock().unwrap().opening.is_empty());
+        service.shutdown_checked().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn blink_shutdown_bounds_wait_for_inflight_open_and_drains_it() {
+        let directory = blink_test_directory();
+        let service = Arc::new(
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                blink_open_shutdown_timeout: std::time::Duration::from_millis(20),
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap(),
+        );
+        let tenant = TenantId::new(104);
+        service.set_open_test_gate(tenant, Arc::new(Semaphore::new(0)));
+        let open_service = Arc::clone(&service);
+        let opening = tokio::spawn(async move { open_service.open_shard(tenant).await });
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if service.shards.lock().unwrap().opening.contains(&tenant) {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(matches!(
+            service.shutdown_checked().await,
+            Err(Error::Overloaded(_))
+        ));
+        service
+            .open_test_gate
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .1
+            .add_permits(1);
+        assert!(opening.await.unwrap().is_err());
+        service.shutdown_checked().await.unwrap();
+        assert!(service.shards.lock().unwrap().opening.is_empty());
     }
 
     #[test]
