@@ -1794,6 +1794,8 @@ struct PagedWritableShard {
     maximum_transaction_wal_append_bytes: u64,
     checkpoint_debt_ledger: Arc<CheckpointDebtLedger>,
     checkpoint_pending: AtomicBool,
+    checkpoint_shutdown: AtomicBool,
+    checkpoint_shutdown_notify: tokio::sync::Notify,
     latest: StdRwLock<Arc<dodb_storage::blink::PagedReadHandle>>,
     transaction_worker: Arc<Semaphore>,
     #[cfg(all(test, feature = "blink-demand-paging"))]
@@ -1926,6 +1928,8 @@ impl PagedWritableShard {
             maximum_transaction_wal_append_bytes,
             checkpoint_debt_ledger,
             checkpoint_pending: AtomicBool::new(false),
+            checkpoint_shutdown: AtomicBool::new(false),
+            checkpoint_shutdown_notify: tokio::sync::Notify::new(),
             latest: StdRwLock::new(latest),
             transaction_worker: Arc::new(Semaphore::new(1)),
             #[cfg(all(test, feature = "blink-demand-paging"))]
@@ -2115,8 +2119,9 @@ impl PagedWritableShard {
         self: &Arc<Self>,
         mut request_metrics_guard: CheckpointRequestMetricsGuard,
     ) -> Result<Option<(u64, bool)>, Error> {
-        let initial_permit =
-            physical_checkpoint::acquire_fair_checkpoint_slice(self.tenant_id).await?;
+        let Some(initial_permit) = self.acquire_checkpoint_slice().await? else {
+            return Ok(None);
+        };
         let writable = Arc::clone(self);
         let pack_number = next_paged_checkpoint_pack_number(&self.checkpoint_directory)?;
         let mut job = physical_checkpoint::submit_checkpoint_progress(move || {
@@ -2154,8 +2159,9 @@ impl PagedWritableShard {
         let Some(mut job) = job.take() else {
             return Ok(None);
         };
-        job.reserve_disk_capacity(self.checkpoint_capacity_wait_timeout)
-            .await?;
+        if !self.reserve_checkpoint_disk_capacity(&mut job).await? {
+            return Ok(None);
+        }
         request_metrics_guard.started();
         if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
             metrics.tenant_checkpoint_slice_completed(self.tenant_id);
@@ -2169,12 +2175,60 @@ impl PagedWritableShard {
         self.complete_checkpoint_job(job).await
     }
 
+    async fn acquire_checkpoint_slice(
+        &self,
+    ) -> Result<Option<physical_checkpoint::CheckpointCapacityPermit>, Error> {
+        if self.checkpoint_shutdown.load(Ordering::Acquire) {
+            return Ok(None);
+        }
+        let shutdown = self.checkpoint_shutdown_notify.notified();
+        tokio::pin!(shutdown);
+        shutdown.as_mut().enable();
+        if self.checkpoint_shutdown.load(Ordering::Acquire) {
+            return Ok(None);
+        }
+        tokio::select! {
+            permit = physical_checkpoint::acquire_fair_checkpoint_slice(self.tenant_id) => {
+                permit.map(Some)
+            }
+            _ = shutdown => Ok(None),
+        }
+    }
+
+    async fn reserve_checkpoint_disk_capacity(
+        &self,
+        job: &mut dodb_storage::blink::PagedCheckpointJob,
+    ) -> Result<bool, Error> {
+        if self.checkpoint_shutdown.load(Ordering::Acquire) {
+            return Ok(false);
+        }
+        let shutdown = self.checkpoint_shutdown_notify.notified();
+        tokio::pin!(shutdown);
+        shutdown.as_mut().enable();
+        if self.checkpoint_shutdown.load(Ordering::Acquire) {
+            return Ok(false);
+        }
+        tokio::select! {
+            result = job.reserve_disk_capacity(self.checkpoint_capacity_wait_timeout) => {
+                result.map(|()| true)
+            }
+            _ = shutdown => Ok(false),
+        }
+    }
+
+    fn cancel_checkpoints(&self) {
+        self.checkpoint_shutdown.store(true, Ordering::Release);
+        self.checkpoint_shutdown_notify.notify_waiters();
+    }
+
     async fn complete_checkpoint_job(
         self: &Arc<Self>,
         mut job: dodb_storage::blink::PagedCheckpointJob,
     ) -> Result<Option<(u64, bool)>, Error> {
         loop {
-            let permit = physical_checkpoint::acquire_fair_checkpoint_slice(self.tenant_id).await?;
+            let Some(permit) = self.acquire_checkpoint_slice().await? else {
+                return Ok(None);
+            };
             let activity = Arc::clone(&self.activity);
             let (next_job, complete) =
                 physical_checkpoint::submit_checkpoint_progress(move || {
@@ -2196,8 +2250,9 @@ impl PagedWritableShard {
                 break;
             }
         }
-        let publish_permit =
-            physical_checkpoint::acquire_fair_checkpoint_slice(self.tenant_id).await?;
+        let Some(publish_permit) = self.acquire_checkpoint_slice().await? else {
+            return Ok(None);
+        };
         let writable = Arc::clone(self);
         let (wal_bytes, has_uncheckpointed, next_snapshot) =
             physical_checkpoint::submit_checkpoint_progress(move || {
@@ -4109,6 +4164,14 @@ impl AsyncBlinkShard {
     }
 
     async fn shutdown(&self) -> Result<(), Error> {
+        #[cfg(feature = "blink-demand-paging")]
+        if let BlinkShardReadHandle::Paged {
+            writable: Some(writable),
+            ..
+        } = &self.read_handle
+        {
+            writable.cancel_checkpoints();
+        }
         self.request_tx.lock().await.take();
         if let Some(task) = self.coordinator_task.lock().await.take() {
             task.await.map_err(|error| {
@@ -6513,6 +6576,96 @@ mod tests {
         assert_eq!(metrics.checkpoints_completed, 1);
         assert_eq!(metrics.checkpoints_failed, 0);
         service.shutdown_checked().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_service_shutdown_cancels_checkpoint_waiting_for_disk_capacity() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(724);
+        let config = LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            max_open_shards: 1,
+            blink_open_waiter_limit: 4,
+            blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce: true,
+            },
+            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                threshold_bytes: u64::MAX,
+            },
+            blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+            blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+            ..LocalTenantServiceConfig::default()
+        };
+        let service = BlinkTenantService::new(config).unwrap();
+        let database_path = service.database_path(tenant);
+        create_empty_paged_service_fixture(&database_path, tenant);
+        service
+            .execute_request(
+                tenant,
+                Request::Put {
+                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"shutdown-wait".to_vec()),
+                    value: b"shutdown-capacity-wait-checkpoint".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap();
+        let shard = service
+            .shards
+            .lock()
+            .unwrap()
+            .shards
+            .get(&tenant)
+            .cloned()
+            .unwrap();
+        let writable = match &shard.read_handle {
+            BlinkShardReadHandle::Paged {
+                writable: Some(writable),
+                ..
+            } => Arc::clone(writable),
+            BlinkShardReadHandle::Resident(_) | BlinkShardReadHandle::Paged { .. } => {
+                panic!("expected the writable paged service route")
+            }
+        };
+        let resources = service.shared_resources.as_ref().unwrap().clone();
+        let disk = resources.disk();
+        let tenant_disk = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
+        let disk_headroom = 256;
+        let blocker_bytes = writable_paged_blink_shared_resources()
+            .disk
+            .per_tenant_bytes
+            .saturating_sub(tenant_disk.current_total)
+            .saturating_sub(disk_headroom);
+        assert!(blocker_bytes > 0);
+        let blocker = disk
+            .reserve(
+                tenant.get(),
+                dodb_storage::blink::resource::DiskCategory::RetainedSource,
+                blocker_bytes,
+            )
+            .unwrap();
+        let checkpoint = {
+            let writable = Arc::clone(&writable);
+            tokio::spawn(async move { writable.run_threshold_checkpoint(1).await })
+        };
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if disk.snapshot().unwrap().pending_waiters == 1 {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+
+        service.shutdown_checked().await.unwrap();
+        checkpoint.await.unwrap().unwrap();
+        assert_eq!(disk.snapshot().unwrap().pending_waiters, 0);
+        assert_eq!(service.checkpoint_metrics_snapshot().checkpoints_failed, 0);
+        drop(blocker);
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
