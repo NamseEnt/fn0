@@ -1,0 +1,112 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.49s
+     Running unittests src/lib.rs (target/debug/deps/dodb_server-5a83d6c3f6b87b47)
+
+running 11 tests
+test tests::absent_blink_reads_preserve_capacity_and_do_not_cache_absence ... ok
+test tests::cached_blink_reads_do_not_depend_on_repeated_path_checks ... ok
+test tests::checkpoint_debt_metrics_track_excess_time_and_request_wait ... ok
+test tests::database_uuid_includes_all_shard_bits ... ok
+test tests::logical_database_uuid_is_stable_for_reopen ... ok
+test tests::peer_stream_reset_and_stop_are_benign_diagnostic_events ... ok
+test tests::racing_blink_read_and_open_share_one_shard ... ok
+test tests::request_latency_histogram_records_cumulative_operation_buckets ... ok
+test tests::storage_metrics_count_database_wal_and_persisted_files_separately_from_open_shards ... ok
+test tests::transport_classification_separates_disconnects_from_actionable_failures ... ok
+test tests::transport_metric_labels_are_bounded_and_only_actionable_events_raise_errors ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running unittests src/main.rs (target/debug/deps/dodb_server-2f80c7f6f70bb18f)
+
+running 6 tests
+test telemetry::tests::baseline_flush_exports_zero_request_and_latency_series_before_requests ... ok
+test tests::cli_defaults_are_stable ... ok
+test tests::cli_overrides_are_applied ... ok
+test tests::required_arguments_must_be_present ... ok
+test tests::server_binds_from_pem_files_and_shuts_down_cleanly ... ok
+test tests::zero_limits_are_rejected ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/background_checkpoint.rs (target/debug/deps/background_checkpoint-7cb6af8a8226290a)
+
+running 7 tests
+test background_checkpoint_preserves_newer_writes_rotations_tree_growth_and_reopen ... ok
+test checkpoint_capacity_waits_and_oversized_requests_are_rejected_without_a_commit ... ok
+test completed_checkpoint_rechecks_coalesced_threshold_before_starting_more_work ... ok
+test pending_shards_keep_writing_with_only_one_process_checkpoint_worker ... ok
+test shutdown_joins_an_active_checkpoint_before_returning ... ok
+test synchronous_execution_waits_for_the_identical_snapshot_worker ... ok
+test worker_failure_and_panic_fail_closed_preserve_acknowledged_writes_and_resolve_shutdown ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.55s
+
+     Running tests/blink_wal_checkpoint.rs (target/debug/deps/blink_wal_checkpoint-8dec651ee351bab7)
+
+running 8 tests
+test checkpoint_failure_keeps_acknowledged_commit_and_fails_later_writes ... ok
+test disabled_policy_does_not_checkpoint_and_default_is_disabled ... ok
+test explicit_segmented_layout_uses_segmented_wal_through_service_transactions ... ok
+test process_kill_during_checkpoint_replays_acknowledged_commit ... ok
+test segmented_threshold_checkpoints_reclaim_files_and_reopen ... ok
+test threshold_below_current_wal_does_not_checkpoint ... ok
+test threshold_checkpoints_repeat_and_reopen_keeps_latest_revision ... ok
+test zero_threshold_and_btree_policy_are_rejected ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
+     Running tests/blink_writer_pin_reuse.rs (target/debug/deps/blink_writer_pin_reuse-ea7288bfcb7aba00)
+
+running 2 tests
+test process_kill_recovers_incomplete_transaction_then_write_then_second_crash ... 
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+ok
+test service_recovers_torn_tail_accepts_write_and_recovers_again_for_legacy_and_bases ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+
+     Running tests/durable_base_checkpoint.rs (target/debug/deps/durable_base_checkpoint-89cc1a146fad8b89)
+
+running 6 tests
+test background_checkpoint_preserves_newer_writes_rotations_tree_growth_and_reopen ... ok
+test completed_checkpoint_rechecks_coalesced_threshold_before_starting_more_work ... ok
+test pending_shards_keep_writing_with_only_one_process_checkpoint_worker ... ok
+test shutdown_joins_an_active_checkpoint_before_returning ... ok
+test synchronous_execution_waits_for_the_identical_snapshot_worker ... ok
+test worker_failure_and_panic_fail_closed_preserve_acknowledged_writes_and_resolve_shutdown ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.38s
+
+     Running tests/phase6_quic.rs (target/debug/deps/phase6_quic-fcc9afc882fedeaa)
+
+running 14 tests
+test abrupt_disconnects_do_not_trigger_implicit_mutation_retries ... ok
+test aggregate_read_budget_returns_structured_query_and_scan_errors ... ok
+test ambiguous_mutation_is_not_replayed_after_connection_loss ... ok
+test concurrent_streams_and_tenant_isolation_are_preserved ... ok
+test conflict_does_not_materialize_large_value_or_exceed_small_response_budget ... ok
+test global_request_backpressure_preserves_unrelated_in_flight_streams ... ok
+test idle_connection_does_not_hoard_global_request_capacity ... ok
+test lazy_connection_dials_on_first_use_and_recovers_after_initial_failure ... ok
+test loopback_protocol_preserves_storage_semantics_and_lazy_creation ... ok
+test peer_close_and_stream_reset_are_diagnostic_not_actionable_transport_errors ... ok
+test persisted_state_is_available_after_server_reopen ... ok
+test shared_client_reconnects_after_same_address_restart ... ok
+test tenant_handles_share_one_connection_and_close_independently ... ok
+test wal_durability_failure_is_unknown_over_the_real_client_path ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.03s
+
+     Running tests/startup_smoke.rs (target/debug/deps/startup_smoke-a5e55c5cde8ad8b5)
+
+running 1 test
+test binary_starts_without_an_otlp_receiver_in_a_fresh_process ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s
+

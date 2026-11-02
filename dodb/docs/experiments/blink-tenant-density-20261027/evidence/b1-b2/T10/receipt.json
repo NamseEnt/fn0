@@ -24,7 +24,8 @@
     "eadacccfac2e80cd36eab298581317263dd02f05",
     "c3d84e5e7f7500d7df18a8eb45a8597de645e463",
     "f7ab8c76bc74145ad98687f8cdb9712448f98104",
-    "8beb8aa00ebd29a1ebd2a3be3b4c10f2fcda7a92"
+    "8beb8aa00ebd29a1ebd2a3be3b4c10f2fcda7a92",
+    "faca901d1b0ca43d357243b04f937d9683d60e87"
   ],
   "push": {
     "remote": "origin",
@@ -54,7 +55,13 @@
     "dodb/crates/dodb-storage/src/blink/version_index.rs",
     "dodb/crates/dodb-storage/src/wal.rs",
     "dodb/crates/dodb-storage/src/blink/source_catalog.rs",
-    "dodb/crates/dodb-storage/src/blink/resource.rs"
+    "dodb/crates/dodb-storage/src/blink/resource.rs",
+    "dodb/crates/dodb-server/src/lib.rs",
+    "dodb/crates/dodb-server/src/physical_checkpoint.rs",
+    "dodb/crates/dodb-server/tests/background_checkpoint.rs",
+    "dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs",
+    "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs",
+    "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs"
   ],
   "source_hashes": {
     "dodb/crates/dodb-storage/src/blink/mod.rs": "5d54e591f176fd7272fa19f54fe4566ad169bbc4d0bff4be26984de4e6dbf950",
@@ -67,14 +74,20 @@
     "dodb/crates/dodb-storage/src/wal.rs": "7fec7f957680ed1dc779ec355cd9b90018bc27ddb88023b6c446dd38763f601d",
     "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "e69d6062bfb9371d2e3a6b28ac3d114697642c4017d81f12666e8413fc46d366",
     "dodb/crates/dodb-storage/src/blink/source_catalog.rs": "c03109ba28ca3dd063b0d3a837be0d066c3648bb3c89b623a20a1bc8d746f3be",
-    "dodb/crates/dodb-storage/src/blink/resource.rs": "bd224080785a3273ab3fa951cc33f97d39484a9766bd47013c8febdcc0ff3259"
+    "dodb/crates/dodb-storage/src/blink/resource.rs": "bd224080785a3273ab3fa951cc33f97d39484a9766bd47013c8febdcc0ff3259",
+    "dodb/crates/dodb-server/src/lib.rs": "aac009967a26b9cbd07b51e06145313cc8545db2769ec153c590b93b790547db",
+    "dodb/crates/dodb-server/src/physical_checkpoint.rs": "f889f4130a4962d0093b8feb3b478be8240a8c3a06c5a78540d42e28f6d8c76e",
+    "dodb/crates/dodb-server/tests/background_checkpoint.rs": "2e0e2579359fe74009588e3d7dbf3b9a82a71d4a96297567a847975487639844",
+    "dodb/crates/dodb-rocksdb/src/bin/memory_diagnostic_worker.rs": "caaeeae84ff7a62d9cea74630a0c9a172f6e40ffc89717aeb3ee00ab9293d7ca",
+    "dodb/crates/dodb-rocksdb/src/bin/service_workload.rs": "d8d01912c6dd07bc851cb2fb9c143925aef606ea30c7c809931a86764268fb87",
+    "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs": "e0287a41641b0e205db2bf100d20af15e0924205a39558361289149b2c9a7f70"
   },
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "f7ab8c76bc74145ad98687f8cdb9712448f98104"
+    "source_commit": "faca901d1b0ca43d357243b04f937d9683d60e87"
   },
   "features": [
     "blink-demand-paging",
@@ -93,7 +106,8 @@
     "checkpoint_worker": "One active checkpoint job per PagedTransactionWriter; a job retains its output reservation and cursor between slices; overlapping jobs are rejected and job drop or publication releases the worker slot; fair cross-tenant scheduling is not implemented.",
     "pointer_faults": "Injectable boundaries exist before pointer temporary creation, after temporary-file sync, after atomic rename, and after directory sync; the exercised writer path fails after temporary-file sync.",
     "pack_failure": "Checkpoint jobs accept a storage fault injector; a page-write failure keeps the manifest selected and releases the single active worker lease when the failed job is dropped.",
-    "disk_accounting": "Retained pack, WAL, source-catalog, and version-index node usage is keyed by tenant and canonical directories in the shared disk manager and survives source/index manager drop; reopen reconciles actual bytes without duplicate charges. Version-index node creation reserves before file creation and converts the reservation atomically to persistent usage; GC reconciles retained node bytes while serialized with node writes. Paged WAL appends reserve a checked maximum frame bound before writing and reconcile actual source-directory bytes afterward. Source-catalog, manifest-validation, and GC marker runs reserve 48 bytes per conservatively counted marker before directory creation. Active WAL remains charged to RetainedSource rather than a distinct persistent Wal category."
+    "disk_accounting": "Retained pack, WAL, source-catalog, and version-index node usage is keyed by tenant and canonical directories in the shared disk manager and survives source/index manager drop; reopen reconciles actual bytes without duplicate charges. Version-index node creation reserves before file creation and converts the reservation atomically to persistent usage; GC reconciles retained node bytes while serialized with node writes. Paged WAL appends reserve a checked maximum frame bound before writing and reconcile actual source-directory bytes afterward. Source-catalog, manifest-validation, and GC marker runs reserve 48 bytes per conservatively counted marker before directory creation. Active WAL remains charged to RetainedSource rather than a distinct persistent Wal category.",
+    "checkpoint_metrics": "Global checkpoint metrics expose current and maximum WAL bytes above the configured threshold, accumulated closed time above threshold, current live duration and Unix start timestamp, queued/pending/cancelled checkpoint requests, and total/maximum request wait. Metrics are recorded in both the segmented PhysicalCoordinator and the legacy direct checkpoint path. These are aggregate observability counters; fair tenant scheduling and per-tenant debt attribution remain unimplemented."
   },
   "checks": [
     {
@@ -2486,6 +2500,91 @@
         "sha256": "b3a4a2c62ddaf76ec45bf8f05a4b32d5754027ab84d4b7e69a2880b3f5b86278"
       },
       "source_commit": "8beb8aa00ebd29a1ebd2a3be3b4c10f2fcda7a92"
+    },
+    {
+      "name": "checkpoint_debt_metrics_server_tests",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-server",
+        "--lib",
+        "--tests",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "55 passed, 0 failed across server library, binary, and integration test targets; includes debt, live threshold duration, queue, and wait assertions.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-debt-metrics-server-tests-final.log",
+        "sha256": "0cf60d53e2c92726631e366b7ccb7a02c4ade49813e7b382926b27707ea9948e"
+      },
+      "source_commit": "faca901d1b0ca43d357243b04f937d9683d60e87"
+    },
+    {
+      "name": "checkpoint_debt_metrics_server_strict_clippy_no_deps",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-server",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed with warnings denied.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-debt-metrics-server-strict-clippy-final.log",
+        "sha256": "a80446d1e7ae155b53169c0c1ad16d98687e19867c6582f0fe8f925c56fec339"
+      },
+      "source_commit": "faca901d1b0ca43d357243b04f937d9683d60e87"
+    },
+    {
+      "name": "checkpoint_debt_metrics_rustfmt_and_diff_check",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--check",
+        "-p",
+        "dodb-server",
+        "-p",
+        "dodb-rocksdb",
+        "&&",
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "Rust formatting and whitespace checks passed.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-debt-metrics-rustfmt.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source_commit": "faca901d1b0ca43d357243b04f937d9683d60e87"
+    },
+    {
+      "name": "checkpoint_debt_metrics_rocksdb_workload_bins_build",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-rocksdb",
+        "--bins"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 101,
+      "summary": "compiler verification blocked before bin compilation because this environment lacks DODB_ROCKSDB_DIR pointing to the pinned RocksDB 11.8.1 build; formatting parsed the edited sources.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-debt-metrics-rocksdb-workloads-build-blocked.log",
+        "sha256": "d619661de2e8e1e5023fe7aabf21afe7905cf28615a6dc10ccad3a2be55acb0b"
+      },
+      "source_commit": "faca901d1b0ca43d357243b04f937d9683d60e87"
     }
   ],
   "acceptance_mapping": {
@@ -2498,7 +2597,7 @@
     "complete_reopen_oracle": "partial: a disk-backed writer test publishes complete and incremental checkpoints, injects a failure before a later manifest pointer, reopens generation 3, and reads the exact generation-3 value; no process crash or pointer-write I/O fault is injected",
     "bounded_memory_and_source_index_disk_reservations": "partial: checkpoint pack output rejects before pack creation and retries after disk capacity release; source catalog output, retained sources, version-index nodes, WAL growth, and source marker scratch are reserved or persistently accounted. Checkpoint index insertion and durable promotion use a type-derived 20,480-byte bounded path reservation, released between phases; the pinned-reader writer fixture passes under its unchanged 64 KiB progress pool. Active-WAL disk category separation and required loader overlap remain incomplete.",
     "tiny_capacity_bounded_defer_and_eventual_progress": "partial: checkpoint pack output rejects before pack creation and retries after disk capacity release. Checkpoint index reservation rejects while a temporary progress charge blocks the 64 KiB pool, then succeeds after release; the same eight-page writer fixture completes with an old reader pinned without increasing that pool. A pool below the legal index path reservation rejects before mutation.",
-    "checkpoint_debt_and_time_above_threshold": "not implemented; no maintenance scheduler or tenant debt accounting exists yet",
+    "checkpoint_debt_and_time_above_threshold": "partial: global WAL debt bytes, threshold duration, and checkpoint queue/wait metrics are implemented and covered by server tests for both checkpoint execution paths; fair tenant scheduling and per-tenant debt attribution remain outstanding.",
     "resumable_bounded_slices": "passed within a single writer job: a one-page slice yields before completion, a later commit proceeds between slices while the pinned target remains fixed, the cursor visits descriptors in order with fixed-depth state, and a failed slice cannot be retried; fair tenant scheduling remains unimplemented",
     "persistent_source_catalog_and_restart_gc": "passed for the exercised checkpoint writer path: immutable catalogs are synced before manifest publication; reopen validates exact source identities and headers; GC protects durable and pending roots, retains the current catalog generation, and reclaims obsolete generations; process-kill boundaries and disk reservation limits remain open"
   },
@@ -2647,11 +2746,31 @@
       "reason": "Strict Clippy found a manual division-ceiling expression and a constant-only fixture assertion in the new capacity code. The expression now uses div_ceil, the redundant assertion was removed, and the final strict run reports only 32 existing crate findings.",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/pinned-root-index-small-pool-strict-clippy.log",
       "sha256": "a72d898e4094647dfa7cfc785d5f17bd6094fe390715b84ce50f8e57c2db7526"
+    },
+    {
+      "name": "checkpoint_debt_metrics_dependency_inclusive_strict_clippy",
+      "exit_status": 101,
+      "reason": "Workspace dependency-inclusive Clippy stopped on 12 existing dodb-storage diagnostics. The changed dodb-server targets passed strict Clippy with --no-deps; no lint suppressions were added.",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-debt-metrics-strict-clippy.log",
+      "sha256": "7fecc4cb5e77cdb0b430f0c343c7dce7476ae2df6f984744bacee642b6ba86bb"
+    },
+    {
+      "name": "checkpoint_debt_metrics_first_server_strict_clippy",
+      "exit_status": 101,
+      "reason": "The first server strict Clippy run found three collapsible-if diagnostics in AsyncBlinkShard::transact. They were simplified and the final server no-deps strict Clippy run passed.",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-debt-metrics-server-strict-clippy.log"
+    },
+    {
+      "name": "checkpoint_debt_metrics_rocksdb_bins_missing_pinned_native_build",
+      "exit_status": 101,
+      "reason": "The workload reporters were updated, but cargo could not compile the dodb-rocksdb bins because DODB_ROCKSDB_DIR is unset and the pinned RocksDB 11.8.1 build is unavailable in this environment.",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-debt-metrics-rocksdb-workloads-build-blocked.log",
+      "sha256": "d619661de2e8e1e5023fe7aabf21afe7905cf28615a6dc10ccad3a2be55acb0b"
     }
   ],
   "remaining_work": [
-    "Implement a fair multi-tenant continuation scheduler and bounded checkpoint debt/time-above-threshold accounting",
-    "Separate active WAL persistent usage from retained-source usage; reserve loader memory with index promotion; complete paged-writer process-kill recovery coverage"
+    "Implement fair tenant-ready checkpoint scheduling and per-tenant queue service/debt attribution in T14 after T12-T13.",
+    "Separate active WAL persistent usage from retained-source usage; reserve loader memory with index promotion; complete paged-writer process-kill recovery coverage."
   ],
   "next_task": "T10"
 }

@@ -215,3 +215,13 @@ T10 remains partial. Checkpoint output rejection before pack creation and progre
 - Raw logs: `logs/pinned-root-index-small-pool-focused.log`, `logs/pinned-root-index-small-pool-writer-focused.log`, `logs/pinned-root-index-small-pool-final-feature-library.log`, `logs/pinned-root-index-small-pool-all-targets-final-check.log`, `logs/pinned-root-index-small-pool-strict-clippy-final.log`, and `logs/pinned-root-index-small-pool-retry.log` (preserved failed guard attempt).
 
 T10 remains partial. The pinned-reader checkpoint index capacity case now progresses under the original 64 KiB pool, and checkpoint disk rejection/retry also passes. Fair multi-tenant continuation scheduling, bounded checkpoint debt and time-above-threshold accounting, distinct active-WAL disk accounting, loader overlap with index promotion, and paged-writer process-kill recovery remain open. Service routing and defaults remain unchanged; T17 was not started.
+
+## Partial substep: checkpoint debt, threshold duration, and queue observability
+
+- Source commit: `faca901d1b0ca43d357243b04f937d9683d60e87`.
+- Added global checkpoint metrics for current and maximum WAL debt above threshold, accumulated and current time above threshold, the current interval's Unix start timestamp, queued/pending/cancelled checkpoint requests, and total/maximum request wait. Both the segmented physical coordinator and legacy direct checkpoint path record these metrics.
+- Server tests passed: 55 passed, 0 failed. The background checkpoint integration test verifies live debt and threshold duration, a queued pending request while the worker is gated, and request wait after release. Strict server Clippy with `--no-deps` and rustfmt passed.
+- The dependency-inclusive strict Clippy run remains blocked by 12 existing `dodb-storage` diagnostics. The edited RocksDB workload reporters could not be compiler-verified because `DODB_ROCKSDB_DIR` is unset and the pinned RocksDB 11.8.1 build is unavailable; the blocked build log is preserved.
+- Raw logs: `logs/checkpoint-debt-metrics-server-tests-final.log`, `logs/checkpoint-debt-metrics-server-strict-clippy-final.log`, `logs/checkpoint-debt-metrics-rustfmt.log`, `logs/checkpoint-debt-metrics-strict-clippy.log`, and `logs/checkpoint-debt-metrics-rocksdb-workloads-build-blocked.log`.
+
+T10 remains partial. Aggregate debt/time and queue observability are implemented, while fair tenant scheduling and per-tenant debt attribution remain open for T14. Active WAL category separation, loader overlap with index promotion, and paged-writer process-kill recovery also remain open. No service route, default, or performance experiment changed; T17 was not started.
