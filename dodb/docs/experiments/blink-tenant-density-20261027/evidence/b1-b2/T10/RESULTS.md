@@ -225,3 +225,12 @@ T10 remains partial. The pinned-reader checkpoint index capacity case now progre
 - Raw logs: `logs/checkpoint-debt-metrics-server-tests-final.log`, `logs/checkpoint-debt-metrics-server-strict-clippy-final.log`, `logs/checkpoint-debt-metrics-rustfmt.log`, `logs/checkpoint-debt-metrics-strict-clippy.log`, and `logs/checkpoint-debt-metrics-rocksdb-workloads-build-blocked.log`.
 
 T10 remains partial. Aggregate debt/time and queue observability are implemented, while fair tenant scheduling and per-tenant debt attribution remain open for T14. Active WAL category separation, loader overlap with index promotion, and paged-writer process-kill recovery also remain open. No service route, default, or performance experiment changed; T17 was not started.
+
+## Partial substep: measure loader overlap with checkpoint index promotion
+
+- Source commit: `949b2314a0c8da37e6f34823870a0f5fa6dfbfd0`.
+- Extended the pinned-reader writer fixture to evict every target page before checkpoint output, force a source reload during a one-page slice, and keep the decoded page guard alive through index promotion. It asserts the checkpoint output reservation stays live, progress usage rises above that reservation while index work runs, and total/progress peaks remain within the configured 4 MiB/512 KiB caps.
+- Focused integration test: 1 passed. Targeted formatting and `git diff --check` passed. The first assertion attempt checked the lazy output reservation too early; its captured failure output is preserved separately and the corrected test passed.
+- Raw logs: `logs/checkpoint-loader-index-overlap-focused.log`, `logs/checkpoint-loader-index-overlap-format-check.log`, and `logs/checkpoint-loader-index-overlap-initial-reservation-order-failure.log` (reconstructed from captured tool output after the first tee file was overwritten).
+
+T10 remains partial. The checkpoint loader/output/index memory overlap now has an integrated bounded-peak assertion. Active WAL bytes still lack a distinct persistent `Wal` category; fair per-tenant scheduling and debt attribution remain for T14. T11 storage validation and crash/reopen gates are not started.

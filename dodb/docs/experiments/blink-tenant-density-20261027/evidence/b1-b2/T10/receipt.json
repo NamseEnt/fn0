@@ -25,7 +25,8 @@
     "c3d84e5e7f7500d7df18a8eb45a8597de645e463",
     "f7ab8c76bc74145ad98687f8cdb9712448f98104",
     "8beb8aa00ebd29a1ebd2a3be3b4c10f2fcda7a92",
-    "faca901d1b0ca43d357243b04f937d9683d60e87"
+    "faca901d1b0ca43d357243b04f937d9683d60e87",
+    "949b2314a"
   ],
   "push": {
     "remote": "origin",
@@ -64,7 +65,7 @@
     "dodb/crates/dodb-rocksdb/src/bin/unconditional_write_workload.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "5d54e591f176fd7272fa19f54fe4566ad169bbc4d0bff4be26984de4e6dbf950",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "1e94cd5bf41f6ec6a0b86093f43f792b6dc562dc270ec3b603e2035ae0552a4f",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "97b2227be417739bcb6c4bada445402e66cf4f0ec6ae47b203008d65dde05364",
     "dodb/crates/dodb-storage/src/blink/page_locator.rs": "80fbbdc6a569b379b563e8ad65b396c047bb4e63524240e3126c15710d59b48a",
     "dodb/crates/dodb-storage/src/bin/phase0-bench.rs": "2cf4d0a7d12caaa477046445f3a4675c861b85628105c81496115e2e03c50c81",
@@ -87,7 +88,7 @@
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "faca901d1b0ca43d357243b04f937d9683d60e87"
+    "source_commit": "949b2314ae8029278dba855bbaa7f19366ab7fc9"
   },
   "features": [
     "blink-demand-paging",
@@ -2585,6 +2586,51 @@
         "sha256": "d619661de2e8e1e5023fe7aabf21afe7905cf28615a6dc10ccad3a2be55acb0b"
       },
       "source_commit": "faca901d1b0ca43d357243b04f937d9683d60e87"
+    },
+    {
+      "name": "checkpoint_loader_and_index_promotion_memory_overlap",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "paged_transaction_writer_publishes_complete_and_incremental_checkpoints",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "1 passed. The test evicts all target pages, forces a source reload during a one-page checkpoint slice, holds the decoded page guard through checkpoint index promotion, verifies the progress peak exceeds the live checkpoint output reservation, and checks total/progress peaks remain within configured 4 MiB/512 KiB caps.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-loader-index-overlap-focused.log",
+        "sha256": "0524bcb8b530804ea35927d4538beae0061cd19c1e273422a683f30cb63d384b"
+      },
+      "source_commit": "949b2314ae8029278dba855bbaa7f19366ab7fc9"
+    },
+    {
+      "name": "checkpoint_loader_index_overlap_format_and_diff_check",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--check",
+        "-p",
+        "dodb-storage",
+        "&&",
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-loader-index-overlap-format-check.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source_commit": "949b2314ae8029278dba855bbaa7f19366ab7fc9"
     }
   ],
   "acceptance_mapping": {
@@ -2595,7 +2641,7 @@
     "writes_after_target_capture": "passed for the serialized writer path: the next transaction enters the newly rotated WAL only after manifest publication and active-segment switch; the integration fixture commits after a complete checkpoint and then publishes an incremental checkpoint",
     "checkpoint_failure_and_old_reader_retention": "partial: an integrated fault before the manifest pointer leaves the prior generation selected after reopen and fences the writer after an uncertain result; incomplete-pack and pinned-reader tests pass. The eight-page writer fixture now completes index promotion with its old reader pinned under the existing 64 KiB progress pool. Process-kill recovery and pack/index/WAL I/O fault coverage remain unverified.",
     "complete_reopen_oracle": "partial: a disk-backed writer test publishes complete and incremental checkpoints, injects a failure before a later manifest pointer, reopens generation 3, and reads the exact generation-3 value; no process crash or pointer-write I/O fault is injected",
-    "bounded_memory_and_source_index_disk_reservations": "partial: checkpoint pack output rejects before pack creation and retries after disk capacity release; source catalog output, retained sources, version-index nodes, WAL growth, and source marker scratch are reserved or persistently accounted. Checkpoint index insertion and durable promotion use a type-derived 20,480-byte bounded path reservation, released between phases; the pinned-reader writer fixture passes under its unchanged 64 KiB progress pool. Active-WAL disk category separation and required loader overlap remain incomplete.",
+    "bounded_memory_and_source_index_disk_reservations": "partial: checkpoint output, source/catalog/WAL growth, index-node writes, GC scratch, and retained sources are charged; the pinned-reader fixture now forces a cache miss during checkpoint output and holds a decoded page guard through index promotion while asserting peak progress and total usage stay within configured caps. Active WAL still shares RetainedSource instead of a distinct Wal category.",
     "tiny_capacity_bounded_defer_and_eventual_progress": "partial: checkpoint pack output rejects before pack creation and retries after disk capacity release. Checkpoint index reservation rejects while a temporary progress charge blocks the 64 KiB pool, then succeeds after release; the same eight-page writer fixture completes with an old reader pinned without increasing that pool. A pool below the legal index path reservation rejects before mutation.",
     "checkpoint_debt_and_time_above_threshold": "partial: global WAL debt bytes, threshold duration, and checkpoint queue/wait metrics are implemented and covered by server tests for both checkpoint execution paths; fair tenant scheduling and per-tenant debt attribution remain outstanding.",
     "resumable_bounded_slices": "passed within a single writer job: a one-page slice yields before completion, a later commit proceeds between slices while the pinned target remains fixed, the cursor visits descriptors in order with fixed-depth state, and a failed slice cannot be retried; fair tenant scheduling remains unimplemented",
@@ -2613,7 +2659,7 @@
     "checkpoint_index_promotion_progress_reservation_bytes": 20480,
     "checkpoint_index_plus_promotion_progress_peak_bytes": 45056,
     "minimum_progress_pool_for_index_build_fixture_bytes": 45056,
-    "required_loader_overlap_with_index_promotion": "not integrated or measured"
+    "required_loader_overlap_with_index_promotion": "verified in the eight-page pinned-reader writer fixture: an evicted target is reloaded during checkpoint slicing; its decoded page guard remains live across index promotion while the checkpoint output reservation is retained; peak progress and total are asserted within the configured 512 KiB and 4 MiB limits."
   },
   "failed_attempts": [
     {
@@ -2766,6 +2812,13 @@
       "reason": "The workload reporters were updated, but cargo could not compile the dodb-rocksdb bins because DODB_ROCKSDB_DIR is unset and the pinned RocksDB 11.8.1 build is unavailable in this environment.",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-debt-metrics-rocksdb-workloads-build-blocked.log",
       "sha256": "d619661de2e8e1e5023fe7aabf21afe7905cf28615a6dc10ccad3a2be55acb0b"
+    },
+    {
+      "name": "checkpoint_loader_index_overlap_checked_reservation_before_slice",
+      "exit_status": 101,
+      "reason": "The first assertion inspected the checkpoint output reservation before write_pack_slice had lazily acquired it. The assertion was moved after the first slice; the focused integration test then passed. The preserved log is a copy reconstructed from the captured command output because the initial tee file was overwritten by the successful rerun.",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-loader-index-overlap-initial-reservation-order-failure.log",
+      "sha256": "54fce120906b751f1c9fcaae18c3e4dfb127b14c5aa0772381828b32eb2d2dd2"
     }
   ],
   "remaining_work": [

@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.13s
+     Running unittests src/lib.rs (target/debug/deps/dodb_storage-70634b21c90c24df)
+
+running 1 test
+test blink::tests::paged_transaction_writer_publishes_complete_and_incremental_checkpoints ... FAILED
+
+failures:
+
+---- blink::tests::paged_transaction_writer_publishes_complete_and_incremental_checkpoints stdout ----
+
+thread 'blink::tests::paged_transaction_writer_publishes_complete_and_incremental_checkpoints' (444055517) panicked at dodb/crates/dodb-storage/src/blink/mod.rs:16510:9:
+assertion failed: checkpoint_output_reservation_bytes > 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    blink::tests::paged_transaction_writer_publishes_complete_and_incremental_checkpoints
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 313 filtered out; finished in 0.34s
+
+error: test failed, to rerun pass `-p dodb-storage --lib`
