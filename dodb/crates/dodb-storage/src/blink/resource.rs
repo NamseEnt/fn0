@@ -1,5 +1,8 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use tokio::sync::Notify;
 
 const CATEGORY_COUNT: usize = 7;
 
@@ -27,15 +30,20 @@ pub struct ResourceLimits {
     pub per_tenant_bytes: u64,
     pub progress_pool_bytes: u64,
     pub max_tenants: usize,
+    pub max_pending_waiters: usize,
+    pub global_category_bytes: [u64; CATEGORY_COUNT],
+    pub per_tenant_category_bytes: [u64; CATEGORY_COUNT],
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ResourceError {
     InvalidLimits,
     TooManyTenants,
+    TooManyWaiters,
     CapacityExceeded,
     ArithmeticOverflow,
     SharedOwnership,
+    WaitTimedOut,
     Poisoned,
 }
 
@@ -48,6 +56,7 @@ pub struct ResourceSnapshot {
     pub current_progress: u64,
     pub peak_progress: u64,
     pub active_tenants: usize,
+    pub pending_waiters: usize,
     pub rejected_reservations: u64,
 }
 
@@ -76,12 +85,18 @@ struct State {
     current_progress: u64,
     peak_progress: u64,
     rejected_reservations: u64,
+    pending_waiters: usize,
     tenants: BTreeMap<u64, TenantState>,
 }
 
 struct Inner {
     limits: ResourceLimits,
     state: Mutex<State>,
+    capacity_changed: Notify,
+}
+
+struct WaiterRegistration {
+    inner: Arc<Inner>,
 }
 
 #[derive(Clone)]
@@ -106,8 +121,18 @@ impl BlinkResourceManager {
         if limits.global_bytes == 0
             || limits.per_tenant_bytes == 0
             || limits.max_tenants == 0
+            || limits.max_pending_waiters == 0
             || limits.per_tenant_bytes > limits.global_bytes
+            || limits.progress_pool_bytes == 0
             || limits.progress_pool_bytes >= limits.global_bytes
+            || limits
+                .global_category_bytes
+                .iter()
+                .any(|limit| *limit == 0 || *limit > limits.global_bytes)
+            || limits
+                .per_tenant_category_bytes
+                .iter()
+                .any(|limit| *limit == 0 || *limit > limits.per_tenant_bytes)
         {
             return Err(ResourceError::InvalidLimits);
         }
@@ -115,6 +140,7 @@ impl BlinkResourceManager {
             inner: Arc::new(Inner {
                 limits,
                 state: Mutex::new(State::default()),
+                capacity_changed: Notify::new(),
             }),
         })
     }
@@ -175,10 +201,19 @@ impl BlinkResourceManager {
         let next_category = state.current_by_category[category_index]
             .checked_add(bytes)
             .ok_or(ResourceError::ArithmeticOverflow)?;
-        let tenant_state = state.tenants.entry(tenant_id).or_default();
-        let next_tenant_category = tenant_state.current_by_category[category_index]
+        let tenant_category = state.tenants.get(&tenant_id).map_or(0, |tenant_state| {
+            tenant_state.current_by_category[category_index]
+        });
+        let next_tenant_category = tenant_category
             .checked_add(bytes)
             .ok_or(ResourceError::ArithmeticOverflow)?;
+        if next_category > self.inner.limits.global_category_bytes[category_index]
+            || next_tenant_category > self.inner.limits.per_tenant_category_bytes[category_index]
+        {
+            state.rejected_reservations = state.rejected_reservations.saturating_add(1);
+            return Err(ResourceError::CapacityExceeded);
+        }
+        let tenant_state = state.tenants.entry(tenant_id).or_default();
         tenant_state.current_by_category[category_index] = next_tenant_category;
         tenant_state.peak_by_category[category_index] =
             tenant_state.peak_by_category[category_index].max(next_tenant_category);
@@ -204,6 +239,31 @@ impl BlinkResourceManager {
         })
     }
 
+    pub async fn reserve_wait(
+        &self,
+        tenant_id: u64,
+        category: ResourceCategory,
+        class: ReservationClass,
+        bytes: u64,
+        wait_limit: Duration,
+    ) -> Result<Reservation, ResourceError> {
+        let _waiter_registration = self.register_waiter()?;
+        let deadline = tokio::time::Instant::now() + wait_limit;
+        loop {
+            let capacity_changed = self.inner.capacity_changed.notified();
+            tokio::pin!(capacity_changed);
+            capacity_changed.as_mut().enable();
+            match self.reserve(tenant_id, category, class, bytes) {
+                Ok(reservation) => return Ok(reservation),
+                Err(ResourceError::CapacityExceeded | ResourceError::TooManyTenants) => {}
+                Err(error) => return Err(error),
+            }
+            tokio::time::timeout_at(deadline, capacity_changed)
+                .await
+                .map_err(|_| ResourceError::WaitTimedOut)?;
+        }
+    }
+
     pub fn snapshot(&self) -> Result<ResourceSnapshot, ResourceError> {
         let state = self
             .inner
@@ -219,6 +279,7 @@ impl BlinkResourceManager {
             peak_progress: state.peak_progress,
             active_tenants: state.tenants.len(),
             rejected_reservations: state.rejected_reservations,
+            pending_waiters: state.pending_waiters,
         })
     }
 
@@ -240,6 +301,29 @@ impl BlinkResourceManager {
                 current_total: tenant_state.current_total,
                 peak_total: tenant_state.peak_total,
             }))
+    }
+
+    fn register_waiter(&self) -> Result<WaiterRegistration, ResourceError> {
+        let mut state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| ResourceError::Poisoned)?;
+        if state.pending_waiters == self.inner.limits.max_pending_waiters {
+            return Err(ResourceError::TooManyWaiters);
+        }
+        state.pending_waiters += 1;
+        Ok(WaiterRegistration {
+            inner: Arc::clone(&self.inner),
+        })
+    }
+}
+
+impl Drop for WaiterRegistration {
+    fn drop(&mut self) {
+        if let Ok(mut state) = self.inner.state.lock() {
+            state.pending_waiters = state.pending_waiters.saturating_sub(1);
+        }
     }
 }
 
@@ -280,6 +364,11 @@ impl Reservation {
         let new_tenant = tenant_state.current_by_category[new_index]
             .checked_add(charge.bytes)
             .ok_or(ResourceError::ArithmeticOverflow)?;
+        if new_global > charge.inner.limits.global_category_bytes[new_index]
+            || new_tenant > charge.inner.limits.per_tenant_category_bytes[new_index]
+        {
+            return Err(ResourceError::CapacityExceeded);
+        }
         tenant_state.current_by_category[old_index] = tenant_state.current_by_category[old_index]
             .checked_sub(charge.bytes)
             .ok_or(ResourceError::ArithmeticOverflow)?;
@@ -319,14 +408,18 @@ impl Drop for Charge {
         if remove_tenant {
             state.tenants.remove(&self.tenant_id);
         }
+        drop(state);
+        self.inner.capacity_changed.notify_waiters();
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        BlinkResourceManager, ReservationClass, ResourceCategory, ResourceError, ResourceLimits,
+        BlinkResourceManager, CATEGORY_COUNT, ReservationClass, ResourceCategory, ResourceError,
+        ResourceLimits,
     };
+    use std::time::Duration;
 
     fn manager() -> BlinkResourceManager {
         BlinkResourceManager::new(ResourceLimits {
@@ -334,6 +427,9 @@ mod tests {
             per_tenant_bytes: 80,
             progress_pool_bytes: 20,
             max_tenants: 2,
+            max_pending_waiters: 2,
+            global_category_bytes: [100; CATEGORY_COUNT],
+            per_tenant_category_bytes: [80; CATEGORY_COUNT],
         })
         .unwrap()
     }
@@ -476,6 +572,9 @@ mod tests {
                 per_tenant_bytes: 10,
                 progress_pool_bytes: 10,
                 max_tenants: 1,
+                max_pending_waiters: 2,
+                global_category_bytes: [10; CATEGORY_COUNT],
+                per_tenant_category_bytes: [10; CATEGORY_COUNT],
             })
             .err(),
             Some(ResourceError::InvalidLimits)
@@ -507,8 +606,11 @@ mod tests {
         let manager = BlinkResourceManager::new(ResourceLimits {
             global_bytes: u64::MAX,
             per_tenant_bytes: u64::MAX,
-            progress_pool_bytes: 0,
+            progress_pool_bytes: 1,
             max_tenants: 1,
+            max_pending_waiters: 2,
+            global_category_bytes: [u64::MAX; CATEGORY_COUNT],
+            per_tenant_category_bytes: [u64::MAX; CATEGORY_COUNT],
         })
         .unwrap();
         let reservation = manager
@@ -516,7 +618,7 @@ mod tests {
                 1,
                 ResourceCategory::Metadata,
                 ReservationClass::Foreground,
-                u64::MAX,
+                u64::MAX - 1,
             )
             .unwrap();
         assert!(matches!(
@@ -524,11 +626,11 @@ mod tests {
                 1,
                 ResourceCategory::Metadata,
                 ReservationClass::Foreground,
-                1
+                2
             ),
             Err(ResourceError::ArithmeticOverflow)
         ));
-        assert_eq!(manager.snapshot().unwrap().current_total, u64::MAX);
+        assert_eq!(manager.snapshot().unwrap().current_total, u64::MAX - 1);
         drop(reservation);
     }
 
@@ -537,8 +639,11 @@ mod tests {
         let manager = BlinkResourceManager::new(ResourceLimits {
             global_bytes: 100,
             per_tenant_bytes: 100,
-            progress_pool_bytes: 0,
+            progress_pool_bytes: 1,
             max_tenants: 2,
+            max_pending_waiters: 2,
+            global_category_bytes: [100; CATEGORY_COUNT],
+            per_tenant_category_bytes: [100; CATEGORY_COUNT],
         })
         .unwrap();
         let first_manager = manager.clone();
@@ -573,5 +678,179 @@ mod tests {
         assert_eq!(snapshot.peak_total, 60);
         drop((first_result, second_result));
         assert_eq!(manager.snapshot().unwrap().current_total, 0);
+    }
+
+    #[test]
+    fn category_limits_reject_before_accounting_changes() {
+        let manager = BlinkResourceManager::new(ResourceLimits {
+            global_bytes: 100,
+            per_tenant_bytes: 100,
+            progress_pool_bytes: 10,
+            max_tenants: 1,
+            max_pending_waiters: 2,
+            global_category_bytes: [10, 100, 100, 100, 100, 100, 100],
+            per_tenant_category_bytes: [8, 100, 100, 100, 100, 100, 100],
+        })
+        .unwrap();
+        let first_charge = manager
+            .reserve(
+                1,
+                ResourceCategory::DecodedPayload,
+                ReservationClass::Foreground,
+                8,
+            )
+            .unwrap();
+        assert!(matches!(
+            manager.reserve(
+                1,
+                ResourceCategory::DecodedPayload,
+                ReservationClass::Foreground,
+                1
+            ),
+            Err(ResourceError::CapacityExceeded)
+        ));
+        assert_eq!(manager.snapshot().unwrap().current_total, 8);
+        drop(first_charge);
+    }
+
+    #[tokio::test]
+    async fn bounded_wait_resumes_after_capacity_is_released() {
+        let manager = BlinkResourceManager::new(ResourceLimits {
+            global_bytes: 100,
+            per_tenant_bytes: 100,
+            progress_pool_bytes: 10,
+            max_tenants: 1,
+            max_pending_waiters: 2,
+            global_category_bytes: [100; CATEGORY_COUNT],
+            per_tenant_category_bytes: [100; CATEGORY_COUNT],
+        })
+        .unwrap();
+        let held_charge = manager
+            .reserve(
+                1,
+                ResourceCategory::WritePreparation,
+                ReservationClass::Foreground,
+                90,
+            )
+            .unwrap();
+        let waiting_manager = manager.clone();
+        let waiter = tokio::spawn(async move {
+            waiting_manager
+                .reserve_wait(
+                    1,
+                    ResourceCategory::WritePreparation,
+                    ReservationClass::Foreground,
+                    90,
+                    Duration::from_secs(1),
+                )
+                .await
+        });
+        tokio::task::yield_now().await;
+        drop(held_charge);
+        let acquired_charge = waiter.await.unwrap().unwrap();
+        assert_eq!(manager.snapshot().unwrap().current_total, 90);
+        drop(acquired_charge);
+    }
+
+    #[tokio::test]
+    async fn bounded_wait_times_out_and_cancellation_leaves_no_charge() {
+        let manager = BlinkResourceManager::new(ResourceLimits {
+            global_bytes: 100,
+            per_tenant_bytes: 100,
+            progress_pool_bytes: 1,
+            max_tenants: 1,
+            max_pending_waiters: 2,
+            global_category_bytes: [100; CATEGORY_COUNT],
+            per_tenant_category_bytes: [100; CATEGORY_COUNT],
+        })
+        .unwrap();
+        let held_charge = manager
+            .reserve(
+                1,
+                ResourceCategory::WritePreparation,
+                ReservationClass::Foreground,
+                99,
+            )
+            .unwrap();
+        assert!(matches!(
+            manager
+                .reserve_wait(
+                    1,
+                    ResourceCategory::WritePreparation,
+                    ReservationClass::Foreground,
+                    1,
+                    Duration::from_millis(1),
+                )
+                .await,
+            Err(ResourceError::WaitTimedOut)
+        ));
+        let waiting_manager = manager.clone();
+        let waiter = tokio::spawn(async move {
+            waiting_manager
+                .reserve_wait(
+                    1,
+                    ResourceCategory::WritePreparation,
+                    ReservationClass::Foreground,
+                    1,
+                    Duration::from_secs(1),
+                )
+                .await
+        });
+        tokio::task::yield_now().await;
+        waiter.abort();
+        drop(held_charge);
+        assert_eq!(manager.snapshot().unwrap().current_total, 0);
+    }
+
+    #[tokio::test]
+    async fn pending_waiters_are_bounded_and_cancellation_releases_slot() {
+        let manager = BlinkResourceManager::new(ResourceLimits {
+            global_bytes: 10,
+            per_tenant_bytes: 10,
+            progress_pool_bytes: 1,
+            max_tenants: 1,
+            max_pending_waiters: 1,
+            global_category_bytes: [10; CATEGORY_COUNT],
+            per_tenant_category_bytes: [10; CATEGORY_COUNT],
+        })
+        .unwrap();
+        let held_charge = manager
+            .reserve(
+                1,
+                ResourceCategory::QueuedForeground,
+                ReservationClass::Foreground,
+                9,
+            )
+            .unwrap();
+        let waiting_manager = manager.clone();
+        let waiter = tokio::spawn(async move {
+            waiting_manager
+                .reserve_wait(
+                    1,
+                    ResourceCategory::QueuedForeground,
+                    ReservationClass::Foreground,
+                    1,
+                    Duration::from_secs(1),
+                )
+                .await
+        });
+        tokio::task::yield_now().await;
+        assert_eq!(manager.snapshot().unwrap().pending_waiters, 1);
+        assert!(matches!(
+            manager
+                .reserve_wait(
+                    1,
+                    ResourceCategory::QueuedForeground,
+                    ReservationClass::Foreground,
+                    1,
+                    Duration::from_secs(1),
+                )
+                .await,
+            Err(ResourceError::TooManyWaiters)
+        ));
+        waiter.abort();
+        tokio::task::yield_now().await;
+        assert_eq!(manager.snapshot().unwrap().pending_waiters, 0);
+        drop(held_charge);
     }
 }
