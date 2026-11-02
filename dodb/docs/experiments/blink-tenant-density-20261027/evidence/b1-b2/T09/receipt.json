@@ -191,7 +191,7 @@
       "summary": "12 existing findings in blink/mod.rs and wal.rs; no lint suppressions added",
       "raw_log": {
         "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/storage-feature-strict-clippy.log.gz",
-        "sha256": "a89548033dc733fefd0b255c37ee6e3fa29e1a3a4b7bf9cd7e086908b2903616"
+        "sha256": "a89548033dc733fefd0b255c37ee6a3fa29e1a3a4b7bf9cd7e086908b2903616"
       }
     },
     {
