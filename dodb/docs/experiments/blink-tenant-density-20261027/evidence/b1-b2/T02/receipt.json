@@ -3,7 +3,7 @@
   "scope": "Commit-gated WAL page location capture and read-only scan",
   "status": "partial",
   "parent_source_commit": "fa1262d015f97844efdefb137b2225d954d52aab",
-  "implementation_commit": "479ac8402754d5995b924173907a8cf34671c842",
+  "implementation_commit": "6e3e370a16dd95fe2cae46d000393b829845f1f7",
   "prerequisite_receipts": [
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T01/receipt.json"
   ],
@@ -12,7 +12,7 @@
     "dodb/crates/dodb-storage/src/lib.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/wal.rs": "2840fe401bcc7cf15cd8c74b0a6a3d2b6f45b42713a87797795e59c1f2331db6",
+    "dodb/crates/dodb-storage/src/wal.rs": "ebe098efb8c6fe9d952e8b9bfb95974b01fa632993d123c671483088dc290806",
     "dodb/crates/dodb-storage/src/lib.rs": "32386885640de44c9866feb5fdddb8880c816059f2406dbff60ffadf69d1a14a"
   },
   "host": "local worktree",
@@ -24,7 +24,13 @@
       "argv": ["cargo", "test", "-p", "dodb-storage", "--features", "blink-demand-paging", "wal::tests::", "--lib"],
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
       "exit_status": 0,
-      "result": "31 passed"
+      "result": "32 passed"
+    },
+    {
+      "argv": ["cargo", "check", "-p", "dodb-storage", "--features", "blink-demand-paging", "--lib"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "result": "passed"
     },
     {
       "argv": ["rustfmt", "--check", "--edition", "2024", "--config", "skip_children=true", "dodb/crates/dodb-storage/src/wal.rs", "dodb/crates/dodb-storage/src/lib.rs"],
@@ -38,6 +44,7 @@
     "active torn tail leaves committed prefix usable without mutation": "Covered by location scan tests",
     "scan result retains locations rather than after-images": "Returned pages map is cleared in Locations mode; temporary validation map remains during scan",
     "re-reading a location validates exact source frame and whole transaction digest": "Covered by image, delta, source-mutation, and sibling-frame tests",
+    "exact image/delta reconstruction from a previous WAL version or checkpoint base": "Covered by multi-delta and checkpoint-base reconstruction tests",
     "live append locations visible only after successful sync": "Not implemented",
     "exact image/delta reconstruction and source identity checks": "Not implemented",
     "remaining corruption, path replacement, concurrency, and delta-cap cases": "Not implemented"
