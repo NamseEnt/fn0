@@ -37,9 +37,9 @@ The opt-in resource configuration rejects Legacy and non-base segmented WAL layo
 
 The service now selects an explicit opt-in `paged_read_only` route for the experimental marker, uses the shared manager for its index, source manager, and page loader, replays the recovery WAL, validates every indexed page, and serves Get/Query/Scan on bounded blocking workers. Writes fail as unsupported while the route is read-only. The route follows the sidecar directory convention now recorded in `B1-B2-CONTRACTS.md`.
 
-A complete synthetic paged fixture now opens through `BlinkTenantService`; real Get, Query, and Scan requests load its checkpoint page, the Put request is rejected, the single blocking worker permit returns after reads, and shutdown releases the shared memory charges. Shutdown also times out while a read activity guard is held and succeeds on retry after the guard is released.
+A complete synthetic paged fixture opens through `BlinkTenantService`; real Get, Query, and Scan requests load its checkpoint page, the Put request is rejected, and shutdown releases shared memory charges. With the sole blocking worker held inside an actual page read, a concurrent Query is rejected at the worker limit. Cancelling the Tokio request does not release the still-running blocking worker or its activity guard: shutdown times out until the read gate opens, after which the worker permit and activity count return and shutdown succeeds on retry. A subsequent Get, Query, and Scan all succeed.
 
-T12 remains partial pending saturation and cancellation checks under concurrent page loads, and shutdown while an actual page load is active. Operation-owned request and write charges belong to T13. No tenant-density performance matrix was run.
+The active-load saturation/cancellation/shutdown test is recorded in `logs/server-lib-tests-paged-active-load-shutdown.log`; the full feature suite passed with 21 tests, the default suite passed with 17 tests, both all-target checks passed, and formatting passed. T12 is complete. Operation-owned request and write charges, fair maintenance, service crash acceptance, and experiment preparation belong to T13-T16. No tenant-density performance matrix was run.
 
 ## Recovery-aware paged storage open substep
 

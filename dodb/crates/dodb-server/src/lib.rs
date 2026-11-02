@@ -1320,6 +1320,8 @@ pub struct BlinkTenantService {
     fault_injector_factory: Mutex<Option<FaultInjectorFactory>>,
     #[cfg(test)]
     open_test_gate: StdMutex<Option<(TenantId, Arc<Semaphore>)>>,
+    #[cfg(all(test, feature = "blink-demand-paging"))]
+    page_read_test_gate: StdMutex<Option<Arc<PagedReadTestGate>>>,
 }
 
 struct BlinkShardRegistry {
@@ -1429,6 +1431,8 @@ enum BlinkShardReadHandle {
         handle: Arc<dodb_storage::blink::PagedReadHandle>,
         blocking_workers: Arc<Semaphore>,
         activity: Arc<CoordinatorActivity>,
+        #[cfg(test)]
+        read_test_gate: Option<Arc<PagedReadTestGate>>,
     },
 }
 
@@ -1445,6 +1449,8 @@ impl BlinkShardReadHandle {
                 handle,
                 blocking_workers,
                 activity,
+                #[cfg(test)]
+                read_test_gate,
             } => {
                 let worker_permit = blocking_workers
                     .clone()
@@ -1454,9 +1460,13 @@ impl BlinkShardReadHandle {
                 let key = key.clone();
                 let activity = Arc::clone(activity);
                 let activity_guard = activity.enter();
+                #[cfg(test)]
+                let read_test_gate = read_test_gate.clone();
                 tokio::task::spawn_blocking(move || {
                     let _worker_permit = worker_permit;
                     let _activity_guard = activity_guard;
+                    #[cfg(test)]
+                    wait_for_paged_read_test_gate(read_test_gate);
                     handle.get_with_response_budget(&key, maximum_response_bytes)
                 })
                 .await
@@ -1484,6 +1494,8 @@ impl BlinkShardReadHandle {
                 handle,
                 blocking_workers,
                 activity,
+                #[cfg(test)]
+                read_test_gate,
             } => {
                 let worker_permit = blocking_workers
                     .clone()
@@ -1494,9 +1506,13 @@ impl BlinkShardReadHandle {
                 let exclusive_after_sort_key = exclusive_after_sort_key.cloned();
                 let activity = Arc::clone(activity);
                 let activity_guard = activity.enter();
+                #[cfg(test)]
+                let read_test_gate = read_test_gate.clone();
                 tokio::task::spawn_blocking(move || {
                     let _worker_permit = worker_permit;
                     let _activity_guard = activity_guard;
+                    #[cfg(test)]
+                    wait_for_paged_read_test_gate(read_test_gate);
                     handle.query_with_response_budget(
                         &primary_key,
                         exclusive_after_sort_key.as_ref(),
@@ -1525,6 +1541,8 @@ impl BlinkShardReadHandle {
                 handle,
                 blocking_workers,
                 activity,
+                #[cfg(test)]
+                read_test_gate,
             } => {
                 let worker_permit = blocking_workers
                     .clone()
@@ -1534,9 +1552,13 @@ impl BlinkShardReadHandle {
                 let exclusive_after = exclusive_after.cloned();
                 let activity = Arc::clone(activity);
                 let activity_guard = activity.enter();
+                #[cfg(test)]
+                let read_test_gate = read_test_gate.clone();
                 tokio::task::spawn_blocking(move || {
                     let _worker_permit = worker_permit;
                     let _activity_guard = activity_guard;
+                    #[cfg(test)]
+                    wait_for_paged_read_test_gate(read_test_gate);
                     handle.scan_with_response_budget(
                         exclusive_after.as_ref(),
                         limit,
@@ -1555,6 +1577,21 @@ impl BlinkShardReadHandle {
             return true;
         }
         false
+    }
+}
+
+#[cfg(all(test, feature = "blink-demand-paging"))]
+struct PagedReadTestGate {
+    barrier: std::sync::Barrier,
+    first_read: std::sync::atomic::AtomicBool,
+}
+
+#[cfg(all(test, feature = "blink-demand-paging"))]
+fn wait_for_paged_read_test_gate(gate: Option<Arc<PagedReadTestGate>>) {
+    if let Some(gate) = gate {
+        if gate.first_read.swap(false, Ordering::SeqCst) {
+            gate.barrier.wait();
+        }
     }
 }
 
@@ -1695,6 +1732,8 @@ impl BlinkTenantService {
             fault_injector_factory: Mutex::new(None),
             #[cfg(test)]
             open_test_gate: StdMutex::new(None),
+            #[cfg(all(test, feature = "blink-demand-paging"))]
+            page_read_test_gate: StdMutex::new(None),
         })
     }
 
@@ -2109,12 +2148,22 @@ impl BlinkTenantService {
                         metadata_reservation,
                     )),
                     #[cfg(feature = "blink-demand-paging")]
-                    OpenedBlinkStore::Paged(read_handle) => Arc::new(AsyncBlinkShard::start_paged(
-                        read_handle,
-                        Arc::clone(&self.coordinator_activity),
-                        Arc::clone(&self.open_workers),
-                        metadata_reservation,
-                    )),
+                    OpenedBlinkStore::Paged(read_handle) => {
+                        #[cfg(test)]
+                        let page_read_test_gate = self
+                            .page_read_test_gate
+                            .lock()
+                            .ok()
+                            .and_then(|current| current.clone());
+                        Arc::new(AsyncBlinkShard::start_paged(
+                            read_handle,
+                            Arc::clone(&self.coordinator_activity),
+                            Arc::clone(&self.open_workers),
+                            #[cfg(test)]
+                            page_read_test_gate,
+                            metadata_reservation,
+                        ))
+                    }
                 };
                 attempt.finish(Some(Arc::clone(&shard)))?;
                 return Ok(shard);
@@ -2135,6 +2184,13 @@ impl BlinkTenantService {
     fn set_open_test_gate(&self, tenant: TenantId, gate: Arc<Semaphore>) {
         if let Ok(mut current) = self.open_test_gate.lock() {
             *current = Some((tenant, gate));
+        }
+    }
+
+    #[cfg(all(test, feature = "blink-demand-paging"))]
+    fn set_page_read_test_gate(&self, gate: Arc<PagedReadTestGate>) {
+        if let Ok(mut current) = self.page_read_test_gate.lock() {
+            *current = Some(gate);
         }
     }
 
@@ -2657,6 +2713,7 @@ impl AsyncBlinkShard {
         read_handle: dodb_storage::blink::PagedReadHandle,
         activity: Arc<CoordinatorActivity>,
         blocking_workers: Arc<Semaphore>,
+        #[cfg(test)] read_test_gate: Option<Arc<PagedReadTestGate>>,
         metadata_reservation: Option<dodb_storage::blink::resource::Reservation>,
     ) -> Self {
         Self {
@@ -2664,6 +2721,8 @@ impl AsyncBlinkShard {
                 handle: Arc::new(read_handle),
                 blocking_workers,
                 activity: Arc::clone(&activity),
+                #[cfg(test)]
+                read_test_gate,
             },
             request_tx: Mutex::new(None),
             coordinator_task: Mutex::new(None),
@@ -3862,22 +3921,88 @@ mod tests {
     async fn paged_service_opens_recovered_store_for_get_query_and_scan() {
         let directory = blink_test_directory();
         let tenant = TenantId::new(712);
-        let service = BlinkTenantService::new(LocalTenantServiceConfig {
-            data_dir: directory.path().to_path_buf(),
-            max_open_shards: 1,
-            blink_open_worker_count: 1,
-            blink_open_waiter_limit: 4,
-            blink_open_shutdown_timeout: std::time::Duration::from_millis(10),
-            blink_wal_layout: BlinkWalLayout::SegmentedBases {
-                max_segment_bytes: 1_048_576,
-                coalesce: true,
-            },
-            blink_shared_resources: Some(paged_blink_shared_resources()),
-            ..LocalTenantServiceConfig::default()
-        })
-        .unwrap();
+        let service = Arc::new(
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                max_open_shards: 1,
+                blink_open_worker_count: 1,
+                blink_open_waiter_limit: 4,
+                blink_open_shutdown_timeout: std::time::Duration::from_millis(10),
+                blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                    max_segment_bytes: 1_048_576,
+                    coalesce: true,
+                },
+                blink_shared_resources: Some(paged_blink_shared_resources()),
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap(),
+        );
         let database_path = service.database_path(tenant);
         create_empty_paged_service_fixture(&database_path, tenant);
+        let page_read_gate = Arc::new(PagedReadTestGate {
+            barrier: std::sync::Barrier::new(2),
+            first_read: std::sync::atomic::AtomicBool::new(true),
+        });
+        service.set_page_read_test_gate(Arc::clone(&page_read_gate));
+        let get_service = Arc::clone(&service);
+        let get_task = tokio::spawn(async move {
+            get_service
+                .execute_request(
+                    tenant,
+                    Request::Get {
+                        key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"sk".to_vec()),
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if service.coordinator_activity.active.load(Ordering::SeqCst) == 1
+                    && service.open_workers.available_permits() == 0
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(
+            service
+                .execute_request(
+                    tenant,
+                    Request::Query {
+                        pk: dodb_core::PrimaryKey::new(b"pk".to_vec()),
+                        exclusive_after_sk: None,
+                        limit: 8,
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .is_err()
+        );
+        assert!(service.shutdown_checked().await.is_err());
+        get_task.abort();
+        assert!(get_task.await.unwrap_err().is_cancelled());
+        tokio::task::spawn_blocking({
+            let page_read_gate = Arc::clone(&page_read_gate);
+            move || page_read_gate.barrier.wait()
+        })
+        .await
+        .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if service.open_workers.available_permits() == 1
+                    && service.coordinator_activity.active.load(Ordering::SeqCst) == 0
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
         let get_response = service
             .execute_request(
                 tenant,
@@ -3932,9 +4057,6 @@ mod tests {
                 .is_err()
         );
         let manager = service.shared_resources.as_ref().unwrap();
-        let page_load_guard = service.coordinator_activity.enter();
-        assert!(service.shutdown_checked().await.is_err());
-        drop(page_load_guard);
         service.shutdown_checked().await.unwrap();
         assert_eq!(manager.snapshot().unwrap().current_total, 0);
     }
