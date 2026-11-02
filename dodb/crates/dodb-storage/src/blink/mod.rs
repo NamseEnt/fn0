@@ -27,6 +27,8 @@ use crate::btree::{
 };
 pub mod durable_bases;
 mod leaf;
+#[cfg(feature = "blink-checkpoint-locators")]
+pub mod page_locator;
 mod physical_checkpoint;
 pub mod segmented_wal;
 pub use physical_checkpoint::{BlinkCheckpointOutput, BlinkCheckpointSnapshot};

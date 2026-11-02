@@ -1,6 +1,6 @@
 use super::*;
 use std::fs::{self, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{Read, Seek, Write};
 use std::path::{Path, PathBuf};
 
 const MAGIC: [u8; 8] = *b"DBLKBASE";
@@ -152,9 +152,36 @@ pub(super) fn read_pack(
     owners: &mut BTreeMap<PageId, u64>,
 ) -> Result<()> {
     let mut file = fs::File::open(pack_path(directory, entry.number))?;
+    scan_pack(
+        &mut file,
+        entry,
+        identity,
+        high_water_page_id,
+        |page_id, _image_lsn, _record_offset, image| {
+            pages.insert(
+                page_id,
+                RecoveredWalPage {
+                    commit_lsn: entry.checkpoint_lsn,
+                    image: Box::new(*image),
+                },
+            );
+            owners.insert(page_id, entry.number);
+            Ok(())
+        },
+    )
+}
+
+pub(super) fn scan_pack(
+    file: &mut fs::File,
+    entry: &BasePackEntry,
+    identity: &WalIdentity,
+    high_water_page_id: PageId,
+    mut visit: impl FnMut(PageId, Lsn, u64, &[u8; PAGE_SIZE]) -> Result<()>,
+) -> Result<()> {
     if entry.bytes != encoded_size(entry.page_count) || file.metadata()?.len() != entry.bytes {
         return Err(Error::corruption("page-base file length mismatch"));
     }
+    file.rewind()?;
     let mut header = [0u8; HEADER_SIZE];
     file.read_exact(&mut header)?;
     let word = |offset| u64::from_le_bytes(header[offset..offset + 8].try_into().unwrap());
@@ -177,7 +204,7 @@ pub(super) fn read_pack(
     let mut checksum = crc32c::crc32c(&header);
     let mut previous_id = None;
     let mut record = [0u8; RECORD_SIZE];
-    for _page_index in 0..entry.page_count {
+    for page_index in 0..entry.page_count {
         file.read_exact(&mut record)?;
         checksum = crc32c::crc32c_append(checksum, &record);
         let page_id = PageId::new(u64::from_le_bytes(record[8..16].try_into().unwrap()));
@@ -189,21 +216,17 @@ pub(super) fn read_pack(
                 "page-base page range or ordering mismatch",
             ));
         }
-        let image = record;
-        let decoded = decode_blink_page(&image, page_id)?;
+        let decoded = decode_blink_page(&record, page_id)?;
         if decoded.lsn() > entry.checkpoint_lsn {
             return Err(Error::corruption(
                 "page-base image exceeds its checkpoint target",
             ));
         }
-        pages.insert(
-            page_id,
-            RecoveredWalPage {
-                commit_lsn: entry.checkpoint_lsn,
-                image: Box::new(image),
-            },
-        );
-        owners.insert(page_id, entry.number);
+        let record_offset = page_index
+            .checked_mul(RECORD_SIZE as u64)
+            .and_then(|offset| offset.checked_add(HEADER_SIZE as u64))
+            .ok_or_else(|| Error::corruption("page-base record offset overflow"))?;
+        visit(page_id, decoded.lsn(), record_offset, &record)?;
         previous_id = Some(page_id);
     }
     let mut trailer = [0u8; 4];

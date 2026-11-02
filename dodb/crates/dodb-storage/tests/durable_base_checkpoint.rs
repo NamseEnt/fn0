@@ -8,6 +8,8 @@ use dodb_core::{
     DocumentKey, Error, RevisionState, TransactionCondition, TransactionMutation,
     TransactionRequest,
 };
+#[cfg(feature = "blink-checkpoint-locators")]
+use dodb_storage::blink::page_locator::ValidatedCheckpointPack;
 use dodb_storage::blink::segmented_wal::SegmentedWalManifest;
 use dodb_storage::{BlinkStore, DatabaseConfig, FaultInjector, ProductionFile};
 
@@ -632,6 +634,61 @@ fn failed_public_write_leaves_an_incomplete_transaction_that_can_be_recovered_tw
         );
         verified.check_invariants().unwrap();
         drop(verified);
+        fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+#[cfg(feature = "blink-checkpoint-locators")]
+#[test]
+fn held_checkpoint_locator_keeps_exact_image_across_real_pack_unlink() {
+    for coalesce in [false, true] {
+        let directory = directory("checkpoint-locator-reclamation");
+        let path = directory.join("tenant.db");
+        let mut store = open(&path, coalesce);
+        let mut expected = seed(&mut store);
+        store.checkpoint().unwrap();
+        let original_manifest = manifest(&path);
+        let entry = original_manifest.bases.as_ref().unwrap()[0].clone();
+        let pack_directory = path.with_file_name("tenant.db.segments");
+        let pack = ValidatedCheckpointPack::open(
+            &pack_directory,
+            &entry,
+            &original_manifest.identity,
+            original_manifest.high_water_page_id,
+        )
+        .unwrap();
+        let locator = pack.locate(original_manifest.root_page_id).unwrap();
+        let original_image = locator.read_image().unwrap();
+        drop(pack);
+        let original_path = pack_directory.join(format!("base-{:020}.pages", entry.number));
+        let mut original_unlinked = false;
+        for generation in 1..=16 {
+            let number = (generation * 7) % 192;
+            let value = vec![generation as u8; 512];
+            let revision = store.put(key(number), value.clone()).unwrap();
+            expected.insert(number, RevisionState::Present { value, revision });
+            store.checkpoint().unwrap();
+            if !original_path.exists() {
+                original_unlinked = true;
+                break;
+            }
+        }
+        assert!(original_unlinked);
+        assert!(
+            manifest(&path)
+                .bases
+                .unwrap()
+                .iter()
+                .all(|current| current.number != entry.number)
+        );
+        assert_eq!(locator.read_image().unwrap(), original_image);
+        verify(&mut store, &expected);
+        drop(store);
+        let mut reopened = open(&path, coalesce);
+        verify(&mut reopened, &expected);
+        assert_eq!(locator.read_image().unwrap(), original_image);
+        drop(reopened);
+        drop(locator);
         fs::remove_dir_all(directory).unwrap();
     }
 }
