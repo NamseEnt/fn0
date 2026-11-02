@@ -12600,12 +12600,31 @@ mod tests {
         assert_eq!(overlay_query.len(), 16);
         assert_eq!(overlay_query[6].value, b"overlay-value");
         drop(overlay_handle);
-        let current_leaf = BlinkPage::Leaf {
+        let current_split_key = DocumentKey::new(b"p".to_vec(), b"k04".to_vec()).encode();
+        let current_left_leaf = BlinkPage::Leaf {
+            lsn: Lsn::new(2),
+            high_key: Some(current_split_key.clone()),
+            right_sibling: Some(spare_page_id),
+            entries: pack_leaf(
+                &(0..4)
+                    .map(|row_index| {
+                        let sort_key = format!("k{row_index:02}");
+                        let value = randomized_values[&sort_key].clone();
+                        LeafEntry {
+                            key: DocumentKey::new(b"p".to_vec(), sort_key.into_bytes()).encode(),
+                            revision: Revision::new(row_index + 1),
+                            value: Some(OwnedValue::Inline(value)),
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+            ),
+        };
+        let current_middle_leaf = BlinkPage::Leaf {
             lsn: Lsn::new(2),
             high_key: Some(DocumentKey::new(b"p".to_vec(), b"k08".to_vec()).encode()),
             right_sibling: Some(right_page_id),
             entries: pack_leaf(
-                &(0..8)
+                &(4..8)
                     .map(|row_index| {
                         let sort_key = format!("k{row_index:02}");
                         let value = if row_index == 7 {
@@ -12622,7 +12641,31 @@ mod tests {
                     .collect::<Vec<_>>(),
             ),
         };
-        let current_image = encode_blink_page(left_page_id, &current_leaf).unwrap();
+        let current_root_page = BlinkPage::Internal {
+            lsn: Lsn::new(2),
+            level: 1,
+            high_key: None,
+            right_sibling: None,
+            leftmost_child: left_page_id,
+            entries: vec![
+                InternalEntry {
+                    key: current_split_key,
+                    right_child: spare_page_id,
+                },
+                InternalEntry {
+                    key: DocumentKey::new(b"p".to_vec(), b"k08".to_vec()).encode(),
+                    right_child: right_page_id,
+                },
+            ],
+        };
+        let current_images = [
+            (left_page_id, current_left_leaf),
+            (spare_page_id, current_middle_leaf),
+            (root_page_id, current_root_page),
+        ]
+        .into_iter()
+        .map(|(page_id, page)| (page_id, encode_blink_page(page_id, &page).unwrap()))
+        .collect::<Vec<_>>();
         let current_header = vec![0x62; PAGE_SIZE];
         let current_source_identity = version_index::SourceIdentity {
             kind: version_index::SourceFileKind::CheckpointPack,
@@ -12632,30 +12675,36 @@ mod tests {
         let current_source_path = checkpoint_directory.join("base-00000000000000000002.pages");
         let mut current_source_file = std::fs::File::create(&current_source_path).unwrap();
         current_source_file.write_all(&current_header).unwrap();
-        current_source_file.write_all(&current_image).unwrap();
+        let current_source_length = PAGE_SIZE as u64 * (current_images.len() as u64 + 1);
+        let mut current_offsets = BTreeMap::new();
+        for (page_index, (page_id, image)) in current_images.iter().enumerate() {
+            current_source_file.write_all(image).unwrap();
+            current_offsets.insert(*page_id, PAGE_SIZE as u64 * (page_index as u64 + 1));
+        }
         drop(current_source_file);
-        let current_image_crc32c = crc32c::crc32c(&current_image);
-        let current_root = index
-            .insert(
-                root,
-                left_page_id,
-                version_index::VersionDescriptor {
-                    page_id: left_page_id,
-                    token: version_index::VersionToken::Bootstrap {
-                        page_id: left_page_id,
-                    },
-                    image_lsn: Lsn::new(2),
-                    image_crc32c: current_image_crc32c,
-                    locator: version_index::VersionLocator::CheckpointImage {
-                        source: current_source_identity,
-                        offset: PAGE_SIZE as u64,
-                        source_length: (PAGE_SIZE * 2) as u64,
+        let mut current_root = root;
+        for (page_id, image) in &current_images {
+            let image_crc32c = crc32c::crc32c(image);
+            current_root = index
+                .insert(
+                    current_root,
+                    *page_id,
+                    version_index::VersionDescriptor {
+                        page_id: *page_id,
+                        token: version_index::VersionToken::Bootstrap { page_id: *page_id },
                         image_lsn: Lsn::new(2),
-                        image_crc32c: current_image_crc32c,
+                        image_crc32c,
+                        locator: version_index::VersionLocator::CheckpointImage {
+                            source: current_source_identity,
+                            offset: current_offsets[page_id],
+                            source_length: current_source_length,
+                            image_lsn: Lsn::new(2),
+                            image_crc32c,
+                        },
                     },
-                },
-            )
-            .unwrap();
+                )
+                .unwrap();
+        }
         let old_handle = Arc::new(handle);
         let current_handle = Arc::new(
             PagedReadHandle::new(
