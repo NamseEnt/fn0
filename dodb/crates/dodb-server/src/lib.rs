@@ -7659,6 +7659,141 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "blink-demand-paging")]
+    async fn paged_service_rejects_missing_or_corrupt_reachable_checkpoint_sources() {
+        use std::io::{Seek, SeekFrom};
+
+        for coalesce in [false, true] {
+            for missing_source in [false, true] {
+                let directory = blink_test_directory();
+                let tenant =
+                    TenantId::new(760 + u64::from(coalesce) * 2 + u64::from(missing_source));
+                let config = LocalTenantServiceConfig {
+                    data_dir: directory.path().to_path_buf(),
+                    max_open_shards: 1,
+                    blink_open_waiter_limit: 4,
+                    blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                        max_segment_bytes: 1_048_576,
+                        coalesce,
+                    },
+                    blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                        threshold_bytes: u64::MAX,
+                    },
+                    blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+                    blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+                    ..LocalTenantServiceConfig::default()
+                };
+                let service = BlinkTenantService::new(config.clone()).unwrap();
+                let database_path = service.database_path(tenant);
+                create_empty_paged_service_fixture(&database_path, tenant);
+                service
+                    .execute_request(
+                        tenant,
+                        Request::Put {
+                            key: dodb_core::DocumentKey::new(
+                                b"source-check".to_vec(),
+                                b"key".to_vec(),
+                            ),
+                            value: b"reachable-checkpoint-value".to_vec(),
+                        },
+                        ExecutionBudget::new(1024),
+                    )
+                    .await
+                    .unwrap();
+                let shard = service
+                    .shards
+                    .lock()
+                    .unwrap()
+                    .shards
+                    .get(&tenant)
+                    .cloned()
+                    .unwrap();
+                let writable = match &shard.read_handle {
+                    BlinkShardReadHandle::Paged {
+                        writable: Some(writable),
+                        ..
+                    } => Arc::clone(writable),
+                    BlinkShardReadHandle::Resident(_) | BlinkShardReadHandle::Paged { .. } => {
+                        panic!("expected the writable paged service route")
+                    }
+                };
+                writable.run_threshold_checkpoint(1).await.unwrap();
+                drop(writable);
+                drop(shard);
+                service.shutdown_checked().await.unwrap();
+
+                let pack_directory =
+                    dodb_storage::blink::paged_manifest::PagedManifestStore::sidecar_directory(
+                        &database_path,
+                    )
+                    .join("packs");
+                let mut checkpoint_packs = std::fs::read_dir(&pack_directory)
+                    .unwrap()
+                    .flatten()
+                    .map(|entry| entry.path())
+                    .filter(|path| {
+                        path.file_name()
+                            .and_then(|name| name.to_str())
+                            .is_some_and(|name| {
+                                name.starts_with("base-") && name.ends_with(".pages")
+                            })
+                    })
+                    .collect::<Vec<_>>();
+                checkpoint_packs.sort();
+                let reachable_pack = checkpoint_packs.pop().unwrap();
+                if missing_source {
+                    std::fs::remove_file(&reachable_pack).unwrap();
+                } else {
+                    let mut source = std::fs::OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .open(&reachable_pack)
+                        .unwrap();
+                    let source_length = source.metadata().unwrap().len();
+                    let page_frame_offset = dodb_storage::PAGE_SIZE as u64 + 100;
+                    assert!(source_length > page_frame_offset);
+                    source.seek(SeekFrom::Start(page_frame_offset)).unwrap();
+                    let mut final_byte = [0u8; 1];
+                    std::io::Read::read_exact(&mut source, &mut final_byte).unwrap();
+                    source.seek(SeekFrom::Start(page_frame_offset)).unwrap();
+                    std::io::Write::write_all(&mut source, &[final_byte[0] ^ 1]).unwrap();
+                    source.sync_all().unwrap();
+                }
+
+                let reopened = BlinkTenantService::new(config.clone());
+                let rejected = match reopened {
+                    Err(_) => true,
+                    Ok(reopened_service) => {
+                        let result = reopened_service
+                            .execute_request(
+                                tenant,
+                                Request::Get {
+                                    key: dodb_core::DocumentKey::new(
+                                        b"source-check".to_vec(),
+                                        b"key".to_vec(),
+                                    ),
+                                },
+                                ExecutionBudget::new(1024),
+                            )
+                            .await;
+                        let shutdown = reopened_service.shutdown_checked().await;
+                        result.is_err() && shutdown.is_ok()
+                    }
+                };
+                if !rejected {
+                    let retained_path = directory.keep();
+                    panic!(
+                        "paged service accepted a {} reachable source with coalesce={coalesce}; retained database at {}",
+                        if missing_source { "missing" } else { "corrupt" },
+                        retained_path.display()
+                    );
+                }
+                eprintln!("reachable_source_rejected missing={missing_source} coalesce={coalesce}");
+            }
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
     async fn paged_service_shutdown_cancels_checkpoint_waiting_for_disk_capacity() {
         let directory = blink_test_directory();
         let tenant = TenantId::new(724);
