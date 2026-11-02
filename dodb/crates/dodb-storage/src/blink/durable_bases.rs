@@ -35,6 +35,42 @@ pub(super) struct BasePackOutput {
     pub phase_timings: [u64; 3],
 }
 
+#[cfg(feature = "blink-demand-paging")]
+pub(super) struct PagedBasePackJob {
+    pub directory: PathBuf,
+    pub identity: WalIdentity,
+    pub number: u64,
+    pub checkpoint_lsn: Lsn,
+    pub page_count: u64,
+    pub coalesce: bool,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+pub(super) struct PagedBasePackWriter {
+    directory: PathBuf,
+    file: fs::File,
+    entry: BasePackEntry,
+    expected_page_count: u64,
+    written_page_count: u64,
+    previous_page_id: Option<PageId>,
+    checksum: u32,
+    unsynced_bytes: usize,
+    write_calls: u64,
+    sync_nanos: u64,
+    buffer: Vec<u8>,
+    buffer_capacity: usize,
+    started: Instant,
+    injector: Option<Box<dyn FaultInjector + Send>>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+pub struct PagedBasePackOutput {
+    pub entry: BasePackEntry,
+    pub complete: bool,
+    pub write_calls: u64,
+    pub phase_timings: [u64; 3],
+}
+
 pub(super) fn encoded_size(page_count: u64) -> u64 {
     page_count
         .saturating_mul(RECORD_SIZE as u64)
@@ -139,6 +175,146 @@ impl BasePackJob {
             complete: self.complete,
             write_calls,
             phase_timings: [page_nanos, sync_nanos, elapsed_nanos(directory_started)],
+        })
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl PagedBasePackJob {
+    pub fn begin(
+        self,
+        injector: Option<Box<dyn FaultInjector + Send>>,
+    ) -> Result<PagedBasePackWriter> {
+        let mut header = Vec::with_capacity(HEADER_SIZE);
+        header.extend_from_slice(&MAGIC);
+        header.extend_from_slice(&1u32.to_le_bytes());
+        header.extend_from_slice(&(PAGE_SIZE as u32).to_le_bytes());
+        header.extend_from_slice(&self.identity.database_uuid);
+        header.extend_from_slice(&self.identity.tenant_id.get().to_le_bytes());
+        header.extend_from_slice(&self.identity.shard_id.get().to_le_bytes());
+        header.extend_from_slice(&self.identity.shard_epoch.get().to_le_bytes());
+        header.extend_from_slice(&self.number.to_le_bytes());
+        header.extend_from_slice(&self.checkpoint_lsn.get().to_le_bytes());
+        header.extend_from_slice(&self.page_count.to_le_bytes());
+        header.resize(HEADER_SIZE - 4, 0);
+        let header_checksum = crc32c::crc32c(&header);
+        header.extend_from_slice(&header_checksum.to_le_bytes());
+        let mut injector = injector;
+        hit(&mut injector, "before_base_pack_create")?;
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(pack_path(&self.directory, self.number))?;
+        hit(&mut injector, "before_checkpoint_data_flush")?;
+        file.write_all(&header)?;
+        let buffer_capacity = RECORD_SIZE * if self.coalesce { 4 } else { 1 };
+        Ok(PagedBasePackWriter {
+            directory: self.directory,
+            file,
+            entry: BasePackEntry {
+                number: self.number,
+                checkpoint_lsn: self.checkpoint_lsn,
+                page_count: self.page_count,
+                bytes: encoded_size(self.page_count),
+                checksum: crc32c::crc32c(&header),
+            },
+            expected_page_count: self.page_count,
+            written_page_count: 0,
+            previous_page_id: None,
+            checksum: crc32c::crc32c(&header),
+            unsynced_bytes: HEADER_SIZE,
+            write_calls: 1,
+            sync_nanos: 0,
+            buffer: Vec::with_capacity(buffer_capacity),
+            buffer_capacity,
+            started: Instant::now(),
+            injector,
+        })
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl PagedBasePackWriter {
+    pub fn append_page(&mut self, page_id: PageId, image: &[u8; PAGE_SIZE]) -> Result<()> {
+        if page_id.get() < FIRST_DATA_PAGE
+            || self
+                .previous_page_id
+                .is_some_and(|previous_page_id| page_id <= previous_page_id)
+            || self.written_page_count >= self.expected_page_count
+        {
+            return Err(Error::invariant(
+                "paged checkpoint pages are duplicated, unordered, or exceed the target count",
+            ));
+        }
+        let decoded = decode_blink_page(image, page_id)?;
+        if decoded.lsn() > self.entry.checkpoint_lsn {
+            return Err(Error::invariant(
+                "paged checkpoint image exceeds its captured target LSN",
+            ));
+        }
+        hit(&mut self.injector, "during_checkpoint_page_write")?;
+        hit(&mut self.injector, "during_base_pack_page_write")?;
+        self.buffer.extend_from_slice(image);
+        self.written_page_count += 1;
+        self.previous_page_id = Some(page_id);
+        if self.buffer.len() == self.buffer_capacity {
+            self.flush_buffer()?;
+        }
+        Ok(())
+    }
+
+    fn flush_buffer(&mut self) -> Result<()> {
+        if self.buffer.is_empty() {
+            return Ok(());
+        }
+        self.checksum = crc32c::crc32c_append(self.checksum, &self.buffer);
+        self.file.write_all(&self.buffer)?;
+        self.unsynced_bytes = self.unsynced_bytes.saturating_add(self.buffer.len());
+        self.buffer.clear();
+        self.write_calls += 1;
+        hit(&mut self.injector, "after_checkpoint_page_write")?;
+        if self.unsynced_bytes >= SYNC_BYTES {
+            hit(&mut self.injector, "before_base_pack_chunk_sync")?;
+            let sync_started = Instant::now();
+            self.file.sync_data()?;
+            self.sync_nanos = self.sync_nanos.saturating_add(elapsed_nanos(sync_started));
+            self.unsynced_bytes = 0;
+            hit(&mut self.injector, "after_base_pack_chunk_sync")?;
+        }
+        Ok(())
+    }
+
+    pub fn finish(mut self) -> Result<PagedBasePackOutput> {
+        if self.written_page_count != self.expected_page_count {
+            return Err(Error::invariant(
+                "paged checkpoint page count differs from its captured index root",
+            ));
+        }
+        self.flush_buffer()?;
+        self.file.write_all(&self.checksum.to_le_bytes())?;
+        self.write_calls += 1;
+        hit(&mut self.injector, "before_checkpoint_data_sync")?;
+        hit(&mut self.injector, "before_base_pack_sync")?;
+        let sync_started = Instant::now();
+        self.file.sync_all()?;
+        self.sync_nanos = self.sync_nanos.saturating_add(elapsed_nanos(sync_started));
+        hit(&mut self.injector, "after_base_pack_sync")?;
+        hit(&mut self.injector, "after_checkpoint_data_sync")?;
+        let directory_started = Instant::now();
+        hit(&mut self.injector, "before_base_pack_directory_sync")?;
+        fs::File::open(&self.directory)?.sync_all()?;
+        hit(&mut self.injector, "after_base_pack_directory_sync")?;
+        self.entry.checksum = self.checksum;
+        let page_nanos = elapsed_nanos(self.started).saturating_sub(self.sync_nanos);
+        Ok(PagedBasePackOutput {
+            entry: self.entry,
+            complete: true,
+            write_calls: self.write_calls,
+            phase_timings: [
+                page_nanos,
+                self.sync_nanos,
+                elapsed_nanos(directory_started),
+            ],
         })
     }
 }

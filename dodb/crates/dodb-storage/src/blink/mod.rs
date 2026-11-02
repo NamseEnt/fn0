@@ -2042,6 +2042,75 @@ impl PagedReadHandle {
             })
             .map(Some)
     }
+
+    pub fn write_checkpoint_pack(
+        &self,
+        directory: &Path,
+        file_number: u64,
+        identity: WalIdentity,
+        checkpoint_lsn: Lsn,
+        coalesce: bool,
+        injector: Option<Box<dyn FaultInjector + Send>>,
+    ) -> Result<durable_bases::PagedBasePackOutput> {
+        if file_number == 0
+            || identity.database_uuid != self.index.store_identity().database_uuid
+            || identity.shard_epoch.get() != self.index.store_identity().wal_epoch
+        {
+            return Err(Error::invalid_input(
+                "paged checkpoint identity or source number is invalid",
+            ));
+        }
+        let buffer_page_count = if coalesce { 6 } else { 3 };
+        let reservation_bytes = u64::try_from(buffer_page_count)
+            .ok()
+            .and_then(|page_count| page_count.checked_mul(PAGE_SIZE as u64))
+            .ok_or_else(|| Error::overloaded("paged checkpoint reservation overflows"))?;
+        let _checkpoint_reservation = self
+            .resources
+            .reserve(
+                self.tenant_id,
+                resource::ResourceCategory::CheckpointValidation,
+                resource::ReservationClass::Progress,
+                reservation_bytes,
+            )
+            .map_err(page_cache::map_resource_error)?;
+        let mut page_count = 0u64;
+        self.index.visit_descriptors(self.root, &mut |_| {
+            page_count = page_count
+                .checked_add(1)
+                .ok_or_else(|| Error::overloaded("paged checkpoint page count overflows"))?;
+            Ok(())
+        })?;
+        if page_count == 0 {
+            return Err(Error::corruption(
+                "paged checkpoint index contains no page images",
+            ));
+        }
+        let job = durable_bases::PagedBasePackJob {
+            directory: directory.to_path_buf(),
+            identity,
+            number: file_number,
+            checkpoint_lsn,
+            page_count,
+            coalesce,
+        };
+        let mut pack_writer = job.begin(injector)?;
+        self.index.visit_descriptors(self.root, &mut |descriptor| {
+            let page = self
+                .load_mutation_base_page(descriptor.page_id)?
+                .ok_or_else(|| Error::corruption("paged checkpoint page image is missing"))?;
+            let image = encode_blink_page(descriptor.page_id, page.as_ref())?;
+            if crc32c::crc32c(&image) != descriptor.image_crc32c
+                || page.as_ref().lsn() != descriptor.image_lsn
+            {
+                return Err(Error::corruption(
+                    "paged checkpoint page differs from its captured index descriptor",
+                ));
+            }
+            pack_writer.append_page(descriptor.page_id, &image)
+        })?;
+        pack_writer.finish()
+    }
 }
 
 #[cfg(feature = "blink-demand-paging")]
@@ -14078,6 +14147,75 @@ mod tests {
             ShardId::new(1),
             ShardEpoch::new(store_identity.wal_epoch),
         );
+        let checkpoint_source_reads_before = handle.source_read_count();
+        let checkpoint_output = handle
+            .write_checkpoint_pack(
+                &checkpoint_directory,
+                99,
+                wal_identity.clone(),
+                Lsn::new(1),
+                true,
+                None,
+            )
+            .unwrap();
+        assert!(checkpoint_output.complete);
+        assert_eq!(checkpoint_output.entry.page_count, page_images.len() as u64);
+        assert!(handle.source_read_count() > checkpoint_source_reads_before);
+        let mut streamed_checkpoint_pages = BTreeMap::new();
+        durable_bases::scan_pack(
+            &mut std::fs::File::open(durable_bases::pack_path(
+                &checkpoint_directory,
+                checkpoint_output.entry.number,
+            ))
+            .unwrap(),
+            &checkpoint_output.entry,
+            &wal_identity,
+            high_water_page_id,
+            |page_id, _, _, image| {
+                streamed_checkpoint_pages.insert(page_id, *image);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(streamed_checkpoint_pages.len(), page_images.len());
+        for (page_id, expected_image) in &page_images {
+            assert_eq!(streamed_checkpoint_pages.get(page_id), Some(expected_image));
+        }
+        let failed_checkpoint = handle.write_checkpoint_pack(
+            &checkpoint_directory,
+            101,
+            wal_identity.clone(),
+            Lsn::new(1),
+            false,
+            Some(Box::new(FailOnOccurrence {
+                point: "during_checkpoint_page_write",
+                remaining: 1,
+            })),
+        );
+        assert!(failed_checkpoint.is_err());
+        assert_eq!(
+            std::fs::metadata(durable_bases::pack_path(&checkpoint_directory, 101))
+                .unwrap()
+                .len(),
+            PAGE_SIZE as u64
+        );
+        let uncoalesced_checkpoint_output = handle
+            .write_checkpoint_pack(
+                &checkpoint_directory,
+                100,
+                wal_identity.clone(),
+                Lsn::new(1),
+                false,
+                None,
+            )
+            .unwrap();
+        assert!(checkpoint_output.write_calls > 0);
+        assert!(uncoalesced_checkpoint_output.write_calls > 0);
+        let _checkpoint_phase_timings = checkpoint_output.phase_timings;
+        assert_eq!(
+            uncoalesced_checkpoint_output.entry.page_count,
+            checkpoint_output.entry.page_count
+        );
         let wal = WalLog::open_with_page_image_format(
             crate::durable_file::ProductionFile::open(&wal_path).unwrap(),
             wal_identity.clone(),
@@ -14219,6 +14357,36 @@ mod tests {
             writer.current().get(&second_writer_key).unwrap().value(),
             Some(&b"writer-second-updated"[..])
         );
+        let target_pack = old_reader
+            .write_checkpoint_pack(
+                &checkpoint_directory,
+                102,
+                wal_identity.clone(),
+                Lsn::new(1),
+                true,
+                None,
+            )
+            .unwrap();
+        let mut target_pages = BTreeMap::new();
+        durable_bases::scan_pack(
+            &mut std::fs::File::open(durable_bases::pack_path(
+                &checkpoint_directory,
+                target_pack.entry.number,
+            ))
+            .unwrap(),
+            &target_pack.entry,
+            &wal_identity,
+            old_reader.high_water_page_id,
+            |page_id, _, _, image| {
+                target_pages.insert(page_id, *image);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(target_pages.len(), page_images.len());
+        for (page_id, expected_image) in &page_images {
+            assert_eq!(target_pages.get(page_id), Some(expected_image));
+        }
         assert_eq!(
             old_reader.get(&second_writer_key).unwrap().value(),
             handle.get(&second_writer_key).unwrap().value()

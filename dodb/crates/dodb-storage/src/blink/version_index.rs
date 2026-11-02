@@ -782,6 +782,98 @@ impl VersionIndex {
         )
     }
 
+    pub fn visit_descriptors<F>(&self, root: VersionIndexRoot, visitor: &mut F) -> Result<()>
+    where
+        F: FnMut(VersionDescriptor) -> Result<()>,
+    {
+        fn visit_node<F>(
+            index: &VersionIndex,
+            node_reference: NodeRef,
+            expected_level: u8,
+            parent_generation: u64,
+            root_generation: u64,
+            key_prefix: u64,
+            visitor: &mut F,
+        ) -> Result<()>
+        where
+            F: FnMut(VersionDescriptor) -> Result<()>,
+        {
+            let cached = index.load_node(node_reference)?;
+            if cached.node.level != expected_level
+                || cached.node.generation > parent_generation
+                || cached.node.generation > root_generation
+            {
+                return Err(Error::corruption(
+                    "version-index descriptor traversal ancestry is invalid",
+                ));
+            }
+            match &cached.node.content {
+                NodeContent::Leaf(descriptors) if expected_level == 0 => {
+                    let descriptors = **descriptors;
+                    drop(cached);
+                    for (slot, descriptor) in descriptors.into_iter().enumerate() {
+                        if let Some(descriptor) = descriptor {
+                            if descriptor.page_id.get() < 2
+                                || descriptor.page_id.get() != (key_prefix | slot as u64)
+                            {
+                                return Err(Error::corruption(
+                                    "version-index descriptor traversal found a mismatched key",
+                                ));
+                            }
+                            visitor(descriptor)?;
+                        }
+                    }
+                    Ok(())
+                }
+                NodeContent::Internal(children) if expected_level > 0 => {
+                    let generation = cached.node.generation;
+                    let child_references = **children;
+                    drop(cached);
+                    for (slot, child_reference) in child_references.into_iter().enumerate() {
+                        if let Some(child_reference) = child_reference {
+                            visit_node(
+                                index,
+                                child_reference,
+                                expected_level - 1,
+                                generation,
+                                root_generation,
+                                key_prefix | ((slot as u64) << (u32::from(expected_level) * 4)),
+                                visitor,
+                            )?;
+                        }
+                    }
+                    Ok(())
+                }
+                _ => Err(Error::corruption(
+                    "version-index descriptor traversal found a node at a wrong level",
+                )),
+            }
+        }
+
+        let Some(root_reference) = root.node else {
+            if root.generation != 0 {
+                return Err(Error::corruption(
+                    "empty version-index traversal root has a generation",
+                ));
+            }
+            return Ok(());
+        };
+        if root.generation == 0 {
+            return Err(Error::corruption(
+                "version-index traversal root generation is zero",
+            ));
+        }
+        visit_node(
+            self,
+            root_reference,
+            MAX_RADIX_LEVEL,
+            root.generation,
+            root.generation,
+            0,
+            visitor,
+        )
+    }
+
     pub fn insert(
         &self,
         root: VersionIndexRoot,
