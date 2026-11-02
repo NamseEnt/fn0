@@ -1679,4 +1679,40 @@ mod tests {
             VersionIndexRoot::from_node_reference(root.generation(), node_reference).unwrap();
         assert!(reopened.lookup(restored_root, page_id).is_err());
     }
+
+    #[test]
+    fn wrong_level_and_generation_ancestry_fail_closed() {
+        let directory = TestDirectory::new("ancestry");
+        let index = open_index(directory.path(), ([1; 16], 19), 2);
+        let page_id = PageId::new(0x4567_89ab_cdef_0123);
+        let wrong_level = index
+            .store
+            .write_node(&super::IndexNode::empty(0, 1, super::NodeFileKind::Spill))
+            .unwrap();
+        let wrong_level_root = VersionIndexRoot {
+            generation: 1,
+            node: Some(wrong_level),
+        };
+        assert!(index.lookup(wrong_level_root, page_id).is_err());
+
+        let mut descendant = index
+            .store
+            .write_node(&super::IndexNode::empty(0, 3, super::NodeFileKind::Spill))
+            .unwrap();
+        for level in 1..=super::MAX_RADIX_LEVEL {
+            let mut parent = super::IndexNode::empty(level, 2, super::NodeFileKind::Spill);
+            let super::NodeContent::Internal(children) = &mut parent.content else {
+                unreachable!();
+            };
+            let slot = super::page_nibble(page_id, level);
+            children[slot] = Some(descendant);
+            parent.bitmap |= 1 << slot;
+            descendant = index.store.write_node(&parent).unwrap();
+        }
+        let wrong_ancestry_root = VersionIndexRoot {
+            generation: 2,
+            node: Some(descendant),
+        };
+        assert!(index.lookup(wrong_ancestry_root, page_id).is_err());
+    }
 }
