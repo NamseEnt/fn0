@@ -37,7 +37,9 @@ The opt-in resource configuration rejects Legacy and non-base segmented WAL layo
 
 The service now selects an explicit opt-in `paged_read_only` route for the experimental marker, uses the shared manager for its index, source manager, and page loader, replays the recovery WAL, validates every indexed page, and serves Get/Query/Scan on bounded blocking workers. Writes fail as unsupported while the route is read-only. The route follows the sidecar directory convention now recorded in `B1-B2-CONTRACTS.md`.
 
-T12 remains partial pending a successful service request against a complete paged fixture, resource and worker release checks under concurrent page loads, and shutdown behavior while page loads are active. Operation-owned request and write charges belong to T13. No tenant-density performance matrix was run.
+A complete synthetic paged fixture now opens through `BlinkTenantService`; real Get, Query, and Scan requests load its checkpoint page, the Put request is rejected, the single blocking worker permit returns after reads, and shutdown releases the shared memory charges. Shutdown also times out while a read activity guard is held and succeeds on retry after the guard is released.
+
+T12 remains partial pending saturation and cancellation checks under concurrent page loads, and shutdown while an actual page load is active. Operation-owned request and write charges belong to T13. No tenant-density performance matrix was run.
 
 ## Recovery-aware paged storage open substep
 
@@ -50,7 +52,7 @@ The checkpoint publication failure regression now reopens through this path and 
 - `cargo fmt --manifest-path crates/dodb-storage/Cargo.toml --check`: passed.
 - `cargo clippy --manifest-path crates/dodb-storage/Cargo.toml --lib --features blink-demand-paging -- -D warnings`: blocked by 12 existing Clippy findings in unrelated Blink/WAL functions; no lint suppressions were added. The full output is preserved in `logs/storage-clippy-paged-recovery.log`.
 
-The server now calls this path during tenant opening. A focused service test verifies that an incomplete manifest is rejected before the index, packs, WAL, or scratch directories are created and that its tenant metadata reservation is released.
+The server now calls this path during tenant opening. Focused service tests verify that an incomplete manifest is rejected before the index, packs, WAL, or scratch directories are created, that its tenant metadata reservation is released, and that a complete paged fixture serves real Get/Query/Scan requests.
 
 - `cargo test -p dodb-server --features blink-demand-paging --lib -- --test-threads=1`: 20 passed, 0 failed.
 - `cargo test -p dodb-server --lib -- --test-threads=1`: 17 passed, 0 failed; the default resident route remains unchanged.
