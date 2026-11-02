@@ -2679,6 +2679,28 @@ pub struct PagedTransactionWriter<F: DurableFile> {
 }
 
 #[cfg(feature = "blink-demand-paging")]
+fn paged_wal_append_bound(page_count: usize) -> Result<u64> {
+    let page_frame_bytes = crate::wal::WAL_MIN_FRAME_SIZE
+        .checked_add(PAGE_IMAGE_PAYLOAD_SIZE)
+        .ok_or_else(|| Error::overloaded("paged WAL frame bound overflows"))?;
+    let page_frame_count = u64::try_from(page_count)
+        .map_err(|_| Error::overloaded("paged WAL page count does not fit u64"))?;
+    let page_frames = page_frame_count
+        .checked_mul(
+            u64::try_from(page_frame_bytes)
+                .map_err(|_| Error::overloaded("paged WAL frame size does not fit u64"))?,
+        )
+        .ok_or_else(|| Error::overloaded("paged WAL append bound overflows"))?;
+    let commit_frame_bytes = crate::wal::WAL_MIN_FRAME_SIZE
+        .checked_add(16)
+        .and_then(|bytes| u64::try_from(bytes).ok())
+        .ok_or_else(|| Error::overloaded("paged WAL commit frame bound overflows"))?;
+    page_frames
+        .checked_add(commit_frame_bytes)
+        .ok_or_else(|| Error::overloaded("paged WAL append bound overflows"))
+}
+
+#[cfg(feature = "blink-demand-paging")]
 impl<F: DurableFile> PagedTransactionWriter<F> {
     pub fn new(
         current: PagedReadHandle,
@@ -3057,6 +3079,10 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             .root_reservation
             .take()
             .ok_or_else(|| Error::invariant("paged source root publication was not reserved"))?;
+        let wal_growth_reservation = self
+            .current
+            .sources
+            .reserve_wal_growth(paged_wal_append_bound(commit.pages.len())?)?;
         let eligible_commits = [true];
         let append_result = {
             let mut base_source =
@@ -3075,10 +3101,29 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
         let reports = match append_result {
             Ok(reports) => reports,
             Err(error) => {
+                let accounting_result = self
+                    .current
+                    .sources
+                    .retain_disk_reservation(wal_growth_reservation);
                 self.broken = Some(error.to_string());
+                if let Err(accounting_error) = accounting_result {
+                    return Err(Error::durability(format!(
+                        "paged WAL append failed and disk accounting could not reconcile its file: {accounting_error}"
+                    )));
+                }
                 return Err(error);
             }
         };
+        if let Err(error) = self
+            .current
+            .sources
+            .retain_disk_reservation(wal_growth_reservation)
+        {
+            self.broken = Some(error.to_string());
+            return Err(Error::durability(format!(
+                "paged WAL append committed but disk accounting could not reconcile its file: {error}"
+            )));
+        }
         let report = reports
             .first()
             .ok_or_else(|| Error::invariant("paged transaction WAL returned no report"))?;
@@ -16337,6 +16382,32 @@ mod tests {
                 value: b"complete".to_vec(),
             }],
         );
+        let wal_length_before_quota_rejection = writer.wal.file_length().unwrap();
+        let disk_usage_before_quota_rejection = resources.disk().snapshot().unwrap().current_total;
+        let disk_capacity = 2_097_152;
+        let quota_blocker = resources
+            .disk()
+            .reserve(
+                7,
+                resource::DiskCategory::Scratch,
+                disk_capacity - disk_usage_before_quota_rejection,
+            )
+            .unwrap();
+        assert!(
+            writer
+                .transact(&first_write, &StorageLimits::default(), Revision::new(1))
+                .is_err()
+        );
+        assert_eq!(
+            writer.wal.file_length().unwrap(),
+            wal_length_before_quota_rejection
+        );
+        assert_eq!(
+            writer.current().get(&key).unwrap().value(),
+            None,
+            "quota rejection must leave the logical state unchanged"
+        );
+        drop(quota_blocker);
         let first_result = writer
             .transact(&first_write, &StorageLimits::default(), Revision::new(1))
             .unwrap();

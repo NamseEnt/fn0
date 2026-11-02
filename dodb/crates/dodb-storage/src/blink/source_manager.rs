@@ -145,6 +145,7 @@ struct GcGate {
 
 struct GcScratch {
     path: PathBuf,
+    _reservation: Option<DiskReservation>,
 }
 
 impl SourceManager {
@@ -465,6 +466,14 @@ impl SourceManager {
                 current.checked_add(1)
             })
             .map_err(|_| Error::invalid_input("source catalog run id exhausted"))?;
+        let mut marker_count = 1u64;
+        index.visit_sources(root, &mut |_| {
+            marker_count = marker_count
+                .checked_add(1)
+                .ok_or_else(|| Error::overloaded("source catalog marker count overflows"))?;
+            Ok(())
+        })?;
+        let scratch_reservation = self.reserve_marker_scratch(marker_count)?;
         let marker_directory = self.inner.scratch_directory.join(format!(
             "source-catalog-{}-{run_id:020}",
             std::process::id()
@@ -472,6 +481,7 @@ impl SourceManager {
         fs::create_dir(&marker_directory)?;
         let _scratch = GcScratch {
             path: marker_directory.clone(),
+            _reservation: Some(scratch_reservation),
         };
         index.visit_sources(root, &mut |source| match source {
             SourceReachability::Exact(identity) => write_source_marker(&marker_directory, identity),
@@ -578,6 +588,55 @@ impl SourceManager {
         Ok(())
     }
 
+    pub(crate) fn reserve_wal_growth(&self, maximum_bytes: u64) -> Result<DiskReservation> {
+        self.inner
+            .resources
+            .disk()
+            .reserve(
+                self.inner.tenant_id,
+                DiskCategory::RetainedSource,
+                maximum_bytes,
+            )
+            .map_err(|_| Error::overloaded("paged WAL disk budget is exhausted"))
+    }
+
+    fn reserve_marker_scratch(&self, marker_count: u64) -> Result<DiskReservation> {
+        let bytes = marker_count
+            .checked_mul(48)
+            .ok_or_else(|| Error::overloaded("paged source scratch reservation overflows"))?;
+        self.inner
+            .resources
+            .disk()
+            .reserve(self.inner.tenant_id, DiskCategory::Scratch, bytes)
+            .map_err(|_| Error::overloaded("paged source scratch disk budget is exhausted"))
+    }
+
+    fn count_gc_markers(
+        &self,
+        index: &VersionIndex,
+        roots: &[VersionIndexRoot],
+        catalog_roots: [Option<super::version_index::NodeRef>; 2],
+    ) -> Result<u64> {
+        let mut marker_count = 0u64;
+        for root in roots {
+            index.visit_sources(*root, &mut |_| {
+                marker_count = marker_count
+                    .checked_add(1)
+                    .ok_or_else(|| Error::overloaded("paged source GC marker count overflows"))?;
+                Ok(())
+            })?;
+        }
+        for catalog_root in catalog_roots.into_iter().flatten() {
+            self.inner.source_catalog.visit(catalog_root, &mut |_| {
+                marker_count = marker_count
+                    .checked_add(1)
+                    .ok_or_else(|| Error::overloaded("paged source GC marker count overflows"))?;
+                Ok(())
+            })?;
+        }
+        Ok(marker_count)
+    }
+
     pub(super) fn install_source_catalog_root(
         &self,
         mut publication: SourceCatalogPublicationLease,
@@ -609,6 +668,25 @@ impl SourceManager {
         manifest: super::paged_manifest::PagedManifest,
         catalog_root: super::version_index::NodeRef,
     ) -> Result<()> {
+        let root = index.root_from_node_reference(manifest.durable_index_root)?;
+        let recovery_wal = self.source_identity_from_file(
+            SourceFileKind::WalSegment,
+            manifest.recovery_wal_file_number,
+        )?;
+        let mut marker_count = 1u64;
+        index.visit_sources(root, &mut |_| {
+            marker_count = marker_count.checked_add(1).ok_or_else(|| {
+                Error::overloaded("source catalog validation marker count overflows")
+            })?;
+            Ok(())
+        })?;
+        self.inner.source_catalog.visit(catalog_root, &mut |_| {
+            marker_count = marker_count.checked_add(1).ok_or_else(|| {
+                Error::overloaded("source catalog validation marker count overflows")
+            })?;
+            Ok(())
+        })?;
+        let scratch_reservation = self.reserve_marker_scratch(marker_count)?;
         let run_id = GC_RUN_SEQUENCE
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
                 current.checked_add(1)
@@ -622,16 +700,14 @@ impl SourceManager {
         let actual_path = scratch_path.join("actual");
         fs::create_dir_all(&expected_path)?;
         fs::create_dir(&actual_path)?;
-        let _scratch = GcScratch { path: scratch_path };
-        let root = index.root_from_node_reference(manifest.durable_index_root)?;
+        let _scratch = GcScratch {
+            path: scratch_path,
+            _reservation: Some(scratch_reservation),
+        };
         index.visit_sources(root, &mut |source| match source {
             SourceReachability::Exact(identity) => write_source_marker(&expected_path, identity),
             SourceReachability::AllWalSegments => write_all_wal_marker(&expected_path),
         })?;
-        let recovery_wal = self.source_identity_from_file(
-            SourceFileKind::WalSegment,
-            manifest.recovery_wal_file_number,
-        )?;
         write_source_marker(&expected_path, recovery_wal)?;
         self.inner
             .source_catalog
@@ -788,6 +864,9 @@ impl SourceManager {
         let _gate = GcGate {
             manager: self.clone(),
         };
+        let marker_count =
+            self.count_gc_markers(index, &roots, [durable_catalog_root, pending_catalog_root])?;
+        let scratch_reservation = self.reserve_marker_scratch(marker_count)?;
         let run_id = GC_RUN_SEQUENCE
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
                 current.checked_add(1)
@@ -800,6 +879,7 @@ impl SourceManager {
         fs::create_dir(&scratch_path)?;
         let _scratch = GcScratch {
             path: scratch_path.clone(),
+            _reservation: Some(scratch_reservation),
         };
         for root in &roots {
             index.visit_sources(*root, &mut |source| match source {
@@ -1345,6 +1425,68 @@ mod tests {
         assert_eq!(
             resources.disk().snapshot().unwrap().current_total,
             actual_bytes
+        );
+    }
+
+    #[test]
+    fn source_gc_rejects_scratch_quota_before_creating_markers() {
+        let directory = TestDirectory::new();
+        let resources = BlinkResourceManager::new_with_disk_limits(
+            super::super::resource::ResourceLimits {
+                global_bytes: 1 << 20,
+                per_tenant_bytes: 1 << 20,
+                progress_pool_bytes: 1 << 17,
+                max_tenants: 4,
+                max_pending_waiters: 4,
+                global_category_bytes: [1 << 20; 7],
+                per_tenant_category_bytes: [1 << 20; 7],
+            },
+            super::super::resource::DiskResourceLimits {
+                global_bytes: 1 << 20,
+                per_tenant_bytes: 1 << 20,
+                max_tenants: 4,
+                global_category_bytes: [1 << 20, 1 << 20, 1 << 20, 47, 1 << 20],
+                per_tenant_category_bytes: [1 << 20, 1 << 20, 1 << 20, 47, 1 << 20],
+            },
+        )
+        .unwrap();
+        let store_identity = StoreIdentity {
+            database_uuid: [19; 16],
+            wal_epoch: 3,
+        };
+        let index = VersionIndex::open(
+            &directory.path().join("index"),
+            store_identity,
+            resources.clone(),
+            9,
+            2,
+        )
+        .unwrap();
+        let manager = SourceManager::new(
+            SourceManagerConfig {
+                store_identity,
+                checkpoint_directory: directory.path().join("packs"),
+                wal_directory: directory.path().join("segments"),
+                scratch_directory: directory.path().join("scratch"),
+                tenant_id: 9,
+                maximum_open_handles: 2,
+                maximum_roots: 4,
+                handle_charge_bytes: 128,
+                gc_reservation_bytes: 8192,
+            },
+            resources,
+        )
+        .unwrap();
+        let source = source_identity(SourceFileKind::CheckpointPack, 1, b"missing-but-indexed");
+        let root = insert_checkpoint_page(&index, index.empty_root(), source, 8192, 1, 3);
+        let _root_lease = manager.pin_root(&index, root).unwrap();
+
+        assert!(manager.collect_garbage(&index, [], |_| Ok(())).is_err());
+        assert_eq!(
+            fs::read_dir(directory.path().join("scratch"))
+                .unwrap()
+                .count(),
+            0
         );
     }
 
