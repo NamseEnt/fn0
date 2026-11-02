@@ -39,3 +39,13 @@ T09 remains partial. The writer currently emits full images, commits one logical
 - Current feature library suite: 293 passed, 0 failed, 4 ignored. Default and feature library checks and targeted rustfmt passed. Strict feature Clippy still reports the same 12 existing findings, with no new findings from this change.
 
 T09 remains partial. The writer still emits full images, commits one transaction per append, and lacks the complete-or-absent reopen oracle, grouped transaction durability, ninth-delta image selection, and durable tombstone/ABA and page-reuse acceptance. The paged route remains disconnected from `dodb-server`; defaults remain unchanged. No OCI or performance experiment was run.
+
+## Bounded delta ancestry in paged writes (2026-11-02)
+
+- Added a per-dirty-page base-version input to WAL redo planning. The paged writer loads and reserves current dirty-page base images before append, without collecting a history-wide page map.
+- The writer now emits page deltas when the encoded delta is smaller and the indexed predecessor has fewer than eight deltas. After WAL sync it writes and syncs the immutable delta-chain sidecar using a pre-reserved metadata charge, then inserts the descriptor that names the exact sidecar. Sidecar or index publication failures keep the writer fail-stopped; unreferenced sidecars remain preserved.
+- The focused writer test verifies a full-image base, delta depths 1 through 8, and a full image on the ninth update. The feature library suite completed with 293 passed, 0 failed, and 4 ignored. Default and feature library checks and targeted rustfmt passed. Strict feature Clippy still reports the same 12 existing findings.
+- Source commit: `78f7ad58c737ee3be118b132c17c75c72f47fe72`.
+- The package-wide feature test command remains blocked by the pre-existing `phase0-bench.rs` initializer missing `WalRedoStats::image_delta_chain_limit`; the raw output is preserved in the T09 logs.
+
+T09 remains partial. Grouped transaction boundaries and recovery, the complete-or-absent reopen oracle for writer fault cases, page reuse and durable ABA acceptance, and split/overflow differential coverage remain outstanding. The paged route remains disconnected from `dodb-server`; defaults remain unchanged. No OCI or performance experiment was run.
