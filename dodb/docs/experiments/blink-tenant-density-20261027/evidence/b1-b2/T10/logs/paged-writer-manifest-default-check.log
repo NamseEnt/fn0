@@ -1,5 +1,4 @@
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on build directory
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.75s
+    Checking dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.92s

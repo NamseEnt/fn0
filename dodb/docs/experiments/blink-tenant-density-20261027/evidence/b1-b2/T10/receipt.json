@@ -7,7 +7,8 @@
     "971bb8143",
     "e741dd19d",
     "0bdce39d1",
-    "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+    "d99c3e465ca4a72d54e74caa723536a09b62cc02",
+    "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b"
   ],
   "push": {
     "remote": "origin",
@@ -31,21 +32,23 @@
     "dodb/crates/dodb-storage/src/blink/durable_bases.rs",
     "dodb/crates/dodb-storage/src/blink/version_index.rs",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs",
-    "dodb/crates/dodb-storage/src/wal.rs"
+    "dodb/crates/dodb-storage/src/wal.rs",
+    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "69bb091b63cb83c5419f326e4418dbddbdafb67ccacf6f4499deda04d19eb4ea",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "0ed3db14f8d22418c838a2ada5fdfe778bb45ac4cb66a793db10a4784716d832",
     "dodb/crates/dodb-storage/src/blink/durable_bases.rs": "26fd15c75154e71c42394f50e9f97b3bad8e6f7992e3161d35a6fd35ddaa9f08",
     "dodb/crates/dodb-storage/src/blink/version_index.rs": "e60ab5bc5981aed2d216d28f28ff8710e0f68f61dfdb8f39561c181482ed3880",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "dece389300575f090e393780fc1a9a31aaf6f2689774ec604677c0c3967d8a4f",
-    "dodb/crates/dodb-storage/src/wal.rs": "7fec7f957680ed1dc779ec355cd9b90018bc27ddb88023b6c446dd38763f601d"
+    "dodb/crates/dodb-storage/src/wal.rs": "7fec7f957680ed1dc779ec355cd9b90018bc27ddb88023b6c446dd38763f601d",
+    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "d1c7c0cdebab4c9fd3f70994e0a04bbe87c219f025e96bfd69bed2c2e2b69579"
   },
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+    "source_commit": "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b"
   },
   "features": [
     "blink-demand-paging",
@@ -582,12 +585,12 @@
       ],
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
       "exit_status": 0,
-      "summary": "1 passed; the writer publishes a complete checkpoint, commits into the rotated WAL, publishes an incremental checkpoint, reopens manifest generation 3, and reads the exact latest value",
+      "summary": "1 passed; the writer publishes complete and incremental checkpoints, commits into each rotated WAL, injects a pre-pointer failure, reopens the unchanged generation 3, and reads its exact latest committed value while the uncertain writer remains fenced",
       "raw_log": {
         "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-integration-focused.log",
-        "sha256": "f75226dcd3e80146796f7fd9b50c04fba4eb8070ebb9456f332faf3c1798670b"
+        "sha256": "df64d42b73f085f7bcf2e53239c3f4876385c0f88b7631f0d16b0e9e7dab0e6e"
       },
-      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+      "source_commit": "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b"
     },
     {
       "name": "paged_writer_manifest_feature_library_tests_serial",
@@ -604,12 +607,12 @@
       ],
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
       "exit_status": 0,
-      "summary": "297 passed, 0 failed, 4 ignored in 125.43 seconds",
+      "summary": "297 passed, 0 failed, 4 ignored in 126.17 seconds, including complete/incremental writer publication and pre-pointer fault recovery selection",
       "raw_log": {
         "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-feature-lib.log",
-        "sha256": "68790fbd6ce20dcbbed9c8109fe9cf9208bef4b84a5b9fa33d53ab0a7b16a31e"
+        "sha256": "fe3dae04cf9528227d04c90d7590bc12bf6117aceebfb8ffb842c83d916f869d"
       },
-      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+      "source_commit": "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b"
     },
     {
       "name": "paged_writer_manifest_default_library_tests_serial",
@@ -629,7 +632,7 @@
         "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-default-lib.log",
         "sha256": "3b9ac8923df47228bf56175a4bb1afd97f2fefaa059a2bd733825a8b445b3049"
       },
-      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+      "source_commit": "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b"
     },
     {
       "name": "paged_writer_manifest_default_library_check",
@@ -645,9 +648,9 @@
       "summary": "passed without warnings",
       "raw_log": {
         "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-default-check.log",
-        "sha256": "5fbed9e3c5716d3d79a33a421d51ff90db76e5df9078a8befecbdb72050ec0d4"
+        "sha256": "528c20c4d4cb281bcfa1349bae5d81e7f6ffd137201d97426ef5d430dacc562e"
       },
-      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+      "source_commit": "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b"
     },
     {
       "name": "paged_writer_manifest_feature_library_check",
@@ -665,9 +668,9 @@
       "summary": "passed without warnings",
       "raw_log": {
         "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-feature-check.log",
-        "sha256": "0ccdfb163f5bdd46d03951d388f3fd8254245d259a39c05375f2be26f8fcb480"
+        "sha256": "8cc94eb3a98a6c39c9337c11db8bd1ed294390e345091347b258092e9f2594d9"
       },
-      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+      "source_commit": "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b"
     },
     {
       "name": "paged_writer_manifest_format_check",
@@ -685,7 +688,7 @@
         "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-format.log",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
-      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+      "source_commit": "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b"
     },
     {
       "name": "paged_writer_manifest_strict_clippy_all_targets",
@@ -704,12 +707,12 @@
       ],
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
       "exit_status": 101,
-      "summary": "32 existing crate findings; no diagnostic points to checkpoint_to_manifest, the integration fixture, WAL source-header identity, or the source-directory helper; no suppressions added",
+      "summary": "32 existing crate findings; no diagnostic points to checkpoint_to_manifest, the pointer-fault integration fixture, WAL source-header identity, or the source-directory helper; no suppressions added",
       "raw_log": {
         "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-strict-clippy-all-targets.log",
-        "sha256": "a6679876aac80114d12fa9dfed15ee1cc3c02806b0661c9c0c913710ddb2fb25"
+        "sha256": "07af284317399bfae81f6bf87d9c9077f9e0f087f5b579752c03b1a29deead04"
       },
-      "source_commit": "d99c3e465ca4a72d54e74caa723536a09b62cc02"
+      "source_commit": "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b"
     }
   ],
   "acceptance_mapping": {
@@ -718,8 +721,8 @@
     "coalesced_and_uncoalesced_output": "passed: both modes produce complete packs with matching page counts and exact images",
     "forced_cache_misses_larger_than_cache": "passed for the fixture: eight indexed pages stream through a two-page decoded cache and source-read count increases",
     "writes_after_target_capture": "passed for the serialized writer path: the next transaction enters the newly rotated WAL only after manifest publication and active-segment switch; the integration fixture commits after a complete checkpoint and then publishes an incremental checkpoint",
-    "checkpoint_failure_and_old_reader_retention": "partial: pack and index work precede pointer publication, and uncertain publication disables the writer; existing incomplete-pack and pinned-reader tests pass, but integrated pointer/WAL fault injection, crash recovery, old-reader overlap through the writer API, and pinned-root capacity remain unverified",
-    "complete_reopen_oracle": "partial: a disk-backed writer test publishes complete and incremental checkpoints, reopens generation 3, and reads the exact latest value; no process crash or publication fault is injected",
+    "checkpoint_failure_and_old_reader_retention": "partial: an integrated fault before the manifest pointer leaves the prior generation selected after reopen and fences the writer after an uncertain result; incomplete-pack and pinned-reader tests pass, while pack/index/WAL I/O faults, process crash recovery, old-reader overlap through the writer API, and pinned-root capacity remain unverified",
+    "complete_reopen_oracle": "partial: a disk-backed writer test publishes complete and incremental checkpoints, injects a failure before a later manifest pointer, reopens generation 3, and reads the exact generation-3 value; no process crash or pointer-write I/O fault is injected",
     "bounded_memory_and_source_index_disk_reservations": "partial: pack output is bounded to 16 KiB coalesced or 4 KiB uncoalesced; checkpoint insertion and durable root promotion reserve 128 KiB each, and the writer integration uses a 512 KiB progress pool; required loader overlap and source/index disk reservations are not integrated",
     "tiny_capacity_bounded_defer_and_eventual_progress": "partial: a 64 KiB progress pool rejects the 128 KiB checkpoint insertion unit before changing root or progress accounting; scheduler defer/wake and eventual progress after capacity release are not implemented",
     "checkpoint_debt_and_time_above_threshold": "not implemented; no maintenance scheduler or tenant debt accounting exists yet"
@@ -796,7 +799,7 @@
     }
   ],
   "remaining_work": [
-    "Add pack, index, pointer, WAL-boundary, old-reader, GC, and process-crash/reopen fault oracles; integrate source-catalog registration and old-root GC retention",
+    "Add integrated pack/index/WAL I/O and actual pointer-write faults plus process-crash/reopen, old-reader, and GC retention oracles; integrate source-catalog registration and old-root collection",
     "Reserve source/index disk overlap and required loader memory together with checkpoint output and index promotion",
     "Resolve the eight-page pinned-root index-capacity attempt without increasing the cap to hide the bound; test defer and progress after capacity release",
     "Implement one-worker resumable slices, bounded checkpoint debt, and time-above-threshold accounting"
