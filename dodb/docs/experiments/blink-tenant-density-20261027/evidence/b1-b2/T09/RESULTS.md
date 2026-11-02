@@ -71,7 +71,7 @@ T09 remains partial. Grouped transaction recovery, durable tombstone/ABA and pag
 - Focused fixture: 1 passed. Full feature library suite: 293 passed, 0 failed, 4 ignored in 121.87 seconds. Targeted rustfmt and `git diff --check` passed. Two failed readback attempts and their logs are preserved.
 - Source commit: `231e402f68ced94e3f7716feee285739be11d6b0`.
 
-T09 remains partial. Physical free-page reuse, grouped WAL transaction boundaries, split/overflow writer readback, full process restart with index rebuild, and full readback of width-16 commits remain outstanding. No service activation or performance experiment occurred.
+T09 remains partial. Grouped WAL transaction boundaries, split/readback differential coverage, full process restart with index rebuild, and full readback of width-16 commits remain outstanding. No service activation or performance experiment occurred.
 
 
 ## Delta reconstruction across writer close and WAL rotation (2026-11-02)
@@ -83,3 +83,14 @@ T09 remains partial. Physical free-page reuse, grouped WAL transaction boundarie
 - Source commit: `b259815d12f010dc0686488fc7fb3cc197f11430`.
 
 T09 remains partial. Grouped transaction boundaries, zero-reader page reuse, split/overflow writer readback, full width-16 readback, and full process restart with index rebuild remain outstanding. No service activation or performance experiment occurred.
+
+
+## Zero-reader overflow page reuse (2026-11-02)
+
+- Added a `SourceManager` reservation that enables page reuse only when the current writer root is the sole registered root. It fences new reader roots through the next-generation publication and defers source GC while active. A second existing root prevents admission; a new root cannot register under the fence.
+- The paged writer now passes the guarded reuse decision into mutation preparation and consumes the same reserved root slot for publication. Read-only preparation keeps reuse disabled.
+- The file-backed writer fixture writes a 3-page overflow value, deletes it, and reinserts it. The exact overflow PageId set is reused without increasing high-water, and the full value reads back. The writer is dropped before later unrelated reader-capacity assertions.
+- Focused writer and root-fence tests passed. Full feature library suite: 294 passed, 0 failed, 4 ignored in 122.42 seconds. Default/feature library checks and targeted rustfmt passed. Strict Clippy still reports the same 12 existing findings; no suppressions were added.
+- Source commit: `3523096fae312360ff2b2976b8ac329829edf870`.
+
+T09 remains partial. Grouped WAL transaction boundaries, split/readback differential coverage, full readback of width-16 commits, and a full process restart with index rebuild remain outstanding. The paged route remains disconnected from `dodb-server`; defaults and the performance matrix remain unchanged.

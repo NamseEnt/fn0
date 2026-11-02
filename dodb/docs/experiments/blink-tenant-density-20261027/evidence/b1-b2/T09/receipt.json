@@ -11,7 +11,8 @@
     "78f7ad58c737ee3be118b132c17c75c72f47fe72",
     "4b23d25bed61befd36ab2c6e55636b914145ac3e",
     "231e402f68ced94e3f7716feee285739be11d6b0",
-    "b259815d12f010dc0686488fc7fb3cc197f11430"
+    "b259815d12f010dc0686488fc7fb3cc197f11430",
+    "3523096fae312360ff2b2976b8ac329829edf870"
   ],
   "push": {
     "remote": "origin",
@@ -46,10 +47,10 @@
     "dodb/crates/dodb-storage/src/btree/mod.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "fbb084fc0299dec65af4aa1c1c63f3d05e94e28a80a6e6385858ad9473b2d182",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "a839193ea286b3de166e912fbdd1ce81e8fed4bd886143545e01c90774beb35c",
     "dodb/crates/dodb-storage/src/blink/page_cache.rs": "83d1ac6841a55cf5d6eefb11e68e5a2eece05882b49d5db11b4850013ae0a133",
     "dodb/crates/dodb-storage/src/wal.rs": "8270097336b983145f651e4206688c826f5d4d3d244dc7c4b8f82790b621475e",
-    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "8f077ed1e82932247bcf986f0b3c95c846cc48188525775380c3375a4f90c86e",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "22814972741b0b9ff25d8e5a935c754c68d73a63c1e41e8edcb6a53a46e6d65a",
     "dodb/crates/dodb-storage/src/blink/version_index.rs": "c5766389322b006e58b30c7fc3f2603cd6f71b0f696d7dd8d28e5e0fcf8b0a1a",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "f0e1466b2db53c65ed40272a8ba88ca32bfdc904500a7325dae7e2d9024486e4",
     "dodb/crates/dodb-storage/src/blink/version_chain.rs": "874e9c43d88b2063b18259a4fdff684d872b21b0d6d9b9f58415e74c55c4e3af",
@@ -783,6 +784,150 @@
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
       "exit_status": 0,
       "summary": "package rustfmt passed before focused and full-suite checks; source diff check passed before commit"
+    },
+    {
+      "name": "paged_writer_zero_reader_overflow_page_reuse_focused",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "blink::tests::paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; a reader-free writer creates four overflow pages, deletes and frees them, then reuses the exact PageId set without growing the high-water mark and reads back the complete large value; publication fault checks run after reuse",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-zero-reader-overflow-reuse-final.log.gz",
+        "sha256": "e772cae63aac94b8d5a663e04230c9337299ec66e5cdf04c9347aa9dff5a2e7b"
+      }
+    },
+    {
+      "name": "source_manager_page_reuse_reader_fence_focused",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "zero_reader_page_reuse_reservation_fences_new_roots_until_publication_slot_is_reserved",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; a second existing reader prevents reservation, and a new reader root cannot register while the zero-reader reuse fence is held",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/source-page-reuse-reservation-focused.log.gz",
+        "sha256": "dce52aa7f815ffa61ae956df15eb84bf9dd6e0ad062b2a70a45902b9d3127189"
+      }
+    },
+    {
+      "name": "paged_writer_zero_reader_feature_library_tests_serial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "294 passed, 0 failed, 4 ignored; finished in 122.42s",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-zero-reader-reuse-feature-lib.log.gz",
+        "sha256": "21c3b7a7f3f9789303e086682435be95d0b5b14cddf0192cf060385cdcf3eaea"
+      }
+    },
+    {
+      "name": "paged_writer_zero_reader_default_library_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-zero-reader-default-check.log.gz",
+        "sha256": "da7b045d0489d95b3572919e34bbafd6413e1fdd225a47b6b033ea608a3031e6"
+      }
+    },
+    {
+      "name": "paged_writer_zero_reader_feature_library_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-zero-reader-feature-check.log.gz",
+        "sha256": "72bc8566e5fdc7b8318809c9c796151263cb655e1ff7527484b2d47086e0097f"
+      }
+    },
+    {
+      "name": "paged_writer_zero_reader_rustfmt_check",
+      "argv": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "--config",
+        "skip_children=true",
+        "dodb/crates/dodb-storage/src/blink/mod.rs",
+        "dodb/crates/dodb-storage/src/blink/source_manager.rs"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-zero-reader-rustfmt.log.gz",
+        "sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+      }
+    },
+    {
+      "name": "paged_writer_zero_reader_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 101,
+      "summary": "12 previously observed findings in blink/mod.rs and wal.rs; none in source_manager.rs or the added writer changes; no suppressions added",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-zero-reader-reuse-clippy.log.gz",
+        "sha256": "81a6426036cbbd1bc7bdb401c67105c0fed62f2474b78a44626fa7b03a85d8e8"
+      }
     }
   ],
   "acceptance_mapping": {
@@ -798,7 +943,9 @@
     "production_service_activation": "not activated; remains gated for T12-T15",
     "conditional_and_multikey_writer_commit": "partial: stale RevisionEquals conflict leaves WAL next LSN and page generation unchanged; one successful two-key transaction validates both base revisions and publishes both values; grouped commit boundaries remain unimplemented",
     "planned_writer_widths_1_4_16": "partial: writer commits requests with widths 1, 4, and 16 within the configured working-page cap; full readback of the width-16 result is constrained by the fixture cache budget and remains outstanding",
-    "paged_writer_delta_reconstruction_across_rotation": "partial: after closing the segment-4 writer, reopen from the exact post-segment-1 base pages reconstructs the exact eighth page image, image LSN, and CRC; chain metadata names one checkpoint base and eight deltas across segments 1 and 4; full process restart and index rebuild remain outstanding"
+    "paged_writer_delta_reconstruction_across_rotation": "partial: after closing the segment-4 writer, reopen from the exact post-segment-1 base pages reconstructs the exact eighth page image, image LSN, and CRC; chain metadata names one checkpoint base and eight deltas across segments 1 and 4; full process restart and index rebuild remain outstanding",
+    "zero_reader_page_reuse": "partial: SourceManager atomically admits page reuse only when exactly the current writer root is registered, blocks new root admission during preparation/publication, and defers GC during the reuse fence; the writer fixture deletes a multi-page overflow value and reuses the exact freed PageId set without high-water growth; existing-reader behavior is covered by the root-fence test",
+    "split_overflow_free_reuse_writer": "partial: writer overflow allocation, deletion, complete value readback, and zero-reader PageId reuse pass; width-16 structural split is committed but full split/readback differential coverage remains outstanding"
   },
   "ownership_peaks": {
     "test_maximum_working_pages": 32,
@@ -854,11 +1001,42 @@
       "exit_status": 101,
       "reason": "the initial test patch scoped rotation recovery context inside the rotation block; moved the context to the enclosing focused test and reran successfully",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-delta-rotation-reopen.log.gz"
+    },
+    {
+      "name": "paged_writer_reuse_first_compile_after_moving_reader_handle",
+      "exit_status": 101,
+      "reason": "the fixture still needed the original checkpoint handle later; reconstructed that handle after the zero-reader reuse check",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-zero-reader-overflow-reuse.log.gz"
+    },
+    {
+      "name": "paged_writer_reuse_attempt_after_publication_fault",
+      "exit_status": 101,
+      "reason": "the writer was already fail-stopped by the publication fault probe; moved that probe after the free-page reuse test",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-zero-reader-overflow-reuse-retry.log.gz"
+    },
+    {
+      "name": "paged_writer_free_list_first_retry",
+      "exit_status": 101,
+      "reason": "a prepared overflow-delete object still held a root publication reservation, so the writer correctly declined zero-reader reuse; explicitly dropped the preparation before the reuse scenario",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-zero-reader-overflow-reuse-retry2.log.gz"
+    },
+    {
+      "name": "paged_writer_free_list_root_count_diagnostic",
+      "exit_status": 101,
+      "reason": "confirmed the high-water mark grew because an earlier preparation still owned its root reservation; fixed by dropping that prepared transaction",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-zero-reader-root-count.log.gz"
+    },
+    {
+      "name": "source_page_reuse_test_initial_filter",
+      "exit_status": 0,
+      "reason": "the exact test filter selected zero tests; reran with the function-name substring and observed one passing test",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/source-page-reuse-reservation.log.gz"
     }
   ],
   "remaining_work": [
-    "T09 preserve transaction boundaries for grouped requests and prove grouped complete-or-absent WAL recovery",
-    "T09 complete zero-reader dirty-page free-page reuse, split/overflow writer readback, and full readback of width-16 commits",
+    "T09 preserve grouped transaction boundaries and prove grouped complete-or-absent WAL recovery",
+    "T09 add split/readback differential writer coverage and full readback of width-16 commits",
+    "T09 prove full process restart with index rebuild in addition to WAL-segment close/reopen recovery",
     "T10-T16 checkpoint, recovery, service, resource, scheduling, crash, and experiment-readiness gates",
     "T17 remains separately authorized and was not started"
   ],
