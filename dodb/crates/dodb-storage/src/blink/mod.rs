@@ -16413,6 +16413,34 @@ mod tests {
             .unwrap();
         let first_checkpoint_lsn = first_result.commit_lsn.unwrap();
         let old_reader = writer.snapshot().unwrap();
+        let disk_usage_before_checkpoint_quota = resources.disk().snapshot().unwrap().current_total;
+        let checkpoint_quota_blocker = resources
+            .disk()
+            .reserve(
+                7,
+                resource::DiskCategory::Scratch,
+                2_097_152 - disk_usage_before_checkpoint_quota,
+            )
+            .unwrap();
+        let mut deferred_checkpoint = writer
+            .begin_checkpoint(
+                &manifest_store,
+                PagedCheckpointPackRequest {
+                    directory: checkpoint_directory.clone(),
+                    file_number: 2,
+                    identity: wal_identity.clone(),
+                    checkpoint_lsn: Lsn::ZERO,
+                    previous_checkpoint_lsn: None,
+                    coalesce: true,
+                },
+                false,
+            )
+            .unwrap()
+            .unwrap();
+        assert!(deferred_checkpoint.write_pack().is_err());
+        assert!(!durable_bases::pack_path(&checkpoint_directory, 2).exists());
+        drop(deferred_checkpoint);
+        drop(checkpoint_quota_blocker);
         let mut complete_job = writer
             .begin_checkpoint(
                 &manifest_store,
