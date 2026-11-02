@@ -283,7 +283,7 @@
   "push": {
     "remote": "origin",
     "branch": "experiment/blink-tenant-density-20261027",
-    "status": "pending"
+    "status": "pushed"
   },
   "preserved_failures": [
     {
