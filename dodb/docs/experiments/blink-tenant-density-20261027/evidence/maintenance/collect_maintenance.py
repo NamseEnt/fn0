@@ -127,6 +127,15 @@ def verify_local(evidence_directory):
         if capacity_review.compare_pair(reports[f'maintenance-n24-r{repetition}-blink'],
                                         reports[f'maintenance-n24-r{repetition}-shared']) != pair:
             raise AssertionError('local paired fingerprints differ')
+    slo_passes = {backend: sum(cell['slo_pass'] for cell in review['cells'].values()
+                               if cell['backend'] == backend) for backend in maintenance.BACKENDS}
+    successful = sum(report['workload']['successful'] for report in reports.values())
+    completed = (run_directory / 'completion.json').is_file() and len(reports) == 6 and len(review['pairs']) == 3
+    if (review['slo_passes_by_backend'] != slo_passes or review['successful_requests'] != successful
+            or review['oracle_count'] != 2 * len(reports)
+            or review['completed_run_evidence_valid'] != completed
+            or review['accepted_run'] != (completed and all(count == 3 for count in slo_passes.values()))):
+        raise AssertionError('local cohort acceptance or accounting differs')
     if not receipt['all_recorded_processes_exited'] or not all(group['processes_empty'] for group in receipt['cgroups']):
         raise AssertionError('collection did not preserve clean process/group exit evidence')
     if not all(database['preserved'] for database in receipt['databases']):
