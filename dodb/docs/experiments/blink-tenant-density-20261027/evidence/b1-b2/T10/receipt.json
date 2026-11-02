@@ -12,7 +12,8 @@
     "163961877f966e076c66d772dd3310724b2a1cbb",
     "70133a4f6885ea2b46904a54f5acb8c20c2ff760",
     "445dce45c585abd9b2d795dd14c468e4e9463791",
-    "560d185172d27c266b676d2a44e2508b28515335"
+    "560d185172d27c266b676d2a44e2508b28515335",
+    "03f01f45a982289258aee7b8bc92b024078223a4"
   ],
   "push": {
     "remote": "origin",
@@ -43,7 +44,7 @@
     "dodb/crates/dodb-storage/src/wal.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "8629cb5e37beaeb96e6eaa0b111614aee4c0693eb98f726034375f8e99e2e29a",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "6375763914ea352bc59d28541017283b061f24de9e09dd3c051bb6a581e484aa",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "a4b1321c4793fb086fdf77900d3a33f7bfef51bd46fce9c2d3b83748247e461c",
     "dodb/crates/dodb-storage/src/blink/page_locator.rs": "80fbbdc6a569b379b563e8ad65b396c047bb4e63524240e3126c15710d59b48a",
     "dodb/crates/dodb-storage/src/bin/phase0-bench.rs": "2cf4d0a7d12caaa477046445f3a4675c861b85628105c81496115e2e03c50c81",
@@ -58,7 +59,7 @@
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "560d185172d27c266b676d2a44e2508b28515335"
+    "source_commit": "03f01f45a982289258aee7b8bc92b024078223a4"
   },
   "features": [
     "blink-demand-paging",
@@ -75,7 +76,8 @@
     "oci_experiment": false,
     "performance_matrix_started": false,
     "checkpoint_worker": "One active checkpoint job per PagedTransactionWriter; overlapping jobs are rejected, and job drop or publication releases the slot.",
-    "pointer_faults": "Injectable boundaries exist before pointer temporary creation, after temporary-file sync, after atomic rename, and after directory sync; the exercised writer path fails after temporary-file sync."
+    "pointer_faults": "Injectable boundaries exist before pointer temporary creation, after temporary-file sync, after atomic rename, and after directory sync; the exercised writer path fails after temporary-file sync.",
+    "pack_failure": "Checkpoint jobs accept a storage fault injector; a page-write failure keeps the manifest selected and releases the single active worker lease when the failed job is dropped."
   },
   "checks": [
     {
@@ -1021,6 +1023,92 @@
         "sha256": "1da960b436fad2113e48aa617e7c19b2ad87d5cc83da5407887d6f806d37f023"
       },
       "source_commit": "560d185172d27c266b676d2a44e2508b28515335"
+    },
+    {
+      "name": "paged_checkpoint_pack_failure_reader_gc_and_pointer_fault",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "paged_transaction_writer_publishes_complete_and_incremental_checkpoints"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "1 passed; page-output fault leaves an incomplete header-only pack without manifest publication, a later writer transaction proceeds, the old reader retains its WAL, and a later pointer-temp-sync failure keeps the previous generation selected after reopen.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-pack-failure-focused.log",
+        "sha256": "f9663e19856e1752254d8e431d7ff847f3d401d4cecd2c7d7724046aca81f3db"
+      },
+      "source_commit": "03f01f45a982289258aee7b8bc92b024078223a4"
+    },
+    {
+      "name": "paged_checkpoint_faults_reader_gc_feature_library",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "297 passed, 0 failed, 4 ignored.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-faults-reader-gc-feature-lib.log",
+        "sha256": "0b78913651b3500685d5286c30f1385556c93ca23d66417cddf8f633d0c5dc8f"
+      },
+      "source_commit": "03f01f45a982289258aee7b8bc92b024078223a4"
+    },
+    {
+      "name": "paged_checkpoint_faults_reader_gc_all_target_compile",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--no-run"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "All library, binary, and integration targets compiled; existing benchmark harness dead-code warnings remain.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-faults-reader-gc-all-targets-compile.log",
+        "sha256": "105d5b47f5630d1d53747792791db7a4dc4c60c8ce12769e0928fed0e19103dc"
+      },
+      "source_commit": "03f01f45a982289258aee7b8bc92b024078223a4"
+    },
+    {
+      "name": "paged_checkpoint_faults_reader_gc_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "--message-format",
+        "short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 101,
+      "summary": "12 pre-existing crate diagnostics remain; no diagnostic points to checkpoint fault injection or source-retention tests.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-faults-reader-gc-strict-clippy.log",
+        "sha256": "03424de7e5a97fb082939f80f90ef7c204ec08412e410cbcd43dd3e40294c35c"
+      },
+      "source_commit": "03f01f45a982289258aee7b8bc92b024078223a4"
     }
   ],
   "acceptance_mapping": {

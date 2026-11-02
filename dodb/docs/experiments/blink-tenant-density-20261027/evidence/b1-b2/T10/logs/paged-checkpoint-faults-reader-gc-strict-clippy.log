@@ -1,0 +1,14 @@
+    Checking dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+dodb/crates/dodb-storage/src/blink/mod.rs:1500:5: error: this function has too many arguments (8/7)
+dodb/crates/dodb-storage/src/blink/mod.rs:6302:21: error: this `if` statement can be collapsed
+dodb/crates/dodb-storage/src/blink/mod.rs:6346:21: error: this `if` statement can be collapsed
+dodb/crates/dodb-storage/src/blink/mod.rs:8139:1: error: this function has too many arguments (9/7)
+dodb/crates/dodb-storage/src/blink/mod.rs:8674:35: error: derefed type is same as origin: help: try: `budget`
+dodb/crates/dodb-storage/src/blink/mod.rs:8789:43: error: redundant slicing of the whole range: help: use the original value instead: `entry.key`
+dodb/crates/dodb-storage/src/blink/mod.rs:10009:1: error: this function has too many arguments (9/7)
+dodb/crates/dodb-storage/src/blink/mod.rs:10051:1: error: this function has too many arguments (8/7)
+dodb/crates/dodb-storage/src/blink/mod.rs:10161:1: error: this function has too many arguments (10/7)
+dodb/crates/dodb-storage/src/wal.rs:671:5: error: this function has too many arguments (8/7)
+dodb/crates/dodb-storage/src/wal.rs:3938:1: error: this function has too many arguments (8/7)
+dodb/crates/dodb-storage/src/wal.rs:3968:1: error: this function has too many arguments (10/7)
+error: could not compile `dodb-storage` (lib) due to 12 previous errors

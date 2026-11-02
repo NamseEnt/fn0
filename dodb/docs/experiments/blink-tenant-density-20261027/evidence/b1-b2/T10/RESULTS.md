@@ -94,3 +94,13 @@ T10 remains partial. Process-kill crash/reopen, source-catalog and GC integratio
 - Raw log: `logs/paged-writer-old-reader-gc-focused.log`.
 
 T10 remains partial. Persistent source-catalog publication, restart-time root/source retention, source/index disk reservations, combined loader/index/output accounting, bounded defer and progress after capacity release, resumable slices, and checkpoint debt/time-above-threshold accounting remain open.
+
+## Completed substep: failed checkpoint pack stays unpublished
+
+- The checkpoint job exposes an injectable pack-write fault for storage validation. A failure during page output leaves only the pack header, does not advance the manifest, and releases the single-worker lease when the job is dropped.
+- The writer then accepts a later transaction and another checkpoint attempt. The same fixture still verifies old-reader source protection and the manifest-pointer temporary-sync fault boundary.
+- Focused combined pack-fault/reader-GC/pointer-fault fixture: 1 passed. Full feature suite: 297 passed, 0 failed, 4 ignored. All feature targets compiled. Strict Clippy reports 12 pre-existing diagnostics and no new checkpoint diagnostic.
+- Source commit: `03f01f45a982289258aee7b8bc92b024078223a4`.
+- Raw logs: `logs/paged-writer-pack-failure-focused.log`, `logs/paged-checkpoint-faults-reader-gc-feature-lib.log`, `logs/paged-checkpoint-faults-reader-gc-all-targets-compile.log`, and `logs/paged-checkpoint-faults-reader-gc-strict-clippy.log`.
+
+T10 remains partial. Persistent source-catalog publication and restart-time root/source retention, source/index disk reservations, combined loader/index/output accounting, bounded defer and progress after capacity release, resumable slices, and checkpoint debt/time-above-threshold accounting remain open.
