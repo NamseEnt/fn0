@@ -113,6 +113,17 @@ T09 remains partial. Grouped WAL transaction boundaries and complete-or-absent g
 
 T09 remains partial. Grouped WAL transaction boundaries and complete-or-absent grouped recovery, plus full process restart with index rebuild, remain outstanding. No service activation or performance experiment occurred.
 
+## Durable manifest and index rebuild from committed WAL (2026-11-02)
+
+- Extended the actual-WAL recovery test to persist a checkpoint index root and manifest, close both stores, and reopen them from disk before replaying the committed WAL into a new recovery index root.
+- The rebuilt root is promoted to durable index storage and published as the next manifest generation. Both index and manifest are then closed and reopened again; the recovered page LSN and CRC match the expected image, and a fresh WAL reopen reconstructs the exact expected page bytes from the checkpoint base plus committed WAL.
+- Focused recovery fixture: 1 passed. Final serialized feature library suite: 294 passed, 0 failed, 4 ignored in 124.36 seconds. Rustfmt passed.
+- Strict `clippy --tests` reports 32 remaining existing crate findings. The restart test adds no findings; it also replaces one lazy `bool::then` in the recovery test with `then_some`. The first Clippy run caught a nonessential explicit `drop` of the recovery builder; that call was removed without a lint suppression.
+- Raw test and Clippy outputs: `logs/paged-writer-index-rebuild-final-feature-lib.log.gz` and `logs/paged-writer-full-restart-strict-clippy-fixed.log.gz`.
+- Source commit: `86c4373f4`.
+
+This proves storage-object close/reopen and durable manifest/index rebuild from an actual committed WAL. It does not exercise an OS process kill; the subprocess crash matrix remains part of T11/T15. T09 remains partial because grouped WAL transaction boundaries and complete-or-absent grouped recovery are still outstanding.
+
 ## Reload after page-cache eviction (2026-11-02)
 
 - Created a fresh two-page loader for the current writer generation. Loading three distinct pages causes the least-recently-used entry to be evicted; reloading that first page increases the source-read counter, proving the current generation can reconstruct an evicted page from its durable version sources.
