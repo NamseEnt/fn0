@@ -1,11 +1,7 @@
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on build directory
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.12s
-     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-70634b21c90c24df)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running unittests src/lib.rs (target/debug/deps/dodb_storage-70634b21c90c24df)
 
-running 319 tests
+running 320 tests
 test blink::page_cache::tests::all_pinned_cache_capacity_returns_overload ... ok
 test blink::page_cache::tests::cache_eviction_keeps_guard_charge_until_last_owner_drops ... ok
 test blink::page_cache::tests::cancelled_load_wakes_followers_and_releases_job_and_byte_reservations ... ok
@@ -234,6 +230,13 @@ test blink::tests::writer_pin_reuse_bounds_overflow_churn_and_preserves_pinned_g
 test blink::version_chain::tests::chain_read_rejects_foreign_identity_corruption_and_truncation ... ok
 test blink::version_chain::tests::chain_reference_requires_zero_offset_and_nonzero_file_number ... ok
 test blink::version_chain::tests::chain_validation_rejects_base_mismatch_and_more_than_eight_deltas ... ok
+test blink::version_chain::tests::delta_chain_sidecar_sigkill_boundaries_leave_only_unpublished_files ... 
+running 1 test
+
+running 1 test
+
+running 1 test
+ok
 test blink::version_chain::tests::immutable_chain_sidecar_reopens_exact_delta_ancestry ... ok
 test blink::version_chain::tests::reconstructs_eight_deltas_from_exact_sources_after_reopen ... ok
 test blink::version_index::tests::checkpoint_index_path_reservation_fits_the_existing_small_progress_pool ... ok
@@ -342,5 +345,5 @@ test wal::tests::trusted_internal_valid_images_are_byte_identical_to_strict_imag
 test wal::tests::unsupported_version_is_rejected ... ok
 test wal::tests::wrong_magic_is_rejected ... ok
 
-test result: ok. 315 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 128.64s
+test result: ok. 316 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 128.86s
 
