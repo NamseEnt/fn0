@@ -1,0 +1,11 @@
+Rejected service-level pressure probes for the old-reader checkpoint lifecycle.
+
+All attempts used the isolated blink_test_directory and were automatically removed when the test process exited. No preserved database or user data was removed.
+
+1. A single 128 KiB value exceeded the configured maximum working-page limit with `Overloaded("paged transaction exceeds its working-page limit")`. The test fixture was reduced to 4 KiB values.
+2. Assuming the original WAL filename was segment 1 was incorrect; the test now discovers the actual segment created before checkpoint publication.
+3. With one post-checkpoint overwrite, the checkpoint output fit the remaining artificial disk headroom, so the checkpoint completed before the waiter assertion. The service lifecycle fixture now updates all seeded keys to create a bounded multi-page incremental output.
+4. Artificially filling total disk capacity before the output waiter could not reliably isolate the intended wait. At 2 MiB the fixture exhausted version-index capacity. At 16 MiB and 8 KiB headroom, and again with larger output datasets and 256 KiB headroom, checkpoint source reconciliation failed with `Overloaded("paged WAL disk budget is exhausted")` before the intended waiter assertion. These are rejected probes, not capacity-wait evidence.
+5. With 20 and then 50 seeded keys, the 2 MiB and 16 MiB experimental limits respectively exhausted version-index space during setup. The fixture limit was increased to 64 MiB; the final test does not create an artificial disk blocker.
+
+The accepted service test now proves that an old operation root keeps its WAL source readable after checkpoint publication, and that dropping the root permits the next checkpoint's source collection to unlink that source before publishing the next checkpoint. Existing separate tests cover checkpoint capacity wait/resume and root-release notifications. The combined lifecycle where that exact old-reader release unblocks a disk-capacity-waiting checkpoint remains unproven.

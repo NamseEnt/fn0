@@ -6521,7 +6521,7 @@ mod tests {
             blink_shared_resources: Some(shared_resources),
             ..LocalTenantServiceConfig::default()
         };
-        let service = BlinkTenantService::new(config).unwrap();
+        let service = BlinkTenantService::new(config.clone()).unwrap();
         let database_path = service.database_path(tenant);
         create_empty_paged_service_fixture(&database_path, tenant);
         service
@@ -6591,6 +6591,145 @@ mod tests {
         assert_eq!(metrics.checkpoints_completed, 1);
         assert_eq!(metrics.checkpoints_failed, 0);
         service.shutdown_checked().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_checkpoint_reclaims_old_reader_source_before_publication() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(726);
+        let mut shared_resources = writable_paged_blink_shared_resources();
+        let disk_capacity = 64 * 1024 * 1024;
+        shared_resources.disk.global_bytes = disk_capacity;
+        shared_resources.disk.per_tenant_bytes = disk_capacity;
+        shared_resources.disk.global_category_bytes = [disk_capacity; 5];
+        shared_resources.disk.per_tenant_category_bytes = [disk_capacity; 5];
+        shared_resources.maximum_checkpoint_debt_bytes_global = 1024 * 1024;
+        shared_resources.maximum_checkpoint_debt_bytes_per_tenant = 1024 * 1024;
+        let config = LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            max_open_shards: 1,
+            blink_open_waiter_limit: 4,
+            blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce: true,
+            },
+            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                threshold_bytes: u64::MAX,
+            },
+            blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+            blink_shared_resources: Some(shared_resources),
+            ..LocalTenantServiceConfig::default()
+        };
+        let service = BlinkTenantService::new(config.clone()).unwrap();
+        let database_path = service.database_path(tenant);
+        create_empty_paged_service_fixture(&database_path, tenant);
+        let keys = (0u32..50)
+            .map(|key_number| {
+                dodb_core::DocumentKey::new(
+                    b"pinned-reader".to_vec(),
+                    key_number.to_le_bytes().to_vec(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let key = keys[0].clone();
+        let old_value = vec![17; 4096];
+        let new_value = vec![29; 4096];
+        for write_key in &keys {
+            service
+                .execute_request(
+                    tenant,
+                    Request::Put {
+                        key: write_key.clone(),
+                        value: old_value.clone(),
+                    },
+                    ExecutionBudget::new(16 * 1024),
+                )
+                .await
+                .unwrap();
+        }
+        let shard = service
+            .shards
+            .lock()
+            .unwrap()
+            .shards
+            .get(&tenant)
+            .cloned()
+            .unwrap();
+        let writable = match &shard.read_handle {
+            BlinkShardReadHandle::Paged {
+                writable: Some(writable),
+                ..
+            } => Arc::clone(writable),
+            BlinkShardReadHandle::Resident(_) | BlinkShardReadHandle::Paged { .. } => {
+                panic!("expected the writable paged service route")
+            }
+        };
+        let old_reader = writable.snapshot().unwrap();
+        let old_reader_value = old_reader.get(&key).unwrap();
+        assert_eq!(old_reader_value.value(), Some(old_value.as_slice()));
+        drop(old_reader_value);
+        let wal_directory =
+            dodb_storage::blink::paged_manifest::PagedManifestStore::sidecar_directory(
+                &database_path,
+            )
+            .join("segments");
+        let wal_paths_before_checkpoint = std::fs::read_dir(&wal_directory)
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|extension| extension == "wal"))
+            .collect::<Vec<_>>();
+        writable.run_threshold_checkpoint(1).await.unwrap();
+        let previous_wal_path = wal_paths_before_checkpoint
+            .into_iter()
+            .find(|path| path.is_file())
+            .expect("old reader should retain a WAL source after checkpoint publication");
+        assert_eq!(
+            old_reader.get(&key).unwrap().value(),
+            Some(old_value.as_slice())
+        );
+
+        for write_key in &keys {
+            service
+                .execute_request(
+                    tenant,
+                    Request::Put {
+                        key: write_key.clone(),
+                        value: new_value.clone(),
+                    },
+                    ExecutionBudget::new(16 * 1024),
+                )
+                .await
+                .unwrap();
+        }
+        assert!(previous_wal_path.is_file());
+        assert_eq!(
+            old_reader.get(&key).unwrap().value(),
+            Some(old_value.as_slice())
+        );
+        drop(old_reader);
+        writable.run_threshold_checkpoint(1).await.unwrap();
+
+        assert!(!previous_wal_path.exists());
+        let metrics = service.checkpoint_metrics_snapshot();
+        assert_eq!(metrics.checkpoints_completed, 2);
+        assert_eq!(metrics.checkpoints_failed, 0);
+        service.shutdown_checked().await.unwrap();
+        let reopened_service = BlinkTenantService::new(config).unwrap();
+        match reopened_service
+            .execute_request(
+                tenant,
+                Request::Get { key },
+                ExecutionBudget::new(16 * 1024),
+            )
+            .await
+            .unwrap()
+        {
+            Response::Get(state) => assert_eq!(state.value(), Some(new_value.as_slice())),
+            response => panic!("unexpected response: {response:?}"),
+        }
+        reopened_service.shutdown_checked().await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
