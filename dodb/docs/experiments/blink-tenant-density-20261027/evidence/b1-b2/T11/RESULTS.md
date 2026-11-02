@@ -2,13 +2,14 @@
 
 ## Scope
 
-This increment adds an explicit `PagedReadHandle::open_with_indexed_page_validation` entry point. It walks the version index with its fixed-depth descriptor cursor and loads each indexed page through the configured bounded page loader. It rejects descriptors outside the allocated range, missing page images, checksum or decode failures, and image LSN mismatches. It does not claim complete B-link tree, free-list, reachability, overflow-chain, or crash-recovery validation.
+This increment adds an explicit `PagedReadHandle::open_with_indexed_page_validation` entry point. It walks the version index with its fixed-depth descriptor cursor and loads each indexed page through the configured bounded page loader. It rejects descriptors outside the allocated range, gaps in the page-ID sequence, missing page images through the high-water mark, checksum or decode failures, and image LSN mismatches. A regression with a high-water mark beyond the final indexed page verifies that incomplete allocation coverage fails. It does not claim complete B-link tree, free-list, reachability, overflow-chain, or crash-recovery validation.
 
 The focused regression corrupts an indexed leaf page that is outside the already-cached requested route. The cached GET still succeeds, demonstrating why lazy reads alone do not satisfy opening validation; the validation-open path rejects the corrupted image. After restoring the image, validation reads all eight indexed pages with a two-page cache.
 
 ## Validation
 
 - `rustfmt --edition 2024 --check crates/dodb-storage/src/blink/mod.rs`: passed.
+- The focused regression also verified that a missing allocated page above the indexed range is rejected.
 - Focused `dodb-storage` test `paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages` with `blink-demand-paging blink-writer-pin-reuse`: passed, 1 test.
 - `git diff --check`: passed.
 

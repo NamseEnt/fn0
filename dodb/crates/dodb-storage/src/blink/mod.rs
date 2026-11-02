@@ -2267,6 +2267,7 @@ impl PagedReadHandle {
 
     pub fn validate_all_indexed_pages(&self) -> Result<u64> {
         let mut cursor = self.index.descriptor_cursor(self.root)?;
+        let mut expected_page_id = FIRST_DATA_PAGE;
         let mut validated_pages = 0u64;
         while let Some(descriptor) = cursor.next_descriptor(&self.index)? {
             if descriptor.page_id < PageId::new(FIRST_DATA_PAGE)
@@ -2274,6 +2275,11 @@ impl PagedReadHandle {
             {
                 return Err(Error::corruption(
                     "paged validation found an indexed page outside the allocated range",
+                ));
+            }
+            if descriptor.page_id.get() != expected_page_id {
+                return Err(Error::corruption(
+                    "paged validation found a gap in the allocated page range",
                 ));
             }
             let page = self
@@ -2288,6 +2294,14 @@ impl PagedReadHandle {
             validated_pages = validated_pages
                 .checked_add(1)
                 .ok_or_else(|| Error::corruption("paged validation page count overflows"))?;
+            expected_page_id = expected_page_id
+                .checked_add(1)
+                .ok_or_else(|| Error::corruption("paged validation page range overflows"))?;
+        }
+        if expected_page_id != self.high_water_page_id.get().saturating_add(1) {
+            return Err(Error::corruption(
+                "paged validation found missing allocated pages",
+            ));
         }
         Ok(validated_pages)
     }
@@ -14803,6 +14817,27 @@ mod tests {
             page_images.len() as u64
         );
         drop(validated_open);
+        let missing_allocated_page_open = PagedReadHandle::open_with_indexed_page_validation(
+            PagedReadConfig {
+                tenant_id: 11,
+                root,
+                root_page_id,
+                free_list_head: None,
+                high_water_page_id: PageId::new(high_water_page_id.get() + 1),
+                loader: page_cache::PageLoaderConfig {
+                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 10) as u64,
+                    maximum_concurrent_loads: 2,
+                    maximum_followers: 8,
+                },
+            },
+            Arc::clone(&index),
+            resources.clone(),
+            sources.clone(),
+            |_| Ok(PAGE_SIZE),
+        );
+        assert!(missing_allocated_page_open.is_err());
         assert!(handle.get(&tombstone_key).unwrap().value().is_none());
         assert!(handle.get(&missing_key).unwrap().value().is_none());
         let query = handle.query(&primary_key, None, 16).unwrap();
