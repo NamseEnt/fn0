@@ -47,6 +47,7 @@ struct Arguments {
     worker_binary_sha256: String,
     parent_binary_sha256: String,
     parent_pid: u32,
+    worker_phase: String,
     response_budget: usize,
     max_mutations: usize,
     max_concurrent_requests: usize,
@@ -61,6 +62,12 @@ struct Arguments {
     blink_cache_pages: Option<usize>,
     blink_checkpoint_policy: BlinkCheckpointPolicy,
     blink_checkpoint: blink_checkpoint::Options,
+    blink_demand_paging: bool,
+    blink_paged_cache_bytes: u64,
+    blink_memory_limit_bytes: u64,
+    blink_memory_per_tenant_bytes: u64,
+    blink_disk_limit_bytes: u64,
+    blink_disk_per_tenant_bytes: u64,
 }
 
 enum BackendService {
@@ -75,6 +82,16 @@ impl BackendService {
     fn open(arguments: &Arguments) -> WorkerResult<Self> {
         match arguments.backend.as_str() {
             "blink" => {
+                #[cfg(feature = "blink-demand-paging")]
+                let blink_shared_resources = if arguments.blink_demand_paging {
+                    Some(paged_resource_config(arguments)?)
+                } else {
+                    None
+                };
+                #[cfg(not(feature = "blink-demand-paging"))]
+                if arguments.blink_demand_paging {
+                    return Err("worker binary was not built with blink-demand-paging".into());
+                }
                 let config = LocalTenantServiceConfig {
                     data_dir: arguments.data_dir.clone(),
                     max_open_shards: arguments.blink_max_open_shards,
@@ -87,6 +104,8 @@ impl BackendService {
                     blink_checkpoint_policy: arguments.blink_checkpoint_policy,
                     blink_wal_layout: arguments.blink_checkpoint.layout,
                     blink_checkpoint_execution: arguments.blink_checkpoint.execution,
+                    #[cfg(feature = "blink-demand-paging")]
+                    blink_shared_resources,
                     ..LocalTenantServiceConfig::default()
                 };
                 Ok(Self::Blink(BlinkTenantService::new(config)?))
@@ -284,6 +303,236 @@ fn blink_checkpoint_metrics_json(
     })
 }
 
+#[cfg(feature = "blink-demand-paging")]
+fn paged_resource_config(
+    arguments: &Arguments,
+) -> WorkerResult<dodb_server::BlinkSharedResourceConfig> {
+    if arguments.blink_memory_limit_bytes < 32 * 1024 * 1024
+        || arguments.blink_memory_per_tenant_bytes < 32 * 1024 * 1024
+        || arguments.blink_memory_per_tenant_bytes > arguments.blink_memory_limit_bytes
+        || arguments.blink_disk_limit_bytes < 32 * 1024 * 1024
+        || arguments.blink_disk_per_tenant_bytes < 32 * 1024 * 1024
+        || arguments.blink_disk_per_tenant_bytes > arguments.blink_disk_limit_bytes
+        || arguments.blink_paged_cache_bytes < dodb_storage::PAGE_SIZE as u64
+    {
+        return Err("B-link paging resource limits are invalid".into());
+    }
+    let progress_pool_bytes = (64 * 1024 * 1024).min(arguments.blink_memory_limit_bytes / 2);
+    Ok(dodb_server::BlinkSharedResourceConfig {
+        memory: dodb_storage::blink::resource::ResourceLimits {
+            global_bytes: arguments.blink_memory_limit_bytes,
+            per_tenant_bytes: arguments.blink_memory_per_tenant_bytes,
+            progress_pool_bytes,
+            max_tenants: arguments.blink_max_open_shards,
+            max_pending_waiters: 4096,
+            global_category_bytes: [arguments.blink_memory_limit_bytes; 7],
+            per_tenant_category_bytes: [arguments.blink_memory_per_tenant_bytes; 7],
+        },
+        disk: dodb_storage::blink::resource::DiskResourceLimits {
+            global_bytes: arguments.blink_disk_limit_bytes,
+            per_tenant_bytes: arguments.blink_disk_per_tenant_bytes,
+            max_tenants: arguments.blink_max_open_shards,
+            global_category_bytes: [arguments.blink_disk_limit_bytes; 5],
+            per_tenant_category_bytes: [arguments.blink_disk_per_tenant_bytes; 5],
+        },
+        open_tenant_metadata_bytes: 4096,
+        paged_read_only: false,
+        paged_writer_enabled: true,
+        maximum_working_pages: 64,
+        page_loader: dodb_storage::blink::page_cache::PageLoaderConfig {
+            maximum_cache_bytes: arguments.blink_paged_cache_bytes,
+            minimum_decoded_page_bytes: dodb_storage::PAGE_SIZE as u64,
+            maximum_load_reconstruction_bytes: arguments
+                .blink_paged_cache_bytes
+                .max(16 * dodb_storage::PAGE_SIZE as u64),
+            maximum_concurrent_loads: 8,
+            maximum_followers: 128,
+        },
+        maximum_cached_index_nodes: 4096,
+        maximum_open_source_handles: 4096,
+        maximum_roots_per_tenant: 4096,
+        source_handle_charge_bytes: 256,
+        source_gc_reservation_bytes: 4096 + 4096 * 256,
+        checkpoint_capacity_wait_timeout: Duration::from_secs(30),
+        maximum_checkpoint_debt_bytes_global: arguments.blink_disk_limit_bytes / 2,
+        maximum_checkpoint_debt_bytes_per_tenant: arguments.blink_disk_per_tenant_bytes / 2,
+    })
+}
+
+#[cfg(feature = "blink-demand-paging")]
+fn paged_resource_snapshot_json(
+    snapshot: dodb_server::BlinkPagedResourceSnapshot,
+) -> serde_json::Value {
+    let memory_current = snapshot.memory.current_by_category;
+    let memory_peak = snapshot.memory.peak_by_category;
+    let disk_current = snapshot.disk.current_by_category;
+    let disk_peak = snapshot.disk.peak_by_category;
+    let page_loader = snapshot
+        .tenants
+        .iter()
+        .map(|tenant| tenant.page_loader)
+        .fold(
+            dodb_storage::blink::page_cache::PageLoaderMetrics::default(),
+            |mut total, metrics| {
+                total.cache_misses += metrics.cache_misses;
+                total.evictions += metrics.evictions;
+                total.source_reads += metrics.source_reads;
+                total.wal_reconstructions += metrics.wal_reconstructions;
+                total.coalesced_loads += metrics.coalesced_loads;
+                total.chain_entries_inspected += metrics.chain_entries_inspected;
+                total.maximum_chain_entries = total
+                    .maximum_chain_entries
+                    .max(metrics.maximum_chain_entries);
+                total.current_cache_bytes += metrics.current_cache_bytes;
+                total.peak_cache_bytes += metrics.peak_cache_bytes;
+                total.active_loads += metrics.active_loads;
+                total.active_followers += metrics.active_followers;
+                total
+            },
+        );
+    let active_source_handles = snapshot
+        .tenants
+        .iter()
+        .map(|tenant| tenant.source_manager.active_source_handles)
+        .sum::<usize>();
+    let active_roots = snapshot
+        .tenants
+        .iter()
+        .map(|tenant| tenant.source_manager.active_roots)
+        .sum::<usize>();
+    let reserved_roots = snapshot
+        .tenants
+        .iter()
+        .map(|tenant| tenant.source_manager.reserved_roots)
+        .sum::<usize>();
+    let source_opens = snapshot
+        .tenants
+        .iter()
+        .map(|tenant| tenant.source_manager.source_opens)
+        .sum::<u64>();
+    let oldest_root_age_millis = snapshot
+        .tenants
+        .iter()
+        .filter_map(|tenant| tenant.source_manager.oldest_root_age_millis)
+        .max();
+    json!({
+        "status": "sampled",
+        "maximum_open_shards": snapshot.maximum_open_shards,
+        "applied_paging_config": {
+            "paged_read_only": snapshot.applied_config.paged_read_only,
+            "paged_writer_enabled": snapshot.applied_config.paged_writer_enabled,
+            "open_tenant_metadata_bytes": snapshot.applied_config.open_tenant_metadata_bytes,
+            "maximum_working_pages": snapshot.applied_config.maximum_working_pages,
+            "page_loader": {
+                "maximum_cache_bytes": snapshot.applied_config.page_loader.maximum_cache_bytes,
+                "minimum_decoded_page_bytes": snapshot.applied_config.page_loader.minimum_decoded_page_bytes,
+                "maximum_load_reconstruction_bytes": snapshot.applied_config.page_loader.maximum_load_reconstruction_bytes,
+                "maximum_concurrent_loads": snapshot.applied_config.page_loader.maximum_concurrent_loads,
+                "maximum_followers": snapshot.applied_config.page_loader.maximum_followers,
+            },
+            "maximum_cached_index_nodes": snapshot.applied_config.maximum_cached_index_nodes,
+            "maximum_open_source_handles": snapshot.applied_config.maximum_open_source_handles,
+            "maximum_roots_per_tenant": snapshot.applied_config.maximum_roots_per_tenant,
+            "source_handle_charge_bytes": snapshot.applied_config.source_handle_charge_bytes,
+            "source_gc_reservation_bytes": snapshot.applied_config.source_gc_reservation_bytes,
+            "checkpoint_capacity_wait_timeout_ms": snapshot.applied_config.checkpoint_capacity_wait_timeout.as_millis(),
+            "maximum_checkpoint_debt_bytes_global": snapshot.applied_config.maximum_checkpoint_debt_bytes_global,
+            "maximum_checkpoint_debt_bytes_per_tenant": snapshot.applied_config.maximum_checkpoint_debt_bytes_per_tenant,
+        },
+        "format_identities": {
+            "version_index": dodb_storage::blink::version_index::VERSION_INDEX_FORMAT_ID,
+            "delta_chain_sidecar": dodb_storage::blink::version_chain::DELTA_CHAIN_FORMAT_ID,
+        },
+        "memory_limits": {
+            "global_bytes": snapshot.memory_limits.global_bytes,
+            "per_tenant_bytes": snapshot.memory_limits.per_tenant_bytes,
+            "progress_pool_bytes": snapshot.memory_limits.progress_pool_bytes,
+            "max_tenants": snapshot.memory_limits.max_tenants,
+            "max_pending_waiters": snapshot.memory_limits.max_pending_waiters,
+            "global_category_bytes": snapshot.memory_limits.global_category_bytes,
+            "per_tenant_category_bytes": snapshot.memory_limits.per_tenant_category_bytes,
+        },
+        "memory": {
+            "current_by_category_bytes": snapshot.memory.current_by_category,
+            "peak_by_category_bytes": snapshot.memory.peak_by_category,
+            "categories": {
+                "decoded_payload": {"current_bytes": memory_current[0], "peak_bytes": memory_peak[0]},
+                "metadata": {"current_bytes": memory_current[1], "peak_bytes": memory_peak[1]},
+                "load_reconstruction": {"current_bytes": memory_current[2], "peak_bytes": memory_peak[2]},
+                "queued_foreground": {"current_bytes": memory_current[3], "peak_bytes": memory_peak[3]},
+                "write_preparation": {"current_bytes": memory_current[4], "peak_bytes": memory_peak[4]},
+                "dirty_images": {"current_bytes": memory_current[5], "peak_bytes": memory_peak[5]},
+                "checkpoint_validation": {"current_bytes": memory_current[6], "peak_bytes": memory_peak[6]},
+            },
+            "current_total_bytes": snapshot.memory.current_total,
+            "peak_total_bytes": snapshot.memory.peak_total,
+            "current_progress_bytes": snapshot.memory.current_progress,
+            "peak_progress_bytes": snapshot.memory.peak_progress,
+            "active_tenants": snapshot.memory.active_tenants,
+            "pending_waiters": snapshot.memory.pending_waiters,
+            "rejected_reservations": snapshot.memory.rejected_reservations,
+        },
+        "disk_limits": {
+            "global_bytes": snapshot.disk_limits.global_bytes,
+            "per_tenant_bytes": snapshot.disk_limits.per_tenant_bytes,
+            "max_tenants": snapshot.disk_limits.max_tenants,
+            "global_category_bytes": snapshot.disk_limits.global_category_bytes,
+            "per_tenant_category_bytes": snapshot.disk_limits.per_tenant_category_bytes,
+        },
+        "disk": {
+            "current_by_category_bytes": snapshot.disk.current_by_category,
+            "peak_by_category_bytes": snapshot.disk.peak_by_category,
+            "categories": {
+                "wal": {"current_bytes": disk_current[0], "peak_bytes": disk_peak[0]},
+                "checkpoint_output": {"current_bytes": disk_current[1], "peak_bytes": disk_peak[1]},
+                "version_index": {"current_bytes": disk_current[2], "peak_bytes": disk_peak[2]},
+                "scratch": {"current_bytes": disk_current[3], "peak_bytes": disk_peak[3]},
+                "retained_source": {"current_bytes": disk_current[4], "peak_bytes": disk_peak[4]},
+            },
+            "current_total_bytes": snapshot.disk.current_total,
+            "peak_total_bytes": snapshot.disk.peak_total,
+            "active_tenants": snapshot.disk.active_tenants,
+            "pending_waiters": snapshot.disk.pending_waiters,
+            "rejected_reservations": snapshot.disk.rejected_reservations,
+        },
+        "disk_bytes": {
+            "reachable_source_bytes": null,
+            "reachable_source_bytes_reason": "the service does not expose a bounded reachability walk in periodic snapshots",
+            "retained_source_bytes": disk_current[4],
+            "temporary_checkpoint_and_scratch_bytes": disk_current[1] + disk_current[3],
+        },
+        "page_loader_totals": {
+            "cache_misses": page_loader.cache_misses,
+            "evictions": page_loader.evictions,
+            "source_reads": page_loader.source_reads,
+            "wal_reconstructions": page_loader.wal_reconstructions,
+            "coalesced_loads": page_loader.coalesced_loads,
+            "chain_entries_inspected": page_loader.chain_entries_inspected,
+            "maximum_chain_entries": page_loader.maximum_chain_entries,
+            "current_cache_bytes": page_loader.current_cache_bytes,
+            "peak_cache_bytes_sum_of_tenant_peaks": page_loader.peak_cache_bytes,
+            "active_loads": page_loader.active_loads,
+            "active_followers": page_loader.active_followers,
+        },
+        "source_manager_totals": {
+            "source_opens": source_opens,
+            "active_source_handles": active_source_handles,
+            "active_roots": active_roots,
+            "reserved_roots": reserved_roots,
+            "oldest_root_age_millis": oldest_root_age_millis,
+            "paged_route_enabled": true,
+            "loaded_paged_tenant_count": snapshot.tenants.len(),
+        },
+        "per_tenant": snapshot.tenants.iter().map(|tenant| json!({
+            "tenant_id": tenant.tenant_id,
+            "page_loader": tenant.page_loader,
+            "source_manager": tenant.source_manager,
+        })).collect::<Vec<_>>(),
+        "allocator_retained_bytes": null,
+        "allocator_retained_bytes_reason": "allocator and representation-specific retained heap are not exposed",
+    })
+}
+
 fn backend_configuration_json(arguments: &Arguments) -> serde_json::Value {
     match arguments.backend.as_str() {
         "blink" => json!({
@@ -300,6 +549,13 @@ fn backend_configuration_json(arguments: &Arguments) -> serde_json::Value {
                 }),
             },
             "cache_capacity_is_blink_memory_limit": false,
+            "demand_paging_enabled": arguments.blink_demand_paging,
+            "paged_cache_bytes_requested": if arguments.blink_demand_paging { Some(arguments.blink_paged_cache_bytes) } else { None },
+            "paged_memory_global_bytes_requested": if arguments.blink_demand_paging { Some(arguments.blink_memory_limit_bytes) } else { None },
+            "paged_memory_per_tenant_bytes_requested": if arguments.blink_demand_paging { Some(arguments.blink_memory_per_tenant_bytes) } else { None },
+            "paged_disk_global_bytes_requested": if arguments.blink_demand_paging { Some(arguments.blink_disk_limit_bytes) } else { None },
+            "paged_disk_per_tenant_bytes_requested": if arguments.blink_demand_paging { Some(arguments.blink_disk_per_tenant_bytes) } else { None },
+            "feature_compiled": cfg!(feature = "blink-demand-paging"),
         }),
         "minimal-native" | "minimal-native-shared" => json!({
             "shared_resources": arguments.shared_resources.map(|resources| resources.report()),
@@ -391,6 +647,38 @@ impl BackendService {
             );
         }
         metrics
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    fn blink_paged_resource_snapshot(&self) -> serde_json::Value {
+        match self {
+            Self::Blink(service) => match service.paged_resource_snapshot() {
+                Ok(Some(snapshot)) => paged_resource_snapshot_json(snapshot),
+                Ok(None) => json!({
+                    "status": "resident",
+                    "reason": "paged resources were not requested",
+                }),
+                Err(error) => json!({"status": "error", "reason": error.to_string()}),
+            },
+            _ => json!({
+                "status": "unsupported",
+                "reason": "backend is not B-link",
+            }),
+        }
+    }
+
+    #[cfg(not(feature = "blink-demand-paging"))]
+    fn blink_paged_resource_snapshot(&self) -> serde_json::Value {
+        match self {
+            Self::Blink(_) => json!({
+                "status": "resident",
+                "reason": "worker binary was built without blink-demand-paging",
+            }),
+            _ => json!({
+                "status": "unsupported",
+                "reason": "backend is not B-link",
+            }),
+        }
     }
 }
 
@@ -498,6 +786,8 @@ async fn run(
     let mut health_report = engine_health_disabled_report();
     let mut shared_measurement_start = serde_json::Value::Null;
     let mut shared_measurement_end = serde_json::Value::Null;
+    let mut paged_measurement_start = serde_json::Value::Null;
+    let mut paged_measurement_end = serde_json::Value::Null;
     let mut pressure_samples = pressure_observations::PressureObservations::default();
     let mut pressure_phase = "before-measurement";
     let mut pressure_interval =
@@ -517,6 +807,7 @@ async fn run(
                         "shared_resources": backend.shared_resource_snapshot(),
                         "rocksdb_properties": backend.engine_health_observer().map(|observer| observer.sample()),
                         "blink_checkpoints": backend.periodic_blink_checkpoint_metrics(),
+                        "blink_paged_resources": backend.blink_paged_resource_snapshot(),
                     });
                     pressure_samples.record(&sample)?;
                 } else { pressure_samples.mark_truncated(); }
@@ -528,6 +819,7 @@ async fn run(
                 trace.emit("command_received_start_measurement");
                 pressure_phase = "measurement-including-drain";
                 shared_measurement_start = backend.shared_resource_snapshot();
+                paged_measurement_start = backend.blink_paged_resource_snapshot();
                 health_sampler = if arguments.engine_health_interval_ms == 0 {
                     None
                 } else {
@@ -547,6 +839,7 @@ async fn run(
                 trace.emit("final_sampler_capture_start");
                 pressure_phase = "after-measurement";
                 shared_measurement_end = backend.shared_resource_snapshot();
+                paged_measurement_end = backend.blink_paged_resource_snapshot();
                 let final_sampler_capture = match health_sampler.take() {
                     Some(sampler) => sampler.finish(),
                     None if arguments.engine_health_interval_ms == 0 => {
@@ -592,6 +885,7 @@ async fn run(
         |observer| observer.sample(),
     );
     let shared_before_shutdown = backend.shared_resource_snapshot();
+    let paged_resources_before_shutdown = backend.blink_paged_resource_snapshot();
     trace.emit("final_property_capture_end");
     trace.emit("async_server_shutdown_start");
     let shutdown = tokio::time::timeout(Duration::from_secs(15), async {
@@ -640,6 +934,7 @@ async fn run(
         &arguments.health_path,
         json!({
             "backend": arguments.backend.clone(),
+            "worker_phase": arguments.worker_phase,
             "blink_configuration": if arguments.backend == "blink" {
                 backend_configuration_json(&arguments)
             } else {
@@ -648,6 +943,8 @@ async fn run(
             "shared_resource_snapshots": {
                 "measurement_start": shared_measurement_start,
                 "measurement_end": shared_measurement_end,
+                "paged_measurement_start": paged_measurement_start,
+                "paged_measurement_end": paged_measurement_end,
                 "before_shutdown": shared_before_shutdown,
                 "scope": "control-command boundaries; end includes drain; not continuous or peak instrumentation",
             },
@@ -665,6 +962,7 @@ async fn run(
                 "unsupported": ["allocator retained heap", "generation pin ages", "request and checkpoint queue representation bytes"],
             },
             "blink_checkpoint_metrics": blink_checkpoint_metrics,
+            "blink_paged_resources_before_shutdown": paged_resources_before_shutdown,
             "blink_checkpoint_metrics_scope": "worker_lifetime_including setup/preflight, offered load, measurement drain, and shutdown; measurement start/stop controls the RocksDB sampler only and does not reset or snapshot B-link checkpoint counters at offer boundaries",
             "retained_heap_bytes": {
                 "value": null,
@@ -741,6 +1039,8 @@ fn parse_arguments() -> WorkerResult<Arguments> {
     let worker_binary_sha256 = argument_value(&values, "--memory-worker-binary-sha256")?;
     let parent_binary_sha256 = argument_value(&values, "--memory-parent-binary-sha256")?;
     let parent_pid = argument_value(&values, "--memory-parent-pid")?.parse()?;
+    let worker_phase =
+        option_value(&values, "--memory-worker-phase").unwrap_or_else(|| "unspecified".to_owned());
     let response_budget = argument_value(&values, "--memory-response-budget")?.parse()?;
     let max_mutations = argument_value(&values, "--memory-max-mutations")?.parse()?;
     let max_concurrent_requests =
@@ -779,8 +1079,49 @@ fn parse_arguments() -> WorkerResult<Arguments> {
     let blink_cache_pages = option_value(&values, "--memory-blink-cache-pages")
         .map(|value| value.parse())
         .transpose()?;
+    let blink_demand_paging = match option_value(&values, "--memory-blink-demand-paging").as_deref()
+    {
+        None | Some("off") => false,
+        Some("on") => true,
+        Some(value) => return Err(format!("unsupported B-link demand paging mode {value}").into()),
+    };
+    let blink_paged_cache_bytes = option_value(&values, "--memory-blink-paged-cache-bytes")
+        .map(|value| value.parse())
+        .transpose()?
+        .unwrap_or(2 * 1024 * 1024);
+    let blink_memory_limit_bytes = option_value(&values, "--memory-blink-memory-limit-bytes")
+        .map(|value| value.parse())
+        .transpose()?
+        .unwrap_or(512 * 1024 * 1024);
+    let blink_memory_per_tenant_bytes =
+        option_value(&values, "--memory-blink-memory-per-tenant-bytes")
+            .map(|value| value.parse())
+            .transpose()?
+            .unwrap_or(64 * 1024 * 1024);
+    let blink_disk_limit_bytes = option_value(&values, "--memory-blink-disk-limit-bytes")
+        .map(|value| value.parse())
+        .transpose()?
+        .unwrap_or(4 * 1024 * 1024 * 1024);
+    let blink_disk_per_tenant_bytes = option_value(&values, "--memory-blink-disk-per-tenant-bytes")
+        .map(|value| value.parse())
+        .transpose()?
+        .unwrap_or(512 * 1024 * 1024);
     if blink_max_open_shards == 0 {
         return Err("B-link maximum open shards must be nonzero".into());
+    }
+    if blink_demand_paging && !cfg!(feature = "blink-demand-paging") {
+        return Err("worker binary was not built with blink-demand-paging".into());
+    }
+    if blink_demand_paging
+        && (blink_memory_limit_bytes < 32 * 1024 * 1024
+            || blink_memory_per_tenant_bytes < 32 * 1024 * 1024
+            || blink_memory_per_tenant_bytes > blink_memory_limit_bytes
+            || blink_disk_limit_bytes < 32 * 1024 * 1024
+            || blink_disk_per_tenant_bytes < 32 * 1024 * 1024
+            || blink_disk_per_tenant_bytes > blink_disk_limit_bytes
+            || blink_paged_cache_bytes < dodb_storage::PAGE_SIZE as u64)
+    {
+        return Err("B-link paging resource limits are invalid".into());
     }
     let blink_checkpoint_policy =
         match option_value(&values, "--blink-checkpoint-wal-bytes").as_deref() {
@@ -801,6 +1142,18 @@ fn parse_arguments() -> WorkerResult<Arguments> {
     )?;
     if backend != "blink" && option_value(&values, "--blink-checkpoint-wal-bytes").is_some() {
         return Err("B-link checkpoint policy requires the blink backend".into());
+    }
+    if blink_demand_paging
+        && (backend != "blink"
+            || !matches!(
+                blink_checkpoint.configuration()["layout"].as_str(),
+                Some("segmented-bases" | "segmented-bases-coalesced")
+            ))
+    {
+        return Err(
+            "B-link demand paging requires the blink backend and a segmented durable-base layout"
+                .into(),
+        );
     }
     if tenant_count == 0 {
         return Err("memory tenant count must be nonzero".into());
@@ -843,6 +1196,7 @@ fn parse_arguments() -> WorkerResult<Arguments> {
         worker_binary_sha256,
         parent_binary_sha256,
         parent_pid,
+        worker_phase,
         response_budget,
         max_mutations,
         max_concurrent_requests,
@@ -857,6 +1211,12 @@ fn parse_arguments() -> WorkerResult<Arguments> {
         blink_cache_pages,
         blink_checkpoint_policy,
         blink_checkpoint,
+        blink_demand_paging,
+        blink_paged_cache_bytes,
+        blink_memory_limit_bytes,
+        blink_memory_per_tenant_bytes,
+        blink_disk_limit_bytes,
+        blink_disk_per_tenant_bytes,
     })
 }
 

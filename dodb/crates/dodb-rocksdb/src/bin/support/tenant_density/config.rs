@@ -120,6 +120,12 @@ pub struct Options {
     pub width: Width,
     pub checkpoint_policy: BlinkCheckpointPolicy,
     pub blink_checkpoint: crate::blink_checkpoint::Options,
+    pub blink_demand_paging: bool,
+    pub blink_paged_cache_bytes: u64,
+    pub blink_memory_limit_bytes: u64,
+    pub blink_memory_per_tenant_bytes: u64,
+    pub blink_disk_limit_bytes: u64,
+    pub blink_disk_per_tenant_bytes: u64,
 }
 
 impl Options {
@@ -163,6 +169,12 @@ impl Options {
             "--blink-checkpoint-execution",
             "--blink-wal-segment-bytes",
             "--blink-checkpoint-wal-bytes",
+            "--blink-demand-paging",
+            "--blink-paged-cache-bytes",
+            "--blink-memory-limit-bytes",
+            "--blink-memory-per-tenant-bytes",
+            "--blink-disk-limit-bytes",
+            "--blink-disk-per-tenant-bytes",
             "--backend-cgroup-root",
             "--backend-memory-max-bytes",
             "--backend-memory-high-bytes",
@@ -282,6 +294,65 @@ impl Options {
         if checkpoint_option_seen && backend != Backend::Blink {
             return Err("--blink-checkpoint-wal-bytes requires --backend blink".to_owned());
         }
+        let blink_demand_paging = match values.get("--blink-demand-paging").copied() {
+            None | Some("off") => false,
+            Some("on") => true,
+            Some(value) => return Err(format!("unsupported B-link demand paging mode {value}")),
+        };
+        if blink_demand_paging && backend != Backend::Blink {
+            return Err("--blink-demand-paging requires --backend blink".to_owned());
+        }
+        if blink_demand_paging && !cfg!(feature = "blink-demand-paging") {
+            return Err("workload binary was not built with blink-demand-paging".to_owned());
+        }
+        if blink_demand_paging
+            && !matches!(
+                blink_checkpoint.configuration()["layout"].as_str(),
+                Some("segmented-bases" | "segmented-bases-coalesced")
+            )
+        {
+            return Err("B-link demand paging requires a segmented durable-base layout".to_owned());
+        }
+        let blink_paged_cache_bytes =
+            parse_optional_number(&values, "--blink-paged-cache-bytes")?.unwrap_or(2 * 1024 * 1024);
+        let blink_memory_limit_bytes =
+            parse_optional_number(&values, "--blink-memory-limit-bytes")?
+                .unwrap_or(512 * 1024 * 1024);
+        let blink_memory_per_tenant_bytes =
+            parse_optional_number(&values, "--blink-memory-per-tenant-bytes")?
+                .unwrap_or(64 * 1024 * 1024);
+        let blink_disk_limit_bytes = parse_optional_number(&values, "--blink-disk-limit-bytes")?
+            .unwrap_or(4 * 1024 * 1024 * 1024);
+        let blink_disk_per_tenant_bytes =
+            parse_optional_number(&values, "--blink-disk-per-tenant-bytes")?
+                .unwrap_or(512 * 1024 * 1024);
+        let paging_limit_options = [
+            "--blink-paged-cache-bytes",
+            "--blink-memory-limit-bytes",
+            "--blink-memory-per-tenant-bytes",
+            "--blink-disk-limit-bytes",
+            "--blink-disk-per-tenant-bytes",
+        ];
+        if !blink_demand_paging
+            && paging_limit_options
+                .iter()
+                .any(|name| values.contains_key(name))
+        {
+            return Err("B-link paging limits require --blink-demand-paging on".to_owned());
+        }
+        if blink_demand_paging
+            && (blink_paged_cache_bytes < dodb_storage::PAGE_SIZE as u64
+                || blink_memory_per_tenant_bytes > blink_memory_limit_bytes
+                || blink_memory_limit_bytes < 32 * 1024 * 1024
+                || blink_memory_per_tenant_bytes < 32 * 1024 * 1024
+                || blink_disk_per_tenant_bytes > blink_disk_limit_bytes
+                || blink_memory_limit_bytes < 2 * dodb_storage::PAGE_SIZE as u64
+                || blink_memory_per_tenant_bytes < dodb_storage::PAGE_SIZE as u64
+                || blink_disk_limit_bytes == 0
+                || blink_disk_per_tenant_bytes == 0)
+        {
+            return Err("B-link demand paging limits are inconsistent or too small".to_owned());
+        }
         let options = Self {
             backend,
             shared_resources,
@@ -308,6 +379,12 @@ impl Options {
             width,
             checkpoint_policy,
             blink_checkpoint,
+            blink_demand_paging,
+            blink_paged_cache_bytes,
+            blink_memory_limit_bytes,
+            blink_memory_per_tenant_bytes,
+            blink_disk_limit_bytes,
+            blink_disk_per_tenant_bytes,
         };
         options.validate()?;
         Ok(options)
@@ -575,6 +652,32 @@ mod tests {
         assert_eq!(options.backend, Backend::MinimalNativeShared);
         assert_eq!(options.shared_resources, Some(config));
         argument_values[backend_position + 1] = "minimal-native".to_owned();
+        assert!(Options::parse(&argument_values).is_err());
+    }
+
+    #[test]
+    fn demand_paging_requires_candidate_feature_and_durable_bases() {
+        let (_directory, mut argument_values) = arguments(&[
+            "--blink-demand-paging",
+            "on",
+            "--blink-wal-layout",
+            "segmented-bases",
+        ]);
+        let parsed = Options::parse(&argument_values);
+        if cfg!(feature = "blink-demand-paging") {
+            let options = parsed.unwrap();
+            assert!(options.blink_demand_paging);
+            assert_eq!(options.blink_paged_cache_bytes, 2 * 1024 * 1024);
+            assert_eq!(options.blink_memory_limit_bytes, 512 * 1024 * 1024);
+            assert_eq!(options.blink_disk_limit_bytes, 4 * 1024 * 1024 * 1024);
+        } else {
+            assert!(parsed.is_err());
+        }
+        argument_values[argument_values
+            .iter()
+            .position(|argument| argument == "--blink-wal-layout")
+            .unwrap()
+            + 1] = "legacy".to_owned();
         assert!(Options::parse(&argument_values).is_err());
     }
 

@@ -14,6 +14,7 @@ use super::resource::{
 use super::version_chain::{DeltaChainRef, DeltaChainStore};
 
 pub const VERSION_INDEX_NODE_BYTES: usize = 4096;
+pub const VERSION_INDEX_FORMAT_ID: &str = "DDBVIDX1/v2";
 const NODE_HEADER_BYTES: usize = 112;
 const NODE_CHECKSUM_OFFSET: usize = VERSION_INDEX_NODE_BYTES - 32;
 const NODE_PAYLOAD_BYTES: usize = NODE_CHECKSUM_OFFSET - NODE_HEADER_BYTES;

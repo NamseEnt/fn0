@@ -10,6 +10,7 @@ use super::version_index::{SourceFileKind, SourceIdentity, StoreIdentity, WalFra
 
 const CHAIN_MAGIC: [u8; 8] = *b"DDBVCHN1";
 const CHAIN_FORMAT_VERSION: u16 = 1;
+pub const DELTA_CHAIN_FORMAT_ID: &str = "DDBVCHN1/v1";
 const CHAIN_HEADER_BYTES: usize = 128;
 const CHAIN_ENTRY_BYTES: usize = 136;
 const CHAIN_CHECKSUM_BYTES: usize = 32;

@@ -108,6 +108,9 @@ pub struct PageLoaderMetrics {
     pub evictions: u64,
     pub source_reads: u64,
     pub wal_reconstructions: u64,
+    pub coalesced_loads: u64,
+    pub chain_entries_inspected: u64,
+    pub maximum_chain_entries: u64,
     pub current_cache_bytes: u64,
     pub peak_cache_bytes: u64,
     pub active_loads: usize,
@@ -219,6 +222,9 @@ pub struct PageLoader<K, V> {
     evictions: AtomicU64,
     source_reads: AtomicU64,
     wal_reconstructions: AtomicU64,
+    coalesced_loads: AtomicU64,
+    chain_entries_inspected: AtomicU64,
+    maximum_chain_entries: AtomicU64,
 }
 
 impl<K, V> PageLoader<K, V>
@@ -251,6 +257,9 @@ where
             evictions: AtomicU64::new(0),
             source_reads: AtomicU64::new(0),
             wal_reconstructions: AtomicU64::new(0),
+            coalesced_loads: AtomicU64::new(0),
+            chain_entries_inspected: AtomicU64::new(0),
+            maximum_chain_entries: AtomicU64::new(0),
         })
     }
 
@@ -291,6 +300,7 @@ where
                 }
                 state.active_followers += 1;
                 ticket.followers.fetch_add(1, Ordering::AcqRel);
+                self.coalesced_loads.fetch_add(1, Ordering::Relaxed);
                 (ticket, false)
             } else {
                 if state.active_loads == self.config.maximum_concurrent_loads {
@@ -418,6 +428,9 @@ where
             evictions: self.evictions.load(Ordering::Relaxed),
             source_reads: self.source_reads.load(Ordering::Relaxed),
             wal_reconstructions: self.wal_reconstructions.load(Ordering::Relaxed),
+            coalesced_loads: self.coalesced_loads.load(Ordering::Relaxed),
+            chain_entries_inspected: self.chain_entries_inspected.load(Ordering::Relaxed),
+            maximum_chain_entries: self.maximum_chain_entries.load(Ordering::Relaxed),
             current_cache_bytes: state.cache_bytes,
             peak_cache_bytes: state.peak_cache_bytes,
             active_loads: state.active_loads,
@@ -531,6 +544,11 @@ impl PageLoader<PageVersionKey, super::BlinkPage> {
                 "page version chain does not match its index descriptor",
             ));
         }
+        let chain_entries = chain.entries.len() as u64;
+        self.chain_entries_inspected
+            .fetch_add(chain_entries, Ordering::Relaxed);
+        self.maximum_chain_entries
+            .fetch_max(chain_entries, Ordering::Relaxed);
         let uses_wal_source = chain.entries.iter().any(|entry| {
             matches!(
                 entry,
@@ -1019,6 +1037,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(load_count.load(Ordering::SeqCst), 1);
         assert!(pages.iter().all(|page| page.as_ref() == &vec![9; 8]));
+        assert!(loader.metrics().unwrap().coalesced_loads > 0);
     }
 
     #[test]

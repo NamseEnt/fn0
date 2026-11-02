@@ -7,6 +7,9 @@ description = "Experimental RocksDB-backed dodb service"
 repository.workspace = true
 build = "build.rs"
 
+[features]
+blink-demand-paging = ["dodb-server/blink-demand-paging", "dodb-storage/blink-demand-paging"]
+
 [dependencies]
 dodb-core.workspace = true
 dodb-client.workspace = true

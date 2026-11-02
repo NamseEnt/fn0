@@ -149,6 +149,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     cell_is_valid &= oracle["passed"] == true && reopened_oracle["passed"] == true;
 
     let diagnostic = session.finish_sampling();
+    let measurement_health = diagnostic["engine_health_reports"]
+        .as_array()
+        .and_then(|reports| {
+            reports
+                .iter()
+                .find(|report| report["worker_phase"].as_str() == Some("measurement"))
+        });
+    let paged_resource_report = measurement_health
+        .map(|report| &report["blink_paged_resources_before_shutdown"]);
+    let paged_route_verified = if options.blink_demand_paging {
+        paged_resource_report.is_some_and(|resources| {
+            resources["status"].as_str() == Some("sampled")
+                && resources["source_manager_totals"]["paged_route_enabled"] == true
+                && resources["source_manager_totals"]["loaded_paged_tenant_count"].as_u64()
+                    == Some((options.active_tenants + options.opened_idle_tenants) as u64)
+                && resources["applied_paging_config"]["paged_writer_enabled"] == true
+                && resources["applied_paging_config"]["page_loader"]["maximum_cache_bytes"]
+                    .as_u64()
+                    == Some(options.blink_paged_cache_bytes)
+                && resources["format_identities"]["version_index"] == "DDBVIDX1/v2"
+                && resources["format_identities"]["delta_chain_sidecar"] == "DDBVCHN1/v1"
+        })
+    } else {
+        paged_resource_report.is_none_or(|resources| resources["status"].as_str() == Some("resident"))
+    };
+    cell_is_valid &= paged_route_verified;
     let measurement_process_summary = resources::summarize_measurement_processes(
         &diagnostic,
         &offer_process_before,
@@ -160,6 +186,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "compiled_source_revision": compiled_source_revision,
         "effective_configuration": effective_configuration(&options),
         "measurement_worker_epoch": "measurement worker only; opened-idle tenants received Get; registered minus active and opened-idle were never opened in this epoch",
+        "measurement_paged_route_verification": {
+            "requested": options.blink_demand_paging,
+            "verified": paged_route_verified,
+            "measurement_worker_snapshot": paged_resource_report.cloned().unwrap_or(Value::Null),
+        },
         "correctness_preflight_key_scope": {
             "tenant": 1,
             "rows": [options.initial_rows + options.client_count * 16 + 16, options.initial_rows + options.client_count * 16 + 17, options.initial_rows + options.client_count * 16 + 18],
@@ -246,6 +277,8 @@ async fn spawn_worker(
         options.registered_tenants.to_string(),
         "--memory-tenant-count".to_owned(),
         options.registered_tenants.to_string(),
+        "--memory-worker-phase".to_owned(),
+        phase.to_owned(),
     ];
     if let Some(monitor) = pressure_monitor {
         worker_arguments.extend(
@@ -283,6 +316,22 @@ async fn spawn_worker(
             worker_arguments.extend([
                 "--blink-checkpoint-wal-bytes".to_owned(),
                 threshold_bytes.to_string(),
+            ]);
+        }
+        if options.blink_demand_paging {
+            worker_arguments.extend([
+                "--memory-blink-demand-paging".to_owned(),
+                "on".to_owned(),
+                "--memory-blink-paged-cache-bytes".to_owned(),
+                options.blink_paged_cache_bytes.to_string(),
+                "--memory-blink-memory-limit-bytes".to_owned(),
+                options.blink_memory_limit_bytes.to_string(),
+                "--memory-blink-memory-per-tenant-bytes".to_owned(),
+                options.blink_memory_per_tenant_bytes.to_string(),
+                "--memory-blink-disk-limit-bytes".to_owned(),
+                options.blink_disk_limit_bytes.to_string(),
+                "--memory-blink-disk-per-tenant-bytes".to_owned(),
+                options.blink_disk_per_tenant_bytes.to_string(),
             ]);
         }
     }
@@ -773,6 +822,12 @@ fn effective_configuration(options: &Options) -> Value {
         "queue_bound": options.queue_bound, "max_in_flight": options.max_in_flight,
         "per_tenant_rate": options.per_tenant_rate,
         "blink_layout": options.blink_checkpoint.configuration(),
+        "blink_demand_paging_requested": options.blink_demand_paging,
+        "blink_paged_cache_bytes_requested": options.blink_demand_paging.then_some(options.blink_paged_cache_bytes),
+        "blink_memory_limit_bytes_requested": options.blink_demand_paging.then_some(options.blink_memory_limit_bytes),
+        "blink_memory_per_tenant_bytes_requested": options.blink_demand_paging.then_some(options.blink_memory_per_tenant_bytes),
+        "blink_disk_limit_bytes_requested": options.blink_demand_paging.then_some(options.blink_disk_limit_bytes),
+        "blink_disk_per_tenant_bytes_requested": options.blink_demand_paging.then_some(options.blink_disk_per_tenant_bytes),
         "checkpoint_policy": format!("{:?}", options.checkpoint_policy),
         "minimal_native_revisions": "reserved-ranges", "minimal_native_condition_locks": "exclusive"
     })
@@ -810,6 +865,12 @@ mod tests {
             width: Width::Mixed,
             checkpoint_policy: dodb_server::BlinkCheckpointPolicy::Disabled,
             blink_checkpoint: crate::blink_checkpoint::Options::default(),
+            blink_demand_paging: false,
+            blink_paged_cache_bytes: 2 * 1024 * 1024,
+            blink_memory_limit_bytes: 512 * 1024 * 1024,
+            blink_memory_per_tenant_bytes: 64 * 1024 * 1024,
+            blink_disk_limit_bytes: 4 * 1024 * 1024 * 1024,
+            blink_disk_per_tenant_bytes: 512 * 1024 * 1024,
         }
     }
 

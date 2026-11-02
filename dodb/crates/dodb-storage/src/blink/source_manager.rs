@@ -27,6 +27,7 @@ struct RootEntry {
     root: VersionIndexRoot,
     _pin: VersionIndexRootPin,
     _reservation: Reservation,
+    registered_at: std::time::Instant,
 }
 
 #[derive(Default)]
@@ -57,12 +58,22 @@ struct SourceManagerInner {
     checkpoint_disk_key: String,
     wal_disk_key: String,
     root_release_generation: watch::Sender<u64>,
+    source_opens: AtomicU64,
     state: Mutex<SourceState>,
 }
 
 #[derive(Clone)]
 pub struct SourceManager {
     inner: Arc<SourceManagerInner>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct SourceManagerMetrics {
+    pub source_opens: u64,
+    pub active_source_handles: usize,
+    pub active_roots: usize,
+    pub reserved_roots: usize,
+    pub oldest_root_age_millis: Option<u64>,
 }
 
 pub struct SourceManagerConfig {
@@ -227,6 +238,7 @@ impl SourceManager {
                 checkpoint_disk_key,
                 wal_disk_key,
                 root_release_generation,
+                source_opens: AtomicU64::new(0),
                 state: Mutex::new(SourceState {
                     roots: HashMap::new(),
                     active_handles: HashMap::new(),
@@ -510,6 +522,7 @@ impl SourceManager {
                 root,
                 _pin: pin,
                 _reservation: root_reservation,
+                registered_at: std::time::Instant::now(),
             },
         );
         reservation.slot_reserved = false;
@@ -919,11 +932,37 @@ impl SourceManager {
                 return Err(error);
             }
         };
+        self.inner.source_opens.fetch_add(1, Ordering::Relaxed);
         Ok(SourceLease {
             manager: self.clone(),
             identity,
             file,
             _reservation: reservation,
+        })
+    }
+
+    pub fn metrics(&self) -> Result<SourceManagerMetrics> {
+        let state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| Error::invariant("paged source manager lock poisoned"))?;
+        let now = std::time::Instant::now();
+        let oldest_root_age_millis = state
+            .roots
+            .values()
+            .map(|root| {
+                now.duration_since(root.registered_at)
+                    .as_millis()
+                    .min(u64::MAX as u128) as u64
+            })
+            .max();
+        Ok(SourceManagerMetrics {
+            source_opens: self.inner.source_opens.load(Ordering::Relaxed),
+            active_source_handles: state.active_handles.values().sum(),
+            active_roots: state.roots.len(),
+            reserved_roots: state.reserved_roots,
+            oldest_root_age_millis,
         })
     }
 
@@ -2010,6 +2049,11 @@ mod tests {
             .unwrap();
         assert!(old_image.iter().all(|byte| *byte == 71));
         drop(reopened_old_source);
+        let source_metrics = manager.metrics().unwrap();
+        assert_eq!(source_metrics.source_opens, 2);
+        assert_eq!(source_metrics.active_source_handles, 0);
+        assert_eq!(source_metrics.active_roots, 1);
+        assert!(source_metrics.oldest_root_age_millis.is_some());
 
         let (new_source, _) = write_checkpoint_page(&manager, 2, 12, 72);
         let new_root = insert_checkpoint_page(&index, old_root, new_source, 8192, 2, 8);

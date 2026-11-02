@@ -1526,6 +1526,12 @@ mod tests {
             width: Width::Mixed,
             checkpoint_policy: dodb_server::BlinkCheckpointPolicy::Disabled,
             blink_checkpoint: crate::blink_checkpoint::Options::default(),
+            blink_demand_paging: false,
+            blink_paged_cache_bytes: 2 * 1024 * 1024,
+            blink_memory_limit_bytes: 512 * 1024 * 1024,
+            blink_memory_per_tenant_bytes: 64 * 1024 * 1024,
+            blink_disk_limit_bytes: 4 * 1024 * 1024 * 1024,
+            blink_disk_per_tenant_bytes: 512 * 1024 * 1024,
         }
     }
 

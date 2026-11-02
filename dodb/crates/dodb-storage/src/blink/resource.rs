@@ -281,9 +281,17 @@ impl BlinkResourceManager {
     pub fn disk(&self) -> BlinkDiskResourceManager {
         self.disk.clone()
     }
+
+    pub fn limits(&self) -> ResourceLimits {
+        self.inner.limits
+    }
 }
 
 impl BlinkDiskResourceManager {
+    pub fn limits(&self) -> DiskResourceLimits {
+        self.inner.limits
+    }
+
     pub async fn reserve_wait_for_root_release(
         &self,
         tenant_id: u64,

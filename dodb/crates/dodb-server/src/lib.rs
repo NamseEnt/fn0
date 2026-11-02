@@ -968,6 +968,26 @@ pub struct BlinkSharedResourceConfig {
 }
 
 #[cfg(feature = "blink-demand-paging")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BlinkPagedTenantMetrics {
+    pub tenant_id: u64,
+    pub page_loader: dodb_storage::blink::page_cache::PageLoaderMetrics,
+    pub source_manager: dodb_storage::blink::source_manager::SourceManagerMetrics,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BlinkPagedResourceSnapshot {
+    pub maximum_open_shards: usize,
+    pub applied_config: BlinkSharedResourceConfig,
+    pub memory_limits: dodb_storage::blink::resource::ResourceLimits,
+    pub memory: dodb_storage::blink::resource::ResourceSnapshot,
+    pub disk_limits: dodb_storage::blink::resource::DiskResourceLimits,
+    pub disk: dodb_storage::blink::resource::DiskResourceSnapshot,
+    pub tenants: Vec<BlinkPagedTenantMetrics>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
 fn valid_paged_open_config(config: BlinkSharedResourceConfig) -> bool {
     let Some(metadata_bytes) = u64::try_from(config.maximum_cached_index_nodes)
         .ok()
@@ -2425,6 +2445,36 @@ impl PagedWritableShard {
 }
 
 impl BlinkShardReadHandle {
+    #[cfg(feature = "blink-demand-paging")]
+    fn paged_metrics(
+        &self,
+    ) -> Result<
+        Option<(
+            dodb_storage::blink::page_cache::PageLoaderMetrics,
+            dodb_storage::blink::source_manager::SourceManagerMetrics,
+        )>,
+        Error,
+    > {
+        let Self::Paged {
+            handle, writable, ..
+        } = self
+        else {
+            return Ok(None);
+        };
+        let snapshot = match writable {
+            Some(writable) => Some(writable.snapshot()?),
+            None => handle.as_ref().map(Arc::clone),
+        };
+        snapshot
+            .map(|snapshot| {
+                Ok((
+                    snapshot.page_loader_metrics()?,
+                    snapshot.source_manager_metrics()?,
+                ))
+            })
+            .transpose()
+    }
+
     async fn get_with_response_budget(
         &self,
         key: &dodb_core::DocumentKey,
@@ -2792,6 +2842,46 @@ impl BlinkTenantService {
             .lock()
             .map(|metrics| metrics.snapshot_at(current_unix_nanos()))
             .unwrap_or_default()
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    pub fn paged_resource_snapshot(&self) -> Result<Option<BlinkPagedResourceSnapshot>, Error> {
+        let Some(resources) = &self.shared_resources else {
+            return Ok(None);
+        };
+        let Some(applied_config) = self.paged_open_config else {
+            return Ok(None);
+        };
+        let mut tenants = Vec::new();
+        let registry = self
+            .shards
+            .lock()
+            .map_err(|_| Error::invariant("B-link shard registry lock poisoned"))?;
+        for (tenant, shard) in &registry.shards {
+            if let Some((page_loader, source_manager)) = shard.read_handle.paged_metrics()? {
+                tenants.push(BlinkPagedTenantMetrics {
+                    tenant_id: tenant.get(),
+                    page_loader,
+                    source_manager,
+                });
+            }
+        }
+        let memory = resources.snapshot().map_err(|error| {
+            Error::invariant(format!("B-link resource snapshot failed: {error:?}"))
+        })?;
+        let disk_manager = resources.disk();
+        let disk = disk_manager
+            .snapshot()
+            .map_err(|error| Error::invariant(format!("B-link disk snapshot failed: {error:?}")))?;
+        Ok(Some(BlinkPagedResourceSnapshot {
+            maximum_open_shards: self.max_open_shards,
+            applied_config,
+            memory_limits: resources.limits(),
+            memory,
+            disk_limits: disk_manager.limits(),
+            disk,
+            tenants,
+        }))
     }
 
     pub fn checkpoint_metrics_handle(&self) -> BlinkWalCheckpointMetricsHandle {
