@@ -3322,6 +3322,12 @@ impl BlinkTenantService {
                     }
                     #[cfg(feature = "blink-demand-paging")]
                     OpenedBlinkStore::PagedWritable(opened) => {
+                        #[cfg(test)]
+                        let page_read_test_gate = self
+                            .page_read_test_gate
+                            .lock()
+                            .ok()
+                            .and_then(|current| current.clone());
                         #[cfg(all(test, feature = "blink-demand-paging"))]
                         let commit_test_gate = self
                             .commit_test_gate
@@ -3375,7 +3381,7 @@ impl BlinkTenantService {
                                 activity: Arc::clone(&self.coordinator_activity),
                                 blocking_workers: Arc::clone(&self.open_workers),
                                 #[cfg(test)]
-                                read_test_gate: None,
+                                read_test_gate: page_read_test_gate,
                                 tenant_id: tenant.get(),
                                 foreground_resources: self.shared_resources.clone(),
                                 metadata_reservation,
@@ -5475,6 +5481,17 @@ mod tests {
     }
 
     #[cfg(feature = "blink-demand-paging")]
+    fn paged_crash_source_read_count(service: &BlinkTenantService, tenant: TenantId) -> u64 {
+        paged_crash_writable_shard(service, tenant)
+            .writer
+            .lock()
+            .unwrap()
+            .snapshot()
+            .unwrap()
+            .source_read_count()
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
     async fn run_paged_crash_child(
         data_dir: std::path::PathBuf,
         marker_directory: &std::path::Path,
@@ -5827,16 +5844,26 @@ mod tests {
                         secondary_revision,
                     )
                     .await;
-                    assert_paged_crash_value_only(
-                        &recovered,
-                        tenant,
-                        DocumentKey::new(
-                            b"paged-crash-dataset".to_vec(),
-                            15u32.to_be_bytes().to_vec(),
-                        ),
-                        &[15; 4_096],
-                    )
-                    .await;
+                    let source_reads_before_dataset =
+                        paged_crash_source_read_count(&recovered, tenant);
+                    for key_number in 0..16u32 {
+                        assert_paged_crash_value_only(
+                            &recovered,
+                            tenant,
+                            DocumentKey::new(
+                                b"paged-crash-dataset".to_vec(),
+                                key_number.to_be_bytes().to_vec(),
+                            ),
+                            &vec![key_number as u8; 4_096],
+                        )
+                        .await;
+                    }
+                    let source_reads_after_dataset =
+                        paged_crash_source_read_count(&recovered, tenant);
+                    assert!(
+                        source_reads_after_dataset > source_reads_before_dataset,
+                        "recovered service dataset reads did not load any durable page sources"
+                    );
                     let response = recovered
                         .execute_request(
                             tenant,
@@ -6775,6 +6802,146 @@ mod tests {
         let manager = service.shared_resources.as_ref().unwrap();
         service.shutdown_checked().await.unwrap();
         assert_eq!(manager.snapshot().unwrap().current_total, 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_service_query_keeps_one_snapshot_across_concurrent_multi_key_commit() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(713);
+        let service = Arc::new(
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                max_open_shards: 1,
+                blink_open_waiter_limit: 4,
+                blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                    max_segment_bytes: 1_048_576,
+                    coalesce: true,
+                },
+                blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                    threshold_bytes: u64::MAX,
+                },
+                blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+                blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap(),
+        );
+        let database_path = service.database_path(tenant);
+        create_empty_paged_service_fixture(&database_path, tenant);
+        let page_read_gate = Arc::new(OneShotTestGate {
+            barrier: std::sync::Barrier::new(2),
+            blocks_next_worker: std::sync::atomic::AtomicBool::new(true),
+        });
+        service.set_page_read_test_gate(Arc::clone(&page_read_gate));
+        let first_key = dodb_core::DocumentKey::new(b"pk".to_vec(), b"a".to_vec());
+        let second_key = dodb_core::DocumentKey::new(b"pk".to_vec(), b"b".to_vec());
+        for (key, value) in [
+            (first_key.clone(), b"old-a".to_vec()),
+            (second_key.clone(), b"old-b".to_vec()),
+        ] {
+            service
+                .execute_request(
+                    tenant,
+                    Request::Put { key, value },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .unwrap();
+        }
+
+        let query_service = Arc::clone(&service);
+        let query_task = tokio::spawn(async move {
+            query_service
+                .execute_request(
+                    tenant,
+                    Request::Query {
+                        pk: dodb_core::PrimaryKey::new(b"pk".to_vec()),
+                        exclusive_after_sk: None,
+                        limit: 8,
+                    },
+                    ExecutionBudget::new(4096),
+                )
+                .await
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if !page_read_gate.blocks_next_worker.load(Ordering::SeqCst) {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+
+        let write_result = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            service.execute_request(
+                tenant,
+                Request::Transact {
+                    request: TransactionRequest::new(
+                        vec![
+                            TransactionCondition::Exists {
+                                key: first_key.clone(),
+                            },
+                            TransactionCondition::Exists {
+                                key: second_key.clone(),
+                            },
+                        ],
+                        vec![
+                            TransactionMutation::Put {
+                                key: first_key.clone(),
+                                value: b"new-a".to_vec(),
+                            },
+                            TransactionMutation::Put {
+                                key: second_key.clone(),
+                                value: b"new-b".to_vec(),
+                            },
+                        ],
+                    ),
+                },
+                ExecutionBudget::new(4096),
+            ),
+        )
+        .await
+        .expect("concurrent transaction did not complete while Query held its old snapshot")
+        .unwrap();
+        assert!(matches!(write_result, Response::Transact(_)));
+
+        page_read_gate.barrier.wait();
+        let old_query = query_task.await.unwrap().unwrap();
+        let Response::Query(old_rows) = old_query else {
+            panic!("expected a query response")
+        };
+        assert_eq!(old_rows.len(), 2);
+        assert_eq!(old_rows[0].key, first_key);
+        assert_eq!(old_rows[0].value, b"old-a");
+        assert_eq!(old_rows[1].key, second_key);
+        assert_eq!(old_rows[1].value, b"old-b");
+
+        let new_query = service
+            .execute_request(
+                tenant,
+                Request::Query {
+                    pk: dodb_core::PrimaryKey::new(b"pk".to_vec()),
+                    exclusive_after_sk: None,
+                    limit: 8,
+                },
+                ExecutionBudget::new(4096),
+            )
+            .await
+            .unwrap();
+        let Response::Query(new_rows) = new_query else {
+            panic!("expected a query response")
+        };
+        assert_eq!(new_rows.len(), 2);
+        assert_eq!(new_rows[0].key, first_key);
+        assert_eq!(new_rows[0].value, b"new-a");
+        assert_eq!(new_rows[1].key, second_key);
+        assert_eq!(new_rows[1].value, b"new-b");
+        assert_eq!(new_rows[0].revision, new_rows[1].revision);
+        service.shutdown_checked().await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
