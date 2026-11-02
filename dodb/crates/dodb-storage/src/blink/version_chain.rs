@@ -572,7 +572,7 @@ impl DeltaChainStore {
     }
 
     #[cfg(test)]
-    fn write_with_stage<F>(
+    pub(crate) fn write_with_stage<F>(
         &self,
         generation: u64,
         chain: &DeltaChain,

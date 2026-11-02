@@ -694,9 +694,10 @@ mod tests {
     };
     use crate::blink::BlinkStore;
     use crate::blink::resource::{BlinkResourceManager, ResourceLimits};
+    use crate::blink::version_chain::{DeltaChain, DeltaChainEntry};
     use crate::blink::version_index::{
         NodeRef, SourceFileKind, SourceIdentity, StoreIdentity, VersionDescriptor, VersionIndex,
-        VersionLocator, VersionToken,
+        VersionLocator, VersionToken, WalFrameLocator,
     };
     use crate::btree::DatabaseConfig;
     use crate::durable_file::ProductionFile;
@@ -1150,6 +1151,188 @@ mod tests {
                 .filter(|entry| entry.file_name().to_string_lossy().ends_with(".node"))
                 .count()
                 > 1
+        );
+    }
+
+    #[test]
+    fn synced_delta_chain_before_index_publication_survives_sigkill_as_orphan() {
+        const CHILD_DIRECTORY: &str = "DODB_CHAIN_BEFORE_INDEX_SIGKILL_DIRECTORY";
+        const CHILD_READY: &str = "DODB_CHAIN_BEFORE_INDEX_SIGKILL_READY";
+        let identity = StoreIdentity {
+            database_uuid: [0x35; 16],
+            wal_epoch: 21,
+        };
+        if let Ok(directory_path) = std::env::var(CHILD_DIRECTORY) {
+            let directory = TestDirectory(PathBuf::from(directory_path));
+            let index = VersionIndex::open(
+                &version_index_directory(&directory.database_path()),
+                identity,
+                resource_manager(),
+                71,
+                4,
+            )
+            .unwrap();
+            let manifest_store =
+                PagedManifestStore::open_with_index(&directory.database_path(), identity, &index)
+                    .unwrap();
+            let initial_root = index
+                .root_from_node_reference(manifest_store.current().durable_index_root)
+                .unwrap();
+            let page_id = PageId::new(2);
+            let mut descriptor = index.lookup(initial_root, page_id).unwrap().unwrap();
+            let (checkpoint_source, checkpoint_offset, checkpoint_source_length) =
+                match descriptor.locator {
+                    VersionLocator::CheckpointImage {
+                        source,
+                        offset,
+                        source_length,
+                        ..
+                    } => (source, offset, source_length),
+                    _ => panic!("initial page is not backed by a checkpoint image"),
+                };
+            let wal_source = SourceIdentity {
+                kind: SourceFileKind::WalSegment,
+                file_number: 1,
+                header_identity: [0x22; 32],
+            };
+            let frame = WalFrameLocator {
+                source: wal_source,
+                frame_offset: 200,
+                frame_length: 100,
+                header_crc32c: 11,
+                payload_offset: 232,
+                payload_length: 50,
+                payload_crc32c: 11,
+                committed_prefix_length: 4096,
+                commit_frame_offset: 300,
+                commit_lsn: Lsn::new(12),
+            };
+            let chain = DeltaChain::new(
+                page_id,
+                vec![
+                    DeltaChainEntry::CheckpointImage {
+                        source: checkpoint_source,
+                        offset: checkpoint_offset,
+                        source_length: checkpoint_source_length,
+                        image_lsn: Lsn::new(10),
+                        image_crc32c: 99,
+                    },
+                    DeltaChainEntry::WalDelta {
+                        frame,
+                        record_lsn: Lsn::new(11),
+                        base_lsn: Lsn::new(10),
+                        base_crc32c: 99,
+                        image_lsn: Lsn::new(12),
+                        image_crc32c: 100,
+                    },
+                ],
+            )
+            .unwrap();
+            let ready_path = PathBuf::from(std::env::var(CHILD_READY).unwrap());
+            let chain_reference = index.delta_chains().write_with_stage(2, &chain, |stage| {
+                if stage == "after_delta_chain_directory_sync" {
+                    fs::write(&ready_path, b"ready")?;
+                    loop {
+                        thread::sleep(Duration::from_secs(1));
+                    }
+                }
+                Ok(())
+            });
+            let chain_reference = chain_reference.unwrap();
+            descriptor.token = VersionToken::Wal {
+                source_file_number: 1,
+                record_lsn: Lsn::new(11),
+            };
+            descriptor.image_lsn = Lsn::new(12);
+            descriptor.image_crc32c = 100;
+            descriptor.locator = VersionLocator::WalDelta {
+                frame,
+                chain: chain_reference,
+                depth: 1,
+            };
+            let staged_root = index.insert(initial_root, page_id, descriptor).unwrap();
+            let _staged_durable_root = index.promote_root_to_durable(staged_root).unwrap();
+            panic!("child published the index after the sidecar crash boundary");
+        }
+
+        let directory = TestDirectory::new("chain-before-index-sigkill");
+        let (index, _, initial_node) = build_index(&directory, identity);
+        let mut initial_manifest = manifest(identity, 1, 0);
+        initial_manifest.durable_index_root = initial_node;
+        PagedManifestStore::create_with_index(&directory.database_path(), initial_manifest, &index)
+            .unwrap();
+        drop(index);
+        let ready_path = directory.0.join("ready");
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "blink::paged_manifest::tests::synced_delta_chain_before_index_publication_survives_sigkill_as_orphan",
+                "--nocapture",
+            ])
+            .env(CHILD_DIRECTORY, &directory.0)
+            .env(CHILD_READY, &ready_path)
+            .spawn()
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !ready_path.exists() && Instant::now() < deadline {
+            if let Some(status) = child.try_wait().unwrap() {
+                panic!("SIGKILL child exited before delta-chain directory sync: {status}");
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
+        assert!(ready_path.exists(), "child did not reach delta-chain sync");
+        assert_eq!(
+            unsafe { libc::kill(child.id() as libc::pid_t, libc::SIGKILL) },
+            0
+        );
+        let status = child.wait().unwrap();
+        use std::os::unix::process::ExitStatusExt;
+        assert_eq!(status.signal(), Some(libc::SIGKILL));
+
+        let index = VersionIndex::open(
+            &version_index_directory(&directory.database_path()),
+            identity,
+            resource_manager(),
+            71,
+            4,
+        )
+        .unwrap();
+        let reopened =
+            PagedManifestStore::open_with_index(&directory.database_path(), identity, &index)
+                .unwrap();
+        assert_eq!(reopened.current().generation, 1);
+        assert_eq!(reopened.current().durable_index_root, initial_node);
+        let selected_root = index
+            .root_from_node_reference(reopened.current().durable_index_root)
+            .unwrap();
+        let selected_descriptor = index
+            .lookup(selected_root, PageId::new(2))
+            .unwrap()
+            .unwrap();
+        assert_eq!(selected_descriptor.image_lsn, Lsn::ZERO);
+        assert!(matches!(
+            selected_descriptor.locator,
+            VersionLocator::CheckpointImage { .. }
+        ));
+        let chain_path = version_index_directory(&directory.database_path())
+            .join("version-chain-00000000000000000001.bin");
+        let chain_bytes = fs::read(&chain_path).unwrap();
+        let checksum = chain_bytes[chain_bytes.len() - 32..].try_into().unwrap();
+        assert_eq!(
+            index
+                .delta_chains()
+                .read(
+                    crate::blink::version_chain::DeltaChainRef {
+                        file_number: 1,
+                        offset: 0,
+                        checksum,
+                    },
+                    PageId::new(2),
+                )
+                .unwrap()
+                .entries
+                .len(),
+            2
         );
     }
 
