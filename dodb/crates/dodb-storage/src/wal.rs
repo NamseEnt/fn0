@@ -376,7 +376,33 @@ struct PendingBatch {
     batch_id: u64,
     first_record_lsn: Lsn,
     records: Vec<PendingRedo>,
+    locations: Vec<WalPageLocation>,
     digest: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WalPageLocation {
+    pub page_id: PageId,
+    pub record_lsn: Lsn,
+    pub batch_id: u64,
+    pub record_index: u32,
+    pub record_type: WalRecordType,
+    pub frame_offset: u64,
+    pub frame_length: u32,
+    pub header_crc32c: u32,
+    pub payload_offset: u64,
+    pub payload_length: u32,
+    pub payload_crc32c: u32,
+    pub commit_lsn: Lsn,
+    pub commit_frame_offset: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WalLocationScan {
+    pub locations: Vec<WalPageLocation>,
+    pub committed_prefix_length: u64,
+    pub last_commit_lsn: Option<Lsn>,
+    pub torn_tail_bytes: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -439,12 +465,15 @@ struct WalScanOutput {
     redo: WalRedoStats,
     report: WalScanReport,
     valid_length: u64,
+    locations: Vec<WalPageLocation>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ScanMaterialization {
     Recovery,
+    #[cfg(test)]
     Batches,
+    Locations,
     ValidateOnly,
 }
 
@@ -661,6 +690,7 @@ impl<F: DurableFile> WalLog<F> {
             redo,
             mut report,
             valid_length,
+            locations: _,
         } = scan_wal(
             &mut file,
             &identity,
@@ -834,6 +864,30 @@ impl<F: DurableFile> WalLog<F> {
 
     pub fn committed_batch_count(&self) -> usize {
         self.scan_report.committed_batches
+    }
+
+    pub fn scan_committed_page_locations(
+        file: &mut F,
+        identity: &WalIdentity,
+        page_image_format: WalPageImageFormat,
+        start_batch_id: Option<u64>,
+        bases: BTreeMap<PageId, RecoveredWalPage>,
+    ) -> Result<WalLocationScan> {
+        let file_length = file.len()?;
+        let scan = scan_wal(
+            file,
+            identity,
+            page_image_format,
+            ScanMaterialization::Locations,
+            start_batch_id,
+            bases,
+        )?;
+        Ok(WalLocationScan {
+            locations: scan.locations,
+            committed_prefix_length: scan.valid_length,
+            last_commit_lsn: scan.last_commit_lsn,
+            torn_tail_bytes: file_length.saturating_sub(scan.valid_length),
+        })
     }
 
     #[cfg(test)]
@@ -3293,10 +3347,17 @@ fn scan_wal<F: DurableFile>(
     let mut last_commit_lsn = None;
     let mut last_commit_batch_id = None;
     let mut committed_length = 0;
+    let mut locations = Vec::new();
     let blink = page_image_format == WalPageImageFormat::ExperimentalBlink;
     let compact = page_image_format != WalPageImageFormat::Baseline;
-    let keep_batches = !blink || materialization == ScanMaterialization::Batches;
+    let keep_batches = match materialization {
+        ScanMaterialization::Recovery => !blink,
+        #[cfg(test)]
+        ScanMaterialization::Batches => true,
+        ScanMaterialization::Locations | ScanMaterialization::ValidateOnly => false,
+    };
     while offset < length {
+        let frame_offset = offset;
         let remaining = length - offset;
         if remaining < WAL_HEADER_SIZE as u64 {
             break;
@@ -3390,6 +3451,7 @@ fn scan_wal<F: DurableFile>(
                 ));
             }
             WalRecordType::PageImage | WalRecordType::PageDelta => {
+                let payload_crc32c = crc32c::crc32c(&payload);
                 let image = if record_type == WalRecordType::PageImage {
                     let page = decode_page_image(&payload)?;
                     validate_page_image(&page, page_image_format)?;
@@ -3404,6 +3466,10 @@ fn scan_wal<F: DurableFile>(
                         return Err(Error::corruption("WAL page delta targets a superblock"));
                     }
                     None
+                };
+                let page_id = match &image {
+                    Some(page) => page.page_id,
+                    None => decode_page_delta(&payload)?.page_id,
                 };
                 if pending
                     .as_ref()
@@ -3422,6 +3488,7 @@ fn scan_wal<F: DurableFile>(
                         batch_id,
                         first_record_lsn: record_lsn,
                         records: Vec::new(),
+                        locations: Vec::new(),
                         digest: 0,
                     });
                 }
@@ -3442,6 +3509,27 @@ fn scan_wal<F: DurableFile>(
                     Some(page) => PendingRedo::Image(Box::new(page)),
                     None => PendingRedo::Delta(payload),
                 });
+                if materialization == ScanMaterialization::Locations {
+                    current.locations.push(WalPageLocation {
+                        page_id,
+                        record_lsn,
+                        batch_id,
+                        record_index,
+                        record_type,
+                        frame_offset,
+                        frame_length: u32::try_from(frame_length)
+                            .map_err(|_| Error::corruption("WAL frame length exceeds u32"))?,
+                        header_crc32c: crc32c::crc32c(&header_bytes),
+                        payload_offset: frame_offset
+                            .checked_add(WAL_HEADER_SIZE as u64)
+                            .ok_or_else(|| Error::corruption("WAL payload offset overflows"))?,
+                        payload_length: u32::try_from(payload_length)
+                            .map_err(|_| Error::corruption("WAL payload length exceeds u32"))?,
+                        payload_crc32c,
+                        commit_lsn: Lsn::ZERO,
+                        commit_frame_offset: 0,
+                    });
+                }
             }
             WalRecordType::Commit => {
                 let current = pending.take().ok_or_else(|| {
@@ -3460,6 +3548,13 @@ fn scan_wal<F: DurableFile>(
                     return Err(Error::corruption(
                         "WAL commit metadata does not match page images",
                     ));
+                }
+                if materialization == ScanMaterialization::Locations {
+                    for mut location in current.locations {
+                        location.commit_lsn = record_lsn;
+                        location.commit_frame_offset = frame_offset;
+                        locations.push(location);
+                    }
                 }
                 let mut batch_pages = Vec::new();
                 let mut batch_kinds = Vec::new();
@@ -3578,16 +3673,23 @@ fn scan_wal<F: DurableFile>(
         history_start_lsn,
         last_commit_lsn,
         batches,
-        pages,
+        pages: if materialization == ScanMaterialization::Locations {
+            BTreeMap::new()
+        } else {
+            pages
+        },
         redo,
         report,
         valid_length: if start_batch_id.is_some()
-            || materialization == ScanMaterialization::ValidateOnly
-        {
+            || matches!(
+                materialization,
+                ScanMaterialization::ValidateOnly | ScanMaterialization::Locations
+            ) {
             committed_length
         } else {
             offset
         },
+        locations,
     })
 }
 
@@ -4202,7 +4304,7 @@ mod tests {
     use crate::page::{PageHeader, PageType, encode_page};
     use std::cell::Cell;
 
-    #[derive(Default)]
+    #[derive(Clone, Default)]
     struct MemoryFile(Vec<u8>);
 
     struct CountingFile {
@@ -4351,6 +4453,84 @@ mod tests {
             )
             .unwrap(),
         }
+    }
+
+    #[test]
+    fn committed_location_scan_is_commit_gated_and_does_not_mutate_file() {
+        let mut wal = WalLog::open_with_page_image_format(
+            MemoryFile::default(),
+            identity(),
+            WalPageImageFormat::ExperimentalBtree,
+        )
+        .unwrap();
+        wal.append_commit(1, Lsn::new(2), &[page_at_lsn(7, Lsn::new(2))], None)
+            .unwrap();
+        let mut file = wal.into_file();
+        let committed_length = file.0.len();
+        file.0.extend_from_slice(&[9, 8, 7]);
+        let original_bytes = file.0.clone();
+        let scan = WalLog::scan_committed_page_locations(
+            &mut file,
+            &identity(),
+            WalPageImageFormat::ExperimentalBtree,
+            None,
+            BTreeMap::new(),
+        )
+        .unwrap();
+        assert_eq!(file.0, original_bytes);
+        assert_eq!(scan.committed_prefix_length, committed_length as u64);
+        assert_eq!(scan.torn_tail_bytes, 3);
+        assert_eq!(scan.locations.len(), 1);
+        let location = &scan.locations[0];
+        assert_eq!(location.page_id, PageId::new(7));
+        assert_eq!(location.record_type, WalRecordType::PageImage);
+        assert_eq!(location.commit_lsn, Lsn::new(2));
+        assert!(location.frame_offset < location.commit_frame_offset);
+        let frame_start = usize::try_from(location.frame_offset).unwrap();
+        let header_end = frame_start + WAL_HEADER_SIZE;
+        assert_eq!(
+            location.header_crc32c,
+            crc32c::crc32c(&file.0[frame_start..header_end])
+        );
+        let payload_start = usize::try_from(location.payload_offset).unwrap();
+        let payload_end = payload_start + location.payload_length as usize;
+        assert_eq!(
+            location.payload_crc32c,
+            crc32c::crc32c(&file.0[payload_start..payload_end])
+        );
+    }
+
+    #[test]
+    fn complete_page_frame_without_commit_is_not_exposed_as_location() {
+        let mut wal = WalLog::open_with_page_image_format(
+            MemoryFile::default(),
+            identity(),
+            WalPageImageFormat::ExperimentalBtree,
+        )
+        .unwrap();
+        wal.append_commit(1, Lsn::new(2), &[page_at_lsn(8, Lsn::new(2))], None)
+            .unwrap();
+        let mut file = wal.into_file();
+        let initialization_length = decode_header(&file.0[..WAL_HEADER_SIZE]).unwrap().2;
+        let page_frame_offset = initialization_length;
+        let page_frame_length =
+            decode_header(&file.0[page_frame_offset..page_frame_offset + WAL_HEADER_SIZE])
+                .unwrap()
+                .2;
+        file.0.truncate(page_frame_offset + page_frame_length);
+        let original_bytes = file.0.clone();
+        let scan = WalLog::scan_committed_page_locations(
+            &mut file,
+            &identity(),
+            WalPageImageFormat::ExperimentalBtree,
+            None,
+            BTreeMap::new(),
+        )
+        .unwrap();
+        assert_eq!(file.0, original_bytes);
+        assert!(scan.locations.is_empty());
+        assert_eq!(scan.committed_prefix_length, initialization_length as u64);
+        assert_eq!(scan.torn_tail_bytes, page_frame_length as u64);
     }
 
     #[test]

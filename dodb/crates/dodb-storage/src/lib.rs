@@ -32,6 +32,7 @@ pub use superblock::{
 };
 pub use wal::{
     CommittedWalBatch, RecoveredWalPage, WAL_FORMAT_VERSION, WAL_HEADER_SIZE, WAL_MAGIC,
-    WAL_PAGE_IMAGE_FORMAT_VERSION, WalAppendReport, WalCommit, WalIdentity, WalLog, WalMetrics,
-    WalPageImage, WalPageImageFormat, WalRecordType, WalRedoKind, WalRedoStats, WalScanReport,
+    WAL_PAGE_IMAGE_FORMAT_VERSION, WalAppendReport, WalCommit, WalIdentity, WalLocationScan,
+    WalLog, WalMetrics, WalPageImage, WalPageImageFormat, WalPageLocation, WalRecordType,
+    WalRedoKind, WalRedoStats, WalScanReport,
 };
