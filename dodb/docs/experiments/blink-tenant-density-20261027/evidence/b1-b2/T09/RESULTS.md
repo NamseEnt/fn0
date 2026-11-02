@@ -94,3 +94,11 @@ T09 remains partial. Grouped transaction boundaries, zero-reader page reuse, spl
 - Source commit: `3523096fae312360ff2b2976b8ac329829edf870`.
 
 T09 remains partial. Grouped WAL transaction boundaries, split/readback differential coverage, full readback of width-16 commits, and a full process restart with index rebuild remain outstanding. The paged route remains disconnected from `dodb-server`; defaults and the performance matrix remain unchanged.
+
+## Width-16 committed-value readback (2026-11-02)
+
+- The focused file-backed writer fixture now retains expected values for widths 1, 4, and 16 and reads them through the current writer generation after dropping the older overlay and checkpoint readers. This keeps the two-page cache and reconstruction budget unchanged while validating every committed key and value.
+- Focused fixture: 1 passed. Serialized feature library suite: 294 passed, 0 failed, 4 ignored in 123.40 seconds. An initial parallel suite run had one temporary-directory `AlreadyExists` failure in a page-locator test; that test passed in isolation and the serialized full suite passed.
+- The successful serialized run is preserved at `logs/paged-writer-width-readback-feature-lib.log.gz`.
+
+T09 remains partial. Grouped WAL transaction boundaries and complete-or-absent grouped recovery, split/readback differential writer coverage, and full process restart with index rebuild remain outstanding. No service activation or performance experiment occurred.
