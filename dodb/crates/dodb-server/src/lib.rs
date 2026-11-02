@@ -6670,6 +6670,94 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "blink-demand-paging")]
+    async fn paged_checkpoint_progresses_while_foreground_queue_budget_is_full() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(725);
+        let mut shared_resources = writable_paged_blink_shared_resources();
+        shared_resources.memory.global_bytes = 64 * 1024 * 1024;
+        shared_resources.memory.per_tenant_bytes = 32 * 1024 * 1024;
+        let config = LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            max_open_shards: 1,
+            blink_open_waiter_limit: 4,
+            blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce: true,
+            },
+            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                threshold_bytes: u64::MAX,
+            },
+            blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+            blink_shared_resources: Some(shared_resources),
+            ..LocalTenantServiceConfig::default()
+        };
+        let service = BlinkTenantService::new(config).unwrap();
+        let database_path = service.database_path(tenant);
+        create_empty_paged_service_fixture(&database_path, tenant);
+        service
+            .execute_request(
+                tenant,
+                Request::Put {
+                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"foreground-full".to_vec()),
+                    value: b"checkpoint-with-full-foreground-queue".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap();
+        let shard = service
+            .shards
+            .lock()
+            .unwrap()
+            .shards
+            .get(&tenant)
+            .cloned()
+            .unwrap();
+        let writable = match &shard.read_handle {
+            BlinkShardReadHandle::Paged {
+                writable: Some(writable),
+                ..
+            } => Arc::clone(writable),
+            BlinkShardReadHandle::Resident(_) | BlinkShardReadHandle::Paged { .. } => {
+                panic!("expected the writable paged service route")
+            }
+        };
+        let resources = service.shared_resources.as_ref().unwrap().clone();
+        let category = dodb_storage::blink::resource::ResourceCategory::QueuedForeground;
+        let category_limit = shared_resources.memory.per_tenant_category_bytes[category as usize];
+        let category_current = resources.snapshot().unwrap().current_by_category[category as usize];
+        let blocker_bytes = category_limit.saturating_sub(category_current);
+        assert!(blocker_bytes > 0);
+        let foreground_blocker = resources
+            .reserve(
+                tenant.get(),
+                category,
+                dodb_storage::blink::resource::ReservationClass::Foreground,
+                blocker_bytes,
+            )
+            .unwrap();
+        assert_eq!(
+            resources.snapshot().unwrap().current_by_category[category as usize],
+            category_limit
+        );
+
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            writable.run_threshold_checkpoint(1),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            service.checkpoint_metrics_snapshot().checkpoints_completed,
+            1
+        );
+        drop(foreground_blocker);
+        service.shutdown_checked().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
     async fn paged_service_backpressures_writes_at_checkpoint_debt_limit() {
         let directory = blink_test_directory();
         let tenant = TenantId::new(722);

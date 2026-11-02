@@ -54,6 +54,7 @@ Named tests and validation:
 - `blink::resource::tests::disk_capacity_waiters_are_bounded_and_cancellation_releases_a_slot`: passed; waiters are capped and task cancellation releases its slot.
 - `tests::paged_checkpoint_resumes_after_disk_capacity_release`: passed through the writable service checkpoint path; it waits at the disk limit, resumes after capacity release, publishes, and clears the pending waiter.
 - `tests::paged_service_shutdown_cancels_checkpoint_waiting_for_disk_capacity`: passed through the writable service route; shutdown cancels the capacity wait, drains the checkpoint task, and clears the waiter registration.
+- `tests::paged_checkpoint_progresses_while_foreground_queue_budget_is_full`: passed; checkpoint publication completes while the queued-foreground category is at its per-tenant byte ceiling. This does not fill every foreground category or prove a multi-tenant pressure bound.
 - `tests::checkpoint_debt_admission_enforces_global_and_tenant_limits`: passed.
 - `tests::paged_open_rejects_checkpoint_debt_cap_below_one_worst_case_transaction`: passed.
 - `tests::paged_service_backpressures_writes_at_checkpoint_debt_limit`: passed; the service rejects at the configured ceiling and actual tenant debt stays at or below the cap.
@@ -62,7 +63,7 @@ Named tests and validation:
 - `tests::foreground_queue_count_limit_rejects_excess_without_leaking_charges`: passed in isolation and in the serial full-suite run. A parallel full-suite run stalled at this test and was interrupted; the serial rerun passed all 45 paging server library tests at that point.
 - `tests::cancelled_paged_write_keeps_charges_until_shutdown_drain`: passed with a bounded wait for asynchronous metadata-charge release after shutdown. An earlier full-suite run observed a transient 512-byte metadata charge immediately after shutdown; the failed logs are retained.
 - `cargo test -p dodb-server --lib -- --test-threads=1`: 26 passed.
-- `cargo test -p dodb-server --features blink-demand-paging --lib -- --test-threads=1`: 47 passed.
+- `cargo test -p dodb-server --features blink-demand-paging --lib -- --test-threads=1`: 48 passed.
 - `cargo test -p dodb-storage --features blink-demand-paging --lib -- --test-threads=1`: 322 passed, 4 ignored.
 - `cargo check -p dodb-server --all-targets`: passed.
 - `cargo check -p dodb-server --all-targets --features blink-demand-paging`: passed.
@@ -72,4 +73,4 @@ Named tests and validation:
 
 Logs: `storage-paging-library-capacity-wake.log`, `server-default-all-targets-shutdown-cancel.log`, `server-paging-all-targets-shutdown-cancel.log`, `server-default-clippy-shutdown-cancel.log`, `server-paging-clippy-shutdown-cancel-final.log`, `server-paging-library-shutdown-cancel-final.log`, `server-paging-library-shutdown-drain-wakeup.log`, and `storage-paging-library-debt-cap-final.log`, alongside earlier pressure-bound and failed diagnostic logs in this directory.
 
-Remaining T14 gates: the capacity waiter is proven to resume after retained-source accounting is released, but the complete old-reader pin-release lifecycle has not been shown to release retained bytes and resume checkpoint publication. The queue simulation covers synchronized and staggered arrivals with a deterministic three-turn bound, but service-integrated all-active pressure and measured time bounds are not complete. Full foreground-pool interaction, a long pinned reader under pressure, and recovery after capacity release remain unverified. Debt-cap tests show configured foreground backpressure, not a multi-tenant SLO bound. T14 acceptance remains open; T15, T16, and T17 have not started.
+Remaining T14 gates: the capacity waiter is proven to resume after retained-source accounting is released, but the complete old-reader pin-release lifecycle has not been shown to release retained bytes and resume checkpoint publication. The queue simulation covers synchronized and staggered arrivals with a deterministic three-turn bound, but service-integrated all-active pressure and measured time bounds are not complete. A long pinned reader under pressure and recovery after capacity release remain unverified. The full queued-foreground category test does not fill all foreground categories. Debt-cap tests show configured foreground backpressure, not a multi-tenant SLO bound. T14 acceptance remains open; T15, T16, and T17 have not started.
