@@ -320,7 +320,7 @@ impl Options {
                 .unwrap_or(512 * 1024 * 1024);
         let blink_memory_per_tenant_bytes =
             parse_optional_number(&values, "--blink-memory-per-tenant-bytes")?
-                .unwrap_or(64 * 1024 * 1024);
+                .unwrap_or(128 * 1024 * 1024);
         let blink_disk_limit_bytes = parse_optional_number(&values, "--blink-disk-limit-bytes")?
             .unwrap_or(4 * 1024 * 1024 * 1024);
         let blink_disk_per_tenant_bytes =

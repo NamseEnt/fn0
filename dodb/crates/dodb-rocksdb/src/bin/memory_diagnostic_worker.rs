@@ -1131,7 +1131,7 @@ fn parse_arguments() -> WorkerResult<Arguments> {
         option_value(&values, "--memory-blink-memory-per-tenant-bytes")
             .map(|value| value.parse())
             .transpose()?
-            .unwrap_or(64 * 1024 * 1024);
+            .unwrap_or(128 * 1024 * 1024);
     let blink_disk_limit_bytes = option_value(&values, "--memory-blink-disk-limit-bytes")
         .map(|value| value.parse())
         .transpose()?
