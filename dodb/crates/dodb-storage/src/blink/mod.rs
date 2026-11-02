@@ -2392,6 +2392,10 @@ impl PagedReadHandle {
         self.loader.source_read_count()
     }
 
+    pub fn page_loader_metrics(&self) -> Result<page_cache::PageLoaderMetrics> {
+        self.loader.metrics()
+    }
+
     pub fn validate_all_indexed_pages(&self) -> Result<u64> {
         let reservation_bytes = (PAGE_SIZE as u64)
             .checked_mul(3)

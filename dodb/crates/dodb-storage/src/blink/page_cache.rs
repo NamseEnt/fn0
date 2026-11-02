@@ -102,6 +102,18 @@ pub struct PageLoaderConfig {
     pub maximum_followers: usize,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PageLoaderMetrics {
+    pub cache_misses: u64,
+    pub evictions: u64,
+    pub source_reads: u64,
+    pub wal_reconstructions: u64,
+    pub current_cache_bytes: u64,
+    pub peak_cache_bytes: u64,
+    pub active_loads: usize,
+    pub active_followers: usize,
+}
+
 impl PageLoaderConfig {
     pub fn validate(self) -> Result<Self> {
         if self.maximum_cache_bytes < self.minimum_decoded_page_bytes
@@ -191,6 +203,7 @@ struct CacheState<K, V> {
     lru: VecDeque<K>,
     in_flight: HashMap<K, Arc<LoadTicket<V>>>,
     cache_bytes: u64,
+    peak_cache_bytes: u64,
     reserved_cache_bytes: u64,
     active_loads: usize,
     active_followers: usize,
@@ -202,7 +215,10 @@ pub struct PageLoader<K, V> {
     resources: BlinkResourceManager,
     config: PageLoaderConfig,
     state: Mutex<CacheState<K, V>>,
+    cache_misses: AtomicU64,
+    evictions: AtomicU64,
     source_reads: AtomicU64,
+    wal_reconstructions: AtomicU64,
 }
 
 impl<K, V> PageLoader<K, V>
@@ -225,12 +241,16 @@ where
                 lru: VecDeque::new(),
                 in_flight: HashMap::new(),
                 cache_bytes: 0,
+                peak_cache_bytes: 0,
                 reserved_cache_bytes: 0,
                 active_loads: 0,
                 active_followers: 0,
                 closed: false,
             }),
+            cache_misses: AtomicU64::new(0),
+            evictions: AtomicU64::new(0),
             source_reads: AtomicU64::new(0),
+            wal_reconstructions: AtomicU64::new(0),
         })
     }
 
@@ -264,6 +284,7 @@ where
                 touch_lru(&mut state.lru, key);
                 return Ok(PageGuard(value));
             }
+            self.cache_misses.fetch_add(1, Ordering::Relaxed);
             if let Some(ticket) = state.in_flight.get(&key).cloned() {
                 if state.active_followers == self.config.maximum_followers {
                     return Err(Error::overloaded("paged loader follower limit exceeded"));
@@ -275,7 +296,12 @@ where
                 if state.active_loads == self.config.maximum_concurrent_loads {
                     return Err(Error::overloaded("paged loader job limit exceeded"));
                 }
-                evict_to_fit(&mut state, self.config.maximum_cache_bytes, decoded_bytes)?;
+                evict_to_fit(
+                    &mut state,
+                    self.config.maximum_cache_bytes,
+                    decoded_bytes,
+                    &self.evictions,
+                )?;
                 state.reserved_cache_bytes = state
                     .reserved_cache_bytes
                     .checked_add(decoded_bytes)
@@ -344,6 +370,7 @@ where
                 .cache_bytes
                 .checked_add(decoded_bytes)
                 .ok_or_else(|| Error::invariant("page cache byte count overflow"))?;
+            state.peak_cache_bytes = state.peak_cache_bytes.max(state.cache_bytes);
             state.entries.insert(key.clone(), Arc::clone(&candidate));
             touch_lru(&mut state.lru, key.clone());
             drop(state);
@@ -371,6 +398,7 @@ where
         };
         state.lru.retain(|candidate| candidate != key);
         state.cache_bytes = state.cache_bytes.saturating_sub(value.bytes);
+        self.evictions.fetch_add(1, Ordering::Relaxed);
         drop(state);
         drop(value);
         Ok(true)
@@ -378,6 +406,23 @@ where
 
     pub fn source_read_count(&self) -> u64 {
         self.source_reads.load(Ordering::Relaxed)
+    }
+
+    pub fn metrics(&self) -> Result<PageLoaderMetrics> {
+        let state = self
+            .state
+            .lock()
+            .map_err(|_| Error::invariant("page cache lock poisoned"))?;
+        Ok(PageLoaderMetrics {
+            cache_misses: self.cache_misses.load(Ordering::Relaxed),
+            evictions: self.evictions.load(Ordering::Relaxed),
+            source_reads: self.source_reads.load(Ordering::Relaxed),
+            wal_reconstructions: self.wal_reconstructions.load(Ordering::Relaxed),
+            current_cache_bytes: state.cache_bytes,
+            peak_cache_bytes: state.peak_cache_bytes,
+            active_loads: state.active_loads,
+            active_followers: state.active_followers,
+        })
     }
 
     pub fn close(&self) -> Result<()> {
@@ -486,6 +531,12 @@ impl PageLoader<PageVersionKey, super::BlinkPage> {
                 "page version chain does not match its index descriptor",
             ));
         }
+        let uses_wal_source = chain.entries.iter().any(|entry| {
+            matches!(
+                entry,
+                DeltaChainEntry::WalImage { .. } | DeltaChainEntry::WalDelta { .. }
+            )
+        });
         let key = PageVersionKey::from_descriptor(index.store_identity(), descriptor);
         let encoded_bytes = chain.entries.iter().try_fold(0u64, |total, entry| {
             let bytes = match entry {
@@ -529,7 +580,11 @@ impl PageLoader<PageVersionKey, super::BlinkPage> {
                     true,
                 ),
             })?;
-            super::decode_blink_page(&image, page_id)
+            let page = super::decode_blink_page(&image, page_id)?;
+            if uses_wal_source {
+                self.wal_reconstructions.fetch_add(1, Ordering::Relaxed);
+            }
+            Ok(page)
         })
     }
 }
@@ -609,6 +664,7 @@ fn evict_to_fit<K, V>(
     state: &mut CacheState<K, V>,
     maximum_bytes: u64,
     needed_bytes: u64,
+    evictions: &AtomicU64,
 ) -> Result<()>
 where
     K: Clone + Eq + Hash,
@@ -643,6 +699,7 @@ where
         }
         let value = state.entries.remove(&key).unwrap();
         state.cache_bytes = state.cache_bytes.saturating_sub(value.bytes);
+        evictions.fetch_add(1, Ordering::Relaxed);
         drop(value);
     }
     Ok(())

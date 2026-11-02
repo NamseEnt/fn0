@@ -5467,6 +5467,21 @@ mod tests {
     }
 
     #[cfg(feature = "blink-demand-paging")]
+    fn paged_crash_loader_metrics(
+        service: &BlinkTenantService,
+        tenant: TenantId,
+    ) -> dodb_storage::blink::page_cache::PageLoaderMetrics {
+        paged_crash_writable_shard(service, tenant)
+            .writer
+            .lock()
+            .unwrap()
+            .snapshot()
+            .unwrap()
+            .page_loader_metrics()
+            .unwrap()
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
     fn paged_crash_current_manifest(
         service: &BlinkTenantService,
         tenant: TenantId,
@@ -5850,6 +5865,43 @@ mod tests {
                     assert!(
                         source_reads_after_dataset > source_reads_before_dataset,
                         "recovered service dataset reads did not load any durable page sources"
+                    );
+                    let loader_metrics = paged_crash_loader_metrics(&recovered, tenant);
+                    let memory_peaks = recovered
+                        .shared_resources
+                        .as_ref()
+                        .unwrap()
+                        .snapshot()
+                        .unwrap();
+                    let disk_peaks = recovered
+                        .shared_resources
+                        .as_ref()
+                        .unwrap()
+                        .disk()
+                        .snapshot()
+                        .unwrap();
+                    assert!(loader_metrics.cache_misses > 0);
+                    assert!(loader_metrics.evictions > 0);
+                    assert!(loader_metrics.wal_reconstructions > 0);
+                    assert!(loader_metrics.peak_cache_bytes <= 8 * dodb_storage::PAGE_SIZE as u64);
+                    assert_eq!(loader_metrics.active_loads, 0);
+                    assert_eq!(loader_metrics.active_followers, 0);
+                    eprintln!(
+                        "paged loader metrics: cache_misses={} evictions={} source_reads={} wal_reconstructions={} cache_peak_bytes={} active_loads={} active_followers={}",
+                        loader_metrics.cache_misses,
+                        loader_metrics.evictions,
+                        loader_metrics.source_reads,
+                        loader_metrics.wal_reconstructions,
+                        loader_metrics.peak_cache_bytes,
+                        loader_metrics.active_loads,
+                        loader_metrics.active_followers
+                    );
+                    eprintln!(
+                        "paged resource peaks: memory_total={} memory_categories={:?} disk_total={} disk_categories={:?}",
+                        memory_peaks.peak_total,
+                        memory_peaks.peak_by_category,
+                        disk_peaks.peak_total,
+                        disk_peaks.peak_by_category
                     );
                     for key_number in 0..16u32 {
                         recovered
