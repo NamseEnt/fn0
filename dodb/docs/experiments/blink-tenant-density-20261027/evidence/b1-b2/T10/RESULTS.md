@@ -126,3 +126,13 @@ T10 remains partial. Slices are resumable within one active writer job, but no f
 - Raw logs: `logs/source-catalog-multipage-focused.log`, `logs/source-catalog-pending-publication-focused.log`, `logs/source-catalog-restart-gc-focused.log`, `logs/source-catalog-feature-library-final2.log`, `logs/source-catalog-all-targets-check-final3.log`, and `logs/source-catalog-strict-clippy-final3.log`.
 
 T10 remains partial. Persistent source catalog publication and restart-time recovery-WAL retention pass for the exercised writer path. Catalog-generation reclamation, source/index disk reservations, combined loader/index/output accounting, bounded defer and progress after capacity release, the fair multi-tenant continuation scheduler, debt/time-above-threshold accounting, and process-kill recovery coverage for this paged writer remain open. Service routing and defaults remain unchanged; T17 was not started.
+
+## Completed substep: reclaim unreachable source catalog generations
+
+- Source commit: `fc6f974856750b6a0fadf70b76b48bed3e19504c`.
+- Source GC now preserves catalog page ranges reachable from the durable and pending manifest roots, then removes and directory-syncs unreachable catalog pages. The collector verifies each retained chain before removing files and reports reclaimed catalog page and byte counts separately from pack/WAL sources.
+- The focused generation test reclaimed two obsolete pages and retained the current root page. The checkpoint restart/GC integration fixture passed and verified an obsolete generation was reclaimed. Full feature library suite: 300 passed, 0 failed, 4 ignored. All-target feature check passed; rustfmt and `git diff --check` passed.
+- Strict feature Clippy exits 101 with the same 12 existing storage diagnostics; no diagnostic points to source catalog reclamation.
+- Raw logs: `logs/source-catalog-gc-reclaim-focused.log`, `logs/source-catalog-gc-restart-focused.log`, `logs/source-catalog-gc-feature-library.log`, `logs/source-catalog-gc-all-targets-check.log`, and `logs/source-catalog-gc-strict-clippy.log`.
+
+T10 remains partial. Source catalog generations now have bounded retention after GC, but checkpoint pack/index output disk reservations, combined loader/index/output memory accounting, bounded defer and eventual progress after capacity release, fair maintenance slices with debt/time-above-threshold accounting, and process-kill recovery coverage for this paged writer remain open. Service routing and defaults remain unchanged; T17 was not started.
