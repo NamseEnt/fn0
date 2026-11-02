@@ -5602,12 +5602,40 @@ mod tests {
             )
             .is_err()
         );
+        let mut wrong_base_lsn_locations = scan.locations.clone();
+        wrong_base_lsn_locations[2].base_page_lsn = Some(Lsn::new(999));
+        assert!(
+            WalLog::reconstruct_page_location(
+                &mut file.clone(),
+                &wrong_base_lsn_locations,
+                2,
+                scan.committed_prefix_length,
+                WalPageImageFormat::ExperimentalBtree,
+                &BTreeMap::new()
+            )
+            .is_err()
+        );
         let mut wrong_result_crc_locations = scan.locations.clone();
         wrong_result_crc_locations[2].image_crc32c = Some(u32::MAX);
         assert!(
             WalLog::reconstruct_page_location(
                 &mut file.clone(),
                 &wrong_result_crc_locations,
+                2,
+                scan.committed_prefix_length,
+                WalPageImageFormat::ExperimentalBtree,
+                &BTreeMap::new()
+            )
+            .is_err()
+        );
+        let mut truncated_file = file.clone();
+        truncated_file
+            .0
+            .truncate(usize::try_from(scan.locations[2].frame_offset).unwrap() + WAL_HEADER_SIZE);
+        assert!(
+            WalLog::reconstruct_page_location(
+                &mut truncated_file,
+                &scan.locations,
                 2,
                 scan.committed_prefix_length,
                 WalPageImageFormat::ExperimentalBtree,
@@ -5694,6 +5722,16 @@ mod tests {
                 &scan.locations,
                 0,
                 scan.committed_prefix_length,
+            )
+            .is_err()
+        );
+        assert!(
+            WalLog::scan_committed_page_locations(
+                &mut changed_sibling_file,
+                &identity(),
+                WalPageImageFormat::ExperimentalBtree,
+                None,
+                BTreeMap::new()
             )
             .is_err()
         );
