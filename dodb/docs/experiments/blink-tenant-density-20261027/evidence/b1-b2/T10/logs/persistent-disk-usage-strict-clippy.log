@@ -1,0 +1,441 @@
+    Checking dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+error: this function has too many arguments (8/7)
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:1502:5
+     |
+1502 | /     fn prepare_catalog_delta<F>(
+1503 | |         &self,
+1504 | |         base: &PageCatalog,
+1505 | |         base_high_water_page_id: PageId,
+...    |
+1512 | |     where
+1513 | |         F: FnMut(PageId) -> Result<Option<Arc<BlinkPage>>>,
+     | |___________________________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+     = note: `-D clippy::too-many-arguments` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::too_many_arguments)]`
+
+error: this `if` statement can be collapsed
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:6522:21
+     |
+6522 | /                     if let MaterializerState::Failed(failure) = &materializer.state {
+6523 | |                         if materializer
+6524 | |                             .checkpoint_may_be_durable
+6525 | |                             .load(Ordering::Acquire)
+...    |
+6529 | |                     }
+     | |_____________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+     = note: `-D clippy::collapsible-if` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+     |
+6522 ~                     if let MaterializerState::Failed(failure) = &materializer.state
+6523 ~                         && materializer
+6524 |                             .checkpoint_may_be_durable
+ ...
+6527 |                             self.broken = Some(failure.clone());
+6528 ~                         }
+     |
+
+error: this `if` statement can be collapsed
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:6566:21
+     |
+6566 | /                     if let MaterializerState::Failed(failure) = &materializer.state {
+6567 | |                         if materializer
+6568 | |                             .checkpoint_may_be_durable
+6569 | |                             .load(Ordering::Acquire)
+...    |
+6573 | |                     }
+     | |_____________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#collapsible_if
+help: collapse nested if block
+     |
+6566 ~                     if let MaterializerState::Failed(failure) = &materializer.state
+6567 ~                         && materializer
+6568 |                             .checkpoint_may_be_durable
+ ...
+6571 |                             self.broken = Some(failure.clone());
+6572 ~                         }
+     |
+
+error: this function has too many arguments (9/7)
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:8359:1
+     |
+8359 | / fn prepare_planned_serial_execution<'a>(
+8360 | |     state: &'a BlinkState,
+8361 | |     plan: &BatchPlan,
+8362 | |     allow_page_reuse: bool,
+...    |
+8368 | |     batch_metrics: &mut BlinkBatchMetrics,
+8369 | | ) -> Result<PlannedExecutionPreparation<'a>> {
+     | |____________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+error: derefed type is same as origin
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:8894:35
+     |
+8894 |             if let Some(budget) = budget.as_deref_mut() {
+     |                                   ^^^^^^^^^^^^^^^^^^^^^ help: try: `budget`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_option_as_deref
+     = note: `-D clippy::needless-option-as-deref` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::needless_option_as_deref)]`
+
+error: redundant slicing of the whole range
+    --> dodb/crates/dodb-storage/src/blink/mod.rs:9009:43
+     |
+9009 |                     .is_some_and(|cursor| &entry.key[..] <= cursor)
+     |                                           ^^^^^^^^^^^^^^ help: use the original value instead: `entry.key`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#redundant_slicing
+     = note: `-D clippy::redundant-slicing` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::redundant_slicing)]`
+
+error: this function has too many arguments (9/7)
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:10229:1
+      |
+10229 | / fn split_leaf<S: BlinkMutationState>(
+10230 | |     state: &mut S,
+10231 | |     dirty: &mut BTreeSet<PageId>,
+10232 | |     metrics: &mut BlinkSplitMetrics,
+...     |
+10238 | |     revision: Revision,
+10239 | | ) -> Result<()> {
+      | |_______________^
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+error: this function has too many arguments (8/7)
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:10271:1
+      |
+10271 | / fn install_separator<S: BlinkMutationState>(
+10272 | |     state: &mut S,
+10273 | |     dirty: &mut BTreeSet<PageId>,
+10274 | |     metrics: &mut BlinkSplitMetrics,
+...     |
+10279 | |     revision: Revision,
+10280 | | ) -> Result<()> {
+      | |_______________^
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+error: this function has too many arguments (10/7)
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:10381:1
+      |
+10381 | / fn split_internal<S: BlinkMutationState>(
+10382 | |     state: &mut S,
+10383 | |     dirty: &mut BTreeSet<PageId>,
+10384 | |     metrics: &mut BlinkSplitMetrics,
+...     |
+10391 | |     revision: Revision,
+10392 | | ) -> Result<(Vec<u8>, PageId)> {
+      | |______________________________^
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+error: this function has too many arguments (8/7)
+   --> dodb/crates/dodb-storage/src/wal.rs:671:5
+    |
+671 | /     pub(crate) fn open_with_segment_boundary(
+672 | |         file: F,
+673 | |         identity: WalIdentity,
+674 | |         page_image_format: WalPageImageFormat,
+...   |
+679 | |         injector: Option<&mut (dyn FaultInjector + Send + '_)>,
+680 | |     ) -> Result<Self> {
+    | |_____________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+error: this function has too many arguments (8/7)
+    --> dodb/crates/dodb-storage/src/wal.rs:3938:1
+     |
+3938 | / fn append_frame_direct(
+3939 | |     output: &mut Vec<u8>,
+3940 | |     format_version: u16,
+3941 | |     record_type: WalRecordType,
+...    |
+3946 | |     attribution: &mut WalEncodeAttribution,
+3947 | | ) -> Result<usize> {
+     | |__________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+error: this function has too many arguments (10/7)
+    --> dodb/crates/dodb-storage/src/wal.rs:3968:1
+     |
+3968 | / fn append_frame_parts_direct(
+3969 | |     output: &mut Vec<u8>,
+3970 | |     format_version: u16,
+3971 | |     record_type: WalRecordType,
+...    |
+3978 | |     attribution: &mut WalEncodeAttribution,
+3979 | | ) -> Result<usize> {
+     | |__________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+
+error: could not compile `dodb-storage` (lib) due to 12 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: used `assert_eq!` with a literal bool
+   --> dodb/crates/dodb-storage/src/blink/paged_manifest.rs:827:9
+    |
+827 |         assert_eq!(fs::metadata(&directory.database_path()).is_ok(), false);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#bool_assert_comparison
+    = note: `-D clippy::bool-assert-comparison` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::bool_assert_comparison)]`
+help: replace it with `assert!(..)`
+    |
+827 -         assert_eq!(fs::metadata(&directory.database_path()).is_ok(), false);
+827 +         assert!(!fs::metadata(&directory.database_path()).is_ok());
+    |
+
+error: the borrowed expression implements the required traits
+   --> dodb/crates/dodb-storage/src/blink/paged_manifest.rs:827:33
+    |
+827 |         assert_eq!(fs::metadata(&directory.database_path()).is_ok(), false);
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `directory.database_path()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_borrows_for_generic_args
+    = note: `-D clippy::needless-borrows-for-generic-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrows_for_generic_args)]`
+
+error: casting to the same type is unnecessary (`u64` -> `u64`)
+    --> dodb/crates/dodb-storage/src/blink/version_chain.rs:1055:35
+     |
+1055 |                 frame: frame(10 + delta_index as u64, 300, record_lsn),
+     |                                   ^^^^^^^^^^^^^^^^^^ help: try: `delta_index`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_cast
+     = note: `-D clippy::unnecessary-cast` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::unnecessary_cast)]`
+
+error: called `iter().cloned().collect()` on a slice to create a `Vec`. Calling `to_vec()` is both faster and more readable
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:12864:50
+      |
+12864 |                       overlay_sets[..overlay_count]
+      |  __________________________________________________^
+12865 | |                         .iter()
+12866 | |                         .cloned()
+12867 | |                         .collect::<Vec<_>>()
+      | |____________________________________________^ help: try: `.to_vec()`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#iter_cloned_collect
+      = note: `-D clippy::iter-cloned-collect` implied by `-D warnings`
+      = help: to override `-D warnings` add `#[allow(clippy::iter_cloned_collect)]`
+
+error: the borrowed expression implements the required traits
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:15172:63
+      |
+15172 |                     crate::durable_file::ProductionFile::open(&rotation_wal_path).unwrap(),
+      |                                                               ^^^^^^^^^^^^^^^^^^ help: change this to: `rotation_wal_path`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#needless_borrows_for_generic_args
+
+error: manual implementation of `.is_multiple_of()`
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:18203:39
+      |
+18203 |                     let mutation = if next_layout_random(&mut random_state) % 5 == 0 {
+      |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `next_layout_random(&mut random_state).is_multiple_of(5)`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_is_multiple_of
+      = note: `-D clippy::manual-is-multiple-of` implied by `-D warnings`
+      = help: to override `-D warnings` add `#[allow(clippy::manual_is_multiple_of)]`
+
+error: this call to `as_ref` does nothing
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:18562:42
+      |
+18562 | ...                   .any(|entry| entry.key.as_ref() == encoded_key.as_slice()) =>
+      |                                    ^^^^^^^^^^^^^^^^^^ help: try: `entry.key`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#useless_asref
+      = note: `-D clippy::useless-asref` implied by `-D warnings`
+      = help: to override `-D warnings` add `#[allow(clippy::useless_asref)]`
+
+error: this call to `as_ref` does nothing
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:22652:34
+      |
+22652 |                     .any(|entry| entry.key.as_ref() == encoded.as_slice()),
+      |                                  ^^^^^^^^^^^^^^^^^^ help: try: `entry.key`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#useless_asref
+
+error: very complex type used. Consider factoring parts into `type` definitions
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:23064:19
+      |
+23064 |         payloads: Vec<(*const u8, Vec<u8>, Option<(*const u8, Vec<u8>)>)>,
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#type_complexity
+      = note: `-D clippy::type-complexity` implied by `-D warnings`
+      = help: to override `-D warnings` add `#[allow(clippy::type_complexity)]`
+
+error: this call to `as_ref` does nothing
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:23130:32
+      |
+23130 |                     assert_eq!(entry.key.as_ref(), key.as_slice(), "{label}: key bytes");
+      |                                ^^^^^^^^^^^^^^^^^^ help: try: `entry.key`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#useless_asref
+
+error: this call to `as_ref` does nothing
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:23134:40
+      |
+23134 | ...                   assert_eq!(bytes.as_ref(), expected.as_slice(), "{label}: value bytes");
+      |                                  ^^^^^^^^^^^^^^ help: try: `bytes`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#useless_asref
+
+error: unnecessary closure used with `bool::then`
+    --> dodb/crates/dodb-storage/src/wal.rs:6043:13
+     |
+6043 |             (requested_page_id == page_id).then(|| Cow::Borrowed(&base_page.image))
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_lazy_evaluations
+     = note: `-D clippy::unnecessary-lazy-evaluations` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::unnecessary_lazy_evaluations)]`
+help: use `then_some` instead
+     |
+6043 -             (requested_page_id == page_id).then(|| Cow::Borrowed(&base_page.image))
+6043 +             (requested_page_id == page_id).then_some(Cow::Borrowed(&base_page.image))
+     |
+
+error: unnecessary closure used with `bool::then`
+    --> dodb/crates/dodb-storage/src/wal.rs:6174:13
+     |
+6174 |             (requested_page_id == page_id).then(|| Cow::Borrowed(&first_page.image))
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_lazy_evaluations
+help: use `then_some` instead
+     |
+6174 -             (requested_page_id == page_id).then(|| Cow::Borrowed(&first_page.image))
+6174 +             (requested_page_id == page_id).then_some(Cow::Borrowed(&first_page.image))
+     |
+
+error: unnecessary closure used with `bool::then`
+    --> dodb/crates/dodb-storage/src/wal.rs:6267:17
+     |
+6267 |                 (requested_page_id == page_id).then(|| Cow::Borrowed(&current_page.image))
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_lazy_evaluations
+help: use `then_some` instead
+     |
+6267 -                 (requested_page_id == page_id).then(|| Cow::Borrowed(&current_page.image))
+6267 +                 (requested_page_id == page_id).then_some(Cow::Borrowed(&current_page.image))
+     |
+
+error: unnecessary closure used with `bool::then`
+    --> dodb/crates/dodb-storage/src/wal.rs:6440:13
+     |
+6440 |             (requested_page_id == page_id).then(|| Cow::Borrowed(&base_page.image))
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_lazy_evaluations
+help: use `then_some` instead
+     |
+6440 -             (requested_page_id == page_id).then(|| Cow::Borrowed(&base_page.image))
+6440 +             (requested_page_id == page_id).then_some(Cow::Borrowed(&base_page.image))
+     |
+
+error: unnecessary closure used with `bool::then`
+    --> dodb/crates/dodb-storage/src/wal.rs:6458:13
+     |
+6458 |             (requested_page_id == page_id).then(|| Cow::Borrowed(&second_page.image))
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_lazy_evaluations
+help: use `then_some` instead
+     |
+6458 -             (requested_page_id == page_id).then(|| Cow::Borrowed(&second_page.image))
+6458 +             (requested_page_id == page_id).then_some(Cow::Borrowed(&second_page.image))
+     |
+
+error: manual implementation of `.is_multiple_of()`
+    --> dodb/crates/dodb-storage/src/wal.rs:6747:38
+     |
+6747 |                 let record_type = if (case_index + record_position as u32) % 3 == 0 {
+     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `(case_index + record_position as u32).is_multiple_of(3)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_is_multiple_of
+
+error: useless use of `vec!`
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:19142:24
+      |
+19142 |           let requests = vec![
+      |  ________________________^
+19143 | |             TransactionRequest::new(
+19144 | |                 Vec::new(),
+19145 | |                 vec![
+...     |
+19177 | |             ),
+19178 | |         ];
+      | |_________^
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#useless_vec
+      = note: `-D clippy::useless-vec` implied by `-D warnings`
+      = help: to override `-D warnings` add `#[allow(clippy::useless_vec)]`
+help: you can use an array directly
+      |
+19142 ~         let requests = [TransactionRequest::new(
+19143 +                 Vec::new(),
+19144 +                 vec![
+19145 +                     TransactionMutation::Put {
+19146 +                         key: first_key.clone(),
+19147 +                         value: b"first".to_vec(),
+19148 +                     },
+19149 +                     TransactionMutation::Put {
+19150 +                         key: same_leaf_key.clone(),
+19151 +                         value: b"same-leaf".to_vec(),
+19152 +                     },
+19153 +                     TransactionMutation::Put {
+19154 +                         key: first_key.clone(),
+19155 +                         value: b"duplicate".to_vec(),
+19156 +                     },
+19157 +                 ],
+19158 +             ),
+19159 +             TransactionRequest::new(
+19160 +                 vec![TransactionCondition::Exists {
+19161 +                     key: first_key.clone(),
+19162 +                 }],
+19163 +                 vec![TransactionMutation::Put {
+19164 +                     key: first_key.clone(),
+19165 +                     value: b"conditioned".to_vec(),
+19166 +                 }],
+19167 +             ),
+19168 +             TransactionRequest::new(
+19169 +                 vec![TransactionCondition::Exists {
+19170 +                     key: first_key.clone(),
+19171 +                 }],
+19172 +                 vec![TransactionMutation::Put {
+19173 +                     key: different_leaf_key.clone(),
+19174 +                     value: b"different-leaf".to_vec(),
+19175 +                 }],
+19176 ~             )];
+      |
+
+error: useless use of `vec!`
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:23346:22
+      |
+23346 |         let groups = vec![vec![put_request(&writes)]];
+      |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: you can use an array directly: `[vec![put_request(&writes)]]`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#useless_vec
+
+error: useless use of `vec!`
+    --> dodb/crates/dodb-storage/src/blink/segmented_wal.rs:1574:55
+     |
+1574 |         assert_present(&mut reopened, &key(b"chain"), &vec![5; 32], third);
+     |                                                       ^^^^^^^^^^^^ help: you can use a slice directly: `&[5; 32]`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#useless_vec
+
+error: could not compile `dodb-storage` (lib test) due to 32 previous errors

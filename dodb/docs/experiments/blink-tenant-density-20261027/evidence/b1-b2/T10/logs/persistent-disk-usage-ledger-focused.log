@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.32s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-70634b21c90c24df)
+
+running 1 test
+test blink::resource::tests::persistent_disk_usage_survives_owner_drop_and_reconciles_idempotently ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 309 filtered out; finished in 0.01s
+

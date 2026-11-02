@@ -19,7 +19,8 @@
     "fc6f974856750b6a0fadf70b76b48bed3e19504c",
     "a96a3155d23f9301f6a7126e8061afbe77593775",
     "58faa228edf8252cc83e4579c2df85fb15bf6828",
-    "8039b0edb32990a357e87e04acd945135fa4d9ea"
+    "8039b0edb32990a357e87e04acd945135fa4d9ea",
+    "c613f9ba42178609b9ff5269a206844b32c8c4a3"
   ],
   "push": {
     "remote": "origin",
@@ -58,18 +59,18 @@
     "dodb/crates/dodb-storage/src/bin/phase0-bench.rs": "2cf4d0a7d12caaa477046445f3a4675c861b85628105c81496115e2e03c50c81",
     "dodb/crates/dodb-storage/src/blink/durable_bases.rs": "26fd15c75154e71c42394f50e9f97b3bad8e6f7992e3161d35a6fd35ddaa9f08",
     "dodb/crates/dodb-storage/src/blink/version_index.rs": "03dc7d4b1f321fdb6cdd7af6963f991d44fefefdc9ea5aa366989a61a5946418",
-    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "f694729960b0b8bc67309774e3134c18043f6268390fb5229fac9ec108aaf863",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "87f52c073395e2e2ee0ae9279bf9672559b2bdc47ae314a1f68732ea70f9c643",
     "dodb/crates/dodb-storage/src/wal.rs": "7fec7f957680ed1dc779ec355cd9b90018bc27ddb88023b6c446dd38763f601d",
     "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "e69d6062bfb9371d2e3a6b28ac3d114697642c4017d81f12666e8413fc46d366",
     "dodb/crates/dodb-storage/src/blink/source_catalog.rs": "c03109ba28ca3dd063b0d3a837be0d066c3648bb3c89b623a20a1bc8d746f3be",
-    "dodb/crates/dodb-storage/src/blink/resource.rs": "13f167ba3e2c1619147b1c2d73d42b00dff649fba8335427061db19d8304d6fe"
+    "dodb/crates/dodb-storage/src/blink/resource.rs": "b1cc9b893361768405213c33ce6e0b0026db54f830a26e66d5f2ba79836704aa"
   },
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "8039b0edb32990a357e87e04acd945135fa4d9ea"
+    "source_commit": "c613f9ba42178609b9ff5269a206844b32c8c4a3"
   },
   "features": [
     "blink-demand-paging",
@@ -1867,6 +1868,159 @@
         "sha256": "537df7357e318353a5705f65bdaab35acc9fdc76b36a13b12edff1e2d8c425d4"
       },
       "source_commit": "8039b0edb32990a357e87e04acd945135fa4d9ea"
+    },
+    {
+      "name": "persistent_disk_usage_ledger_focused",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "persistent_disk_usage",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; keyed retained-source usage persists after its reservation owner drops and repeated reconciliation does not double count.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/persistent-disk-usage-ledger-focused.log",
+        "sha256": "9b596967a0805766e729e5b29fdab7b82e06ac866ba6283dec1252b8202cc4c3"
+      },
+      "source_commit": "c613f9ba42178609b9ff5269a206844b32c8c4a3"
+    },
+    {
+      "name": "persistent_disk_reservation_conversion_focused",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "disk_reservation_can_be_atomically_converted_to_persistent_usage",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; converting temporary output reservation atomically replaces the keyed persistent charge without double counting.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/persistent-source-reservation-conversion-focused.log",
+        "sha256": "943f671d8d24555221dc6854be9fc17f36775bd070e3c541b56b5d5f3d315020"
+      },
+      "source_commit": "c613f9ba42178609b9ff5269a206844b32c8c4a3"
+    },
+    {
+      "name": "source_manager_retained_disk_reopen_focused",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "retained_disk_usage_survives_manager_drop_and_reopen_without_double_counting",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; retained source bytes remain charged after SourceManager drop and reopening the same canonical directories under the shared manager does not double count.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/persistent-source-reopen-focused.log",
+        "sha256": "7dded8d8915074a9b40496a7eac2793254f0eb3e51516768afd2de380f8d6c6d"
+      },
+      "source_commit": "c613f9ba42178609b9ff5269a206844b32c8c4a3"
+    },
+    {
+      "name": "persistent_disk_usage_feature_library_tests_serial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "306 passed, 0 failed, 4 ignored; finished in 126.80s.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/persistent-disk-usage-feature-library.log",
+        "sha256": "da25d0f9f03e2f80d3b55de259524204f07e104342034827b4f2ca39f0961af0"
+      },
+      "source_commit": "c613f9ba42178609b9ff5269a206844b32c8c4a3"
+    },
+    {
+      "name": "persistent_disk_usage_default_library_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "passed.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/persistent-disk-usage-default-check.log",
+        "sha256": "f0788aa36d1c86b6ccdfb7f4042a5574102d82061c046422a2d42e008a1e4710"
+      },
+      "source_commit": "c613f9ba42178609b9ff5269a206844b32c8c4a3"
+    },
+    {
+      "name": "persistent_disk_usage_feature_all_targets_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--all-targets",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "passed; existing mixed-harness dead-code warnings remain.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/persistent-disk-usage-all-targets-check.log",
+        "sha256": "ad795caf2d8b52850c091cd3555150834b306c2b98edf6756ea4e2c4e8b19366"
+      },
+      "source_commit": "c613f9ba42178609b9ff5269a206844b32c8c4a3"
+    },
+    {
+      "name": "persistent_disk_usage_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--tests",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 101,
+      "summary": "32 existing crate lint findings; no diagnostics in resource.rs or source_manager.rs; no lint suppressions added.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/persistent-disk-usage-strict-clippy.log",
+        "sha256": "f1317b700f80aa4a32105cba45289854a79d347e4367a89358ecade99a41ae68"
+      },
+      "source_commit": "c613f9ba42178609b9ff5269a206844b32c8c4a3"
     }
   ],
   "acceptance_mapping": {
@@ -2002,12 +2156,17 @@
       "exit_status": 101,
       "reason": "After VersionIndexStore began charging node files, the combined source and index usage exceeded the writer fixture 128 KiB cap during SourceManager reopen. The cap was raised to 2 MiB for the passing integrated writer fixture; the 128 KiB failure database is preserved. Tool output was not captured as a raw file.",
       "preserved_artifact": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-paged-writer-checkpoint-42580-1793616885919787000"
+    },
+    {
+      "name": "persistent_source_manager_lifecycle_fixture_initial_reconciliation",
+      "exit_status": 101,
+      "reason": "The initial lifecycle fixture wrote a source file after manager initialization and dropped the manager without invoking directory reconciliation, so the assertion expected an unobserved post-open write to be charged. The fixture now reconciles actual directory bytes before drop and verifies charge survival and idempotent reopen. The temporary test directory was automatically removed; no raw failure log or database artifact was produced."
     }
   ],
   "remaining_work": [
     "Resolve the eight-page pinned-root index-capacity attempt without increasing the cap to hide the bound; test defer and progress after capacity release",
     "Implement a fair multi-tenant continuation scheduler and bounded checkpoint debt/time-above-threshold accounting",
-    "Reserve active WAL growth before writes and scratch disk before marking; make retained disk charges survive per-tenant manager teardown without double counting on reopen; prove no pack creation on checkpoint quota rejection and progress after release; reserve loader memory with index promotion"
+    "Reserve active WAL growth before writes and scratch disk before marking; make version-index disk charges survive store-manager teardown without double counting on reopen; prove no pack creation on checkpoint quota rejection and progress after release; reserve loader memory with index promotion"
   ],
   "next_task": "T10"
 }
