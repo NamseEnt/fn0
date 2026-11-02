@@ -13419,12 +13419,56 @@ mod tests {
         .unwrap();
         let old_reader = writer.snapshot().unwrap();
         let writer_key = DocumentKey::new(b"p".to_vec(), b"k00".to_vec());
-        let writer_request = TransactionRequest::new(
-            Vec::new(),
+        let second_writer_key = DocumentKey::new(b"p".to_vec(), b"k15".to_vec());
+        let writer_base_revision = writer.current().get(&writer_key).unwrap().revision();
+        let second_writer_base_revision =
+            writer.current().get(&second_writer_key).unwrap().revision();
+        let writer_next_lsn = writer.wal.next_lsn();
+        let stale_revision_request = TransactionRequest::new(
+            vec![TransactionCondition::RevisionEquals {
+                key: writer_key.clone(),
+                expected_revision: Revision::new(writer_base_revision.get() + 1),
+            }],
             vec![TransactionMutation::Put {
                 key: writer_key.clone(),
-                value: b"writer-updated".to_vec(),
+                value: b"must-not-commit".to_vec(),
             }],
+        );
+        assert!(
+            writer
+                .transact(
+                    &stale_revision_request,
+                    &StorageLimits::default(),
+                    Revision::new(1999),
+                )
+                .is_err()
+        );
+        assert_eq!(writer.wal.next_lsn(), writer_next_lsn);
+        assert_eq!(
+            writer.current().get(&writer_key).unwrap().revision(),
+            writer_base_revision
+        );
+        let writer_request = TransactionRequest::new(
+            vec![
+                TransactionCondition::RevisionEquals {
+                    key: writer_key.clone(),
+                    expected_revision: writer_base_revision,
+                },
+                TransactionCondition::RevisionEquals {
+                    key: second_writer_key.clone(),
+                    expected_revision: second_writer_base_revision,
+                },
+            ],
+            vec![
+                TransactionMutation::Put {
+                    key: writer_key.clone(),
+                    value: b"writer-updated".to_vec(),
+                },
+                TransactionMutation::Put {
+                    key: second_writer_key.clone(),
+                    value: b"writer-second-updated".to_vec(),
+                },
+            ],
         );
         let writer_result = writer
             .transact(
@@ -13434,11 +13478,16 @@ mod tests {
             )
             .unwrap();
         assert!(writer_result.commit_lsn.is_some());
+        let writer_key_leaf =
+            find_leaf_with_metrics(writer.current(), &writer_key.encode(), &mut 0, None).unwrap();
         let delta_location = writer
             .wal
             .recent_committed_page_locations()
             .iter()
-            .find(|location| location.record_type == crate::wal::WalRecordType::PageDelta)
+            .find(|location| {
+                location.page_id == writer_key_leaf
+                    && location.record_type == crate::wal::WalRecordType::PageDelta
+            })
             .unwrap();
         let delta_page_id = delta_location.page_id;
         assert!(matches!(
@@ -13468,6 +13517,14 @@ mod tests {
         assert_eq!(
             writer.current().get(&writer_key).unwrap().value(),
             Some(&b"writer-updated"[..])
+        );
+        assert_eq!(
+            writer.current().get(&second_writer_key).unwrap().value(),
+            Some(&b"writer-second-updated"[..])
+        );
+        assert_eq!(
+            old_reader.get(&second_writer_key).unwrap().value(),
+            handle.get(&second_writer_key).unwrap().value()
         );
         for update_number in 2..=9 {
             let updated_value = format!("writer-updated-{update_number:02}").into_bytes();
@@ -13524,6 +13581,74 @@ mod tests {
             writer.current().get(&writer_key).unwrap().value(),
             Some(&b"writer-updated-09"[..])
         );
+        let tombstone_request = TransactionRequest::new(
+            Vec::new(),
+            vec![TransactionMutation::Delete {
+                key: writer_key.clone(),
+            }],
+        );
+        writer
+            .transact(
+                &tombstone_request,
+                &StorageLimits::default(),
+                Revision::new(2030),
+            )
+            .unwrap();
+        assert!(writer.current().get(&writer_key).unwrap().is_missing());
+        let resurrect_request = TransactionRequest::new(
+            vec![TransactionCondition::NotExists {
+                key: writer_key.clone(),
+            }],
+            vec![TransactionMutation::Put {
+                key: writer_key.clone(),
+                value: b"writer-resurrected".to_vec(),
+            }],
+        );
+        writer
+            .transact(
+                &resurrect_request,
+                &StorageLimits::default(),
+                Revision::new(2031),
+            )
+            .unwrap();
+        assert_eq!(
+            writer.current().get(&writer_key).unwrap().value(),
+            Some(&b"writer-resurrected"[..])
+        );
+        for mutation_width in [1, 4, 16] {
+            let width_keys = (0..mutation_width)
+                .map(|row_index| {
+                    DocumentKey::new(
+                        b"writer-width".to_vec(),
+                        format!("{mutation_width:02}-{row_index:02}").into_bytes(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let width_request = TransactionRequest::new(
+                width_keys
+                    .iter()
+                    .cloned()
+                    .map(|key| TransactionCondition::NotExists { key })
+                    .collect(),
+                width_keys
+                    .iter()
+                    .enumerate()
+                    .map(|(row_index, key)| TransactionMutation::Put {
+                        key: key.clone(),
+                        value: format!("writer-width-{mutation_width:02}-{row_index:02}")
+                            .into_bytes(),
+                    })
+                    .collect(),
+            );
+            let width_result = writer
+                .transact(
+                    &width_request,
+                    &StorageLimits::default(),
+                    Revision::new(2040 + mutation_width as u64),
+                )
+                .unwrap();
+            assert!(width_result.commit_lsn.is_some());
+        }
         assert_eq!(
             old_reader.get(&writer_key).unwrap().value(),
             Some(randomized_values["k00"].as_slice())
