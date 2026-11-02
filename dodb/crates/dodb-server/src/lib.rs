@@ -1008,7 +1008,12 @@ pub struct BlinkWalCheckpointMetrics {
     pub wal_bytes_at_measurement_start: Option<u64>,
     pub wal_bytes_at_measurement_end: Option<u64>,
     pub wal_bytes_max: u64,
+    pub checkpoint_debt_bytes_current: u64,
+    pub checkpoint_debt_bytes_max: u64,
     pub threshold_excess_max_bytes: u64,
+    pub threshold_excess_total_nanos: u64,
+    pub threshold_excess_current_nanos: u64,
+    pub threshold_excess_since_unix_nanos: Option<u128>,
     pub successful_mutation_transactions: u64,
     pub mutation_commit_groups: u64,
     pub transaction_group_histogram: Vec<u64>,
@@ -1022,6 +1027,11 @@ pub struct BlinkWalCheckpointMetrics {
     pub execution: BlinkCheckpointExecution,
     pub writes_during_checkpoint: u64,
     pub merged_checkpoint_requests: u64,
+    pub checkpoint_requests_queued: u64,
+    pub checkpoint_requests_pending: u64,
+    pub checkpoint_requests_cancelled: u64,
+    pub checkpoint_request_wait_nanos_total: u64,
+    pub checkpoint_request_wait_nanos_max: u64,
     pub capacity_wait_count: u64,
     pub capacity_wait_nanos: u64,
     pub coordinator_pause_nanos: u64,
@@ -1041,7 +1051,7 @@ impl BlinkWalCheckpointMetricsHandle {
     pub fn snapshot(&self) -> BlinkWalCheckpointMetrics {
         self.inner
             .lock()
-            .map(|metrics| metrics.clone())
+            .map(|metrics| metrics.snapshot_at(current_unix_nanos()))
             .unwrap_or_default()
     }
 
@@ -1056,12 +1066,90 @@ impl BlinkWalCheckpointMetricsHandle {
     }
 }
 
+fn current_unix_nanos() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_nanos())
+}
+
 impl BlinkWalCheckpointMetrics {
+    fn observe_wal_bytes(&mut self, wal_bytes: u64, observed_unix_nanos: u128) {
+        self.wal_bytes_current = wal_bytes;
+        self.wal_bytes_max = self.wal_bytes_max.max(wal_bytes);
+        let debt_bytes = self.threshold_bytes.map_or(0, |threshold_bytes| {
+            wal_bytes.saturating_sub(threshold_bytes)
+        });
+        self.checkpoint_debt_bytes_current = debt_bytes;
+        self.checkpoint_debt_bytes_max = self.checkpoint_debt_bytes_max.max(debt_bytes);
+        self.threshold_excess_max_bytes = self.threshold_excess_max_bytes.max(debt_bytes);
+        if debt_bytes > 0 {
+            self.threshold_excess_since_unix_nanos
+                .get_or_insert(observed_unix_nanos);
+        } else if let Some(started_unix_nanos) = self.threshold_excess_since_unix_nanos.take() {
+            let elapsed_nanos = observed_unix_nanos
+                .saturating_sub(started_unix_nanos)
+                .min(u64::MAX as u128) as u64;
+            self.threshold_excess_total_nanos = self
+                .threshold_excess_total_nanos
+                .saturating_add(elapsed_nanos);
+        }
+        self.threshold_excess_current_nanos = self.threshold_excess_total_nanos;
+        if let Some(started_unix_nanos) = self.threshold_excess_since_unix_nanos {
+            let elapsed_nanos = observed_unix_nanos
+                .saturating_sub(started_unix_nanos)
+                .min(u64::MAX as u128) as u64;
+            self.threshold_excess_current_nanos = self
+                .threshold_excess_current_nanos
+                .saturating_add(elapsed_nanos);
+        }
+    }
+
+    fn snapshot_at(&self, observed_unix_nanos: u128) -> BlinkWalCheckpointMetrics {
+        let mut snapshot = self.clone();
+        snapshot.threshold_excess_current_nanos = snapshot.threshold_excess_total_nanos;
+        if let Some(started_unix_nanos) = snapshot.threshold_excess_since_unix_nanos {
+            let elapsed_nanos = observed_unix_nanos
+                .saturating_sub(started_unix_nanos)
+                .min(u64::MAX as u128) as u64;
+            snapshot.threshold_excess_current_nanos = snapshot
+                .threshold_excess_current_nanos
+                .saturating_add(elapsed_nanos);
+        }
+        snapshot
+    }
+
+    fn checkpoint_request_queued(&mut self) {
+        self.checkpoint_requests_queued = self.checkpoint_requests_queued.saturating_add(1);
+        self.checkpoint_requests_pending = self.checkpoint_requests_pending.saturating_add(1);
+    }
+
+    fn checkpoint_request_started(&mut self, wait_nanos: u64) {
+        self.checkpoint_requests_pending = self.checkpoint_requests_pending.saturating_sub(1);
+        self.checkpoint_request_wait_nanos_total = self
+            .checkpoint_request_wait_nanos_total
+            .saturating_add(wait_nanos);
+        self.checkpoint_request_wait_nanos_max =
+            self.checkpoint_request_wait_nanos_max.max(wait_nanos);
+    }
+
+    fn checkpoint_request_cancelled(&mut self, wait_nanos: u64) {
+        self.checkpoint_requests_pending = self.checkpoint_requests_pending.saturating_sub(1);
+        self.checkpoint_requests_cancelled = self.checkpoint_requests_cancelled.saturating_add(1);
+        self.checkpoint_request_wait_nanos_total = self
+            .checkpoint_request_wait_nanos_total
+            .saturating_add(wait_nanos);
+        self.checkpoint_request_wait_nanos_max =
+            self.checkpoint_request_wait_nanos_max.max(wait_nanos);
+    }
+
     fn reset(&mut self) {
         let policy = self.policy;
         let execution = self.execution;
         let retained_image_bytes = self.retained_image_bytes;
         let tasks_running = self.tasks_running;
+        let checkpoint_debt_bytes_current = self.checkpoint_debt_bytes_current;
+        let threshold_excess_since_unix_nanos = self.threshold_excess_since_unix_nanos;
+        let checkpoint_requests_pending = self.checkpoint_requests_pending;
         *self = Self {
             policy,
             execution,
@@ -1069,6 +1157,9 @@ impl BlinkWalCheckpointMetrics {
             peak_retained_image_bytes: retained_image_bytes,
             tasks_running,
             peak_tasks_running: tasks_running,
+            checkpoint_debt_bytes_current,
+            threshold_excess_since_unix_nanos,
+            checkpoint_requests_pending,
             threshold_bytes: match policy {
                 BlinkCheckpointPolicy::Disabled => None,
                 BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => {
@@ -1275,7 +1366,7 @@ impl BlinkTenantService {
     pub fn checkpoint_metrics_snapshot(&self) -> BlinkWalCheckpointMetrics {
         self.checkpoint_metrics
             .lock()
-            .map(|metrics| metrics.clone())
+            .map(|metrics| metrics.snapshot_at(current_unix_nanos()))
             .unwrap_or_default()
     }
 
@@ -1669,8 +1760,10 @@ impl AsyncBlinkShard {
                             metrics.wal_syncs = metrics.wal_syncs.saturating_add(sync_delta);
                             metrics.commit_wal_syncs =
                                 metrics.commit_wal_syncs.saturating_add(sync_delta);
-                            metrics.wal_bytes_current =
-                                wal_after.as_ref().map_or(0, |wal| wal.wal_bytes);
+                            metrics.observe_wal_bytes(
+                                wal_after.as_ref().map_or(0, |wal| wal.wal_bytes),
+                                current_unix_nanos(),
+                            );
                             metrics.wal_bytes_at_measurement_end = Some(metrics.wal_bytes_current);
                             metrics.wal_bytes_max =
                                 metrics.wal_bytes_max.max(metrics.wal_bytes_current);
@@ -1711,6 +1804,8 @@ impl AsyncBlinkShard {
                             if let Ok(mut metrics) = checkpoint_metrics.lock() {
                                 metrics.checkpoints_started =
                                     metrics.checkpoints_started.saturating_add(1);
+                                metrics.checkpoint_request_queued();
+                                metrics.checkpoint_request_started(0);
                             }
                             let (updated_store, checkpoint_result, wal_bytes_after) =
                                 match tokio::task::spawn_blocking(move || {
@@ -1795,7 +1890,7 @@ impl AsyncBlinkShard {
                                     .saturating_add(checkpoint_duration_nanos);
                                 metrics.checkpoint_max_nanos =
                                     metrics.checkpoint_max_nanos.max(checkpoint_duration_nanos);
-                                metrics.wal_bytes_current = wal_bytes_after;
+                                metrics.observe_wal_bytes(wal_bytes_after, ended_unix_nanos);
                                 metrics.wal_bytes_at_measurement_end = Some(wal_bytes_after);
                                 metrics.wal_bytes_max = metrics.wal_bytes_max.max(wal_bytes_after);
                                 if let Some(threshold_bytes) = metrics.threshold_bytes {
@@ -1876,10 +1971,10 @@ impl AsyncBlinkShard {
     }
 
     async fn transact(&self, request: TransactionRequest) -> Result<TransactionResult, Error> {
-        if let Ok(failed) = self.failed_message.lock() {
-            if let Some(message) = failed.as_ref() {
-                return Err(Error::durability(message.clone()));
-            }
+        if let Ok(failed) = self.failed_message.lock()
+            && let Some(message) = failed.as_ref()
+        {
+            return Err(Error::durability(message.clone()));
         }
         let (response_tx, response_rx) = tokio::sync::oneshot::channel();
         let send_result = self
@@ -1893,12 +1988,11 @@ impl AsyncBlinkShard {
                 response_tx,
             });
         if let Err(error) = send_result {
-            if matches!(error, tokio::sync::mpsc::error::TrySendError::Closed(_)) {
-                if let Ok(failed) = self.failed_message.lock() {
-                    if let Some(message) = failed.as_ref() {
-                        return Err(Error::durability(message.clone()));
-                    }
-                }
+            if matches!(error, tokio::sync::mpsc::error::TrySendError::Closed(_))
+                && let Ok(failed) = self.failed_message.lock()
+                && let Some(message) = failed.as_ref()
+            {
+                return Err(Error::durability(message.clone()));
             }
             return Err(match error {
                 tokio::sync::mpsc::error::TrySendError::Full(_) => {
@@ -2419,6 +2513,42 @@ fn condition_matches(condition: &TransactionCondition, actual: &ObservedState) -
 mod tests {
     use super::*;
     use dodb_core::DocumentKey;
+
+    #[test]
+    fn checkpoint_debt_metrics_track_excess_time_and_request_wait() {
+        let mut metrics = BlinkWalCheckpointMetrics {
+            threshold_bytes: Some(100),
+            ..BlinkWalCheckpointMetrics::default()
+        };
+
+        metrics.observe_wal_bytes(100, 1_000);
+        assert_eq!(metrics.checkpoint_debt_bytes_current, 0);
+        assert_eq!(metrics.threshold_excess_since_unix_nanos, None);
+        metrics.observe_wal_bytes(125, 2_000);
+        assert_eq!(metrics.checkpoint_debt_bytes_current, 25);
+        assert_eq!(metrics.checkpoint_debt_bytes_max, 25);
+        assert_eq!(metrics.threshold_excess_since_unix_nanos, Some(2_000));
+        assert_eq!(
+            metrics.snapshot_at(6_000).threshold_excess_current_nanos,
+            4_000
+        );
+        metrics.observe_wal_bytes(100, 7_000);
+        assert_eq!(metrics.threshold_excess_total_nanos, 5_000);
+        assert_eq!(metrics.threshold_excess_current_nanos, 5_000);
+        assert_eq!(metrics.threshold_excess_since_unix_nanos, None);
+
+        metrics.checkpoint_request_queued();
+        assert_eq!(metrics.checkpoint_requests_pending, 1);
+        metrics.checkpoint_request_started(3_000);
+        assert_eq!(metrics.checkpoint_requests_queued, 1);
+        assert_eq!(metrics.checkpoint_requests_pending, 0);
+        assert_eq!(metrics.checkpoint_request_wait_nanos_total, 3_000);
+        assert_eq!(metrics.checkpoint_request_wait_nanos_max, 3_000);
+        metrics.checkpoint_request_queued();
+        metrics.checkpoint_request_cancelled(4_000);
+        assert_eq!(metrics.checkpoint_requests_cancelled, 1);
+        assert_eq!(metrics.checkpoint_request_wait_nanos_total, 7_000);
+    }
 
     fn blink_test_directory() -> tempfile::TempDir {
         match std::env::var_os("DODB_TEST_DATA_DIR") {

@@ -177,6 +177,19 @@ async fn background_checkpoint_preserves_newer_writes_rotations_tree_growth_and_
     .unwrap();
     let latest = get(&service, 1, 1).await;
     assert_eq!(latest.value(), Some(vec![3; 8192].as_slice()));
+    let queued_metrics = service.checkpoint_metrics_snapshot();
+    assert!(
+        queued_metrics.checkpoint_debt_bytes_current > 0,
+        "{queued_metrics:?}"
+    );
+    assert!(
+        queued_metrics.threshold_excess_current_nanos > 0,
+        "{queued_metrics:?}"
+    );
+    assert!(
+        queued_metrics.checkpoint_requests_pending > 0,
+        "{queued_metrics:?}"
+    );
     assert!(
         service
             .checkpoint_metrics_snapshot()
@@ -192,6 +205,13 @@ async fn background_checkpoint_preserves_newer_writes_rotations_tree_growth_and_
     assert_eq!(metrics.tasks_running, 0);
     assert_eq!(metrics.peak_tasks_running, 1);
     assert_eq!(metrics.retained_image_bytes, 0);
+    assert!(metrics.checkpoint_requests_queued >= 2, "{metrics:?}");
+    assert_eq!(metrics.checkpoint_requests_pending, 0, "{metrics:?}");
+    assert!(
+        metrics.checkpoint_request_wait_nanos_total > 0,
+        "{metrics:?}"
+    );
+    assert!(metrics.threshold_excess_current_nanos > 0, "{metrics:?}");
     service.shutdown_checked().await.unwrap();
     let reopened = BlinkTenantService::new(config).unwrap();
     assert_eq!(get(&reopened, 1, 1).await, latest);

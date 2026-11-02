@@ -49,6 +49,7 @@ pub(super) struct PhysicalCoordinator {
     queued: Vec<QueuedBlinkTransaction>,
     running: Option<RunningCheckpoint>,
     requested: bool,
+    requested_since: Option<Instant>,
     requested_activity: Option<CoordinatorActivityGuard>,
 }
 
@@ -66,12 +67,14 @@ impl PhysicalCoordinator {
             queued: Vec::new(),
             running: None,
             requested: false,
+            requested_since: None,
             requested_activity: None,
         }
     }
 
     pub async fn run(mut self) {
         if let Err(error) = self.run_loop().await {
+            self.cancel_pending_checkpoint_request();
             let message = error.to_string();
             if let Ok(mut failed) = self.settings.failed_message.lock() {
                 *failed = Some(message.clone());
@@ -103,11 +106,24 @@ impl PhysicalCoordinator {
     fn request_checkpoint(&mut self) {
         if self.requested {
             self.metrics(|metrics| metrics.merged_checkpoint_requests += 1);
+        } else {
+            self.requested_since = Some(Instant::now());
+            self.metrics(|metrics| metrics.checkpoint_request_queued());
         }
         self.requested = true;
         if self.requested_activity.is_none() {
             self.requested_activity = Some(self.settings.activity.enter());
         }
+    }
+
+    fn cancel_pending_checkpoint_request(&mut self) {
+        if !self.requested {
+            return;
+        }
+        self.requested = false;
+        self.requested_activity = None;
+        let wait_nanos = self.requested_since.take().map_or(0, nanos);
+        self.metrics(|metrics| metrics.checkpoint_request_cancelled(wait_nanos));
     }
 
     fn semaphore() -> Arc<Semaphore> {
@@ -311,6 +327,7 @@ impl PhysicalCoordinator {
             metrics.wal_bytes_current = wal_bytes;
             metrics.wal_bytes_at_measurement_end = Some(wal_bytes);
             metrics.wal_bytes_max = metrics.wal_bytes_max.max(wal_bytes);
+            metrics.observe_wal_bytes(wal_bytes, unix_nanos());
             metrics.successful_mutation_transactions += successful;
             if overlap {
                 metrics.writes_during_checkpoint += successful;
@@ -350,7 +367,9 @@ impl PhysicalCoordinator {
         .await
         .map_err(|error| Error::durability(format!("checkpoint preparation failed: {error}")))?;
         self.store = Some(store);
+        let request_wait_nanos = self.requested_since.take().map_or(0, nanos);
         self.requested = false;
+        self.metrics(|metrics| metrics.checkpoint_request_started(request_wait_nanos));
         let snapshot = snapshot?;
         self.metrics(|metrics| {
             metrics.coordinator_pause_nanos = metrics
@@ -365,9 +384,8 @@ impl PhysicalCoordinator {
                 .commit_wal_syncs
                 .saturating_add(metrics.checkpoint_wal_syncs);
             if let Some(wal) = &after {
-                metrics.wal_bytes_current = wal.wal_bytes;
+                metrics.observe_wal_bytes(wal.wal_bytes, unix_nanos());
                 metrics.wal_bytes_at_measurement_end = Some(wal.wal_bytes);
-                metrics.wal_bytes_max = metrics.wal_bytes_max.max(wal.wal_bytes);
             }
         });
         let Some(mut snapshot) = snapshot else {
@@ -476,9 +494,8 @@ impl PhysicalCoordinator {
                 .map_or((None, metrics.wal_bytes_current), |(report, bytes)| {
                     (Some(report), *bytes)
                 });
-            metrics.wal_bytes_current = bytes;
+            metrics.observe_wal_bytes(bytes, unix_nanos());
             metrics.wal_bytes_at_measurement_end = Some(bytes);
-            metrics.wal_bytes_max = metrics.wal_bytes_max.max(bytes);
             if result.is_ok() {
                 metrics.checkpoints_completed += 1;
             } else {
@@ -515,8 +532,7 @@ impl PhysicalCoordinator {
             && matches!(self.settings.policy,
                 BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } if *wal_bytes < threshold_bytes)
         {
-            self.requested = false;
-            self.requested_activity = None;
+            self.cancel_pending_checkpoint_request();
         }
         result.map(|_: (BlinkCheckpointReport, u64)| ())
     }
