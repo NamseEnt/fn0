@@ -1,0 +1,32 @@
+{
+  "task_id": "T00",
+  "scope": "Freeze B1/B2 contracts, formats, and failure ordering",
+  "status": "specification-drafted",
+  "parent_source_commit": "6f7389d1836aad7e710b18c5d986010df9b83373",
+  "implementation_commit": null,
+  "prerequisite_receipts": [],
+  "owned_paths": [
+    "dodb/docs/experiments/blink-tenant-density-20261027/B1-B2-CONTRACTS.md",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T00/RESULTS.md",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T00/receipt.json"
+  ],
+  "source_hashes": {},
+  "host": "local worktree",
+  "toolchain": "not used",
+  "features": [],
+  "runtime_configuration": "none",
+  "checks": [],
+  "acceptance_mapping": {
+    "compatibility, identity, formats, WAL, retention, resource, lock, fairness, and transition contracts": "Specified in B1-B2-CONTRACTS.md; not yet independently reviewed",
+    "existing integration points": "Mapped to current Rust symbols in B1-B2-CONTRACTS.md",
+    "implementation claims": "None"
+  },
+  "ownership_peaks": {},
+  "failed_attempts": [],
+  "remaining_work": [
+    "Review and freeze the contract in its own commit before T01",
+    "Implement and validate T01 through T16",
+    "Freeze and separately authorize the T17 comparison matrix"
+  ],
+  "next_task": "T01"
+}
