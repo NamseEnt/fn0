@@ -14,14 +14,16 @@ Storage tests cover all four paged manifest pointer publication fault boundaries
 
 Additional process-kill coverage now starts from a free page with one acknowledged WAL version, then kills a child after it writes an overflow image for that same page ID but before the commit marker. Reopen recovers the acknowledged free-page version and excludes the attempted reuse. The indexed-publication crash test now also pins the previous version-index root while writing the next COW root and manifest pointer; the child is killed before pointer rename, and reopen selects the pinned generation's durable root.
 
+The real `PagedTransactionWriter` path now has process-kill coverage at the delta-chain sidecar-to-index boundary. A child commits a transaction whose page update produces a WAL delta, syncs the ancestry sidecar, and pauses immediately before inserting the index descriptor. The parent sends `SIGKILL`, reopens the WAL with checkpoint base images, verifies the committed batch, confirms the sidecar remains on disk, and verifies the version-index node set is unchanged from immediately before the transaction. This demonstrates a committed WAL update with an unreferenced sidecar after the crash; recovery can rebuild the descriptor from the WAL and checkpoint ancestry.
+
 ## Validation
 
 - `rustfmt --edition 2024 --check crates/dodb-storage/src/blink/paged_recovery.rs crates/dodb-storage/src/blink/paged_manifest.rs crates/dodb-storage/src/blink/version_chain.rs crates/dodb-storage/src/blink/source_manager.rs crates/dodb-storage/src/blink/mod.rs`: passed.
-- Focused paged validation, recovery streaming validation, manifest validated-open, pointer and source-GC `SIGKILL` boundaries, sidecar-before-index and index-before-manifest `SIGKILL`, reused free-page SIGKILL recovery, pinned-root manifest SIGKILL recovery, and delta-chain sidecar regressions: passed.
+- Focused paged validation, recovery streaming validation, manifest validated-open, pointer and source-GC `SIGKILL` boundaries, sidecar-before-index and index-before-manifest `SIGKILL`, reused free-page SIGKILL recovery, pinned-root manifest SIGKILL recovery, actual-writer sidecar-before-index SIGKILL, and delta-chain sidecar regressions: passed.
 - `cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1`: passed, 319 tests; 4 ignored. A preceding full-suite attempt hit the existing background-materialization test's five-second start timeout; its focused retry and this full-suite rerun passed.
 - `git diff --check`: passed.
 - Strict Clippy remains blocked by 12 diagnostics in existing code in `blink/mod.rs` and `wal.rs`; none point to the new recovery validation API, bounded validator, validated-open API, or `source_manager.rs`. No lint suppression was added.
 
-## Remaining T11 Work
+## T11 Status
 
-The bounded checker is integrated with explicit paged manifest opening and WAL recovery validation. Service tenant opening will route through the validated path as part of T12. Additional process-kill cases cover an active WAL interrupted before its commit frame, paged base-pack construction, a free-page reuse attempt interrupted before commit, and a pinned old index root during pre-rename manifest publication. The remaining T11 gap is the delta-chain sidecar-to-index boundary through the actual transaction writer. The free-page test exercises WAL recovery at the page-image/commit boundary; it does not replace process-kill coverage through `PagedTransactionWriter` allocation and publication. T11 remains partial until the actual-writer boundary passes.
+T11 acceptance is complete. Service tenant opening through the validated path remains T12 work, and real-service recovery-write-second-crash coverage remains T15 work.

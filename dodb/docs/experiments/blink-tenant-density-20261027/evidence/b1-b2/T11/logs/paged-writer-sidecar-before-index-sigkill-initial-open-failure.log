@@ -1,0 +1,32 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+warning: variable does not need to be mutable
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:14961:17
+      |
+14961 |             let mut wal = WalLog::open_with_page_image_format(
+      |                 ----^^^
+      |                 |
+      |                 help: remove this `mut`
+      |
+      = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `dodb-storage` (lib test) generated 1 warning (run `cargo fix --lib -p dodb-storage --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.27s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-70634b21c90c24df)
+
+running 1 test
+test blink::tests::paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages ... 
+running 1 test
+
+thread 'blink::tests::paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages' (444277898) panicked at dodb/crates/dodb-storage/src/blink/mod.rs:14969:14:
+called `Result::unwrap()` on an `Err` value: Corruption("WAL page delta for page 2 has no full-image base in this WAL history")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    blink::tests::paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 322 filtered out; finished in 1.18s
+
+error: test failed, to rerun pass `-p dodb-storage --lib`

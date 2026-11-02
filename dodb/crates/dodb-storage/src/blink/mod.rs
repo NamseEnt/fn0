@@ -3732,6 +3732,9 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
                             &chain,
                             chain_reservation,
                         )?;
+                        if let Some(injector) = &mut self.publication_fault_injector {
+                            injector.hit("after_paged_delta_chain_sync_before_index_insert")?;
+                        }
                         version_index::VersionLocator::WalDelta {
                             frame,
                             chain: chain_reference,
@@ -12563,9 +12566,10 @@ mod tests {
     use super::*;
     use std::alloc::{GlobalAlloc, Layout, System};
     use std::io::{BufRead, BufReader, Write};
+    use std::process::Command;
     use std::sync::atomic::AtomicBool;
     #[cfg(feature = "blink-demand-paging")]
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     static COUNT_READ_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
     static READ_ALLOCATION_COUNT: AtomicU64 = AtomicU64::new(0);
@@ -14876,14 +14880,123 @@ mod tests {
     #[cfg(feature = "blink-demand-paging")]
     #[test]
     fn paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages() {
-        let directory = std::env::temp_dir().join(format!(
-            "dodb-paged-read-route-{}-{}",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
+        const CHILD_DIRECTORY: &str = "DODB_PAGED_WRITER_CHAIN_SIGKILL_DIRECTORY";
+        const CHILD_READY: &str = "DODB_PAGED_WRITER_CHAIN_SIGKILL_READY";
+        const CHILD_NODE_BASELINE: &str = "DODB_PAGED_WRITER_CHAIN_NODE_BASELINE";
+        let is_crash_child = std::env::var_os(CHILD_DIRECTORY).is_some();
+        let directory = match std::env::var_os(CHILD_DIRECTORY) {
+            Some(path) => std::path::PathBuf::from(path),
+            None => std::env::temp_dir().join(format!(
+                "dodb-paged-read-route-{}-{}",
+                std::process::id(),
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            )),
+        };
+        if !is_crash_child {
+            let ready_path = directory.join("writer-chain-ready");
+            let baseline_path = directory.join("writer-chain-nodes-before");
+            let mut child = Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "blink::tests::paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages",
+                    "--nocapture",
+                ])
+                .env(CHILD_DIRECTORY, &directory)
+                .env(CHILD_READY, &ready_path)
+                .env(CHILD_NODE_BASELINE, &baseline_path)
+                .spawn()
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(30);
+            while !ready_path.exists() && Instant::now() < deadline {
+                if let Some(status) = child.try_wait().unwrap() {
+                    panic!("writer SIGKILL child exited before sidecar sync: {status}");
+                }
+                thread::sleep(Duration::from_millis(1));
+            }
+            assert!(
+                ready_path.exists(),
+                "writer child did not sync its delta sidecar"
+            );
+            assert_eq!(
+                unsafe { libc::kill(child.id() as libc::pid_t, libc::SIGKILL) },
+                0
+            );
+            let status = child.wait().unwrap();
+            use std::os::unix::process::ExitStatusExt;
+            assert_eq!(status.signal(), Some(libc::SIGKILL));
+
+            let index_directory = directory.join("index");
+            let baseline_nodes = std::fs::read_to_string(&baseline_path).unwrap();
+            let mut current_nodes = std::fs::read_dir(&index_directory)
                 .unwrap()
-                .as_nanos()
-        ));
+                .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+                .filter(|file_name| file_name.ends_with(".node"))
+                .collect::<Vec<_>>();
+            current_nodes.sort();
+            let mut baseline_nodes = baseline_nodes
+                .lines()
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            baseline_nodes.sort();
+            assert_eq!(current_nodes, baseline_nodes);
+            assert!(
+                std::fs::read_dir(&index_directory)
+                    .unwrap()
+                    .any(|entry| entry
+                        .unwrap()
+                        .file_name()
+                        .to_string_lossy()
+                        .starts_with("version-chain-")),
+                "synced delta-chain sidecar is missing after writer SIGKILL"
+            );
+            let wal_identity = WalIdentity::new(
+                [83; 16],
+                TenantId::new(11),
+                ShardId::new(1),
+                ShardEpoch::new(4),
+            );
+            let checkpoint_bytes =
+                std::fs::read(directory.join("packs/base-00000000000000000001.pages")).unwrap();
+            let wal_bases = (0..8usize)
+                .map(|page_offset| {
+                    let page_id = PageId::new(2 + page_offset as u64);
+                    let image_offset = PAGE_SIZE * (page_offset + 1);
+                    let image = checkpoint_bytes[image_offset..image_offset + PAGE_SIZE].to_vec();
+                    let page = decode_blink_page(&image, page_id).unwrap();
+                    (
+                        page_id,
+                        RecoveredWalPage {
+                            commit_lsn: page.lsn(),
+                            image: Box::new(image.try_into().unwrap()),
+                        },
+                    )
+                })
+                .collect::<BTreeMap<_, _>>();
+            let wal = WalLog::open_with_segment_bases(
+                crate::durable_file::ProductionFile::open(
+                    directory.join("segments/segment-00000000000000000001.wal"),
+                )
+                .unwrap(),
+                wal_identity,
+                WalPageImageFormat::ExperimentalBlink,
+                crate::wal::WalSegmentBoundary {
+                    start_after_lsn: Lsn::new(1),
+                    start_batch_id: None,
+                    truncate_torn_tail: true,
+                    defer_initial_sync: false,
+                },
+                wal_bases,
+                None,
+            )
+            .unwrap();
+            assert!(wal.last_commit_lsn().is_some());
+            assert!(wal.committed_batch_count() > 0);
+            std::fs::remove_dir_all(&directory).unwrap();
+            return;
+        }
         let checkpoint_directory = directory.join("packs");
         let wal_directory = directory.join("segments");
         let scratch_directory = directory.join("scratch");
@@ -15677,6 +15790,21 @@ mod tests {
                 },
             ],
         );
+        if let Ok(baseline_path) = std::env::var("DODB_PAGED_WRITER_CHAIN_NODE_BASELINE") {
+            let mut node_names = std::fs::read_dir(&index_directory)
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+                .filter(|file_name| file_name.ends_with(".node"))
+                .collect::<Vec<_>>();
+            node_names.sort();
+            std::fs::write(baseline_path, node_names.join("\n")).unwrap();
+        }
+        if let Ok(ready_path) = std::env::var("DODB_PAGED_WRITER_CHAIN_SIGKILL_READY") {
+            writer.set_boxed_publication_fault_injector(Box::new(PauseAt {
+                point: "after_paged_delta_chain_sync_before_index_insert",
+                ready_path: std::path::PathBuf::from(ready_path),
+            }));
+        }
         let writer_result = writer
             .transact(
                 &writer_request,
@@ -17851,6 +17979,23 @@ mod tests {
     struct FailOnOccurrence {
         point: &'static str,
         remaining: usize,
+    }
+
+    struct PauseAt {
+        point: &'static str,
+        ready_path: std::path::PathBuf,
+    }
+
+    impl FaultInjector for PauseAt {
+        fn hit(&mut self, point: &str) -> Result<()> {
+            if point == self.point {
+                std::fs::write(&self.ready_path, b"ready")?;
+                loop {
+                    thread::sleep(Duration::from_secs(1));
+                }
+            }
+            Ok(())
+        }
     }
 
     impl FaultInjector for FailOnOccurrence {
