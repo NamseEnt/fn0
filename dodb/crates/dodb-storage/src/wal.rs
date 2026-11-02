@@ -218,6 +218,7 @@ pub struct WalRedoStats {
     pub image_first_touch: u64,
     pub image_no_base: u64,
     pub image_not_smaller: u64,
+    pub image_delta_chain_limit: u64,
 }
 
 impl WalRedoStats {
@@ -227,6 +228,7 @@ impl WalRedoStats {
         self.page_delta_payload_bytes += other.page_delta_payload_bytes;
         self.page_delta_spans += other.page_delta_spans;
         self.page_delta_changed_bytes += other.page_delta_changed_bytes;
+        self.image_delta_chain_limit += other.image_delta_chain_limit;
         self.image_superblock += other.image_superblock;
         self.image_not_requested += other.image_not_requested;
         self.image_page_image_format += other.image_page_image_format;
@@ -383,6 +385,7 @@ struct PendingBatch {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WalPageLocation {
+    pub source_identity: WalIdentity,
     pub page_id: PageId,
     pub record_lsn: Lsn,
     pub batch_id: u64,
@@ -399,8 +402,20 @@ pub struct WalPageLocation {
     pub predecessor_frame_offset: Option<u64>,
     pub image_lsn: Option<Lsn>,
     pub image_crc32c: Option<u32>,
+    pub delta_depth: u8,
     pub commit_lsn: Lsn,
     pub commit_frame_offset: u64,
+}
+
+struct DecodedWalFrame {
+    format_version: u16,
+    record_type: WalRecordType,
+    frame_length: usize,
+    payload: Vec<u8>,
+    record_lsn: u64,
+    batch_id: u64,
+    record_index: u32,
+    header_crc32c: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -431,6 +446,7 @@ struct GroupAppendOutcome {
     replayable_pages: usize,
     stats: WalRedoStats,
     chain_updates: Vec<(PageId, PageChainEntry)>,
+    locations: Vec<WalPageLocation>,
 }
 
 /// One logical commit whose redo records were already planned and encoded by
@@ -486,6 +502,7 @@ enum ScanMaterialization {
 struct EncodedWalGroup {
     bytes: Vec<u8>,
     reports: Vec<WalAppendReport>,
+    locations: Vec<WalPageLocation>,
     next_lsn: Lsn,
     next_batch_id: u64,
     attribution: WalEncodeAttribution,
@@ -526,6 +543,8 @@ pub struct WalLog<F: DurableFile> {
     recovery_batches: Vec<CommittedWalBatch>,
     recovery_pages: BTreeMap<PageId, RecoveredWalPage>,
     page_chain: HashMap<PageId, PageChainEntry>,
+    page_locations: Option<Vec<WalPageLocation>>,
+    latest_page_locations: HashMap<PageId, WalPageLocation>,
     redo_stats: WalRedoStats,
     redo_plan_nanos: u64,
     scan_report: WalScanReport,
@@ -761,6 +780,8 @@ impl<F: DurableFile> WalLog<F> {
             recovery_batches: batches,
             recovery_pages: pages,
             page_chain,
+            page_locations: None,
+            latest_page_locations: HashMap::new(),
             redo_stats: redo,
             redo_plan_nanos: 0,
             scan_report: report,
@@ -801,6 +822,8 @@ impl<F: DurableFile> WalLog<F> {
             recovery_batches: Vec::new(),
             recovery_pages: BTreeMap::new(),
             page_chain: HashMap::new(),
+            page_locations: None,
+            latest_page_locations: HashMap::new(),
             redo_stats: WalRedoStats::default(),
             redo_plan_nanos: 0,
             scan_report: WalScanReport::default(),
@@ -896,6 +919,111 @@ impl<F: DurableFile> WalLog<F> {
         })
     }
 
+    pub fn enable_page_location_tracking(
+        &mut self,
+        base_pages: BTreeMap<PageId, RecoveredWalPage>,
+    ) -> Result<()> {
+        let scan = Self::scan_committed_page_locations(
+            &mut self.file,
+            &self.identity,
+            self.page_image_format,
+            self.segment_start_batch_id,
+            base_pages,
+        )?;
+        if scan.committed_prefix_length != self.file.len()? {
+            return Err(Error::corruption(
+                "WAL location tracking cannot start with an uncommitted tail",
+            ));
+        }
+        self.latest_page_locations = scan
+            .locations
+            .iter()
+            .filter(|location| location.image_lsn.is_some() && location.image_crc32c.is_some())
+            .map(|location| (location.page_id, location.clone()))
+            .collect();
+        self.page_locations = Some(scan.locations);
+        Ok(())
+    }
+
+    pub fn committed_page_locations(&self) -> Option<&[WalPageLocation]> {
+        self.page_locations.as_deref()
+    }
+
+    fn resolve_append_locations(
+        &self,
+        locations: &[WalPageLocation],
+        append_offset: u64,
+    ) -> Result<Vec<WalPageLocation>> {
+        let mut current_versions = self
+            .page_chain
+            .iter()
+            .map(|(page_id, entry)| (*page_id, (entry.page_lsn, entry.image_crc, None, 0)))
+            .collect::<HashMap<_, _>>();
+        for (page_id, location) in &self.latest_page_locations {
+            if let (Some(image_lsn), Some(image_crc32c)) =
+                (location.image_lsn, location.image_crc32c)
+            {
+                current_versions.insert(
+                    *page_id,
+                    (
+                        image_lsn,
+                        image_crc32c,
+                        Some(location.frame_offset),
+                        location.delta_depth,
+                    ),
+                );
+            }
+        }
+        let mut resolved = Vec::with_capacity(locations.len());
+        for location in locations {
+            let mut location = location.clone();
+            location.frame_offset = append_offset
+                .checked_add(location.frame_offset)
+                .ok_or_else(|| Error::invariant("WAL location offset overflows"))?;
+            location.payload_offset = append_offset
+                .checked_add(location.payload_offset)
+                .ok_or_else(|| Error::invariant("WAL payload offset overflows"))?;
+            location.commit_frame_offset = append_offset
+                .checked_add(location.commit_frame_offset)
+                .ok_or_else(|| Error::invariant("WAL commit offset overflows"))?;
+            if let Some(base_page_lsn) = location.base_page_lsn {
+                let (current_lsn, current_crc32c, predecessor_offset, current_delta_depth) =
+                    current_versions
+                        .get(&location.page_id)
+                        .copied()
+                        .ok_or_else(|| Error::invariant("WAL delta has no tracked base version"))?;
+                if current_lsn != base_page_lsn {
+                    return Err(Error::invariant(
+                        "WAL delta base LSN differs from tracked page version",
+                    ));
+                }
+                location.base_image_crc32c = Some(current_crc32c);
+                location.predecessor_frame_offset = predecessor_offset;
+                location.delta_depth = current_delta_depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::invariant("WAL delta depth overflows"))?;
+            }
+            if location.record_type == WalRecordType::PageImage {
+                location.delta_depth = 0;
+            }
+            if let (Some(image_lsn), Some(image_crc32c)) =
+                (location.image_lsn, location.image_crc32c)
+            {
+                current_versions.insert(
+                    location.page_id,
+                    (
+                        image_lsn,
+                        image_crc32c,
+                        Some(location.frame_offset),
+                        location.delta_depth,
+                    ),
+                );
+            }
+            resolved.push(location);
+        }
+        Ok(resolved)
+    }
+
     pub fn read_committed_page_payload(
         file: &mut F,
         locations: &[WalPageLocation],
@@ -905,6 +1033,21 @@ impl<F: DurableFile> WalLog<F> {
         let target = locations
             .get(location_index)
             .ok_or_else(|| Error::invalid_input("WAL location index is out of range"))?;
+        let init_frame = read_exact_frame(file, 0, committed_prefix_length)?;
+        if init_frame.record_type != WalRecordType::Init
+            || init_frame.record_lsn != 0
+            || init_frame.batch_id != 0
+            || init_frame.record_index != 0
+        {
+            return Err(Error::corruption(
+                "WAL location source has an invalid initialization frame",
+            ));
+        }
+        verify_identity(
+            init_frame.format_version,
+            &init_frame.payload,
+            &target.source_identity,
+        )?;
         let mut batch_locations = locations
             .iter()
             .filter(|location| location.batch_id == target.batch_id)
@@ -912,7 +1055,8 @@ impl<F: DurableFile> WalLog<F> {
         batch_locations.sort_by_key(|location| location.record_index);
         if batch_locations.is_empty()
             || batch_locations.iter().any(|location| {
-                location.commit_lsn != target.commit_lsn
+                location.source_identity != target.source_identity
+                    || location.commit_lsn != target.commit_lsn
                     || location.commit_frame_offset != target.commit_frame_offset
             })
             || batch_locations
@@ -956,23 +1100,13 @@ impl<F: DurableFile> WalLog<F> {
         }
         let commit_frame =
             read_exact_frame(file, target.commit_frame_offset, committed_prefix_length)?;
-        let (
-            commit_version,
-            commit_type,
-            _commit_frame_length,
-            commit_payload,
-            commit_lsn,
-            commit_batch_id,
-            commit_record_index,
-            _,
-        ) = commit_frame;
         let (first_record_lsn, expected_page_count, expected_digest) =
-            decode_commit_payload(&commit_payload)?;
-        if commit_type != WalRecordType::Commit
-            || Some(commit_version) != target_format_version
-            || commit_lsn != target.commit_lsn.get()
-            || commit_batch_id != target.batch_id
-            || commit_record_index as usize != batch_locations.len()
+            decode_commit_payload(&commit_frame.payload)?;
+        if commit_frame.record_type != WalRecordType::Commit
+            || Some(commit_frame.format_version) != target_format_version
+            || commit_frame.record_lsn != target.commit_lsn.get()
+            || commit_frame.batch_id != target.batch_id
+            || commit_frame.record_index as usize != batch_locations.len()
             || batch_locations
                 .first()
                 .is_none_or(|location| location.record_lsn.get() != first_record_lsn.get())
@@ -995,6 +1129,10 @@ impl<F: DurableFile> WalLog<F> {
         base_pages: &BTreeMap<PageId, RecoveredWalPage>,
     ) -> Result<WalPageImage> {
         let mut current_index = location_index;
+        let target_delta_depth = locations
+            .get(location_index)
+            .ok_or_else(|| Error::invalid_input("WAL location index is out of range"))?
+            .delta_depth;
         let mut visited_offsets = HashSet::new();
         let mut staged_deltas = Vec::new();
         let mut reconstructed_page = loop {
@@ -1015,7 +1153,8 @@ impl<F: DurableFile> WalLog<F> {
                     let page = decode_page_image(&payload)?;
                     validate_page_image(&page, page_image_format)?;
                     validate_page_image_lsn(&page, location.commit_lsn)?;
-                    if Some(crc32c::crc32c(&page.image[..])) != location.image_crc32c
+                    if location.delta_depth != 0
+                        || Some(crc32c::crc32c(&page.image[..])) != location.image_crc32c
                         || (!is_superblock_page(page.page_id)
                             && Some(page_lsn_of(&page.image)) != location.image_lsn)
                     {
@@ -1032,8 +1171,14 @@ impl<F: DurableFile> WalLog<F> {
                         ));
                     }
                     let delta = decode_page_delta(&payload)?;
+                    let traversed_deltas = u8::try_from(staged_deltas.len())
+                        .map_err(|_| Error::corruption("WAL delta depth overflows"))?;
+                    let expected_depth = target_delta_depth
+                        .checked_sub(traversed_deltas)
+                        .ok_or_else(|| Error::corruption("WAL delta depth is inconsistent"))?;
                     if delta.page_id != location.page_id
                         || Some(delta.base_page_lsn) != location.base_page_lsn
+                        || location.delta_depth != expected_depth
                     {
                         return Err(Error::corruption(
                             "WAL delta base identity does not match its location",
@@ -1194,6 +1339,10 @@ impl<F: DurableFile> WalLog<F> {
             .sync_count
             .checked_add(1)
             .ok_or_else(|| Error::invariant("WAL sync count overflow"))?;
+        if let Some(page_locations) = &mut self.page_locations {
+            page_locations.clear();
+        }
+        self.latest_page_locations.clear();
         hit(&mut injector, "after_wal_reset_truncate_sync")?;
 
         self.history_start_lsn = checkpoint_lsn;
@@ -1420,8 +1569,10 @@ impl<F: DurableFile> WalLog<F> {
             .group_encode_nanos
             .checked_add(plan_nanos)
             .ok_or_else(|| Error::invariant("WAL group-encode timing overflow"))?;
-        let (reports, next_lsn, next_batch_id) = if injector.is_some() {
-            self.append_group_fault_injectable(commits, &plan, &mut injector)?
+        let (reports, next_lsn, next_batch_id, locations) = if injector.is_some() {
+            let (reports, next_lsn, next_batch_id) =
+                self.append_group_fault_injectable(commits, &plan, &mut injector)?;
+            (reports, next_lsn, next_batch_id, Vec::new())
         } else {
             let encode_started = Instant::now();
             let encoded = self.encode_group(commits, validation_mode, &plan)?;
@@ -1434,19 +1585,30 @@ impl<F: DurableFile> WalLog<F> {
             let write_started = Instant::now();
             let write_result = (|| {
                 let offset = self.file.len()?;
+                let locations = if self.page_locations.is_some() {
+                    self.resolve_append_locations(&encoded.locations, offset)?
+                } else {
+                    Vec::new()
+                };
                 write_all_at_counted(
                     &mut self.file,
                     offset,
                     &encoded.bytes,
                     &mut self.physical_write_calls,
                 )
+                .map(|()| (offset, locations))
             })();
             self.group_write_nanos = self
                 .group_write_nanos
                 .checked_add(elapsed_nanos(write_started)?)
                 .ok_or_else(|| Error::invariant("WAL group-write timing overflow"))?;
-            write_result?;
-            (encoded.reports, encoded.next_lsn, encoded.next_batch_id)
+            let (_, locations) = write_result?;
+            (
+                encoded.reports,
+                encoded.next_lsn,
+                encoded.next_batch_id,
+                locations,
+            )
         };
 
         let replayable_pages = commits
@@ -1465,6 +1627,7 @@ impl<F: DurableFile> WalLog<F> {
                 replayable_pages,
                 stats: plan.stats,
                 chain_updates: plan.chain_updates,
+                locations,
             },
         )?;
         Ok(reports)
@@ -1524,6 +1687,15 @@ impl<F: DurableFile> WalLog<F> {
         for (page_id, entry) in outcome.chain_updates {
             self.page_chain.insert(page_id, entry);
         }
+        if let Some(page_locations) = &mut self.page_locations {
+            for location in outcome.locations {
+                if location.image_lsn.is_some() && location.image_crc32c.is_some() {
+                    self.latest_page_locations
+                        .insert(location.page_id, location.clone());
+                }
+                page_locations.push(location);
+            }
+        }
         self.redo_stats.add(&outcome.stats);
         Ok(())
     }
@@ -1556,8 +1728,10 @@ impl<F: DurableFile> WalLog<F> {
             .group_encode_nanos
             .checked_add(plan_nanos)
             .ok_or_else(|| Error::invariant("WAL group-encode timing overflow"))?;
-        let (reports, next_lsn, next_batch_id) = if injector.is_some() {
-            self.append_prepared_fault_injectable(commits, &mut injector)?
+        let (reports, next_lsn, next_batch_id, locations) = if injector.is_some() {
+            let (reports, next_lsn, next_batch_id) =
+                self.append_prepared_fault_injectable(commits, &mut injector)?;
+            (reports, next_lsn, next_batch_id, Vec::new())
         } else {
             let encode_started = Instant::now();
             let encoded = self.encode_prepared_group(commits)?;
@@ -1569,19 +1743,30 @@ impl<F: DurableFile> WalLog<F> {
             let write_started = Instant::now();
             let write_result = (|| {
                 let offset = self.file.len()?;
+                let locations = if self.page_locations.is_some() {
+                    self.resolve_append_locations(&encoded.locations, offset)?
+                } else {
+                    Vec::new()
+                };
                 write_all_at_counted(
                     &mut self.file,
                     offset,
                     &encoded.bytes,
                     &mut self.physical_write_calls,
                 )
+                .map(|()| locations)
             })();
             self.group_write_nanos = self
                 .group_write_nanos
                 .checked_add(elapsed_nanos(write_started)?)
                 .ok_or_else(|| Error::invariant("WAL group-write timing overflow"))?;
-            write_result?;
-            (encoded.reports, encoded.next_lsn, encoded.next_batch_id)
+            let locations = write_result?;
+            (
+                encoded.reports,
+                encoded.next_lsn,
+                encoded.next_batch_id,
+                locations,
+            )
         };
         let replayable_pages = commits
             .iter()
@@ -1599,6 +1784,7 @@ impl<F: DurableFile> WalLog<F> {
                 replayable_pages,
                 stats,
                 chain_updates,
+                locations,
             },
         )?;
         Ok(reports)
@@ -1610,6 +1796,7 @@ impl<F: DurableFile> WalLog<F> {
         strict: bool,
     ) -> Result<(Vec<(PageId, PageChainEntry)>, WalRedoStats)> {
         let mut group_chain: HashMap<PageId, PageChainEntry> = HashMap::new();
+        let mut group_delta_depth = HashMap::new();
         let mut chain_updates = Vec::new();
         let mut stats = WalRedoStats::default();
         let mut next_lsn = self.next_lsn;
@@ -1650,6 +1837,15 @@ impl<F: DurableFile> WalLog<F> {
                     ));
                 }
                 previous_page_id = Some(record.page_id);
+                let prior_delta_depth = group_delta_depth
+                    .get(&record.page_id)
+                    .copied()
+                    .or_else(|| {
+                        self.latest_page_locations
+                            .get(&record.page_id)
+                            .map(|location| location.delta_depth)
+                    })
+                    .unwrap_or(0);
                 if record.page_lsn != commit.commit_lsn {
                     return Err(Error::corruption(format!(
                         "WAL page {} has page LSN {}, commit LSN {}",
@@ -1691,6 +1887,13 @@ impl<F: DurableFile> WalLog<F> {
                         spans,
                         changed_bytes,
                     } => {
+                        if self.page_locations.is_some()
+                            && prior_delta_depth >= MAX_RECONSTRUCTION_DELTAS as u8
+                        {
+                            return Err(Error::invariant(
+                                "prepared WAL delta exceeds the reconstruction limit",
+                            ));
+                        }
                         if payload.len() < PAGE_DELTA_HEADER_SIZE
                             || payload.len() >= PAGE_IMAGE_PAYLOAD_SIZE
                         {
@@ -1748,6 +1951,14 @@ impl<F: DurableFile> WalLog<F> {
                     image_crc: record.image_crc,
                 };
                 group_chain.insert(record.page_id, entry);
+                group_delta_depth.insert(
+                    record.page_id,
+                    if matches!(&record.redo, PreparedWalRedo::Delta { .. }) {
+                        prior_delta_depth.saturating_add(1)
+                    } else {
+                        0
+                    },
+                );
                 chain_updates.push((record.page_id, entry));
             }
             next_lsn = Lsn::new(
@@ -1784,12 +1995,14 @@ impl<F: DurableFile> WalLog<F> {
             .try_reserve(capacity)
             .map_err(|_| Error::invalid_input("WAL group buffer is too large"))?;
         let mut reports = Vec::with_capacity(commits.len());
+        let mut locations = Vec::new();
         let mut next_lsn = self.next_lsn;
         let mut next_batch_id = self.next_batch_id;
         for commit in commits {
             let first_record_lsn = next_lsn;
             let mut bytes_written = 0usize;
             let mut digest = 0u32;
+            let batch_location_start = locations.len();
             for (record_position, record) in commit.records.iter().enumerate() {
                 let page_id_bytes = record.page_id.get().to_le_bytes();
                 let record_index = u32::try_from(record_position)
@@ -1820,6 +2033,8 @@ impl<F: DurableFile> WalLog<F> {
                     .checked_add(record_position as u64)
                     .map(Lsn::new)
                     .ok_or_else(|| Error::invariant("WAL LSN exhausted"))?;
+                let frame_offset = u64::try_from(bytes.len())
+                    .map_err(|_| Error::invariant("WAL group offset does not fit u64"))?;
                 let frame_length = append_frame_parts_direct(
                     &mut bytes,
                     self.format_version,
@@ -1832,6 +2047,50 @@ impl<F: DurableFile> WalLog<F> {
                     &payload_parts,
                     &mut attribution,
                 )?;
+                if self.page_locations.is_some() {
+                    let payload_length = payload_parts[0]
+                        .len()
+                        .checked_add(payload_parts[1].len())
+                        .ok_or_else(|| Error::invariant("WAL payload length overflows"))?;
+                    let header_start = usize::try_from(frame_offset)
+                        .map_err(|_| Error::invariant("WAL group offset does not fit usize"))?;
+                    let header_end = header_start
+                        .checked_add(WAL_HEADER_SIZE)
+                        .ok_or_else(|| Error::invariant("WAL header range overflows"))?;
+                    let base_page_lsn = match &record.redo {
+                        PreparedWalRedo::Delta { base_lsn, .. } => Some(*base_lsn),
+                        PreparedWalRedo::Image(_) => None,
+                    };
+                    locations.push(WalPageLocation {
+                        source_identity: self.identity.clone(),
+                        page_id: record.page_id,
+                        record_lsn,
+                        batch_id: commit.batch_id,
+                        record_index,
+                        record_type,
+                        frame_offset,
+                        frame_length: u32::try_from(frame_length)
+                            .map_err(|_| Error::invariant("WAL frame length exceeds u32"))?,
+                        header_crc32c: crc32c::crc32c(&bytes[header_start..header_end]),
+                        payload_offset: frame_offset
+                            .checked_add(WAL_HEADER_SIZE as u64)
+                            .ok_or_else(|| Error::invariant("WAL payload offset overflows"))?,
+                        payload_length: u32::try_from(payload_length)
+                            .map_err(|_| Error::invariant("WAL payload length exceeds u32"))?,
+                        payload_crc32c: payload_checksum,
+                        base_page_lsn,
+                        base_image_crc32c: match &record.redo {
+                            PreparedWalRedo::Delta { base_crc, .. } => Some(*base_crc),
+                            PreparedWalRedo::Image(_) => None,
+                        },
+                        predecessor_frame_offset: None,
+                        image_lsn: Some(record.page_lsn),
+                        image_crc32c: Some(record.image_crc),
+                        delta_depth: 0,
+                        commit_lsn: Lsn::ZERO,
+                        commit_frame_offset: 0,
+                    });
+                }
                 bytes_written = bytes_written
                     .checked_add(frame_length)
                     .ok_or_else(|| Error::invariant("WAL byte count overflow"))?;
@@ -1841,6 +2100,8 @@ impl<F: DurableFile> WalLog<F> {
                 prepared_commit_payload(first_record_lsn, commit.records.len(), digest)?;
             let commit_record_index = u32::try_from(commit.records.len())
                 .map_err(|_| Error::invalid_input("WAL record index overflows u32"))?;
+            let commit_frame_offset = u64::try_from(bytes.len())
+                .map_err(|_| Error::invariant("WAL group offset does not fit u64"))?;
             let commit_frame_length = append_frame_direct(
                 &mut bytes,
                 self.format_version,
@@ -1851,6 +2112,12 @@ impl<F: DurableFile> WalLog<F> {
                 &commit_payload,
                 &mut attribution,
             )?;
+            if self.page_locations.is_some() {
+                for location in &mut locations[batch_location_start..] {
+                    location.commit_lsn = commit.commit_lsn;
+                    location.commit_frame_offset = commit_frame_offset;
+                }
+            }
             bytes_written = bytes_written
                 .checked_add(commit_frame_length)
                 .ok_or_else(|| Error::invariant("WAL byte count overflow"))?;
@@ -1875,6 +2142,7 @@ impl<F: DurableFile> WalLog<F> {
         Ok(EncodedWalGroup {
             bytes,
             reports,
+            locations,
             next_lsn,
             next_batch_id,
             attribution,
@@ -2038,6 +2306,7 @@ impl<F: DurableFile> WalLog<F> {
         let track_chain = self.page_image_format != WalPageImageFormat::Baseline;
         let delta_format = self.page_delta_enabled();
         let mut group_chain: HashMap<PageId, (PageChainEntry, &[u8; PAGE_SIZE])> = HashMap::new();
+        let mut group_delta_depth = HashMap::new();
         let mut records = Vec::with_capacity(commits.len());
         let mut chain_updates = Vec::new();
         let mut stats = WalRedoStats::default();
@@ -2045,6 +2314,15 @@ impl<F: DurableFile> WalLog<F> {
             let mut commit_records = Vec::with_capacity(commit.pages.len());
             for page in &commit.pages {
                 let superblock = is_superblock_page(page.page_id);
+                let prior_delta_depth = group_delta_depth
+                    .get(&page.page_id)
+                    .copied()
+                    .or_else(|| {
+                        self.latest_page_locations
+                            .get(&page.page_id)
+                            .map(|location| location.delta_depth)
+                    })
+                    .unwrap_or(0);
                 let planned = if superblock {
                     stats.image_superblock += 1;
                     PlannedRedo::Image
@@ -2083,7 +2361,14 @@ impl<F: DurableFile> WalLog<F> {
                                         PlannedRedo::Image
                                     }
                                     Some(base) => {
-                                        self.plan_page_delta(page, base, entry, &mut stats)?
+                                        if self.page_locations.is_some()
+                                            && prior_delta_depth >= MAX_RECONSTRUCTION_DELTAS as u8
+                                        {
+                                            stats.image_delta_chain_limit += 1;
+                                            PlannedRedo::Image
+                                        } else {
+                                            self.plan_page_delta(page, base, entry, &mut stats)?
+                                        }
                                     }
                                 }
                             }
@@ -2104,6 +2389,14 @@ impl<F: DurableFile> WalLog<F> {
                     group_chain.insert(page.page_id, (entry, &page.image));
                     chain_updates.push((page.page_id, entry));
                 }
+                group_delta_depth.insert(
+                    page.page_id,
+                    if matches!(&planned, PlannedRedo::Delta(_)) {
+                        prior_delta_depth.saturating_add(1)
+                    } else {
+                        0
+                    },
+                );
                 commit_records.push(planned);
             }
             records.push(commit_records);
@@ -2214,6 +2507,7 @@ impl<F: DurableFile> WalLog<F> {
             .try_reserve(capacity)
             .map_err(|_| Error::invalid_input("WAL group buffer is too large"))?;
         let mut reports = Vec::with_capacity(commits.len());
+        let mut locations = Vec::new();
         let mut next_lsn = self.next_lsn;
         let mut next_batch_id = self.next_batch_id;
 
@@ -2241,6 +2535,7 @@ impl<F: DurableFile> WalLog<F> {
 
             let mut bytes_written = 0usize;
             let mut digest = 0u32;
+            let batch_location_start = locations.len();
             for (page_index, (page, record)) in commit.pages.iter().zip(records).enumerate() {
                 let page_lsn_validation_started = Instant::now();
                 validate_page_image_lsn(page, commit.commit_lsn)?;
@@ -2281,6 +2576,8 @@ impl<F: DurableFile> WalLog<F> {
                     )
                     .map(Lsn::new)
                     .ok_or_else(|| Error::invariant("WAL LSN exhausted"))?;
+                let frame_offset = u64::try_from(bytes.len())
+                    .map_err(|_| Error::invariant("WAL group offset does not fit u64"))?;
                 let frame_length = append_frame_parts_direct(
                     &mut bytes,
                     self.format_version,
@@ -2293,6 +2590,50 @@ impl<F: DurableFile> WalLog<F> {
                     &payload_parts,
                     &mut attribution,
                 )?;
+                if self.page_locations.is_some() {
+                    let payload_length = payload_parts[0]
+                        .len()
+                        .checked_add(payload_parts[1].len())
+                        .ok_or_else(|| Error::invariant("WAL payload length overflows"))?;
+                    let header_start = usize::try_from(frame_offset)
+                        .map_err(|_| Error::invariant("WAL group offset does not fit usize"))?;
+                    let header_end = header_start
+                        .checked_add(WAL_HEADER_SIZE)
+                        .ok_or_else(|| Error::invariant("WAL header range overflows"))?;
+                    let base_page_lsn = match record {
+                        PlannedRedo::Delta(payload) => {
+                            Some(decode_page_delta(payload)?.base_page_lsn)
+                        }
+                        PlannedRedo::Image => None,
+                    };
+                    locations.push(WalPageLocation {
+                        source_identity: self.identity.clone(),
+                        page_id: page.page_id,
+                        record_lsn,
+                        batch_id: commit.batch_id,
+                        record_index,
+                        record_type,
+                        frame_offset,
+                        frame_length: u32::try_from(frame_length)
+                            .map_err(|_| Error::invariant("WAL frame length exceeds u32"))?,
+                        header_crc32c: crc32c::crc32c(&bytes[header_start..header_end]),
+                        payload_offset: frame_offset
+                            .checked_add(WAL_HEADER_SIZE as u64)
+                            .ok_or_else(|| Error::invariant("WAL payload offset overflows"))?,
+                        payload_length: u32::try_from(payload_length)
+                            .map_err(|_| Error::invariant("WAL payload length exceeds u32"))?,
+                        payload_crc32c: payload_checksum,
+                        base_page_lsn,
+                        base_image_crc32c: None,
+                        predecessor_frame_offset: None,
+                        image_lsn: (!is_superblock_page(page.page_id))
+                            .then(|| page_lsn_of(&page.image)),
+                        image_crc32c: Some(crc32c::crc32c(&page.image[..])),
+                        delta_depth: 0,
+                        commit_lsn: Lsn::ZERO,
+                        commit_frame_offset: 0,
+                    });
+                }
                 bytes_written = bytes_written
                     .checked_add(frame_length)
                     .ok_or_else(|| Error::invariant("WAL byte count overflow"))?;
@@ -2309,6 +2650,8 @@ impl<F: DurableFile> WalLog<F> {
             commit_payload[12..16].copy_from_slice(&digest.to_le_bytes());
             let commit_record_index = u32::try_from(commit.pages.len())
                 .map_err(|_| Error::invalid_input("WAL record index overflows u32"))?;
+            let commit_frame_offset = u64::try_from(bytes.len())
+                .map_err(|_| Error::invariant("WAL group offset does not fit u64"))?;
             let commit_frame_length = append_frame_direct(
                 &mut bytes,
                 self.format_version,
@@ -2319,6 +2662,12 @@ impl<F: DurableFile> WalLog<F> {
                 &commit_payload,
                 &mut attribution,
             )?;
+            if self.page_locations.is_some() {
+                for location in &mut locations[batch_location_start..] {
+                    location.commit_lsn = commit.commit_lsn;
+                    location.commit_frame_offset = commit_frame_offset;
+                }
+            }
             bytes_written = bytes_written
                 .checked_add(commit_frame_length)
                 .ok_or_else(|| Error::invariant("WAL byte count overflow"))?;
@@ -2344,6 +2693,7 @@ impl<F: DurableFile> WalLog<F> {
         Ok(EncodedWalGroup {
             bytes,
             reports,
+            locations,
             next_lsn,
             next_batch_id,
             attribution,
@@ -3567,7 +3917,7 @@ fn scan_wal<F: DurableFile>(
     let mut last_commit_batch_id = None;
     let mut committed_length = 0;
     let mut locations = Vec::new();
-    let mut latest_location_by_page: HashMap<PageId, (u64, Lsn, u32)> = HashMap::new();
+    let mut latest_location_by_page: HashMap<PageId, (u64, Lsn, u32, u8)> = HashMap::new();
     let blink = page_image_format == WalPageImageFormat::ExperimentalBlink;
     let compact = page_image_format != WalPageImageFormat::Baseline;
     let keep_batches = match materialization {
@@ -3731,6 +4081,7 @@ fn scan_wal<F: DurableFile>(
                 });
                 if materialization == ScanMaterialization::Locations {
                     current.locations.push(WalPageLocation {
+                        source_identity: identity.clone(),
                         page_id,
                         record_lsn,
                         batch_id,
@@ -3751,6 +4102,7 @@ fn scan_wal<F: DurableFile>(
                         predecessor_frame_offset: None,
                         image_lsn: None,
                         image_crc32c: None,
+                        delta_depth: 0,
                         commit_lsn: Lsn::ZERO,
                         commit_frame_offset: 0,
                     });
@@ -3815,16 +4167,14 @@ fn scan_wal<F: DurableFile>(
                             })?;
                             let base_image_crc32c = crc32c::crc32c(&base.image[..]);
                             let predecessor = latest_location_by_page.get(&view.page_id).copied();
-                            if materialization == ScanMaterialization::Locations {
-                                if let Some((_, predecessor_lsn, predecessor_crc)) = predecessor {
-                                    if predecessor_lsn != view.base_page_lsn
-                                        || predecessor_crc != base_image_crc32c
-                                    {
-                                        return Err(Error::corruption(
-                                            "WAL delta predecessor does not match the latest committed page version",
-                                        ));
-                                    }
-                                }
+                            if materialization == ScanMaterialization::Locations
+                                && let Some((_, predecessor_lsn, predecessor_crc, _)) = predecessor
+                                && (predecessor_lsn != view.base_page_lsn
+                                    || predecessor_crc != base_image_crc32c)
+                            {
+                                return Err(Error::corruption(
+                                    "WAL delta predecessor does not match the latest committed page version",
+                                ));
                             }
                             let page = WalPageImage {
                                 page_id: view.page_id,
@@ -3836,13 +4186,24 @@ fn scan_wal<F: DurableFile>(
                             redo.page_delta_payload_bytes += delta_payload.len() as u64;
                             redo.page_delta_spans += view.spans.len() as u64;
                             redo.page_delta_changed_bytes += view.changed_bytes() as u64;
+                            let delta_depth = predecessor
+                                .map(|(_, _, _, previous_depth)| previous_depth.saturating_add(1))
+                                .unwrap_or(1);
+                            if materialization == ScanMaterialization::Locations
+                                && delta_depth > MAX_RECONSTRUCTION_DELTAS as u8
+                            {
+                                return Err(Error::corruption(
+                                    "WAL page delta chain exceeds the reconstruction limit",
+                                ));
+                            }
                             (
                                 page,
                                 WalRedoKind::PageDelta,
                                 Some((
                                     view.base_page_lsn,
                                     base_image_crc32c,
-                                    predecessor.map(|(frame_offset, _, _)| frame_offset),
+                                    predecessor.map(|(frame_offset, _, _, _)| frame_offset),
+                                    delta_depth,
                                 )),
                             )
                         }
@@ -3862,18 +4223,28 @@ fn scan_wal<F: DurableFile>(
                                 "WAL location page ID does not match its redo record",
                             ));
                         }
-                        if let Some((base_page_lsn, base_image_crc32c, predecessor_frame_offset)) =
-                            base_metadata
+                        if let Some((
+                            base_page_lsn,
+                            base_image_crc32c,
+                            predecessor_frame_offset,
+                            delta_depth,
+                        )) = base_metadata
                         {
                             location.base_page_lsn = Some(base_page_lsn);
                             location.base_image_crc32c = Some(base_image_crc32c);
                             location.predecessor_frame_offset = predecessor_frame_offset;
+                            location.delta_depth = delta_depth;
                         }
                         location.image_lsn = image_lsn;
                         location.image_crc32c = Some(image_crc32c);
                         latest_location_by_page.insert(
                             page.page_id,
-                            (location.frame_offset, record_lsn, image_crc32c),
+                            (
+                                location.frame_offset,
+                                record_lsn,
+                                image_crc32c,
+                                location.delta_depth,
+                            ),
                         );
                     }
                     report.replayable_pages += 1;
@@ -3975,37 +4346,27 @@ fn read_location_frame<F: DurableFile>(
     committed_prefix_length: u64,
 ) -> Result<(u16, Vec<u8>)> {
     let frame = read_exact_frame(file, location.frame_offset, committed_prefix_length)?;
-    let (
-        format_version,
-        record_type,
-        frame_length,
-        payload,
-        record_lsn,
-        batch_id,
-        record_index,
-        header_crc32c,
-    ) = frame;
     let expected_payload_offset = location
         .frame_offset
         .checked_add(WAL_HEADER_SIZE as u64)
         .ok_or_else(|| Error::corruption("WAL location payload offset overflows"))?;
-    if record_type != location.record_type
-        || record_lsn != location.record_lsn.get()
-        || batch_id != location.batch_id
-        || record_index != location.record_index
-        || frame_length != location.frame_length as usize
+    if frame.record_type != location.record_type
+        || frame.record_lsn != location.record_lsn.get()
+        || frame.batch_id != location.batch_id
+        || frame.record_index != location.record_index
+        || frame.frame_length != location.frame_length as usize
         || expected_payload_offset != location.payload_offset
-        || payload.len() != location.payload_length as usize
-        || header_crc32c != location.header_crc32c
-        || crc32c::crc32c(&payload) != location.payload_crc32c
+        || frame.payload.len() != location.payload_length as usize
+        || frame.header_crc32c != location.header_crc32c
+        || crc32c::crc32c(&frame.payload) != location.payload_crc32c
     {
         return Err(Error::corruption(
             "WAL source frame no longer matches its page location",
         ));
     }
-    let page_id = match record_type {
-        WalRecordType::PageImage => decode_page_image(&payload)?.page_id,
-        WalRecordType::PageDelta => decode_page_delta(&payload)?.page_id,
+    let page_id = match frame.record_type {
+        WalRecordType::PageImage => decode_page_image(&frame.payload)?.page_id,
+        WalRecordType::PageDelta => decode_page_delta(&frame.payload)?.page_id,
         _ => return Err(Error::corruption("WAL location is not a page record")),
     };
     if page_id != location.page_id {
@@ -4013,14 +4374,14 @@ fn read_location_frame<F: DurableFile>(
             "WAL source page identity does not match its location",
         ));
     }
-    Ok((format_version, payload))
+    Ok((frame.format_version, frame.payload))
 }
 
 fn read_exact_frame<F: DurableFile>(
     file: &mut F,
     frame_offset: u64,
     committed_prefix_length: u64,
-) -> Result<(u16, WalRecordType, usize, Vec<u8>, u64, u64, u32, u32)> {
+) -> Result<DecodedWalFrame> {
     let header_end = frame_offset
         .checked_add(WAL_HEADER_SIZE as u64)
         .ok_or_else(|| Error::corruption("WAL frame header offset overflows"))?;
@@ -4062,7 +4423,7 @@ fn read_exact_frame<F: DurableFile>(
         return Err(Error::corruption("WAL frame trailing length mismatch"));
     }
     verify_payload_checksum(&header, &payload, frame_offset)?;
-    Ok((
+    Ok(DecodedWalFrame {
         format_version,
         record_type,
         frame_length,
@@ -4070,8 +4431,8 @@ fn read_exact_frame<F: DurableFile>(
         record_lsn,
         batch_id,
         record_index,
-        crc32c::crc32c(&header),
-    ))
+        header_crc32c: crc32c::crc32c(&header),
+    })
 }
 
 fn decode_header(bytes: &[u8]) -> Result<(u16, WalRecordType, usize, usize, u64, u64, u32)> {
@@ -4688,6 +5049,11 @@ mod tests {
     #[derive(Clone, Default)]
     struct MemoryFile(Vec<u8>);
 
+    struct FailingSyncFile {
+        inner: MemoryFile,
+        fail_next_sync: bool,
+    }
+
     struct CountingFile {
         inner: MemoryFile,
         write_calls: u64,
@@ -4812,6 +5178,36 @@ mod tests {
         }
     }
 
+    impl DurableFile for FailingSyncFile {
+        fn read_at(&mut self, offset: u64, buffer: &mut [u8]) -> Result<usize> {
+            self.inner.read_at(offset, buffer)
+        }
+
+        fn write_at(&mut self, offset: u64, bytes: &[u8]) -> Result<usize> {
+            self.inner.write_at(offset, bytes)
+        }
+
+        fn len(&self) -> Result<u64> {
+            self.inner.len()
+        }
+
+        fn set_len(&mut self, length: u64) -> Result<()> {
+            self.inner.set_len(length)
+        }
+
+        fn sync_data(&mut self) -> Result<()> {
+            if self.fail_next_sync {
+                self.fail_next_sync = false;
+                return Err(Error::durability("injected sync failure"));
+            }
+            Ok(())
+        }
+
+        fn sync_all(&mut self) -> Result<()> {
+            Ok(())
+        }
+    }
+
     fn identity() -> WalIdentity {
         WalIdentity::new(
             [7; 16],
@@ -4901,6 +5297,174 @@ mod tests {
             )
             .is_err()
         );
+        let foreign_identity = WalIdentity {
+            database_uuid: [8; 16],
+            ..identity()
+        };
+        let mut foreign_wal = WalLog::open_with_page_image_format(
+            MemoryFile::default(),
+            foreign_identity,
+            WalPageImageFormat::ExperimentalBtree,
+        )
+        .unwrap();
+        foreign_wal
+            .append_commit(1, Lsn::new(2), &[page_at_lsn(7, Lsn::new(2))], None)
+            .unwrap();
+        let mut foreign_file = foreign_wal.into_file();
+        assert!(
+            WalLog::read_committed_page_payload(
+                &mut foreign_file,
+                &scan.locations,
+                0,
+                scan.committed_prefix_length
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn appended_locations_publish_after_sync_and_link_delta_predecessors() {
+        let page_id = PageId::new(17);
+        let first_page = page_at_lsn(17, Lsn::new(2));
+        let mut wal = WalLog::open_with_page_image_format(
+            MemoryFile::default(),
+            identity(),
+            WalPageImageFormat::ExperimentalBtree,
+        )
+        .unwrap();
+        wal.enable_page_location_tracking(BTreeMap::new()).unwrap();
+        assert!(wal.committed_page_locations().unwrap().is_empty());
+        wal.append_commit(1, Lsn::new(2), std::slice::from_ref(&first_page), None)
+            .unwrap();
+
+        let next_record_lsn = wal.next_lsn();
+        let second_commit_lsn = Lsn::new(next_record_lsn.get() + 1);
+        let second_page = page_at_lsn(17, second_commit_lsn);
+        let eligible_commits = [true];
+        let mut base_source = |requested_page_id| {
+            (requested_page_id == page_id).then(|| Cow::Borrowed(&first_page.image))
+        };
+        let mut delta_request = WalDeltaRequest {
+            eligible_commits: &eligible_commits,
+            base_source: &mut base_source,
+        };
+        wal.append_group_with_page_deltas(
+            &[WalCommit {
+                batch_id: wal.next_batch_id(),
+                commit_lsn: second_commit_lsn,
+                pages: vec![second_page.clone()],
+            }],
+            &mut delta_request,
+            None,
+        )
+        .unwrap();
+
+        let locations = wal.committed_page_locations().unwrap().to_vec();
+        assert_eq!(locations.len(), 2);
+        assert_eq!(locations[0].record_type, WalRecordType::PageImage);
+        assert_eq!(locations[1].record_type, WalRecordType::PageDelta);
+        assert_eq!(
+            locations[1].predecessor_frame_offset,
+            Some(locations[0].frame_offset)
+        );
+        assert_eq!(locations[1].base_image_crc32c, locations[0].image_crc32c);
+        let committed_prefix_length = wal.file.len().unwrap();
+        let mut file = wal.into_file();
+        let reconstructed_page = WalLog::reconstruct_page_location(
+            &mut file,
+            &locations,
+            1,
+            committed_prefix_length,
+            WalPageImageFormat::ExperimentalBtree,
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        assert_eq!(reconstructed_page.image, second_page.image);
+    }
+
+    #[test]
+    fn tracked_wal_writes_full_image_after_eight_deltas() {
+        let page_id = PageId::new(23);
+        let mut current_page = page_at_lsn(23, Lsn::new(2));
+        let mut wal = WalLog::open_with_page_image_format(
+            MemoryFile::default(),
+            identity(),
+            WalPageImageFormat::ExperimentalBtree,
+        )
+        .unwrap();
+        wal.enable_page_location_tracking(BTreeMap::new()).unwrap();
+        wal.append_commit(1, Lsn::new(2), std::slice::from_ref(&current_page), None)
+            .unwrap();
+
+        for _update_number in 0..=MAX_RECONSTRUCTION_DELTAS {
+            let commit_lsn = Lsn::new(wal.next_lsn().get() + 1);
+            let next_page = page_at_lsn(page_id.get(), commit_lsn);
+            let eligible_commits = [true];
+            let mut base_source = |requested_page_id| {
+                (requested_page_id == page_id).then(|| Cow::Borrowed(&current_page.image))
+            };
+            let mut delta_request = WalDeltaRequest {
+                eligible_commits: &eligible_commits,
+                base_source: &mut base_source,
+            };
+            wal.append_group_with_page_deltas(
+                &[WalCommit {
+                    batch_id: wal.next_batch_id(),
+                    commit_lsn,
+                    pages: vec![next_page.clone()],
+                }],
+                &mut delta_request,
+                None,
+            )
+            .unwrap();
+            current_page = next_page;
+        }
+
+        let locations = wal.committed_page_locations().unwrap().to_vec();
+        assert_eq!(locations.len(), MAX_RECONSTRUCTION_DELTAS + 2);
+        assert_eq!(locations[0].record_type, WalRecordType::PageImage);
+        assert!(
+            locations[1..=MAX_RECONSTRUCTION_DELTAS]
+                .iter()
+                .all(|location| location.record_type == WalRecordType::PageDelta)
+        );
+        assert_eq!(
+            locations[MAX_RECONSTRUCTION_DELTAS + 1].record_type,
+            WalRecordType::PageImage
+        );
+        assert_eq!(locations[MAX_RECONSTRUCTION_DELTAS].delta_depth, 8);
+        assert_eq!(locations[MAX_RECONSTRUCTION_DELTAS + 1].delta_depth, 0);
+        let committed_prefix_length = wal.file.len().unwrap();
+        let mut file = wal.into_file();
+        let reconstructed_page = WalLog::reconstruct_page_location(
+            &mut file,
+            &locations,
+            MAX_RECONSTRUCTION_DELTAS + 1,
+            committed_prefix_length,
+            WalPageImageFormat::ExperimentalBtree,
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        assert_eq!(reconstructed_page.image, current_page.image);
+    }
+
+    #[test]
+    fn failed_sync_does_not_publish_appended_page_location() {
+        let mut wal = WalLog::open_with_page_image_format(
+            FailingSyncFile {
+                inner: MemoryFile::default(),
+                fail_next_sync: false,
+            },
+            identity(),
+            WalPageImageFormat::ExperimentalBtree,
+        )
+        .unwrap();
+        wal.enable_page_location_tracking(BTreeMap::new()).unwrap();
+        wal.file.fail_next_sync = true;
+        let append_result =
+            wal.append_commit(1, Lsn::new(2), &[page_at_lsn(19, Lsn::new(2))], None);
+        assert!(append_result.is_err());
+        assert!(wal.committed_page_locations().unwrap().is_empty());
     }
 
     #[test]
@@ -5011,20 +5575,72 @@ mod tests {
             scan.locations[1].base_image_crc32c,
             scan.locations[0].image_crc32c
         );
-        let reconstructed_page = WalLog::reconstruct_page_location(
-            &mut file,
-            &scan.locations,
-            2,
-            scan.committed_prefix_length,
-            WalPageImageFormat::ExperimentalBtree,
-            &BTreeMap::new(),
-        )
-        .unwrap();
-        assert_eq!(reconstructed_page.page_id, page_id);
-        assert_eq!(
-            reconstructed_page.image,
-            page_at_lsn(7, third_commit_lsn).image
+        let expected_pages = [base_page, second_page, page_at_lsn(7, third_commit_lsn)];
+        for (location_index, expected_page) in expected_pages.iter().enumerate() {
+            let reconstructed_page = WalLog::reconstruct_page_location(
+                &mut file,
+                &scan.locations,
+                location_index,
+                scan.committed_prefix_length,
+                WalPageImageFormat::ExperimentalBtree,
+                &BTreeMap::new(),
+            )
+            .unwrap();
+            assert_eq!(reconstructed_page.page_id, page_id);
+            assert_eq!(reconstructed_page.image, expected_page.image);
+        }
+        let mut wrong_base_crc_locations = scan.locations.clone();
+        wrong_base_crc_locations[2].base_image_crc32c = Some(u32::MAX);
+        assert!(
+            WalLog::reconstruct_page_location(
+                &mut file.clone(),
+                &wrong_base_crc_locations,
+                2,
+                scan.committed_prefix_length,
+                WalPageImageFormat::ExperimentalBtree,
+                &BTreeMap::new()
+            )
+            .is_err()
         );
+        let mut wrong_result_crc_locations = scan.locations.clone();
+        wrong_result_crc_locations[2].image_crc32c = Some(u32::MAX);
+        assert!(
+            WalLog::reconstruct_page_location(
+                &mut file.clone(),
+                &wrong_result_crc_locations,
+                2,
+                scan.committed_prefix_length,
+                WalPageImageFormat::ExperimentalBtree,
+                &BTreeMap::new()
+            )
+            .is_err()
+        );
+        let concurrent_file = file.clone();
+        let concurrent_locations = scan.locations.clone();
+        let concurrent_prefix_length = scan.committed_prefix_length;
+        let concurrent_reads = (0..concurrent_locations.len())
+            .map(|location_index| {
+                let mut file = concurrent_file.clone();
+                let locations = concurrent_locations.clone();
+                std::thread::spawn(move || {
+                    WalLog::reconstruct_page_location(
+                        &mut file,
+                        &locations,
+                        location_index,
+                        concurrent_prefix_length,
+                        WalPageImageFormat::ExperimentalBtree,
+                        &BTreeMap::new(),
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+        for (read_handle, expected_page) in concurrent_reads.into_iter().zip(expected_pages.iter())
+        {
+            assert_eq!(
+                read_handle.join().unwrap().unwrap().image,
+                expected_page.image
+            );
+        }
         for location_index in 0..scan.locations.len() {
             let payload = WalLog::read_committed_page_payload(
                 &mut file,
