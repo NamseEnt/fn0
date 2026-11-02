@@ -899,6 +899,17 @@ impl VersionIndex {
             .map_err(map_resource_error)
     }
 
+    pub(crate) fn reserve_checkpoint_insert_work(&self) -> Result<Reservation> {
+        self.resources
+            .reserve(
+                self.tenant_id,
+                ResourceCategory::WritePreparation,
+                ReservationClass::Progress,
+                INSERT_RESERVATION_BYTES,
+            )
+            .map_err(map_resource_error)
+    }
+
     pub(crate) fn insert_reserved(
         &self,
         root: VersionIndexRoot,
@@ -1881,6 +1892,37 @@ mod tests {
             per_tenant_category_bytes: [2 * 1024 * 1024; 7],
         })
         .unwrap()
+    }
+
+    #[test]
+    fn checkpoint_index_work_rejects_insufficient_progress_capacity_before_reserving() {
+        let directory = TestDirectory::new("checkpoint-progress-capacity");
+        let resources = BlinkResourceManager::new(ResourceLimits {
+            global_bytes: 2 * 1024 * 1024,
+            per_tenant_bytes: 2 * 1024 * 1024,
+            progress_pool_bytes: 64 * 1024,
+            max_tenants: 4,
+            max_pending_waiters: 4,
+            global_category_bytes: [2 * 1024 * 1024; 7],
+            per_tenant_category_bytes: [2 * 1024 * 1024; 7],
+        })
+        .unwrap();
+        let index =
+            open_index_with_manager(directory.path(), ([0x92; 16], 33), 2, resources.clone());
+        let page_id = PageId::new(2);
+        let root = index
+            .insert(index.empty_root(), page_id, checkpoint_descriptor(page_id))
+            .unwrap();
+        let progress_before = resources.snapshot().unwrap().current_progress;
+        assert!(index.reserve_checkpoint_insert_work().is_err());
+        assert_eq!(
+            resources.snapshot().unwrap().current_progress,
+            progress_before
+        );
+        assert_eq!(
+            index.lookup(root, page_id).unwrap(),
+            Some(checkpoint_descriptor(page_id))
+        );
     }
 
     fn open_index(

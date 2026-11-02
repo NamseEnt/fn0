@@ -34,6 +34,7 @@ pub fn build_checkpoint_index(
             "paged checkpoint index requires a complete pack",
         ));
     }
+    let checkpoint_insert_reservation = index.reserve_checkpoint_insert_work()?;
     let mut file = File::open(pack_path)?;
     let mut header = [0u8; crate::page::PAGE_SIZE];
     file.read_exact(&mut header)?;
@@ -63,7 +64,7 @@ pub fn build_checkpoint_index(
                 }
                 None => VersionToken::Bootstrap { page_id },
             };
-            root = index.insert(
+            root = index.insert_reserved(
                 root,
                 page_id,
                 VersionDescriptor {
@@ -79,6 +80,7 @@ pub fn build_checkpoint_index(
                         image_crc32c,
                     },
                 },
+                &checkpoint_insert_reservation,
             )?;
             Ok(())
         },
@@ -100,6 +102,7 @@ pub fn build_incremental_checkpoint_index(
             "incremental checkpoint pack target or page count is invalid",
         ));
     }
+    let checkpoint_insert_reservation = index.reserve_checkpoint_insert_work()?;
     let mut expected_page_count = 0u64;
     index.visit_descriptors(target_root, &mut |descriptor| {
         if descriptor.image_lsn > pack_entry.checkpoint_lsn {
@@ -147,7 +150,7 @@ pub fn build_incremental_checkpoint_index(
                     "incremental checkpoint image differs from its target descriptor",
                 ));
             }
-            root = index.insert(
+            root = index.insert_reserved(
                 root,
                 page_id,
                 VersionDescriptor {
@@ -163,6 +166,7 @@ pub fn build_incremental_checkpoint_index(
                         image_crc32c,
                     },
                 },
+                &checkpoint_insert_reservation,
             )?;
             indexed_page_count = indexed_page_count
                 .checked_add(1)
@@ -552,14 +556,20 @@ mod tests {
         PagedRecoveryIndexBuilder, build_checkpoint_index, build_incremental_checkpoint_index,
     };
     use crate::blink::durable_bases::{BasePackJob, pack_path};
+    #[cfg(feature = "blink-demand-paging")]
+    use crate::blink::page_cache::PageLoaderConfig;
     use crate::blink::paged_manifest::{PagedManifest, PagedManifestStore};
     use crate::blink::resource::{BlinkResourceManager, ResourceLimits};
+    #[cfg(feature = "blink-demand-paging")]
+    use crate::blink::source_manager::{SourceManager, SourceManagerConfig};
     use crate::blink::version_chain::DeltaChainEntry;
     use crate::blink::version_index::{
         SourceFileKind, SourceIdentity, StoreIdentity, VersionDescriptor, VersionIndex,
         VersionLocator, VersionToken, WalFrameLocator,
     };
     use crate::blink::{BlinkPage, encode_blink_page};
+    #[cfg(feature = "blink-demand-paging")]
+    use crate::blink::{PagedReadConfig, PagedReadHandle};
     use crate::durable_file::ProductionFile;
     use crate::wal::{
         WalCommit, WalDeltaRequest, WalIdentity, WalLog, WalPageImage, WalPageImageFormat,
@@ -1239,27 +1249,24 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "blink-demand-paging")]
     fn incremental_checkpoint_replaces_only_pages_newer_than_the_previous_checkpoint() {
         let directory = TestDirectory::new();
         let identity = StoreIdentity {
             database_uuid: [0x7a; 16],
             wal_epoch: 21,
         };
+        let resources = resources();
         let index = VersionIndex::open(
             &directory.path().join("index"),
             identity,
-            resources(),
+            resources.clone(),
             79,
             2,
         )
         .unwrap();
         let unchanged_page_id = PageId::new(2);
         let changed_page_id = PageId::new(3);
-        let previous_source = SourceIdentity {
-            kind: SourceFileKind::CheckpointPack,
-            file_number: 1,
-            header_identity: [0x21; 32],
-        };
         let previous_image = encode_blink_page(
             unchanged_page_id,
             &BlinkPage::Free {
@@ -1268,6 +1275,35 @@ mod tests {
             },
         )
         .unwrap();
+        let pack_identity = wal_identity(identity);
+        let mut initial_pack_injector = None;
+        let initial_pack_output = BasePackJob {
+            directory: directory.path().to_path_buf(),
+            identity: pack_identity.clone(),
+            number: 1,
+            checkpoint_lsn: Lsn::new(10),
+            complete: true,
+            coalesce: true,
+        }
+        .run(
+            &BTreeMap::from([(unchanged_page_id, Arc::new(previous_image))]),
+            &mut initial_pack_injector,
+        )
+        .unwrap();
+        let mut initial_pack_file = std::fs::File::open(pack_path(
+            directory.path(),
+            initial_pack_output.entry.number,
+        ))
+        .unwrap();
+        let mut initial_pack_header = [0u8; crate::page::PAGE_SIZE];
+        initial_pack_file
+            .read_exact(&mut initial_pack_header)
+            .unwrap();
+        let previous_source = SourceIdentity {
+            kind: SourceFileKind::CheckpointPack,
+            file_number: initial_pack_output.entry.number,
+            header_identity: *blake3::hash(&initial_pack_header).as_bytes(),
+        };
         let previous_crc = crc32c::crc32c(&previous_image);
         let unchanged_descriptor = VersionDescriptor {
             page_id: unchanged_page_id,
@@ -1279,7 +1315,7 @@ mod tests {
             locator: VersionLocator::CheckpointImage {
                 source: previous_source,
                 offset: 4096,
-                source_length: 8196,
+                source_length: initial_pack_output.entry.bytes,
                 image_lsn: Lsn::new(10),
                 image_crc32c: previous_crc,
             },
@@ -1287,6 +1323,26 @@ mod tests {
         let previous_root = index
             .insert(index.empty_root(), unchanged_page_id, unchanged_descriptor)
             .unwrap();
+        let previous_root = index.promote_root_to_durable(previous_root).unwrap();
+        let database_path = directory.path().join("database");
+        let mut manifest_store = PagedManifestStore::create_with_index(
+            &database_path,
+            PagedManifest {
+                identity,
+                generation: 1,
+                tree_root: unchanged_page_id,
+                free_list_root: None,
+                high_water_page_id: unchanged_page_id,
+                durable_index_root: previous_root.node_reference().unwrap(),
+                source_catalog_root: None,
+                recovery_wal_file_number: 1,
+                recovery_offset: 0,
+                committed_prefix_lsn: Lsn::new(10),
+                previous_generation: 0,
+            },
+            &index,
+        )
+        .unwrap();
         let changed_image = encode_blink_page(
             changed_page_id,
             &BlinkPage::Free {
@@ -1325,7 +1381,6 @@ mod tests {
         let target_root = index
             .insert(previous_root, changed_page_id, previous_changed_descriptor)
             .unwrap();
-        let pack_identity = wal_identity(identity);
         let mut writer = super::super::durable_bases::PagedBasePackJob {
             directory: directory.path().to_path_buf(),
             identity: pack_identity.clone(),
@@ -1366,5 +1421,104 @@ mod tests {
             VersionLocator::CheckpointImage { source, .. } if source == checkpoint_source
         ));
         index.validate_durable_root(checkpoint_root).unwrap();
+        let wal_directory = directory.path().join("wal");
+        fs::create_dir_all(&wal_directory).unwrap();
+        let next_wal_path = wal_directory.join("segment-00000000000000000002.wal");
+        let mut next_wal = WalLog::open_with_segment_boundary(
+            ProductionFile::open(&next_wal_path).unwrap(),
+            pack_identity,
+            WalPageImageFormat::ExperimentalBlink,
+            Lsn::new(12),
+            Some(1),
+            true,
+            false,
+            None,
+        )
+        .unwrap();
+        next_wal.sync_all().unwrap();
+        let recovery_offset = next_wal.file_length().unwrap();
+        drop(next_wal);
+        fs::File::open(&wal_directory).unwrap().sync_all().unwrap();
+        manifest_store
+            .publish_with_index(
+                PagedManifest {
+                    identity,
+                    generation: 2,
+                    tree_root: unchanged_page_id,
+                    free_list_root: None,
+                    high_water_page_id: changed_page_id,
+                    durable_index_root: checkpoint_root.node_reference().unwrap(),
+                    source_catalog_root: None,
+                    recovery_wal_file_number: 2,
+                    recovery_offset,
+                    committed_prefix_lsn: Lsn::new(12),
+                    previous_generation: 1,
+                },
+                &index,
+            )
+            .unwrap();
+        drop(manifest_store);
+        let reopened_manifest =
+            PagedManifestStore::open_with_index(&database_path, identity, &index).unwrap();
+        assert_eq!(reopened_manifest.current().generation, 2);
+        assert_eq!(
+            reopened_manifest.current().committed_prefix_lsn,
+            Lsn::new(12)
+        );
+        let sources = SourceManager::new(
+            SourceManagerConfig {
+                store_identity: identity,
+                checkpoint_directory: directory.path().to_path_buf(),
+                wal_directory,
+                scratch_directory: directory.path().join("scratch"),
+                tenant_id: 7,
+                maximum_open_handles: 4,
+                maximum_roots: 4,
+                handle_charge_bytes: 256,
+                gc_reservation_bytes: 8192,
+            },
+            resources.clone(),
+        )
+        .unwrap();
+        let reopened_root = index
+            .root_from_node_reference(reopened_manifest.current().durable_index_root)
+            .unwrap();
+        let reader = PagedReadHandle::new(
+            PagedReadConfig {
+                tenant_id: 7,
+                root: reopened_root,
+                root_page_id: unchanged_page_id,
+                free_list_head: None,
+                high_water_page_id: changed_page_id,
+                loader: PageLoaderConfig {
+                    maximum_cache_bytes: (2 * crate::page::PAGE_SIZE) as u64,
+                    minimum_decoded_page_bytes: crate::page::PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: crate::page::PAGE_SIZE as u64,
+                    maximum_concurrent_loads: 1,
+                    maximum_followers: 2,
+                },
+            },
+            Arc::new(index),
+            resources,
+            sources,
+            |_| Ok(crate::page::PAGE_SIZE),
+        )
+        .unwrap();
+        let reopened_unchanged = reader
+            .load_mutation_base_page(unchanged_page_id)
+            .unwrap()
+            .unwrap();
+        let reopened_changed = reader
+            .load_mutation_base_page(changed_page_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            encode_blink_page(unchanged_page_id, reopened_unchanged.as_ref()).unwrap(),
+            previous_image
+        );
+        assert_eq!(
+            encode_blink_page(changed_page_id, reopened_changed.as_ref()).unwrap(),
+            changed_image
+        );
     }
 }

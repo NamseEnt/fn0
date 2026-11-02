@@ -11535,6 +11535,7 @@ mod tests {
     use std::alloc::{GlobalAlloc, Layout, System};
     use std::io::{BufRead, BufReader, Write};
     use std::sync::atomic::AtomicBool;
+    #[cfg(feature = "blink-demand-paging")]
     use std::time::{SystemTime, UNIX_EPOCH};
 
     static COUNT_READ_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
