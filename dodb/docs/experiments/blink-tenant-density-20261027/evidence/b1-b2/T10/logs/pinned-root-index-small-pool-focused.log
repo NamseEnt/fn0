@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
+     Running unittests src/lib.rs (target/debug/deps/dodb_storage-70634b21c90c24df)
+
+running 3 tests
+test blink::version_index::tests::checkpoint_index_path_reservation_fits_the_existing_small_progress_pool ... ok
+test blink::version_index::tests::checkpoint_index_reservation_retries_after_progress_capacity_is_released ... ok
+test blink::version_index::tests::checkpoint_index_work_rejects_insufficient_progress_capacity_before_reserving ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 311 filtered out; finished in 0.01s
+

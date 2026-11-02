@@ -204,3 +204,14 @@ T10 remains partial. Source and version-index disk charges now survive manager t
 - Raw logs: `logs/checkpoint-output-quota-reject-retry-focused.log` and `logs/checkpoint-output-quota-strict-clippy.log`.
 
 T10 remains partial. Checkpoint output rejection before pack creation and progress after capacity release now pass for the writer fixture. Pinned-root index capacity defer/progress, fair maintenance scheduling, debt/time-above-threshold accounting, separate active-WAL disk category accounting, loader overlap, and paged-writer process-kill recovery remain outstanding. Service routing and defaults remain unchanged; T17 was not started.
+
+
+## Partial substep: pinned-reader checkpoint index progress at the existing capacity
+
+- Source commit: `8beb8aa00ebd29a1ebd2a3be3b4c10f2fcda7a92`.
+- Checkpoint index insertion and durable-root promotion now reserve a type-derived maximum radix-path allocation bound of 20,480 bytes. The insertion reservation is released before durable promotion, avoiding the previous simultaneous 128 KiB plus 128 KiB reservations. The eight-page writer fixture keeps its existing 64 KiB progress pool and a pinned old reader; complete and incremental checkpoint publication now pass without raising that limit.
+- Added focused fixtures for a progress-capacity rejection followed by retry after release, fitting the same 64 KiB pool, and rejection below the legal path bound before index mutation. Focused index fixtures: 3 passed. Pinned-reader writer fixture: 1 passed. Full feature library suite: 310 passed, 0 failed, 4 ignored. Feature all-target and default library checks passed. Strict Clippy exits 101 with 32 existing crate findings and no new finding in the changed checkpoint-index path.
+- The first integration attempt exposed a stale guard still requiring the old 128 KiB reservation; it did not reach the injected pointer fault. The diagnostic log is preserved.
+- Raw logs: `logs/pinned-root-index-small-pool-focused.log`, `logs/pinned-root-index-small-pool-writer-focused.log`, `logs/pinned-root-index-small-pool-final-feature-library.log`, `logs/pinned-root-index-small-pool-all-targets-final-check.log`, `logs/pinned-root-index-small-pool-strict-clippy-final.log`, and `logs/pinned-root-index-small-pool-retry.log` (preserved failed guard attempt).
+
+T10 remains partial. The pinned-reader checkpoint index capacity case now progresses under the original 64 KiB pool, and checkpoint disk rejection/retry also passes. Fair multi-tenant continuation scheduling, bounded checkpoint debt and time-above-threshold accounting, distinct active-WAL disk accounting, loader overlap with index promotion, and paged-writer process-kill recovery remain open. Service routing and defaults remain unchanged; T17 was not started.
