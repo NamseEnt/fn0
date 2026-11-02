@@ -38,6 +38,8 @@ mod physical_checkpoint;
 pub mod resource;
 pub mod segmented_wal;
 #[cfg(feature = "blink-demand-paging")]
+pub mod source_manager;
+#[cfg(feature = "blink-demand-paging")]
 pub mod version_index;
 pub use physical_checkpoint::{BlinkCheckpointOutput, BlinkCheckpointSnapshot};
 

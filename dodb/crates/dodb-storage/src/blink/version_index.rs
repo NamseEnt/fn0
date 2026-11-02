@@ -95,18 +95,24 @@ pub enum VersionToken {
     },
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[repr(u8)]
 pub enum SourceFileKind {
     CheckpointPack = 1,
     WalSegment = 2,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct SourceIdentity {
     pub kind: SourceFileKind,
     pub file_number: u64,
     pub header_identity: [u8; 32],
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SourceReachability {
+    Exact(SourceIdentity),
+    AllWalSegments,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -365,6 +371,10 @@ impl VersionIndex {
 
     pub fn empty_root(&self) -> VersionIndexRoot {
         VersionIndexRoot::empty()
+    }
+
+    pub fn store_identity(&self) -> StoreIdentity {
+        self.store.identity
     }
 
     pub fn root_from_node_reference(&self, node_reference: NodeRef) -> Result<VersionIndexRoot> {
@@ -635,6 +645,103 @@ impl VersionIndex {
                 }
             }
         }
+    }
+
+    pub fn visit_sources<F>(&self, root: VersionIndexRoot, visitor: &mut F) -> Result<()>
+    where
+        F: FnMut(SourceReachability) -> Result<()>,
+    {
+        fn visit_node<F>(
+            index: &VersionIndex,
+            node_reference: NodeRef,
+            expected_level: u8,
+            parent_generation: u64,
+            root_generation: u64,
+            visitor: &mut F,
+        ) -> Result<()>
+        where
+            F: FnMut(SourceReachability) -> Result<()>,
+        {
+            let cached = index.load_node(node_reference)?;
+            if cached.node.level != expected_level
+                || cached.node.generation > parent_generation
+                || cached.node.generation > root_generation
+            {
+                return Err(Error::corruption(
+                    "version-index traversal level or generation is invalid",
+                ));
+            }
+            match &cached.node.content {
+                NodeContent::Leaf(descriptors) if expected_level == 0 => {
+                    let descriptors = **descriptors;
+                    drop(cached);
+                    for descriptor in descriptors.into_iter().flatten() {
+                        if descriptor.page_id.get() < 2 {
+                            return Err(Error::corruption(
+                                "version-index traversal found an invalid page id",
+                            ));
+                        }
+                        match descriptor.locator {
+                            VersionLocator::CheckpointImage { source, .. } => {
+                                visitor(SourceReachability::Exact(source))?
+                            }
+                            VersionLocator::WalImage { frame } => {
+                                visitor(SourceReachability::Exact(frame.source))?
+                            }
+                            VersionLocator::WalDelta { frame, base, .. } => {
+                                visitor(SourceReachability::Exact(frame.source))?;
+                                visitor(SourceReachability::Exact(base.source))?;
+                                if base.source.kind == SourceFileKind::WalSegment {
+                                    visitor(SourceReachability::AllWalSegments)?;
+                                }
+                            }
+                        }
+                    }
+                    Ok(())
+                }
+                NodeContent::Internal(children) if expected_level > 0 => {
+                    let generation = cached.node.generation;
+                    let child_references = **children;
+                    drop(cached);
+                    for child_reference in child_references.into_iter().flatten() {
+                        visit_node(
+                            index,
+                            child_reference,
+                            expected_level - 1,
+                            generation,
+                            root_generation,
+                            visitor,
+                        )?;
+                    }
+                    Ok(())
+                }
+                _ => Err(Error::corruption(
+                    "version-index traversal found a node at a wrong level",
+                )),
+            }
+        }
+
+        let Some(root_reference) = root.node else {
+            if root.generation != 0 {
+                return Err(Error::corruption(
+                    "empty version-index traversal root has a generation",
+                ));
+            }
+            return Ok(());
+        };
+        if root.generation == 0 {
+            return Err(Error::corruption(
+                "version-index traversal root generation is zero",
+            ));
+        }
+        visit_node(
+            self,
+            root_reference,
+            MAX_RADIX_LEVEL,
+            root.generation,
+            root.generation,
+            visitor,
+        )
     }
 
     pub fn insert(
