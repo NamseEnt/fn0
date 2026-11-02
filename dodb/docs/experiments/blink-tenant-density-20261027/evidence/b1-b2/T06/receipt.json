@@ -1,0 +1,145 @@
+{
+  "task_id": "T06",
+  "scope": "Fallible mutation page access, owned guards, Arc-backed working overlays, and resident compatibility tests",
+  "status": "accepted",
+  "parent_source_commit": "0928f9e51f720d53d4ec11905548d54433977dc1",
+  "implementation_commit": "476a4eb603d60a9ef6755ba9c778f8c91719d926",
+  "implementation_commits": [
+    "476a4eb603d60a9ef6755ba9c778f8c91719d926"
+  ],
+  "push": {
+    "remote": "origin",
+    "branch": "experiment/blink-tenant-density-20261027",
+    "status": "pushed"
+  },
+  "prerequisite_receipts": [
+    {
+      "task_id": "T04",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T04/receipt.json",
+      "sha256": "2ada0eda80d5226157d8407707dd304861cca5cc40f3b1d3e3605de91f7b71e6"
+    },
+    {
+      "task_id": "T05",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/receipt.json",
+      "sha256": "49d3b24e808ec4aafc1a605393f668501c0fff62790a3a8796b3e7bf74bb07ca"
+    }
+  ],
+  "owned_paths": [
+    "dodb/crates/dodb-storage/src/blink/mod.rs"
+  ],
+  "source_hashes": {
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "c25a57e78209275976d29a18392904df983cb673f66b8f796ee88dbfa2b07570"
+  },
+  "host": {
+    "os": "macOS-26.4-arm64",
+    "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+    "branch": "experiment/blink-tenant-density-20261027"
+  },
+  "features": [
+    "blink-demand-paging",
+    "blink-borrowed-page-views"
+  ],
+  "runtime_configuration": {
+    "route": "storage library tests using the resident adapter and isolated test fixtures",
+    "service_route_activated": false,
+    "blocking_paged_load_adapter_integrated": false,
+    "defaults_changed": false,
+    "oci_experiment": false,
+    "performance_matrix_started": false
+  },
+  "checks": [
+    {
+      "name": "feature_storage_library_tests_serial",
+      "argv": [
+        "cargo", "test", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml",
+        "--features", "blink-demand-paging", "--lib", "--", "--test-threads=1"
+      ],
+      "exit_status": 0,
+      "summary": "273 passed, 0 failed, 4 ignored; finished in 115.45s",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T06/logs/storage-feature-tests-serial.log.gz",
+        "sha256": "d54552543009f18ee89c09007a55c19dc9e23c85456f6cfc6d68f27bfe307ca5"
+      }
+    },
+    {
+      "name": "default_storage_library_check",
+      "argv": ["cargo", "check", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--lib"],
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T06/logs/storage-default-lib-check.log",
+        "sha256": "ed8483667e663d49dc0056b5edec5b79cc6737f3e5873ee9c5aae2988a4298dc"
+      }
+    },
+    {
+      "name": "feature_storage_library_check",
+      "argv": ["cargo", "check", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--features", "blink-demand-paging", "--lib"],
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T06/logs/storage-feature-lib-check.log",
+        "sha256": "f65d70c7aa8e8a278c52ef025f34a27b4c7dfd5c7552862fcf97faa061268c51"
+      }
+    },
+    {
+      "name": "borrowed_page_views_compatibility_compile",
+      "argv": ["cargo", "test", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--features", "blink-demand-paging,blink-borrowed-page-views", "--lib", "--no-run"],
+      "exit_status": 0,
+      "summary": "compiled successfully",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T06/logs/borrowed-views-feature-compile.log",
+        "sha256": "eca48ef982309d9cabc6687ae7fc9127cbf90a597de991c6ec958464a6b1b8a6"
+      }
+    },
+    {
+      "name": "targeted_rustfmt_check",
+      "argv": ["rustfmt", "--edition", "2024", "--check", "dodb/crates/dodb-storage/src/blink/mod.rs"],
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T06/logs/rustfmt-check.log",
+        "sha256": "bde294368bfed77c2cddf8cec271d398aee9cdbab3b26e1059281bd33adb0120"
+      }
+    },
+    {
+      "name": "feature_strict_clippy",
+      "argv": ["cargo", "clippy", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--features", "blink-demand-paging", "--lib", "--", "-D", "warnings"],
+      "exit_status": 101,
+      "summary": "12 existing findings in blink/mod.rs and wal.rs; no lint suppression added",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T06/logs/storage-feature-strict-clippy.log",
+        "sha256": "992ee1ed2e9da4ecb867bdfffc99b1d097f974552e5318138ee4ea797926ada8"
+      }
+    },
+    {
+      "name": "full_storage_crate_check",
+      "argv": ["cargo", "check", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml"],
+      "exit_status": 101,
+      "summary": "phase0-bench.rs:4786 omits WalRedoStats.image_delta_chain_limit",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T06/logs/storage-full-check.log",
+        "sha256": "1fba002c91fd56c2ffe22ec0da6f47e98fb597b677212c6f708d1e5fa58692d6"
+      }
+    },
+    {
+      "name": "parallel_feature_library_test_attempt",
+      "argv": ["cargo", "test", "--manifest-path", "dodb/crates/dodb-storage/Cargo.toml", "--features", "blink-demand-paging", "--lib"],
+      "exit_status": 101,
+      "summary": "272 passed, 1 existing page-locator test failed with temporary-file AlreadyExists; test passed alone and serialized suite passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T06/logs/storage-feature-tests-parallel-failure-observation.log",
+        "sha256": "7a3d2742449621f6be8c95fc446b9ee2a8e33c2f9b80acec6ebc2ea0cba2e359"
+      }
+    }
+  ],
+  "acceptance_mapping": {
+    "fallible_mutation_page_access": "passed through Result<Option<OwnedBlinkPageGuard>> and call-site propagation",
+    "error_kind_preservation": "passed for injected I/O, corruption, and overload",
+    "guard_lifetime": "passed after removal of resident map entry",
+    "immutable_overlay_isolation": "passed in existing copy-on-write regression",
+    "borrowed_view_feature_compatibility": "compile passed",
+    "service_and_blocking_load_integration": "not part of T06 resident-adapter evidence; deferred to later tasks"
+  }
+}

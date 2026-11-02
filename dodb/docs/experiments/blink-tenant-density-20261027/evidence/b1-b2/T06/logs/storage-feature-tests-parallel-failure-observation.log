@@ -1,0 +1,5 @@
+Observed command: cargo test --manifest-path dodb/crates/dodb-storage/Cargo.toml --features blink-demand-paging --lib
+Observed result: exit 101; 272 passed, 1 failed, 4 ignored.
+Failing test: blink::page_locator::tests::full_scan_rejects_resealed_pack_and_checkpoint_header_mismatch
+Failure: page_locator.rs:170 called Result::unwrap() on Os error 17 AlreadyExists (File exists) while creating a temporary file.
+Follow-up: the exact test passed alone; the complete 277-test library suite passed with --test-threads=1 (273 passed, 0 failed, 4 ignored).
