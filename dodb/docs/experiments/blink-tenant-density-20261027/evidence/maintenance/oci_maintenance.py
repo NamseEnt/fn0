@@ -107,7 +107,8 @@ def maintenance_metrics(report, capacity_review):
                         if sample['epoch'] == 'measurement' and sample['event'] == 'periodic']
     checkpoint_counts = [sample['blink_checkpoints']['checkpoints_completed']
                          for sample in health['periodic_pressure']['samples']
-                         if sample.get('blink_checkpoints') is not None]
+                         if isinstance(sample.get('blink_checkpoints'), dict)
+                         and 'checkpoints_completed' in sample['blink_checkpoints']]
     result = {
         'worst_tenant_p99_upper_exclusive_ms': reduced['worst_tenant_p99_upper_exclusive_ms'],
         'cell_peak_bytes': reduced['cell_peak_bytes'],

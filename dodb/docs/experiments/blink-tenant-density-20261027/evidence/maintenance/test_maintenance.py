@@ -74,6 +74,13 @@ class MaintenanceChecks(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'duration_ms'):
             self.reviewer.validate_report(self.report, 'maintenance-n24-r1-blink', 'blink')
 
+    def test_shared_report_does_not_supply_blink_cycle_counters(self):
+        report_path = next((EVIDENCE / 'resident-frontier' / 'runtime').rglob('screen-n32-shared.json'))
+        report = json.loads(report_path.read_text())
+        metrics = CONTROLLER.maintenance_metrics(report, self.capacity_review)
+        self.assertIsNone(metrics['periodic_checkpoint_count_increase'])
+        self.assertIsNone(metrics['blink_multiple_cycles_observed'])
+
     def test_pair_fingerprint_mismatch_is_rejected(self):
         altered = copy.deepcopy(self.report)
         altered['workload']['request_fingerprint'] = 'incorrect'
