@@ -8013,6 +8013,19 @@ fn encode_blink_page(page_id: PageId, page: &BlinkPage) -> Result<[u8; PAGE_SIZE
     Ok(encoded)
 }
 
+#[cfg(test)]
+pub(crate) fn test_blink_page_image(page_id: PageId, lsn: Lsn) -> Result<[u8; PAGE_SIZE]> {
+    encode_blink_page(
+        page_id,
+        &BlinkPage::Leaf {
+            lsn,
+            high_key: None,
+            right_sibling: None,
+            entries: LeafEntries::default(),
+        },
+    )
+}
+
 fn encode_blink_page_arc(page_id: PageId, page: &BlinkPage) -> Result<Arc<[u8; PAGE_SIZE]>> {
     let mut encoded = Arc::new([0u8; PAGE_SIZE]);
     encode_blink_page_into(

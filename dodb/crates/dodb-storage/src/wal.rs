@@ -5383,6 +5383,39 @@ mod tests {
     }
 
     #[test]
+    fn prepared_append_publishes_location_after_sync() {
+        let page_id = PageId::new(31);
+        let image = crate::blink::test_blink_page_image(page_id, Lsn::new(2)).unwrap();
+        let mut wal = WalLog::open_with_page_image_format(
+            MemoryFile::default(),
+            identity(),
+            WalPageImageFormat::ExperimentalBlink,
+        )
+        .unwrap();
+        wal.enable_page_location_tracking(BTreeMap::new()).unwrap();
+        let record = PreparedWalRecord {
+            page_id,
+            page_lsn: Lsn::new(2),
+            image_crc: crc32c::crc32c(&image[..]),
+            redo: PreparedWalRedo::Image(&image),
+        };
+        wal.append_group_prepared(
+            &[PreparedWalCommit {
+                batch_id: 1,
+                commit_lsn: Lsn::new(2),
+                records: vec![record],
+            }],
+            None,
+        )
+        .unwrap();
+        let locations = wal.committed_page_locations().unwrap();
+        assert_eq!(locations.len(), 1);
+        assert_eq!(locations[0].page_id, page_id);
+        assert_eq!(locations[0].record_type, WalRecordType::PageImage);
+        assert_eq!(locations[0].source_identity, identity());
+    }
+
+    #[test]
     fn tracked_wal_writes_full_image_after_eight_deltas() {
         let page_id = PageId::new(23);
         let mut current_page = page_at_lsn(23, Lsn::new(2));
