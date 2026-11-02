@@ -1,0 +1,42 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-3e25b353bf814c67)
+
+running 35 tests
+test blink::segmented_wal::tests::manifest_round_trip_preserves_identity_and_ranges ... ok
+test blink::segmented_wal::tests::manifest_rejects_corruption_and_invalid_ranges ... ok
+test wal::tests::complete_page_frame_without_commit_is_not_exposed_as_location ... ok
+test wal::tests::appended_locations_publish_after_sync_and_link_delta_predecessors ... ok
+test wal::tests::committed_location_scan_is_commit_gated_and_does_not_mutate_file ... ok
+test wal::tests::delta_reconstruction_uses_exact_checkpoint_base_without_wal_predecessor ... ok
+test wal::tests::committed_location_scan_identifies_delta_records_and_exact_offsets ... ok
+test wal::tests::failed_sync_does_not_publish_appended_page_location ... ok
+test wal::tests::fast_group_torn_tail_keeps_only_complete_commits ... ok
+test wal::tests::framed_commit_round_trips_and_assigns_monotonic_lsns ... ok
+test wal::tests::group_fast_path_is_byte_identical_to_fault_injectable_path ... ok
+test wal::tests::group_fast_path_handles_short_writes ... ok
+test wal::tests::impossible_frame_length_is_rejected ... ok
+test wal::tests::group_fast_path_uses_one_physical_write ... ok
+test wal::tests::incomplete_final_frame_is_truncated ... ok
+test wal::tests::location_read_revalidates_every_record_in_the_committed_batch ... ok
+test wal::tests::logical_wal_discards_an_incomplete_transaction_and_reuses_its_sequence ... ok
+test wal::tests::logical_wal_discards_torn_put_and_delete_records_and_keeps_complete_group_prefix ... ok
+test wal::tests::logical_wal_group_round_trips_and_separates_commit_sequence_from_frame_lsn ... ok
+test wal::tests::logical_wal_reset_counts_each_successful_sync ... ok
+test wal::tests::logical_wal_rejects_corrupt_commit_digest_and_mixed_v3_dispatch ... ok
+test wal::tests::logical_wal_retries_short_writes_and_fails_before_commit_without_appending ... ok
+test blink::segmented_wal::tests::manifest_atomic_write_round_trips ... ok
+test wal::tests::payload_corruption_is_not_treated_as_a_torn_tail ... ok
+test wal::tests::physical_wal_reset_counts_each_successful_sync ... ok
+test wal::tests::trusted_internal_fault_injection_still_rejects_invalid_images ... ok
+test wal::tests::trusted_internal_fault_injection_delegates_to_the_strict_path ... ok
+test wal::tests::trusted_internal_valid_images_are_byte_identical_to_strict_images ... ok
+test wal::tests::unsupported_version_is_rejected ... ok
+test wal::tests::wrong_magic_is_rejected ... ok
+test wal::tests::tracked_wal_writes_full_image_after_eight_deltas ... ok
+test wal::tests::appended_commits_keep_only_metadata_and_reopen_hands_payload_once ... ok
+test wal::tests::split_page_payload_crc_and_incremental_digest_match_contiguous_crc ... ok
+test wal::tests::direct_group_encoding_matches_reference_for_randomized_valid_groups ... ok
+test wal::tests::combined_payload_digest_matches_direct_digest_for_randomized_records ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 206 filtered out; finished in 6.64s
+

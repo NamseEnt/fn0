@@ -1,70 +1,134 @@
 {
   "task_id": "T02",
-  "scope": "Commit-gated WAL page location capture and read-only scan",
-  "status": "partial",
-  "parent_source_commit": "fa1262d015f97844efdefb137b2225d954d52aab",
-  "implementation_commit": "6e3e370a16dd95fe2cae46d000393b829845f1f7",
+  "scope": "Commit-gated WAL page locations, exact image and delta reconstruction, and synced writer publication",
+  "status": "accepted",
+  "parent_source_commit": "f1daf6ed776b350bf08a8c25b16578d7dd7fc18b",
+  "implementation_commit": "ec3284865d7b52d18f471c76a48238ccc0907702",
   "prerequisite_receipts": [
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T00/receipt.json",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T01/receipt.json"
   ],
   "owned_paths": [
     "dodb/crates/dodb-storage/src/wal.rs",
-    "dodb/crates/dodb-storage/src/lib.rs"
+    "dodb/crates/dodb-storage/src/blink/mod.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/wal.rs": "ebe098efb8c6fe9d952e8b9bfb95974b01fa632993d123c671483088dc290806",
-    "dodb/crates/dodb-storage/src/lib.rs": "32386885640de44c9866feb5fdddb8880c816059f2406dbff60ffadf69d1a14a"
+    "dodb/crates/dodb-storage/src/wal.rs": "22066310482919fe294cfbdfe0ea891373ca9b3934da8a41174a49dbba969bf6",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "8e43532175c2e006ba20946a0cde5429c65cd045dee5688a0adff0513c6c5619"
   },
-  "host": "local worktree",
-  "toolchain": "Rust workspace toolchain",
-  "features": ["blink-demand-paging"],
-  "runtime_configuration": "WAL unit tests using in-memory DurableFile",
+  "host": "local macOS worktree",
+  "toolchain": "Rust workspace toolchain; rustfmt 2024 edition",
+  "features": [
+    "blink-demand-paging"
+  ],
+  "runtime_configuration": "Storage unit tests with in-memory DurableFile; tracking is opt-in and no service route consumes it",
   "checks": [
     {
-      "argv": ["cargo", "test", "-p", "dodb-storage", "--features", "blink-demand-paging", "wal::tests::", "--lib"],
-      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "wal::tests::",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "checked_at_utc": "2026-11-02 03:23:57 UTC",
       "exit_status": 0,
-      "result": "32 passed"
+      "result": "37 passed, 0 failed, 206 filtered",
+      "log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T02/logs/wal-tests-ec3284865.log",
+      "log_sha256": "d2e7f64e89b7bcb1a828c949b4d362c3cfbeb7b9de1da5d1dd14cda8c215b222"
     },
     {
-      "argv": ["cargo", "check", "-p", "dodb-storage", "--features", "blink-demand-paging", "--lib"],
-      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "checked_at_utc": "2026-11-02 03:23:57 UTC",
       "exit_status": 0,
-      "result": "passed"
+      "result": "passed",
+      "log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T02/logs/storage-check-ec3284865.log",
+      "log_sha256": "714f95a54b467001c62f35c5933e0da2282fe38aeb1bb864a66fd5efb995f6ee"
     },
     {
-      "argv": ["rustfmt", "--check", "--edition", "2024", "--config", "skip_children=true", "dodb/crates/dodb-storage/src/wal.rs", "dodb/crates/dodb-storage/src/lib.rs"],
-      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "argv": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "crates/dodb-storage/src/wal.rs",
+        "crates/dodb-storage/src/blink/mod.rs"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "checked_at_utc": "2026-11-02 03:23:57 UTC",
       "exit_status": 0,
-      "result": "passed"
+      "result": "passed",
+      "log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T02/logs/rustfmt-check-ec3284865.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "checked_at_utc": "2026-11-02 03:23:57 UTC",
+      "exit_status": 101,
+      "result": "12 pre-existing findings in resident Blink and WAL code; no finding in the T02 additions",
+      "log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T02/logs/strict-clippy-ec3284865.log",
+      "log_sha256": "2b56e1f0c7c944effc937c92de8874143c553cb61c25879d7b4a1c4c72b6c08d"
     }
   ],
   "acceptance_mapping": {
-    "frame locations are exposed only after commit and digest validation": "Covered by commit-gated scanner tests",
-    "active torn tail leaves committed prefix usable without mutation": "Covered by location scan tests",
-    "scan result retains locations rather than after-images": "Returned pages map is cleared in Locations mode; temporary validation map remains during scan",
-    "re-reading a location validates exact source frame and whole transaction digest": "Covered by image, delta, source-mutation, and sibling-frame tests",
-    "exact image/delta reconstruction from a previous WAL version or checkpoint base": "Covered by multi-delta and checkpoint-base reconstruction tests",
-    "live append locations visible only after successful sync": "Not implemented",
-    "exact image/delta reconstruction and source identity checks": "Not implemented",
-    "remaining corruption, path replacement, concurrency, and delta-cap cases": "Not implemented"
+    "Only records in a verified commit and digest are indexed": "committed_location_scan_is_commit_gated_and_does_not_mutate_file, complete_page_frame_without_commit_is_not_exposed_as_location, and commit_digest_mismatch_rejects_wal_locations passed",
+    "A torn active tail leaves the valid committed prefix readable without mutation": "committed_location_scan_is_commit_gated_and_does_not_mutate_file passed; existing segmented active-tail coverage remains in the suite",
+    "Exact source bytes, identity, and transaction siblings are revalidated on read": "location_read_revalidates_every_record_in_the_committed_batch and committed_location_scan_is_commit_gated_and_does_not_mutate_file passed, including foreign WAL identity and changed sibling bytes",
+    "Image and delta versions reconstruct byte-for-byte with checkpoint-base support": "committed_location_scan_identifies_delta_records_and_exact_offsets and delta_reconstruction_uses_exact_checkpoint_base_without_wal_predecessor passed; every version in the two-delta history was checked",
+    "Reconstruction detects bad base LSN/CRC, result CRC, and truncated source": "committed_location_scan_identifies_delta_records_and_exact_offsets passed these negative cases",
+    "Concurrent reconstruction does not share mutable loader state": "committed_location_scan_identifies_delta_records_and_exact_offsets reconstructed each version on independent threads; load coalescing remains T07",
+    "The ninth would-be delta is encoded as a full image": "tracked_wal_writes_full_image_after_eight_deltas passed, including exact depth assertions and reconstruction",
+    "Normal and prepared writer locations are visible only after successful sync": "appended_locations_publish_after_sync_and_link_delta_predecessors and prepared_append_publishes_location_after_sync passed",
+    "A real sync failure does not expose the new location": "failed_sync_does_not_publish_appended_page_location passed",
+    "Temporary opening metadata is bounded for this foundation": "Returned locations retain metadata only; scanner still uses an O(page count) validation map and O(committed records) locator vector, allowed for T02 and scheduled for T03-T04 replacement"
   },
   "ownership_peaks": {
-    "temporary_scan_recovery_map": "O(page count), permitted only for this isolated foundation",
-    "returned_page_images": "None"
+    "returned_after_images": "None",
+    "scan_validation_map": "O(page count), permitted only for the T02 foundation",
+    "locator_collection": "O(committed WAL page records), permitted only for the T02 foundation",
+    "process_rss": "Not measured"
   },
   "failed_attempts": [
     {
+      "attempt": "prepared_append_publishes_location_after_sync with a generic B-tree page fixture",
+      "result": "Exit 101 because the prepared WAL API validates B-link page encoding; no WAL mutation occurred",
+      "preserved": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T02/logs/failed-prepared-append-fixture.log; replaced with a B-link page fixture and the named test passed"
+    },
+    {
       "attempt": "Initial dual-name cargo test filter invocation",
-      "result": "Cargo accepts only one positional test filter; no test process ran",
-      "preserved": "Command output only"
+      "result": "Cargo accepted only one positional test filter; no test process ran",
+      "preserved": "Prior receipt record"
     }
   ],
   "remaining_work": [
-    "Capture live append offsets and publish only after successful sync",
-    "Implement bounded exact reconstruction from image/delta locators",
-    "Complete T02 corruption, concurrency, source-change, and delta-chain acceptance cases",
-    "Complete T03 through T16 sequentially and separately freeze the T17 matrix"
+    "T03 replaces the temporary O(page count) scan state and locator vector with the persistent bounded version index",
+    "T04-T16 implement bounded storage and service integration; no paged runtime route is activated",
+    "T17 remains gated on T16 readiness and a separately frozen experiment matrix"
   ],
-  "next_task": "T02"
+  "next_task": "T03"
 }

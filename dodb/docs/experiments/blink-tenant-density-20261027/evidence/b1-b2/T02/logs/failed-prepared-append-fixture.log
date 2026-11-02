@@ -1,0 +1,27 @@
+Command: cargo test -p dodb-storage --features blink-demand-paging prepared_append_publishes_location_after_sync --lib
+Working directory: /Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb
+Exit status: 101
+
+Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+Finished `test` profile [unoptimized + debuginfo] target(s) in 4.43s
+Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-3e25b353bf814c67)
+
+running 1 test
+test wal::tests::prepared_append_publishes_location_after_sync ... FAILED
+
+failures:
+
+---- wal::tests::prepared_append_publishes_location_after_sync stdout ----
+
+thread 'wal::tests::prepared_append_publishes_location_after_sync' panicked at dodb/crates/dodb-storage/src/wal.rs:5409:10:
+called `Result::unwrap()` on an `Err` value: Corruption("Blink leaf magic mismatch")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    wal::tests::prepared_append_publishes_location_after_sync
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 242 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p dodb-storage --lib`
+
+Classification: Test fixture used the experimental B-tree page encoder with the B-link-only prepared WAL API. No production code or WAL bytes were modified by this test; the temporary test was removed.
