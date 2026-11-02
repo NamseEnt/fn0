@@ -1,9 +1,9 @@
 {
   "task_id": "T01",
   "scope": "Opt-in shared byte ledger and reservation ownership",
-  "status": "partial",
+  "status": "accepted",
   "parent_source_commit": "21976b3f6",
-  "implementation_commit": null,
+  "implementation_commit": "6d7cd1c1c67da0f490cdeb8d58068a7b1612328b",
   "prerequisite_receipts": [
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T00/receipt.json"
   ],
@@ -12,7 +12,11 @@
     "dodb/crates/dodb-storage/src/blink/mod.rs",
     "dodb/crates/dodb-storage/src/blink/resource.rs"
   ],
-  "source_hashes": {},
+  "source_hashes": {
+    "dodb/crates/dodb-storage/Cargo.toml": "f748aff8ccd2ca5f3983d17fd84bd083ea55aaf496f36d117958b83a24e56681",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "606bdef3f309194e204920a7a085ab41edc952dec904b15856e2ee44ef15727e",
+    "dodb/crates/dodb-storage/src/blink/resource.rs": "ee8219be32a7476b50a242d5fbbaf8439ef1e4a749ade8098c6101e5293c52ea"
+  },
   "host": "local worktree",
   "toolchain": "Rust workspace toolchain",
   "features": ["blink-demand-paging"],
@@ -22,7 +26,13 @@
       "argv": ["cargo", "test", "-p", "dodb-storage", "--features", "blink-demand-paging", "blink::resource::tests", "--lib"],
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
       "exit_status": 0,
-      "result": "9 passed"
+      "result": "13 passed"
+    },
+    {
+      "argv": ["rustfmt", "--check", "--edition", "2024", "--config", "skip_children=true", "dodb/crates/dodb-storage/src/blink/resource.rs"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "result": "passed"
     },
     {
       "argv": ["cargo", "clippy", "-p", "dodb-storage", "--features", "blink-demand-paging", "--lib", "--", "-D", "warnings"],
@@ -32,13 +42,12 @@
     }
   ],
   "acceptance_mapping": {
-    "global and per-tenant aggregate limits": "Covered by focused tests",
+    "global and per-tenant aggregate and category limits": "Covered by focused tests",
     "category current and peak accounting": "Implemented",
     "reservation transfer and shared final-owner release": "Covered by focused tests",
-    "foreground isolation from progress pool": "Covered by focused test",
-    "async bounded wait and cancellation": "Not implemented",
-    "per-category hard capacity configuration": "Not implemented",
-    "server integration": "Not implemented"
+    "foreground isolation from minimum progress pool": "Covered by focused test",
+    "bounded wait, waiter count, timeout, and cancellation cleanup": "Covered by focused tests",
+    "server integration": "Scheduled for T12; not part of T01"
   },
   "ownership_peaks": {
     "application_ledger": "Validated in unit tests at exact and rejected limits",
@@ -46,9 +55,8 @@
   },
   "failed_attempts": [],
   "remaining_work": [
-    "Finish T01 contract requirements or amend them before dependent work",
     "Complete T02 through T16 sequentially",
     "Freeze and execute T17 only after T16 readiness and a separately frozen matrix"
   ],
-  "next_task": "T01"
+  "next_task": "T02"
 }
