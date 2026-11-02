@@ -2090,6 +2090,21 @@ pub struct PagedReadHandle {
 
 #[cfg(feature = "blink-demand-paging")]
 impl PagedReadHandle {
+    pub fn open_with_indexed_page_validation<F>(
+        config: PagedReadConfig,
+        index: Arc<version_index::VersionIndex>,
+        resources: resource::BlinkResourceManager,
+        sources: source_manager::SourceManager,
+        header_length: F,
+    ) -> Result<Self>
+    where
+        F: Fn(version_index::SourceIdentity) -> Result<usize> + Send + Sync + 'static,
+    {
+        let handle = Self::new(config, index, resources, sources, header_length)?;
+        handle.validate_all_indexed_pages()?;
+        Ok(handle)
+    }
+
     pub fn new<F>(
         config: PagedReadConfig,
         index: Arc<version_index::VersionIndex>,
@@ -2248,6 +2263,33 @@ impl PagedReadHandle {
 
     pub fn source_read_count(&self) -> u64 {
         self.loader.source_read_count()
+    }
+
+    pub fn validate_all_indexed_pages(&self) -> Result<u64> {
+        let mut cursor = self.index.descriptor_cursor(self.root)?;
+        let mut validated_pages = 0u64;
+        while let Some(descriptor) = cursor.next_descriptor(&self.index)? {
+            if descriptor.page_id < PageId::new(FIRST_DATA_PAGE)
+                || descriptor.page_id > self.high_water_page_id
+            {
+                return Err(Error::corruption(
+                    "paged validation found an indexed page outside the allocated range",
+                ));
+            }
+            let page = self
+                .load_mutation_base_page(descriptor.page_id)?
+                .ok_or_else(|| Error::corruption("paged validation found a missing page"))?;
+            if page.as_ref().lsn() != descriptor.image_lsn {
+                return Err(Error::corruption(
+                    "paged validation image LSN differs from its index descriptor",
+                ));
+            }
+            drop(page);
+            validated_pages = validated_pages
+                .checked_add(1)
+                .ok_or_else(|| Error::corruption("paged validation page count overflows"))?;
+        }
+        Ok(validated_pages)
     }
 
     pub fn prepare_transaction(
@@ -14675,6 +14717,92 @@ mod tests {
             handle.get(&key_b).unwrap().value(),
             Some(&b"0123456789"[..])
         );
+        let right_page_image = &page_images
+            .iter()
+            .find(|(candidate_page_id, _)| *candidate_page_id == right_page_id)
+            .unwrap()
+            .1;
+        let right_page_tail_offset = page_offsets[&right_page_id] + PAGE_SIZE as u64 - 1;
+        let right_page_tail_byte = right_page_image[PAGE_SIZE - 1];
+        let mut corrupted_source = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&source_path)
+            .unwrap();
+        use std::io::{Seek, SeekFrom};
+        corrupted_source
+            .seek(SeekFrom::Start(right_page_tail_offset))
+            .unwrap();
+        corrupted_source
+            .write_all(&[right_page_tail_byte ^ 1])
+            .unwrap();
+        drop(corrupted_source);
+        assert_eq!(
+            handle.get(&key_b).unwrap().value(),
+            Some(&b"0123456789"[..]),
+            "the cached requested route must not touch the unrelated corrupted leaf"
+        );
+        let corrupted_validation_open = PagedReadHandle::open_with_indexed_page_validation(
+            PagedReadConfig {
+                tenant_id: 11,
+                root,
+                root_page_id,
+                free_list_head: None,
+                high_water_page_id,
+                loader: page_cache::PageLoaderConfig {
+                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 10) as u64,
+                    maximum_concurrent_loads: 2,
+                    maximum_followers: 8,
+                },
+            },
+            Arc::clone(&index),
+            resources.clone(),
+            sources.clone(),
+            |_| Ok(PAGE_SIZE),
+        );
+        assert!(corrupted_validation_open.is_err());
+        let mut restored_source = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&source_path)
+            .unwrap();
+        restored_source
+            .seek(SeekFrom::Start(right_page_tail_offset))
+            .unwrap();
+        restored_source.write_all(&[right_page_tail_byte]).unwrap();
+        drop(restored_source);
+        let source_reads_before_full_validation = handle.source_read_count();
+        assert_eq!(
+            handle.validate_all_indexed_pages().unwrap(),
+            page_images.len() as u64
+        );
+        assert!(handle.source_read_count() > source_reads_before_full_validation);
+        let validated_open = PagedReadHandle::open_with_indexed_page_validation(
+            PagedReadConfig {
+                tenant_id: 11,
+                root,
+                root_page_id,
+                free_list_head: None,
+                high_water_page_id,
+                loader: page_cache::PageLoaderConfig {
+                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 10) as u64,
+                    maximum_concurrent_loads: 2,
+                    maximum_followers: 8,
+                },
+            },
+            Arc::clone(&index),
+            resources.clone(),
+            sources.clone(),
+            |_| Ok(PAGE_SIZE),
+        )
+        .unwrap();
+        assert_eq!(
+            validated_open.validate_all_indexed_pages().unwrap(),
+            page_images.len() as u64
+        );
+        drop(validated_open);
         assert!(handle.get(&tombstone_key).unwrap().value().is_none());
         assert!(handle.get(&missing_key).unwrap().value().is_none());
         let query = handle.query(&primary_key, None, 16).unwrap();
@@ -16125,7 +16253,6 @@ mod tests {
             .write(true)
             .open(&source_path)
             .unwrap();
-        use std::io::{Seek, SeekFrom};
         corrupted_source
             .seek(SeekFrom::Start(
                 page_offsets[&root_page_id] + PAGE_SIZE as u64 - 1,

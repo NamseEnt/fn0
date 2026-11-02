@@ -1,0 +1,66 @@
+{
+  "task_id": "T11",
+  "scope": "Streaming full validation and storage crash matrix",
+  "status": "partial",
+  "parent_source_commit": "0b85b89e66daa45e210bacdff080bbdab6eb842d",
+  "implementation_commits": [],
+  "host": {
+    "os": "macOS arm64",
+    "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+    "branch": "experiment/blink-tenant-density-20261027",
+    "source_commit": "0b85b89e66daa45e210bacdff080bbdab6eb842d"
+  },
+  "features": [
+    "blink-demand-paging",
+    "blink-writer-pin-reuse"
+  ],
+  "validated": [
+    {
+      "name": "rustfmt_check",
+      "command": "rustfmt --edition 2024 --check crates/dodb-storage/src/blink/mod.rs",
+      "exit_status": 0
+    },
+    {
+      "name": "paged_indexed_image_validation_regression",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages -- --test-threads=1",
+      "exit_status": 0,
+      "result": "1 passed"
+    },
+    {
+      "name": "git_diff_check",
+      "command": "git diff --check",
+      "exit_status": 0
+    }
+  ],
+  "source_hashes": {
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "c4f6301aa63d7bea01ae1ab0f35683eddb62202011965022d0ae26682b2219d9"
+  },
+  "logs": [
+    {
+      "name": "initial_duplicate_import_compile_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-paged-validation-compile-failure.log",
+      "sha256": "f23022265e62a7342cfbd027c92fd9541307fe9c7601d4621fe4d9a91bdd8908",
+      "exit_status": 101
+    },
+    {
+      "name": "focused_regression_initial_pass",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-paged-validation-focused.log",
+      "sha256": "769c09dd33d09ef8d04635870b2e5a09225a9f1755a87c4573f59f0db3c9b8e3",
+      "exit_status": 0
+    },
+    {
+      "name": "focused_regression_after_format_check",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-paged-validation-focused-r2.log",
+      "sha256": "068b5c4b729f58d335d9d4886dbf388be5950418bf45d393b0a88b50525764ad",
+      "exit_status": 0
+    }
+  ],
+  "remaining_work": [
+    "Implement bounded structural validation and external scratch accounting.",
+    "Validate allocation range, free-list membership, duplicate ownership, reachability, tree links and ordering, and overflow chains across the complete indexed store.",
+    "Add above-cache reopen and large-WAL replay validation.",
+    "Complete the T11 storage SIGKILL matrix for torn tails, invalid bases and sidecars, publication and GC boundaries, page reuse, pinned-version checkpoint races, and recovery-write-second-crash recovery."
+  ],
+  "next_task": "T11"
+}

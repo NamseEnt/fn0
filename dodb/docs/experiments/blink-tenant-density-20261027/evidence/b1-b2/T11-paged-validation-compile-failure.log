@@ -1,0 +1,37 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+error[E0252]: the name `Seek` is defined multiple times
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:16217:23
+      |
+14716 |         use std::io::{Seek, SeekFrom};
+      |                       ---- previous import of the trait `Seek` here
+...
+16217 |         use std::io::{Seek, SeekFrom};
+      |                       ^^^^--
+      |                       |
+      |                       `Seek` reimported here
+      |                       help: remove unnecessary import
+      |
+      = note: `Seek` must be defined only once in the type namespace of this block
+
+error[E0252]: the name `SeekFrom` is defined multiple times
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:16217:29
+      |
+14716 |         use std::io::{Seek, SeekFrom};
+      |                             -------- previous import of the type `SeekFrom` here
+...
+16217 |         use std::io::{Seek, SeekFrom};
+      |                             ^^^^^^^^ `SeekFrom` reimported here
+      |
+      = note: `SeekFrom` must be defined only once in the type namespace of this block
+
+warning: unused imports: `SeekFrom` and `Seek`
+     --> dodb/crates/dodb-storage/src/blink/mod.rs:16217:23
+      |
+16217 |         use std::io::{Seek, SeekFrom};
+      |                       ^^^^  ^^^^^^^^
+      |
+      = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0252`.
+warning: `dodb-storage` (lib test) generated 1 warning
+error: could not compile `dodb-storage` (lib test) due to 2 previous errors; 1 warning emitted
