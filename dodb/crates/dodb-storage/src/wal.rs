@@ -4204,9 +4204,9 @@ fn scan_wal_with_sink<F: DurableFile>(
             continue;
         };
         if record_lsn <= history_start_lsn {
-            return Err(Error::corruption(
-                "WAL record LSN is not after the initialization history boundary",
-            ));
+            return Err(Error::corruption(format!(
+                "WAL record LSN {record_lsn} is not after initialization history boundary {history_start_lsn}"
+            )));
         }
         max_batch_id = max_batch_id.max(batch_id);
         match record_type {

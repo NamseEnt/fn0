@@ -1,0 +1,20 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+   Compiling dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.64s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-300bb259f2fc591f)
+
+running 1 test
+
+thread 'tests::paged_writer_service_commits_and_recovers_service_requests' (444448068) panicked at dodb/crates/dodb-server/src/lib.rs:4947:14:
+called `Result::unwrap()` on an `Err` value: Corruption("WAL record LSN 1 is not after initialization history boundary 2")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::paged_writer_service_commits_and_recovers_service_requests ... FAILED
+
+failures:
+
+failures:
+    tests::paged_writer_service_commits_and_recovers_service_requests
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 25 filtered out; finished in 0.32s
+
+error: test failed, to rerun pass `-p dodb-server --lib`

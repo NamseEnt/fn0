@@ -3185,6 +3185,7 @@ pub struct PagedTransactionWriter<F: DurableFile> {
     superblock: BlinkSuperblock,
     active_slot: SuperblockSlot,
     maximum_working_pages: usize,
+    allow_page_deltas: bool,
     broken: Option<String>,
     wal_fault_injector: Option<Box<dyn FaultInjector + Send>>,
     publication_fault_injector: Option<Box<dyn FaultInjector + Send>>,
@@ -3215,6 +3216,75 @@ fn paged_wal_append_bound(page_count: usize) -> Result<u64> {
 
 #[cfg(feature = "blink-demand-paging")]
 impl<F: DurableFile> PagedTransactionWriter<F> {
+    pub fn open_from_recovered_manifest(
+        current: PagedReadHandle,
+        manifest_store: &paged_manifest::PagedManifestStore,
+        recovery_wal_path: &std::path::Path,
+        wal_identity: WalIdentity,
+        database_config: &DatabaseConfig,
+        maximum_working_pages: usize,
+    ) -> Result<Self>
+    where
+        F: From<crate::durable_file::ProductionFile>,
+    {
+        let manifest = manifest_store.current();
+        if manifest.identity != current.index.store_identity()
+            || manifest.tree_root != current.root_page_id
+            || manifest.free_list_root != current.free_list_head
+            || manifest.high_water_page_id != current.high_water_page_id
+            || manifest.recovery_wal_file_number == 0
+            || database_config.database_uuid != wal_identity.database_uuid
+            || database_config.tenant_id != wal_identity.tenant_id
+            || database_config.shard_id != wal_identity.shard_id
+            || database_config.shard_epoch != wal_identity.shard_epoch
+        {
+            return Err(Error::invalid_input(
+                "paged writer recovery identity differs from its manifest",
+            ));
+        }
+        let production_wal = crate::durable_file::ProductionFile::open_existing(recovery_wal_path)?;
+        let mut wal = WalLog::open_with_page_image_format_and_fault_injector_and_start_lsn(
+            F::from(production_wal),
+            wal_identity,
+            WalPageImageFormat::ExperimentalBlink,
+            manifest.committed_prefix_lsn,
+            None,
+        )?;
+        wal.resume_after(manifest.committed_prefix_lsn)?;
+        let wal_source = version_index::SourceIdentity {
+            kind: version_index::SourceFileKind::WalSegment,
+            file_number: manifest.recovery_wal_file_number,
+            header_identity: wal.source_header_identity(),
+        };
+        let expected_source = paged_manifest::PagedManifestStore::recovery_source_identity(
+            recovery_wal_path,
+            manifest.recovery_wal_file_number,
+        )?;
+        if wal_source != expected_source {
+            return Err(Error::corruption(
+                "paged writer recovery WAL identity differs from the manifest source",
+            ));
+        }
+        let mut superblock = BlinkSuperblock::new(database_config, manifest.tree_root);
+        superblock.generation = manifest.generation;
+        superblock.root_page_id = manifest.tree_root;
+        superblock.free_list_head = manifest.free_list_root;
+        superblock.high_water_page_id = manifest.high_water_page_id;
+        superblock.checkpoint_lsn = manifest.committed_prefix_lsn;
+        superblock.checkpoint_sequence = manifest.committed_prefix_lsn.get();
+        let superblock_image = encode_blink_superblock(&superblock)?;
+        let mut writer = Self::new(
+            current,
+            wal,
+            wal_source,
+            &superblock_image,
+            SuperblockSlot::A,
+            maximum_working_pages,
+        )?;
+        writer.allow_page_deltas = false;
+        Ok(writer)
+    }
+
     pub fn new(
         current: PagedReadHandle,
         wal: WalLog<F>,
@@ -3248,6 +3318,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             superblock,
             active_slot,
             maximum_working_pages,
+            allow_page_deltas: true,
             broken: None,
             wal_fault_injector: None,
             publication_fault_injector: None,
@@ -3257,6 +3328,16 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
 
     pub fn current(&self) -> &PagedReadHandle {
         &self.current
+    }
+
+    pub fn next_revision(&self) -> Result<Revision> {
+        let revision = Revision::new(self.wal.next_lsn().get());
+        if revision == Revision::ZERO {
+            return Err(Error::durability(
+                "paged transaction revision counter is exhausted",
+            ));
+        }
+        Ok(revision)
     }
 
     pub fn set_boxed_publication_fault_injector(
@@ -4123,7 +4204,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             });
             commit_positions.push(request_index);
             commit_revisions.push(provisional_revision);
-            eligible_commits.push(true);
+            eligible_commits.push(self.allow_page_deltas);
             outcomes[request_index] = Some(Ok(TransactionResult {
                 commit_lsn: Some(Lsn::ZERO),
                 revision: Some(provisional_revision),

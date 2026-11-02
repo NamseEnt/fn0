@@ -5,6 +5,8 @@ use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
+#[cfg(feature = "blink-demand-paging")]
+use std::sync::RwLock as StdRwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -952,6 +954,8 @@ pub struct BlinkSharedResourceConfig {
     pub disk: dodb_storage::blink::resource::DiskResourceLimits,
     pub open_tenant_metadata_bytes: u64,
     pub paged_read_only: bool,
+    pub paged_writer_enabled: bool,
+    pub maximum_working_pages: usize,
     pub page_loader: dodb_storage::blink::page_cache::PageLoaderConfig,
     pub maximum_cached_index_nodes: usize,
     pub maximum_open_source_handles: usize,
@@ -993,7 +997,14 @@ fn valid_paged_open_config(config: BlinkSharedResourceConfig) -> bool {
         config.disk.global_category_bytes[category as usize]
             .min(config.disk.per_tenant_category_bytes[category as usize])
     };
+    let Some(working_bytes) = u64::try_from(config.maximum_working_pages)
+        .ok()
+        .and_then(|pages| pages.checked_mul(dodb_storage::PAGE_SIZE as u64))
+    else {
+        return false;
+    };
     config.page_loader.validate().is_ok()
+        && config.maximum_working_pages > 0
         && config.maximum_cached_index_nodes > 0
         && config.maximum_open_source_handles > 0
         && config.maximum_roots_per_tenant > 0
@@ -1011,6 +1022,12 @@ fn valid_paged_open_config(config: BlinkSharedResourceConfig) -> bool {
             )
         && config.source_gc_reservation_bytes
             <= disk_category_limit(dodb_storage::blink::resource::DiskCategory::Scratch)
+        && working_bytes
+            <= memory_category_limit(
+                dodb_storage::blink::resource::ResourceCategory::WritePreparation,
+            )
+        && working_bytes
+            <= memory_category_limit(dodb_storage::blink::resource::ResourceCategory::DirtyImages)
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -1435,11 +1452,108 @@ enum BlinkShardReadHandle {
     #[cfg(feature = "blink-demand-paging")]
     Paged {
         handle: Arc<dodb_storage::blink::PagedReadHandle>,
+        writable: Option<Arc<PagedWritableShard>>,
         blocking_workers: Arc<Semaphore>,
         activity: Arc<CoordinatorActivity>,
         #[cfg(test)]
         read_test_gate: Option<Arc<OneShotTestGate>>,
     },
+}
+
+#[cfg(feature = "blink-demand-paging")]
+struct PagedWritableShard {
+    writer: StdMutex<dodb_storage::blink::PagedTransactionWriter<ProductionFile>>,
+    latest: StdRwLock<Arc<dodb_storage::blink::PagedReadHandle>>,
+    transaction_worker: Arc<Semaphore>,
+    #[cfg(all(test, feature = "blink-demand-paging"))]
+    commit_test_gate: Option<Arc<OneShotTestGate>>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl PagedWritableShard {
+    fn new(
+        writer: dodb_storage::blink::PagedTransactionWriter<ProductionFile>,
+        #[cfg(all(test, feature = "blink-demand-paging"))] commit_test_gate: Option<
+            Arc<OneShotTestGate>,
+        >,
+    ) -> Result<Arc<Self>, Error> {
+        let latest = Arc::new(writer.snapshot()?);
+        Ok(Arc::new(Self {
+            writer: StdMutex::new(writer),
+            latest: StdRwLock::new(latest),
+            transaction_worker: Arc::new(Semaphore::new(1)),
+            #[cfg(all(test, feature = "blink-demand-paging"))]
+            commit_test_gate,
+        }))
+    }
+
+    fn snapshot(&self) -> Result<Arc<dodb_storage::blink::PagedReadHandle>, Error> {
+        self.latest
+            .read()
+            .map(|current| Arc::clone(&current))
+            .map_err(|_| Error::invariant("paged writer snapshot lock poisoned"))
+    }
+
+    async fn transact(
+        self: &Arc<Self>,
+        request: TransactionRequest,
+        queued_reservation: Option<dodb_storage::blink::resource::Reservation>,
+        preparation_reservation: Option<dodb_storage::blink::resource::Reservation>,
+        blocking_workers: Arc<Semaphore>,
+        activity: Arc<CoordinatorActivity>,
+    ) -> Result<TransactionResult, Error> {
+        let worker_permit = blocking_workers
+            .try_acquire_owned()
+            .map_err(|_| Error::overloaded("paged writer worker capacity is full"))?;
+        let transaction_permit = self
+            .transaction_worker
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Error::overloaded("paged transaction capacity is full"))?;
+        let activity_guard = activity.enter();
+        let writable = Arc::clone(self);
+        tokio::task::spawn_blocking(move || {
+            let _worker_permit = worker_permit;
+            let _transaction_permit = transaction_permit;
+            let _activity_guard = activity_guard;
+            let _queued_reservation = queued_reservation;
+            let _preparation_reservation = preparation_reservation;
+            #[cfg(all(test, feature = "blink-demand-paging"))]
+            wait_for_one_shot_test_gate(writable.commit_test_gate.clone());
+            let mut writer = writable
+                .writer
+                .lock()
+                .map_err(|_| Error::invariant("paged writer lock poisoned"))?;
+            let revision = writer.next_revision()?;
+            let transaction_results = writer.transact_group(
+                std::slice::from_ref(&request),
+                &dodb_storage::StorageLimits::default(),
+                &[revision],
+            )?;
+            let transaction_result = transaction_results
+                .into_iter()
+                .next()
+                .ok_or_else(|| Error::invariant("paged writer returned no transaction result"))?;
+            if transaction_result
+                .as_ref()
+                .is_ok_and(|result| result.commit_lsn.is_some())
+            {
+                let next_snapshot = Arc::new(writer.snapshot().map_err(|error| {
+                    Error::durability(format!(
+                        "paged transaction committed but its read root could not be pinned: {error}"
+                    ))
+                })?);
+                *writable
+                    .latest
+                    .write()
+                    .map_err(|_| Error::durability("paged committed root lock is poisoned"))? =
+                    next_snapshot;
+            }
+            transaction_result
+        })
+        .await
+        .map_err(|error| Error::durability(format!("paged transaction worker failed: {error}")))?
+    }
 }
 
 impl BlinkShardReadHandle {
@@ -1453,6 +1567,7 @@ impl BlinkShardReadHandle {
             #[cfg(feature = "blink-demand-paging")]
             Self::Paged {
                 handle,
+                writable,
                 blocking_workers,
                 activity,
                 #[cfg(test)]
@@ -1462,7 +1577,10 @@ impl BlinkShardReadHandle {
                     .clone()
                     .try_acquire_owned()
                     .map_err(|_| Error::overloaded("paged read worker capacity is full"))?;
-                let handle = Arc::clone(handle);
+                let handle = match writable {
+                    Some(writable) => writable.snapshot()?,
+                    None => Arc::clone(handle),
+                };
                 let key = key.clone();
                 let activity = Arc::clone(activity);
                 let activity_guard = activity.enter();
@@ -1498,6 +1616,7 @@ impl BlinkShardReadHandle {
             #[cfg(feature = "blink-demand-paging")]
             Self::Paged {
                 handle,
+                writable,
                 blocking_workers,
                 activity,
                 #[cfg(test)]
@@ -1507,7 +1626,10 @@ impl BlinkShardReadHandle {
                     .clone()
                     .try_acquire_owned()
                     .map_err(|_| Error::overloaded("paged read worker capacity is full"))?;
-                let handle = Arc::clone(handle);
+                let handle = match writable {
+                    Some(writable) => writable.snapshot()?,
+                    None => Arc::clone(handle),
+                };
                 let primary_key = primary_key.clone();
                 let exclusive_after_sort_key = exclusive_after_sort_key.cloned();
                 let activity = Arc::clone(activity);
@@ -1545,6 +1667,7 @@ impl BlinkShardReadHandle {
             #[cfg(feature = "blink-demand-paging")]
             Self::Paged {
                 handle,
+                writable,
                 blocking_workers,
                 activity,
                 #[cfg(test)]
@@ -1554,7 +1677,10 @@ impl BlinkShardReadHandle {
                     .clone()
                     .try_acquire_owned()
                     .map_err(|_| Error::overloaded("paged read worker capacity is full"))?;
-                let handle = Arc::clone(handle);
+                let handle = match writable {
+                    Some(writable) => writable.snapshot()?,
+                    None => Arc::clone(handle),
+                };
                 let exclusive_after = exclusive_after.cloned();
                 let activity = Arc::clone(activity);
                 let activity_guard = activity.enter();
@@ -1579,7 +1705,7 @@ impl BlinkShardReadHandle {
 
     fn is_read_only(&self) -> bool {
         #[cfg(feature = "blink-demand-paging")]
-        if matches!(self, Self::Paged { .. }) {
+        if matches!(self, Self::Paged { writable: None, .. }) {
             return true;
         }
         false
@@ -1590,6 +1716,23 @@ impl BlinkShardReadHandle {
 struct OneShotTestGate {
     barrier: std::sync::Barrier,
     blocks_next_worker: std::sync::atomic::AtomicBool,
+}
+
+#[cfg(all(test, feature = "blink-demand-paging"))]
+struct FailAtOnce {
+    point: &'static str,
+    fired: bool,
+}
+
+#[cfg(all(test, feature = "blink-demand-paging"))]
+impl dodb_storage::FaultInjector for FailAtOnce {
+    fn hit(&mut self, point: &str) -> Result<(), Error> {
+        if point == self.point && !self.fired {
+            self.fired = true;
+            return Err(Error::durability(format!("injected failure at {point}")));
+        }
+        Ok(())
+    }
 }
 
 #[cfg(all(test, feature = "blink-demand-paging"))]
@@ -1681,7 +1824,8 @@ impl BlinkTenantService {
                     || resource_config.memory.max_tenants < config.max_open_shards
                     || resource_config.memory.max_pending_waiters < config.blink_open_waiter_limit
                     || resource_config.disk.max_tenants < config.max_open_shards
-                    || resource_config.paged_read_only && !valid_paged_open_config(resource_config)
+                    || (resource_config.paged_read_only || resource_config.paged_writer_enabled)
+                        && !valid_paged_open_config(resource_config)
                 {
                     return Err(Error::invalid_request(
                         "B-link shared resource limits do not cover configured tenant opens",
@@ -1698,7 +1842,8 @@ impl BlinkTenantService {
                 (
                     Some(manager),
                     resource_config.open_tenant_metadata_bytes,
-                    resource_config.paged_read_only.then_some(resource_config),
+                    (resource_config.paged_read_only || resource_config.paged_writer_enabled)
+                        .then_some(resource_config),
                 )
             }
             None => (None, 0, None),
@@ -2181,8 +2326,7 @@ impl BlinkTenantService {
                             tenant,
                             paged_config,
                             resources,
-                        )
-                        .map(OpenedBlinkStore::Paged);
+                        );
                     }
                     #[cfg(feature = "blink-demand-paging")]
                     if paged_open_config.is_some() {
@@ -2247,7 +2391,7 @@ impl BlinkTenantService {
                         ))
                     }
                     #[cfg(feature = "blink-demand-paging")]
-                    OpenedBlinkStore::Paged(read_handle) => {
+                    OpenedBlinkStore::PagedReadOnly(read_handle) => {
                         #[cfg(test)]
                         let page_read_test_gate = self
                             .page_read_test_gate
@@ -2255,11 +2399,38 @@ impl BlinkTenantService {
                             .ok()
                             .and_then(|current| current.clone());
                         Arc::new(AsyncBlinkShard::start_paged(
-                            read_handle,
+                            Arc::new(read_handle),
+                            None,
                             Arc::clone(&self.coordinator_activity),
                             Arc::clone(&self.open_workers),
                             #[cfg(test)]
                             page_read_test_gate,
+                            tenant.get(),
+                            self.shared_resources.clone(),
+                            metadata_reservation,
+                        ))
+                    }
+                    #[cfg(feature = "blink-demand-paging")]
+                    OpenedBlinkStore::PagedWritable(writer) => {
+                        #[cfg(all(test, feature = "blink-demand-paging"))]
+                        let commit_test_gate = self
+                            .commit_test_gate
+                            .lock()
+                            .ok()
+                            .and_then(|current| current.clone());
+                        let writable = PagedWritableShard::new(
+                            writer,
+                            #[cfg(all(test, feature = "blink-demand-paging"))]
+                            commit_test_gate,
+                        )?;
+                        let read_handle = writable.snapshot()?;
+                        Arc::new(AsyncBlinkShard::start_paged(
+                            read_handle,
+                            Some(writable),
+                            Arc::clone(&self.coordinator_activity),
+                            Arc::clone(&self.open_workers),
+                            #[cfg(test)]
+                            None,
                             tenant.get(),
                             self.shared_resources.clone(),
                             metadata_reservation,
@@ -2332,7 +2503,9 @@ impl BlinkTenantService {
 enum OpenedBlinkStore {
     Resident(dodb_storage::BlinkStore<ProductionFile, ProductionFile>),
     #[cfg(feature = "blink-demand-paging")]
-    Paged(dodb_storage::blink::PagedReadHandle),
+    PagedReadOnly(dodb_storage::blink::PagedReadHandle),
+    #[cfg(feature = "blink-demand-paging")]
+    PagedWritable(dodb_storage::blink::PagedTransactionWriter<ProductionFile>),
 }
 
 #[cfg(feature = "blink-demand-paging")]
@@ -2342,7 +2515,7 @@ fn open_paged_blink_store(
     tenant: TenantId,
     paging_config: BlinkSharedResourceConfig,
     resources: dodb_storage::blink::resource::BlinkResourceManager,
-) -> Result<dodb_storage::blink::PagedReadHandle, Error> {
+) -> Result<OpenedBlinkStore, Error> {
     use dodb_storage::blink::paged_manifest::PagedManifestStore;
     use dodb_storage::blink::source_manager::{SourceManager, SourceManagerConfig};
     use dodb_storage::blink::version_index::{StoreIdentity, VersionIndex};
@@ -2390,7 +2563,7 @@ fn open_paged_blink_store(
         database_config.shard_id,
         database_config.shard_epoch,
     );
-    let (_, read_handle) = PagedManifestStore::open_with_recovered_pages(
+    let (manifest_store, read_handle) = PagedManifestStore::open_with_recovered_pages(
         &database_path,
         identity,
         dodb_storage::blink::paged_manifest::PagedRecoveryOpenConfig {
@@ -2409,12 +2582,24 @@ fn open_paged_blink_store(
                     },
                 )
             },
-            recovery_wal_path,
+            recovery_wal_path: recovery_wal_path.clone(),
             recovery_source,
-            wal_identity,
+            wal_identity: wal_identity.clone(),
         },
     )?;
-    Ok(read_handle)
+    if paging_config.paged_writer_enabled {
+        return Ok(OpenedBlinkStore::PagedWritable(
+            dodb_storage::blink::PagedTransactionWriter::open_from_recovered_manifest(
+                read_handle,
+                &manifest_store,
+                &recovery_wal_path,
+                wal_identity,
+                &database_config,
+                paging_config.maximum_working_pages,
+            )?,
+        ));
+    }
+    Ok(OpenedBlinkStore::PagedReadOnly(read_handle))
 }
 
 fn open_blink_store(
@@ -2837,7 +3022,8 @@ impl AsyncBlinkShard {
 
     #[cfg(feature = "blink-demand-paging")]
     fn start_paged(
-        read_handle: dodb_storage::blink::PagedReadHandle,
+        read_handle: Arc<dodb_storage::blink::PagedReadHandle>,
+        writable: Option<Arc<PagedWritableShard>>,
         activity: Arc<CoordinatorActivity>,
         blocking_workers: Arc<Semaphore>,
         #[cfg(test)] read_test_gate: Option<Arc<OneShotTestGate>>,
@@ -2847,7 +3033,8 @@ impl AsyncBlinkShard {
     ) -> Self {
         Self {
             read_handle: BlinkShardReadHandle::Paged {
-                handle: Arc::new(read_handle),
+                handle: read_handle,
+                writable,
                 blocking_workers,
                 activity: Arc::clone(&activity),
                 #[cfg(test)]
@@ -2906,6 +3093,24 @@ impl AsyncBlinkShard {
             }
             None => None,
         };
+        #[cfg(feature = "blink-demand-paging")]
+        if let BlinkShardReadHandle::Paged {
+            writable: Some(writable),
+            blocking_workers,
+            activity,
+            ..
+        } = &self.read_handle
+        {
+            return Arc::clone(writable)
+                .transact(
+                    request,
+                    queued_reservation,
+                    preparation_reservation,
+                    Arc::clone(blocking_workers),
+                    Arc::clone(activity),
+                )
+                .await;
+        }
         let (response_tx, response_rx) = tokio::sync::oneshot::channel();
         let send_result = self
             .request_tx
@@ -3625,6 +3830,8 @@ mod tests {
             },
             open_tenant_metadata_bytes: 7_000,
             paged_read_only: false,
+            paged_writer_enabled: false,
+            maximum_working_pages: 4,
             page_loader: dodb_storage::blink::page_cache::PageLoaderConfig {
                 maximum_cache_bytes: 8 * dodb_storage::PAGE_SIZE as u64,
                 minimum_decoded_page_bytes: dodb_storage::PAGE_SIZE as u64,
@@ -3699,6 +3906,8 @@ mod tests {
             },
             open_tenant_metadata_bytes: 4096,
             paged_read_only: true,
+            paged_writer_enabled: false,
+            maximum_working_pages: 8,
             page_loader: dodb_storage::blink::page_cache::PageLoaderConfig {
                 maximum_cache_bytes: 2 * 1024 * 1024,
                 minimum_decoded_page_bytes: dodb_storage::PAGE_SIZE as u64,
@@ -3712,6 +3921,14 @@ mod tests {
             source_handle_charge_bytes: 256,
             source_gc_reservation_bytes: 65_536,
         }
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    fn writable_paged_blink_shared_resources() -> BlinkSharedResourceConfig {
+        let mut resources = paged_blink_shared_resources();
+        resources.paged_read_only = false;
+        resources.paged_writer_enabled = true;
+        resources
     }
 
     #[cfg(feature = "blink-demand-paging")]
@@ -4406,6 +4623,59 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "blink-demand-paging")]
+    async fn closed_blink_coordinator_releases_foreground_charges() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(720);
+        let service = BlinkTenantService::new(LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            max_open_shards: 1,
+            blink_open_waiter_limit: 4,
+            coordinator_config: CoordinatorConfig {
+                queue_capacity: 1,
+                max_group_requests: 1,
+                ..CoordinatorConfig::default()
+            },
+            blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce: true,
+            },
+            blink_shared_resources: Some(foreground_blink_shared_resources()),
+            ..LocalTenantServiceConfig::default()
+        })
+        .unwrap();
+        let shard = service.open_shard(tenant).await.unwrap();
+        *shard.request_tx.lock().await = None;
+        let rejected = service
+            .execute_request(
+                tenant,
+                Request::Put {
+                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"closed".to_vec()),
+                    value: b"not-committed".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap_err();
+        assert!(rejected.to_string().contains("coordinator is closed"));
+        let resources = service.shared_resources.as_ref().unwrap();
+        let snapshot = resources.snapshot().unwrap();
+        assert_eq!(
+            snapshot.current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize],
+            0
+        );
+        assert_eq!(
+            snapshot.current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize],
+            0
+        );
+        drop(shard);
+        service.shutdown_checked().await.unwrap();
+        assert_eq!(resources.snapshot().unwrap().current_total, 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
     async fn foreground_queue_count_limit_rejects_excess_without_leaking_charges() {
         let directory = blink_test_directory();
         let tenant = TenantId::new(716);
@@ -4701,6 +4971,436 @@ mod tests {
         let manager = service.shared_resources.as_ref().unwrap();
         service.shutdown_checked().await.unwrap();
         assert_eq!(manager.snapshot().unwrap().current_total, 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn cancelled_transaction_before_enqueue_releases_foreground_charges() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(724);
+        let service = Arc::new(
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                max_open_shards: 1,
+                blink_open_waiter_limit: 4,
+                blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                    max_segment_bytes: 1_048_576,
+                    coalesce: true,
+                },
+                blink_shared_resources: Some(foreground_blink_shared_resources()),
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap(),
+        );
+        let shard = service.open_shard(tenant).await.unwrap();
+        let request_sender_guard = shard.request_tx.lock().await;
+        let write_service = Arc::clone(&service);
+        let write_task = tokio::spawn(async move {
+            write_service
+                .execute_request(
+                    tenant,
+                    Request::Put {
+                        key: dodb_core::DocumentKey::new(
+                            b"pk".to_vec(),
+                            b"before-enqueue".to_vec(),
+                        ),
+                        value: b"cancel-before-enqueue".to_vec(),
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+        });
+        let resources = service.shared_resources.as_ref().unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                let snapshot = resources.snapshot().unwrap();
+                if snapshot.current_by_category
+                    [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize]
+                    > 0
+                    && snapshot.current_by_category
+                        [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize]
+                        > 0
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        write_task.abort();
+        assert!(write_task.await.unwrap_err().is_cancelled());
+        assert_eq!(
+            resources.snapshot().unwrap().current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize],
+            0
+        );
+        assert_eq!(
+            resources.snapshot().unwrap().current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize],
+            0
+        );
+        drop(request_sender_guard);
+        assert!(matches!(
+            service
+                .execute_request(
+                    tenant,
+                    Request::Put {
+                        key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"after-cancel".to_vec()),
+                        value: b"coordinator-alive".to_vec(),
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .unwrap(),
+            Response::Put(_)
+        ));
+        drop(shard);
+        service.shutdown_checked().await.unwrap();
+        assert_eq!(resources.snapshot().unwrap().current_total, 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn cancelled_paged_write_keeps_charges_until_shutdown_drain() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(719);
+        let service = Arc::new(
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                max_open_shards: 1,
+                blink_open_waiter_limit: 4,
+                blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                    max_segment_bytes: 1_048_576,
+                    coalesce: true,
+                },
+                blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap(),
+        );
+        create_empty_paged_service_fixture(&service.database_path(tenant), tenant);
+        let commit_gate = Arc::new(OneShotTestGate {
+            barrier: std::sync::Barrier::new(2),
+            blocks_next_worker: std::sync::atomic::AtomicBool::new(true),
+        });
+        service.set_commit_test_gate(Arc::clone(&commit_gate));
+        let write_service = Arc::clone(&service);
+        let write_task = tokio::spawn(async move {
+            write_service
+                .execute_request(
+                    tenant,
+                    Request::Put {
+                        key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"shutdown".to_vec()),
+                        value: b"durable-on-drain".to_vec(),
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+        });
+        let resources = service.shared_resources.as_ref().unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                let snapshot = resources.snapshot().unwrap();
+                if service.coordinator_activity.active.load(Ordering::SeqCst) > 0
+                    && snapshot.current_by_category
+                        [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize]
+                        > 0
+                    && snapshot.current_by_category
+                        [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize]
+                        > 0
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let gate_release = tokio::task::spawn_blocking({
+            let commit_gate = Arc::clone(&commit_gate);
+            move || commit_gate.barrier.wait()
+        });
+        write_task.abort();
+        assert!(write_task.await.unwrap_err().is_cancelled());
+        let held_snapshot = resources.snapshot().unwrap();
+        assert!(
+            held_snapshot.current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize]
+                > 0
+        );
+        assert!(
+            held_snapshot.current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize]
+                > 0
+        );
+        let shutdown_service = Arc::clone(&service);
+        let shutdown_task = tokio::spawn(async move { shutdown_service.shutdown_checked().await });
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if service.shards.lock().unwrap().shutting_down {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        gate_release.await.unwrap();
+        shutdown_task.await.unwrap().unwrap();
+        assert_eq!(resources.snapshot().unwrap().current_total, 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_writer_admission_releases_charges_before_dispatch() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(718);
+        let service = BlinkTenantService::new(LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            max_open_shards: 1,
+            blink_open_waiter_limit: 4,
+            blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce: true,
+            },
+            blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+            ..LocalTenantServiceConfig::default()
+        })
+        .unwrap();
+        let database_path = service.database_path(tenant);
+        create_empty_paged_service_fixture(&database_path, tenant);
+        let shard = service.open_shard(tenant).await.unwrap();
+        let writable = match &shard.read_handle {
+            BlinkShardReadHandle::Paged {
+                writable: Some(writable),
+                ..
+            } => Arc::clone(writable),
+            _ => panic!("paged writer shard was not opened"),
+        };
+        let transaction_permit = writable
+            .transaction_worker
+            .clone()
+            .try_acquire_owned()
+            .unwrap();
+        let rejected = service
+            .execute_request(
+                tenant,
+                Request::Put {
+                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"blocked".to_vec()),
+                    value: b"not-enqueued".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap_err();
+        assert!(
+            rejected
+                .to_string()
+                .contains("paged transaction capacity is full")
+        );
+        let resources = service.shared_resources.as_ref().unwrap();
+        let snapshot = resources.snapshot().unwrap();
+        assert_eq!(
+            snapshot.current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize],
+            0
+        );
+        assert_eq!(
+            snapshot.current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize],
+            0
+        );
+        drop(transaction_permit);
+        assert!(matches!(
+            service
+                .execute_request(
+                    tenant,
+                    Request::Put {
+                        key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"ready".to_vec()),
+                        value: b"committed".to_vec(),
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .unwrap(),
+            Response::Put(_)
+        ));
+        drop(writable);
+        drop(shard);
+        service.shutdown_checked().await.unwrap();
+        assert_eq!(resources.snapshot().unwrap().current_total, 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_writer_service_commits_and_recovers_service_requests() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(717);
+        let config = LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            max_open_shards: 1,
+            blink_open_waiter_limit: 4,
+            blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce: true,
+            },
+            blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+            ..LocalTenantServiceConfig::default()
+        };
+        let service = BlinkTenantService::new(config.clone()).unwrap();
+        let database_path = service.database_path(tenant);
+        create_empty_paged_service_fixture(&database_path, tenant);
+        let key = dodb_core::DocumentKey::new(b"pk".to_vec(), b"sk".to_vec());
+        let put_response = service
+            .execute_request(
+                tenant,
+                Request::Put {
+                    key: key.clone(),
+                    value: b"durable-paged-value".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap();
+        assert!(matches!(put_response, Response::Put(_)));
+        match service
+            .execute_request(
+                tenant,
+                Request::Get { key: key.clone() },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap()
+        {
+            Response::Get(state) => {
+                assert_eq!(state.value(), Some(b"durable-paged-value".as_slice()))
+            }
+            response => panic!("unexpected response: {response:?}"),
+        }
+        service.shutdown_checked().await.unwrap();
+        assert_eq!(
+            service
+                .shared_resources
+                .as_ref()
+                .unwrap()
+                .snapshot()
+                .unwrap()
+                .current_total,
+            0
+        );
+        let reopened_service = BlinkTenantService::new(config).unwrap();
+        match reopened_service
+            .execute_request(tenant, Request::Get { key }, ExecutionBudget::new(1024))
+            .await
+            .unwrap()
+        {
+            Response::Get(state) => {
+                assert_eq!(state.value(), Some(b"durable-paged-value".as_slice()))
+            }
+            response => panic!("unexpected response: {response:?}"),
+        }
+        reopened_service.shutdown_checked().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_writer_service_failures_release_admission_and_recover_atomic_state() {
+        for (tenant_id, fault_point, publication_fault, expected_value) in [
+            (721, "before_wal_append", false, Some(None)),
+            (722, "during_wal_sync", false, None),
+            (
+                723,
+                "before_paged_generation_publication",
+                true,
+                Some(Some(b"failure-boundary".as_slice())),
+            ),
+        ] {
+            let directory = blink_test_directory();
+            let tenant = TenantId::new(tenant_id);
+            let config = LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                max_open_shards: 1,
+                blink_open_waiter_limit: 4,
+                blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                    max_segment_bytes: 1_048_576,
+                    coalesce: true,
+                },
+                blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+                ..LocalTenantServiceConfig::default()
+            };
+            let service = BlinkTenantService::new(config.clone()).unwrap();
+            create_empty_paged_service_fixture(&service.database_path(tenant), tenant);
+            let shard = service.open_shard(tenant).await.unwrap();
+            let writable = match &shard.read_handle {
+                BlinkShardReadHandle::Paged {
+                    writable: Some(writable),
+                    ..
+                } => Arc::clone(writable),
+                _ => panic!("paged writer shard was not opened"),
+            };
+            {
+                let mut writer = writable.writer.lock().unwrap();
+                let fault = Box::new(FailAtOnce {
+                    point: fault_point,
+                    fired: false,
+                });
+                if publication_fault {
+                    writer.set_boxed_publication_fault_injector(fault);
+                } else {
+                    writer.set_boxed_wal_fault_injector(fault);
+                }
+            }
+            let key = dodb_core::DocumentKey::new(b"pk".to_vec(), b"fault".to_vec());
+            assert!(
+                service
+                    .execute_request(
+                        tenant,
+                        Request::Put {
+                            key: key.clone(),
+                            value: b"failure-boundary".to_vec(),
+                        },
+                        ExecutionBudget::new(1024),
+                    )
+                    .await
+                    .is_err()
+            );
+            let resources = service.shared_resources.as_ref().unwrap();
+            let snapshot = resources.snapshot().unwrap();
+            assert_eq!(
+                snapshot.current_by_category
+                    [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize],
+                0
+            );
+            assert_eq!(
+                snapshot.current_by_category
+                    [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize],
+                0
+            );
+            drop(writable);
+            drop(shard);
+            service.shutdown_checked().await.unwrap();
+
+            let reopened_service = BlinkTenantService::new(config).unwrap();
+            let actual_value = match reopened_service
+                .execute_request(tenant, Request::Get { key }, ExecutionBudget::new(1024))
+                .await
+                .unwrap()
+            {
+                Response::Get(state) => state.value().map(<[u8]>::to_vec),
+                response => panic!("unexpected response: {response:?}"),
+            };
+            match expected_value {
+                Some(expected_value) => {
+                    assert_eq!(actual_value.as_deref(), expected_value);
+                }
+                None => assert!(
+                    actual_value.is_none()
+                        || actual_value.as_deref() == Some(b"failure-boundary".as_slice())
+                ),
+            }
+            reopened_service.shutdown_checked().await.unwrap();
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
