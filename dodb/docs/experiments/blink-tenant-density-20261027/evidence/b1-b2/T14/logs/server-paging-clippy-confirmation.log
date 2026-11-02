@@ -1,0 +1,27 @@
+    Checking dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
+error: large size difference between variants
+    --> dodb/crates/dodb-server/src/lib.rs:3068:1
+     |
+3068 | / enum OpenedBlinkStore {
+3069 | |     Resident(Box<dodb_storage::BlinkStore<ProductionFile, ProductionFile>>),
+     | |     ----------------------------------------------------------------------- the second-largest variant contains at least 8 bytes
+3070 | |     #[cfg(feature = "blink-demand-paging")]
+3071 | |     PagedReadOnly(dodb_storage::blink::PagedReadHandle),
+     | |     --------------------------------------------------- the largest variant contains at least 240 bytes
+3072 | |     #[cfg(feature = "blink-demand-paging")]
+3073 | |     PagedWritable(Box<OpenedPagedWritableStore>),
+3074 | | }
+     | |_^ the entire enum is at least 240 bytes
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#large_enum_variant
+     = note: `-D clippy::large-enum-variant` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::large_enum_variant)]`
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+     |
+3071 -     PagedReadOnly(dodb_storage::blink::PagedReadHandle),
+3071 +     PagedReadOnly(Box<dodb_storage::blink::PagedReadHandle>),
+     |
+
+error: could not compile `dodb-server` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `dodb-server` (lib test) due to 1 previous error

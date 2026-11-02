@@ -3330,6 +3330,16 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
         &self.current
     }
 
+    pub fn wal_metrics(&self) -> Result<WalMetrics> {
+        self.wal.metrics()
+    }
+
+    pub fn has_commits_after(&self, checkpoint_lsn: Lsn) -> bool {
+        self.wal
+            .last_commit_lsn()
+            .is_some_and(|last_commit_lsn| last_commit_lsn > checkpoint_lsn)
+    }
+
     pub fn next_revision(&self) -> Result<Revision> {
         let revision = Revision::new(self.wal.next_lsn().get());
         if revision == Revision::ZERO {

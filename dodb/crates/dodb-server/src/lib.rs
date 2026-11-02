@@ -7,6 +7,8 @@ use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 #[cfg(feature = "blink-demand-paging")]
 use std::sync::RwLock as StdRwLock;
+#[cfg(feature = "blink-demand-paging")]
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -1086,6 +1088,21 @@ pub struct BlinkCheckpointEvent {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct BlinkTenantCheckpointMetrics {
+    pub wal_bytes_current: u64,
+    pub checkpoint_debt_bytes_current: u64,
+    pub checkpoint_debt_bytes_max: u64,
+    pub threshold_excess_total_nanos: u64,
+    pub threshold_excess_since_unix_nanos: Option<u128>,
+    pub checkpoint_requests_queued: u64,
+    pub checkpoint_requests_pending: u64,
+    pub checkpoint_requests_cancelled: u64,
+    pub checkpoint_request_wait_nanos_total: u64,
+    pub checkpoint_request_wait_nanos_max: u64,
+    pub service_slices: u64,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BlinkWalCheckpointMetrics {
     pub policy: BlinkCheckpointPolicy,
     pub threshold_bytes: Option<u64>,
@@ -1129,6 +1146,7 @@ pub struct BlinkWalCheckpointMetrics {
     pub peak_retained_image_bytes: u64,
     pub tasks_running: u64,
     pub peak_tasks_running: u64,
+    pub per_tenant: BTreeMap<u64, BlinkTenantCheckpointMetrics>,
 }
 
 #[derive(Clone)]
@@ -1163,6 +1181,107 @@ fn current_unix_nanos() -> u128 {
 }
 
 impl BlinkWalCheckpointMetrics {
+    fn observe_tenant_wal_bytes(
+        &mut self,
+        tenant_id: u64,
+        wal_bytes: u64,
+        observed_unix_nanos: u128,
+    ) {
+        let debt_bytes = wal_bytes.saturating_sub(self.threshold_bytes.unwrap_or(0));
+        self.observe_tenant_checkpoint_state(tenant_id, wal_bytes, debt_bytes, observed_unix_nanos);
+    }
+
+    fn observe_tenant_checkpoint_state(
+        &mut self,
+        tenant_id: u64,
+        wal_bytes: u64,
+        debt_bytes: u64,
+        observed_unix_nanos: u128,
+    ) {
+        let tenant_debt_max = {
+            let tenant = self.per_tenant.entry(tenant_id).or_default();
+            tenant.wal_bytes_current = wal_bytes;
+            tenant.checkpoint_debt_bytes_current = debt_bytes;
+            tenant.checkpoint_debt_bytes_max = tenant.checkpoint_debt_bytes_max.max(debt_bytes);
+            if debt_bytes > 0 {
+                tenant
+                    .threshold_excess_since_unix_nanos
+                    .get_or_insert(observed_unix_nanos);
+            } else if let Some(started_unix_nanos) = tenant.threshold_excess_since_unix_nanos.take()
+            {
+                let elapsed_nanos = observed_unix_nanos
+                    .saturating_sub(started_unix_nanos)
+                    .min(u64::MAX as u128) as u64;
+                tenant.threshold_excess_total_nanos = tenant
+                    .threshold_excess_total_nanos
+                    .saturating_add(elapsed_nanos);
+            }
+            tenant.checkpoint_debt_bytes_max
+        };
+        self.wal_bytes_current = self
+            .per_tenant
+            .values()
+            .map(|entry| entry.wal_bytes_current)
+            .fold(0, u64::saturating_add);
+        self.checkpoint_debt_bytes_current = self
+            .per_tenant
+            .values()
+            .map(|entry| entry.checkpoint_debt_bytes_current)
+            .fold(0, u64::saturating_add);
+        self.wal_bytes_max = self.wal_bytes_max.max(self.wal_bytes_current);
+        self.checkpoint_debt_bytes_max = self
+            .checkpoint_debt_bytes_max
+            .max(self.checkpoint_debt_bytes_current);
+        self.threshold_excess_max_bytes = self.threshold_excess_max_bytes.max(tenant_debt_max);
+        self.threshold_excess_current_nanos = self
+            .per_tenant
+            .values()
+            .map(|entry| entry.threshold_excess_total_nanos)
+            .fold(0, u64::saturating_add);
+        self.threshold_excess_total_nanos = self.threshold_excess_current_nanos;
+        self.threshold_excess_since_unix_nanos = self
+            .per_tenant
+            .values()
+            .filter_map(|entry| entry.threshold_excess_since_unix_nanos)
+            .min();
+    }
+
+    fn tenant_checkpoint_request_queued(&mut self, tenant_id: u64) {
+        self.checkpoint_request_queued();
+        let tenant = self.per_tenant.entry(tenant_id).or_default();
+        tenant.checkpoint_requests_queued = tenant.checkpoint_requests_queued.saturating_add(1);
+        tenant.checkpoint_requests_pending = tenant.checkpoint_requests_pending.saturating_add(1);
+    }
+
+    fn tenant_checkpoint_request_started(&mut self, tenant_id: u64, wait_nanos: u64) {
+        self.checkpoint_request_started(wait_nanos);
+        let tenant = self.per_tenant.entry(tenant_id).or_default();
+        tenant.checkpoint_requests_pending = tenant.checkpoint_requests_pending.saturating_sub(1);
+        tenant.checkpoint_request_wait_nanos_total = tenant
+            .checkpoint_request_wait_nanos_total
+            .saturating_add(wait_nanos);
+        tenant.checkpoint_request_wait_nanos_max =
+            tenant.checkpoint_request_wait_nanos_max.max(wait_nanos);
+    }
+
+    fn tenant_checkpoint_request_cancelled(&mut self, tenant_id: u64, wait_nanos: u64) {
+        self.checkpoint_request_cancelled(wait_nanos);
+        let tenant = self.per_tenant.entry(tenant_id).or_default();
+        tenant.checkpoint_requests_pending = tenant.checkpoint_requests_pending.saturating_sub(1);
+        tenant.checkpoint_requests_cancelled =
+            tenant.checkpoint_requests_cancelled.saturating_add(1);
+        tenant.checkpoint_request_wait_nanos_total = tenant
+            .checkpoint_request_wait_nanos_total
+            .saturating_add(wait_nanos);
+        tenant.checkpoint_request_wait_nanos_max =
+            tenant.checkpoint_request_wait_nanos_max.max(wait_nanos);
+    }
+
+    fn tenant_checkpoint_slice_completed(&mut self, tenant_id: u64) {
+        let tenant = self.per_tenant.entry(tenant_id).or_default();
+        tenant.service_slices = tenant.service_slices.saturating_add(1);
+    }
+
     fn observe_wal_bytes(&mut self, wal_bytes: u64, observed_unix_nanos: u128) {
         self.wal_bytes_current = wal_bytes;
         self.wal_bytes_max = self.wal_bytes_max.max(wal_bytes);
@@ -1196,14 +1315,31 @@ impl BlinkWalCheckpointMetrics {
 
     fn snapshot_at(&self, observed_unix_nanos: u128) -> BlinkWalCheckpointMetrics {
         let mut snapshot = self.clone();
-        snapshot.threshold_excess_current_nanos = snapshot.threshold_excess_total_nanos;
-        if let Some(started_unix_nanos) = snapshot.threshold_excess_since_unix_nanos {
-            let elapsed_nanos = observed_unix_nanos
-                .saturating_sub(started_unix_nanos)
-                .min(u64::MAX as u128) as u64;
-            snapshot.threshold_excess_current_nanos = snapshot
-                .threshold_excess_current_nanos
-                .saturating_add(elapsed_nanos);
+        if snapshot.per_tenant.is_empty() {
+            snapshot.threshold_excess_current_nanos = snapshot.threshold_excess_total_nanos;
+            if let Some(started_unix_nanos) = snapshot.threshold_excess_since_unix_nanos {
+                let elapsed_nanos = observed_unix_nanos
+                    .saturating_sub(started_unix_nanos)
+                    .min(u64::MAX as u128) as u64;
+                snapshot.threshold_excess_current_nanos = snapshot
+                    .threshold_excess_current_nanos
+                    .saturating_add(elapsed_nanos);
+            }
+        } else {
+            snapshot.threshold_excess_current_nanos = 0;
+            for tenant in snapshot.per_tenant.values() {
+                let mut tenant_current = tenant.threshold_excess_total_nanos;
+                if let Some(started_unix_nanos) = tenant.threshold_excess_since_unix_nanos {
+                    tenant_current = tenant_current.saturating_add(
+                        observed_unix_nanos
+                            .saturating_sub(started_unix_nanos)
+                            .min(u64::MAX as u128) as u64,
+                    );
+                }
+                snapshot.threshold_excess_current_nanos = snapshot
+                    .threshold_excess_current_nanos
+                    .saturating_add(tenant_current);
+            }
         }
         snapshot
     }
@@ -1240,6 +1376,16 @@ impl BlinkWalCheckpointMetrics {
         let checkpoint_debt_bytes_current = self.checkpoint_debt_bytes_current;
         let threshold_excess_since_unix_nanos = self.threshold_excess_since_unix_nanos;
         let checkpoint_requests_pending = self.checkpoint_requests_pending;
+        let mut per_tenant = self.per_tenant.clone();
+        for tenant in per_tenant.values_mut() {
+            tenant.checkpoint_debt_bytes_max = tenant.checkpoint_debt_bytes_current;
+            tenant.threshold_excess_total_nanos = 0;
+            tenant.checkpoint_requests_queued = 0;
+            tenant.checkpoint_requests_cancelled = 0;
+            tenant.checkpoint_request_wait_nanos_total = 0;
+            tenant.checkpoint_request_wait_nanos_max = 0;
+            tenant.service_slices = 0;
+        }
         *self = Self {
             policy,
             execution,
@@ -1250,6 +1396,7 @@ impl BlinkWalCheckpointMetrics {
             checkpoint_debt_bytes_current,
             threshold_excess_since_unix_nanos,
             checkpoint_requests_pending,
+            per_tenant,
             threshold_bytes: match policy {
                 BlinkCheckpointPolicy::Disabled => None,
                 BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } => {
@@ -1463,6 +1610,16 @@ enum BlinkShardReadHandle {
 #[cfg(feature = "blink-demand-paging")]
 struct PagedWritableShard {
     writer: StdMutex<dodb_storage::blink::PagedTransactionWriter<ProductionFile>>,
+    manifest_store: StdMutex<dodb_storage::blink::paged_manifest::PagedManifestStore>,
+    checkpoint_directory: PathBuf,
+    wal_directory: PathBuf,
+    wal_identity: dodb_storage::WalIdentity,
+    tenant_id: u64,
+    checkpoint_policy: BlinkCheckpointPolicy,
+    checkpoint_execution: BlinkCheckpointExecution,
+    checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
+    activity: Arc<CoordinatorActivity>,
+    checkpoint_pending: AtomicBool,
     latest: StdRwLock<Arc<dodb_storage::blink::PagedReadHandle>>,
     transaction_worker: Arc<Semaphore>,
     #[cfg(all(test, feature = "blink-demand-paging"))]
@@ -1470,16 +1627,109 @@ struct PagedWritableShard {
 }
 
 #[cfg(feature = "blink-demand-paging")]
+struct PagedWritableShardOpenConfig {
+    writer: dodb_storage::blink::PagedTransactionWriter<ProductionFile>,
+    manifest_store: dodb_storage::blink::paged_manifest::PagedManifestStore,
+    checkpoint_directory: PathBuf,
+    wal_directory: PathBuf,
+    wal_identity: dodb_storage::WalIdentity,
+    tenant_id: u64,
+    checkpoint_policy: BlinkCheckpointPolicy,
+    checkpoint_execution: BlinkCheckpointExecution,
+    checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
+    activity: Arc<CoordinatorActivity>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+struct AtomicFlagReset<'flag>(&'flag AtomicBool);
+
+#[cfg(feature = "blink-demand-paging")]
+impl Drop for AtomicFlagReset<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+struct CheckpointTaskGuard(Arc<StdMutex<BlinkWalCheckpointMetrics>>);
+
+#[cfg(feature = "blink-demand-paging")]
+impl Drop for CheckpointTaskGuard {
+    fn drop(&mut self) {
+        if let Ok(mut metrics) = self.0.lock() {
+            metrics.tasks_running = metrics.tasks_running.saturating_sub(1);
+        }
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+struct CheckpointRequestMetricsGuard {
+    metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
+    tenant_id: u64,
+    queued_at: Instant,
+    pending: bool,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl CheckpointRequestMetricsGuard {
+    fn started(&mut self) {
+        if !self.pending {
+            return;
+        }
+        let wait_nanos = self.queued_at.elapsed().as_nanos().min(u64::MAX as u128) as u64;
+        if let Ok(mut metrics) = self.metrics.lock() {
+            metrics.tenant_checkpoint_request_started(self.tenant_id, wait_nanos);
+        }
+        self.pending = false;
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl Drop for CheckpointRequestMetricsGuard {
+    fn drop(&mut self) {
+        if !self.pending {
+            return;
+        }
+        let wait_nanos = self.queued_at.elapsed().as_nanos().min(u64::MAX as u128) as u64;
+        if let Ok(mut metrics) = self.metrics.lock() {
+            metrics.tenant_checkpoint_request_cancelled(self.tenant_id, wait_nanos);
+        }
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
 impl PagedWritableShard {
     fn new(
-        writer: dodb_storage::blink::PagedTransactionWriter<ProductionFile>,
+        config: PagedWritableShardOpenConfig,
         #[cfg(all(test, feature = "blink-demand-paging"))] commit_test_gate: Option<
             Arc<OneShotTestGate>,
         >,
     ) -> Result<Arc<Self>, Error> {
+        let PagedWritableShardOpenConfig {
+            writer,
+            manifest_store,
+            checkpoint_directory,
+            wal_directory,
+            wal_identity,
+            tenant_id,
+            checkpoint_policy,
+            checkpoint_execution,
+            checkpoint_metrics,
+            activity,
+        } = config;
         let latest = Arc::new(writer.snapshot()?);
         Ok(Arc::new(Self {
             writer: StdMutex::new(writer),
+            manifest_store: StdMutex::new(manifest_store),
+            checkpoint_directory,
+            wal_directory,
+            wal_identity,
+            tenant_id,
+            checkpoint_policy,
+            checkpoint_execution,
+            checkpoint_metrics,
+            activity,
+            checkpoint_pending: AtomicBool::new(false),
             latest: StdRwLock::new(latest),
             transaction_worker: Arc::new(Semaphore::new(1)),
             #[cfg(all(test, feature = "blink-demand-paging"))]
@@ -1492,6 +1742,270 @@ impl PagedWritableShard {
             .read()
             .map(|current| Arc::clone(&current))
             .map_err(|_| Error::invariant("paged writer snapshot lock poisoned"))
+    }
+
+    fn schedule_checkpoint_after_commit(
+        self: &Arc<Self>,
+        wal_bytes: u64,
+        has_uncheckpointed_commits: bool,
+        runtime: &tokio::runtime::Handle,
+    ) -> Option<tokio::sync::oneshot::Receiver<Result<(), Error>>> {
+        let BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes } = self.checkpoint_policy
+        else {
+            return None;
+        };
+        let debt_bytes = if has_uncheckpointed_commits {
+            wal_bytes.saturating_sub(threshold_bytes)
+        } else {
+            0
+        };
+        if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
+            metrics.observe_tenant_checkpoint_state(
+                self.tenant_id,
+                wal_bytes,
+                debt_bytes,
+                current_unix_nanos(),
+            );
+        }
+        if !has_uncheckpointed_commits || wal_bytes < threshold_bytes {
+            return None;
+        }
+        if self
+            .checkpoint_pending
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            return None;
+        }
+        if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
+            metrics.tenant_checkpoint_request_queued(self.tenant_id);
+        }
+        let (result_sender, result_receiver) = tokio::sync::oneshot::channel();
+        let writable = Arc::clone(self);
+        let activity_guard = self.activity.enter();
+        runtime.spawn(async move {
+            let _pending_guard = AtomicFlagReset(&writable.checkpoint_pending);
+            let _activity_guard = activity_guard;
+            let result = writable.run_threshold_checkpoint(threshold_bytes).await;
+            let _ = result_sender.send(result);
+        });
+        Some(result_receiver)
+    }
+
+    async fn run_threshold_checkpoint(self: &Arc<Self>, threshold_bytes: u64) -> Result<(), Error> {
+        let _activity_guard = self.activity.enter();
+        let checkpoint_started = Instant::now();
+        let (current_wal_bytes, has_uncheckpointed_commits) = {
+            let writable = Arc::clone(self);
+            tokio::task::spawn_blocking(move || {
+                let _activity_guard = writable.activity.enter();
+                let writer = writable
+                    .writer
+                    .lock()
+                    .map_err(|_| Error::invariant("paged writer lock poisoned"))?;
+                let manifest_store = writable
+                    .manifest_store
+                    .lock()
+                    .map_err(|_| Error::invariant("paged manifest lock poisoned"))?;
+                let wal_bytes = writer.wal_metrics()?.wal_bytes;
+                let has_uncheckpointed =
+                    writer.has_commits_after(manifest_store.current().committed_prefix_lsn);
+                Ok::<_, Error>((wal_bytes, has_uncheckpointed))
+            })
+            .await
+            .map_err(|error| {
+                Error::durability(format!("paged WAL metric worker failed: {error}"))
+            })??
+        };
+        if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
+            let debt_bytes = if has_uncheckpointed_commits {
+                current_wal_bytes.saturating_sub(threshold_bytes)
+            } else {
+                0
+            };
+            metrics.observe_tenant_checkpoint_state(
+                self.tenant_id,
+                current_wal_bytes,
+                debt_bytes,
+                current_unix_nanos(),
+            );
+        }
+        if !has_uncheckpointed_commits || current_wal_bytes < threshold_bytes {
+            return Ok(());
+        }
+        let request_metrics_guard = CheckpointRequestMetricsGuard {
+            metrics: Arc::clone(&self.checkpoint_metrics),
+            tenant_id: self.tenant_id,
+            queued_at: Instant::now(),
+            pending: true,
+        };
+        let checkpoint_result = self.run_checkpoint_slices(request_metrics_guard).await;
+        let duration_nanos = checkpoint_started
+            .elapsed()
+            .as_nanos()
+            .min(u64::MAX as u128) as u64;
+        if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
+            metrics.checkpoint_total_nanos = metrics
+                .checkpoint_total_nanos
+                .saturating_add(duration_nanos);
+            metrics.checkpoint_max_nanos = metrics.checkpoint_max_nanos.max(duration_nanos);
+            match &checkpoint_result {
+                Ok(Some((wal_bytes, has_uncheckpointed))) => {
+                    metrics.checkpoints_completed = metrics.checkpoints_completed.saturating_add(1);
+                    let debt_bytes = if *has_uncheckpointed {
+                        wal_bytes.saturating_sub(threshold_bytes)
+                    } else {
+                        0
+                    };
+                    metrics.observe_tenant_checkpoint_state(
+                        self.tenant_id,
+                        *wal_bytes,
+                        debt_bytes,
+                        current_unix_nanos(),
+                    );
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    metrics.checkpoints_failed = metrics.checkpoints_failed.saturating_add(1);
+                    metrics.failed_message = Some(error.to_string());
+                }
+            }
+        }
+        checkpoint_result.map(|_| ())
+    }
+
+    async fn run_checkpoint_slices(
+        self: &Arc<Self>,
+        mut request_metrics_guard: CheckpointRequestMetricsGuard,
+    ) -> Result<Option<(u64, bool)>, Error> {
+        let initial_permit =
+            physical_checkpoint::acquire_fair_checkpoint_slice(self.tenant_id).await?;
+        request_metrics_guard.started();
+        if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
+            metrics.tenant_checkpoint_slice_completed(self.tenant_id);
+        }
+        let writable = Arc::clone(self);
+        let pack_number = next_paged_checkpoint_pack_number(&self.checkpoint_directory)?;
+        let mut job = physical_checkpoint::submit_checkpoint_progress(move || {
+            let _activity_guard = writable.activity.enter();
+            let result = (|| {
+                let mut writer = writable
+                    .writer
+                    .lock()
+                    .map_err(|_| Error::invariant("paged writer lock poisoned"))?;
+                let manifest_store = writable
+                    .manifest_store
+                    .lock()
+                    .map_err(|_| Error::invariant("paged manifest lock poisoned"))?;
+                let previous_manifest = manifest_store.current();
+                writer.begin_checkpoint(
+                    &manifest_store,
+                    dodb_storage::blink::PagedCheckpointPackRequest {
+                        directory: writable.checkpoint_directory.clone(),
+                        file_number: pack_number,
+                        identity: writable.wal_identity.clone(),
+                        checkpoint_lsn: dodb_core::Lsn::ZERO,
+                        previous_checkpoint_lsn: Some(previous_manifest.committed_prefix_lsn),
+                        coalesce: true,
+                    },
+                    true,
+                )
+            })();
+            drop(initial_permit);
+            result
+        })?
+        .await
+        .map_err(|error| {
+            Error::durability(format!("paged checkpoint begin worker failed: {error}"))
+        })??;
+        let Some(job) = job.take() else {
+            return Ok(None);
+        };
+        if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
+            metrics.checkpoints_started = metrics.checkpoints_started.saturating_add(1);
+            metrics.tasks_running = metrics.tasks_running.saturating_add(1);
+            metrics.peak_tasks_running = metrics.peak_tasks_running.max(metrics.tasks_running);
+        }
+        let _task_guard = CheckpointTaskGuard(Arc::clone(&self.checkpoint_metrics));
+        self.complete_checkpoint_job(job).await
+    }
+
+    async fn complete_checkpoint_job(
+        self: &Arc<Self>,
+        mut job: dodb_storage::blink::PagedCheckpointJob,
+    ) -> Result<Option<(u64, bool)>, Error> {
+        loop {
+            let permit = physical_checkpoint::acquire_fair_checkpoint_slice(self.tenant_id).await?;
+            let activity = Arc::clone(&self.activity);
+            let (next_job, complete) =
+                physical_checkpoint::submit_checkpoint_progress(move || {
+                    let _activity_guard = activity.enter();
+                    let mut job = job;
+                    let result = job.write_pack_slice(128, None);
+                    drop(permit);
+                    result.map(|complete| (job, complete))
+                })?
+                .await
+                .map_err(|error| {
+                    Error::durability(format!("paged checkpoint slice worker failed: {error}"))
+                })??;
+            job = next_job;
+            if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
+                metrics.tenant_checkpoint_slice_completed(self.tenant_id);
+            }
+            if complete {
+                break;
+            }
+        }
+        let publish_permit =
+            physical_checkpoint::acquire_fair_checkpoint_slice(self.tenant_id).await?;
+        let writable = Arc::clone(self);
+        let (wal_bytes, has_uncheckpointed, next_snapshot) =
+            physical_checkpoint::submit_checkpoint_progress(move || {
+                let _activity_guard = writable.activity.enter();
+                let result: Result<(u64, bool, Arc<dodb_storage::blink::PagedReadHandle>), Error> =
+                    (|| {
+                        let mut writer = writable
+                            .writer
+                            .lock()
+                            .map_err(|_| Error::invariant("paged writer lock poisoned"))?;
+                        let mut manifest_store = writable
+                            .manifest_store
+                            .lock()
+                            .map_err(|_| Error::invariant("paged manifest lock poisoned"))?;
+                        let previous_manifest = manifest_store.current();
+                        let (next_wal_number, next_wal_file) = create_next_paged_wal_segment(
+                            &writable.wal_directory,
+                            previous_manifest.recovery_wal_file_number,
+                        )?;
+                        writer.publish_checkpoint(
+                            &mut manifest_store,
+                            job,
+                            next_wal_number,
+                            next_wal_file,
+                        )?;
+                        let wal_bytes = writer.wal_metrics()?.wal_bytes;
+                        let has_uncheckpointed =
+                            writer.has_commits_after(manifest_store.current().committed_prefix_lsn);
+                        let next_snapshot = Arc::new(writer.snapshot()?);
+                        Ok((wal_bytes, has_uncheckpointed, next_snapshot))
+                    })();
+                drop(publish_permit);
+                result
+            })?
+            .await
+            .map_err(|error| {
+                Error::durability(format!("paged checkpoint publish worker failed: {error}"))
+            })??;
+        *self
+            .latest
+            .write()
+            .map_err(|_| Error::durability("paged committed root lock is poisoned"))? =
+            next_snapshot;
+        if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
+            metrics.tenant_checkpoint_slice_completed(self.tenant_id);
+        }
+        Ok(Some((wal_bytes, has_uncheckpointed)))
     }
 
     async fn transact(
@@ -1512,47 +2026,84 @@ impl PagedWritableShard {
             .map_err(|_| Error::overloaded("paged transaction capacity is full"))?;
         let activity_guard = activity.enter();
         let writable = Arc::clone(self);
-        tokio::task::spawn_blocking(move || {
-            let _worker_permit = worker_permit;
-            let _transaction_permit = transaction_permit;
-            let _activity_guard = activity_guard;
-            let _queued_reservation = queued_reservation;
-            let _preparation_reservation = preparation_reservation;
-            #[cfg(all(test, feature = "blink-demand-paging"))]
-            wait_for_one_shot_test_gate(writable.commit_test_gate.clone());
-            let mut writer = writable
-                .writer
-                .lock()
-                .map_err(|_| Error::invariant("paged writer lock poisoned"))?;
-            let revision = writer.next_revision()?;
-            let transaction_results = writer.transact_group(
-                std::slice::from_ref(&request),
-                &dodb_storage::StorageLimits::default(),
-                &[revision],
-            )?;
-            let transaction_result = transaction_results
-                .into_iter()
-                .next()
-                .ok_or_else(|| Error::invariant("paged writer returned no transaction result"))?;
-            if transaction_result
-                .as_ref()
-                .is_ok_and(|result| result.commit_lsn.is_some())
-            {
-                let next_snapshot = Arc::new(writer.snapshot().map_err(|error| {
+        let runtime = tokio::runtime::Handle::current();
+        let (transaction_result, checkpoint_waiter) =
+            tokio::task::spawn_blocking(move || {
+                let _worker_permit = worker_permit;
+                let _transaction_permit = transaction_permit;
+                let _activity_guard = activity_guard;
+                let _queued_reservation = queued_reservation;
+                let _preparation_reservation = preparation_reservation;
+                #[cfg(all(test, feature = "blink-demand-paging"))]
+                wait_for_one_shot_test_gate(writable.commit_test_gate.clone());
+                let mut writer = writable
+                    .writer
+                    .lock()
+                    .map_err(|_| Error::invariant("paged writer lock poisoned"))?;
+                let revision = writer.next_revision()?;
+                let transaction_results = writer.transact_group(
+                    std::slice::from_ref(&request),
+                    &dodb_storage::StorageLimits::default(),
+                    &[revision],
+                )?;
+                let transaction_result =
+                    transaction_results.into_iter().next().ok_or_else(|| {
+                        Error::invariant("paged writer returned no transaction result")
+                    })?;
+                if transaction_result
+                    .as_ref()
+                    .is_ok_and(|result| result.commit_lsn.is_some())
+                {
+                    let next_snapshot = Arc::new(writer.snapshot().map_err(|error| {
                     Error::durability(format!(
                         "paged transaction committed but its read root could not be pinned: {error}"
                     ))
                 })?);
-                *writable
-                    .latest
-                    .write()
-                    .map_err(|_| Error::durability("paged committed root lock is poisoned"))? =
-                    next_snapshot;
-            }
-            transaction_result
-        })
-        .await
-        .map_err(|error| Error::durability(format!("paged transaction worker failed: {error}")))?
+                    *writable.latest.write().map_err(|_| {
+                        Error::durability("paged committed root lock is poisoned")
+                    })? = next_snapshot;
+                }
+                let checkpoint_waiter = if transaction_result
+                    .as_ref()
+                    .is_ok_and(|result| result.commit_lsn.is_some())
+                {
+                    let wal_bytes = writer
+                        .wal_metrics()
+                        .map_err(|error| {
+                            Error::durability(format!(
+                                "paged transaction committed but WAL accounting failed: {error}"
+                            ))
+                        })?
+                        .wal_bytes;
+                    let manifest_store = writable.manifest_store.lock().map_err(|_| {
+                        Error::durability(
+                            "paged transaction committed but manifest state is unavailable",
+                        )
+                    })?;
+                    let has_uncheckpointed_commits =
+                        writer.has_commits_after(manifest_store.current().committed_prefix_lsn);
+                    writable.schedule_checkpoint_after_commit(
+                        wal_bytes,
+                        has_uncheckpointed_commits,
+                        &runtime,
+                    )
+                } else {
+                    None
+                };
+                Ok::<_, Error>((transaction_result, checkpoint_waiter))
+            })
+            .await
+            .map_err(|error| {
+                Error::durability(format!("paged transaction worker failed: {error}"))
+            })??;
+        if self.checkpoint_execution == BlinkCheckpointExecution::Sync
+            && let Some(checkpoint_waiter) = checkpoint_waiter
+        {
+            checkpoint_waiter.await.map_err(|error| {
+                Error::durability(format!("paged checkpoint task dropped its result: {error}"))
+            })??;
+        }
+        transaction_result
     }
 }
 
@@ -1737,10 +2288,10 @@ impl dodb_storage::FaultInjector for FailAtOnce {
 
 #[cfg(all(test, feature = "blink-demand-paging"))]
 fn wait_for_one_shot_test_gate(gate: Option<Arc<OneShotTestGate>>) {
-    if let Some(gate) = gate {
-        if gate.blocks_next_worker.swap(false, Ordering::SeqCst) {
-            gate.barrier.wait();
-        }
+    if let Some(gate) = gate
+        && gate.blocks_next_worker.swap(false, Ordering::SeqCst)
+    {
+        gate.barrier.wait();
     }
 }
 
@@ -2334,17 +2885,17 @@ impl BlinkTenantService {
                             "paged Blink service route requires a paged format marker",
                         ));
                     }
-                    open_blink_store(
+                    open_blink_store(ResidentBlinkOpenConfig {
                         database_path,
                         database_config,
                         wal_layout,
                         checkpoint_policy,
                         checkpoint_retention_bytes,
-                        open_factory,
+                        factory: open_factory,
                         tenant,
                         shard_id,
-                    )
-                    .map(OpenedBlinkStore::Resident)
+                    })
+                    .map(|store| OpenedBlinkStore::Resident(Box::new(store)))
                 })
                 .await
                 .map_err(|error| Error::invariant(format!("B-link open worker failed: {error}")))?;
@@ -2363,11 +2914,11 @@ impl BlinkTenantService {
                             .lock()
                             .ok()
                             .and_then(|current| current.clone());
-                        Arc::new(AsyncBlinkShard::start(
-                            store,
-                            self.coordinator_config,
-                            self.checkpoint_policy,
-                            match wal_layout {
+                        Arc::new(AsyncBlinkShard::start(AsyncBlinkShardStartConfig {
+                            store: *store,
+                            coordinator_config: self.coordinator_config,
+                            checkpoint_policy: self.checkpoint_policy,
+                            physical_config: match wal_layout {
                                 BlinkWalLayout::Legacy => None,
                                 BlinkWalLayout::Segmented { .. }
                                 | BlinkWalLayout::SegmentedBases { .. } => {
@@ -2378,16 +2929,16 @@ impl BlinkTenantService {
                                     })
                                 }
                             },
-                            Arc::clone(&self.checkpoint_metrics),
-                            Arc::clone(&self.coordinator_activity),
-                            tenant.get(),
+                            checkpoint_metrics: Arc::clone(&self.checkpoint_metrics),
+                            activity: Arc::clone(&self.coordinator_activity),
+                            tenant_id: tenant.get(),
                             #[cfg(feature = "blink-demand-paging")]
-                            self.shared_resources.clone(),
+                            foreground_resources: self.shared_resources.clone(),
                             #[cfg(all(test, feature = "blink-demand-paging"))]
                             commit_test_gate,
                             #[cfg(feature = "blink-demand-paging")]
                             metadata_reservation,
-                        ))
+                        }))
                     }
                     #[cfg(feature = "blink-demand-paging")]
                     OpenedBlinkStore::PagedReadOnly(read_handle) => {
@@ -2398,19 +2949,21 @@ impl BlinkTenantService {
                             .ok()
                             .and_then(|current| current.clone());
                         Arc::new(AsyncBlinkShard::start_paged(
-                            Arc::new(read_handle),
-                            None,
-                            Arc::clone(&self.coordinator_activity),
-                            Arc::clone(&self.open_workers),
-                            #[cfg(test)]
-                            page_read_test_gate,
-                            tenant.get(),
-                            self.shared_resources.clone(),
-                            metadata_reservation,
+                            AsyncBlinkShardPagedStartConfig {
+                                read_handle: Arc::new(*read_handle),
+                                writable: None,
+                                activity: Arc::clone(&self.coordinator_activity),
+                                blocking_workers: Arc::clone(&self.open_workers),
+                                #[cfg(test)]
+                                read_test_gate: page_read_test_gate,
+                                tenant_id: tenant.get(),
+                                foreground_resources: self.shared_resources.clone(),
+                                metadata_reservation,
+                            },
                         ))
                     }
                     #[cfg(feature = "blink-demand-paging")]
-                    OpenedBlinkStore::PagedWritable(writer) => {
+                    OpenedBlinkStore::PagedWritable(opened) => {
                         #[cfg(all(test, feature = "blink-demand-paging"))]
                         let commit_test_gate = self
                             .commit_test_gate
@@ -2418,21 +2971,34 @@ impl BlinkTenantService {
                             .ok()
                             .and_then(|current| current.clone());
                         let writable = PagedWritableShard::new(
-                            writer,
+                            PagedWritableShardOpenConfig {
+                                writer: opened.writer,
+                                manifest_store: opened.manifest_store,
+                                checkpoint_directory: opened.checkpoint_directory,
+                                wal_directory: opened.wal_directory,
+                                wal_identity: opened.wal_identity,
+                                tenant_id: tenant.get(),
+                                checkpoint_policy: self.checkpoint_policy,
+                                checkpoint_execution: self.checkpoint_execution,
+                                checkpoint_metrics: Arc::clone(&self.checkpoint_metrics),
+                                activity: Arc::clone(&self.coordinator_activity),
+                            },
                             #[cfg(all(test, feature = "blink-demand-paging"))]
                             commit_test_gate,
                         )?;
                         let read_handle = writable.snapshot()?;
                         Arc::new(AsyncBlinkShard::start_paged(
-                            read_handle,
-                            Some(writable),
-                            Arc::clone(&self.coordinator_activity),
-                            Arc::clone(&self.open_workers),
-                            #[cfg(test)]
-                            None,
-                            tenant.get(),
-                            self.shared_resources.clone(),
-                            metadata_reservation,
+                            AsyncBlinkShardPagedStartConfig {
+                                read_handle,
+                                writable: Some(writable),
+                                activity: Arc::clone(&self.coordinator_activity),
+                                blocking_workers: Arc::clone(&self.open_workers),
+                                #[cfg(test)]
+                                read_test_gate: None,
+                                tenant_id: tenant.get(),
+                                foreground_resources: self.shared_resources.clone(),
+                                metadata_reservation,
+                            },
                         ))
                     }
                 };
@@ -2500,11 +3066,69 @@ impl BlinkTenantService {
 }
 
 enum OpenedBlinkStore {
-    Resident(dodb_storage::BlinkStore<ProductionFile, ProductionFile>),
+    Resident(Box<dodb_storage::BlinkStore<ProductionFile, ProductionFile>>),
     #[cfg(feature = "blink-demand-paging")]
-    PagedReadOnly(dodb_storage::blink::PagedReadHandle),
+    PagedReadOnly(Box<dodb_storage::blink::PagedReadHandle>),
     #[cfg(feature = "blink-demand-paging")]
-    PagedWritable(dodb_storage::blink::PagedTransactionWriter<ProductionFile>),
+    PagedWritable(Box<OpenedPagedWritableStore>),
+}
+
+#[cfg(feature = "blink-demand-paging")]
+struct OpenedPagedWritableStore {
+    writer: dodb_storage::blink::PagedTransactionWriter<ProductionFile>,
+    manifest_store: dodb_storage::blink::paged_manifest::PagedManifestStore,
+    checkpoint_directory: PathBuf,
+    wal_directory: PathBuf,
+    wal_identity: dodb_storage::WalIdentity,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+fn next_paged_checkpoint_pack_number(directory: &std::path::Path) -> Result<u64, Error> {
+    let mut maximum_number = 0u64;
+    for entry in std::fs::read_dir(directory)? {
+        let entry = entry?;
+        let Some(file_name) = entry.file_name().to_str().map(str::to_owned) else {
+            continue;
+        };
+        let Some(number) = file_name
+            .strip_prefix("base-")
+            .and_then(|name| name.strip_suffix(".pages"))
+            .and_then(|number| number.parse::<u64>().ok())
+        else {
+            continue;
+        };
+        maximum_number = maximum_number.max(number);
+    }
+    maximum_number
+        .checked_add(1)
+        .ok_or_else(|| Error::durability("paged checkpoint pack number is exhausted"))
+}
+
+#[cfg(feature = "blink-demand-paging")]
+fn create_next_paged_wal_segment(
+    directory: &std::path::Path,
+    current_number: u64,
+) -> Result<(u64, ProductionFile), Error> {
+    let mut candidate = current_number
+        .checked_add(1)
+        .ok_or_else(|| Error::durability("paged recovery WAL segment number is exhausted"))?;
+    loop {
+        let path = directory.join(format!("segment-{candidate:020}.wal"));
+        match std::fs::OpenOptions::new()
+            .create_new(true)
+            .read(true)
+            .write(true)
+            .open(path)
+        {
+            Ok(file) => return Ok((candidate, ProductionFile::from_file(file))),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                candidate = candidate.checked_add(1).ok_or_else(|| {
+                    Error::durability("paged recovery WAL segment number is exhausted")
+                })?;
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
 }
 
 #[cfg(feature = "blink-demand-paging")]
@@ -2587,21 +3211,27 @@ fn open_paged_blink_store(
         },
     )?;
     if paging_config.paged_writer_enabled {
-        return Ok(OpenedBlinkStore::PagedWritable(
-            dodb_storage::blink::PagedTransactionWriter::open_from_recovered_manifest(
-                read_handle,
-                &manifest_store,
-                &recovery_wal_path,
+        return Ok(OpenedBlinkStore::PagedWritable(Box::new(
+            OpenedPagedWritableStore {
+                writer: dodb_storage::blink::PagedTransactionWriter::open_from_recovered_manifest(
+                    read_handle,
+                    &manifest_store,
+                    &recovery_wal_path,
+                    wal_identity.clone(),
+                    &database_config,
+                    paging_config.maximum_working_pages,
+                )?,
+                manifest_store,
+                checkpoint_directory: sidecar_directory.join("packs"),
+                wal_directory,
                 wal_identity,
-                &database_config,
-                paging_config.maximum_working_pages,
-            )?,
-        ));
+            },
+        )));
     }
-    Ok(OpenedBlinkStore::PagedReadOnly(read_handle))
+    Ok(OpenedBlinkStore::PagedReadOnly(Box::new(read_handle)))
 }
 
-fn open_blink_store(
+struct ResidentBlinkOpenConfig {
     database_path: PathBuf,
     database_config: DatabaseConfig,
     wal_layout: BlinkWalLayout,
@@ -2610,7 +3240,21 @@ fn open_blink_store(
     factory: Option<FaultInjectorFactory>,
     tenant: TenantId,
     shard_id: ShardId,
+}
+
+fn open_blink_store(
+    config: ResidentBlinkOpenConfig,
 ) -> Result<dodb_storage::BlinkStore<ProductionFile, ProductionFile>, Error> {
+    let ResidentBlinkOpenConfig {
+        database_path,
+        database_config,
+        wal_layout,
+        checkpoint_policy,
+        checkpoint_retention_bytes,
+        factory,
+        tenant,
+        shard_id,
+    } = config;
     let mut store = match wal_layout {
         BlinkWalLayout::Legacy => {
             dodb_storage::BlinkStore::<ProductionFile, ProductionFile>::open_path(
@@ -2648,24 +3292,22 @@ fn open_blink_store(
 }
 
 impl AsyncBlinkShard {
-    fn start(
-        mut store: dodb_storage::BlinkStore<ProductionFile, ProductionFile>,
-        config: CoordinatorConfig,
-        checkpoint_policy: BlinkCheckpointPolicy,
-        physical_config: Option<physical_checkpoint::PhysicalCheckpointConfig>,
-        checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
-        activity: Arc<CoordinatorActivity>,
-        tenant_id: u64,
-        #[cfg(feature = "blink-demand-paging")] foreground_resources: Option<
-            dodb_storage::blink::resource::BlinkResourceManager,
-        >,
-        #[cfg(all(test, feature = "blink-demand-paging"))] commit_test_gate: Option<
-            Arc<OneShotTestGate>,
-        >,
-        #[cfg(feature = "blink-demand-paging")] metadata_reservation: Option<
-            dodb_storage::blink::resource::Reservation,
-        >,
-    ) -> Self {
+    fn start(start_config: AsyncBlinkShardStartConfig) -> Self {
+        let AsyncBlinkShardStartConfig {
+            mut store,
+            coordinator_config: config,
+            checkpoint_policy,
+            physical_config,
+            checkpoint_metrics,
+            activity,
+            tenant_id,
+            #[cfg(feature = "blink-demand-paging")]
+            foreground_resources,
+            #[cfg(all(test, feature = "blink-demand-paging"))]
+            commit_test_gate,
+            #[cfg(feature = "blink-demand-paging")]
+            metadata_reservation,
+        } = start_config;
         let read_handle = BlinkShardReadHandle::Resident(store.versioned_read_handle());
         let (request_tx, mut request_rx) =
             tokio::sync::mpsc::channel::<QueuedBlinkTransaction>(config.queue_capacity.max(1));
@@ -3021,16 +3663,18 @@ impl AsyncBlinkShard {
     }
 
     #[cfg(feature = "blink-demand-paging")]
-    fn start_paged(
-        read_handle: Arc<dodb_storage::blink::PagedReadHandle>,
-        writable: Option<Arc<PagedWritableShard>>,
-        activity: Arc<CoordinatorActivity>,
-        blocking_workers: Arc<Semaphore>,
-        #[cfg(test)] read_test_gate: Option<Arc<OneShotTestGate>>,
-        tenant_id: u64,
-        foreground_resources: Option<dodb_storage::blink::resource::BlinkResourceManager>,
-        metadata_reservation: Option<dodb_storage::blink::resource::Reservation>,
-    ) -> Self {
+    fn start_paged(start_config: AsyncBlinkShardPagedStartConfig) -> Self {
+        let AsyncBlinkShardPagedStartConfig {
+            read_handle,
+            writable,
+            activity,
+            blocking_workers,
+            #[cfg(test)]
+            read_test_gate,
+            tenant_id,
+            foreground_resources,
+            metadata_reservation,
+        } = start_config;
         Self {
             read_handle: BlinkShardReadHandle::Paged {
                 handle: read_handle,
@@ -3161,6 +3805,35 @@ impl AsyncBlinkShard {
         }
         Ok(())
     }
+}
+
+struct AsyncBlinkShardStartConfig {
+    store: dodb_storage::BlinkStore<ProductionFile, ProductionFile>,
+    coordinator_config: CoordinatorConfig,
+    checkpoint_policy: BlinkCheckpointPolicy,
+    physical_config: Option<physical_checkpoint::PhysicalCheckpointConfig>,
+    checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
+    activity: Arc<CoordinatorActivity>,
+    tenant_id: u64,
+    #[cfg(feature = "blink-demand-paging")]
+    foreground_resources: Option<dodb_storage::blink::resource::BlinkResourceManager>,
+    #[cfg(all(test, feature = "blink-demand-paging"))]
+    commit_test_gate: Option<Arc<OneShotTestGate>>,
+    #[cfg(feature = "blink-demand-paging")]
+    metadata_reservation: Option<dodb_storage::blink::resource::Reservation>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+struct AsyncBlinkShardPagedStartConfig {
+    read_handle: Arc<dodb_storage::blink::PagedReadHandle>,
+    writable: Option<Arc<PagedWritableShard>>,
+    activity: Arc<CoordinatorActivity>,
+    blocking_workers: Arc<Semaphore>,
+    #[cfg(test)]
+    read_test_gate: Option<Arc<OneShotTestGate>>,
+    tenant_id: u64,
+    foreground_resources: Option<dodb_storage::blink::resource::BlinkResourceManager>,
+    metadata_reservation: Option<dodb_storage::blink::resource::Reservation>,
 }
 
 fn transaction_size(request: &TransactionRequest) -> usize {
@@ -3800,6 +4473,57 @@ mod tests {
         metrics.checkpoint_request_cancelled(4_000);
         assert_eq!(metrics.checkpoint_requests_cancelled, 1);
         assert_eq!(metrics.checkpoint_request_wait_nanos_total, 7_000);
+    }
+
+    #[test]
+    fn tenant_checkpoint_metrics_aggregate_debt_wait_and_service() {
+        let mut metrics = BlinkWalCheckpointMetrics {
+            threshold_bytes: Some(100),
+            ..BlinkWalCheckpointMetrics::default()
+        };
+        metrics.observe_tenant_wal_bytes(1, 150, 1_000);
+        metrics.observe_tenant_wal_bytes(2, 125, 2_000);
+        assert_eq!(metrics.checkpoint_debt_bytes_current, 75);
+        assert_eq!(metrics.checkpoint_debt_bytes_max, 75);
+        assert_eq!(metrics.per_tenant[&1].checkpoint_debt_bytes_current, 50);
+        assert_eq!(metrics.per_tenant[&2].checkpoint_debt_bytes_current, 25);
+        assert_eq!(
+            metrics.snapshot_at(6_000).threshold_excess_current_nanos,
+            9_000
+        );
+
+        metrics.tenant_checkpoint_request_queued(2);
+        metrics.tenant_checkpoint_request_started(2, 800);
+        metrics.tenant_checkpoint_slice_completed(2);
+        assert_eq!(metrics.per_tenant[&2].checkpoint_requests_queued, 1);
+        assert_eq!(metrics.per_tenant[&2].checkpoint_requests_pending, 0);
+        assert_eq!(
+            metrics.per_tenant[&2].checkpoint_request_wait_nanos_max,
+            800
+        );
+        assert_eq!(metrics.per_tenant[&2].service_slices, 1);
+
+        metrics.observe_tenant_wal_bytes(1, 100, 7_000);
+        assert_eq!(metrics.per_tenant[&1].threshold_excess_total_nanos, 6_000);
+        assert_eq!(metrics.checkpoint_debt_bytes_current, 25);
+    }
+
+    #[test]
+    #[cfg(feature = "blink-demand-paging")]
+    fn abandoned_checkpoint_request_clears_tenant_pending_metrics() {
+        let metrics = Arc::new(StdMutex::new(BlinkWalCheckpointMetrics::default()));
+        metrics.lock().unwrap().tenant_checkpoint_request_queued(5);
+        let request_guard = CheckpointRequestMetricsGuard {
+            metrics: Arc::clone(&metrics),
+            tenant_id: 5,
+            queued_at: Instant::now(),
+            pending: true,
+        };
+        drop(request_guard);
+
+        let metrics = metrics.lock().unwrap();
+        assert_eq!(metrics.per_tenant[&5].checkpoint_requests_pending, 0);
+        assert_eq!(metrics.per_tenant[&5].checkpoint_requests_cancelled, 1);
     }
 
     fn blink_test_directory() -> tempfile::TempDir {
@@ -5245,6 +5969,10 @@ mod tests {
                 max_segment_bytes: 1_048_576,
                 coalesce: true,
             },
+            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                threshold_bytes: 1,
+            },
+            blink_checkpoint_execution: BlinkCheckpointExecution::Background,
             blink_shared_resources: Some(writable_paged_blink_shared_resources()),
             ..LocalTenantServiceConfig::default()
         };
@@ -5264,6 +5992,17 @@ mod tests {
             .await
             .unwrap();
         assert!(matches!(put_response, Response::Put(_)));
+        service
+            .checkpoint_metrics_handle()
+            .wait_for_coordinators_idle()
+            .await;
+        let checkpoint_metrics = service.checkpoint_metrics_snapshot();
+        assert_eq!(checkpoint_metrics.checkpoints_completed, 1);
+        let tenant_checkpoint_metrics = &checkpoint_metrics.per_tenant[&tenant.get()];
+        assert_eq!(tenant_checkpoint_metrics.checkpoint_requests_queued, 1);
+        assert_eq!(tenant_checkpoint_metrics.checkpoint_requests_pending, 0);
+        assert!(tenant_checkpoint_metrics.service_slices >= 3);
+        assert_eq!(tenant_checkpoint_metrics.checkpoint_debt_bytes_current, 0);
         match service
             .execute_request(
                 tenant,
@@ -5301,6 +6040,86 @@ mod tests {
             response => panic!("unexpected response: {response:?}"),
         }
         reopened_service.shutdown_checked().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_writer_checkpoint_releases_the_global_worker_between_slices() {
+        let directory = blink_test_directory();
+        let hot_tenant = TenantId::new(719);
+        let small_tenant = TenantId::new(720);
+        let config = LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            max_open_shards: 2,
+            blink_open_waiter_limit: 4,
+            blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce: true,
+            },
+            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                threshold_bytes: 524_288,
+            },
+            blink_shared_resources: Some(writable_paged_blink_shared_resources()),
+            ..LocalTenantServiceConfig::default()
+        };
+        let service = BlinkTenantService::new(config).unwrap();
+        create_empty_paged_service_fixture(&service.database_path(hot_tenant), hot_tenant);
+        create_empty_paged_service_fixture(&service.database_path(small_tenant), small_tenant);
+        let (hot_result, small_result) = tokio::join!(
+            async {
+                for key_number in 0..80u32 {
+                    let key = dodb_core::DocumentKey::new(
+                        b"hot".to_vec(),
+                        key_number.to_be_bytes().to_vec(),
+                    );
+                    let response = service
+                        .execute_request(
+                            hot_tenant,
+                            Request::Put {
+                                key,
+                                value: vec![key_number as u8; 8_192],
+                            },
+                            ExecutionBudget::new(1024),
+                        )
+                        .await?;
+                    assert!(matches!(response, Response::Put(_)));
+                }
+                Result::<(), Error>::Ok(())
+            },
+            async {
+                for key_number in 0..32u32 {
+                    let key = dodb_core::DocumentKey::new(
+                        b"small".to_vec(),
+                        key_number.to_be_bytes().to_vec(),
+                    );
+                    let response = service
+                        .execute_request(
+                            small_tenant,
+                            Request::Put {
+                                key,
+                                value: vec![key_number as u8; 16_384],
+                            },
+                            ExecutionBudget::new(1024),
+                        )
+                        .await?;
+                    assert!(matches!(response, Response::Put(_)));
+                }
+                Result::<(), Error>::Ok(())
+            }
+        );
+        hot_result.unwrap();
+        small_result.unwrap();
+        let checkpoint_metrics = service.checkpoint_metrics_snapshot();
+        assert!(checkpoint_metrics.checkpoints_completed > 0);
+        let hot_metrics = &checkpoint_metrics.per_tenant[&hot_tenant.get()];
+        let small_metrics = &checkpoint_metrics.per_tenant[&small_tenant.get()];
+        assert!(hot_metrics.checkpoint_requests_queued > 0);
+        assert!(small_metrics.checkpoint_requests_queued > 0);
+        assert_eq!(hot_metrics.checkpoint_requests_pending, 0);
+        assert_eq!(small_metrics.checkpoint_requests_pending, 0);
+        assert!(hot_metrics.service_slices >= 4);
+        assert!(small_metrics.service_slices > 0);
+        service.shutdown_checked().await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

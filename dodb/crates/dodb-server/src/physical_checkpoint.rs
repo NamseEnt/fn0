@@ -3,15 +3,65 @@ use dodb_storage::{BlinkCheckpointOutput, BlinkCheckpointReport, BlinkStore};
 use std::collections::{HashSet, VecDeque};
 use std::sync::OnceLock;
 use std::sync::atomic::AtomicBool;
-use tokio::sync::{mpsc, watch};
+use std::sync::mpsc::SyncSender;
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::{JoinError, JoinHandle};
 
 type Store = BlinkStore<ProductionFile, ProductionFile>;
 type WorkerResult = Result<Result<BlinkCheckpointOutput, Error>, JoinError>;
+type CheckpointProgressJob = Box<dyn FnOnce() + Send>;
+type CheckpointProgressSender = SyncSender<CheckpointProgressJob>;
 
 static TASK_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 static CHECKPOINT_CAPACITY: OnceLock<Arc<FairCheckpointScheduler>> = OnceLock::new();
+static CHECKPOINT_PROGRESS_SENDER: OnceLock<Result<CheckpointProgressSender, String>> =
+    OnceLock::new();
+
+pub(super) fn submit_checkpoint_progress<T, F>(job: F) -> Result<oneshot::Receiver<T>, Error>
+where
+    T: Send + 'static,
+    F: FnOnce() -> T + Send + 'static,
+{
+    let sender = CHECKPOINT_PROGRESS_SENDER.get_or_init(|| {
+        let (sender, receiver) = std::sync::mpsc::sync_channel::<CheckpointProgressJob>(16);
+        std::thread::Builder::new()
+            .name("dodb-checkpoint-progress".to_owned())
+            .spawn(move || {
+                while let Ok(job) = receiver.recv() {
+                    job();
+                }
+            })
+            .map_err(|error| error.to_string())?;
+        Ok(sender)
+    });
+    let sender = sender.as_ref().map_err(|error| {
+        Error::durability(format!("checkpoint progress worker failed: {error}"))
+    })?;
+    let (result_sender, result_receiver) = oneshot::channel();
+    let progress_job = Box::new(move || {
+        if let Ok(result) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job)) {
+            let _ = result_sender.send(result);
+        }
+    });
+    sender.try_send(progress_job).map_err(|error| match error {
+        std::sync::mpsc::TrySendError::Full(_) => {
+            Error::overloaded("checkpoint progress worker queue is full")
+        }
+        std::sync::mpsc::TrySendError::Disconnected(_) => {
+            Error::durability("checkpoint progress worker stopped")
+        }
+    })?;
+    Ok(result_receiver)
+}
+
+struct CheckpointWorkerActivity(Arc<AtomicBool>);
+
+impl Drop for CheckpointWorkerActivity {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
 
 #[derive(Default)]
 pub(super) struct FairTenantReadyQueue {
@@ -161,9 +211,17 @@ impl Drop for CheckpointWaitTicket {
     }
 }
 
-struct CheckpointCapacityPermit {
+pub(super) struct CheckpointCapacityPermit {
     scheduler: Arc<FairCheckpointScheduler>,
     tenant: u64,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+pub(super) async fn acquire_fair_checkpoint_slice(
+    tenant: u64,
+) -> Result<CheckpointCapacityPermit, Error> {
+    let scheduler = CHECKPOINT_CAPACITY.get_or_init(|| Arc::new(FairCheckpointScheduler::new()));
+    Arc::clone(scheduler).acquire(tenant).await
 }
 
 impl Drop for CheckpointCapacityPermit {
@@ -277,7 +335,9 @@ impl PhysicalCoordinator {
             self.metrics(|metrics| metrics.merged_checkpoint_requests += 1);
         } else {
             self.requested_since = Some(Instant::now());
-            self.metrics(|metrics| metrics.checkpoint_request_queued());
+            self.metrics(|metrics| {
+                metrics.tenant_checkpoint_request_queued(self.settings.tenant_id)
+            });
         }
         self.requested = true;
         if self.requested_activity.is_none() {
@@ -292,7 +352,9 @@ impl PhysicalCoordinator {
         self.requested = false;
         self.requested_activity = None;
         let wait_nanos = self.requested_since.take().map_or(0, nanos);
-        self.metrics(|metrics| metrics.checkpoint_request_cancelled(wait_nanos));
+        self.metrics(|metrics| {
+            metrics.tenant_checkpoint_request_cancelled(self.settings.tenant_id, wait_nanos)
+        });
     }
 
     fn scheduler() -> Arc<FairCheckpointScheduler> {
@@ -478,6 +540,7 @@ impl PhysicalCoordinator {
             running.completed_writes += successful;
         }
         let wal_bytes = after.as_ref().map_or(0, |wal| wal.wal_bytes);
+        let tenant_id = self.settings.tenant_id;
         self.metrics(|metrics| {
             if metrics.wal_bytes_at_measurement_start.is_none() {
                 metrics.wal_bytes_at_measurement_start = before.as_ref().map(|wal| wal.wal_bytes);
@@ -490,10 +553,8 @@ impl PhysicalCoordinator {
             metrics.wal_syncs = metrics
                 .commit_wal_syncs
                 .saturating_add(metrics.checkpoint_wal_syncs);
-            metrics.wal_bytes_current = wal_bytes;
-            metrics.wal_bytes_at_measurement_end = Some(wal_bytes);
-            metrics.wal_bytes_max = metrics.wal_bytes_max.max(wal_bytes);
-            metrics.observe_wal_bytes(wal_bytes, unix_nanos());
+            metrics.observe_tenant_wal_bytes(tenant_id, wal_bytes, unix_nanos());
+            metrics.wal_bytes_at_measurement_end = Some(metrics.wal_bytes_current);
             metrics.successful_mutation_transactions += successful;
             if overlap {
                 metrics.writes_during_checkpoint += successful;
@@ -535,7 +596,9 @@ impl PhysicalCoordinator {
         self.store = Some(store);
         let request_wait_nanos = self.requested_since.take().map_or(0, nanos);
         self.requested = false;
-        self.metrics(|metrics| metrics.checkpoint_request_started(request_wait_nanos));
+        self.metrics(|metrics| {
+            metrics.tenant_checkpoint_request_started(self.settings.tenant_id, request_wait_nanos)
+        });
         let snapshot = snapshot?;
         self.metrics(|metrics| {
             metrics.coordinator_pause_nanos = metrics
@@ -550,8 +613,12 @@ impl PhysicalCoordinator {
                 .commit_wal_syncs
                 .saturating_add(metrics.checkpoint_wal_syncs);
             if let Some(wal) = &after {
-                metrics.observe_wal_bytes(wal.wal_bytes, unix_nanos());
-                metrics.wal_bytes_at_measurement_end = Some(wal.wal_bytes);
+                metrics.observe_tenant_wal_bytes(
+                    self.settings.tenant_id,
+                    wal.wal_bytes,
+                    unix_nanos(),
+                );
+                metrics.wal_bytes_at_measurement_end = Some(metrics.wal_bytes_current);
             }
         });
         let Some(mut snapshot) = snapshot else {
@@ -581,12 +648,18 @@ impl PhysicalCoordinator {
         let preparation_nanos = nanos(started);
         let worker_active = Arc::new(AtomicBool::new(false));
         let worker_state = Arc::clone(&worker_active);
+        let worker = submit_checkpoint_progress(move || {
+            worker_state.store(true, Ordering::Release);
+            let _worker_activity = CheckpointWorkerActivity(worker_state);
+            snapshot.run()
+        })?;
         self.running = Some(RunningCheckpoint {
-            worker: tokio::task::spawn_blocking(move || {
-                worker_state.store(true, Ordering::Release);
-                let result = snapshot.run();
-                worker_state.store(false, Ordering::Release);
-                result
+            worker: tokio::spawn(async move {
+                worker.await.map_err(|error| {
+                    Error::durability(format!(
+                        "checkpoint progress worker dropped its result: {error}"
+                    ))
+                })?
             }),
             _permit: permit,
             _activity: self.settings.activity.enter(),
@@ -620,7 +693,7 @@ impl PhysicalCoordinator {
             .map_or([0; 3], |output| output.phase_timings());
         let completion_started = Instant::now();
         let result = if let Some(mut store) = self.store.take() {
-            match tokio::task::spawn_blocking(move || {
+            match submit_checkpoint_progress(move || {
                 let result = store.complete_segmented_checkpoint(output);
                 let bytes = store
                     .wal_metrics()
@@ -628,7 +701,7 @@ impl PhysicalCoordinator {
                     .flatten()
                     .map_or(0, |wal| wal.wal_bytes);
                 (store, result, bytes)
-            })
+            })?
             .await
             {
                 Ok((store, report, bytes)) => {
@@ -660,10 +733,11 @@ impl PhysicalCoordinator {
                 .map_or((None, metrics.wal_bytes_current), |(report, bytes)| {
                     (Some(report), *bytes)
                 });
-            metrics.observe_wal_bytes(bytes, unix_nanos());
-            metrics.wal_bytes_at_measurement_end = Some(bytes);
+            metrics.observe_tenant_wal_bytes(self.settings.tenant_id, bytes, unix_nanos());
+            metrics.wal_bytes_at_measurement_end = Some(metrics.wal_bytes_current);
             if result.is_ok() {
                 metrics.checkpoints_completed += 1;
+                metrics.tenant_checkpoint_slice_completed(self.settings.tenant_id);
             } else {
                 metrics.checkpoints_failed += 1;
             }
@@ -716,7 +790,7 @@ fn unix_nanos() -> u128 {
 
 #[cfg(test)]
 mod tests {
-    use super::{FairCheckpointScheduler, FairTenantReadyQueue};
+    use super::{FairCheckpointScheduler, FairTenantReadyQueue, submit_checkpoint_progress};
     use std::sync::Arc;
 
     async fn wait_until_pending(scheduler: &FairCheckpointScheduler, tenant: u64) {
@@ -816,5 +890,70 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(next_permit.tenant, 73);
+    }
+
+    #[tokio::test]
+    async fn checkpoint_continuation_returns_behind_other_ready_tenants() {
+        let scheduler = Arc::new(FairCheckpointScheduler::new());
+        let initial_permit = scheduler.try_acquire(81).unwrap();
+        let first_scheduler = Arc::clone(&scheduler);
+        let first_slice = tokio::spawn(async move { first_scheduler.acquire(82).await.unwrap() });
+        wait_until_pending(&scheduler, 82).await;
+        let second_scheduler = Arc::clone(&scheduler);
+        let second_tenant_slice =
+            tokio::spawn(async move { second_scheduler.acquire(83).await.unwrap() });
+        wait_until_pending(&scheduler, 83).await;
+
+        drop(initial_permit);
+        let first_permit = tokio::time::timeout(std::time::Duration::from_secs(2), first_slice)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(first_permit.tenant, 82);
+        let continuation_scheduler = Arc::clone(&scheduler);
+        let continuation_slice =
+            tokio::spawn(async move { continuation_scheduler.acquire(82).await.unwrap() });
+        wait_until_pending(&scheduler, 82).await;
+
+        drop(first_permit);
+        let second_permit =
+            tokio::time::timeout(std::time::Duration::from_secs(2), second_tenant_slice)
+                .await
+                .unwrap()
+                .unwrap();
+        assert_eq!(second_permit.tenant, 83);
+        drop(second_permit);
+        let continuation_permit =
+            tokio::time::timeout(std::time::Duration::from_secs(2), continuation_slice)
+                .await
+                .unwrap()
+                .unwrap();
+        assert_eq!(continuation_permit.tenant, 82);
+    }
+
+    #[tokio::test]
+    async fn failed_progress_job_releases_worker_and_checkpoint_capacity() {
+        let scheduler = Arc::new(FairCheckpointScheduler::new());
+        let first_permit = scheduler.try_acquire(91).unwrap();
+        let failed_result = submit_checkpoint_progress(move || {
+            drop(first_permit);
+            Err::<(), _>(super::Error::durability("injected progress failure"))
+        })
+        .unwrap();
+        assert!(failed_result.await.unwrap().is_err());
+
+        let next_permit = scheduler.try_acquire(92).unwrap();
+        assert_eq!(next_permit.tenant, 92);
+        let next_result = submit_checkpoint_progress(|| 1u64).unwrap();
+        assert_eq!(next_result.await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn panicking_progress_job_does_not_stop_the_dedicated_worker() {
+        let failed_result =
+            submit_checkpoint_progress(|| -> u64 { panic!("injected worker panic") }).unwrap();
+        assert!(failed_result.await.is_err());
+        let recovered_result = submit_checkpoint_progress(|| 2u64).unwrap();
+        assert_eq!(recovered_result.await.unwrap(), 2);
     }
 }
