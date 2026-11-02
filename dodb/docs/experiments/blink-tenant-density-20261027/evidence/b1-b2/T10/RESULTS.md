@@ -74,3 +74,13 @@ T10 remains partial. Process-kill recovery, actual pointer-write I/O injection, 
 - Raw logs: `logs/paged-checkpoint-single-worker-focused.log`, `logs/paged-checkpoint-single-worker-feature-lib.log`, `logs/paged-checkpoint-single-worker-all-targets-compile.log`, and `logs/paged-checkpoint-single-worker-clippy.log`.
 
 T10 remains partial. The active-job guard does not yet provide resumable bounded slices, queue debt/time accounting, or capacity-release wakeups. Process-crash, source catalog/GC, and disk reservation acceptance remains open.
+
+## Completed substep: manifest pointer write fault boundary
+
+- Manifest publication now accepts fault injection at four pointer stages: before temporary creation, after the temporary pointer has been written and synced, after rename, and after containing-directory sync.
+- The checkpoint integration fixture injects failure after the temporary pointer sync. It verifies generation 3 remains selected on reopen, the synced temporary pointer is preserved, and the writer rejects further commits after the uncertain publication result.
+- Full feature library suite: 297 passed, 0 failed, 4 ignored. All feature targets compiled. The test-only publication helper was excluded from non-test builds after the first compile exposed an unused-method warning. Strict Clippy still reports 12 pre-existing diagnostics and no new checkpoint finding.
+- Source commit: `445dce45c585abd9b2d795dd14c468e4e9463791`.
+- Raw logs: `logs/paged-checkpoint-pointer-fault-feature-lib.log`, `logs/paged-checkpoint-pointer-fault-all-targets-compile.log` (first compile warning), `logs/paged-checkpoint-pointer-fault-all-targets-compile-final.log`, and `logs/paged-checkpoint-pointer-fault-strict-clippy.log`.
+
+T10 remains partial. Process-kill crash/reopen, source-catalog and GC integration, source/index disk reservations, combined loader/index/output accounting, bounded defer with progress after capacity release, resumable slices, and checkpoint debt/time-above-threshold accounting remain open.

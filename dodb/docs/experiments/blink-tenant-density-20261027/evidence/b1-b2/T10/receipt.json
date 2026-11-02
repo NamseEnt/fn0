@@ -10,7 +10,8 @@
     "d99c3e465ca4a72d54e74caa723536a09b62cc02",
     "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b",
     "163961877f966e076c66d772dd3310724b2a1cbb",
-    "70133a4f6885ea2b46904a54f5acb8c20c2ff760"
+    "70133a4f6885ea2b46904a54f5acb8c20c2ff760",
+    "445dce45c585abd9b2d795dd14c468e4e9463791"
   ],
   "push": {
     "remote": "origin",
@@ -41,7 +42,7 @@
     "dodb/crates/dodb-storage/src/wal.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "413fa0e5cc78f819640f469c15711963161bc0c7044e30d2bba2ccbf5a1aa985",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "5b0603bb863db40ed94d2edbabdfca956d7a3ce511b57a1ea90bc2e6d4a77be2",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "a4b1321c4793fb086fdf77900d3a33f7bfef51bd46fce9c2d3b83748247e461c",
     "dodb/crates/dodb-storage/src/blink/page_locator.rs": "80fbbdc6a569b379b563e8ad65b396c047bb4e63524240e3126c15710d59b48a",
     "dodb/crates/dodb-storage/src/bin/phase0-bench.rs": "2cf4d0a7d12caaa477046445f3a4675c861b85628105c81496115e2e03c50c81",
@@ -49,14 +50,14 @@
     "dodb/crates/dodb-storage/src/blink/version_index.rs": "e60ab5bc5981aed2d216d28f28ff8710e0f68f61dfdb8f39561c181482ed3880",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "dece389300575f090e393780fc1a9a31aaf6f2689774ec604677c0c3967d8a4f",
     "dodb/crates/dodb-storage/src/wal.rs": "7fec7f957680ed1dc779ec355cd9b90018bc27ddb88023b6c446dd38763f601d",
-    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "d1c7c0cdebab4c9fd3f70994e0a04bbe87c219f025e96bfd69bed2c2e2b69579"
+    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "e69d6062bfb9371d2e3a6b28ac3d114697642c4017d81f12666e8413fc46d366"
   },
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "70133a4f6885ea2b46904a54f5acb8c20c2ff760"
+    "source_commit": "445dce45c585abd9b2d795dd14c468e4e9463791"
   },
   "features": [
     "blink-demand-paging",
@@ -72,7 +73,8 @@
     "defaults_changed": false,
     "oci_experiment": false,
     "performance_matrix_started": false,
-    "checkpoint_worker": "One active checkpoint job per PagedTransactionWriter; overlapping jobs are rejected, and job drop or publication releases the slot."
+    "checkpoint_worker": "One active checkpoint job per PagedTransactionWriter; overlapping jobs are rejected, and job drop or publication releases the slot.",
+    "pointer_faults": "Injectable boundaries exist before pointer temporary creation, after temporary-file sync, after atomic rename, and after directory sync; the exercised writer path fails after temporary-file sync."
   },
   "checks": [
     {
@@ -912,6 +914,91 @@
         "sha256": "c1fe638a37892de8b17defff2cbad138396f9a02418c958e6298ef034568fad7"
       },
       "source_commit": "70133a4f6885ea2b46904a54f5acb8c20c2ff760"
+    },
+    {
+      "name": "paged_checkpoint_pointer_fault_feature_library",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "297 passed, 0 failed, 4 ignored. The writer pointer fault leaves generation 3 selected after reopen and preserves the synced temporary pointer.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-pointer-fault-feature-lib.log",
+        "sha256": "96e243c15f205043cfd26b7364b52c4061c71df1705aa49adcd9db782a2db3da"
+      },
+      "source_commit": "445dce45c585abd9b2d795dd14c468e4e9463791"
+    },
+    {
+      "name": "paged_checkpoint_pointer_fault_all_target_compile_initial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--no-run"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "Compiled all targets but exposed a new unused test-helper warning; the helper was restricted to test builds and compile was rerun.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-pointer-fault-all-targets-compile.log",
+        "sha256": "f86193e829f130e7ce960580d4432d8ff0b2d76ffa4bc3fb518e3178b3110fd7"
+      },
+      "source_commit": "445dce45c585abd9b2d795dd14c468e4e9463791"
+    },
+    {
+      "name": "paged_checkpoint_pointer_fault_all_target_compile",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--no-run"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "All feature library, binary, and integration targets compiled; no new library warning remains. Existing benchmark harness dead-code warnings remain.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-pointer-fault-all-targets-compile-final.log",
+        "sha256": "3f820e5852388f0d4d061bb1b6890602d2aa26190ef3859d4ba3e740d9ee37b2"
+      },
+      "source_commit": "445dce45c585abd9b2d795dd14c468e4e9463791"
+    },
+    {
+      "name": "paged_checkpoint_pointer_fault_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "--message-format",
+        "short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 101,
+      "summary": "12 pre-existing crate diagnostics remain; no diagnostic points to checkpoint publication fault injection.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-pointer-fault-strict-clippy.log",
+        "sha256": "f0fad39885bb275506ddcf1fbcfd493400b9d95fc1108503c69df5ab80911cf4"
+      },
+      "source_commit": "445dce45c585abd9b2d795dd14c468e4e9463791"
     }
   ],
   "acceptance_mapping": {
@@ -1019,10 +1106,10 @@
     }
   ],
   "remaining_work": [
-    "Add actual pointer-write I/O faults plus process-crash/reopen, old-reader, and GC retention oracles; integrate source-catalog registration and old-root collection",
+    "Add process-kill checkpoint crash/reopen, old-reader, and GC retention oracles; integrate source-catalog registration and old-root collection",
     "Reserve source/index disk overlap and required loader memory together with checkpoint output and index promotion",
     "Resolve the eight-page pinned-root index-capacity attempt without increasing the cap to hide the bound; test defer and progress after capacity release",
-    "Implement one-worker resumable slices, bounded checkpoint debt, and time-above-threshold accounting"
+    "Implement resumable worker slices, bounded checkpoint debt, and time-above-threshold accounting"
   ],
   "next_task": "T10"
 }

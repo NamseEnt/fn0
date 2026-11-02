@@ -1,0 +1,119 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+warning: method `publish_with_hook` is never used
+   --> dodb/crates/dodb-storage/src/blink/paged_manifest.rs:228:8
+    |
+ 83 | impl PagedManifestStore {
+    | ----------------------- method in this implementation
+...
+228 |     fn publish_with_hook<F>(&mut self, manifest: PagedManifest, before_pointer: F) -> Result<()>
+    |        ^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `dodb-storage` (lib) generated 1 warning
+warning: constant `BASE_SEED` is never used
+ --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:4:11
+  |
+4 | pub const BASE_SEED: u64 = 979_000_000;
+  |           ^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `SEED_STRIDE` is never used
+ --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:5:11
+  |
+5 | pub const SEED_STRIDE: u64 = 1_009;
+  |           ^^^^^^^^^^^
+
+warning: variants `SameLeafHeavy`, `DifferentLeafHeavy`, and `Hotspot` are never constructed
+  --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:14:5
+   |
+12 | pub enum Distribution {
+   |          ------------ variants in this enum
+13 |     Uniform,
+14 |     SameLeafHeavy,
+   |     ^^^^^^^^^^^^^
+15 |     DifferentLeafHeavy,
+   |     ^^^^^^^^^^^^^^^^^^
+16 |     Hotspot,
+   |     ^^^^^^^
+   |
+   = note: `Distribution` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: associated items `parse`, `as_str`, and `report_name` are never used
+  --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:51:12
+   |
+50 | impl Distribution {
+   | ----------------- associated items in this implementation
+51 |     pub fn parse(value: &str) -> Self {
+   |            ^^^^^
+...
+61 |     pub fn as_str(self) -> &'static str {
+   |            ^^^^^^
+...
+70 |     pub fn report_name(self) -> &'static str {
+   |            ^^^^^^^^^^^
+
+warning: method `next_read_key` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:163:12
+    |
+112 | impl WorkloadGenerator {
+    | ---------------------- method in this implementation
+...
+163 |     pub fn next_read_key(&mut self) -> Vec<u8> {
+    |            ^^^^^^^^^^^^^
+
+warning: function `invocation_seed` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:258:8
+    |
+258 | pub fn invocation_seed(scenario_index: u64, repetition_index: u64) -> u64 {
+    |        ^^^^^^^^^^^^^^^
+
+warning: struct `TraceHash` is never constructed
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:566:12
+    |
+566 | pub struct TraceHash {
+    |            ^^^^^^^^^
+
+warning: associated items `new`, `absorb`, and `push_transaction` are never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:572:12
+    |
+571 | impl TraceHash {
+    | -------------- associated items in this implementation
+572 |     pub fn new() -> Self {
+    |            ^^^
+...
+579 |     fn absorb(&mut self, bytes: &[u8]) {
+    |        ^^^^^^
+...
+586 |     pub fn push_transaction<'a>(
+    |            ^^^^^^^^^^^^^^^^
+
+warning: method `merge` is never used
+   --> dodb/crates/dodb-storage/src/bin/../../../../experiments/mixed-harness/harness/common/workload.rs:638:12
+    |
+616 | impl LatencySamples {
+    | ------------------- method in this implementation
+...
+638 |     pub fn merge(&mut self, other: Self) {
+    |            ^^^^^
+
+warning: `dodb-storage` (bin "blink-fixed-group-bench" test) generated 7 warnings (7 duplicates)
+warning: `dodb-storage` (bin "blink-fixed-group-bench") generated 9 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.81s
+  Executable unittests src/lib.rs (target/debug/deps/dodb_storage-61add53ad8a69c71)
+  Executable unittests src/bin/blink-fixed-group-bench.rs (target/debug/deps/blink_fixed_group_bench-e11774eba16867a4)
+  Executable unittests src/bin/phase0-bench.rs (target/debug/deps/phase0_bench-8580870681af2b82)
+  Executable unittests src/bin/phase1-bench.rs (target/debug/deps/phase1_bench-991509cb024641d5)
+  Executable unittests src/bin/phase2-crash-child.rs (target/debug/deps/phase2_crash_child-b677e69c5c04ea16)
+  Executable unittests src/bin/phase4-bench.rs (target/debug/deps/phase4_bench-acf1e4761830215d)
+  Executable unittests src/bin/phase5-bench.rs (target/debug/deps/phase5_bench-c83139cf416a5f93)
+  Executable unittests src/bin/process-crash-recovery-child.rs (target/debug/deps/process_crash_recovery_child-aae73f79596e3e11)
+  Executable tests/background_checkpoint_sigkill.rs (target/debug/deps/background_checkpoint_sigkill-5a6d628760539d8e)
+  Executable tests/durable_base_background_sigkill.rs (target/debug/deps/durable_base_background_sigkill-0bc1efa4e80402ea)
+  Executable tests/durable_base_checkpoint.rs (target/debug/deps/durable_base_checkpoint-ae218866432633d4)
+  Executable tests/durable_base_sigkill.rs (target/debug/deps/durable_base_sigkill-89d0f23c0beacd5d)
+  Executable tests/phase2_recovery.rs (target/debug/deps/phase2_recovery-97b9550b48a283b0)
+  Executable tests/process_crash_recovery.rs (target/debug/deps/process_crash_recovery-727e38bbf8b98075)
+  Executable tests/segmented_checkpoint_sigkill.rs (target/debug/deps/segmented_checkpoint_sigkill-2ba86b05677fdf29)
+  Executable tests/segmented_wal_sigkill.rs (target/debug/deps/segmented_wal_sigkill-36a574f3eef37064)
