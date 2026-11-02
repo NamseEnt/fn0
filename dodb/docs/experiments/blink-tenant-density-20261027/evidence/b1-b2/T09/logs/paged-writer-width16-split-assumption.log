@@ -1,0 +1,4 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages
+Result: failed during test execution at the temporary assertion that the width-16 transaction increases high_water_page_id.
+Observed: width-16 writes and readback do not require high-water growth in this fixture, so high-water growth is not a valid split oracle when the tree can reuse existing free pages.
+Correction: removed that assertion and added a separate 48-key transaction. The corrected fixture counts reachable tree leaves and reads back every inserted key and value.

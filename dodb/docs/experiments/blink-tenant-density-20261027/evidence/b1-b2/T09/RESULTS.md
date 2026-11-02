@@ -102,3 +102,13 @@ T09 remains partial. Grouped WAL transaction boundaries, split/readback differen
 - The successful serialized run is preserved at `logs/paged-writer-width-readback-feature-lib.log.gz`.
 
 T09 remains partial. Grouped WAL transaction boundaries and complete-or-absent grouped recovery, split/readback differential writer coverage, and full process restart with index rebuild remain outstanding. No service activation or performance experiment occurred.
+
+## Paged writer structural split and readback (2026-11-02)
+
+- Added a separate 48-key transaction with 96-byte values after the width 1, 4, and 16 commits. The fixture traverses reachable internal pages before and after the transaction and asserts the reachable leaf count increases, so free-page reuse cannot hide the structural split from the oracle.
+- The expected key/value set is then read through the current writer generation after older readers are dropped. The pinned old reader is also checked to have no entries for any newly committed width or split key.
+- Focused fixture: 1 passed. Serialized feature library suite: 294 passed, 0 failed, 4 ignored in 124.15 seconds. Rustfmt passed. Strict `clippy --tests` remains blocked by 33 findings in existing code; none point into the new split fixture. Raw test and Clippy output: `logs/paged-writer-split-readback-feature-lib.log.gz` and `logs/paged-writer-split-strict-clippy.log.gz`.
+- An initial attempt inferred a split from high-water growth after width 16 and failed because free pages can serve structural allocations. That failed assumption and the corrected oracle are recorded in `logs/paged-writer-width16-split-assumption.log`.
+- Source commit: `88b5569f8`.
+
+T09 remains partial. Grouped WAL transaction boundaries and complete-or-absent grouped recovery, plus full process restart with index rebuild, remain outstanding. No service activation or performance experiment occurred.
