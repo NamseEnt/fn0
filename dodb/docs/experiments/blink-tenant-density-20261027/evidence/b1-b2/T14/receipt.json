@@ -1,0 +1,82 @@
+{
+  "task_id": "T14",
+  "scope": "Fair debt-driven checkpoint admission and root-release source recovery",
+  "status": "partial",
+  "parent_source_commit": "d41719694b0b78653737ad91599ef24257f146a3",
+  "implementation_commit": "6e6f1dca8ebbcdc8c4628b2c77dac25285ec87a1",
+  "prerequisite_receipts": [
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/receipt.json",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/receipt.json",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T13/receipt.json"
+  ],
+  "owned_paths": [
+    "dodb/crates/dodb-server/src/lib.rs",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/RESULTS.md",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-library-old-reader-lifecycle.log",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-old-reader-capacity-probe-failures.log"
+  ],
+  "source_hashes": {
+    "dodb/crates/dodb-server/src/lib.rs": "1140ba19fe95ddb93803421fb8d7dd6c710e3ba02144cc155dc589ed02222876",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/RESULTS.md": "80f22a12e4b9b20d4de768e185b207570def526a332873ebdb795e034253dc4a",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-library-old-reader-lifecycle.log": "18dc912ad60c5c88d86b5f1f4d0ed93f543eb63516712d4b75a144e98a268ec4",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-old-reader-capacity-probe-failures.log": "4598a4eb3eb9bd0c48bb8f3b8f771b9364b6b7a0a3d1476ab6c3354ac369c9c7"
+  },
+  "host": "local worktree / macOS",
+  "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "features": ["blink-demand-paging"],
+  "runtime_configuration": "local service integration tests; 64 MiB test disk cap; 50 distinct 4 KiB values; no performance measurement",
+  "checks": [
+    {
+      "argv": ["cargo", "test", "-p", "dodb-server", "--features", "blink-demand-paging", "--lib", "--", "--test-threads=1"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "49 passed; 0 failed; log retained"
+    },
+    {
+      "argv": ["cargo", "clippy", "-p", "dodb-server", "--features", "blink-demand-paging", "--all-targets", "--no-deps", "--", "-D", "warnings"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "passed"
+    },
+    {
+      "argv": ["rustfmt", "--check", "--edition", "2024", "crates/dodb-server/src/lib.rs"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "passed"
+    },
+    {
+      "argv": ["git", "diff", "--check"],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "passed"
+    }
+  ],
+  "acceptance_mapping": {
+    "old service reader retains WAL through checkpoint publication": "Passed by tests::paged_checkpoint_reclaims_old_reader_source_before_publication",
+    "root release permits old WAL source collection before the following checkpoint publishes": "Passed by tests::paged_checkpoint_reclaims_old_reader_source_before_publication; final value also verified after service reopen",
+    "capacity waiter resumes and checkpoint publishes after capacity release": "Existing tests::paged_checkpoint_resumes_after_disk_capacity_release passed in the 49-test paging library run",
+    "root-release waiter wakes and unregisters": "Existing blink::resource::tests::disk_capacity_waiter_wakes_when_a_root_releases covered by the T14 storage paging library results",
+    "deterministic synchronized and staggered queue wait bound": "Existing physical_checkpoint::tests::fair_ready_queue_bounds_synchronized_and_staggered_pressure_wait reports three service turns",
+    "combined old-reader source release unblocks a waiting checkpoint": "Not proven; rejected capacity probes are preserved",
+    "four-tenant service-integrated all-active pressure and measured wall-clock wait": "Not proven",
+    "long pinned reader under pressure, all foreground categories full, and capacity recovery": "Not proven",
+    "performance, SLO, or tenant-capacity result": "None"
+  },
+  "ownership_peaks": {
+    "test service disk cap": "64 MiB configured; per-run peak not recorded in this test",
+    "process RSS": "Not measured"
+  },
+  "failed_attempts": [
+    "128 KiB single value exceeded the working-page limit",
+    "Hard-coded initial WAL filename was absent; final test discovers the source actually held by the old root",
+    "One-key update produced output below the artificial capacity headroom",
+    "Artificial total-disk blockers reached WAL reconciliation or version-index capacity before the intended waiter; details and exact error classes are in the preserved probe log"
+  ],
+  "remaining_work": [
+    "Prove that releasing this exact old reader's retained source unblocks the waiting checkpoint and permits publication",
+    "Exercise four continuously active tenants through service-integrated synchronized and staggered pressure and record bounded waits",
+    "Exercise a long pinned reader under pressure, all foreground categories full, and capacity recovery",
+    "Do not start T15 until T14 acceptance is complete"
+  ],
+  "next_task": "T14"
+}
