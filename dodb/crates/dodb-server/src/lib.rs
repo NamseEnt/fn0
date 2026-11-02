@@ -7160,6 +7160,107 @@ mod tests {
         service.shutdown_checked().await.unwrap();
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 5)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_writer_fairness_serves_four_active_tenants_under_synchronized_and_staggered_pressure()
+     {
+        for (scenario_number, staggered) in [(0u64, false), (1, true)] {
+            let directory = blink_test_directory();
+            let tenants = (0..4u64)
+                .map(|tenant_offset| TenantId::new(7_300 + scenario_number * 10 + tenant_offset))
+                .collect::<Vec<_>>();
+            let mut shared_resources = writable_paged_blink_shared_resources();
+            shared_resources.memory.max_tenants = tenants.len();
+            shared_resources.memory.max_pending_waiters = 8;
+            shared_resources.disk.max_tenants = tenants.len();
+            let service = Arc::new(
+                BlinkTenantService::new(LocalTenantServiceConfig {
+                    data_dir: directory.path().to_path_buf(),
+                    max_open_shards: tenants.len(),
+                    blink_open_waiter_limit: 8,
+                    blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                        max_segment_bytes: 1_048_576,
+                        coalesce: true,
+                    },
+                    blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                        threshold_bytes: 64 * 1024,
+                    },
+                    blink_shared_resources: Some(shared_resources),
+                    ..LocalTenantServiceConfig::default()
+                })
+                .unwrap(),
+            );
+            for tenant in &tenants {
+                create_empty_paged_service_fixture(&service.database_path(*tenant), *tenant);
+                service.open_shard(*tenant).await.unwrap();
+            }
+
+            let start_barrier = Arc::new(tokio::sync::Barrier::new(tenants.len() + 1));
+            let mut writers = Vec::with_capacity(tenants.len());
+            for (tenant_index, tenant) in tenants.iter().copied().enumerate() {
+                let service = Arc::clone(&service);
+                let start_barrier = Arc::clone(&start_barrier);
+                let initial_delay = if staggered {
+                    std::time::Duration::from_millis(15 * tenant_index as u64)
+                } else {
+                    std::time::Duration::ZERO
+                };
+                writers.push(tokio::spawn(async move {
+                    start_barrier.wait().await;
+                    tokio::time::sleep(initial_delay).await;
+                    let write_count = if tenant_index == 0 { 64 } else { 20 };
+                    let value_size = if tenant_index == 0 { 8_192 } else { 4_096 };
+                    for write_number in 0..write_count {
+                        let key = dodb_core::DocumentKey::new(
+                            b"fairness".to_vec(),
+                            (write_number as u32).to_be_bytes().to_vec(),
+                        );
+                        service
+                            .execute_request(
+                                tenant,
+                                Request::Put {
+                                    key,
+                                    value: vec![tenant_index as u8; value_size],
+                                },
+                                ExecutionBudget::new(1024),
+                            )
+                            .await?;
+                    }
+                    Result::<(), Error>::Ok(())
+                }));
+            }
+            start_barrier.wait().await;
+            for writer in writers {
+                writer.await.unwrap().unwrap();
+            }
+            service
+                .checkpoint_metrics_handle()
+                .wait_for_coordinators_idle()
+                .await;
+
+            let metrics = service.checkpoint_metrics_snapshot();
+            assert!(metrics.checkpoints_completed > 0);
+            let mut maximum_wait_nanos = 0;
+            for tenant in tenants {
+                let tenant_metrics = &metrics.per_tenant[&tenant.get()];
+                assert!(tenant_metrics.checkpoint_requests_queued > 0);
+                assert_eq!(tenant_metrics.checkpoint_requests_pending, 0);
+                assert!(tenant_metrics.service_slices > 0);
+                maximum_wait_nanos =
+                    maximum_wait_nanos.max(tenant_metrics.checkpoint_request_wait_nanos_max);
+            }
+            assert!(
+                maximum_wait_nanos <= 10_000_000_000,
+                "four-tenant maximum checkpoint service wait exceeded 10 seconds in staggered={staggered}: {maximum_wait_nanos} ns"
+            );
+            println!(
+                "four-tenant pressure staggered={staggered} maximum_wait_nanos={maximum_wait_nanos} per_tenant={:?}",
+                metrics.per_tenant
+            );
+            service.shutdown_checked().await.unwrap();
+        }
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "blink-demand-paging")]
     async fn paged_writer_service_failures_release_admission_and_recover_atomic_state() {

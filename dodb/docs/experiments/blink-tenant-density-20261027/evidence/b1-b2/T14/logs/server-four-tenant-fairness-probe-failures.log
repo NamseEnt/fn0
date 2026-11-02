@@ -1,0 +1,3 @@
+Rejected first four-tenant service-test setup
+
+The first targeted run rejected the test configuration before any shard opened. It configured blink_open_waiter_limit=8 while inheriting memory.max_pending_waiters=4, so BlinkTenantService::new returned InvalidRequest("B-link shared resource limits do not cover configured tenant opens"). The test configuration was corrected to raise only memory.max_pending_waiters to 8 and max_tenants to 4 in both memory and disk limits. The corrected synchronized and staggered service test passed.

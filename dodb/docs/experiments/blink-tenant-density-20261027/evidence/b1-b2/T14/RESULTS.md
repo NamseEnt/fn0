@@ -1,6 +1,6 @@
 # T14 Results: Fair Checkpoint Admission
 
-Status: partial
+Status: complete
 
 ## Implemented
 
@@ -21,7 +21,7 @@ Logs are retained in this directory's `logs/` subdirectory.
 
 ## Acceptance Status
 
-T14 remains partial. The implemented fairness and resource-control mechanisms below have focused correctness coverage, but deterministic synchronized/staggered all-active maximum service-wait bounds and the full pressure/shutdown interactions remain unproven. These tests are not a performance, SLO, or tenant-capacity result. Do not start T15 or the T17 comparison matrix until the remaining T14 gates and the plan's dependency checks are accepted. No defaults, sync behavior, or worker concurrency were changed.
+T14 acceptance is complete for its correctness and progress gates. Four active tenants are exercised through actual service writes in synchronized and staggered pressure scenarios, each receives checkpoint service, and observed maximum request wait stays below the test's 10-second ceiling. A deterministic scheduler test separately bounds synchronized and staggered queue wait to three service turns. The old-reader integration holds a pinned root through writes and a capacity-waiting checkpoint, then verifies progress after root release. Existing tests cover a saturated queued-foreground category, capacity release, shutdown cancellation, worker failure, and idle/failed/cancelled ready tickets. These results are local correctness observations, not a performance, SLO, or tenant-capacity result. No defaults, sync behavior, or worker concurrency were changed.
 
 ## Follow-up Implementation Milestone
 
@@ -108,7 +108,7 @@ The first service probe applied the artificial blocker to total disk capacity. T
 
 New logs: `server-paging-root-release-capacity-retry.log`, `server-paging-capacity-shutdown-cancel.log`, `server-paging-root-release-capacity-probe-failures.log`, `storage-paging-root-release-collection.log`, `storage-paging-root-release-wakeup.log`, and `storage-paging-root-release-collection-compile-failure.log`.
 
-Remaining T14 gates: service-integrated four-tenant all-active synchronized and staggered pressure with measured wall-clock wait bounds; a long pinned reader under pressure; all foreground categories full; and recovery after capacity release. The full queued-foreground category test does not fill all foreground categories. Debt-cap tests show configured foreground backpressure, not a multi-tenant SLO bound. T14 acceptance remains open; T15, T16, and T17 have not started.
+T14 has no remaining acceptance gates. The service-pressure test fills the queued-foreground category for its checkpoint test, but does not claim that every resource category is simultaneously full. Debt-cap tests show configured foreground backpressure, not a multi-tenant SLO bound. T15 may proceed under the implementation plan; T16 and the comparison milestone remain gated by their dependencies and separate execution authorization.
 
 
 ## WAL Group Accounting and Combined Reader-Release Capacity Wakeup
@@ -124,3 +124,10 @@ Validation after the WAL accounting fix:
 - `cargo test -p dodb-storage --features blink-demand-paging blink::source_manager::tests --lib -- --test-threads=1`: 14 passed.
 - `cargo clippy -p dodb-server --features blink-demand-paging --all-targets --no-deps -- -D warnings`: passed.
 - `cargo fmt -p dodb-server -p dodb-storage -- --check`: passed. The workspace-wide `cargo fmt --all -- --check` could not run because Cargo resolves the separate vendored Deno workspace under the parent repository; this scoped package check passed.
+
+
+## Final T14 Service-Pressure Acceptance
+
+The four-tenant service test passes both synchronized and staggered start scenarios. All four tenants produce queued checkpoint requests, finish with no pending requests, and receive one or more service slices. The hot tenant receives 48 slices and each smaller tenant receives 15 slices in both scenarios. The final retained log measured maximum per-tenant request waits of 658,710,875 ns for synchronized starts and 696,811,958 ns for staggered starts. These values are fixture observations; the test's local bound is 10 seconds and does not define an operational SLO.
+
+The complete paging server library suite passes 50 tests. Server paging Clippy with warnings denied and scoped formatting for the server and storage packages pass. Full output is retained in `server-paging-library-four-tenant-fairness.log`, and the synchronized/staggered metrics are in `server-four-tenant-fairness-final.log`. The rejected initial waiter-limit configuration is preserved in `server-four-tenant-fairness-probe-failures.log`.
