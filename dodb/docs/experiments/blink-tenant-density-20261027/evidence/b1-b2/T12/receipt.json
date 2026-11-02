@@ -4,14 +4,15 @@
   "status": "partial",
   "parent_source_commit": "a122e574cd12c8156e4b5a2bc02754d173997700",
   "implementation_commits": [
-    "54eaa434c43bd6b6faadb4ed5a4622d334b373e4"
+    "54eaa434c43bd6b6faadb4ed5a4622d334b373e4",
+    "8f636469b1af80e44caf7221166721e9fabd4f62"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "54eaa434c43bd6b6faadb4ed5a4622d334b373e"
+    "source_commit": "8f636469b1af80e44caf7221166721e9fabd4f62"
   },
   "validated": [
     {
@@ -31,6 +32,18 @@
       "command": "cargo fmt --check -p dodb-server",
       "exit_status": 0,
       "result": "passed"
+    },
+    {
+      "name": "server_library_tests_after_shutdown_retry_fix",
+      "command": "cargo test -p dodb-server --lib -- --test-threads=1",
+      "exit_status": 0,
+      "result": "15 passed, 0 failed; timeout retains open shards for a later shutdown retry"
+    },
+    {
+      "name": "server_all_targets_check_after_shutdown_retry_fix",
+      "command": "cargo check -p dodb-server --all-targets",
+      "exit_status": 0,
+      "result": "passed"
     }
   ],
   "prerequisite_receipts": [
@@ -46,8 +59,8 @@
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/receipt.json"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-server/src/lib.rs": "c656514450eaa716a1ffa8a829a7bae91947fb164a4eeedba7a170b1f3a85c2e",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "98135f4b07fc5275828f90ba96f8d5dc072395623399b6d91946dfa3993618fd"
+    "dodb/crates/dodb-server/src/lib.rs": "9272406c1912727366c09d8f9e1e86e759220c1cc57bd76f999bf3c6becf1d7b",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "9aa1196cc5b1e8c3529abaaffa5b600af1ff7efc679aae517402ca05f5dcac7b"
   },
   "logs": [
     {
@@ -67,6 +80,30 @@
       "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-format.log",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "exit_status": 0
+    },
+    {
+      "name": "server_library_tests_after_shutdown_retry_fix",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-lib-tests-after-shutdown-fix.log",
+      "sha256": "05416f85975b16df15bf19d019409e708bc374b9044de92ce753ae1e6bbaba05",
+      "exit_status": 0
+    },
+    {
+      "name": "server_all_targets_check_after_shutdown_retry_fix",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-all-targets-check-after-shutdown-fix.log",
+      "sha256": "45f4318168bd8c238664bf2a020ec70f618e70225d6fec197d6fcbf965e1d22d",
+      "exit_status": 0
+    },
+    {
+      "name": "server_format_after_shutdown_retry_fix",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-format-after-shutdown-fix.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_status": 0
+    },
+    {
+      "name": "workspace_all_targets_check_missing_rocksdb_dir",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/workspace-all-targets-check-missing-rocksdb-dir.log",
+      "sha256": "937272db2e81db51f98558132d06c002ed1a9d8a5bac88d2c8b8f0af09a8090c",
+      "exit_status": 101
     }
   ],
   "remaining_work": [
@@ -81,5 +118,12 @@
     "remote": "origin",
     "branch": "experiment/blink-tenant-density-20261027",
     "status": "pending"
-  }
+  },
+  "preserved_failures": [
+    {
+      "name": "workspace_all_targets_check_requires_rocksdb_build",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/workspace-all-targets-check-missing-rocksdb-dir.log",
+      "reason": "DODB_ROCKSDB_DIR is not set to the required RocksDB 11.8.1 build"
+    }
+  ]
 }
