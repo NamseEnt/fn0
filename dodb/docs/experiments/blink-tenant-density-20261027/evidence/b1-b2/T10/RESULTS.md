@@ -26,7 +26,18 @@ T10 remains partial. Streamed pack writing is not yet connected to durable check
 - Added incremental index application that validates the exact target page set, image LSNs, CRCs, and pack checksum before replacing dirty locators. Unchanged descriptors and version tokens remain intact; the resulting index root is promoted to durable storage.
 - The focused writer fixture commits a newer two-key transaction, verifies that only a strict subset of the eight-page target is emitted, and compares every packed image to the target index descriptor.
 - The focused index test verifies changed-locator replacement, unchanged-source retention, token preservation, and durable-root validation.
-- Full feature library suite: 295 passed, 0 failed, 4 ignored. Default and feature checks and formatting passed without warnings. Strict feature Clippy remains at 32 existing findings, with no diagnostic in the new incremental code.
+- Full feature library suite at this implementation stage: 295 passed, 0 failed, 4 ignored. Default and feature checks and formatting passed; one default test run emitted an unused feature-only import warning that was fixed and verified clean by the final compile check. Strict feature Clippy remains at 32 existing findings, with no diagnostic in the new incremental code.
 - A full-fixture attempt to apply the incremental root while old snapshot handles remained pinned exceeded the fixture's version-index resource capacity. The failed log is preserved. The smaller index test passes; realistic checkpoint/index overlap and progress-pool admission remain open acceptance work.
 
-T10 remains partial. Incremental and complete pack writing and index transformation exist, but they are not integrated with PagedManifest publication, source registration, or a WAL boundary rotated and synced at the captured target. Disk capacity reservations, complete failure/reopen coverage, tiny-capacity progress, and checkpoint debt scheduling remain outstanding. No service route, default, or performance matrix changed.
+T10 remains partial. The incremental helper now composes durable index promotion, a synced next WAL segment, PagedManifest publication, reopen, and exact reads from old and new pack sources. The live PagedTransactionWriter still does not atomically capture and rotate at the target LSN, and the complete streamed-pack publication path is not integrated. Disk capacity reservations, crash-boundary coverage, scheduler defer/wake, and checkpoint debt accounting remain outstanding. No service route, default, or performance matrix changed.
+
+
+## Completed substep: progress reservation and incremental manifest reopen
+
+- Complete and incremental index builders now reserve one 128 KiB non-borrowable progress unit before descriptor updates. Durable root promotion reserves another 128 KiB while that lease remains live, so the tested index-build peak is 256 KiB.
+- A deterministic 64 KiB fixture rejects checkpoint index work before changing the root or progress accounting. The 256 KiB fixture builds both complete and incremental roots.
+- The incremental integration fixture writes a valid prior pack, applies one newer page through an incremental pack, syncs a new WAL segment boundary, publishes manifest generation 2 at LSN 12, reopens the manifest, and reads byte-exact unchanged and changed pages from their referenced pack sources.
+- Default library tests: 221 passed, 0 failed, 4 ignored. Feature library tests: 296 passed, 0 failed, 4 ignored. Default/feature checks and formatting passed. Strict feature Clippy remains at 32 existing crate findings.
+- Final source commit: `0bdce39d1174eb71c87dc1fa12b4521969228ab8`.
+
+T10 remains partial. The publication test composes storage primitives, but the actual paged transaction writer does not yet serialize target capture with WAL rotation and publication. Source/index disk reservations, combined loader/output/index overlap, complete-pack publication, crash fault matrix, resumable worker slices, and checkpoint debt scheduling remain outstanding.

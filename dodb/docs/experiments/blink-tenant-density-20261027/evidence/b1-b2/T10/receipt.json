@@ -5,7 +5,8 @@
   "parent_source_commit": "3275cacea8d6629f1acf5420efa914988e8f94aa",
   "implementation_commits": [
     "971bb8143",
-    "e741dd19d"
+    "e741dd19d",
+    "0bdce39d1"
   ],
   "push": {
     "remote": "origin",
@@ -30,16 +31,16 @@
     "dodb/crates/dodb-storage/src/blink/version_index.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "0f0da4ef1f58b49147b5b9571086e9e85efbe1114a8effdf031d12cfb59044eb",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "9c5ccc9e62b00331e18fbf9ec9f9d28178b2684874bf6a7e2aceff5138613273",
     "dodb/crates/dodb-storage/src/blink/durable_bases.rs": "26fd15c75154e71c42394f50e9f97b3bad8e6f7992e3161d35a6fd35ddaa9f08",
-    "dodb/crates/dodb-storage/src/blink/version_index.rs": "20113c137419db0fa9f23fc9094602c5fc0fac3c5a2ca70456dd9515e5dc8b43"
+    "dodb/crates/dodb-storage/src/blink/version_index.rs": "e60ab5bc5981aed2d216d28f28ff8710e0f68f61dfdb8f39561c181482ed3880"
   },
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "e741dd19d0e6940af6290a85413c81d3292f01be"
+    "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
   },
   "features": [
     "blink-demand-paging",
@@ -326,18 +327,251 @@
         "sha256": "1e0157285357615f203f88eef8b1f221d38583bc5238a38aa68a6a28dc0cf269"
       },
       "source_commit": "e741dd19d0e6940af6290a85413c81d3292f01be"
+    },
+    {
+      "name": "paged_checkpoint_progress_capacity_before_mutation",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "checkpoint_index_work_rejects_insufficient_progress_capacity_before_reserving",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; a 64 KiB progress pool rejects the 128 KiB checkpoint index unit before changing the root or progress accounting",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-progress-capacity-focused.log",
+        "sha256": "79bbff3b23f6c970978a9a3fabf4cdac8d8c94a7eea59db100c0121d4052e507"
+      },
+      "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
+    },
+    {
+      "name": "paged_incremental_index_progress_reservation",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "incremental_checkpoint_replaces_only_pages_newer_than_the_previous_checkpoint",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; incremental index transformation holds a bounded progress reservation and preserves unchanged locators and tokens",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-incremental-index-progress-focused.log",
+        "sha256": "c24c1adfd1b1507e6985a09b8df3a88022f3488e31ca03e06393497812fc5d8a"
+      },
+      "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
+    },
+    {
+      "name": "paged_complete_index_progress_reservation",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "recovery_indexes_locations_from_an_actual_committed_wal",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; complete checkpoint index construction uses the checkpoint progress reservation and existing manifest/WAL recovery test passes",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-complete-index-progress-focused.log",
+        "sha256": "78092416ad64ba26f476aa01dbe07fe71f58b8bb9351d1e4f85b47cf89ab381d"
+      },
+      "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
+    },
+    {
+      "name": "paged_incremental_manifest_and_source_reopen",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "incremental_checkpoint_replaces_only_pages_newer_than_the_previous_checkpoint",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; after syncing a new WAL segment boundary and publishing generation 2, reopen selects checkpoint LSN 12 and reads exact unchanged and changed page images from their retained pack sources",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-incremental-manifest-reopen-focused.log",
+        "sha256": "4b00e34526aae725dd5db2e38a41ff07dc912ef85520311f5d227442c7c289c0"
+      },
+      "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
+    },
+    {
+      "name": "paged_checkpoint_default_library_tests",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "221 passed, 0 failed, 4 ignored; finished in 117.78s; raw log contains an unused feature-only test import warning fixed by cfg-gating the import and verified clean by the later default test compile",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-default-lib.log",
+        "sha256": "3033e7f061546bfc531eddc8aedad05691898421d18dc48243f3da132602b4f4"
+      },
+      "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
+    },
+    {
+      "name": "paged_checkpoint_default_test_compile",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--no-run"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "passed without warnings",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-default-test-compile-final.log",
+        "sha256": "00a4929ed6fd60b42cf63f151644cc6adbdcee9e1c4ba58b5c8a8dabff28c5fc"
+      },
+      "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
+    },
+    {
+      "name": "paged_checkpoint_feature_library_tests_serial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "296 passed, 0 failed, 4 ignored; finished in 125.37s",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-feature-lib-final.log",
+        "sha256": "e2343760ea97a5826339d07497446ae17b8606a9faccc2577c28ed664c65367a"
+      },
+      "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
+    },
+    {
+      "name": "paged_checkpoint_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--tests",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 101,
+      "summary": "32 existing crate findings; no diagnostic points to checkpoint progress reservations, incremental pack/index application, manifest reopen test, or feature-gated imports; no suppressions added",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-strict-clippy-final.log",
+        "sha256": "186af92b26542aad4d3c2dfa04d246fb97bf40918e3a36fb2331aca2586c53cf"
+      },
+      "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
+    },
+    {
+      "name": "paged_checkpoint_format_check",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--check",
+        "-p",
+        "dodb-storage"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-format-final.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
+    },
+    {
+      "name": "paged_checkpoint_default_lib_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "passed without warnings",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-default-check-final.log",
+        "sha256": "e88027038e5ae6fe23e4db912673d0edadf2517bc9bb966e2451af8ed4ba4ba7"
+      },
+      "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
+    },
+    {
+      "name": "paged_checkpoint_feature_lib_check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "passed without warnings",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-feature-check-final.log",
+        "sha256": "c709f18ae40efe139668911f8508982520bf392a4c28b971852fd7cfee335402"
+      },
+      "source_commit": "0bdce39d1174eb71c87dc1fa12b4521969228ab8"
     }
   ],
   "acceptance_mapping": {
     "stream_exact_target_generation_images": "partial: VersionIndex::visit_descriptors streams sorted descriptors with bounded traversal state; exact captured generation pack is verified against every source page image after a newer writer commit",
-    "incremental_and_complete_checkpoints": "partial: complete pack output is verified; incremental output and index-root replacement are verified independently, but they are not integrated with durable manifest publication or WAL boundary rotation",
+    "incremental_and_complete_checkpoints": "partial: complete and incremental pack output plus complete/incremental index transformations are implemented; an incremental component-level publication test syncs a next WAL segment, publishes a PagedManifest generation, reopens it, and reads exact old/new pack images, but no atomic PagedTransactionWriter/WAL capture integration or complete streamed-pack publication flow exists",
     "coalesced_and_uncoalesced_output": "passed: both modes produce complete packs with matching page counts and exact images",
     "forced_cache_misses_larger_than_cache": "passed for the fixture: eight indexed pages stream through a two-page decoded cache and source-read count increases",
     "writes_after_target_capture": "passed: the old reader generation is packed after a newer multi-key writer commit and all target bytes match the captured pages",
-    "checkpoint_failure_and_old_reader_retention": "partial: complete pack failure and pinned old-reader output are verified; incremental index application under the eight-page fixture resource overlap exceeded the configured version-index resource capacity, and crash/reopen integration remains incomplete",
-    "complete_reopen_oracle": "not implemented for streamed incremental or complete checkpoint publication; existing T04 manifest/index reopen coverage remains separate",
-    "bounded_memory_and_source_index_disk_reservations": "partial: fixed output buffer and progress-pool reservation are bounded; source/index disk capacity reservation and publication overlap are not implemented",
-    "tiny_capacity_bounded_defer_and_eventual_progress": "not implemented",
+    "checkpoint_failure_and_old_reader_retention": "partial: incomplete pack failure leaves no manifest publication; a pinned old reader remains readable and its exact pack is verified; low progress capacity is rejected before index mutation; publication crash boundaries and full-fixture pinned-root index capacity remain unverified",
+    "complete_reopen_oracle": "partial: incremental component-level manifest/WAL-boundary reopen reads exact source-backed pages; complete streamed-pack publication and process crash/reopen matrix remain unimplemented",
+    "bounded_memory_and_source_index_disk_reservations": "partial: output buffer is at most 16 KiB coalesced or 4 KiB uncoalesced; checkpoint insertion reserves 128 KiB progress and durable root promotion adds another 128 KiB, with a 256 KiB fixture pool; required loader overlap and source/index disk reservations are not integrated",
+    "tiny_capacity_bounded_defer_and_eventual_progress": "partial: a 64 KiB progress pool rejects the 128 KiB checkpoint insertion unit before changing root or progress accounting; scheduler defer/wake and eventual progress after capacity release are not implemented",
     "checkpoint_debt_and_time_above_threshold": "not implemented; no maintenance scheduler or tenant debt accounting exists yet"
   },
   "ownership_peaks": {
@@ -347,7 +581,12 @@
     "uncoalesced_progress_reservation_bytes": 12288,
     "decoded_page_cache_limit_bytes": "two pages in the focused fixture; the eight-page dataset is four times the configured decoded cache",
     "source_and_index_disk_reservation": "not implemented",
-    "unaccounted_boundaries": "manifest/index publication, durable source overlap, filesystem cache, runtime stacks"
+    "unaccounted_boundaries": "manifest/index publication, durable source overlap, filesystem cache, runtime stacks",
+    "checkpoint_index_insert_progress_reservation_bytes": 131072,
+    "checkpoint_index_promotion_progress_reservation_bytes": 131072,
+    "checkpoint_index_plus_promotion_progress_peak_bytes": 262144,
+    "minimum_progress_pool_for_index_build_fixture_bytes": 262144,
+    "required_loader_overlap_with_index_promotion": "not integrated or measured"
   },
   "failed_attempts": [
     {
@@ -371,7 +610,7 @@
     {
       "name": "paged_incremental_full_fixture_index_promotion_capacity",
       "exit_status": 101,
-      "reason": "applying the incremental pack to the eight-page writer fixture while its old snapshot and base handles remained pinned exceeded the configured version-index resource capacity; the attempt is preserved and the missing overlap behavior remains an acceptance gap",
+      "reason": "applying the incremental pack to the eight-page writer fixture while its old snapshot and base handles remained pinned returned version-index resource overload; after adding a progress preflight, the configured 64 KiB pool is below the 128 KiB index unit and now rejects before index mutation; the realistic pinned-root overlap remains unverified",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-incremental-pack-focused.log",
       "sha256": "e570edfc14d05ff298592377911dbce2160920f2647199c8958382506bbd7ac4"
     },
@@ -391,12 +630,12 @@
     }
   ],
   "remaining_work": [
-    "Integrate complete and incremental streamed packs with durable checkpoint index construction, source registration, and PagedManifest publication",
-    "Capture the checkpoint root and rotate/sync a new WAL boundary atomically before manifest publication; retain prior roots until durable publication and retire sources only after pins release",
-    "Add failure/reopen oracles across pack, durable index, manifest pointer, and WAL boundary publication",
-    "Reserve source/index disk capacity and index-build memory; resolve the incremental root promotion overload under realistic pinned-root overlap",
-    "Test tiny-capacity bounded defer and progress after capacity release, including no partial manifest",
-    "Implement one-worker checkpoint continuation, bounded debt, and time-above-threshold accounting"
+    "Integrate PagedReadHandle streaming with the atomic PagedTransactionWriter target capture and rotate/sync the next WAL boundary at exactly the captured LSN before newer writes enter it",
+    "Connect complete and incremental pack/index output, source registration, and PagedManifest publication in one recoverable checkpoint protocol; retain prior roots until publication is durable and pins release",
+    "Add pack, index, pointer, WAL-boundary, old-reader, GC, and process-crash/reopen fault oracles",
+    "Reserve source/index disk overlap and required loader memory together with checkpoint output and index promotion",
+    "Resolve the eight-page pinned-root index-capacity attempt without increasing the cap to hide the bound; test defer and progress after capacity release",
+    "Implement one-worker resumable slices, bounded checkpoint debt, and time-above-threshold accounting"
   ],
   "next_task": "T10"
 }
