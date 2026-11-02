@@ -60,3 +60,15 @@ T09 remains partial. Grouped transaction boundaries and recovery, page reuse and
 - Raw logs: `logs/paged-writer-reopen-fault-oracle-final.log` and `logs/paged-writer-reopen-feature-lib.log`. The intermediate failed logs and preserved WAL directories are retained alongside them.
 
 T09 remains partial. Grouped transaction recovery, durable tombstone/ABA and page reuse, split/overflow differential coverage, and delta-chain reconstruction after close/reopen and WAL rotation remain outstanding. The paged route remains disconnected from `dodb-server`; defaults remain unchanged. No OCI or performance experiment was run.
+
+
+## Conditional and multi-key paged writer acceptance (2026-11-02)
+
+- Added a stale `RevisionEquals` conflict case and verified it leaves the writer's next WAL LSN and current value unchanged.
+- Added a successful two-key transaction guarded by both current revisions. The new generation sees both updates while the pinned old reader retains both original values.
+- Added a tombstone delete followed by a `NotExists` reinsertion. The writer exposes the reinserted value while the pinned old reader still sees its original version.
+- Writer transactions of widths 1, 4, and 16 all commit and return commit LSNs under the existing bounded working-page configuration. Full immediate readback of width 16 did not fit the fixture's two-page cache budget, so the fixture limit was preserved and readback remains open.
+- Focused fixture: 1 passed. Full feature library suite: 293 passed, 0 failed, 4 ignored in 121.87 seconds. Targeted rustfmt and `git diff --check` passed. Two failed readback attempts and their logs are preserved.
+- Source commit: `231e402f68ced94e3f7716feee285739be11d6b0`.
+
+T09 remains partial. Physical free-page reuse, grouped WAL transaction boundaries, split/overflow writer readback, delta-chain reconstruction across close/reopen and WAL rotation, and full readback of width-16 commits remain outstanding. No service activation or performance experiment occurred.

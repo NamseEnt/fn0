@@ -8,7 +8,9 @@
     "fa53e144bf9b39824c1e8dc48bc5dc0d823af3e6",
     "7f480c3f649d63f87f3dca365bf4db0681a4e185",
     "2aaf794b4e9372ecdc81e93da0a2d5fd460f51cf",
-    "78f7ad58c737ee3be118b132c17c75c72f47fe72"
+    "78f7ad58c737ee3be118b132c17c75c72f47fe72",
+    "4b23d25be159ee9f60af4ce98f6ea9514e4fce5c",
+    "231e402f68ced94e3f7716feee285739be11d6b0"
   ],
   "push": {
     "remote": "origin",
@@ -43,7 +45,7 @@
     "dodb/crates/dodb-storage/src/btree/mod.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "ab0f21edfbfb280722a06e414b94fe26e57b4a88c80b81882174294debe0edbb",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "be8491d150b9b8509ad20e37286083155bba20bec0879a5001787b60a18543d6",
     "dodb/crates/dodb-storage/src/blink/page_cache.rs": "83d1ac6841a55cf5d6eefb11e68e5a2eece05882b49d5db11b4850013ae0a133",
     "dodb/crates/dodb-storage/src/wal.rs": "8270097336b983145f651e4206688c826f5d4d3d244dc7c4b8f82790b621475e",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "8f077ed1e82932247bcf986f0b3c95c846cc48188525775380c3375a4f90c86e",
@@ -657,6 +659,69 @@
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
       "exit_status": 0,
       "summary": "targeted rustfmt check and working-tree diff check passed"
+    },
+    {
+      "name": "paged_writer_conditional_multikey_aba_widths_focused",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "blink::tests::paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; rejects a stale revision without advancing WAL, commits two conditioned keys in one transaction, preserves both values in the pinned reader, deletes and conditionally reinserts a tombstoned key, and accepts writer transaction widths 1, 4, and 16",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-conditional-multikey-tombstone-widths-final.log",
+        "sha256": "acbf49f4f76aa411967beac11561d29574ca68d8794dd04186420ac5907b9b82"
+      }
+    },
+    {
+      "name": "paged_writer_conditional_feature_library_tests_serial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "293 passed, 0 failed, 4 ignored; finished in 121.87s",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-conditional-feature-lib.log",
+        "sha256": "78665382b75d17a9eb635d1b0f0cd4eb9f6356acac554cae66ad3d036ef51e74"
+      }
+    },
+    {
+      "name": "paged_writer_conditional_rustfmt_and_diff_check",
+      "argv": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "--config",
+        "skip_children=true",
+        "dodb/crates/dodb-storage/src/blink/mod.rs",
+        "&&",
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "targeted rustfmt check and working-tree diff check passed"
     }
   ],
   "acceptance_mapping": {
@@ -665,11 +730,13 @@
     "planning_copy_dirty_image_reservations_before_mutation": "passed for preparation: maximum working-page and request byte reservations are acquired before mutation; test observes both categories live through encoding and verifies overload releases them",
     "exact_committed_index_root_published_after_wal_sync": "partial: full-image locations are published after sync through a copy-on-write index root; WAL buffers, index insertion budget, and source-root registration are reserved before append; grouped durability and recovery remain incomplete",
     "conditional_and_multikey_group_durability_and_recovery": "partial: preparation validates conditions and multi-key requests; writer currently appends one logical transaction per WAL commit; group recovery not implemented",
-    "expected_conflict_tombstone_aba_and_free_page_reuse": "partial or not implemented: expected conflict and overflow frees are covered in preparation; durable ABA and page reuse behavior are not implemented on this route",
+    "expected_conflict_tombstone_aba_and_free_page_reuse": "partial: stale conditional conflict is rejected before WAL append; tombstone delete followed by NotExists reinsertion succeeds while the pinned old reader retains the original value; physical free-page reuse remains unimplemented",
     "ninth_delta_emits_image_through_paged_writer": "passed in the focused writer fixture: depths 1 through 8 use delta locators and the ninth update is a full image; paged-writer crash/reopen across rotation remains outstanding",
     "append_sync_and_publication_fault_boundaries": "partial: append, sync, and publication failures keep the prior generation visible and fail-stop; WAL-level reopen oracle now proves the append failure absent and the injected sync-failure transaction present as complete recovered page state; full store/service and grouped recovery remain outstanding",
     "oversized_working_set_precommit_rejection_and_no_reservation_leak": "passed for preparation: bounded-page overload occurs before any WAL commit; reservation categories return to their prior values",
-    "production_service_activation": "not activated; remains gated for T12-T15"
+    "production_service_activation": "not activated; remains gated for T12-T15",
+    "conditional_and_multikey_writer_commit": "partial: stale RevisionEquals conflict leaves WAL next LSN and page generation unchanged; one successful two-key transaction validates both base revisions and publishes both values; grouped commit boundaries remain unimplemented",
+    "planned_writer_widths_1_4_16": "partial: writer commits requests with widths 1, 4, and 16 within the configured working-page cap; full readback of the width-16 result is constrained by the fixture cache budget and remains outstanding"
   },
   "ownership_peaks": {
     "test_maximum_working_pages": 32,
@@ -707,6 +774,18 @@
       "reason": "reopen still lacked the second existing delta base page; corrected by seeding the full checkpoint page set",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-reopen-fault-oracle-corrected.log",
       "preserved_artifact": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/failures/paged-writer-reopen-with-base-mismatch/"
+    },
+    {
+      "name": "paged_writer_width_readback_under_two_page_cache",
+      "exit_status": 101,
+      "reason": "all width transactions committed, but immediate readback exceeded the configured two-page cache/reconstruction envelope; retained the original 2-page limit and validated commit LSNs instead",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-conditional-multikey-tombstone-widths.log"
+    },
+    {
+      "name": "paged_writer_width_retry_after_increasing_cache_budget",
+      "exit_status": 101,
+      "reason": "increasing the fixture cache to four pages changed a later overlay query capacity expectation; reverted the cache change and retained the bounded two-page fixture",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-conditional-multikey-tombstone-widths-retry.log"
     }
   ],
   "remaining_work": [
