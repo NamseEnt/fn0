@@ -17,7 +17,9 @@ The tests cover same-tenant open coalescing, a read joining a blocked open, unre
 
 A shutdown-timeout retry regression test verifies that previously open shards stay registered when an in-flight open exceeds the drain deadline. After the blocked open exits, a later shutdown attempt drains the open attempt and retained shard. A cancellation test aborts a blocked open, verifies its tenant reservation is removed, then successfully reopens with a single-worker limit, proving the worker permit was released.
 
-After the shutdown retry and cancellation changes, the full server library suite passed with 16 tests. The server all-target check and formatting check passed. The initial cancellation-test compile failure and corrected run are both preserved in `logs/`.
+A bounded-capacity test configures one shard slot, one open worker, and one waiter. While the first tenant open is stalled, it verifies that a second same-tenant waiter and a different-tenant open are rejected; the admitted waiter later receives the same shard as the leader.
+
+After the shutdown retry, cancellation, and bounded-capacity changes, the full server library suite passed with 17 tests. The server all-target check and formatting check passed. The initial cancellation-test compile failure and corrected run are both preserved in `logs/`.
 
 ## Remaining T12 work
 

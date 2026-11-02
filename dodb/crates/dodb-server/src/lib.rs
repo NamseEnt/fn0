@@ -3033,6 +3033,66 @@ mod tests {
         service.shutdown_checked().await.unwrap();
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn blink_open_waiters_and_inflight_tenants_obey_configured_limits() {
+        let directory = blink_test_directory();
+        let service = Arc::new(
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                max_open_shards: 1,
+                blink_open_worker_count: 1,
+                blink_open_waiter_limit: 1,
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap(),
+        );
+        let tenant = TenantId::new(107);
+        service.set_open_test_gate(tenant, Arc::new(Semaphore::new(0)));
+        let leader_service = Arc::clone(&service);
+        let leader = tokio::spawn(async move { leader_service.open_shard(tenant).await });
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if service.shards.lock().unwrap().opening.contains(&tenant) {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let waiter_service = Arc::clone(&service);
+        let waiter = tokio::spawn(async move { waiter_service.open_shard(tenant).await });
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            while service.open_waiters.available_permits() != 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(matches!(
+            service.open_shard(tenant).await,
+            Err(Error::Overloaded(_))
+        ));
+        assert!(matches!(
+            service.open_shard(TenantId::new(108)).await,
+            Err(Error::Overloaded(_))
+        ));
+        let gate = service
+            .open_test_gate
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .1
+            .clone();
+        gate.add_permits(1);
+        let opened = leader.await.unwrap().unwrap();
+        assert!(Arc::ptr_eq(&opened, &waiter.await.unwrap().unwrap()));
+        assert_eq!(service.open_waiters.available_permits(), 1);
+        assert!(service.shards.lock().unwrap().opening.is_empty());
+        service.shutdown_checked().await.unwrap();
+    }
+
     #[tokio::test]
     async fn failed_blink_open_releases_tenant_reservation() {
         let directory = blink_test_directory();
