@@ -139,3 +139,25 @@ The resident adapter retains current behavior. The experimental route replaces r
 | Read/write/service semantics | Query/Scan/cursor/response limits, conditional/multi-key transactions, conflicts, revisions/tombstones, service crash/write/crash tests |
 | Streaming maintenance and fairness | Larger-than-cache checkpoint/validation, output-overlap budget, round-robin turn bound and measured I/O wait |
 | End-to-end experiment readiness | Full receipts, source/binary hashes, harness config and separately frozen matched T17 matrix |
+
+## Deterministic correctness fixtures
+
+These values define correctness fixtures only. They are not production defaults or performance recommendations.
+
+| Fixture | Frozen values |
+| --- | --- |
+| Randomized reference-state seeds | `12601`, `12602`; preserve the failing seed for every randomized failure |
+| Value sizes | `512`, `513`, and `4096` bytes |
+| Operation widths | `1`, `4`, and `16` keys |
+| Conditions | Exists, NotExists, and revision equality |
+| Revision history | Delete followed by reinsertion; compare logical missing revisions as well as present values |
+| Tenant populations | `1` tenant for reconstruction/eviction, `4` continuously active tenants for global ownership, and `8` tenants for fair scheduling |
+| Above-cache sizing | Encoded page images at least `4x` decoded-payload cache; index at least `4x` node-cache allowance; verify measured encoded size and nonzero misses |
+| Reservation boundaries | For every category, exercise limit minus one, exact limit, and limit plus one, plus zero and overflow configurations |
+| Long-reader retention | Pin one old operation while overwriting through at least `2` complete/consolidating checkpoints; evict both versions, close pooled handles, verify reads, then release and verify reclamation |
+| Crash/write/crash | Exercise two incomplete-transaction crashes around an acknowledged conditional/multi-key write, both durable-base pack modes, and A1 off/on |
+| Fair-scheduler bound | With `N` ready tenants, each receives a turn after at most `N - 1` other ready-tenant slices |
+| Checkpoint slice bound | At most `1 MiB` of image/index output per slice, or one bounded publication/GC unit |
+| Delta ancestry | At most `8` deltas after an image; the ninth update emits a full image |
+
+The progress-pool minimum is derived from the largest admitted fixed-size I/O/decode/GC unit and every guard required simultaneously by that unit. Each fixture records the resulting configured byte limits and observed owner peaks; a configuration that cannot fit the derived minimum is rejected rather than enlarged at runtime. Each successful or rejected operation is checked against the reference state. Service acceptance additionally confirms actual I/O/checkpoint execution and records the child markers and final revisions exercised.
