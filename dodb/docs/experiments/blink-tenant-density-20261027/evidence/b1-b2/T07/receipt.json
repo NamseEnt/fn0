@@ -1,0 +1,226 @@
+{
+  "task_id": "T07",
+  "scope": "Bounded decoded page cache, coalesced loads, exact source reads, and bounded WAL delta-chain reconstruction",
+  "status": "accepted",
+  "parent_source_commit": "42cc66b64",
+  "implementation_commit": "8c29f2d6396d598a99706056ddfc0f04ad790087",
+  "implementation_commits": [
+    "8c29f2d6396d598a99706056ddfc0f04ad790087"
+  ],
+  "push": {
+    "remote": "origin",
+    "branch": "experiment/blink-tenant-density-20261027",
+    "status": "pushed"
+  },
+  "prerequisite_receipts": [
+    {
+      "task_id": "T01",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T01/receipt.json",
+      "sha256": "8ea1e270b5890c7dfc7af45541b985e842d4718d498b93d60c40d304c2f9e319"
+    },
+    {
+      "task_id": "T02",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T02/receipt.json",
+      "sha256": "18986e7dd63bd9139c4eefb078876d76ce50535eb63a32d3b8b741e374a85389"
+    },
+    {
+      "task_id": "T03",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T03/receipt.json",
+      "sha256": "be70f4734290831956e799b2f94139a8471873ea6432b7224085d409ce6c289c"
+    },
+    {
+      "task_id": "T04",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T04/receipt.json",
+      "sha256": "2ada0eda80d5226157d8407707dd304861cca5cc40f3b1d3e3605de91f7b71e6"
+    },
+    {
+      "task_id": "T05",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/receipt.json",
+      "sha256": "49d3b24e808ec4aafc1a605393f668501c0fff62790a3a8796b3e7bf74bb07ca"
+    },
+    {
+      "task_id": "T06",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T06/receipt.json",
+      "sha256": "f73b4a07fc3bc27e7e0212fc4e335a3fe9a205560ad862da4aa46e2cc94cfabd"
+    },
+    {
+      "task_id": "T00-delta-ancestry-amendment",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/B1-B2-CONTRACTS.md",
+      "sha256": "d9b9219af2fbae79ae80fc74c93cd9e6067728218e1f71f08bf0aae1b96774b1"
+    }
+  ],
+  "owned_paths": [
+    "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "dodb/crates/dodb-storage/src/blink/page_cache.rs",
+    "dodb/crates/dodb-storage/src/blink/paged_recovery.rs",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs",
+    "dodb/crates/dodb-storage/src/blink/version_chain.rs",
+    "dodb/crates/dodb-storage/src/blink/version_index.rs",
+    "dodb/crates/dodb-storage/src/wal.rs"
+  ],
+  "source_hashes": {
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "85108526ef8e993bf66e3361551403960adfb0055425b2a586b02ef0d79fcaad",
+    "dodb/crates/dodb-storage/src/blink/page_cache.rs": "842808204410908f111c71c485112fcfb0ff3e7094d8d2fff5bc4f1e050294f0",
+    "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "9ee884eaa47ef8c1008427b5c6682b46599daf8a852d5d26af7f97fc9bb45f43",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "f5038f90da164531ec19a5b4b25fa7d657dbe31c78fa40c97b955cff2ba2eb4c",
+    "dodb/crates/dodb-storage/src/blink/version_chain.rs": "91211ad5b7e323537850e28fb9612225c4f14d6eec2bf2c84260e901e256b7c1",
+    "dodb/crates/dodb-storage/src/blink/version_index.rs": "4f7b1d14eacb61f733c2e1ba4d0a40f4c847579ca6f0ef4fb530fd81cf675c3f",
+    "dodb/crates/dodb-storage/src/wal.rs": "0bf9135fc72faa384acfb8b7538ce92ee008d36e8c2207ce1cf3c1ea6c13ab8f"
+  },
+  "host": {
+    "os": "macOS arm64",
+    "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+    "branch": "experiment/blink-tenant-density-20261027"
+  },
+  "features": [
+    "blink-demand-paging"
+  ],
+  "runtime_configuration": {
+    "route": "isolated storage library tests with direct source manager and version index fixtures",
+    "service_route_activated": false,
+    "defaults_changed": false,
+    "oci_experiment": false,
+    "performance_matrix_started": false
+  },
+  "checks": [
+    {
+      "name": "feature_storage_library_tests_serial",
+      "argv": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "dodb/crates/dodb-storage/Cargo.toml",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "292 passed, 0 failed, 4 ignored; finished in 114.85s",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T07/logs/storage-feature-tests-serial.log.gz",
+        "sha256": "6e23892ff41ae615784971655178f87d90d2f1f1dc290a52adcd029eb7646807"
+      }
+    },
+    {
+      "name": "default_storage_library_check",
+      "argv": [
+        "cargo",
+        "check",
+        "--manifest-path",
+        "dodb/crates/dodb-storage/Cargo.toml",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T07/logs/storage-default-lib-check.log",
+        "sha256": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec"
+      }
+    },
+    {
+      "name": "feature_storage_library_check",
+      "argv": [
+        "cargo",
+        "check",
+        "--manifest-path",
+        "dodb/crates/dodb-storage/Cargo.toml",
+        "--features",
+        "blink-demand-paging",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T07/logs/storage-feature-lib-check.log",
+        "sha256": "c92508a29848820f033cd2ea015c85dde0953c88b07cc967ce34b7c08f610549"
+      }
+    },
+    {
+      "name": "workspace_format_check",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "dodb/crates/dodb-storage/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T07/logs/rustfmt-check.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "working_tree_diff_check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T07/logs/git-diff-check.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "feature_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "dodb/crates/dodb-storage/Cargo.toml",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 101,
+      "summary": "12 existing findings in blink/mod.rs and wal.rs; no lint suppressions added",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T07/logs/storage-feature-strict-clippy.log.gz",
+        "sha256": "c088e2e375b3aa555c821c252fe9b495c031feab8ce6a2521a1c75a14cb48504"
+      }
+    }
+  ],
+  "acceptance_mapping": {
+    "bounded_cache_and_exact_version_key": "passed: page_cache::tests::version_key_binds_store_and_source_version; cache reservation and all-pinned overload tests",
+    "coalescing_distinct_versions_failures_cancellation_and_shutdown": "passed: page_cache module tests for same-version coalescing, distinct versions, shared failures, cancellation, permit release, and shutdown",
+    "owned_guard_charge_survives_cache_removal": "passed: page_cache::tests::cache_eviction_keeps_guard_charge_until_last_owner_drops",
+    "current_and_old_generation_direct_source_reads": "passed: page_cache::tests::current_and_pinned_old_versions_read_exact_bytes_after_cache_eviction",
+    "one_two_and_eight_delta_reconstruction_across_wal_sources": "passed: wal::tests::page_loader_reopens_and_reconstructs_one_two_and_eight_deltas_across_sources; positioned source reads, frame validation, and intermediate/final LSN and CRC checks",
+    "delta_chain_sync_precedes_index_publication": "passed: DeltaChainStore::write syncs file and directory before VersionIndex::insert validates and publishes a descriptor; sidecar corruption/truncation/foreign identity rejected in version_chain tests",
+    "capacity_below_one_page_rejected": "passed: page_cache::tests::configuration_rejects_capacity_below_one_legal_load",
+    "service_route_and_default_activation": "not activated; reserved for T08-T12",
+    "strict_clippy": "existing blocker: 12 findings in blink/mod.rs and wal.rs; no suppression attributes added"
+  },
+  "ownership_peaks": {
+    "configured_decoded_cache_bytes": 4096,
+    "configured_maximum_load_reconstruction_bytes": 1048576,
+    "configured_test_resource_global_and_tenant_bytes": 1048576,
+    "measured_peak_reservations": "unavailable from this correctness suite; category limits were enforced by the resource manager"
+  },
+  "failed_attempts": [],
+  "remaining_work": [
+    "T08 demand-loaded Get/Query/Scan route integration",
+    "T09 atomic writer integration",
+    "T10-T16 storage/service acceptance",
+    "T17 remains separately authorized and was not started"
+  ],
+  "next_task": "T08"
+}
