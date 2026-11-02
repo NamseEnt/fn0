@@ -1,0 +1,340 @@
+{
+  "acceptance_mapping": [
+    {
+      "criterion": "Matched fingerprints and full/reopen oracle on tiny paired correctness cells",
+      "evidence": "remote/smoke-final/resident.json and paging.json",
+      "observed": {
+        "operation_counts": [
+          160,
+          80,
+          160
+        ],
+        "post_measurement_oracle_passed": true,
+        "reopened_oracle_passed": true,
+        "request_fingerprint_paging": "fnv1a64:1bcef6c52fb9114e",
+        "request_fingerprint_resident": "fnv1a64:1bcef6c52fb9114e",
+        "scheduled_fingerprint_paging": "fnv1a64:c862f3ff84e00270",
+        "scheduled_fingerprint_resident": "fnv1a64:c862f3ff84e00270",
+        "verified_mutated_keys": 55,
+        "verified_seed_rows": 1024
+      },
+      "status": "passed"
+    },
+    {
+      "criterion": "Actual paged route and format identities verified",
+      "evidence": "remote/smoke-final/paging.json",
+      "observed": {
+        "format_identities": {
+          "delta_chain_sidecar": "DDBVCHN1/v1",
+          "version_index": "DDBVIDX1/v2"
+        },
+        "requested": true,
+        "verified": true
+      },
+      "status": "passed"
+    },
+    {
+      "criterion": "Bounded diagnostics with applied limits, category current and peaks, loader/cache and source counts, and phase/cgroup observations",
+      "evidence": "remote/smoke-final/paging.json",
+      "gap": "reachable source bytes and allocator retained bytes are explicitly unavailable; no substitute value inferred",
+      "observed": {
+        "allocator_retained_bytes": null,
+        "allocator_retained_bytes_reason": "allocator and representation-specific retained heap are not exposed",
+        "cache_misses": 2459,
+        "cgroup_memory_peak_paging_bytes": 34410496,
+        "cgroup_memory_peak_resident_bytes": 12218368,
+        "evictions": 2427,
+        "reachable_source_bytes": null,
+        "reachable_source_bytes_reason": "the service does not expose a bounded reachability walk in periodic snapshots",
+        "resource_disk_current_bytes": 80971052,
+        "resource_disk_peak_bytes": 80971052,
+        "resource_memory_current_bytes": 91359232,
+        "resource_memory_peak_bytes": 159141633,
+        "source_opens": 2459
+      },
+      "status": "partial"
+    },
+    {
+      "criterion": "Failed worker preserves partial evidence and default reports retain compatible semantics",
+      "evidence": "remote/smoke-failed/98df8edc9 and remote/smoke-final/resident.json",
+      "observed": "failed candidate reports, logs and databases preserved; feature-off cell verifies resident route while candidate uses explicit opt-in",
+      "status": "passed"
+    },
+    {
+      "criterion": "Freeze a separate T17 matrix and capacity before any performance workload",
+      "evidence": "host capacity gate and plan acceptance",
+      "observed": "not frozen; current ZFS free space exceeds the 10 GiB reserve by only 244,969,472 bytes; T16 reachability accounting remains incomplete",
+      "status": "not_started"
+    }
+  ],
+  "checks": [
+    {
+      "cwd": "dodb",
+      "exit_status": 0,
+      "name": "cargo fmt --check and git diff --check",
+      "raw_log": "logs/format-check.log"
+    },
+    {
+      "cwd": "dodb",
+      "exit_status": 0,
+      "name": "cargo check -p dodb-server --features blink-demand-paging",
+      "raw_log": "logs/server-paging-check.log"
+    },
+    {
+      "cwd": "dodb",
+      "exit_status": 0,
+      "name": "cargo test -p dodb-storage --features blink-demand-paging --lib",
+      "raw_log": "logs/page-cache-tests.log",
+      "result": "324 passed; 0 failed; 4 ignored"
+    },
+    {
+      "cwd": "dodb",
+      "exit_status": 0,
+      "name": "cargo test -p dodb-server --features blink-demand-paging --lib",
+      "raw_log": "logs/server-paging-library-fresh-init-refactor.log",
+      "result": "54 passed; 0 failed; 0 ignored; 78.11 seconds"
+    },
+    {
+      "cwd": "dodb",
+      "exit_status": 0,
+      "name": "cargo clippy -p dodb-server --features blink-demand-paging --all-targets --no-deps -- -D warnings",
+      "raw_log": "logs/server-paging-clippy-final.log"
+    },
+    {
+      "cwd": "dodb",
+      "exit_status": 101,
+      "name": "cargo clippy -p dodb-storage --features blink-demand-paging --all-targets --no-deps -- -D warnings",
+      "raw_log": "logs/storage-paging-clippy-fresh-init.log",
+      "result": "34 existing findings: 14 library and 20 test findings in unrelated code; no lint suppression added"
+    },
+    {
+      "exit_status": 0,
+      "host": "opc@217.142.246.204",
+      "name": "paired OCI correctness smoke",
+      "raw_logs": [
+        "remote/smoke-final/resident.log",
+        "remote/smoke-final/paging.log"
+      ],
+      "raw_reports": [
+        "remote/smoke-final/resident.json",
+        "remote/smoke-final/paging.json"
+      ],
+      "result": "resident and explicitly paged cells completed 400/400 operations; request and schedule fingerprints match; post-measurement and reopened whole-population oracles pass"
+    },
+    {
+      "exit_status": 0,
+      "host": "opc@217.142.246.204",
+      "name": "OCI capacity and terminal-state gate",
+      "raw_log": "logs/oci-capacity-gate.log",
+      "result": "10,982,387,712 bytes ZFS free; 244,969,472 bytes above the 10 GiB reserve; MemAvailable 5,163,736 KiB; ARC size 5,476,982,528 bytes; no workload processes listed"
+    }
+  ],
+  "evidence_commit": null,
+  "failed_attempts": [
+    {
+      "attempt": "OCI feature build at 18679ccff",
+      "failure": "JSON macro recursion limit",
+      "raw_log": "remote/build-logs/build-18679ccff.log",
+      "runtime_started": false
+    },
+    {
+      "attempt": "OCI feature build at f2b5eccee",
+      "failure": "paged resource metrics lacked serialization support",
+      "raw_log": "remote/build-logs/build-f2b5eccee.log",
+      "runtime_started": false
+    },
+    {
+      "attempt": "Candidate smoke at 98df8edc9 with lower per-tenant memory cap",
+      "failure": "B-link response budget exhausted",
+      "preserved_database": "/bench/zfs/db/product-build/b1-b2-t16-98df8edc9/smoke/paging-data",
+      "raw_log": "remote/smoke-failed/98df8edc9/paging.log",
+      "raw_report": "remote/smoke-failed/98df8edc9/paging.json"
+    },
+    {
+      "attempt": "Candidate smoke retry at 98df8edc9 after memory-cap change",
+      "failure": "Fresh tenant store lacked paged format marker",
+      "preserved_database": "/bench/zfs/db/product-build/b1-b2-t16-98df8edc9/smoke/paging-data",
+      "raw_log": "remote/smoke-failed/98df8edc9/paging-r2.log",
+      "raw_report": "remote/smoke-failed/98df8edc9/paging-r2.json"
+    },
+    {
+      "attempt": "Storage feature Clippy",
+      "failure": "34 existing findings in unrelated code",
+      "raw_log": "logs/storage-paging-clippy-fresh-init.log"
+    }
+  ],
+  "features": {
+    "candidate": [
+      "dodb-server/blink-demand-paging"
+    ],
+    "control": [],
+    "runtime_route_candidate": "explicitly enabled",
+    "runtime_route_default": "disabled"
+  },
+  "host": {
+    "active_workload_processes_after_cells": 0,
+    "architecture": "OCI ARM64",
+    "available_bytes_at_gate": 10982387712,
+    "filesystem": "/bench/zfs/db",
+    "headroom_above_reserve_bytes": 244969472,
+    "name": "opc@217.142.246.204",
+    "required_free_bytes": 10737418240
+  },
+  "implementation_commit": "cb427a3b83ae97ed4017cedfba84714fc0da3a45",
+  "next_task": "Resolve T16 instrumentation gaps, then review/freeze the separately authorized T17 matrix and recheck OCI capacity.",
+  "owned_paths": [
+    "crates/dodb-server/src/bin/tenant_density_workload.rs",
+    "crates/dodb-server/src/bin/tenant_density_workload/memory_diagnostic_worker.rs",
+    "crates/dodb-server/src/paged_blink_service.rs",
+    "crates/dodb-server/src/service.rs",
+    "crates/dodb-storage/src/blink/paged/transaction_writer.rs",
+    "crates/dodb-storage/src/blink/paged/resource_manager.rs",
+    "crates/dodb-server/src/lib.rs",
+    "crates/dodb-server/src/tests.rs",
+    "docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T16"
+  ],
+  "ownership_peaks": {
+    "candidate_reported_disk_current_bytes": 80971052,
+    "candidate_reported_disk_limit_bytes": 4294967296,
+    "candidate_reported_disk_peak_bytes": 80971052,
+    "candidate_reported_memory_current_bytes": 91359232,
+    "candidate_reported_memory_limit_bytes": 268435456,
+    "candidate_reported_memory_peak_bytes": 159141633,
+    "candidate_reported_per_tenant_memory_limit_bytes": 134217728,
+    "current_categories": {
+      "checkpoint_output": {
+        "current_bytes": 0,
+        "peak_bytes": 0
+      },
+      "retained_source": {
+        "current_bytes": 32784,
+        "peak_bytes": 32784
+      },
+      "scratch": {
+        "current_bytes": 0,
+        "peak_bytes": 91
+      },
+      "version_index": {
+        "current_bytes": 77725696,
+        "peak_bytes": 77725696
+      },
+      "wal": {
+        "current_bytes": 3212572,
+        "peak_bytes": 3212572
+      }
+    },
+    "memory_categories": {
+      "checkpoint_validation": {
+        "current_bytes": 0,
+        "peak_bytes": 12288
+      },
+      "decoded_payload": {
+        "current_bytes": 131072,
+        "peak_bytes": 131072
+      },
+      "dirty_images": {
+        "current_bytes": 0,
+        "peak_bytes": 286720
+      },
+      "load_reconstruction": {
+        "current_bytes": 0,
+        "peak_bytes": 67113020
+      },
+      "metadata": {
+        "current_bytes": 91228160,
+        "peak_bytes": 91230056
+      },
+      "queued_foreground": {
+        "current_bytes": 0,
+        "peak_bytes": 10944
+      },
+      "write_preparation": {
+        "current_bytes": 0,
+        "peak_bytes": 1098929
+      }
+    },
+    "unavailable": {
+      "allocator_retained_bytes": "allocator and representation-specific retained heap are not exposed",
+      "reachable_source_bytes": "the service does not expose a bounded reachability walk in periodic snapshots"
+    }
+  },
+  "parent_source_commit": "0e4891e55",
+  "prerequisite_receipts": [
+    {
+      "implementation_commit": "0e4891e55",
+      "path": "evidence/b1-b2/T15/receipt.json",
+      "sha256": "786495078d61de24813e7d857d4ec4f06e8e1b527d106a540971883ff4c18cf0",
+      "status": "complete"
+    }
+  ],
+  "preserved_remote_artifacts": {
+    "binary_manifest_path": "/bench/zfs/db/product-build/b1-b2-t16-98df8edc9/artifacts/cb427a3b8",
+    "build_root": "/bench/zfs/db/product-build/b1-b2-t16-cb427a3b8",
+    "database_policy": "all failed and successful smoke databases remain preserved on OCI",
+    "failed_build_roots": [
+      "/bench/zfs/db/product-build/b1-b2-t16-18679ccff",
+      "/bench/zfs/db/product-build/b1-b2-t16-f2b5eccee",
+      "/bench/zfs/db/product-build/b1-b2-t16-98df8edc9",
+      "/bench/zfs/db/product-build/b1-b2-t16-cfbb23821"
+    ],
+    "final_smoke_root": "/bench/zfs/db/product-build/b1-b2-t16-cb427a3b8/smoke"
+  },
+  "remaining_work": [
+    "Complete bounded reachable-source byte reporting or record a reviewed, contract-conforming measurement boundary with exact source ownership.",
+    "Close the allocator retained-byte observation gap or explicitly establish its permitted unavailable boundary in the T16 contract and evidence schema.",
+    "Freeze T17 numeric matrix, input recipes and hashes, setup expansion/overlap, source/native/binary identity, host-cache controls, SLO, offered rates, run lengths, repetitions, stop rules, reviewer, and capacity.",
+    "Do not launch T17 until at least 10 GiB ZFS free space remains after worst-case overlap and failed-cell preservation."
+  ],
+  "runtime_configuration": {
+    "active_tenants": 4,
+    "backend": "blink",
+    "candidate_cache_bytes": 32768,
+    "candidate_disk_global_bytes": 4294967296,
+    "candidate_disk_per_tenant_bytes": 536870912,
+    "candidate_memory_global_bytes": 268435456,
+    "candidate_memory_per_tenant_bytes": 134217728,
+    "checkpoint_execution": "background",
+    "checkpoint_threshold_bytes": 1048576,
+    "client_count": 1,
+    "common_cgroup_memory_high_bytes": 201326592,
+    "common_cgroup_memory_max_bytes": 268435456,
+    "common_swap_limit_bytes": 0,
+    "drain_timeout_ms": 15000,
+    "initial_rows_per_tenant": 256,
+    "layout": "segmented-bases-coalesced",
+    "max_in_flight": 8,
+    "opened_idle_tenants": 0,
+    "operation_count": 400,
+    "profile": "mixed",
+    "profile_weights_get_query_write": [
+      40,
+      20,
+      40
+    ],
+    "queue_bound": 8,
+    "registered_tenants": 4,
+    "request_timeout_ms": 5000,
+    "seed": 20261027,
+    "topology": "fixed-total",
+    "value_bytes": 512,
+    "wal_segment_bytes": 262144,
+    "width": "mixed 80/15/5 for 1/4/16"
+  },
+  "scope": "Demand-paging worker instrumentation, matched correctness smoke, and experiment-readiness handoff",
+  "source_hashes": {
+    "harness_binary_sha256_default": "4fe7477c0a609185da89c4a2ed3df2e7eae537642b43b7a4e37275334e49cf9d",
+    "harness_binary_sha256_paging": "d629cbfcfa87c88268014ad75fd4614ca70c9cb5cc7449418c2facfc7318064a",
+    "implementation_commit": "cb427a3b83ae97ed4017cedfba84714fc0da3a45",
+    "librocksdb_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
+    "rocksdb_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+    "worker_binary_sha256_default": "fe34f0e63089e887d0c7cc3c1657bd09b977d01b96b6bac5f095b6bb41eb83c3",
+    "worker_binary_sha256_paging": "f90559c7a5e39bd7299183162a4f568140b1417aed05a37fa8b275e69368f925"
+  },
+  "status": "partial",
+  "task_id": "T16",
+  "toolchain": {
+    "cargo": "1.97.1",
+    "native_dependency": "RocksDB pinned at abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+    "rust": "1.97.1"
+  }
+}

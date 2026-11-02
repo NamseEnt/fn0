@@ -1,0 +1,18 @@
+    Checking opentelemetry-http v0.31.0
+   Compiling dodb-rocksdb v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-rocksdb)
+error: failed to run custom build command for `dodb-rocksdb v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-rocksdb)`
+
+Caused by:
+  process didn't exit successfully: `/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/build/dodb-rocksdb-4f86a1aae1c5ec43/build-script-build` (exit status: 101)
+  --- stdout
+  cargo:rustc-env=DODB_BUILD_GIT_COMMIT=446ab7b158b635b7bacd8c0f46ed8cdb49e96622
+  cargo:rerun-if-changed=/Users/namse/fn0/.git/worktrees/dodb-tenant-density-20261027/HEAD
+  cargo:rerun-if-changed=/Users/namse/fn0/.git/refs/heads/experiment/blink-tenant-density-20261027
+  cargo:rerun-if-env-changed=DODB_ROCKSDB_DIR
+
+  --- stderr
+
+  thread 'main' (444937602) panicked at dodb/crates/dodb-rocksdb/build.rs:45:14:
+  DODB_ROCKSDB_DIR must name a RocksDB 11.8.1 build: NotPresent
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+warning: build failed, waiting for other jobs to finish...

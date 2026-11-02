@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-61add53ad8a69c71)
+
+running 13 tests
+test blink::page_cache::tests::all_pinned_cache_capacity_returns_overload ... ok
+test blink::page_cache::tests::cache_eviction_keeps_guard_charge_until_last_owner_drops ... ok
+test blink::page_cache::tests::cancelled_load_wakes_followers_and_releases_job_and_byte_reservations ... ok
+test blink::page_cache::tests::coalesced_followers_receive_source_failure_and_loader_slot_recovers ... ok
+test blink::page_cache::tests::concurrent_loads_reserve_cache_bytes_before_decoding ... ok
+test blink::page_cache::tests::configuration_rejects_capacity_below_one_legal_load ... ok
+test blink::page_cache::tests::current_and_pinned_old_versions_read_exact_bytes_after_cache_eviction ... ok
+test blink::page_cache::tests::distinct_versions_do_not_coalesce ... ok
+test blink::page_cache::tests::load_and_decoded_payload_charges_overlap_until_source_reconstruction_finishes ... ok
+test blink::page_cache::tests::load_failures_are_shared_and_permits_are_released ... ok
+test blink::page_cache::tests::same_version_concurrent_misses_coalesce_one_load ... ok
+test blink::page_cache::tests::shutdown_wakes_followers_and_rejects_new_loads ... ok
+test blink::page_cache::tests::version_key_binds_store_and_source_version ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 315 filtered out; finished in 0.07s
+

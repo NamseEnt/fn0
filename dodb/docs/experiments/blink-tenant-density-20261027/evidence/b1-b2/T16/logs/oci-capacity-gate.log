@@ -1,0 +1,23 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+Mon Nov  2 11:04:06 PM UTC 2026
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+0.09 0.32 0.41 1/352 2720475
+MemTotal:       11159744 kB
+MemAvailable:    5163736 kB
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159125196800 148142809088 10982387712  94% /bench/zfs/db
+c_min                           4    357111808
+c_max                           4    5713788928
+size                            4    5476982528
+/sys/fs/cgroup/dodb-b1b2-t16-cb427a3b8/resident
+268435456
+201326592
+12218368
+6205440
+/sys/fs/cgroup/dodb-b1b2-t16-cb427a3b8/paging
+268435456
+201326592
+34410496
+15323136

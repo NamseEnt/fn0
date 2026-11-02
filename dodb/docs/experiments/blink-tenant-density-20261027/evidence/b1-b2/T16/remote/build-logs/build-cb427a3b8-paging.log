@@ -1,0 +1,4 @@
+   Compiling dodb-storage v0.1.0 (/bench/zfs/db/product-build/b1-b2-t16-98df8edc9/source/dodb/crates/dodb-storage)
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/product-build/b1-b2-t16-98df8edc9/source/dodb/crates/dodb-rocksdb)
+   Compiling dodb-server v0.1.0 (/bench/zfs/db/product-build/b1-b2-t16-98df8edc9/source/dodb/crates/dodb-server)
+    Finished `dev` profile [unoptimized] target(s) in 45.27s

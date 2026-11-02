@@ -1,0 +1,25 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_storage-61add53ad8a69c71)
+
+running 14 tests
+test blink::source_manager::tests::active_read_lease_blocks_retirement_and_reopen_checks_exact_header ... ok
+test blink::source_manager::tests::delta_roots_retain_only_exact_ancestry_sources ... ok
+test blink::source_manager::tests::indexed_and_pinned_sources_are_retained_until_every_root_drops ... ok
+test blink::source_manager::tests::load_acquisition_racing_retirement_never_reads_an_unlinked_source ... ok
+test blink::source_manager::tests::manifest_roots_keep_old_reader_sources_across_checkpoint_publication ... ok
+test blink::source_manager::tests::missing_index_reachable_source_is_corruption ... ok
+test blink::source_manager::tests::pending_catalog_publication_protects_recovery_wal_from_gc ... ok
+test blink::source_manager::tests::retained_disk_usage_survives_manager_drop_and_reopen_without_double_counting ... ok
+test blink::source_manager::tests::source_collection_resumes_after_the_last_old_root_releases ... ok
+test blink::source_manager::tests::source_gc_preserves_reachable_files_across_unlink_fault_boundaries ... ok
+test blink::source_manager::tests::source_gc_rejects_scratch_quota_before_creating_markers ... ok
+test blink::source_manager::tests::source_gc_survives_sigkill_before_and_after_unlink ... 
+running 1 test
+
+running 1 test
+ok
+test blink::source_manager::tests::source_handles_and_roots_have_explicit_limits ... ok
+test blink::source_manager::tests::zero_reader_page_reuse_reservation_fences_new_roots_until_publication_slot_is_reserved ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 314 filtered out; finished in 0.68s
+

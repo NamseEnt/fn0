@@ -1,0 +1,1 @@
+Attempt stopped before workload process creation. Shell redirection to resident.log failed with Permission denied because the isolated smoke directory was root-owned. No worker, workload, database initialization, or report ran. The isolated cgroup root exists and had no processes.
