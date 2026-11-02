@@ -837,6 +837,8 @@ mod tests {
     fn active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit() {
         const CHILD_WAL_PATH: &str = "DODB_TORN_WAL_SIGKILL_PATH";
         const CHILD_READY: &str = "DODB_TORN_WAL_SIGKILL_READY";
+        const CHILD_BATCH_ID: &str = "DODB_TORN_WAL_SIGKILL_BATCH_ID";
+        const CHILD_COMMIT_LSN: &str = "DODB_TORN_WAL_SIGKILL_COMMIT_LSN";
         let page_id = PageId::new(2);
         let identity = StoreIdentity {
             database_uuid: [0x78; 16],
@@ -856,7 +858,7 @@ mod tests {
         if let Ok(wal_path) = std::env::var(CHILD_WAL_PATH) {
             let mut wal = WalLog::open_with_segment_bases(
                 ProductionFile::open(&wal_path).unwrap(),
-                wal_identity,
+                wal_identity.clone(),
                 WalPageImageFormat::ExperimentalBlink,
                 WalSegmentBoundary {
                     start_after_lsn: Lsn::new(10),
@@ -874,10 +876,16 @@ mod tests {
                 None,
             )
             .unwrap();
+            let incomplete_batch_id = std::env::var(CHILD_BATCH_ID)
+                .map(|value| value.parse::<u64>().unwrap())
+                .unwrap_or(2);
+            let incomplete_commit_lsn = std::env::var(CHILD_COMMIT_LSN)
+                .map(|value| value.parse::<u64>().unwrap())
+                .unwrap_or(14);
             let incomplete_image = encode_blink_page(
                 page_id,
                 &BlinkPage::Leaf {
-                    lsn: Lsn::new(14),
+                    lsn: Lsn::new(incomplete_commit_lsn),
                     high_key: None,
                     right_sibling: None,
                     entries: super::super::LeafEntries::default(),
@@ -886,8 +894,8 @@ mod tests {
             .unwrap();
             let _ = wal.append_group(
                 &[WalCommit {
-                    batch_id: 2,
-                    commit_lsn: Lsn::new(14),
+                    batch_id: incomplete_batch_id,
+                    commit_lsn: Lsn::new(incomplete_commit_lsn),
                     pages: vec![WalPageImage {
                         page_id,
                         image: incomplete_image,
@@ -976,9 +984,9 @@ mod tests {
         use std::os::unix::process::ExitStatusExt;
         assert_eq!(status.signal(), Some(libc::SIGKILL));
 
-        let reopened = WalLog::open_with_segment_bases(
+        let mut reopened = WalLog::open_with_segment_bases(
             ProductionFile::open(&wal_path).unwrap(),
-            wal_identity,
+            wal_identity.clone(),
             WalPageImageFormat::ExperimentalBlink,
             WalSegmentBoundary {
                 start_after_lsn: Lsn::new(10),
@@ -1008,6 +1016,101 @@ mod tests {
         );
         assert_eq!(reopened.committed_batch_count(), 1);
         assert!(fs::metadata(&wal_path).unwrap().len() >= committed_length);
+
+        let recovered_write_lsn = Lsn::new(reopened.next_lsn().get() + 1);
+        let recovered_write_image = encode_blink_page(
+            page_id,
+            &BlinkPage::Leaf {
+                lsn: recovered_write_lsn,
+                high_key: None,
+                right_sibling: None,
+                entries: super::super::LeafEntries::default(),
+            },
+        )
+        .unwrap();
+        let recovered_batch_id = reopened.next_batch_id();
+        reopened
+            .append_group(
+                &[WalCommit {
+                    batch_id: recovered_batch_id,
+                    commit_lsn: recovered_write_lsn,
+                    pages: vec![WalPageImage {
+                        page_id,
+                        image: recovered_write_image,
+                    }],
+                }],
+                None,
+            )
+            .unwrap();
+        let second_incomplete_batch_id = reopened.next_batch_id();
+        let second_incomplete_commit_lsn = Lsn::new(reopened.next_lsn().get() + 1);
+        drop(reopened);
+
+        let second_ready_path = directory.path().join("ready-second-crash");
+        let mut second_child = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "blink::paged_recovery::tests::active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit",
+                "--nocapture",
+            ])
+            .env(CHILD_WAL_PATH, &wal_path)
+            .env(CHILD_READY, &second_ready_path)
+            .env(CHILD_BATCH_ID, second_incomplete_batch_id.to_string())
+            .env(CHILD_COMMIT_LSN, second_incomplete_commit_lsn.get().to_string())
+            .spawn()
+            .unwrap();
+        let second_deadline = Instant::now() + Duration::from_secs(10);
+        while !second_ready_path.exists() && Instant::now() < second_deadline {
+            if let Some(status) = second_child.try_wait().unwrap() {
+                panic!("second-crash child exited before incomplete WAL append: {status}");
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
+        assert!(
+            second_ready_path.exists(),
+            "second-crash child did not reach incomplete WAL append"
+        );
+        assert_eq!(
+            unsafe { libc::kill(second_child.id() as libc::pid_t, libc::SIGKILL) },
+            0
+        );
+        let second_status = second_child.wait().unwrap();
+        assert_eq!(second_status.signal(), Some(libc::SIGKILL));
+
+        let reopened_after_second_crash = WalLog::open_with_segment_bases(
+            ProductionFile::open(&wal_path).unwrap(),
+            wal_identity,
+            WalPageImageFormat::ExperimentalBlink,
+            WalSegmentBoundary {
+                start_after_lsn: Lsn::new(10),
+                start_batch_id: None,
+                truncate_torn_tail: true,
+                defer_initial_sync: false,
+            },
+            BTreeMap::from([(
+                page_id,
+                crate::wal::RecoveredWalPage {
+                    commit_lsn: Lsn::new(10),
+                    image: Box::new(checkpoint_image),
+                },
+            )]),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            reopened_after_second_crash.last_commit_lsn(),
+            Some(recovered_write_lsn)
+        );
+        assert_eq!(reopened_after_second_crash.committed_batch_count(), 2);
+        assert_eq!(
+            reopened_after_second_crash
+                .recovery_pages()
+                .get(&page_id)
+                .unwrap()
+                .image
+                .as_ref(),
+            &recovered_write_image
+        );
     }
 
     #[test]
