@@ -133,3 +133,15 @@ This proves storage-object close/reopen and durable manifest/index rebuild from 
 - Source commit: `3a1338e91`.
 
 T09 remains partial. Grouped WAL transaction boundaries and complete-or-absent grouped recovery, plus full process restart with index rebuild, remain outstanding. No service activation or performance experiment occurred.
+
+
+## Grouped WAL transactions and T09 closeout (2026-11-02)
+
+- Added `PagedTransactionWriter::transact_group`, which stages requests in FIFO order, validates conditions against accepted earlier requests, preserves per-request commit markers and revisions, and publishes one final reader generation after a single group WAL sync. Repeated page versions chain through the intermediate copy-on-write index roots.
+- The focused fixture verifies ordered condition dependencies, per-request conflict isolation, distinct commit LSNs and batch IDs, exactly one sync for two successful transactions, and immutable old-reader values.
+- Fault recovery reopens each grouped WAL. A failure at the second transaction commit marker yields one complete recovered batch and excludes the uncommitted tail; failure at the group sync boundary recovers both complete batches. No staged generation is exposed by either failed writer.
+- Focused fixture: 1 passed. Feature library suite: 294 passed, 0 failed, 4 ignored in 124.50 seconds. Strict Clippy remains exit 101 with 32 existing crate findings (12 library, 20 test); no diagnostic points to the grouped writer or overlay. No lint suppressions were added.
+- Raw logs: `logs/paged-writer-grouped-focused.log`, `logs/paged-writer-grouped-feature-lib.log`, and `logs/paged-writer-grouped-strict-clippy.log`.
+- Source hash for `dodb/crates/dodb-storage/src/blink/mod.rs`: `e22d26c31ec92344c2d49182dff7802a351a11d959d9e756cb088cfb1037108a`.
+
+T09 acceptance is complete at the storage-object boundary. OS-process kill, restart with service-path write, and crash/recovery after the first recovered write remain in T11/T15. T10 is next. T17 was not started. No service route/default changed and no performance comparison ran.

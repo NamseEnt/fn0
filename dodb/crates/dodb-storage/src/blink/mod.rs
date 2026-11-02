@@ -2045,6 +2045,79 @@ impl PagedReadHandle {
 }
 
 #[cfg(feature = "blink-demand-paging")]
+struct PagedGroupLogicalOverlay<'base> {
+    base: &'base PagedReadHandle,
+    entries: BTreeMap<Vec<u8>, (bool, Revision)>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl<'base> PagedGroupLogicalOverlay<'base> {
+    fn new(base: &'base PagedReadHandle) -> Self {
+        Self {
+            base,
+            entries: BTreeMap::new(),
+        }
+    }
+
+    fn observed_state(&self, key: &DocumentKey) -> Result<ObservedState> {
+        let encoded_key = key.encode();
+        validate_encoded_key(&encoded_key)?;
+        if let Some((present, revision)) = self.entries.get(&encoded_key) {
+            return Ok(if *present {
+                ObservedState::present(*revision)
+            } else {
+                ObservedState::missing(*revision)
+            });
+        }
+        observed_state(self.base, key)
+    }
+
+    fn validate_conditions(&self, conditions: &[TransactionCondition]) -> Result<()> {
+        for condition in conditions {
+            let actual = self.observed_state(condition.key())?;
+            let matches = match condition {
+                TransactionCondition::RevisionEquals {
+                    expected_revision, ..
+                } => actual.revision() == *expected_revision,
+                TransactionCondition::Exists { .. } => !actual.is_missing(),
+                TransactionCondition::NotExists { .. } => actual.is_missing(),
+            };
+            if !matches {
+                return Err(Error::conflict(TransactionConflict {
+                    key: condition.key().clone(),
+                    expected: condition.expectation(),
+                    actual,
+                }));
+            }
+        }
+        Ok(())
+    }
+
+    fn accept(
+        &mut self,
+        request: &TransactionRequest,
+        encoded_mutation_keys: &[Vec<u8>],
+        provisional_revision: Revision,
+    ) -> Result<()> {
+        if request.mutations.len() != encoded_mutation_keys.len() {
+            return Err(Error::invariant(
+                "paged transaction group key count does not match its mutations",
+            ));
+        }
+        for (mutation, encoded_key) in request.mutations.iter().zip(encoded_mutation_keys) {
+            self.entries.insert(
+                encoded_key.clone(),
+                (
+                    matches!(mutation, TransactionMutation::Put { .. }),
+                    provisional_revision,
+                ),
+            );
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
 struct PagedWorkingBlinkState<'base> {
     base: &'base PagedReadHandle,
     pages: BTreeMap<PageId, Arc<BlinkPage>>,
@@ -2573,6 +2646,612 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             commit_lsn: Some(report.commit_lsn),
             revision: Some(provisional_revision),
         })
+    }
+
+    pub fn transact_group(
+        &mut self,
+        requests: &[TransactionRequest],
+        limits: &StorageLimits,
+        provisional_revisions: &[Revision],
+    ) -> Result<Vec<Result<TransactionResult>>> {
+        if requests.is_empty() {
+            return Ok(Vec::new());
+        }
+        if let Some(message) = &self.broken {
+            return Err(Error::durability(format!(
+                "paged transaction writer is unavailable after an uncertain persistence failure: {message}"
+            )));
+        }
+        if requests.len() != provisional_revisions.len() {
+            return Err(Error::invalid_input(
+                "paged transaction revisions do not match the group size",
+            ));
+        }
+        if !self.current.overlays.is_empty() {
+            return Err(Error::overloaded(
+                "paged transaction requires committed overlays to be materialized",
+            ));
+        }
+
+        let mut outcomes = Vec::new();
+        outcomes.try_reserve(requests.len()).map_err(|_| {
+            Error::overloaded("paged transaction group result capacity is exhausted")
+        })?;
+        outcomes.resize_with(requests.len(), || None);
+        let mut encoded_requests = Vec::new();
+        encoded_requests.try_reserve(requests.len()).map_err(|_| {
+            Error::overloaded("paged transaction group request capacity is exhausted")
+        })?;
+        let mut request_bytes = 0u64;
+        let mut has_mutations = false;
+        for (request_index, request) in requests.iter().enumerate() {
+            if let Err(error) = request.validate() {
+                if matches!(&error, Error::InvalidInput(_) | Error::InvalidRequest(_)) {
+                    outcomes[request_index] = Some(Err(error));
+                    encoded_requests.push(None);
+                    continue;
+                }
+                return Err(error);
+            }
+            let encoded_keys = match validate_and_encode_mutation_keys(request, limits) {
+                Ok(encoded_keys) => encoded_keys,
+                Err(error) => {
+                    if matches!(&error, Error::InvalidInput(_) | Error::InvalidRequest(_)) {
+                        outcomes[request_index] = Some(Err(error));
+                        encoded_requests.push(None);
+                        continue;
+                    }
+                    return Err(error);
+                }
+            };
+            if !request.mutations.is_empty()
+                && provisional_revisions[request_index] == Revision::ZERO
+            {
+                outcomes[request_index] = Some(Err(Error::invalid_input(
+                    "paged transaction group revision must be nonzero",
+                )));
+                encoded_requests.push(None);
+                continue;
+            }
+            for (mutation, encoded_key) in request.mutations.iter().zip(&encoded_keys) {
+                let value_bytes = match mutation {
+                    TransactionMutation::Put { value, .. } => value.len(),
+                    TransactionMutation::Delete { .. } => 0,
+                };
+                request_bytes = request_bytes
+                    .checked_add(encoded_key.len() as u64)
+                    .and_then(|bytes| bytes.checked_add(value_bytes as u64))
+                    .ok_or_else(|| Error::overloaded("paged transaction group bytes overflow"))?;
+            }
+            has_mutations |= !request.mutations.is_empty();
+            encoded_requests.push(Some(encoded_keys));
+        }
+
+        if !has_mutations {
+            let overlay = PagedGroupLogicalOverlay::new(&self.current);
+            for (request_index, request) in requests.iter().enumerate() {
+                if outcomes[request_index].is_some() {
+                    continue;
+                }
+                if let Err(error) = overlay.validate_conditions(&request.conditions) {
+                    outcomes[request_index] = Some(Err(error));
+                } else {
+                    outcomes[request_index] = Some(Ok(TransactionResult {
+                        commit_lsn: None,
+                        revision: None,
+                    }));
+                }
+            }
+            return outcomes
+                .into_iter()
+                .map(|outcome| {
+                    outcome.ok_or_else(|| {
+                        Error::invariant("paged transaction group result was not assigned")
+                    })
+                })
+                .collect();
+        }
+
+        let page_reuse_reservation = self
+            .current
+            .sources
+            .reserve_page_reuse(&self.current.index, self.current.root)?;
+        let mut working = PagedWorkingBlinkState::new(
+            &self.current,
+            self.maximum_working_pages,
+            page_reuse_reservation.is_some(),
+        )?;
+        let working_page_bytes = u64::try_from(self.maximum_working_pages)
+            .ok()
+            .and_then(|page_count| page_count.checked_mul(PAGE_SIZE as u64))
+            .ok_or_else(|| Error::overloaded("paged group working-set size overflows"))?;
+        let preparation_reservation = self
+            .current
+            .resources
+            .reserve(
+                self.current.tenant_id,
+                resource::ResourceCategory::WritePreparation,
+                resource::ReservationClass::Foreground,
+                working_page_bytes
+                    .checked_add(request_bytes)
+                    .ok_or_else(|| Error::overloaded("paged group reservation size overflows"))?,
+            )
+            .map_err(page_cache::map_resource_error)?;
+        let dirty_working_reservation = self
+            .current
+            .resources
+            .reserve(
+                self.current.tenant_id,
+                resource::ResourceCategory::DirtyImages,
+                resource::ReservationClass::Foreground,
+                working_page_bytes,
+            )
+            .map_err(page_cache::map_resource_error)?;
+
+        let mut logical_overlay = PagedGroupLogicalOverlay::new(&self.current);
+        let mut commits = Vec::new();
+        commits
+            .try_reserve(requests.len())
+            .map_err(|_| Error::overloaded("paged transaction group WAL capacity is exhausted"))?;
+        let mut commit_positions = Vec::new();
+        commit_positions.try_reserve(requests.len()).map_err(|_| {
+            Error::overloaded("paged transaction group result capacity is exhausted")
+        })?;
+        let mut commit_revisions = Vec::new();
+        commit_revisions.try_reserve(requests.len()).map_err(|_| {
+            Error::overloaded("paged transaction group revision capacity is exhausted")
+        })?;
+        let mut dirty_page_ids = BTreeSet::new();
+        let mut dirty_record_count = 0usize;
+        let mut wal_buffer_reservations = Vec::new();
+        wal_buffer_reservations
+            .try_reserve(requests.len())
+            .map_err(|_| {
+                Error::overloaded("paged transaction group WAL buffer capacity is exhausted")
+            })?;
+        let mut eligible_commits = Vec::new();
+        eligible_commits.try_reserve(requests.len()).map_err(|_| {
+            Error::overloaded("paged transaction group eligibility capacity is exhausted")
+        })?;
+        let mut next_lsn = self.wal.next_lsn();
+        let mut next_batch_id = self.wal.next_batch_id();
+        let mut staged_superblock = self.superblock.clone();
+        let mut staged_active_slot = self.active_slot;
+
+        for (request_index, request) in requests.iter().enumerate() {
+            let Some(encoded_keys) = encoded_requests[request_index].as_ref() else {
+                continue;
+            };
+            if let Err(error) = logical_overlay.validate_conditions(&request.conditions) {
+                if matches!(&error, Error::Conflict(_)) {
+                    outcomes[request_index] = Some(Err(error));
+                    continue;
+                }
+                return Err(error);
+            }
+            if request.mutations.is_empty() {
+                outcomes[request_index] = Some(Ok(TransactionResult {
+                    commit_lsn: None,
+                    revision: None,
+                }));
+                continue;
+            }
+
+            let previous_root_page_id = working.root_page_id;
+            let previous_free_list_head = working.free_list_head;
+            let previous_high_water_page_id = working.high_water_page_id;
+            let provisional_revision = provisional_revisions[request_index];
+            let mut dirty = BTreeSet::new();
+            let mut split_metrics = BlinkSplitMetrics::default();
+            for mutation in &request.mutations {
+                apply_mutation(
+                    &mut working,
+                    &mut dirty,
+                    &mut split_metrics,
+                    mutation,
+                    provisional_revision,
+                )?;
+                working.validate_working_page_limit()?;
+            }
+            if dirty.is_empty() {
+                return Err(Error::invariant(
+                    "paged transaction group mutation produced no dirty pages",
+                ));
+            }
+            logical_overlay.accept(request, encoded_keys, provisional_revision)?;
+
+            let metadata_changed = working.root_page_id != previous_root_page_id
+                || working.free_list_head != previous_free_list_head
+                || working.high_water_page_id != previous_high_water_page_id;
+            let page_count = dirty
+                .len()
+                .checked_add(usize::from(metadata_changed))
+                .ok_or_else(|| Error::overloaded("paged transaction group page count overflows"))?;
+            let commit_lsn = next_lsn
+                .get()
+                .checked_add(u64::try_from(page_count).map_err(|_| {
+                    Error::overloaded("paged transaction group page count does not fit u64")
+                })?)
+                .map(Lsn::new)
+                .ok_or_else(|| Error::durability("paged transaction group LSN is exhausted"))?;
+            let wal_buffer_bytes = u64::try_from(page_count)
+                .ok()
+                .and_then(|page_count| page_count.checked_mul((PAGE_SIZE + 256) as u64))
+                .and_then(|bytes| bytes.checked_add(256))
+                .ok_or_else(|| Error::overloaded("paged transaction group WAL buffer overflows"))?;
+            wal_buffer_reservations.push(
+                self.current
+                    .resources
+                    .reserve(
+                        self.current.tenant_id,
+                        resource::ResourceCategory::WritePreparation,
+                        resource::ReservationClass::Foreground,
+                        wal_buffer_bytes,
+                    )
+                    .map_err(page_cache::map_resource_error)?,
+            );
+            let mutated_keys = encoded_keys.iter().cloned().collect::<BTreeSet<_>>();
+            let mut commit_pages = Vec::new();
+            commit_pages.try_reserve(page_count).map_err(|_| {
+                Error::overloaded("paged transaction group commit page capacity is exhausted")
+            })?;
+            for page_id in &dirty {
+                let mut page = working
+                    .pages
+                    .get(page_id)
+                    .ok_or_else(|| Error::invariant("paged group dirty image is missing"))?
+                    .as_ref()
+                    .clone();
+                page.restamp(provisional_revision, commit_lsn, &mutated_keys);
+                let image = encode_blink_page(*page_id, &page)?;
+                working.pages.insert(*page_id, Arc::new(page));
+                dirty_page_ids.insert(*page_id);
+                commit_pages.push(WalPageImage {
+                    page_id: *page_id,
+                    image,
+                });
+            }
+            if metadata_changed {
+                staged_superblock.generation = staged_superblock
+                    .generation
+                    .checked_add(1)
+                    .ok_or_else(|| Error::durability("paged superblock generation is exhausted"))?;
+                staged_superblock.root_page_id = working.root_page_id;
+                staged_superblock.free_list_head = working.free_list_head;
+                staged_superblock.high_water_page_id = working.high_water_page_id;
+                staged_active_slot = match staged_active_slot {
+                    SuperblockSlot::A => SuperblockSlot::B,
+                    SuperblockSlot::B => SuperblockSlot::A,
+                };
+                let superblock_page_id = match staged_active_slot {
+                    SuperblockSlot::A => PageId::ZERO,
+                    SuperblockSlot::B => PageId::new(1),
+                };
+                commit_pages.push(WalPageImage {
+                    page_id: superblock_page_id,
+                    image: encode_blink_superblock(&staged_superblock)?,
+                });
+            }
+            dirty_record_count = dirty_record_count.checked_add(dirty.len()).ok_or_else(|| {
+                Error::overloaded("paged transaction group dirty count overflows")
+            })?;
+            commits.push(WalCommit {
+                batch_id: next_batch_id,
+                commit_lsn,
+                pages: commit_pages,
+            });
+            commit_positions.push(request_index);
+            commit_revisions.push(provisional_revision);
+            eligible_commits.push(true);
+            outcomes[request_index] = Some(Ok(TransactionResult {
+                commit_lsn: Some(Lsn::ZERO),
+                revision: Some(provisional_revision),
+            }));
+            next_lsn = commit_lsn
+                .get()
+                .checked_add(1)
+                .map(Lsn::new)
+                .ok_or_else(|| Error::durability("paged transaction group LSN is exhausted"))?;
+            next_batch_id = next_batch_id.checked_add(1).ok_or_else(|| {
+                Error::durability("paged transaction group batch ID is exhausted")
+            })?;
+        }
+
+        if commits.is_empty() {
+            return outcomes
+                .into_iter()
+                .map(|outcome| {
+                    outcome.ok_or_else(|| {
+                        Error::invariant("paged transaction group result was not assigned")
+                    })
+                })
+                .collect();
+        }
+
+        let base_image_bytes = u64::try_from(dirty_page_ids.len())
+            .ok()
+            .and_then(|page_count| page_count.checked_mul(PAGE_SIZE as u64))
+            .ok_or_else(|| {
+                Error::overloaded("paged transaction group base image size overflows")
+            })?;
+        let base_image_reservation = self
+            .current
+            .resources
+            .reserve(
+                self.current.tenant_id,
+                resource::ResourceCategory::DirtyImages,
+                resource::ReservationClass::Foreground,
+                base_image_bytes,
+            )
+            .map_err(page_cache::map_resource_error)?;
+        let mut base_images = BTreeMap::new();
+        let mut base_versions = HashMap::new();
+        base_versions
+            .try_reserve(dirty_page_ids.len())
+            .map_err(|_| {
+                Error::overloaded("paged transaction group base version capacity is exhausted")
+            })?;
+        for page_id in &dirty_page_ids {
+            let Some(descriptor) = self.current.index.lookup(self.current.root, *page_id)? else {
+                continue;
+            };
+            let base_page = self
+                .current
+                .load_mutation_base_page(*page_id)?
+                .ok_or_else(|| Error::corruption("paged group base page is missing"))?;
+            base_images.insert(*page_id, encode_blink_page(*page_id, base_page.as_ref())?);
+            let delta_depth = match descriptor.locator {
+                version_index::VersionLocator::WalDelta { depth, .. } => depth,
+                version_index::VersionLocator::CheckpointImage { .. }
+                | version_index::VersionLocator::WalImage { .. } => 0,
+            };
+            base_versions.insert(
+                *page_id,
+                WalDeltaBase {
+                    page_lsn: descriptor.image_lsn,
+                    image_crc32c: descriptor.image_crc32c,
+                    delta_depth,
+                },
+            );
+        }
+        let mut chain_write_reservations = self
+            .current
+            .index
+            .delta_chains()
+            .reserve_write_work(dirty_record_count)?;
+        let publication_reservation = self.current.index.reserve_insert_work(dirty_record_count)?;
+        let root_reservation = if let Some(page_reuse_reservation) = &page_reuse_reservation {
+            page_reuse_reservation.reserve_root_slot(&self.current.index)?
+        } else {
+            self.current
+                .sources
+                .reserve_root_slot(&self.current.index)?
+        };
+        let committed_prefix_length;
+        let reports = {
+            let mut base_source = |page_id| base_images.get(&page_id).map(Cow::Borrowed);
+            let mut delta_request = WalDeltaRequest {
+                eligible_commits: &eligible_commits,
+                base_versions: Some(&base_versions),
+                base_source: &mut base_source,
+            };
+            let reports = match self.wal.append_group_trusted_internal_with_page_deltas(
+                &commits,
+                &mut delta_request,
+                self.wal_fault_injector.as_deref_mut(),
+            ) {
+                Ok(reports) => reports,
+                Err(error) => {
+                    self.broken = Some(error.to_string());
+                    return Err(error);
+                }
+            };
+            committed_prefix_length = match self.wal.file_length() {
+                Ok(length) => length,
+                Err(error) => {
+                    self.broken = Some(error.to_string());
+                    return Err(error);
+                }
+            };
+            reports
+        };
+        if reports.len() != commits.len() {
+            self.broken = Some("paged transaction group WAL report count differs".to_owned());
+            return Err(Error::invariant(
+                "paged transaction group WAL report count differs",
+            ));
+        }
+        if let Some(injector) = &mut self.publication_fault_injector
+            && let Err(error) = injector.hit("before_paged_generation_publication")
+        {
+            self.broken = Some(error.to_string());
+            return Err(error);
+        }
+
+        let publication_result = (|| -> Result<version_index::VersionIndexRoot> {
+            let mut next_root = self.current.root;
+            for location in self.wal.recent_committed_page_locations() {
+                if location.page_id.get() < FIRST_DATA_PAGE {
+                    continue;
+                }
+                let image_lsn = location
+                    .image_lsn
+                    .ok_or_else(|| Error::invariant("paged WAL image LSN is missing"))?;
+                let image_crc32c = location
+                    .image_crc32c
+                    .ok_or_else(|| Error::invariant("paged WAL image checksum is missing"))?;
+                let frame = version_index::WalFrameLocator {
+                    source: self.wal_source,
+                    frame_offset: location.frame_offset,
+                    frame_length: location.frame_length,
+                    header_crc32c: location.header_crc32c,
+                    payload_offset: location.payload_offset,
+                    payload_length: location.payload_length,
+                    payload_crc32c: location.payload_crc32c,
+                    committed_prefix_length,
+                    commit_frame_offset: location.commit_frame_offset,
+                    commit_lsn: location.commit_lsn,
+                };
+                let locator = match location.record_type {
+                    crate::wal::WalRecordType::PageImage => {
+                        if location.delta_depth != 0 {
+                            return Err(Error::invariant(
+                                "paged WAL image has a nonzero delta depth",
+                            ));
+                        }
+                        version_index::VersionLocator::WalImage { frame }
+                    }
+                    crate::wal::WalRecordType::PageDelta => {
+                        let previous = self
+                            .current
+                            .index
+                            .lookup(next_root, location.page_id)?
+                            .ok_or_else(|| {
+                                Error::corruption("paged WAL delta has no indexed predecessor")
+                            })?;
+                        let base_lsn = location.base_page_lsn.ok_or_else(|| {
+                            Error::invariant("paged WAL delta base LSN is missing")
+                        })?;
+                        let base_crc32c = location.base_image_crc32c.ok_or_else(|| {
+                            Error::invariant("paged WAL delta base checksum is missing")
+                        })?;
+                        let mut ancestry = match previous.locator {
+                            version_index::VersionLocator::CheckpointImage {
+                                source,
+                                offset,
+                                source_length,
+                                image_lsn,
+                                image_crc32c,
+                            } => vec![version_chain::DeltaChainEntry::CheckpointImage {
+                                source,
+                                offset,
+                                source_length,
+                                image_lsn,
+                                image_crc32c,
+                            }],
+                            version_index::VersionLocator::WalImage { frame } => {
+                                let version_index::VersionToken::Wal { record_lsn, .. } =
+                                    previous.token
+                                else {
+                                    return Err(Error::corruption(
+                                        "paged WAL image has a non-WAL version token",
+                                    ));
+                                };
+                                vec![version_chain::DeltaChainEntry::WalImage {
+                                    frame,
+                                    record_lsn,
+                                    image_lsn: previous.image_lsn,
+                                    image_crc32c: previous.image_crc32c,
+                                }]
+                            }
+                            version_index::VersionLocator::WalDelta { chain, .. } => {
+                                self.current
+                                    .index
+                                    .delta_chains()
+                                    .read(chain, location.page_id)?
+                                    .entries
+                            }
+                        };
+                        ancestry.push(version_chain::DeltaChainEntry::WalDelta {
+                            frame,
+                            record_lsn: location.record_lsn,
+                            base_lsn,
+                            base_crc32c,
+                            image_lsn,
+                            image_crc32c,
+                        });
+                        let chain = version_chain::DeltaChain::new(location.page_id, ancestry)?;
+                        let generation =
+                            next_root.generation().checked_add(1).ok_or_else(|| {
+                                Error::durability("version-index generation exhausted")
+                            })?;
+                        let chain = self.current.index.delta_chains().write_reserved(
+                            generation,
+                            &chain,
+                            chain_write_reservations.pop().ok_or_else(|| {
+                                Error::invariant("paged group delta-chain reservation is missing")
+                            })?,
+                        )?;
+                        version_index::VersionLocator::WalDelta {
+                            frame,
+                            chain,
+                            depth: location.delta_depth,
+                        }
+                    }
+                    _ => {
+                        return Err(Error::invariant(
+                            "paged WAL writer received an unsupported record type",
+                        ));
+                    }
+                };
+                next_root = self.current.index.insert_reserved(
+                    next_root,
+                    location.page_id,
+                    version_index::VersionDescriptor {
+                        page_id: location.page_id,
+                        token: version_index::VersionToken::Wal {
+                            source_file_number: self.wal_source.file_number,
+                            record_lsn: location.record_lsn,
+                        },
+                        image_lsn,
+                        image_crc32c,
+                        locator,
+                    },
+                    &publication_reservation,
+                )?;
+            }
+            Ok(next_root)
+        })();
+        let next_root = match publication_result {
+            Ok(root) => root,
+            Err(error) => {
+                self.broken = Some(error.to_string());
+                return Err(Error::durability(format!(
+                    "paged transaction group committed but version publication failed: {error}"
+                )));
+            }
+        };
+        let next_handle = match self.current.fork_with_generation_reserved(
+            next_root,
+            working.root_page_id,
+            working.free_list_head,
+            working.high_water_page_id,
+            root_reservation,
+        ) {
+            Ok(handle) => handle,
+            Err(error) => {
+                self.broken = Some(error.to_string());
+                return Err(Error::durability(format!(
+                    "paged transaction group committed but reader generation publication failed: {error}"
+                )));
+            }
+        };
+        self.current = next_handle;
+        self.superblock = staged_superblock;
+        self.active_slot = staged_active_slot;
+        for ((request_index, report), provisional_revision) in commit_positions
+            .into_iter()
+            .zip(reports)
+            .zip(commit_revisions)
+        {
+            outcomes[request_index] = Some(Ok(TransactionResult {
+                commit_lsn: Some(report.commit_lsn),
+                revision: Some(provisional_revision),
+            }));
+        }
+        drop(page_reuse_reservation);
+        drop(preparation_reservation);
+        drop(dirty_working_reservation);
+        drop(base_image_reservation);
+        drop(wal_buffer_reservations);
+        outcomes
+            .into_iter()
+            .map(|outcome| {
+                outcome.ok_or_else(|| {
+                    Error::invariant("paged transaction group result was not assigned")
+                })
+            })
+            .collect()
     }
 }
 
@@ -13558,7 +14237,7 @@ mod tests {
                 .transact(
                     &update_request,
                     &StorageLimits::default(),
-                    Revision::new(2000 + update_number),
+                    Revision::new(2100 + update_number),
                 )
                 .unwrap();
             let latest_location = writer
@@ -13749,6 +14428,89 @@ mod tests {
             writer.current().get(&writer_key).unwrap().value(),
             Some(&b"writer-updated-09"[..])
         );
+        let group_syncs_before = writer.wal.metrics().unwrap().wal_syncs;
+        let group_batches_before = writer.wal.metrics().unwrap().committed_batches;
+        let grouped_results = writer
+            .transact_group(
+                &[
+                    TransactionRequest::new(
+                        Vec::new(),
+                        vec![TransactionMutation::Put {
+                            key: writer_key.clone(),
+                            value: b"group-first".to_vec(),
+                        }],
+                    ),
+                    TransactionRequest::new(
+                        vec![TransactionCondition::Exists {
+                            key: writer_key.clone(),
+                        }],
+                        vec![TransactionMutation::Put {
+                            key: second_writer_key.clone(),
+                            value: b"group-second".to_vec(),
+                        }],
+                    ),
+                    TransactionRequest::new(
+                        vec![TransactionCondition::RevisionEquals {
+                            key: writer_key.clone(),
+                            expected_revision: writer_base_revision,
+                        }],
+                        vec![TransactionMutation::Put {
+                            key: second_writer_key.clone(),
+                            value: b"group-conflict".to_vec(),
+                        }],
+                    ),
+                ],
+                &StorageLimits::default(),
+                &[
+                    Revision::new(2201),
+                    Revision::new(2202),
+                    Revision::new(2203),
+                ],
+            )
+            .unwrap();
+        assert_eq!(grouped_results.len(), 3);
+        let first_group_result = grouped_results[0].as_ref().unwrap();
+        let second_group_result = grouped_results[1].as_ref().unwrap();
+        assert_ne!(
+            first_group_result.commit_lsn,
+            second_group_result.commit_lsn
+        );
+        assert!(matches!(grouped_results[2], Err(Error::Conflict(_))));
+        assert_eq!(
+            writer.wal.metrics().unwrap().wal_syncs,
+            group_syncs_before + 1
+        );
+        assert_eq!(
+            writer.wal.metrics().unwrap().committed_batches,
+            group_batches_before + 2
+        );
+        let grouped_batch_ids = writer
+            .wal
+            .recent_committed_page_locations()
+            .iter()
+            .filter(|location| {
+                Some(location.commit_lsn) == first_group_result.commit_lsn
+                    || Some(location.commit_lsn) == second_group_result.commit_lsn
+            })
+            .map(|location| location.batch_id)
+            .collect::<HashSet<_>>();
+        assert_eq!(grouped_batch_ids.len(), 2);
+        assert_eq!(
+            writer.current().get(&writer_key).unwrap().value(),
+            Some(&b"group-first"[..])
+        );
+        assert_eq!(
+            writer.current().get(&second_writer_key).unwrap().value(),
+            Some(&b"group-second"[..])
+        );
+        assert_eq!(
+            old_reader.get(&writer_key).unwrap().value(),
+            handle.get(&writer_key).unwrap().value()
+        );
+        assert_eq!(
+            old_reader.get(&second_writer_key).unwrap().value(),
+            handle.get(&second_writer_key).unwrap().value()
+        );
         let tombstone_request = TransactionRequest::new(
             Vec::new(),
             vec![TransactionMutation::Delete {
@@ -13759,7 +14521,7 @@ mod tests {
             .transact(
                 &tombstone_request,
                 &StorageLimits::default(),
-                Revision::new(2030),
+                Revision::new(2300),
             )
             .unwrap();
         assert!(writer.current().get(&writer_key).unwrap().is_missing());
@@ -13776,7 +14538,7 @@ mod tests {
             .transact(
                 &resurrect_request,
                 &StorageLimits::default(),
-                Revision::new(2031),
+                Revision::new(2301),
             )
             .unwrap();
         assert_eq!(
@@ -13917,42 +14679,75 @@ mod tests {
             )
             .unwrap()
         };
-        for (file_number, fault_point, key_suffix, expected_recovered_page) in [
-            (2, "before_commit_record", b"append-fault".as_slice(), false),
-            (3, "during_wal_sync", b"sync-fault".as_slice(), true),
+        for (file_number, fault_point, key_suffix, expected_committed_batches) in [
+            (2, "before_commit_record", b"append-fault".as_slice(), 1),
+            (3, "during_wal_sync", b"sync-fault".as_slice(), 2),
         ] {
             let mut fault_writer = make_fault_writer(file_number);
             fault_writer.set_boxed_wal_fault_injector(Box::new(FailOnOccurrence {
                 point: fault_point,
-                remaining: 1,
+                remaining: if fault_point == "before_commit_record" {
+                    2
+                } else {
+                    1
+                },
             }));
-            let fault_key = DocumentKey::new(b"p".to_vec(), key_suffix.to_vec());
-            let fault_request = TransactionRequest::new(
-                Vec::new(),
-                vec![TransactionMutation::Put {
-                    key: fault_key.clone(),
-                    value: b"not-published".to_vec(),
-                }],
-            );
+            let first_fault_key = DocumentKey::new(b"p".to_vec(), [key_suffix, b"-first"].concat());
+            let second_fault_key =
+                DocumentKey::new(b"p".to_vec(), [key_suffix, b"-second"].concat());
+            let fault_requests = [
+                TransactionRequest::new(
+                    Vec::new(),
+                    vec![TransactionMutation::Put {
+                        key: first_fault_key.clone(),
+                        value: b"first-transaction".to_vec(),
+                    }],
+                ),
+                TransactionRequest::new(
+                    Vec::new(),
+                    vec![TransactionMutation::Put {
+                        key: second_fault_key.clone(),
+                        value: b"second-transaction".to_vec(),
+                    }],
+                ),
+            ];
             assert!(
                 fault_writer
-                    .transact(
-                        &fault_request,
+                    .transact_group(
+                        &fault_requests,
                         &StorageLimits::default(),
-                        Revision::new(2010 + file_number),
+                        &[
+                            Revision::new(2010 + file_number),
+                            Revision::new(2020 + file_number)
+                        ],
                     )
                     .is_err()
             );
             assert_eq!(
-                fault_writer.current().get(&fault_key).unwrap().value(),
+                fault_writer
+                    .current()
+                    .get(&first_fault_key)
+                    .unwrap()
+                    .value(),
+                None
+            );
+            assert_eq!(
+                fault_writer
+                    .current()
+                    .get(&second_fault_key)
+                    .unwrap()
+                    .value(),
                 None
             );
             assert!(
                 fault_writer
-                    .transact(
-                        &fault_request,
+                    .transact_group(
+                        &fault_requests,
                         &StorageLimits::default(),
-                        Revision::new(2020 + file_number),
+                        &[
+                            Revision::new(2030 + file_number),
+                            Revision::new(2040 + file_number)
+                        ],
                     )
                     .is_err()
             );
@@ -13979,6 +14774,10 @@ mod tests {
                     fault_base_pages.keys().collect::<Vec<_>>()
                 )
             });
+            assert_eq!(
+                reopened_wal.scan_report().committed_batches,
+                expected_committed_batches
+            );
             assert_eq!(reopened_wal.recovery_pages().len(), fault_base_pages.len());
             let changed_pages = reopened_wal
                 .recovery_pages()
@@ -13989,7 +14788,7 @@ mod tests {
                     })
                 })
                 .collect::<Vec<_>>();
-            assert_eq!(!changed_pages.is_empty(), expected_recovered_page);
+            assert_eq!(!changed_pages.is_empty(), expected_committed_batches > 0);
             for (page_id, recovered_page) in reopened_wal.recovery_pages() {
                 let recovered_image =
                     decode_blink_page(&recovered_page.image[..], *page_id).unwrap();
