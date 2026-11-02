@@ -1,20 +1,21 @@
-# T11 Partial Results: Indexed Page Image Validation
+# T11 Partial Results: Bounded Paged Storage Validation
 
 ## Scope
 
-This increment adds an explicit `PagedReadHandle::open_with_indexed_page_validation` entry point. It walks the version index with its fixed-depth descriptor cursor and loads each indexed page through the configured bounded page loader. It rejects descriptors outside the allocated range, gaps in the page-ID sequence, missing page images through the high-water mark, checksum or decode failures, and image LSN mismatches. A regression with a high-water mark beyond the final indexed page verifies that incomplete allocation coverage fails. It does not claim complete B-link tree, free-list, reachability, overflow-chain, or crash-recovery validation.
+`PagedReadHandle::open_with_indexed_page_validation` and `validate_all_indexed_pages` now perform a complete storage-graph validation over a paged generation. The index descriptor cursor visits every allocated page in order. Page images are decoded through the bounded loader and checked against descriptor LSNs and checksums.
 
-The focused regression corrupts an indexed leaf page that is outside the already-cached requested route. The cached GET still succeeds, demonstrating why lazy reads alone do not satisfy opening validation; the validation-open path rejects the corrupted image. After restoring the image, validation reads all eight indexed pages with a two-page cache.
+The validator reserves three pages from `CheckpointValidation` and reserves one scratch byte per page ID from the tenant `Scratch` disk budget. It uses the scratch file to mark the root, internal-child, overflow, and free-list roles. This detects duplicate ownership, cycles, unreachable pages, unlisted free pages, and references outside the high-water range without an all-page in-memory set. Scratch files and reservations are released on success and error.
+
+The validator also checks internal child types and levels, separator/child fences, leaf and internal sibling continuity, overflow ownership and lengths, and free-list page types. A corrupt leaf not touched by the requested read fails validation. Test fixtures cover a missing allocated page, an omitted free list, a free-list cycle, and a multiply owned tree child.
 
 ## Validation
 
-- `rustfmt --edition 2024 --check crates/dodb-storage/src/blink/mod.rs`: passed.
-- The focused regression also verified that a missing allocated page above the indexed range is rejected.
-- Focused `dodb-storage` test `paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages` with `blink-demand-paging blink-writer-pin-reuse`: passed, 1 test.
+- `rustfmt --edition 2024 --check crates/dodb-storage/src/blink/mod.rs crates/dodb-storage/src/blink/source_manager.rs`: passed.
+- Focused paged validation regression: passed, 1 test.
+- `cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1`: passed, 310 tests; 4 ignored.
 - `git diff --check`: passed.
-
-The initial compile attempt failed because a local `Seek`/`SeekFrom` import duplicated one in the same test function. That attempt is preserved. The corrected focused run passed.
+- Strict Clippy remains blocked by 12 existing diagnostics in `blink/mod.rs` and `wal.rs`; none point to the new paged validator or `source_manager.rs`. No lint suppression was added.
 
 ## Remaining T11 Work
 
-The bounded structural invariant checker, external scratch accounting, high-water and free-list reconciliation, full cross-page structural validation, large-WAL reopen validation, and required crash/recovery matrix remain unimplemented. T11 remains partial and is the next task.
+The bounded structural checker is implemented for explicit paged validation opens. Recovery/service open-path integration, above-cache reopen with a large WAL, and the required storage process-kill/crash-boundary matrix remain. T11 is partial until those gates have evidence.

@@ -69,6 +69,14 @@ use crate::wal::{
 use leaf::{BlinkValueRef, LeafEntries, LeafEntryRef, LeafRange, StoredValue};
 
 const FIRST_DATA_PAGE: u64 = 2;
+#[cfg(feature = "blink-demand-paging")]
+const VALIDATION_ROLE_ROOT: u8 = 1;
+#[cfg(feature = "blink-demand-paging")]
+const VALIDATION_ROLE_TREE_CHILD: u8 = 2;
+#[cfg(feature = "blink-demand-paging")]
+const VALIDATION_ROLE_OVERFLOW: u8 = 3;
+#[cfg(feature = "blink-demand-paging")]
+const VALIDATION_ROLE_FREE: u8 = 4;
 const PAGE_CATALOG_CHUNK_SIZE: usize = 64;
 const MATERIALIZER_SOFT_LIMIT: usize = 4;
 const MAX_OVERLAY_SEGMENTS: usize = 8;
@@ -2089,6 +2097,16 @@ pub struct PagedReadHandle {
 }
 
 #[cfg(feature = "blink-demand-paging")]
+struct PagedValidationEdges {
+    leaf_sibling: Option<(Option<PageId>, Option<Vec<u8>>)>,
+    internal_sibling: Option<(Option<PageId>, Option<Vec<u8>>, u16)>,
+    children: Vec<(PageId, u16)>,
+    overflow_values: Vec<(PageId, u64)>,
+    boundaries: Vec<(PageId, PageId, Vec<u8>)>,
+    last_child_fence: Option<(PageId, Option<Vec<u8>>)>,
+}
+
+#[cfg(feature = "blink-demand-paging")]
 impl PagedReadHandle {
     pub fn open_with_indexed_page_validation<F>(
         config: PagedReadConfig,
@@ -2266,6 +2284,50 @@ impl PagedReadHandle {
     }
 
     pub fn validate_all_indexed_pages(&self) -> Result<u64> {
+        let reservation_bytes = (PAGE_SIZE as u64)
+            .checked_mul(3)
+            .ok_or_else(|| Error::overloaded("paged validation reservation overflows"))?;
+        let _validation_reservation = self
+            .resources
+            .reserve(
+                self.tenant_id,
+                resource::ResourceCategory::CheckpointValidation,
+                resource::ReservationClass::Progress,
+                reservation_bytes,
+            )
+            .map_err(page_cache::map_resource_error)?;
+        let scratch_length = self
+            .high_water_page_id
+            .get()
+            .checked_add(1)
+            .ok_or_else(|| Error::overloaded("paged validation scratch length overflows"))?;
+        let mut scratch = self.sources.create_validation_scratch(scratch_length)?;
+        Self::mark_validation_role(
+            &mut scratch,
+            self.root_page_id,
+            self.high_water_page_id,
+            VALIDATION_ROLE_ROOT,
+        )?;
+        let mut free_page_id = self.free_list_head;
+        while let Some(page_id) = free_page_id {
+            Self::mark_validation_role(
+                &mut scratch,
+                page_id,
+                self.high_water_page_id,
+                VALIDATION_ROLE_FREE,
+            )?;
+            let page = self
+                .load_mutation_base_page(page_id)?
+                .ok_or_else(|| Error::corruption("paged free list points to a missing page"))?;
+            free_page_id = match page.as_ref() {
+                BlinkPage::Free { next, .. } => *next,
+                _ => {
+                    return Err(Error::corruption(
+                        "paged free list points to a non-free page",
+                    ));
+                }
+            };
+        }
         let mut cursor = self.index.descriptor_cursor(self.root)?;
         let mut expected_page_id = FIRST_DATA_PAGE;
         let mut validated_pages = 0u64;
@@ -2290,7 +2352,256 @@ impl PagedReadHandle {
                     "paged validation image LSN differs from its index descriptor",
                 ));
             }
+            let marker = scratch.read_marker(descriptor.page_id.get())?;
+            let edges = match page.as_ref() {
+                BlinkPage::Leaf {
+                    high_key,
+                    right_sibling,
+                    entries,
+                    ..
+                } => {
+                    if marker == VALIDATION_ROLE_OVERFLOW || marker == VALIDATION_ROLE_FREE {
+                        return Err(Error::corruption(
+                            "paged leaf overlaps an incompatible page ownership role",
+                        ));
+                    }
+                    let last_key = entries.last().map(|entry| entry.key.as_ref().to_vec());
+                    if let (Some(high_key), Some(last_key)) = (high_key, last_key.as_deref())
+                        && last_key >= high_key.as_slice()
+                    {
+                        return Err(Error::corruption(
+                            "paged leaf key reaches or exceeds its high fence",
+                        ));
+                    }
+                    if descriptor.page_id == self.root_page_id
+                        && (right_sibling.is_some() || high_key.is_some())
+                    {
+                        return Err(Error::corruption(
+                            "paged root leaf has a finite sibling fence",
+                        ));
+                    }
+                    if right_sibling.is_some() != high_key.is_some() {
+                        return Err(Error::corruption(
+                            "paged leaf sibling and high fence disagree",
+                        ));
+                    }
+                    let overflow_values = entries
+                        .iter()
+                        .filter_map(|entry| match entry.value {
+                            Some(BlinkValueRef::Overflow { head, length }) => Some((head, length)),
+                            _ => None,
+                        })
+                        .collect();
+                    PagedValidationEdges {
+                        leaf_sibling: Some((*right_sibling, high_key.clone())),
+                        internal_sibling: None,
+                        children: Vec::new(),
+                        overflow_values,
+                        boundaries: Vec::new(),
+                        last_child_fence: None,
+                    }
+                }
+                BlinkPage::Internal {
+                    level,
+                    high_key,
+                    right_sibling,
+                    leftmost_child,
+                    entries,
+                    ..
+                } => {
+                    if marker == VALIDATION_ROLE_OVERFLOW || marker == VALIDATION_ROLE_FREE {
+                        return Err(Error::corruption(
+                            "paged internal page overlaps an incompatible page ownership role",
+                        ));
+                    }
+                    if *level == 0 || right_sibling.is_some() != high_key.is_some() {
+                        return Err(Error::corruption(
+                            "paged internal level, sibling, or high fence is invalid",
+                        ));
+                    }
+                    if descriptor.page_id == self.root_page_id
+                        && (right_sibling.is_some() || high_key.is_some())
+                    {
+                        return Err(Error::corruption(
+                            "paged root internal page has a finite sibling fence",
+                        ));
+                    }
+                    let mut children = Vec::with_capacity(entries.len() + 1);
+                    children.push((*leftmost_child, *level - 1));
+                    children.extend(entries.iter().map(|entry| (entry.right_child, *level - 1)));
+                    let mut boundaries = Vec::with_capacity(entries.len());
+                    let mut left_child = *leftmost_child;
+                    for entry in entries {
+                        boundaries.push((left_child, entry.right_child, entry.key.clone()));
+                        left_child = entry.right_child;
+                    }
+                    PagedValidationEdges {
+                        leaf_sibling: None,
+                        internal_sibling: Some((*right_sibling, high_key.clone(), *level)),
+                        children,
+                        overflow_values: Vec::new(),
+                        boundaries,
+                        last_child_fence: Some((left_child, high_key.clone())),
+                    }
+                }
+                BlinkPage::Overflow { .. } => {
+                    if marker != 0 && marker != VALIDATION_ROLE_OVERFLOW {
+                        return Err(Error::corruption(
+                            "paged overflow page overlaps an incompatible page ownership role",
+                        ));
+                    }
+                    PagedValidationEdges {
+                        leaf_sibling: None,
+                        internal_sibling: None,
+                        children: Vec::new(),
+                        overflow_values: Vec::new(),
+                        boundaries: Vec::new(),
+                        last_child_fence: None,
+                    }
+                }
+                BlinkPage::Free { .. } => {
+                    if marker != 0 && marker != VALIDATION_ROLE_FREE {
+                        return Err(Error::corruption(
+                            "paged free page overlaps an incompatible page ownership role",
+                        ));
+                    }
+                    PagedValidationEdges {
+                        leaf_sibling: None,
+                        internal_sibling: None,
+                        children: Vec::new(),
+                        overflow_values: Vec::new(),
+                        boundaries: Vec::new(),
+                        last_child_fence: None,
+                    }
+                }
+            };
             drop(page);
+            if let Some((right_sibling, high_key)) = edges.leaf_sibling {
+                match (right_sibling, high_key.as_deref()) {
+                    (Some(right_sibling), Some(high_key)) => {
+                        let next_first_key = self.validate_paged_sibling(right_sibling, Some(0))?;
+                        if right_sibling == descriptor.page_id
+                            || next_first_key.as_deref() != Some(high_key)
+                        {
+                            return Err(Error::corruption(
+                                "paged leaf sibling fence is not continuous",
+                            ));
+                        }
+                    }
+                    (None, None) => {}
+                    _ => {
+                        return Err(Error::corruption(
+                            "paged leaf sibling and high fence disagree",
+                        ));
+                    }
+                }
+            }
+            if let Some((right_sibling, high_key, level)) = edges.internal_sibling {
+                match (right_sibling, high_key.as_deref()) {
+                    (Some(right_sibling), Some(high_key)) => {
+                        let next_minimum =
+                            self.validate_paged_sibling(right_sibling, Some(level))?;
+                        if right_sibling == descriptor.page_id
+                            || next_minimum.as_deref() != Some(high_key)
+                        {
+                            return Err(Error::corruption(
+                                "paged internal sibling fence is not continuous",
+                            ));
+                        }
+                    }
+                    (None, None) => {}
+                    _ => {
+                        return Err(Error::corruption(
+                            "paged internal sibling and high fence disagree",
+                        ));
+                    }
+                }
+            }
+            for (child_page_id, child_level) in edges.children {
+                Self::mark_validation_role(
+                    &mut scratch,
+                    child_page_id,
+                    self.high_water_page_id,
+                    VALIDATION_ROLE_TREE_CHILD,
+                )?;
+                let child = self
+                    .load_mutation_base_page(child_page_id)?
+                    .ok_or_else(|| Error::corruption("paged internal child is missing"))?;
+                let child_level_matches = match child.as_ref() {
+                    BlinkPage::Leaf { .. } => child_level == 0,
+                    BlinkPage::Internal { level, .. } => *level == child_level,
+                    _ => false,
+                };
+                if !child_level_matches {
+                    return Err(Error::corruption(
+                        "paged internal child has the wrong page type or level",
+                    ));
+                }
+            }
+            for (left_child, right_child, separator) in edges.boundaries {
+                let left_high_key = self.paged_page_high_key(left_child)?;
+                let right_minimum = self.paged_subtree_minimum_key(right_child)?;
+                if left_high_key.as_deref() != Some(separator.as_slice())
+                    || right_minimum.as_deref() != Some(separator.as_slice())
+                {
+                    return Err(Error::corruption(
+                        "paged internal separator disagrees with its child fences",
+                    ));
+                }
+            }
+            if let Some((last_child, parent_high_key)) = edges.last_child_fence {
+                let last_child_high_key = self.paged_page_high_key(last_child)?;
+                if last_child_high_key != parent_high_key {
+                    return Err(Error::corruption(
+                        "paged rightmost child fence disagrees with its parent",
+                    ));
+                }
+            }
+            for (head, expected_length) in edges.overflow_values {
+                let mut overflow_page_id = Some(head);
+                let mut total_length = 0u64;
+                while let Some(overflow_id) = overflow_page_id {
+                    Self::mark_validation_role(
+                        &mut scratch,
+                        overflow_id,
+                        self.high_water_page_id,
+                        VALIDATION_ROLE_OVERFLOW,
+                    )?;
+                    let overflow = self
+                        .load_mutation_base_page(overflow_id)?
+                        .ok_or_else(|| Error::corruption("paged overflow chain is missing"))?;
+                    match overflow.as_ref() {
+                        BlinkPage::Overflow {
+                            next,
+                            total_length: page_total_length,
+                            chunk,
+                            ..
+                        } => {
+                            if *page_total_length != expected_length {
+                                return Err(Error::corruption(
+                                    "paged overflow chain length header differs from its owner",
+                                ));
+                            }
+                            total_length = total_length
+                                .checked_add(chunk.len() as u64)
+                                .ok_or_else(|| {
+                                    Error::corruption("paged overflow length overflows")
+                                })?;
+                            overflow_page_id = *next;
+                        }
+                        _ => {
+                            return Err(Error::corruption(
+                                "paged overflow owner points to a non-overflow page",
+                            ));
+                        }
+                    }
+                }
+                if total_length < expected_length {
+                    return Err(Error::corruption(
+                        "paged overflow chain is shorter than its declared value",
+                    ));
+                }
+            }
             validated_pages = validated_pages
                 .checked_add(1)
                 .ok_or_else(|| Error::corruption("paged validation page count overflows"))?;
@@ -2303,7 +2614,126 @@ impl PagedReadHandle {
                 "paged validation found missing allocated pages",
             ));
         }
+        let mut cursor = self.index.descriptor_cursor(self.root)?;
+        while let Some(descriptor) = cursor.next_descriptor(&self.index)? {
+            let marker = scratch.read_marker(descriptor.page_id.get())?;
+            let page = self
+                .load_mutation_base_page(descriptor.page_id)?
+                .ok_or_else(|| Error::corruption("paged validation found a missing page"))?;
+            let expected_role = match page.as_ref() {
+                BlinkPage::Leaf { .. } | BlinkPage::Internal { .. }
+                    if descriptor.page_id == self.root_page_id =>
+                {
+                    VALIDATION_ROLE_ROOT
+                }
+                BlinkPage::Leaf { .. } | BlinkPage::Internal { .. } => VALIDATION_ROLE_TREE_CHILD,
+                BlinkPage::Overflow { .. } => VALIDATION_ROLE_OVERFLOW,
+                BlinkPage::Free { .. } => VALIDATION_ROLE_FREE,
+            };
+            if marker != expected_role {
+                return Err(Error::corruption(
+                    "paged validation found an unowned, multiply owned, or misclassified page",
+                ));
+            }
+        }
         Ok(validated_pages)
+    }
+
+    fn mark_validation_role(
+        scratch: &mut source_manager::ValidationScratch,
+        page_id: PageId,
+        high_water_page_id: PageId,
+        role: u8,
+    ) -> Result<()> {
+        if page_id.get() < FIRST_DATA_PAGE || page_id > high_water_page_id {
+            return Err(Error::corruption(
+                "paged validation reference is outside the allocated range",
+            ));
+        }
+        if scratch.read_marker(page_id.get())? != 0 {
+            return Err(Error::corruption(
+                "paged validation found duplicate or overlapping page ownership",
+            ));
+        }
+        scratch.write_marker(page_id.get(), role)
+    }
+
+    fn paged_page_high_key(&self, page_id: PageId) -> Result<Option<Vec<u8>>> {
+        let page = self
+            .load_mutation_base_page(page_id)?
+            .ok_or_else(|| Error::corruption("paged tree child is missing"))?;
+        match page.as_ref() {
+            BlinkPage::Leaf { high_key, .. } | BlinkPage::Internal { high_key, .. } => {
+                Ok(high_key.clone())
+            }
+            _ => Err(Error::corruption(
+                "paged tree child has an invalid page type",
+            )),
+        }
+    }
+
+    fn paged_subtree_minimum_key(&self, mut page_id: PageId) -> Result<Option<Vec<u8>>> {
+        let mut expected_level = None;
+        loop {
+            let page = self
+                .load_mutation_base_page(page_id)?
+                .ok_or_else(|| Error::corruption("paged subtree child is missing"))?;
+            match page.as_ref() {
+                BlinkPage::Leaf { entries, .. } => {
+                    if expected_level.is_some_and(|level| level != 0) {
+                        return Err(Error::corruption(
+                            "paged subtree minimum reaches a leaf at the wrong level",
+                        ));
+                    }
+                    return Ok(entries.first().map(|entry| entry.key.as_ref().to_vec()));
+                }
+                BlinkPage::Internal {
+                    level,
+                    leftmost_child,
+                    ..
+                } => {
+                    if *level == 0 || expected_level.is_some_and(|expected| expected != *level) {
+                        return Err(Error::corruption(
+                            "paged subtree minimum has inconsistent levels",
+                        ));
+                    }
+                    expected_level = Some(level - 1);
+                    page_id = *leftmost_child;
+                }
+                _ => {
+                    return Err(Error::corruption(
+                        "paged subtree minimum reaches a non-tree page",
+                    ));
+                }
+            }
+        }
+    }
+
+    fn validate_paged_sibling(
+        &self,
+        page_id: PageId,
+        expected_level: Option<u16>,
+    ) -> Result<Option<Vec<u8>>> {
+        if page_id.get() < FIRST_DATA_PAGE || page_id > self.high_water_page_id {
+            return Err(Error::corruption(
+                "paged sibling link is outside the allocated range",
+            ));
+        }
+        let page = self
+            .load_mutation_base_page(page_id)?
+            .ok_or_else(|| Error::corruption("paged sibling link is missing"))?;
+        match page.as_ref() {
+            BlinkPage::Leaf { entries, .. } if expected_level == Some(0) => {
+                Ok(entries.first().map(|entry| entry.key.as_ref().to_vec()))
+            }
+            BlinkPage::Internal { level, .. } if expected_level == Some(*level) => {
+                drop(page);
+                self.paged_subtree_minimum_key(page_id)
+            }
+            _ => Err(Error::corruption(
+                "paged sibling link targets another page type",
+            )),
+        }
     }
 
     pub fn prepare_transaction(
@@ -14564,7 +14994,7 @@ mod tests {
                 spare_page_id,
                 BlinkPage::Free {
                     lsn: Lsn::new(1),
-                    next: None,
+                    next: Some(page_id(7)),
                 },
             ),
             (
@@ -14580,14 +15010,14 @@ mod tests {
                 page_id(7),
                 BlinkPage::Free {
                     lsn: Lsn::new(1),
-                    next: None,
+                    next: Some(page_id(8)),
                 },
             ),
             (
                 page_id(8),
                 BlinkPage::Free {
                     lsn: Lsn::new(1),
-                    next: None,
+                    next: Some(high_water_page_id),
                 },
             ),
             (
@@ -14686,7 +15116,7 @@ mod tests {
                 tenant_id: 11,
                 root,
                 root_page_id,
-                free_list_head: None,
+                free_list_head: Some(spare_page_id),
                 high_water_page_id,
                 loader: page_cache::PageLoaderConfig {
                     maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
@@ -14760,7 +15190,7 @@ mod tests {
                 tenant_id: 11,
                 root,
                 root_page_id,
-                free_list_head: None,
+                free_list_head: Some(spare_page_id),
                 high_water_page_id,
                 loader: page_cache::PageLoaderConfig {
                     maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
@@ -14786,17 +15216,31 @@ mod tests {
         restored_source.write_all(&[right_page_tail_byte]).unwrap();
         drop(restored_source);
         let source_reads_before_full_validation = handle.source_read_count();
+        let scratch_disk_bytes_before = resources.disk().snapshot().unwrap().current_by_category
+            [resource::DiskCategory::Scratch as usize];
+        let validation_bytes_before = resources.snapshot().unwrap().current_by_category
+            [resource::ResourceCategory::CheckpointValidation as usize];
         assert_eq!(
             handle.validate_all_indexed_pages().unwrap(),
             page_images.len() as u64
         );
         assert!(handle.source_read_count() > source_reads_before_full_validation);
+        assert_eq!(
+            resources.disk().snapshot().unwrap().current_by_category
+                [resource::DiskCategory::Scratch as usize],
+            scratch_disk_bytes_before
+        );
+        assert_eq!(
+            resources.snapshot().unwrap().current_by_category
+                [resource::ResourceCategory::CheckpointValidation as usize],
+            validation_bytes_before
+        );
         let validated_open = PagedReadHandle::open_with_indexed_page_validation(
             PagedReadConfig {
                 tenant_id: 11,
                 root,
                 root_page_id,
-                free_list_head: None,
+                free_list_head: Some(spare_page_id),
                 high_water_page_id,
                 loader: page_cache::PageLoaderConfig {
                     maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
@@ -14822,7 +15266,7 @@ mod tests {
                 tenant_id: 11,
                 root,
                 root_page_id,
-                free_list_head: None,
+                free_list_head: Some(spare_page_id),
                 high_water_page_id: PageId::new(high_water_page_id.get() + 1),
                 loader: page_cache::PageLoaderConfig {
                     maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
@@ -14838,6 +15282,165 @@ mod tests {
             |_| Ok(PAGE_SIZE),
         );
         assert!(missing_allocated_page_open.is_err());
+        let missing_free_list_open = PagedReadHandle::open_with_indexed_page_validation(
+            PagedReadConfig {
+                tenant_id: 11,
+                root,
+                root_page_id,
+                free_list_head: None,
+                high_water_page_id,
+                loader: page_cache::PageLoaderConfig {
+                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 10) as u64,
+                    maximum_concurrent_loads: 2,
+                    maximum_followers: 8,
+                },
+            },
+            Arc::clone(&index),
+            resources.clone(),
+            sources.clone(),
+            |_| Ok(PAGE_SIZE),
+        );
+        assert!(missing_free_list_open.is_err());
+        let cyclic_free_image = encode_blink_page(
+            spare_page_id,
+            &BlinkPage::Free {
+                lsn: Lsn::new(2),
+                next: Some(spare_page_id),
+            },
+        )
+        .unwrap();
+        let cyclic_free_checksum = crc32c::crc32c(&cyclic_free_image);
+        let validation_source_identity = version_index::SourceIdentity {
+            kind: version_index::SourceFileKind::CheckpointPack,
+            file_number: 2,
+            header_identity: source_identity.header_identity,
+        };
+        let validation_source_path = checkpoint_directory.join("base-00000000000000000002.pages");
+        let mut validation_source = std::fs::File::create(&validation_source_path).unwrap();
+        validation_source.write_all(&source_header).unwrap();
+        validation_source.write_all(&cyclic_free_image).unwrap();
+        let cyclic_free_source_length = PAGE_SIZE as u64 * 2;
+        drop(validation_source);
+        let original_free_descriptor = index.lookup(root, spare_page_id).unwrap().unwrap();
+        let cyclic_free_root = index
+            .insert(
+                root,
+                spare_page_id,
+                version_index::VersionDescriptor {
+                    page_id: spare_page_id,
+                    token: original_free_descriptor.token,
+                    image_lsn: Lsn::new(2),
+                    image_crc32c: cyclic_free_checksum,
+                    locator: version_index::VersionLocator::CheckpointImage {
+                        source: validation_source_identity,
+                        offset: PAGE_SIZE as u64,
+                        source_length: cyclic_free_source_length,
+                        image_lsn: Lsn::new(2),
+                        image_crc32c: cyclic_free_checksum,
+                    },
+                },
+            )
+            .unwrap();
+        let cyclic_free_open = PagedReadHandle::open_with_indexed_page_validation(
+            PagedReadConfig {
+                tenant_id: 11,
+                root: cyclic_free_root,
+                root_page_id,
+                free_list_head: Some(spare_page_id),
+                high_water_page_id,
+                loader: page_cache::PageLoaderConfig {
+                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 10) as u64,
+                    maximum_concurrent_loads: 2,
+                    maximum_followers: 8,
+                },
+            },
+            Arc::clone(&index),
+            resources.clone(),
+            sources.clone(),
+            |_| Ok(PAGE_SIZE),
+        );
+        assert!(cyclic_free_open.is_err());
+        let mut duplicate_child_root_page = decode_blink_page(
+            &page_images
+                .iter()
+                .find(|(candidate_page_id, _)| *candidate_page_id == root_page_id)
+                .unwrap()
+                .1,
+            root_page_id,
+        )
+        .unwrap();
+        let BlinkPage::Internal { entries, .. } = &mut duplicate_child_root_page else {
+            unreachable!()
+        };
+        entries[0].right_child = left_page_id;
+        let duplicate_child_root_image =
+            encode_blink_page(root_page_id, &duplicate_child_root_page).unwrap();
+        let duplicate_child_checksum = crc32c::crc32c(&duplicate_child_root_image);
+        let duplicate_child_offset = cyclic_free_source_length;
+        let duplicate_child_source_length = duplicate_child_offset + PAGE_SIZE as u64;
+        let mut append_source = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&validation_source_path)
+            .unwrap();
+        append_source
+            .write_all(&duplicate_child_root_image)
+            .unwrap();
+        drop(append_source);
+        let original_root_descriptor = index.lookup(root, root_page_id).unwrap().unwrap();
+        let duplicate_child_root = index
+            .insert(
+                root,
+                root_page_id,
+                version_index::VersionDescriptor {
+                    page_id: root_page_id,
+                    token: original_root_descriptor.token,
+                    image_lsn: Lsn::new(2),
+                    image_crc32c: duplicate_child_checksum,
+                    locator: version_index::VersionLocator::CheckpointImage {
+                        source: validation_source_identity,
+                        offset: duplicate_child_offset,
+                        source_length: duplicate_child_source_length,
+                        image_lsn: Lsn::new(2),
+                        image_crc32c: duplicate_child_checksum,
+                    },
+                },
+            )
+            .unwrap();
+        let duplicate_child_open = PagedReadHandle::open_with_indexed_page_validation(
+            PagedReadConfig {
+                tenant_id: 11,
+                root: duplicate_child_root,
+                root_page_id,
+                free_list_head: Some(spare_page_id),
+                high_water_page_id,
+                loader: page_cache::PageLoaderConfig {
+                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 10) as u64,
+                    maximum_concurrent_loads: 2,
+                    maximum_followers: 8,
+                },
+            },
+            Arc::clone(&index),
+            resources.clone(),
+            sources.clone(),
+            |_| Ok(PAGE_SIZE),
+        );
+        assert!(duplicate_child_open.is_err());
+        assert_eq!(
+            resources.disk().snapshot().unwrap().current_by_category
+                [resource::DiskCategory::Scratch as usize],
+            scratch_disk_bytes_before
+        );
+        assert_eq!(
+            resources.snapshot().unwrap().current_by_category
+                [resource::ResourceCategory::CheckpointValidation as usize],
+            validation_bytes_before
+        );
         assert!(handle.get(&tombstone_key).unwrap().value().is_none());
         assert!(handle.get(&missing_key).unwrap().value().is_none());
         let query = handle.query(&primary_key, None, 16).unwrap();
@@ -15928,7 +16531,7 @@ mod tests {
                 tenant_id: 11,
                 root,
                 root_page_id,
-                free_list_head: None,
+                free_list_head: Some(spare_page_id),
                 high_water_page_id,
                 loader: page_cache::PageLoaderConfig {
                     maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
@@ -16072,7 +16675,7 @@ mod tests {
                 tenant_id: 11,
                 root,
                 root_page_id,
-                free_list_head: None,
+                free_list_head: Some(spare_page_id),
                 high_water_page_id,
                 loader: page_cache::PageLoaderConfig {
                     maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
@@ -16235,7 +16838,7 @@ mod tests {
                     tenant_id: 11,
                     root: current_root,
                     root_page_id,
-                    free_list_head: None,
+                    free_list_head: Some(spare_page_id),
                     high_water_page_id,
                     loader: page_cache::PageLoaderConfig {
                         maximum_cache_bytes: PAGE_SIZE as u64,
@@ -16305,7 +16908,7 @@ mod tests {
                 tenant_id: 11,
                 root,
                 root_page_id,
-                free_list_head: None,
+                free_list_head: Some(spare_page_id),
                 high_water_page_id,
                 loader: page_cache::PageLoaderConfig {
                     maximum_cache_bytes: (PAGE_SIZE * 2) as u64,

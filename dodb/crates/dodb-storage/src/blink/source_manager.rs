@@ -111,6 +111,12 @@ pub struct SourceLease {
     _reservation: Reservation,
 }
 
+pub(crate) struct ValidationScratch {
+    file: File,
+    path: PathBuf,
+    _reservation: DiskReservation,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SourceCandidate {
     pub identity: SourceIdentity,
@@ -606,6 +612,39 @@ impl SourceManager {
             .map_err(|_| Error::overloaded("paged WAL disk budget is exhausted"))
     }
 
+    pub(crate) fn create_validation_scratch(&self, bytes: u64) -> Result<ValidationScratch> {
+        let reservation = self
+            .inner
+            .resources
+            .disk()
+            .reserve(self.inner.tenant_id, DiskCategory::Scratch, bytes)
+            .map_err(|_| Error::overloaded("paged validation scratch disk budget is exhausted"))?;
+        let run_id = GC_RUN_SEQUENCE
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+                current.checked_add(1)
+            })
+            .map_err(|_| Error::invalid_input("paged validation scratch id exhausted"))?;
+        let path = self.inner.scratch_directory.join(format!(
+            "blink-validation-{}-{run_id:020}.scratch",
+            std::process::id()
+        ));
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&path)?;
+        if let Err(error) = file.set_len(bytes) {
+            drop(file);
+            let _ = fs::remove_file(&path);
+            return Err(error.into());
+        }
+        Ok(ValidationScratch {
+            file,
+            path,
+            _reservation: reservation,
+        })
+    }
+
     fn reserve_marker_scratch(&self, marker_count: u64) -> Result<DiskReservation> {
         let bytes = marker_count
             .checked_mul(48)
@@ -1077,6 +1116,27 @@ impl SourceManager {
                 state.active_handles.remove(&identity);
             }
         }
+    }
+}
+
+impl ValidationScratch {
+    pub(crate) fn read_marker(&mut self, offset: u64) -> Result<u8> {
+        self.file.seek(SeekFrom::Start(offset))?;
+        let mut marker = [0u8; 1];
+        self.file.read_exact(&mut marker)?;
+        Ok(marker[0])
+    }
+
+    pub(crate) fn write_marker(&mut self, offset: u64, marker: u8) -> Result<()> {
+        self.file.seek(SeekFrom::Start(offset))?;
+        self.file.write_all(&[marker])?;
+        Ok(())
+    }
+}
+
+impl Drop for ValidationScratch {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
     }
 }
 
