@@ -1820,7 +1820,15 @@ impl PagedReadHandle {
             resources.clone(),
             config.loader,
         )?);
-        Self::with_shared_loader(config, index, loader, resources, sources, header_length)
+        Self::with_shared_loader(
+            config,
+            index,
+            loader,
+            resources,
+            sources,
+            header_length,
+            None,
+        )
     }
 
     pub(crate) fn with_shared_loader<F>(
@@ -1830,6 +1838,7 @@ impl PagedReadHandle {
         resources: resource::BlinkResourceManager,
         sources: source_manager::SourceManager,
         header_length: F,
+        root_reservation: Option<source_manager::SourceRootReservation>,
     ) -> Result<Self>
     where
         F: Fn(version_index::SourceIdentity) -> Result<usize> + Send + Sync + 'static,
@@ -1841,7 +1850,10 @@ impl PagedReadHandle {
                 "paged read generation identity or page range is invalid",
             ));
         }
-        let root_lease = sources.pin_root(&index, config.root)?;
+        let root_lease = match root_reservation {
+            Some(reservation) => sources.pin_root_reserved(&index, config.root, reservation)?,
+            None => sources.pin_root(&index, config.root)?,
+        };
         let handle = Self {
             tenant_id: config.tenant_id,
             index,
@@ -1976,6 +1988,24 @@ impl PagedReadHandle {
         free_list_head: Option<PageId>,
         high_water_page_id: PageId,
     ) -> Result<Self> {
+        let root_reservation = self.sources.reserve_root_slot(&self.index)?;
+        self.fork_with_generation_reserved(
+            root,
+            root_page_id,
+            free_list_head,
+            high_water_page_id,
+            root_reservation,
+        )
+    }
+
+    pub(crate) fn fork_with_generation_reserved(
+        &self,
+        root: version_index::VersionIndexRoot,
+        root_page_id: PageId,
+        free_list_head: Option<PageId>,
+        high_water_page_id: PageId,
+        root_reservation: source_manager::SourceRootReservation,
+    ) -> Result<Self> {
         let header_length = Arc::clone(&self.header_length);
         Self::with_shared_loader(
             PagedReadConfig {
@@ -1991,6 +2021,7 @@ impl PagedReadHandle {
             self.resources.clone(),
             self.sources.clone(),
             move |source| header_length(source),
+            Some(root_reservation),
         )
     }
 
@@ -2111,6 +2142,8 @@ pub struct PagedMutationPreparation {
     high_water_page_id: PageId,
     provisional_revision: Revision,
     mutated_keys: BTreeSet<Vec<u8>>,
+    publication_reservation: Option<resource::Reservation>,
+    root_reservation: Option<source_manager::SourceRootReservation>,
     _reservations: Vec<resource::Reservation>,
 }
 
@@ -2161,6 +2194,7 @@ pub struct PagedTransactionWriter<F: DurableFile> {
     active_slot: SuperblockSlot,
     maximum_working_pages: usize,
     broken: Option<String>,
+    wal_fault_injector: Option<Box<dyn FaultInjector + Send>>,
     publication_fault_injector: Option<Box<dyn FaultInjector + Send>>,
 }
 
@@ -2200,6 +2234,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             active_slot,
             maximum_working_pages,
             broken: None,
+            wal_fault_injector: None,
             publication_fault_injector: None,
         })
     }
@@ -2213,6 +2248,10 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
         injector: Box<dyn FaultInjector + Send>,
     ) {
         self.publication_fault_injector = Some(injector);
+    }
+
+    pub fn set_boxed_wal_fault_injector(&mut self, injector: Box<dyn FaultInjector + Send>) {
+        self.wal_fault_injector = Some(injector);
     }
 
     pub fn snapshot(&self) -> Result<PagedReadHandle> {
@@ -2235,7 +2274,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
                 "paged transaction writer is unavailable after an uncertain persistence failure: {message}"
             )));
         }
-        let preparation = self.current.prepare_transaction(
+        let mut preparation = self.current.prepare_transaction(
             request,
             limits,
             self.maximum_working_pages,
@@ -2299,6 +2338,14 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             commit_lsn,
             pages,
         };
+        let publication_reservation = preparation
+            .publication_reservation
+            .as_ref()
+            .ok_or_else(|| Error::invariant("paged transaction publication was not reserved"))?;
+        let root_reservation = preparation
+            .root_reservation
+            .take()
+            .ok_or_else(|| Error::invariant("paged source root publication was not reserved"))?;
         let eligible_commits = [false];
         let append_result = {
             let mut base_source = |_| None;
@@ -2309,7 +2356,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             self.wal.append_group_trusted_internal_with_page_deltas(
                 std::slice::from_ref(&commit),
                 &mut delta_request,
-                None,
+                self.wal_fault_injector.as_deref_mut(),
             )
         };
         let reports = match append_result {
@@ -2377,11 +2424,12 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
                     },
                 },
             };
-            next_root = match self
-                .current
-                .index
-                .insert(next_root, location.page_id, descriptor)
-            {
+            next_root = match self.current.index.insert_reserved(
+                next_root,
+                location.page_id,
+                descriptor,
+                publication_reservation,
+            ) {
                 Ok(root) => root,
                 Err(error) => {
                     self.broken = Some(error.to_string());
@@ -2391,11 +2439,12 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
                 }
             };
         }
-        let next_handle = match self.current.fork_with_generation(
+        let next_handle = match self.current.fork_with_generation_reserved(
             next_root,
             preparation.root_page_id(),
             preparation.free_list_head(),
             preparation.high_water_page_id(),
+            root_reservation,
         ) {
             Ok(handle) => handle,
             Err(error) => {
@@ -2447,6 +2496,8 @@ fn prepare_paged_mutation(
             high_water_page_id: base.high_water_page_id,
             provisional_revision,
             mutated_keys: BTreeSet::new(),
+            publication_reservation: None,
+            root_reservation: None,
             _reservations: Vec::new(),
         });
     }
@@ -2503,6 +2554,37 @@ fn prepare_paged_mutation(
             "paged transaction working set contains a clean page",
         ));
     }
+    let metadata_changed = working.root_page_id != base.root_page_id
+        || working.free_list_head != base.free_list_head
+        || working.high_water_page_id != base.high_water_page_id;
+    let wal_page_count = dirty
+        .len()
+        .checked_add(usize::from(metadata_changed))
+        .ok_or_else(|| Error::overloaded("paged transaction WAL page count overflows"))?;
+    let wal_buffer_bytes = u64::try_from(wal_page_count)
+        .ok()
+        .and_then(|page_count| page_count.checked_mul((PAGE_SIZE + 256) as u64))
+        .and_then(|bytes| bytes.checked_add(256))
+        .ok_or_else(|| Error::overloaded("paged transaction WAL buffer reservation overflows"))?;
+    let wal_buffer_reservation = base
+        .resources
+        .reserve(
+            base.tenant_id,
+            resource::ResourceCategory::WritePreparation,
+            resource::ReservationClass::Foreground,
+            wal_buffer_bytes,
+        )
+        .map_err(page_cache::map_resource_error)?;
+    let publication_reservation = if dirty.is_empty() {
+        None
+    } else {
+        Some(base.index.reserve_insert_work(dirty.len())?)
+    };
+    let root_reservation = if dirty.is_empty() {
+        None
+    } else {
+        Some(base.sources.reserve_root_slot(&base.index)?)
+    };
     Ok(PagedMutationPreparation {
         pages: working.pages,
         dirty,
@@ -2511,7 +2593,13 @@ fn prepare_paged_mutation(
         high_water_page_id: working.high_water_page_id,
         provisional_revision,
         mutated_keys: encoded_keys.into_iter().collect(),
-        _reservations: vec![preparation_reservation, dirty_reservation],
+        publication_reservation,
+        root_reservation,
+        _reservations: vec![
+            preparation_reservation,
+            dirty_reservation,
+            wal_buffer_reservation,
+        ],
     })
 }
 
@@ -13149,7 +13237,7 @@ mod tests {
         );
         let wal = WalLog::open_with_page_image_format(
             crate::durable_file::ProductionFile::open(&wal_path).unwrap(),
-            wal_identity,
+            wal_identity.clone(),
             WalPageImageFormat::ExperimentalBlink,
         )
         .unwrap();
@@ -13243,6 +13331,75 @@ mod tests {
                 )
                 .is_err()
         );
+        let make_fault_writer = |file_number: u64| {
+            let wal_path = wal_directory.join(format!("segment-{file_number:020}.wal"));
+            let wal = WalLog::open_with_page_image_format(
+                crate::durable_file::ProductionFile::open(&wal_path).unwrap(),
+                wal_identity.clone(),
+                WalPageImageFormat::ExperimentalBlink,
+            )
+            .unwrap();
+            let wal_bytes = std::fs::read(&wal_path).unwrap();
+            let init_frame_length =
+                u32::from_le_bytes(wal_bytes[8..12].try_into().unwrap()) as usize;
+            let source = version_index::SourceIdentity {
+                kind: version_index::SourceFileKind::WalSegment,
+                file_number,
+                header_identity: *blake3::hash(&wal_bytes[..init_frame_length]).as_bytes(),
+            };
+            PagedTransactionWriter::new(
+                writer
+                    .current()
+                    .fork_with_generation(root, root_page_id, None, high_water_page_id)
+                    .unwrap(),
+                wal,
+                source,
+                &superblock_image,
+                SuperblockSlot::B,
+                32,
+            )
+            .unwrap()
+        };
+        for (file_number, fault_point, key_suffix) in [
+            (2, "before_commit_record", b"append-fault".as_slice()),
+            (3, "during_wal_sync", b"sync-fault".as_slice()),
+        ] {
+            let mut fault_writer = make_fault_writer(file_number);
+            fault_writer.set_boxed_wal_fault_injector(Box::new(FailOnOccurrence {
+                point: fault_point,
+                remaining: 1,
+            }));
+            let fault_key = DocumentKey::new(b"p".to_vec(), key_suffix.to_vec());
+            let fault_request = TransactionRequest::new(
+                Vec::new(),
+                vec![TransactionMutation::Put {
+                    key: fault_key.clone(),
+                    value: b"not-published".to_vec(),
+                }],
+            );
+            assert!(
+                fault_writer
+                    .transact(
+                        &fault_request,
+                        &StorageLimits::default(),
+                        Revision::new(2010 + file_number),
+                    )
+                    .is_err()
+            );
+            assert_eq!(
+                fault_writer.current().get(&fault_key).unwrap().value(),
+                None
+            );
+            assert!(
+                fault_writer
+                    .transact(
+                        &fault_request,
+                        &StorageLimits::default(),
+                        Revision::new(2020 + file_number),
+                    )
+                    .is_err()
+            );
+        }
         for mutation_width in [1, 4, 16] {
             let request = TransactionRequest::new(
                 Vec::new(),

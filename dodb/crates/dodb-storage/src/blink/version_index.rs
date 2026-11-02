@@ -21,6 +21,7 @@ const LEAF_DESCRIPTOR_BYTES: usize = 240;
 const NODE_CACHE_RESERVATION_BYTES: u64 = 8192;
 const ROOT_PIN_RESERVATION_BYTES: u64 = 256;
 const MAX_RADIX_LEVEL: u8 = 15;
+const INSERT_RESERVATION_BYTES: u64 = 16 * NODE_CACHE_RESERVATION_BYTES;
 const NODE_MAGIC: [u8; 8] = *b"DDBVIDX1";
 const NODE_FORMAT_VERSION: u16 = 2;
 const NODE_KIND_DURABLE: u16 = 1;
@@ -419,15 +420,15 @@ impl VersionIndex {
     }
 
     pub fn pin_root(&self, root: VersionIndexRoot) -> Result<VersionIndexRootPin> {
-        let reservation = self
-            .resources
-            .reserve(
-                self.tenant_id,
-                ResourceCategory::Metadata,
-                ReservationClass::Foreground,
-                ROOT_PIN_RESERVATION_BYTES,
-            )
-            .map_err(map_resource_error)?;
+        let reservation = self.reserve_root_pin()?;
+        self.pin_root_reserved(root, reservation)
+    }
+
+    pub(crate) fn pin_root_reserved(
+        &self,
+        root: VersionIndexRoot,
+        reservation: Reservation,
+    ) -> Result<VersionIndexRootPin> {
         match root.node {
             None if root.generation == 0 => {}
             Some(node_reference) => {
@@ -442,6 +443,37 @@ impl VersionIndex {
                     "empty version-index root has a generation",
                 ));
             }
+        }
+        Ok(VersionIndexRootPin {
+            root,
+            _reservation: reservation,
+        })
+    }
+
+    pub(crate) fn reserve_root_pin(&self) -> Result<Reservation> {
+        self.resources
+            .reserve(
+                self.tenant_id,
+                ResourceCategory::Metadata,
+                ReservationClass::Foreground,
+                ROOT_PIN_RESERVATION_BYTES,
+            )
+            .map_err(map_resource_error)
+    }
+
+    pub(crate) fn pin_inserted_root(
+        &self,
+        root: VersionIndexRoot,
+        reservation: Reservation,
+    ) -> Result<VersionIndexRootPin> {
+        if root.generation == 0
+            || root.node.is_none()
+            || reservation.category() != ResourceCategory::Metadata
+            || reservation.bytes() < ROOT_PIN_RESERVATION_BYTES
+        {
+            return Err(Error::invariant(
+                "pre-reserved version-index root identity is invalid",
+            ));
         }
         Ok(VersionIndexRootPin {
             root,
@@ -756,6 +788,39 @@ impl VersionIndex {
         page_id: PageId,
         descriptor: VersionDescriptor,
     ) -> Result<VersionIndexRoot> {
+        let reservation = self.reserve_insert_work(1)?;
+        self.insert_reserved(root, page_id, descriptor, &reservation)
+    }
+
+    pub(crate) fn reserve_insert_work(&self, insert_count: usize) -> Result<Reservation> {
+        let byte_count = u64::try_from(insert_count)
+            .ok()
+            .and_then(|count| count.checked_mul(INSERT_RESERVATION_BYTES))
+            .ok_or_else(|| Error::overloaded("version-index publication reservation overflows"))?;
+        self.resources
+            .reserve(
+                self.tenant_id,
+                ResourceCategory::WritePreparation,
+                ReservationClass::Foreground,
+                byte_count,
+            )
+            .map_err(map_resource_error)
+    }
+
+    pub(crate) fn insert_reserved(
+        &self,
+        root: VersionIndexRoot,
+        page_id: PageId,
+        descriptor: VersionDescriptor,
+        reservation: &Reservation,
+    ) -> Result<VersionIndexRoot> {
+        if reservation.category() != ResourceCategory::WritePreparation
+            || reservation.bytes() < INSERT_RESERVATION_BYTES
+        {
+            return Err(Error::invariant(
+                "version-index publication reservation is insufficient",
+            ));
+        }
         if descriptor.page_id != page_id {
             return Err(Error::invalid_input(
                 "version-index descriptor key differs from insert key",
@@ -803,15 +868,6 @@ impl VersionIndex {
             .generation
             .checked_add(1)
             .ok_or_else(|| Error::invalid_input("version-index generation exhausted"))?;
-        let _write_reservation = self
-            .resources
-            .reserve(
-                self.tenant_id,
-                ResourceCategory::WritePreparation,
-                ReservationClass::Foreground,
-                u64::from(MAX_RADIX_LEVEL + 1) * NODE_CACHE_RESERVATION_BYTES,
-            )
-            .map_err(map_resource_error)?;
         let mut path_nodes: [Option<IndexNode>; 16] = std::array::from_fn(|_| None);
         let mut current_reference = root.node;
         let mut parent_generation = root.generation;

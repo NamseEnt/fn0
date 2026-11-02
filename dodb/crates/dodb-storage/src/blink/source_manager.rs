@@ -29,6 +29,7 @@ struct SourceState {
     roots: HashMap<u64, RootEntry>,
     active_handles: HashMap<SourceIdentity, usize>,
     next_root_id: u64,
+    reserved_roots: usize,
     garbage_collection_active: bool,
 }
 
@@ -66,6 +67,14 @@ pub struct SourceManagerConfig {
 pub struct SourceRootLease {
     manager: SourceManager,
     root_id: u64,
+}
+
+pub struct SourceRootReservation {
+    manager: SourceManager,
+    root_id: u64,
+    index_reservation: Option<Reservation>,
+    root_reservation: Option<Reservation>,
+    slot_reserved: bool,
 }
 
 pub struct SourceLease {
@@ -144,7 +153,13 @@ impl SourceManager {
                 maximum_roots: config.maximum_roots,
                 handle_charge_bytes: config.handle_charge_bytes,
                 gc_reservation_bytes: config.gc_reservation_bytes,
-                state: Mutex::new(SourceState::default()),
+                state: Mutex::new(SourceState {
+                    roots: HashMap::new(),
+                    active_handles: HashMap::new(),
+                    next_root_id: 0,
+                    reserved_roots: 0,
+                    garbage_collection_active: false,
+                }),
             }),
         })
     }
@@ -154,12 +169,22 @@ impl SourceManager {
         index: &VersionIndex,
         root: VersionIndexRoot,
     ) -> Result<SourceRootLease> {
+        let mut reservation = self.reserve_root_slot(index)?;
+        let index_reservation = reservation
+            .index_reservation
+            .take()
+            .ok_or_else(|| Error::invariant("paged source index root reservation is missing"))?;
+        let pin = index.pin_root_reserved(root, index_reservation)?;
+        self.register_root(root, pin, reservation)
+    }
+
+    pub fn reserve_root_slot(&self, index: &VersionIndex) -> Result<SourceRootReservation> {
         if index.store_identity() != self.inner.store_identity {
             return Err(Error::corruption(
                 "paged source root belongs to a different store identity",
             ));
         }
-        let pin = index.pin_root(root)?;
+        let index_reservation = index.reserve_root_pin()?;
         let root_reservation = self
             .inner
             .resources
@@ -180,16 +205,89 @@ impl SourceManager {
                 "paged source root admission is paused during source collection",
             ));
         }
-        if state.roots.len() >= self.inner.maximum_roots {
+        if state
+            .roots
+            .len()
+            .checked_add(state.reserved_roots)
+            .is_none_or(|root_count| root_count >= self.inner.maximum_roots)
+        {
             return Err(Error::overloaded(
                 "paged source root pin limit is exhausted",
             ));
         }
+        let reserved_roots = state
+            .reserved_roots
+            .checked_add(1)
+            .ok_or_else(|| Error::overloaded("paged source root reservation count overflows"))?;
+        state
+            .roots
+            .try_reserve(reserved_roots)
+            .map_err(|_| Error::overloaded("paged source root registry capacity is exhausted"))?;
         let root_id = state.next_root_id;
-        state.next_root_id = state
+        let next_root_id = state
             .next_root_id
             .checked_add(1)
-            .ok_or_else(|| Error::invalid_input("paged source root id exhausted"))?;
+            .ok_or_else(|| Error::overloaded("paged source root id reservation overflows"))?;
+        state.reserved_roots = reserved_roots;
+        state.next_root_id = next_root_id;
+        drop(state);
+        Ok(SourceRootReservation {
+            manager: self.clone(),
+            root_id,
+            index_reservation: Some(index_reservation),
+            root_reservation: Some(root_reservation),
+            slot_reserved: true,
+        })
+    }
+
+    pub fn pin_root_reserved(
+        &self,
+        index: &VersionIndex,
+        root: VersionIndexRoot,
+        mut reservation: SourceRootReservation,
+    ) -> Result<SourceRootLease> {
+        if !Arc::ptr_eq(&self.inner, &reservation.manager.inner)
+            || index.store_identity() != self.inner.store_identity
+        {
+            return Err(Error::corruption(
+                "paged source root reservation belongs to another manager",
+            ));
+        }
+        let index_reservation = reservation
+            .index_reservation
+            .take()
+            .ok_or_else(|| Error::invariant("paged source index root reservation is missing"))?;
+        let pin = index.pin_inserted_root(root, index_reservation)?;
+        self.register_root(root, pin, reservation)
+    }
+
+    fn register_root(
+        &self,
+        root: VersionIndexRoot,
+        pin: VersionIndexRootPin,
+        mut reservation: SourceRootReservation,
+    ) -> Result<SourceRootLease> {
+        let root_reservation = reservation
+            .root_reservation
+            .take()
+            .ok_or_else(|| Error::invariant("paged source root reservation is missing"))?;
+        let mut state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| Error::invariant("paged source manager lock poisoned"))?;
+        if state.garbage_collection_active {
+            return Err(Error::overloaded(
+                "paged source root admission is paused during source collection",
+            ));
+        }
+        if state.reserved_roots == 0 {
+            return Err(Error::invariant(
+                "paged source root reservation accounting underflow",
+            ));
+        }
+        state.reserved_roots -= 1;
+        let root_id = reservation.root_id;
         state.roots.insert(
             root_id,
             RootEntry {
@@ -198,6 +296,7 @@ impl SourceManager {
                 _reservation: root_reservation,
             },
         );
+        reservation.slot_reserved = false;
         Ok(SourceRootLease {
             manager: self.clone(),
             root_id,
@@ -291,6 +390,11 @@ impl SourceManager {
             if state.garbage_collection_active {
                 return Err(Error::overloaded(
                     "paged source collection is already active",
+                ));
+            }
+            if state.reserved_roots != 0 {
+                return Err(Error::overloaded(
+                    "paged source collection is deferred by a reserved reader generation",
                 ));
             }
             state.garbage_collection_active = true;
@@ -476,6 +580,17 @@ impl Drop for SourceRootLease {
     fn drop(&mut self) {
         if let Ok(mut state) = self.manager.inner.state.lock() {
             state.roots.remove(&self.root_id);
+        }
+    }
+}
+
+impl Drop for SourceRootReservation {
+    fn drop(&mut self) {
+        if !self.slot_reserved {
+            return;
+        }
+        if let Ok(mut state) = self.manager.inner.state.lock() {
+            state.reserved_roots = state.reserved_roots.saturating_sub(1);
         }
     }
 }
@@ -1158,13 +1273,21 @@ mod tests {
                 },
             )
             .unwrap();
-        let first_root = manager.pin_root(&index, root).unwrap();
-        let second_root = manager.pin_root(&index, root).unwrap();
-        let third_root = manager.pin_root(&index, root).unwrap();
-        let fourth_root = manager.pin_root(&index, root).unwrap();
-        assert!(manager.pin_root(&index, root).is_err());
-        drop(first_root);
-        drop((second_root, third_root, fourth_root));
+        let mut reservations = Vec::new();
+        for _reservation_number in 0..4 {
+            reservations.push(manager.reserve_root_slot(&index).unwrap());
+        }
+        assert!(manager.reserve_root_slot(&index).is_err());
+        let root_leases = reservations
+            .into_iter()
+            .map(|reservation| {
+                manager
+                    .pin_root_reserved(&index, root, reservation)
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(root_leases.len(), 4);
+        drop(root_leases);
     }
 
     #[test]
