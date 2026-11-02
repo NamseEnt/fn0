@@ -9,7 +9,8 @@
     "0bdce39d1",
     "d99c3e465ca4a72d54e74caa723536a09b62cc02",
     "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b",
-    "163961877f966e076c66d772dd3310724b2a1cbb"
+    "163961877f966e076c66d772dd3310724b2a1cbb",
+    "70133a4f6885ea2b46904a54f5acb8c20c2ff760"
   ],
   "push": {
     "remote": "origin",
@@ -40,7 +41,7 @@
     "dodb/crates/dodb-storage/src/wal.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "f0496c4e9fb5eb584204e7c9db7bbd65972ba4414e6289845462b281b3f194f3",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "413fa0e5cc78f819640f469c15711963161bc0c7044e30d2bba2ccbf5a1aa985",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "a4b1321c4793fb086fdf77900d3a33f7bfef51bd46fce9c2d3b83748247e461c",
     "dodb/crates/dodb-storage/src/blink/page_locator.rs": "80fbbdc6a569b379b563e8ad65b396c047bb4e63524240e3126c15710d59b48a",
     "dodb/crates/dodb-storage/src/bin/phase0-bench.rs": "2cf4d0a7d12caaa477046445f3a4675c861b85628105c81496115e2e03c50c81",
@@ -55,7 +56,7 @@
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "163961877f966e076c66d772dd3310724b2a1cbb"
+    "source_commit": "70133a4f6885ea2b46904a54f5acb8c20c2ff760"
   },
   "features": [
     "blink-demand-paging",
@@ -70,7 +71,8 @@
     "service_route_activated": false,
     "defaults_changed": false,
     "oci_experiment": false,
-    "performance_matrix_started": false
+    "performance_matrix_started": false,
+    "checkpoint_worker": "One active checkpoint job per PagedTransactionWriter; overlapping jobs are rejected, and job drop or publication releases the slot."
   },
   "checks": [
     {
@@ -824,6 +826,92 @@
         "sha256": "56bec4e88409a5a6b51078a0d98e36c1c1f5170ebfcebbf01667c7173995c752"
       },
       "source_commit": "163961877f966e076c66d772dd3310724b2a1cbb"
+    },
+    {
+      "name": "paged_checkpoint_single_worker_focused",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "paged_transaction_writer_publishes_complete_and_incremental_checkpoints"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "1 passed; competing jobs and duplicate pack attempts are rejected, and subsequent publication proceeds.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-single-worker-focused.log",
+        "sha256": "f9e695f4a6668650375a9f088123c3a036c63d6a81d41d70b679a0519cffc8a0"
+      },
+      "source_commit": "70133a4f6885ea2b46904a54f5acb8c20c2ff760"
+    },
+    {
+      "name": "paged_checkpoint_single_worker_feature_library",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "297 passed, 0 failed, 4 ignored.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-single-worker-feature-lib.log",
+        "sha256": "95bec20158c2fb7b0bd988853099127dd7c7b81f8da959628b39db296087f664"
+      },
+      "source_commit": "70133a4f6885ea2b46904a54f5acb8c20c2ff760"
+    },
+    {
+      "name": "paged_checkpoint_single_worker_all_target_compile",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--no-run"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "All library, binary, and integration test targets compiled; existing harness dead-code warnings remain.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-single-worker-all-targets-compile.log",
+        "sha256": "3a5af6f7baafc0d3a3b765676099bcc54660056accaaecaa6fd870494cc70ff7"
+      },
+      "source_commit": "70133a4f6885ea2b46904a54f5acb8c20c2ff760"
+    },
+    {
+      "name": "paged_checkpoint_single_worker_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "--message-format",
+        "short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 101,
+      "summary": "12 existing crate diagnostics remain; no diagnostic points to the new checkpoint worker guard.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-checkpoint-single-worker-clippy.log",
+        "sha256": "c1fe638a37892de8b17defff2cbad138396f9a02418c958e6298ef034568fad7"
+      },
+      "source_commit": "70133a4f6885ea2b46904a54f5acb8c20c2ff760"
     }
   ],
   "acceptance_mapping": {

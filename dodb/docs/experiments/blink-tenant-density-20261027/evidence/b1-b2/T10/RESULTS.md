@@ -64,3 +64,13 @@ T10 remains partial. The successful test proves serialized in-process target cap
 - Raw logs: `logs/paged-locator-fixture-unique-focused.log`, `logs/paged-writer-target-interleave-feature-lib-final2.log`, `logs/paged-writer-target-interleave-default-lib-final.log`, `logs/paged-writer-target-interleave-all-targets-failure.log`, `logs/paged-writer-target-interleave-all-targets-compile-final2.log`, `logs/paged-writer-target-interleave-strict-clippy.log` (initial new findings), and `logs/paged-writer-target-interleave-strict-clippy-final.log` (12 existing diagnostics). `logs/paged-writer-target-interleave-feature-lib.log` preserves the initial fixture collision.
 
 T10 remains partial. Process-kill recovery, actual pointer-write I/O injection, source-catalog registration and GC retention, source/index disk reservations, combined loader/index/output accounting, tiny-capacity defer and progress, a one-worker resumable scheduler, and checkpoint debt/time-above-threshold accounting remain unimplemented. Service routing and defaults remain unchanged; T17 was not started.
+
+## Completed substep: single active checkpoint job
+
+- The writer now keeps a shared active-job flag. A second `begin_checkpoint` while a job owns the pinned target returns overload; dropping or publishing the job releases the slot. Pack output is single-attempt per job, including when incremental output is empty or fails.
+- The writer integration fixture verifies a competing job is rejected, duplicate pack output is rejected, and a later checkpoint can start after publication.
+- Focused writer fixture: 1 passed. Full feature library suite: 297 passed, 0 failed, 4 ignored. All feature test targets compiled. Strict library Clippy still reports 12 pre-existing diagnostics and no new checkpoint diagnostics.
+- Source commit: `70133a4f6885ea2b46904a54f5acb8c20c2ff760`.
+- Raw logs: `logs/paged-checkpoint-single-worker-focused.log`, `logs/paged-checkpoint-single-worker-feature-lib.log`, `logs/paged-checkpoint-single-worker-all-targets-compile.log`, and `logs/paged-checkpoint-single-worker-clippy.log`.
+
+T10 remains partial. The active-job guard does not yet provide resumable bounded slices, queue debt/time accounting, or capacity-release wakeups. Process-crash, source catalog/GC, and disk reservation acceptance remains open.
