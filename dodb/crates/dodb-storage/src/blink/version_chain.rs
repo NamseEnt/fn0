@@ -571,6 +571,20 @@ impl DeltaChainStore {
         self.write_reserved(generation, chain, reservation)
     }
 
+    #[cfg(test)]
+    fn write_with_stage<F>(
+        &self,
+        generation: u64,
+        chain: &DeltaChain,
+        stage: F,
+    ) -> Result<DeltaChainRef>
+    where
+        F: FnMut(&str) -> Result<()>,
+    {
+        let reservation = self.reserve_chain_bytes()?;
+        self.write_reserved_with_stage(generation, chain, reservation, stage)
+    }
+
     pub(crate) fn reserve_write_work(&self, chain_count: usize) -> Result<Vec<Reservation>> {
         let mut reservations = Vec::new();
         reservations
@@ -588,6 +602,19 @@ impl DeltaChainStore {
         chain: &DeltaChain,
         output_charge: Reservation,
     ) -> Result<DeltaChainRef> {
+        self.write_reserved_with_stage(generation, chain, output_charge, |_| Ok(()))
+    }
+
+    fn write_reserved_with_stage<F>(
+        &self,
+        generation: u64,
+        chain: &DeltaChain,
+        output_charge: Reservation,
+        mut stage: F,
+    ) -> Result<DeltaChainRef>
+    where
+        F: FnMut(&str) -> Result<()>,
+    {
         chain.validate()?;
         if generation == 0 {
             return Err(Error::invalid_input("delta-chain generation is zero"));
@@ -616,10 +643,13 @@ impl DeltaChainStore {
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
                 Err(error) => return Err(error.into()),
             };
+            stage("after_delta_chain_create")?;
             let bytes = encode_chain(self.inner.identity, generation, chain, file_number)?;
             file.write_all(&bytes)?;
             file.sync_all()?;
+            stage("after_delta_chain_file_sync")?;
             File::open(&self.inner.directory)?.sync_all()?;
+            stage("after_delta_chain_directory_sync")?;
             let payload_checksum = bytes[bytes.len() - CHAIN_CHECKSUM_BYTES..]
                 .try_into()
                 .map_err(|_| Error::invariant("delta-chain payload checksum length mismatch"))?;
@@ -843,6 +873,9 @@ fn read_u64(bytes: &[u8], offset: usize) -> Result<u64> {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::process::Command;
+    use std::thread;
+    use std::time::{Duration, Instant};
 
     use super::{DeltaChain, DeltaChainEntry, DeltaChainRef, DeltaChainStore};
     use crate::blink::resource::{BlinkResourceManager, ResourceLimits};
@@ -1087,5 +1120,113 @@ mod tests {
             .offset,
             0
         );
+    }
+
+    #[test]
+    fn delta_chain_sidecar_sigkill_boundaries_leave_only_unpublished_files() {
+        const CHILD_DIRECTORY: &str = "DODB_DELTA_CHAIN_SIGKILL_DIRECTORY";
+        const CHILD_STAGE: &str = "DODB_DELTA_CHAIN_SIGKILL_STAGE";
+        const CHILD_READY: &str = "DODB_DELTA_CHAIN_SIGKILL_READY";
+        let identity = StoreIdentity {
+            database_uuid: [1; 16],
+            wal_epoch: 7,
+        };
+        if let Ok(directory) = std::env::var(CHILD_DIRECTORY) {
+            let store =
+                DeltaChainStore::open(std::path::Path::new(&directory), identity, resources(), 1)
+                    .unwrap();
+            let target_stage = std::env::var(CHILD_STAGE).unwrap();
+            let ready_path = std::path::PathBuf::from(std::env::var(CHILD_READY).unwrap());
+            let _ = store.write_with_stage(8, &sample_chain(), |stage_name| {
+                if stage_name == target_stage {
+                    fs::write(&ready_path, b"ready")?;
+                    loop {
+                        thread::sleep(Duration::from_secs(1));
+                    }
+                }
+                Ok(())
+            });
+            panic!("child sidecar write passed the selected crash boundary");
+        }
+
+        for stage_name in [
+            "after_delta_chain_create",
+            "after_delta_chain_file_sync",
+            "after_delta_chain_directory_sync",
+        ] {
+            let directory = temporary_directory();
+            let ready_path = directory.join("ready");
+            let mut child = Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "blink::version_chain::tests::delta_chain_sidecar_sigkill_boundaries_leave_only_unpublished_files",
+                    "--nocapture",
+                ])
+                .env(CHILD_DIRECTORY, &directory)
+                .env(CHILD_STAGE, stage_name)
+                .env(CHILD_READY, &ready_path)
+                .spawn()
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while !ready_path.exists() && Instant::now() < deadline {
+                if let Some(status) = child.try_wait().unwrap() {
+                    panic!("SIGKILL child exited before {stage_name}: {status}");
+                }
+                thread::sleep(Duration::from_millis(1));
+            }
+            assert!(ready_path.exists(), "child did not reach {stage_name}");
+            assert_eq!(
+                unsafe { libc::kill(child.id() as libc::pid_t, libc::SIGKILL) },
+                0
+            );
+            let status = child.wait().unwrap();
+            use std::os::unix::process::ExitStatusExt;
+            assert_eq!(status.signal(), Some(libc::SIGKILL));
+
+            let reopened = DeltaChainStore::open(&directory, identity, resources(), 1).unwrap();
+            let sidecar_path = directory.join("version-chain-00000000000000000001.bin");
+            let sidecar_bytes = fs::read(&sidecar_path).unwrap();
+            if stage_name == "after_delta_chain_create" {
+                assert!(sidecar_bytes.is_empty());
+                assert!(
+                    reopened
+                        .read(
+                            DeltaChainRef {
+                                file_number: 1,
+                                offset: 0,
+                                checksum: [0; 32],
+                            },
+                            PageId::new(5),
+                        )
+                        .is_err()
+                );
+            } else {
+                let checksum_start = sidecar_bytes.len() - 32;
+                let checksum = sidecar_bytes[checksum_start..].try_into().unwrap();
+                let reference = DeltaChainRef {
+                    file_number: 1,
+                    offset: 0,
+                    checksum,
+                };
+                assert_eq!(
+                    reopened.read(reference, PageId::new(5)).unwrap().entries,
+                    sample_chain().entries
+                );
+            }
+            assert_eq!(
+                fs::read_dir(&directory)
+                    .unwrap()
+                    .filter_map(std::result::Result::ok)
+                    .filter(|entry| {
+                        entry
+                            .file_name()
+                            .to_string_lossy()
+                            .starts_with("version-chain-")
+                    })
+                    .count(),
+                1
+            );
+            fs::remove_dir_all(directory).unwrap();
+        }
     }
 }
