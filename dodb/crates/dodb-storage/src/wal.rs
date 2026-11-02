@@ -5501,6 +5501,59 @@ mod tests {
     }
 
     #[test]
+    fn commit_digest_mismatch_rejects_wal_locations() {
+        let mut wal = WalLog::open_with_page_image_format(
+            MemoryFile::default(),
+            identity(),
+            WalPageImageFormat::ExperimentalBtree,
+        )
+        .unwrap();
+        wal.append_commit(1, Lsn::new(2), &[page_at_lsn(29, Lsn::new(2))], None)
+            .unwrap();
+        let mut file = wal.into_file();
+        let scan = WalLog::scan_committed_page_locations(
+            &mut file,
+            &identity(),
+            WalPageImageFormat::ExperimentalBtree,
+            None,
+            BTreeMap::new(),
+        )
+        .unwrap();
+        let location = &scan.locations[0];
+        let commit_frame = read_exact_frame(
+            &mut file,
+            location.commit_frame_offset,
+            scan.committed_prefix_length,
+        )
+        .unwrap();
+        let mut commit_payload = commit_frame.payload;
+        commit_payload[12] ^= 1;
+        let corrupted_commit_frame = encode_frame(
+            commit_frame.format_version,
+            commit_frame.record_type,
+            Lsn::new(commit_frame.record_lsn),
+            commit_frame.batch_id,
+            commit_frame.record_index,
+            &commit_payload,
+        )
+        .unwrap();
+        let commit_start = usize::try_from(location.commit_frame_offset).unwrap();
+        let commit_end = commit_start + commit_frame.frame_length;
+        file.0
+            .splice(commit_start..commit_end, corrupted_commit_frame);
+        assert!(
+            WalLog::scan_committed_page_locations(
+                &mut file,
+                &identity(),
+                WalPageImageFormat::ExperimentalBtree,
+                None,
+                BTreeMap::new()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn committed_location_scan_identifies_delta_records_and_exact_offsets() {
         let page_id = PageId::new(7);
         let base_page = page_at_lsn(7, Lsn::new(2));
