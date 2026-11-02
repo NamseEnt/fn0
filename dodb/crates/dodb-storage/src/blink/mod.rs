@@ -13451,6 +13451,20 @@ mod tests {
                 .locator,
             version_index::VersionLocator::WalDelta { depth: 1, .. }
         ));
+        let mut fault_base_pages = BTreeMap::new();
+        for page_number in 1..=high_water_page_id.get() {
+            let page_id = PageId::new(page_number);
+            if let Some(page) = handle.load_mutation_base_page(page_id).unwrap() {
+                let image = encode_blink_page(page_id, page.as_ref()).unwrap();
+                fault_base_pages.insert(
+                    page_id,
+                    RecoveredWalPage {
+                        commit_lsn: page.as_ref().lsn(),
+                        image: Box::new(image),
+                    },
+                );
+            }
+        }
         assert_eq!(
             writer.current().get(&writer_key).unwrap().value(),
             Some(&b"writer-updated"[..])
@@ -13578,9 +13592,9 @@ mod tests {
             )
             .unwrap()
         };
-        for (file_number, fault_point, key_suffix) in [
-            (2, "before_commit_record", b"append-fault".as_slice()),
-            (3, "during_wal_sync", b"sync-fault".as_slice()),
+        for (file_number, fault_point, key_suffix, expected_recovered_page) in [
+            (2, "before_commit_record", b"append-fault".as_slice(), false),
+            (3, "during_wal_sync", b"sync-fault".as_slice(), true),
         ] {
             let mut fault_writer = make_fault_writer(file_number);
             fault_writer.set_boxed_wal_fault_injector(Box::new(FailOnOccurrence {
@@ -13617,6 +13631,45 @@ mod tests {
                     )
                     .is_err()
             );
+            drop(fault_writer);
+            let reopened_wal_result = WalLog::open_with_segment_bases(
+                crate::durable_file::ProductionFile::open(
+                    wal_directory.join(format!("segment-{file_number:020}.wal")),
+                )
+                .unwrap(),
+                wal_identity.clone(),
+                WalPageImageFormat::ExperimentalBlink,
+                crate::wal::WalSegmentBoundary {
+                    start_after_lsn: Lsn::ZERO,
+                    start_batch_id: None,
+                    truncate_torn_tail: true,
+                    defer_initial_sync: false,
+                },
+                fault_base_pages.clone(),
+                None,
+            );
+            let reopened_wal = reopened_wal_result.unwrap_or_else(|error| {
+                panic!(
+                    "WAL segment {file_number} recovery failed with base keys {:?}: {error}",
+                    fault_base_pages.keys().collect::<Vec<_>>()
+                )
+            });
+            assert_eq!(reopened_wal.recovery_pages().len(), fault_base_pages.len());
+            let changed_pages = reopened_wal
+                .recovery_pages()
+                .iter()
+                .filter(|(page_id, recovered_page)| {
+                    fault_base_pages.get(page_id).is_none_or(|base_page| {
+                        base_page.image.as_ref() != recovered_page.image.as_ref()
+                    })
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(!changed_pages.is_empty(), expected_recovered_page);
+            for (page_id, recovered_page) in reopened_wal.recovery_pages() {
+                let recovered_image =
+                    decode_blink_page(&recovered_page.image[..], *page_id).unwrap();
+                assert_eq!(recovered_image.lsn(), recovered_page.commit_lsn);
+            }
         }
         for mutation_width in [1, 4, 16] {
             let request = TransactionRequest::new(
