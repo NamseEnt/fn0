@@ -16105,6 +16105,7 @@ mod tests {
             .transact(&first_write, &StorageLimits::default(), Revision::new(1))
             .unwrap();
         let first_checkpoint_lsn = first_result.commit_lsn.unwrap();
+        let old_reader = writer.snapshot().unwrap();
         let mut complete_job = writer
             .begin_checkpoint(
                 &manifest_store,
@@ -16235,6 +16236,22 @@ mod tests {
                 .len(),
             durable_bases::encoded_size(1)
         );
+        assert_eq!(
+            old_reader.get(&key).unwrap().value(),
+            Some(&b"complete"[..])
+        );
+        let old_wal_collection = sources
+            .collect_garbage(
+                &index,
+                [source_manager::SourceCandidate {
+                    identity: first_wal_source,
+                    header_bytes: crate::wal::INIT_FRAME_SIZE,
+                }],
+                |_| Ok(()),
+            )
+            .unwrap();
+        assert_eq!(old_wal_collection.protected_sources, 1);
+        assert!(first_wal_path.is_file());
         let fifth_write = TransactionRequest::new(
             vec![TransactionCondition::Exists { key: key.clone() }],
             vec![TransactionMutation::Put {
