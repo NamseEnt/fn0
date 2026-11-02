@@ -1840,6 +1840,13 @@ impl PagedCheckpointJob {
     }
 
     pub fn write_pack(&mut self) -> Result<bool> {
+        self.write_pack_with_fault_injector(None)
+    }
+
+    pub fn write_pack_with_fault_injector(
+        &mut self,
+        injector: Option<Box<dyn FaultInjector + Send>>,
+    ) -> Result<bool> {
         if self.pack_written {
             return Err(Error::invalid_input(
                 "paged checkpoint pack output has already been attempted",
@@ -1853,7 +1860,7 @@ impl PagedCheckpointJob {
                     previous_checkpoint_lsn: Some(self.previous_checkpoint_lsn),
                     ..self.request.clone()
                 },
-                None,
+                injector,
             )?
         } else {
             Some(self.target.write_checkpoint_pack(
@@ -1862,7 +1869,7 @@ impl PagedCheckpointJob {
                     previous_checkpoint_lsn: None,
                     ..self.request.clone()
                 },
-                None,
+                injector,
             )?)
         };
         self.pack_output = output;
@@ -16252,6 +16259,55 @@ mod tests {
             .unwrap();
         assert_eq!(old_wal_collection.protected_sources, 1);
         assert!(first_wal_path.is_file());
+        let pack_failure_write = TransactionRequest::new(
+            vec![TransactionCondition::Exists { key: key.clone() }],
+            vec![TransactionMutation::Put {
+                key: key.clone(),
+                value: b"after-pack-failure-write".to_vec(),
+            }],
+        );
+        writer
+            .transact(
+                &pack_failure_write,
+                &StorageLimits::default(),
+                Revision::new(5),
+            )
+            .unwrap();
+        let mut failed_pack_job = writer
+            .begin_checkpoint(
+                &manifest_store,
+                PagedCheckpointPackRequest {
+                    directory: checkpoint_directory.clone(),
+                    file_number: 90,
+                    identity: wal_identity.clone(),
+                    checkpoint_lsn: fourth_checkpoint_lsn,
+                    previous_checkpoint_lsn: Some(second_checkpoint_lsn),
+                    coalesce: true,
+                },
+                true,
+            )
+            .unwrap()
+            .unwrap();
+        assert!(
+            failed_pack_job
+                .write_pack_with_fault_injector(Some(Box::new(FailOnOccurrence {
+                    point: "during_base_pack_page_write",
+                    remaining: 1,
+                })))
+                .is_err()
+        );
+        drop(failed_pack_job);
+        assert_eq!(manifest_store.current().generation, 3);
+        assert_eq!(
+            std::fs::metadata(durable_bases::pack_path(&checkpoint_directory, 90))
+                .unwrap()
+                .len(),
+            PAGE_SIZE as u64
+        );
+        assert_eq!(
+            writer.current().get(&key).unwrap().value(),
+            Some(&b"after-pack-failure-write"[..])
+        );
         let fifth_write = TransactionRequest::new(
             vec![TransactionCondition::Exists { key: key.clone() }],
             vec![TransactionMutation::Put {
@@ -16260,7 +16316,7 @@ mod tests {
             }],
         );
         writer
-            .transact(&fifth_write, &StorageLimits::default(), Revision::new(5))
+            .transact(&fifth_write, &StorageLimits::default(), Revision::new(6))
             .unwrap();
         writer.set_boxed_publication_fault_injector(Box::new(FailOnOccurrence {
             point: "after_paged_checkpoint_pointer_temporary_sync",
