@@ -30,6 +30,7 @@ struct SourceState {
     active_handles: HashMap<SourceIdentity, usize>,
     next_root_id: u64,
     reserved_roots: usize,
+    page_reuse_root: Option<VersionIndexRoot>,
     garbage_collection_active: bool,
 }
 
@@ -75,6 +76,11 @@ pub struct SourceRootReservation {
     index_reservation: Option<Reservation>,
     root_reservation: Option<Reservation>,
     slot_reserved: bool,
+}
+
+pub struct SourcePageReuseReservation {
+    manager: SourceManager,
+    root: VersionIndexRoot,
 }
 
 pub struct SourceLease {
@@ -158,6 +164,7 @@ impl SourceManager {
                     active_handles: HashMap::new(),
                     next_root_id: 0,
                     reserved_roots: 0,
+                    page_reuse_root: None,
                     garbage_collection_active: false,
                 }),
             }),
@@ -178,10 +185,64 @@ impl SourceManager {
         self.register_root(root, pin, reservation)
     }
 
+    #[cfg(test)]
+    pub(crate) fn registered_root_count(&self) -> Result<usize> {
+        self.inner
+            .state
+            .lock()
+            .map(|state| state.roots.len())
+            .map_err(|_| Error::invariant("paged source manager lock poisoned"))
+    }
+
     pub fn reserve_root_slot(&self, index: &VersionIndex) -> Result<SourceRootReservation> {
+        self.reserve_root_slot_inner(index, None)
+    }
+
+    pub fn reserve_page_reuse(
+        &self,
+        index: &VersionIndex,
+        root: VersionIndexRoot,
+    ) -> Result<Option<SourcePageReuseReservation>> {
         if index.store_identity() != self.inner.store_identity {
             return Err(Error::corruption(
                 "paged source root belongs to a different store identity",
+            ));
+        }
+        let mut state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| Error::invariant("paged source manager lock poisoned"))?;
+        if state.garbage_collection_active
+            || state.reserved_roots != 0
+            || state.page_reuse_root.is_some()
+            || state.roots.len() != 1
+            || !state.roots.values().any(|entry| entry.root == root)
+        {
+            return Ok(None);
+        }
+        state.page_reuse_root = Some(root);
+        Ok(Some(SourcePageReuseReservation {
+            manager: self.clone(),
+            root,
+        }))
+    }
+
+    fn reserve_root_slot_inner(
+        &self,
+        index: &VersionIndex,
+        page_reuse: Option<&SourcePageReuseReservation>,
+    ) -> Result<SourceRootReservation> {
+        if index.store_identity() != self.inner.store_identity {
+            return Err(Error::corruption(
+                "paged source root belongs to a different store identity",
+            ));
+        }
+        if page_reuse
+            .is_some_and(|reservation| !Arc::ptr_eq(&self.inner, &reservation.manager.inner))
+        {
+            return Err(Error::corruption(
+                "paged page-reuse reservation belongs to another source manager",
             ));
         }
         let index_reservation = index.reserve_root_pin()?;
@@ -204,6 +265,20 @@ impl SourceManager {
             return Err(Error::overloaded(
                 "paged source root admission is paused during source collection",
             ));
+        }
+        match (state.page_reuse_root, page_reuse) {
+            (None, None) => {}
+            (Some(root), Some(reservation)) if root == reservation.root => {}
+            (Some(_), _) => {
+                return Err(Error::overloaded(
+                    "paged source root admission is paused during zero-reader page reuse",
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(Error::invariant(
+                    "paged page-reuse reservation lost its root fence",
+                ));
+            }
         }
         if state
             .roots
@@ -392,9 +467,9 @@ impl SourceManager {
                     "paged source collection is already active",
                 ));
             }
-            if state.reserved_roots != 0 {
+            if state.reserved_roots != 0 || state.page_reuse_root.is_some() {
                 return Err(Error::overloaded(
-                    "paged source collection is deferred by a reserved reader generation",
+                    "paged source collection is deferred by a reader generation reservation",
                 ));
             }
             state.garbage_collection_active = true;
@@ -576,6 +651,12 @@ impl Drop for SourceLease {
     }
 }
 
+impl SourcePageReuseReservation {
+    pub fn reserve_root_slot(&self, index: &VersionIndex) -> Result<SourceRootReservation> {
+        self.manager.reserve_root_slot_inner(index, Some(self))
+    }
+}
+
 impl Drop for SourceRootLease {
     fn drop(&mut self) {
         if let Ok(mut state) = self.manager.inner.state.lock() {
@@ -591,6 +672,16 @@ impl Drop for SourceRootReservation {
         }
         if let Ok(mut state) = self.manager.inner.state.lock() {
             state.reserved_roots = state.reserved_roots.saturating_sub(1);
+        }
+    }
+}
+
+impl Drop for SourcePageReuseReservation {
+    fn drop(&mut self) {
+        if let Ok(mut state) = self.manager.inner.state.lock()
+            && state.page_reuse_root == Some(self.root)
+        {
+            state.page_reuse_root = None;
         }
     }
 }
@@ -1288,6 +1379,28 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(root_leases.len(), 4);
         drop(root_leases);
+    }
+
+    #[test]
+    fn zero_reader_page_reuse_reservation_fences_new_roots_until_publication_slot_is_reserved() {
+        let directory = TestDirectory::new();
+        let index = test_index(directory.path());
+        let manager = manager(directory.path());
+        let root = index.empty_root();
+        let current_lease = manager.pin_root(&index, root).unwrap();
+        let older_reader = manager.pin_root(&index, root).unwrap();
+        assert!(manager.reserve_page_reuse(&index, root).unwrap().is_none());
+        drop(older_reader);
+
+        let reuse_reservation = manager.reserve_page_reuse(&index, root).unwrap().unwrap();
+        assert!(manager.pin_root(&index, root).is_err());
+        let publication_reservation = reuse_reservation.reserve_root_slot(&index).unwrap();
+        drop(publication_reservation);
+        drop(reuse_reservation);
+
+        let new_reader = manager.pin_root(&index, root).unwrap();
+        drop(new_reader);
+        drop(current_lease);
     }
 
     #[test]

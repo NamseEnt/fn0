@@ -1980,6 +1980,8 @@ impl PagedReadHandle {
             limits,
             maximum_working_pages,
             provisional_revision,
+            false,
+            None,
         )
     }
 
@@ -2056,7 +2058,11 @@ struct PagedWorkingBlinkState<'base> {
 
 #[cfg(feature = "blink-demand-paging")]
 impl<'base> PagedWorkingBlinkState<'base> {
-    fn new(base: &'base PagedReadHandle, maximum_working_pages: usize) -> Result<Self> {
+    fn new(
+        base: &'base PagedReadHandle,
+        maximum_working_pages: usize,
+        allow_page_reuse: bool,
+    ) -> Result<Self> {
         if maximum_working_pages == 0 {
             return Err(Error::invalid_input(
                 "paged writer working-page limit must be nonzero",
@@ -2068,7 +2074,7 @@ impl<'base> PagedWorkingBlinkState<'base> {
             root_page_id: base.root_page_id,
             free_list_head: base.free_list_head,
             high_water_page_id: base.high_water_page_id,
-            allow_page_reuse: false,
+            allow_page_reuse,
             maximum_working_pages,
             exceeded_working_page_limit: false,
         })
@@ -2279,11 +2285,18 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
                 "paged transaction writer is unavailable after an uncertain persistence failure: {message}"
             )));
         }
-        let mut preparation = self.current.prepare_transaction(
+        let page_reuse_reservation = self
+            .current
+            .sources
+            .reserve_page_reuse(&self.current.index, self.current.root)?;
+        let mut preparation = prepare_paged_mutation(
+            &self.current,
             request,
             limits,
             self.maximum_working_pages,
             provisional_revision,
+            page_reuse_reservation.is_some(),
+            page_reuse_reservation.as_ref(),
         )?;
         if request.mutations.is_empty() {
             return Ok(TransactionResult {
@@ -2551,6 +2564,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             }
         };
         self.current = next_handle;
+        drop(page_reuse_reservation);
         if metadata_changed {
             self.superblock = next_superblock;
             self.active_slot = next_slot;
@@ -2569,6 +2583,8 @@ fn prepare_paged_mutation(
     limits: &StorageLimits,
     maximum_working_pages: usize,
     provisional_revision: Revision,
+    allow_page_reuse: bool,
+    page_reuse_reservation: Option<&source_manager::SourcePageReuseReservation>,
 ) -> Result<PagedMutationPreparation> {
     request.validate()?;
     if maximum_working_pages == 0 || provisional_revision == Revision::ZERO {
@@ -2635,7 +2651,7 @@ fn prepare_paged_mutation(
             working_page_bytes,
         )
         .map_err(page_cache::map_resource_error)?;
-    let mut working = PagedWorkingBlinkState::new(base, maximum_working_pages)?;
+    let mut working = PagedWorkingBlinkState::new(base, maximum_working_pages, allow_page_reuse)?;
     let mut dirty = BTreeSet::new();
     let mut split_metrics = BlinkSplitMetrics::default();
     for mutation in &request.mutations {
@@ -2722,6 +2738,8 @@ fn prepare_paged_mutation(
     };
     let root_reservation = if dirty.is_empty() {
         None
+    } else if let Some(page_reuse_reservation) = page_reuse_reservation {
+        Some(page_reuse_reservation.reserve_root_slot(&base.index)?)
     } else {
         Some(base.sources.reserve_root_slot(&base.index)?)
     };
@@ -13272,7 +13290,7 @@ mod tests {
                 loader: page_cache::PageLoaderConfig {
                     maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
                     minimum_decoded_page_bytes: PAGE_SIZE as u64,
-                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 2) as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 10) as u64,
                     maximum_concurrent_loads: 2,
                     maximum_followers: 8,
                 },
@@ -13804,40 +13822,6 @@ mod tests {
             Some(randomized_values["k00"].as_slice())
         );
         drop(old_reader);
-        writer.set_boxed_publication_fault_injector(Box::new(FailOnOccurrence {
-            point: "before_paged_generation_publication",
-            remaining: 1,
-        }));
-        let failed_key = DocumentKey::new(b"p".to_vec(), b"k01".to_vec());
-        let failed_request = TransactionRequest::new(
-            Vec::new(),
-            vec![TransactionMutation::Put {
-                key: failed_key.clone(),
-                value: b"not-published".to_vec(),
-            }],
-        );
-        assert!(
-            writer
-                .transact(
-                    &failed_request,
-                    &StorageLimits::default(),
-                    Revision::new(2010),
-                )
-                .is_err()
-        );
-        assert_eq!(
-            writer.current().get(&failed_key).unwrap().value(),
-            Some(randomized_values["k01"].as_slice())
-        );
-        assert!(
-            writer
-                .transact(
-                    &failed_request,
-                    &StorageLimits::default(),
-                    Revision::new(2011),
-                )
-                .is_err()
-        );
         let make_fault_writer = |file_number: u64| {
             let wal_path = wal_directory.join(format!("segment-{file_number:020}.wal"));
             let wal = WalLog::open_with_page_image_format(
@@ -14014,6 +13998,7 @@ mod tests {
             )
             .unwrap();
         assert!(overflow_delete.dirty_page_ids().count() >= 2);
+        drop(overflow_delete);
         let oversized_request = TransactionRequest::new(
             Vec::new(),
             vec![TransactionMutation::Put {
@@ -14126,6 +14111,132 @@ mod tests {
         assert_eq!(overlay_query.len(), 16);
         assert_eq!(overlay_query[6].value, b"overlay-value");
         drop(overlay_handle);
+        drop(handle);
+        assert_eq!(sources.registered_root_count().unwrap(), 1);
+        let reuse_key = second_writer_key.clone();
+        let overflow_value = vec![b'r'; PAGE_SIZE * 3];
+        let overflow_write = TransactionRequest::new(
+            Vec::new(),
+            vec![TransactionMutation::Put {
+                key: reuse_key.clone(),
+                value: overflow_value.clone(),
+            }],
+        );
+        writer
+            .transact(
+                &overflow_write,
+                &StorageLimits::default(),
+                Revision::new(2060),
+            )
+            .unwrap();
+        let collect_overflow_pages = |handle: &PagedReadHandle| {
+            let entry = find_entry(handle, &reuse_key.encode()).unwrap().unwrap();
+            let Some(OwnedValue::Overflow { head, .. }) = entry.value else {
+                panic!("large paged-writer value did not use overflow pages");
+            };
+            let mut page_ids = HashSet::new();
+            let mut next_page_id = Some(head);
+            while let Some(page_id) = next_page_id {
+                assert!(page_ids.insert(page_id));
+                let page = handle.page(page_id).unwrap();
+                let BlinkPage::Overflow { next, .. } = page.as_ref() else {
+                    panic!("paged-writer overflow locator names a non-overflow page");
+                };
+                next_page_id = *next;
+            }
+            page_ids
+        };
+        let first_overflow_pages = collect_overflow_pages(writer.current());
+        assert!(first_overflow_pages.len() >= 3);
+        let overflow_high_water = writer.current().high_water_page_id;
+        let overflow_delete = TransactionRequest::new(
+            Vec::new(),
+            vec![TransactionMutation::Delete {
+                key: reuse_key.clone(),
+            }],
+        );
+        writer
+            .transact(
+                &overflow_delete,
+                &StorageLimits::default(),
+                Revision::new(2061),
+            )
+            .unwrap();
+        let reusable_overflow_head = writer.current().free_list_head.unwrap();
+        assert!(first_overflow_pages.contains(&reusable_overflow_head));
+        assert!(writer.current().get(&reuse_key).unwrap().is_missing());
+        writer
+            .transact(
+                &overflow_write,
+                &StorageLimits::default(),
+                Revision::new(2062),
+            )
+            .unwrap();
+        assert_eq!(writer.current().high_water_page_id, overflow_high_water);
+        assert_eq!(
+            collect_overflow_pages(writer.current()),
+            first_overflow_pages
+        );
+        assert_eq!(
+            writer.current().get(&reuse_key).unwrap().value(),
+            Some(overflow_value.as_slice())
+        );
+        let handle = PagedReadHandle::new(
+            PagedReadConfig {
+                tenant_id: 11,
+                root,
+                root_page_id,
+                free_list_head: None,
+                high_water_page_id,
+                loader: page_cache::PageLoaderConfig {
+                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 2) as u64,
+                    maximum_concurrent_loads: 2,
+                    maximum_followers: 8,
+                },
+            },
+            Arc::clone(&index),
+            resources.clone(),
+            sources.clone(),
+            |_| Ok(PAGE_SIZE),
+        )
+        .unwrap();
+        writer.set_boxed_publication_fault_injector(Box::new(FailOnOccurrence {
+            point: "before_paged_generation_publication",
+            remaining: 1,
+        }));
+        let failed_key = DocumentKey::new(b"p".to_vec(), b"k01".to_vec());
+        let failed_request = TransactionRequest::new(
+            Vec::new(),
+            vec![TransactionMutation::Put {
+                key: failed_key.clone(),
+                value: b"not-published".to_vec(),
+            }],
+        );
+        assert!(
+            writer
+                .transact(
+                    &failed_request,
+                    &StorageLimits::default(),
+                    Revision::new(2063),
+                )
+                .is_err()
+        );
+        assert_eq!(
+            writer.current().get(&failed_key).unwrap().value(),
+            Some(randomized_values["k01"].as_slice())
+        );
+        assert!(
+            writer
+                .transact(
+                    &failed_request,
+                    &StorageLimits::default(),
+                    Revision::new(2064),
+                )
+                .is_err()
+        );
+        drop(writer);
         let current_split_key = DocumentKey::new(b"p".to_vec(), b"k04".to_vec()).encode();
         let current_left_leaf = BlinkPage::Leaf {
             lsn: Lsn::new(2),
