@@ -9,14 +9,15 @@
     "53d6451f91836dda6b3079c871abf737766e2d9d",
     "ab526c8b245075358b71b4ca5729461b8ac4a468",
     "67b5a2e8a",
-    "93b9a218ab10f8233caee3b2b85b0d1b79e919ee"
+    "93b9a218ab10f8233caee3b2b85b0d1b79e919ee",
+    "f4b55941b7ef1535e6fb6e76a8e3d58d6aa70e81"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "93b9a218ab10f8233caee3b2b85b0d1b79e919ee"
+    "source_commit": "f4b55941b7ef1535e6fb6e76a8e3d58d6aa70e81"
   },
   "validated": [
     {
@@ -156,6 +157,48 @@
       "command": "cargo clippy --manifest-path crates/dodb-storage/Cargo.toml --lib --features blink-demand-paging -- -D warnings",
       "exit_status": 101,
       "result": "blocked by 12 existing Clippy findings in unrelated Blink and WAL functions; no suppressions added"
+    },
+    {
+      "name": "paged_service_open_failure_releases_charges_and_preserves_sidecars",
+      "command": "cargo test --manifest-path crates/dodb-server/Cargo.toml --features blink-demand-paging paged_route_rejects_incomplete_store_before_creating_open_sidecars",
+      "exit_status": 0,
+      "result": "1 passed; an incomplete paged manifest was rejected before index, packs, segments, or scratch creation and the tenant metadata charge returned to zero"
+    },
+    {
+      "name": "server_library_tests_paged_service_route",
+      "command": "cargo test --manifest-path crates/dodb-server/Cargo.toml --features blink-demand-paging --lib -- --test-threads=1",
+      "exit_status": 0,
+      "result": "20 passed, 0 failed"
+    },
+    {
+      "name": "server_library_tests_default_paged_service_route",
+      "command": "cargo test --manifest-path crates/dodb-server/Cargo.toml --lib -- --test-threads=1",
+      "exit_status": 0,
+      "result": "17 passed, 0 failed; resident route remains unchanged"
+    },
+    {
+      "name": "storage_recovery_open_after_read_only_file_change",
+      "command": "cargo test --manifest-path crates/dodb-storage/Cargo.toml --features blink-demand-paging paged_transaction_writer_publishes_complete_and_incremental_checkpoints",
+      "exit_status": 0,
+      "result": "1 passed; recovery replays the synced write after the selected manifest checkpoint"
+    },
+    {
+      "name": "server_all_targets_default_and_feature_checks",
+      "command": "cargo check --manifest-path crates/dodb-server/Cargo.toml --all-targets; cargo check --manifest-path crates/dodb-server/Cargo.toml --all-targets --features blink-demand-paging",
+      "exit_status": 0,
+      "result": "both passed"
+    },
+    {
+      "name": "storage_all_targets_default_and_feature_checks",
+      "command": "cargo check --manifest-path crates/dodb-storage/Cargo.toml --all-targets; cargo check --manifest-path crates/dodb-storage/Cargo.toml --all-targets --features blink-demand-paging",
+      "exit_status": 0,
+      "result": "both passed"
+    },
+    {
+      "name": "server_and_storage_format",
+      "command": "cargo fmt --manifest-path crates/dodb-server/Cargo.toml --check; cargo fmt --manifest-path crates/dodb-storage/Cargo.toml --check",
+      "exit_status": 0,
+      "result": "both passed"
     }
   ],
   "prerequisite_receipts": [
@@ -171,18 +214,24 @@
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/receipt.json",
     "dodb/crates/dodb-storage/src/blink/mod.rs",
     "dodb/crates/dodb-storage/src/blink/page_cache.rs",
-    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs"
+    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs",
+    "dodb/crates/dodb-storage/src/durable_file.rs",
+    "dodb/crates/dodb-storage/src/wal.rs",
+    "dodb/docs/experiments/blink-tenant-density-20261027/B1-B2-CONTRACTS.md"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-server/src/lib.rs": "3bf748d664262057b7022f77e58d8f2a04385fd823008973fde9b33a9fa28b1f",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "0a35f603f10b757980355d4e4a932b877afb167f0fc06e7dcf803877f3b581af",
+    "dodb/crates/dodb-server/src/lib.rs": "d8d030a7b8b40f287868b1aa054bf760d4e26f725e724977050e7b923d5c8c3b",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "0a354d1eaa3af951c8de1371172df272a69e895f62e063b96018d8a7775040a2",
     "dodb/crates/dodb-server/Cargo.toml": "3a9164700687fd98dd554bd1a8ea300e574fdce383e4733f706dff05abc9c128",
     "crates/dodb-storage/src/blink/mod.rs": "87d877b2702776f5ab86380a855b1bf8707d4963cc91102bb11ce21d2787c09c",
     "crates/dodb-storage/src/blink/page_cache.rs": "2be518ae065e611398fe6e1f3f18da338240ecb4dbee95d8ac8f8982302c2d8e",
     "crates/dodb-storage/src/blink/paged_manifest.rs": "130f5f6358a0ae34086a44dc11310f95f31de7bd3ba29c050a2030d510c0938f",
     "dodb/crates/dodb-storage/src/blink/mod.rs": "87d877b2702776f5ab86380a855b1bf8707d4963cc91102bb11ce21d2787c09c",
     "dodb/crates/dodb-storage/src/blink/page_cache.rs": "2be518ae065e611398fe6e1f3f18da338240ecb4dbee95d8ac8f8982302c2d8e",
-    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "130f5f6358a0ae34086a44dc11310f95f31de7bd3ba29c050a2030d510c0938f"
+    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "0cc005dd0e3b08e5df8877d1bb6f47ad262389dc33cb401437e5eca32c4489e6",
+    "dodb/crates/dodb-storage/src/durable_file.rs": "33f8dcb20a15664559fab603d628c0ef5b240b26cbb332cc9d3a0d22d407fe78",
+    "dodb/crates/dodb-storage/src/wal.rs": "a240dd5ab74185bb7ede68aa25a1e17befacb40de3ab71aa716b53e10d6bf015",
+    "dodb/docs/experiments/blink-tenant-density-20261027/B1-B2-CONTRACTS.md": "53259a5dd77562b55784c04ed13d9f300d4b77c9f8797c3a3935a5f04a0f8cd2"
   },
   "logs": [
     {
@@ -322,15 +371,73 @@
       "path": "docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/storage-clippy-paged-recovery.log",
       "sha256": "194168cd5ab05db808f227d066452b1aa2fdfa47cf207b20a909de9d2fdf64c2",
       "exit_status": 101
+    },
+    {
+      "name": "paged_service_open_focused",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/paged-service-open-focused.log",
+      "sha256": "d5764bca5f4004de46b34f219dfde3f54f901b0ba8c0b03e1f6b202ecee9a6bc",
+      "exit_status": 0
+    },
+    {
+      "name": "server_library_tests_paged_service_route",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-lib-tests-paged-open.log",
+      "sha256": "cc215ae0bb92dcf094d9a5fb96955d7dc007fc6cee812623119bb617826d4fd3",
+      "exit_status": 0
+    },
+    {
+      "name": "server_library_tests_default_paged_service_route",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-lib-tests-default-paged-open.log",
+      "sha256": "461c54cd381ca3e2787a3f3a9f76cd6f2c315ba21bbdd21e5b49316ecb50cf9e",
+      "exit_status": 0
+    },
+    {
+      "name": "storage_recovery_open_focused",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/storage-service-recovery-focused.log",
+      "sha256": "b25b550e0286db5cb4d90d2b35740daef2b561c83d488a1f39f7c777513c3413",
+      "exit_status": 0
+    },
+    {
+      "name": "storage_check_default_paged_service",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/storage-check-default-paged-service.log",
+      "sha256": "a38996a70c96ea3437299ca672644700313cefb2d4916974b2795b66afa1fedc",
+      "exit_status": 0
+    },
+    {
+      "name": "storage_check_feature_paged_service",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/storage-check-feature-paged-service.log",
+      "sha256": "ab8b286d4c263ba4fcdcc7850693ae3fa7a0a1c909fd6573d3f2b648c82ba9cb",
+      "exit_status": 0
+    },
+    {
+      "name": "server_check_default_paged_service",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-check-default-paged-service.log",
+      "sha256": "0b53209db424367e80c52cd8cde8b75e37af110438a0efde777104a1463956de",
+      "exit_status": 0
+    },
+    {
+      "name": "server_check_feature_paged_service",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-check-feature-paged-service.log",
+      "sha256": "2b34696728dc82b03cbf6311d7e3a6a41658bbde097834c3010a78bc82842c1a",
+      "exit_status": 0
+    },
+    {
+      "name": "storage_format_paged_service",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/storage-format-paged-service.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_status": 0
+    },
+    {
+      "name": "server_format_paged_service",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-format-paged-service.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_status": 0
     }
   ],
   "remaining_work": [
-    "Connect the recovery-aware paged storage open API to BlinkTenantService using the shared manager and a validated paging configuration.",
-    "Route paged manifests through complete validated page opening in the service.",
-    "Pass one shared resource manager and validated paging configuration to every shard.",
-    "Account for open-tenant metadata charges and release all task-owned resource charges on failure and shutdown.",
-    "Reject all unsupported feature and layout combinations before touching database files.",
-    "Complete dependent service tasks before the density comparison matrix."
+    "Verify a successful BlinkTenantService open and Get/Query/Scan against a complete paged fixture.",
+    "Verify page-load worker saturation, cancellation, resource release, and shutdown while page loads are active.",
+    "Implement the paged writer/coordinator path and operation-owned foreground charges in T13.",
+    "Complete fair maintenance scheduling, service crash acceptance, and experiment-ready handoff before any density matrix."
   ],
   "next_task": "T12",
   "push": {
