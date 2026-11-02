@@ -5,14 +5,15 @@
   "parent_source_commit": "98544131a",
   "implementation_commits": [
     "98544131a",
-    "866261924"
+    "866261924",
+    "3640e74c3"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "866261924"
+    "source_commit": "3640e74c3"
   },
   "features": [
     "blink-demand-paging",
@@ -34,10 +35,29 @@
       "name": "git_diff_check",
       "command": "git diff --check",
       "exit_status": 0
+    },
+    {
+      "name": "paged_bounded_structural_validation_regression",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages -- --test-threads=1",
+      "exit_status": 0,
+      "result": "1 passed; covers unrequested corruption, missing allocation, missing free list, free-list cycle, duplicate tree child, and scratch release"
+    },
+    {
+      "name": "dodb_storage_full_library_suite",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1",
+      "exit_status": 0,
+      "result": "310 passed, 4 ignored"
+    },
+    {
+      "name": "strict_clippy",
+      "command": "cargo clippy -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- -D warnings",
+      "exit_status": 101,
+      "result": "12 existing diagnostics in blink/mod.rs and wal.rs; none in the new validator or source_manager.rs"
     }
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "60be66a671fa31ab0ab4bd7f5a67015a40295b30ef3962f7450dc749a2cb0d43"
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "d0ed5595e2867dc9e70a0910576a534922f986f61dfa45f328ece008b8219d48",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "830b50eaa186f014496497aba3438979e1c27cc896ab2026bab9e65ff0491dd5"
   },
   "logs": [
     {
@@ -63,13 +83,47 @@
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-paged-validation-r3.log",
       "sha256": "72116aea7b08585caf90f8356ebf3b2db61281b68ff1970439a925a99ac70d19",
       "exit_status": 0
+    },
+    {
+      "name": "bounded_structural_validation_focused",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-bounded-structure-focused.log",
+      "sha256": "011043f630c7ca0f5df40864a6fb45c7bcd877ef1ea397e07a50c27f1bf159d1",
+      "exit_status": 0
+    },
+    {
+      "name": "full_dodb_storage_library_suite",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-bounded-structure-full-lib.log",
+      "sha256": "2b2cf5fd76165fa59ebe8459aeb5f45dcac55a980f14d44defbce4d2ebfa4ad7",
+      "exit_status": 0
+    },
+    {
+      "name": "strict_clippy_existing_findings",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-bounded-structure-clippy.log",
+      "sha256": "37ca404fd19119b9708fd41829514faf9a01c1b5749198f4f2eb5cc8f275d85f",
+      "exit_status": 101
+    },
+    {
+      "name": "structural_validator_compile_failure_reconstructed",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/structural-validator-initial-compile-failure.log",
+      "sha256": "bfb3036410abe3e992b91292625bebbe4b470b79cfb03f9999aa334aea6b5463",
+      "exit_status": 101
+    },
+    {
+      "name": "invalid_free_list_fixture_reconstructed",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/structural-validator-invalid-free-fixture.log",
+      "sha256": "3fb658f8acf796a0158ae6f51c16015bb2ba4ed785d8911446eb799c42213c9e",
+      "exit_status": 101
     }
   ],
   "remaining_work": [
-    "Implement bounded structural validation and external scratch accounting.",
-    "Validate allocation range, free-list membership, duplicate ownership, reachability, tree links and ordering, and overflow chains across the complete indexed store.",
-    "Add above-cache reopen and large-WAL replay validation.",
-    "Complete the T11 storage SIGKILL matrix for torn tails, invalid bases and sidecars, publication and GC boundaries, page reuse, pinned-version checkpoint races, and recovery-write-second-crash recovery."
+    "Integrate bounded full validation into the paged recovery and service open path.",
+    "Add above-cache reopen and large-WAL replay validation with the complete validator.",
+    "Complete the T11 storage SIGKILL and crash-boundary matrix for torn active tails, corrupt closed tails, invalid delta/base, delta-chain sidecars, sidecar/index/manifest ordering, pack construction, publication and GC, page reuse, pinned-version checkpoint races, and recovery-write-second-crash recovery."
   ],
-  "next_task": "T11"
+  "next_task": "T11",
+  "push": {
+    "remote": "origin",
+    "branch": "experiment/blink-tenant-density-20261027",
+    "status": "pushed"
+  }
 }
