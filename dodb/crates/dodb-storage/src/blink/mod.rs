@@ -14185,6 +14185,32 @@ mod tests {
                 Some(expected_value.as_slice())
             );
         }
+        let current_header_length = Arc::clone(&writer.current().header_length);
+        let eviction_probe = PagedReadHandle::new(
+            PagedReadConfig {
+                tenant_id: writer.current().tenant_id,
+                root: writer.current().root,
+                root_page_id: writer.current().root_page_id,
+                free_list_head: writer.current().free_list_head,
+                high_water_page_id: writer.current().high_water_page_id,
+                loader: writer.current().loader_config,
+            },
+            Arc::clone(&writer.current().index),
+            resources.clone(),
+            sources.clone(),
+            move |source| current_header_length(source),
+        )
+        .unwrap();
+        let source_reads_before_probe = eviction_probe.loader.source_read_count();
+        for page_id in [left_page_id, right_page_id, writer.current().root_page_id] {
+            eviction_probe.page(page_id).unwrap();
+        }
+        let source_reads_before_reload = eviction_probe.loader.source_read_count();
+        assert!(source_reads_before_reload > source_reads_before_probe);
+        eviction_probe.page(left_page_id).unwrap();
+        assert!(eviction_probe.loader.source_read_count() > source_reads_before_reload);
+        drop(eviction_probe);
+        assert_eq!(sources.registered_root_count().unwrap(), 1);
         let reuse_key = second_writer_key.clone();
         let overflow_value = vec![b'r'; PAGE_SIZE * 3];
         let overflow_write = TransactionRequest::new(
