@@ -1,0 +1,4 @@
+Command: cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages
+Result: failed at the temporary assertion expecting exactly three source reads for three pages.
+Observed: source reads include the multiple source records needed to reconstruct pages with delta ancestry; the observed count was 11, not 3.
+Correction: assert that loading all three pages performs source reads, then assert that reloading the first page after two intervening cache entries performs additional source reads. The corrected focused test passes.

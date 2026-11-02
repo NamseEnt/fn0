@@ -112,3 +112,13 @@ T09 remains partial. Grouped WAL transaction boundaries and complete-or-absent g
 - Source commit: `88b5569f8`.
 
 T09 remains partial. Grouped WAL transaction boundaries and complete-or-absent grouped recovery, plus full process restart with index rebuild, remain outstanding. No service activation or performance experiment occurred.
+
+## Reload after page-cache eviction (2026-11-02)
+
+- Created a fresh two-page loader for the current writer generation. Loading three distinct pages causes the least-recently-used entry to be evicted; reloading that first page increases the source-read counter, proving the current generation can reconstruct an evicted page from its durable version sources.
+- The probe is dropped before page-reuse acceptance, restoring the sole-root condition. Focused fixture: 1 passed. Serialized feature library suite: 294 passed, 0 failed, 4 ignored in 124.37 seconds.
+- Strict `clippy --tests` still reports 33 existing crate findings; no diagnostic points into the added eviction probe. A failed exact-count assumption and its correction are preserved in `logs/paged-writer-evicted-page-exact-count.log`.
+- Raw test and Clippy outputs: `logs/paged-writer-evicted-page-feature-lib.log.gz` and `logs/paged-writer-evicted-page-strict-clippy.log.gz`.
+- Source commit: `3a1338e91`.
+
+T09 remains partial. Grouped WAL transaction boundaries and complete-or-absent grouped recovery, plus full process restart with index rebuild, remain outstanding. No service activation or performance experiment occurred.

@@ -14,7 +14,8 @@
     "b259815d12f010dc0686488fc7fb3cc197f11430",
     "3523096fae312360ff2b2976b8ac329829edf870",
     "d9dbac2c6",
-    "88b5569f8"
+    "88b5569f8",
+    "3a1338e91"
   ],
   "push": {
     "remote": "origin",
@@ -49,7 +50,7 @@
     "dodb/crates/dodb-storage/src/btree/mod.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "44655a51e78a77c90126316ce336b1d4459feda26c4454d4eb9fc038f3a6a88c",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "fe65b3d870e2d46c4407e836ba2c94e70b0eec4a56a6ee84cb6e189851f16696",
     "dodb/crates/dodb-storage/src/blink/page_cache.rs": "83d1ac6841a55cf5d6eefb11e68e5a2eece05882b49d5db11b4850013ae0a133",
     "dodb/crates/dodb-storage/src/wal.rs": "8270097336b983145f651e4206688c826f5d4d3d244dc7c4b8f82790b621475e",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "22814972741b0b9ff25d8e5a935c754c68d73a63c1e41e8edcb6a53a46e6d65a",
@@ -995,6 +996,50 @@
         "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-split-strict-clippy.log.gz",
         "sha256": "6609cca3e91a4ae02c034e9bba7f582199c78a5f749e46773c7f9340273852f3"
       }
+    },
+    {
+      "name": "paged_writer_evicted_page_feature_library_tests_serial",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "294 passed, 0 failed, 4 ignored; finished in 124.37s; split readback, pinned-reader isolation, and reload after two-page-cache eviction passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-evicted-page-feature-lib.log.gz",
+        "sha256": "a3d4f3d139432c9ab6ac6b6ff09f94f025096d4562d85ba3d209e07eb9fc9fbd"
+      }
+    },
+    {
+      "name": "paged_writer_evicted_page_strict_clippy_tests",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--tests",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 101,
+      "summary": "33 existing lint findings across the crate; no findings point into the added eviction probe; no suppressions added",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-evicted-page-strict-clippy.log.gz",
+        "sha256": "de55cff60ec31ff3d28d71f87f43d46482df512c7ce91a5d7057db4272cc9bcf"
+      }
     }
   ],
   "acceptance_mapping": {
@@ -1012,7 +1057,8 @@
     "planned_writer_widths_1_4_16": "passed: writer commits requests with widths 1, 4, and 16 within the configured working-page cap; every committed key and value is read back from the current generation after older readers are dropped while preserving the two-page cache budget",
     "paged_writer_delta_reconstruction_across_rotation": "partial: after closing the segment-4 writer, reopen from the exact post-segment-1 base pages reconstructs the exact eighth page image, image LSN, and CRC; chain metadata names one checkpoint base and eight deltas across segments 1 and 4; full process restart and index rebuild remain outstanding",
     "zero_reader_page_reuse": "partial: SourceManager atomically admits page reuse only when exactly the current writer root is registered, blocks new root admission during preparation/publication, and defers GC during the reuse fence; the writer fixture deletes a multi-page overflow value and reuses the exact freed PageId set without high-water growth; existing-reader behavior is covered by the root-fence test",
-    "split_overflow_free_reuse_writer": "partial: a separate 48-key writer transaction increases the reachable leaf count and every expected key/value reads back; overflow allocation, deletion, full value readback, and zero-reader reuse of the exact freed PageId set without high-water growth also pass; process-restart and grouped recovery remain outstanding"
+    "split_overflow_free_reuse_writer": "partial: a separate 48-key writer transaction increases the reachable leaf count and every expected key/value reads back; overflow allocation, deletion, full value readback, and zero-reader reuse of the exact freed PageId set without high-water growth also pass; process-restart and grouped recovery remain outstanding",
+    "writer_loads_evicted_page": "passed: a fresh two-page loader for the current writer generation reads three distinct pages, then rereads the first after eviction; source_read_count increases on the reload and the reader root lease is released before zero-reader reuse"
   },
   "ownership_peaks": {
     "test_maximum_working_pages": 32,
@@ -1104,6 +1150,12 @@
       "exit_status": 101,
       "reason": "width 16 did not increase high_water_page_id because existing free pages can satisfy structural allocations; replaced the invalid oracle with reachable leaf count around a separate 48-key transaction",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-width16-split-assumption.log"
+    },
+    {
+      "name": "paged_writer_eviction_probe_exact_source_read_count",
+      "exit_status": 101,
+      "reason": "three page loads require more than three source reads when delta ancestry is reconstructed; replaced the exact-count assertion with cache-eviction and subsequent-source-read assertions",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T09/logs/paged-writer-evicted-page-exact-count.log"
     }
   ],
   "remaining_work": [
