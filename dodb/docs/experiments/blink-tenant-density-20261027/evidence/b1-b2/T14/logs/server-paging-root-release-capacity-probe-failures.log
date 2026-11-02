@@ -6,4 +6,6 @@ Second probe: reducing the `RetainedSource` category and reserving it as the blo
 
 Category correction probe: reserving checkpoint output under `CheckpointOutput` without converting it at publication failed with `InternalInvariantViolation("paged source disk reservation has the wrong category")`.
 
+Old-reader service probe: a 512 KiB single-key value produced a 544,772-byte checkpoint pack but its overwrite exceeded the configured working-page limit. A 128 KiB variant passed the transaction but required more WAL disk headroom than its 143,364-byte pack, so the artificial total-capacity blocker failed before output waiting. No old-reader-to-publication service result is claimed from these rejected probes.
+
 These probes were rejected. The final test constrains the `CheckpointOutput` category while preserving WAL, source-catalog, and retained-source budgets. The source-root collection and waiter wakeup path has separate unit coverage; no full old-reader-to-checkpoint-publication integration result is claimed.
