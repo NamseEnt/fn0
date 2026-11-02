@@ -1,0 +1,33 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+error[E0425]: cannot find function `decode_blink_page` in this scope
+     --> dodb/crates/dodb-storage/src/blink/paged_recovery.rs:1259:13
+      |
+ 1259 |             decode_blink_page(&recovered_page.image[..], page_id).unwrap(),
+      |             ^^^^^^^^^^^^^^^^^
+      |
+     ::: dodb/crates/dodb-storage/src/blink/mod.rs:10978:1
+      |
+10978 | fn encode_blink_page(page_id: PageId, page: &BlinkPage) -> Result<[u8; PAGE_SIZE]> {
+      | ---------------------------------------------------------------------------------- similarly named function `encode_blink_page` defined here
+      |
+help: a function with a similar name exists
+      |
+ 1259 -             decode_blink_page(&recovered_page.image[..], page_id).unwrap(),
+ 1259 +             encode_blink_page(&recovered_page.image[..], page_id).unwrap(),
+      |
+help: consider importing this function
+      |
+  742 +     use crate::blink::decode_blink_page;
+      |
+
+error[E0164]: expected tuple struct or tuple variant, found associated function `Lsn::new`
+    --> dodb/crates/dodb-storage/src/blink/paged_recovery.rs:1261:22
+     |
+1261 |                 lsn: Lsn::new(10),
+     |                      ^^^^^^^^^^^^ `fn` calls are not allowed in patterns
+     |
+     = help: for more information, visit https://doc.rust-lang.org/book/ch19-00-patterns.html
+
+Some errors have detailed explanations: E0164, E0425.
+For more information about an error, try `rustc --explain E0164`.
+error: could not compile `dodb-storage` (lib test) due to 2 previous errors

@@ -754,7 +754,7 @@ mod tests {
         SourceFileKind, SourceIdentity, StoreIdentity, VersionDescriptor, VersionIndex,
         VersionLocator, VersionToken, WalFrameLocator,
     };
-    use crate::blink::{BlinkPage, encode_blink_page};
+    use crate::blink::{BlinkPage, decode_blink_page, encode_blink_page};
     #[cfg(feature = "blink-demand-paging")]
     use crate::blink::{PagedReadConfig, PagedReadHandle};
     use crate::durable_file::ProductionFile;
@@ -1111,6 +1111,178 @@ mod tests {
                 .as_ref(),
             &recovered_write_image
         );
+    }
+
+    #[test]
+    fn reused_free_page_torn_tail_after_sigkill_keeps_free_version() {
+        const CHILD_WAL_PATH: &str = "DODB_REUSED_FREE_PAGE_SIGKILL_PATH";
+        const CHILD_READY: &str = "DODB_REUSED_FREE_PAGE_SIGKILL_READY";
+        let page_id = PageId::new(9);
+        let identity = StoreIdentity {
+            database_uuid: [0x7a; 16],
+            wal_epoch: 16,
+        };
+        let wal_identity = wal_identity(identity);
+        let free_image = encode_blink_page(
+            page_id,
+            &BlinkPage::Free {
+                lsn: Lsn::new(10),
+                next: None,
+            },
+        )
+        .unwrap();
+        if let Ok(wal_path) = std::env::var(CHILD_WAL_PATH) {
+            let mut wal = WalLog::open_with_segment_bases(
+                ProductionFile::open(&wal_path).unwrap(),
+                wal_identity.clone(),
+                WalPageImageFormat::ExperimentalBlink,
+                WalSegmentBoundary {
+                    start_after_lsn: Lsn::new(10),
+                    start_batch_id: None,
+                    truncate_torn_tail: true,
+                    defer_initial_sync: false,
+                },
+                BTreeMap::from([(
+                    page_id,
+                    crate::wal::RecoveredWalPage {
+                        commit_lsn: Lsn::new(10),
+                        image: Box::new(free_image),
+                    },
+                )]),
+                None,
+            )
+            .unwrap();
+            let reused_image = encode_blink_page(
+                page_id,
+                &BlinkPage::Overflow {
+                    lsn: Lsn::new(14),
+                    next: None,
+                    total_length: 5,
+                    chunk: b"reuse".to_vec(),
+                },
+            )
+            .unwrap();
+            let append_result = wal.append_group(
+                &[WalCommit {
+                    batch_id: 2,
+                    commit_lsn: Lsn::new(14),
+                    pages: vec![WalPageImage {
+                        page_id,
+                        image: reused_image,
+                    }],
+                }],
+                Some(&mut PauseWalBeforeCommit {
+                    ready_path: PathBuf::from(std::env::var(CHILD_READY).unwrap()),
+                }),
+            );
+            match append_result {
+                Ok(_) => panic!("child WAL append passed the reused-page crash boundary"),
+                Err(error) => panic!("reused-page WAL append failed: {error}"),
+            }
+        }
+
+        let directory = TestDirectory::new();
+        let wal_path = directory.path().join("reused-page.wal");
+        let mut wal = WalLog::open_with_segment_bases(
+            ProductionFile::open(&wal_path).unwrap(),
+            wal_identity.clone(),
+            WalPageImageFormat::ExperimentalBlink,
+            WalSegmentBoundary {
+                start_after_lsn: Lsn::new(10),
+                start_batch_id: None,
+                truncate_torn_tail: true,
+                defer_initial_sync: false,
+            },
+            BTreeMap::from([(
+                page_id,
+                crate::wal::RecoveredWalPage {
+                    commit_lsn: Lsn::new(10),
+                    image: Box::new(free_image),
+                },
+            )]),
+            None,
+        )
+        .unwrap();
+        let committed_free_image = encode_blink_page(
+            page_id,
+            &BlinkPage::Free {
+                lsn: Lsn::new(12),
+                next: None,
+            },
+        )
+        .unwrap();
+        wal.append_group(
+            &[WalCommit {
+                batch_id: 1,
+                commit_lsn: Lsn::new(12),
+                pages: vec![WalPageImage {
+                    page_id,
+                    image: committed_free_image,
+                }],
+            }],
+            None,
+        )
+        .unwrap();
+        drop(wal);
+        let ready_path = directory.path().join("ready-reused-page");
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "blink::paged_recovery::tests::reused_free_page_torn_tail_after_sigkill_keeps_free_version",
+                "--nocapture",
+            ])
+            .env(CHILD_WAL_PATH, &wal_path)
+            .env(CHILD_READY, &ready_path)
+            .spawn()
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !ready_path.exists() && Instant::now() < deadline {
+            if let Some(status) = child.try_wait().unwrap() {
+                panic!("SIGKILL child exited before reused-page append: {status}");
+            }
+            thread::sleep(Duration::from_millis(1));
+        }
+        assert!(
+            ready_path.exists(),
+            "child did not reach reused-page append"
+        );
+        assert_eq!(
+            unsafe { libc::kill(child.id() as libc::pid_t, libc::SIGKILL) },
+            0
+        );
+        let status = child.wait().unwrap();
+        use std::os::unix::process::ExitStatusExt;
+        assert_eq!(status.signal(), Some(libc::SIGKILL));
+
+        let reopened = WalLog::open_with_segment_bases(
+            ProductionFile::open(&wal_path).unwrap(),
+            wal_identity,
+            WalPageImageFormat::ExperimentalBlink,
+            WalSegmentBoundary {
+                start_after_lsn: Lsn::new(10),
+                start_batch_id: None,
+                truncate_torn_tail: true,
+                defer_initial_sync: false,
+            },
+            BTreeMap::from([(
+                page_id,
+                crate::wal::RecoveredWalPage {
+                    commit_lsn: Lsn::new(10),
+                    image: Box::new(free_image),
+                },
+            )]),
+            None,
+        )
+        .unwrap();
+        assert_eq!(reopened.last_commit_lsn(), Some(Lsn::new(12)));
+        assert_eq!(reopened.committed_batch_count(), 1);
+        let recovered_page = reopened.recovery_pages().get(&page_id).unwrap();
+        assert_eq!(recovered_page.commit_lsn, Lsn::new(12));
+        let recovered_image = decode_blink_page(&recovered_page.image[..], page_id).unwrap();
+        assert!(matches!(
+            recovered_image,
+            BlinkPage::Free { lsn, next: None } if lsn == Lsn::new(12)
+        ));
     }
 
     #[test]

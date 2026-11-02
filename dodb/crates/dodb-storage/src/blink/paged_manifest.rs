@@ -1043,6 +1043,7 @@ mod tests {
                     .unwrap();
             let initial_node = manifest_store.current().durable_index_root;
             let initial_root = index.root_from_node_reference(initial_node).unwrap();
+            let pinned_checkpoint_target = index.pin_root(initial_root).unwrap();
             let page_id = PageId::new(2);
             let mut next_descriptor = index.lookup(initial_root, page_id).unwrap().unwrap();
             next_descriptor.image_lsn = Lsn::new(11);
@@ -1067,6 +1068,14 @@ mod tests {
             let next_root = index
                 .insert(initial_root, page_id, next_descriptor)
                 .unwrap();
+            assert_eq!(
+                index
+                    .lookup(pinned_checkpoint_target.root(), page_id)
+                    .unwrap()
+                    .unwrap()
+                    .image_lsn,
+                Lsn::ZERO
+            );
             let next_durable_root = index.promote_root_to_durable(next_root).unwrap();
             let mut next_manifest = manifest(identity, 2, 1);
             next_manifest.durable_index_root = next_durable_root.node_reference().unwrap();

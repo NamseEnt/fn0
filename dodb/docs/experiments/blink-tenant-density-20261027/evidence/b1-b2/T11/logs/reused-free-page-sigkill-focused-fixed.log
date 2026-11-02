@@ -1,0 +1,37 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.16s
+     Running unittests src/lib.rs (target/debug/deps/dodb_storage-70634b21c90c24df)
+
+running 1 test
+test blink::paged_recovery::tests::reused_free_page_torn_tail_after_sigkill_keeps_free_version ... 
+running 1 test
+
+thread 'blink::paged_recovery::tests::reused_free_page_torn_tail_after_sigkill_keeps_free_version' (444259290) panicked at dodb/crates/dodb-storage/src/blink/paged_recovery.rs:1178:13:
+child WAL append passed the reused-page crash boundary
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test blink::paged_recovery::tests::reused_free_page_torn_tail_after_sigkill_keeps_free_version ... FAILED
+
+failures:
+
+failures:
+    blink::paged_recovery::tests::reused_free_page_torn_tail_after_sigkill_keeps_free_version
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 322 filtered out; finished in 0.00s
+
+FAILED
+
+failures:
+
+---- blink::paged_recovery::tests::reused_free_page_torn_tail_after_sigkill_keeps_free_version stdout ----
+
+thread 'blink::paged_recovery::tests::reused_free_page_torn_tail_after_sigkill_keeps_free_version' (444259288) panicked at dodb/crates/dodb-storage/src/blink/paged_recovery.rs:1218:17:
+SIGKILL child exited before reused-page append: exit status: 101
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    blink::paged_recovery::tests::reused_free_page_torn_tail_after_sigkill_keeps_free_version
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 322 filtered out; finished in 0.04s
+
+error: test failed, to rerun pass `-p dodb-storage --lib`

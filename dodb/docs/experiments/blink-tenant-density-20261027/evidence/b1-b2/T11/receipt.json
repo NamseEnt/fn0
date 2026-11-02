@@ -154,14 +154,39 @@
       "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' active_wal_torn_tail_after_sigkill_keeps_only_acknowledged_commit -- --test-threads=1 --nocapture",
       "exit_status": 0,
       "result": "1 passed; after reopening the first torn-tail crash, a new append succeeds, a second child is SIGKILLed before commit, and the next reopen retains both acknowledged commits with no partial third commit"
+    },
+    {
+      "name": "reused_free_page_torn_tail_sigkill",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' reused_free_page_torn_tail_after_sigkill_keeps_free_version -- --test-threads=1",
+      "exit_status": 0,
+      "result": "1 passed; SIGKILL after a reused overflow page image was appended but before commit; reopen retained the acknowledged Free page at LSN 12"
+    },
+    {
+      "name": "pinned_previous_root_manifest_sigkill",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' durable_index_nodes_before_manifest_pointer_survive_sigkill -- --test-threads=1",
+      "exit_status": 0,
+      "result": "1 passed; pinned the previous root while constructing the next COW root and manifest, then SIGKILL before pointer rename; reopen selected the old durable root"
+    },
+    {
+      "name": "dodb_storage_full_library_suite_after_reuse_and_pinned_root_cases",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1",
+      "exit_status": 0,
+      "result": "319 passed, 4 ignored; 0 failed"
+    },
+    {
+      "name": "cargo_fmt_check_dodb_storage",
+      "command": "cargo fmt --check -p dodb-storage",
+      "exit_status": 0,
+      "result": "passed"
     }
   ],
   "source_hashes": {
     "dodb/crates/dodb-storage/src/blink/mod.rs": "e3c91c56e60c17de54088c1caf90f358ddde88c74d00d0f8b8d06918fe24d788",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "20560bff3b3715642417335a71bd80e5990f8d157398dbbf4e1fa541dd7db6cd",
-    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "fead0f023fb9eace22359d72b81a09bdd846e3af3d29e8855ca3b926ab2138c7",
+    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "eb55fe2979c903e40048024d19401144643f53aea5337f1d5426bab09827c168",
     "dodb/crates/dodb-storage/src/blink/version_chain.rs": "c86233ee1715992282fb272f449017aef79223eb1affe6cc60531ba6f3dadfe5",
-    "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "8c54f05017041260d50b6a2a322b51c70893adf91f602a684c3d2ff942e2c529"
+    "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "1bfddcd55c0f2f098b9939936fb4e2e9bb5adda6089fdb5e27d80cf4efac7475",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/RESULTS.md": "3922f6c3b6e92e52641609e7980e40f325a489e0897e0307ac71f203ff695bc2"
   },
   "logs": [
     {
@@ -415,13 +440,56 @@
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/recovery-write-second-commit-lsn-failure.log",
       "sha256": "527deff587fdce5267e5efebccb67152a78fa14f96f5b8e406e876ab2ac9eafd",
       "exit_status": 101
+    },
+    {
+      "name": "reused_free_page_initial_compile_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/reused-free-page-sigkill-focused.log",
+      "sha256": "f1a82f584b91caed1389e84f653cdbc31c7bdcf5abdf300cdaf6ecf4790b56a5",
+      "exit_status": 101
+    },
+    {
+      "name": "reused_free_page_initial_child_boundary_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/reused-free-page-sigkill-focused-fixed.log",
+      "sha256": "e141cad200725e20d606e261e7ec398e53c3a7868f3b6a2f6801244bf5bdef6f",
+      "exit_status": 101
+    },
+    {
+      "name": "reused_free_page_diagnostic_compile_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/reused-free-page-sigkill-diagnostic.log",
+      "sha256": "8b1518d7ae99b32d9c649c93e1c51ed27d8328cb186b4c41bb99c76214102924",
+      "exit_status": 101
+    },
+    {
+      "name": "reused_free_page_diagnostic_lsn_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/reused-free-page-sigkill-diagnostic-fixed.log",
+      "sha256": "a18109432d891aa5cec268aac1e118c3c84d271e1939fcf41f6d2f83d4166397",
+      "exit_status": 101
+    },
+    {
+      "name": "reused_free_page_torn_tail_sigkill_final",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/reused-free-page-sigkill-focused-final.log",
+      "sha256": "50e037351da98af0a4b09d5689f808be1c69ff27cccf875a8bd803bb10c6afa1",
+      "exit_status": 0
+    },
+    {
+      "name": "pinned_previous_root_manifest_sigkill",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/pinned-checkpoint-root-sigkill-focused.log",
+      "sha256": "33c9922d20ef731d1d9ca87d5e92a59dd4ddb20c976e7a7127e91b227ff25b54",
+      "exit_status": 0
+    },
+    {
+      "name": "dodb_storage_full_library_suite_after_reuse_and_pinned_root_cases",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/reused-page-pinned-checkpoint-full-lib.log",
+      "sha256": "dcd8436318166f9293b5757d0c9b99e48bd8250c57fe0a341ebcd6b4a4f7b000",
+      "exit_status": 0
     }
   ],
   "remaining_work": [
     "Route tenant service opening through complete bounded validation and prove failure cleanup as part of T12.",
-    "Complete process-kill coverage for page-ID reuse and pinned-version/checkpoint races. The storage WAL recovery-write-second-crash check passes; T15 remains responsible for the real-service form."
+    "Exercise delta-chain sidecar-to-index publication through PagedTransactionWriter under process kill; the reused-page test currently covers WAL recovery at the page-image/commit boundary, not the actual transaction writer allocation and publication path.",
+    "Complete real-service recovery-write-second-crash coverage as part of T15; storage-level recovery followed by a successful write and second process crash passes."
   ],
-  "next_task": "T11",
+  "next_task": "T11 actual PagedTransactionWriter crash boundary, then T12 validated tenant service opening",
   "push": {
     "remote": "origin",
     "branch": "experiment/blink-tenant-density-20261027",
