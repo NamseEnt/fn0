@@ -46,7 +46,7 @@ struct LeafSlot {
 /// Bytes of replaced or removed payloads stay in the buffer as garbage until
 /// the leaf is cloned or the garbage outgrows the live bytes.
 #[derive(Default)]
-pub(super) struct LeafEntries {
+pub(crate) struct LeafEntries {
     slots: Vec<LeafSlot>,
     bytes: Vec<u8>,
     garbage: usize,

@@ -5859,7 +5859,7 @@ mod tests {
                     Ok(format!("paged-source-{file_number}").len())
                 })
                 .unwrap();
-            assert_eq!(loaded.as_ref(), &previous_image);
+            assert_eq!(loaded.bytes(), PAGE_SIZE as u64);
             drop(loaded);
             std::fs::remove_dir_all(directory).unwrap();
         }

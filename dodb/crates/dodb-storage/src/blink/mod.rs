@@ -598,13 +598,13 @@ fn encode_blink_superblock(sb: &BlinkSuperblock) -> Result<[u8; PAGE_SIZE]> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct InternalEntry {
+pub(crate) struct InternalEntry {
     key: Vec<u8>,
     right_child: PageId,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-enum BlinkPage {
+pub(crate) enum BlinkPage {
     Leaf {
         lsn: Lsn,
         high_key: Option<Vec<u8>>,
@@ -1772,6 +1772,175 @@ impl BlinkReadHandle {
 
     pub fn metrics(&self) -> BlinkVersionedReadMetrics {
         self.publisher.metrics(0, 0)
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PagedReadConfig {
+    pub tenant_id: u64,
+    pub root: version_index::VersionIndexRoot,
+    pub root_page_id: PageId,
+    pub high_water_page_id: PageId,
+    pub loader: page_cache::PageLoaderConfig,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+pub struct PagedReadHandle {
+    index: Arc<version_index::VersionIndex>,
+    root: version_index::VersionIndexRoot,
+    root_page_id: PageId,
+    high_water_page_id: PageId,
+    loader: Arc<page_cache::PageLoader<page_cache::PageVersionKey, BlinkPage>>,
+    sources: source_manager::SourceManager,
+    overlays: Vec<Arc<ImmutableOverlaySegment>>,
+    header_length: Arc<dyn Fn(version_index::SourceIdentity) -> Result<usize> + Send + Sync>,
+    _root_lease: source_manager::SourceRootLease,
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl PagedReadHandle {
+    pub fn new<F>(
+        config: PagedReadConfig,
+        index: Arc<version_index::VersionIndex>,
+        resources: resource::BlinkResourceManager,
+        sources: source_manager::SourceManager,
+        header_length: F,
+    ) -> Result<Self>
+    where
+        F: Fn(version_index::SourceIdentity) -> Result<usize> + Send + Sync + 'static,
+    {
+        let loader = Arc::new(page_cache::PageLoader::new(
+            config.tenant_id,
+            resources,
+            config.loader,
+        )?);
+        Self::with_shared_loader(config, index, loader, sources, header_length)
+    }
+
+    pub(crate) fn with_shared_loader<F>(
+        config: PagedReadConfig,
+        index: Arc<version_index::VersionIndex>,
+        loader: Arc<page_cache::PageLoader<page_cache::PageVersionKey, BlinkPage>>,
+        sources: source_manager::SourceManager,
+        header_length: F,
+    ) -> Result<Self>
+    where
+        F: Fn(version_index::SourceIdentity) -> Result<usize> + Send + Sync + 'static,
+    {
+        if config.root_page_id.get() < FIRST_DATA_PAGE
+            || config.root_page_id > config.high_water_page_id
+        {
+            return Err(Error::invalid_input(
+                "paged read generation identity or page range is invalid",
+            ));
+        }
+        let root_lease = sources.pin_root(&index, config.root)?;
+        let handle = Self {
+            index,
+            root: config.root,
+            root_page_id: config.root_page_id,
+            high_water_page_id: config.high_water_page_id,
+            loader,
+            sources,
+            overlays: Vec::new(),
+            header_length: Arc::new(header_length),
+            _root_lease: root_lease,
+        };
+        handle.with_overlay_segments(Vec::new())
+    }
+
+    fn with_overlay_segments(
+        mut self,
+        overlays: Vec<Arc<ImmutableOverlaySegment>>,
+    ) -> Result<Self> {
+        if overlays.len() > MAX_OVERLAY_SEGMENTS {
+            return Err(Error::overloaded(
+                "paged read generation overlay limit is exceeded",
+            ));
+        }
+        self.overlays = overlays;
+        Ok(self)
+    }
+
+    pub fn get(&self, key: &DocumentKey) -> Result<RevisionState> {
+        self.get_with_response_budget(key, usize::MAX)
+    }
+
+    pub fn get_with_response_budget(
+        &self,
+        key: &DocumentKey,
+        maximum_response_bytes: usize,
+    ) -> Result<RevisionState> {
+        let mut budget = ResponseBudget::new(maximum_response_bytes)?;
+        let mut budget = Some(&mut budget);
+        let mut right_link_corrections = 0;
+        read_published_state_with_budget(self, key, &mut right_link_corrections, &mut budget)
+    }
+
+    pub fn query(
+        &self,
+        primary_key: &PrimaryKey,
+        exclusive_after_sort_key: Option<&SortKey>,
+        limit: usize,
+    ) -> Result<Vec<Document>> {
+        self.query_with_response_budget(primary_key, exclusive_after_sort_key, limit, usize::MAX)
+    }
+
+    pub fn query_with_response_budget(
+        &self,
+        primary_key: &PrimaryKey,
+        exclusive_after_sort_key: Option<&SortKey>,
+        limit: usize,
+        maximum_response_bytes: usize,
+    ) -> Result<Vec<Document>> {
+        let mut budget = ResponseBudget::new(maximum_response_bytes)?;
+        let mut budget = Some(&mut budget);
+        let mut right_link_corrections = 0;
+        published_range_state_with_budget(
+            self,
+            Some(primary_key),
+            exclusive_after_sort_key.map(|sort_key| {
+                DocumentKey::new(
+                    primary_key.as_bytes().to_vec(),
+                    sort_key.as_bytes().to_vec(),
+                )
+            }),
+            limit,
+            &mut right_link_corrections,
+            &mut budget,
+        )
+    }
+
+    pub fn scan(
+        &self,
+        exclusive_after: Option<&DocumentKey>,
+        limit: usize,
+    ) -> Result<Vec<Document>> {
+        self.scan_with_response_budget(exclusive_after, limit, usize::MAX)
+    }
+
+    pub fn scan_with_response_budget(
+        &self,
+        exclusive_after: Option<&DocumentKey>,
+        limit: usize,
+        maximum_response_bytes: usize,
+    ) -> Result<Vec<Document>> {
+        let mut budget = ResponseBudget::new(maximum_response_bytes)?;
+        let mut budget = Some(&mut budget);
+        let mut right_link_corrections = 0;
+        published_range_state_with_budget(
+            self,
+            None,
+            exclusive_after.cloned(),
+            limit,
+            &mut right_link_corrections,
+            &mut budget,
+        )
+    }
+
+    pub fn source_read_count(&self) -> u64 {
+        self.loader.source_read_count()
     }
 }
 
@@ -4760,6 +4929,10 @@ trait ReadPageSource {
     fn page(&self, page_id: PageId) -> Result<Self::Page<'_>>;
 }
 
+trait PublishedReadPageSource: ReadPageSource {
+    fn overlays(&self) -> &[Arc<ImmutableOverlaySegment>];
+}
+
 impl ReadPageSource for BlinkState {
     type Page<'page> = Arc<BlinkPage>;
 
@@ -4772,6 +4945,34 @@ impl ReadPageSource for BlinkState {
             .get(&page_id)
             .map(Arc::clone)
             .ok_or_else(|| Error::corruption("Blink page is missing"))
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl ReadPageSource for PagedReadHandle {
+    type Page<'page> = page_cache::PageGuard<BlinkPage>;
+
+    fn root_page_id(&self) -> PageId {
+        self.root_page_id
+    }
+
+    fn page(&self, page_id: PageId) -> Result<Self::Page<'_>> {
+        if page_id > self.high_water_page_id {
+            return Err(Error::corruption(
+                "paged Blink page exceeds the generation high-water mark",
+            ));
+        }
+        self.loader
+            .load_version(&self.index, self.root, page_id, &self.sources, |source| {
+                (self.header_length)(source)
+            })
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl PublishedReadPageSource for PagedReadHandle {
+    fn overlays(&self) -> &[Arc<ImmutableOverlaySegment>] {
+        &self.overlays
     }
 }
 
@@ -4796,6 +4997,12 @@ impl ReadPageSource for GenerationPin {
             self.page_cell(page_id)?
                 .borrowed_page_at(self.generation.epoch)
         }
+    }
+}
+
+impl PublishedReadPageSource for GenerationPin {
+    fn overlays(&self) -> &[Arc<ImmutableOverlaySegment>] {
+        &self.generation.overlays
     }
 }
 
@@ -6587,13 +6794,13 @@ fn read_published_state(
     read_published_state_with_budget(state, key, right_link_corrections, &mut None)
 }
 
-fn read_published_state_with_budget(
-    state: &GenerationPin,
+fn read_published_state_with_budget<S: PublishedReadPageSource>(
+    state: &S,
     key: &DocumentKey,
     right_link_corrections: &mut u64,
     budget: &mut Option<&mut ResponseBudget>,
 ) -> Result<RevisionState> {
-    if state.generation.overlays.is_empty() {
+    if state.overlays().is_empty() {
         return read_state_encoded_with_budget(
             state,
             &key.encode(),
@@ -6603,7 +6810,7 @@ fn read_published_state_with_budget(
     }
     let encoded = key.encode();
     validate_encoded_key(&encoded)?;
-    for segment in state.generation.overlays.iter().rev() {
+    for segment in state.overlays().iter().rev() {
         if let Some(slot) = segment.lookup(&encoded) {
             return if slot.tombstone {
                 Ok(RevisionState::missing(slot.revision))
@@ -6788,7 +6995,7 @@ fn scan_state_with_budget<S: ReadPageSource>(
 struct BaseRangeCursor<'state, S: ReadPageSource> {
     state: &'state S,
     leaf_id: PageId,
-    page: S::Page<'state>,
+    page: Option<S::Page<'state>>,
     entry_index: usize,
     exclusive_after: Option<Vec<u8>>,
     visited: HashSet<PageId>,
@@ -6823,7 +7030,7 @@ impl<'state, S: ReadPageSource> BaseRangeCursor<'state, S> {
         Ok(Self {
             state,
             leaf_id,
-            page,
+            page: Some(page),
             entry_index,
             exclusive_after,
             visited,
@@ -6833,7 +7040,12 @@ impl<'state, S: ReadPageSource> BaseRangeCursor<'state, S> {
 
     fn peek_key(&mut self) -> Result<Option<&[u8]>> {
         loop {
-            let next_leaf_id = match self.page.as_ref() {
+            let next_leaf_id = match self
+                .page
+                .as_ref()
+                .ok_or_else(|| Error::invariant("Blink range cursor has no page guard"))?
+                .as_ref()
+            {
                 BlinkPage::Leaf {
                     entries,
                     right_sibling,
@@ -6868,13 +7080,17 @@ impl<'state, S: ReadPageSource> BaseRangeCursor<'state, S> {
                 ));
             }
             self.leaf_id = next_leaf_id;
-            self.page = self.state.page(next_leaf_id)?;
+            drop(self.page.take());
+            self.page = Some(self.state.page(next_leaf_id)?);
             self.entry_index = 0;
         }
     }
 
     fn current_entry(&self) -> Result<LeafEntryRef<'_>> {
-        let BlinkPage::Leaf { entries, .. } = self.page.as_ref() else {
+        let Some(page) = self.page.as_ref() else {
+            return Err(Error::invariant("Blink range cursor has no page guard"));
+        };
+        let BlinkPage::Leaf { entries, .. } = page.as_ref() else {
             return Err(Error::corruption(
                 "Blink range cursor reached non-leaf page",
             ));
@@ -6908,8 +7124,8 @@ fn published_range_state(
     )
 }
 
-fn published_range_state_with_budget(
-    state: &GenerationPin,
+fn published_range_state_with_budget<S: PublishedReadPageSource>(
+    state: &S,
     primary_key: Option<&PrimaryKey>,
     exclusive_after: Option<DocumentKey>,
     limit: usize,
@@ -6919,7 +7135,7 @@ fn published_range_state_with_budget(
     if limit == 0 {
         return Ok(Vec::new());
     }
-    if state.generation.overlays.is_empty() {
+    if state.overlays().is_empty() {
         return match (primary_key, exclusive_after.as_ref()) {
             (Some(primary_key), cursor) => query_state_with_budget(
                 state,
@@ -6955,8 +7171,7 @@ fn published_range_state_with_budget(
         right_link_corrections,
     )?;
     let mut overlay_positions = state
-        .generation
-        .overlays
+        .overlays()
         .iter()
         .map(|segment| {
             let mut position = lower_bound
@@ -6977,7 +7192,7 @@ fn published_range_state_with_budget(
     let mut output = Vec::new();
     while output.len() < limit {
         selected_key.clear();
-        for (segment_index, segment) in state.generation.overlays.iter().enumerate() {
+        for (segment_index, segment) in state.overlays().iter().enumerate() {
             if let Some(slot) = segment.slots.get(overlay_positions[segment_index]) {
                 let key = segment.key(slot);
                 if selected_key.is_empty() || key < selected_key.as_slice() {
@@ -7000,18 +7215,22 @@ fn published_range_state_with_budget(
         if primary_key.is_some_and(|primary_key| decoded_key.pk > *primary_key) {
             break;
         }
-        let winning_overlay = state.generation.overlays.iter().enumerate().rev().find_map(
-            |(segment_index, segment)| {
-                segment
-                    .slots
-                    .get(overlay_positions[segment_index])
-                    .filter(|slot| segment.key(slot) == selected_key)
-                    .map(|slot| (segment_index, slot))
-            },
-        );
+        let winning_overlay =
+            state
+                .overlays()
+                .iter()
+                .enumerate()
+                .rev()
+                .find_map(|(segment_index, segment)| {
+                    segment
+                        .slots
+                        .get(overlay_positions[segment_index])
+                        .filter(|slot| segment.key(slot) == selected_key)
+                        .map(|slot| (segment_index, slot))
+                });
         if let Some((segment_index, slot)) = winning_overlay {
             if !slot.tombstone {
-                let value = state.generation.overlays[segment_index].value(slot);
+                let value = state.overlays()[segment_index].value(slot);
                 if let Some(budget) = budget.as_deref_mut() {
                     budget.reserve_document(&decoded_key, value.len())?;
                 }
@@ -7046,7 +7265,7 @@ fn published_range_state_with_budget(
         {
             base.advance();
         }
-        for (segment_index, segment) in state.generation.overlays.iter().enumerate() {
+        for (segment_index, segment) in state.overlays().iter().enumerate() {
             if segment
                 .slots
                 .get(overlay_positions[segment_index])
@@ -9692,6 +9911,7 @@ mod tests {
     use std::alloc::{GlobalAlloc, Layout, System};
     use std::io::{BufRead, BufReader, Write};
     use std::sync::atomic::AtomicBool;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     static COUNT_READ_ALLOCATIONS: AtomicBool = AtomicBool::new(false);
     static READ_ALLOCATION_COUNT: AtomicU64 = AtomicU64::new(0);
@@ -11997,6 +12217,540 @@ mod tests {
         superblock.generation = generation;
         superblock.high_water_page_id = PageId::new(high_water_page_id);
         superblock
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    #[test]
+    fn paged_read_handle_routes_get_query_scan_and_response_budgets_through_disk_pages() {
+        let directory = std::env::temp_dir().join(format!(
+            "dodb-paged-read-route-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let checkpoint_directory = directory.join("packs");
+        let wal_directory = directory.join("segments");
+        let scratch_directory = directory.join("scratch");
+        let index_directory = directory.join("index");
+        std::fs::create_dir_all(&checkpoint_directory).unwrap();
+        std::fs::create_dir_all(&wal_directory).unwrap();
+        let store_identity = version_index::StoreIdentity {
+            database_uuid: [83; 16],
+            wal_epoch: 4,
+        };
+        let page_id = |raw_page_id| PageId::new(raw_page_id);
+        let left_page_id = page_id(2);
+        let right_page_id = page_id(3);
+        let root_page_id = page_id(4);
+        let spare_page_id = page_id(5);
+        let overflow_page_id = page_id(6);
+        let high_water_page_id = page_id(9);
+        let split_key = DocumentKey::new(b"p".to_vec(), b"k08".to_vec()).encode();
+        let mut random_state = 0x8d41_7b29_c653_0af1u64;
+        let randomized_values = (0..16u64)
+            .map(|row_index| {
+                random_state ^= random_state << 13;
+                random_state ^= random_state >> 7;
+                random_state ^= random_state << 17;
+                let sort_key = format!("k{row_index:02}");
+                let value = format!("row-{row_index:02}-{:016x}", random_state).into_bytes();
+                (sort_key, value)
+            })
+            .collect::<BTreeMap<_, _>>();
+        let row = |sort_key: &[u8], value: Option<&[u8]>, revision: u64| LeafEntry {
+            key: DocumentKey::new(b"p".to_vec(), sort_key.to_vec()).encode(),
+            revision: Revision::new(revision),
+            value: value.map(|value| OwnedValue::Inline(value.to_vec())),
+        };
+        let left_page = BlinkPage::Leaf {
+            lsn: Lsn::new(1),
+            high_key: Some(split_key.clone()),
+            right_sibling: Some(right_page_id),
+            entries: pack_leaf(
+                &(0..8)
+                    .map(|row_index| {
+                        let sort_key = format!("k{row_index:02}");
+                        if row_index == 7 {
+                            LeafEntry {
+                                key: DocumentKey::new(b"p".to_vec(), sort_key.into_bytes())
+                                    .encode(),
+                                revision: Revision::new(row_index + 1),
+                                value: Some(OwnedValue::Overflow {
+                                    head: overflow_page_id,
+                                    length: 10,
+                                }),
+                            }
+                        } else {
+                            row(
+                                sort_key.as_bytes(),
+                                Some(randomized_values[&sort_key].as_slice()),
+                                row_index + 1,
+                            )
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+            ),
+        };
+        let right_page = BlinkPage::Leaf {
+            lsn: Lsn::new(1),
+            high_key: None,
+            right_sibling: None,
+            entries: pack_leaf(
+                &[
+                    (8..16)
+                        .map(|row_index| {
+                            let sort_key = format!("k{row_index:02}");
+                            row(
+                                sort_key.as_bytes(),
+                                Some(randomized_values[&sort_key].as_slice()),
+                                row_index + 1,
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                    vec![
+                        row(b"k16", None, 17),
+                        LeafEntry {
+                            key: DocumentKey::new(b"q".to_vec(), b"a".to_vec()).encode(),
+                            revision: Revision::new(18),
+                            value: Some(OwnedValue::Inline(b"quartz".to_vec())),
+                        },
+                    ],
+                ]
+                .concat(),
+            ),
+        };
+        let root_page = BlinkPage::Internal {
+            lsn: Lsn::new(1),
+            level: 1,
+            high_key: None,
+            right_sibling: None,
+            leftmost_child: left_page_id,
+            entries: vec![InternalEntry {
+                key: split_key,
+                right_child: right_page_id,
+            }],
+        };
+        let page_images = [
+            (left_page_id, left_page),
+            (right_page_id, right_page),
+            (root_page_id, root_page),
+            (
+                spare_page_id,
+                BlinkPage::Free {
+                    lsn: Lsn::new(1),
+                    next: None,
+                },
+            ),
+            (
+                overflow_page_id,
+                BlinkPage::Overflow {
+                    lsn: Lsn::new(1),
+                    next: None,
+                    total_length: 10,
+                    chunk: b"0123456789".to_vec(),
+                },
+            ),
+            (
+                page_id(7),
+                BlinkPage::Free {
+                    lsn: Lsn::new(1),
+                    next: None,
+                },
+            ),
+            (
+                page_id(8),
+                BlinkPage::Free {
+                    lsn: Lsn::new(1),
+                    next: None,
+                },
+            ),
+            (
+                high_water_page_id,
+                BlinkPage::Free {
+                    lsn: Lsn::new(1),
+                    next: None,
+                },
+            ),
+        ]
+        .into_iter()
+        .map(|(page_id, page)| (page_id, encode_blink_page(page_id, &page).unwrap()))
+        .collect::<Vec<_>>();
+        let source_header = vec![0x61; PAGE_SIZE];
+        let source_identity = version_index::SourceIdentity {
+            kind: version_index::SourceFileKind::CheckpointPack,
+            file_number: 1,
+            header_identity: *blake3::hash(&source_header).as_bytes(),
+        };
+        let source_path = checkpoint_directory.join("base-00000000000000000001.pages");
+        let mut source_file = std::fs::File::create(&source_path).unwrap();
+        source_file.write_all(&source_header).unwrap();
+        let mut page_offsets = BTreeMap::new();
+        for (page_index, (page_id, image)) in page_images.iter().enumerate() {
+            let offset = PAGE_SIZE as u64 * (page_index as u64 + 1);
+            source_file.write_all(image).unwrap();
+            page_offsets.insert(*page_id, offset);
+        }
+        let source_length = PAGE_SIZE as u64 * (page_images.len() as u64 + 1);
+        let mut global_category_bytes = [4_194_304; 7];
+        let mut per_tenant_category_bytes = [4_194_304; 7];
+        global_category_bytes[resource::ResourceCategory::DecodedPayload as usize] =
+            (PAGE_SIZE * 4) as u64;
+        per_tenant_category_bytes[resource::ResourceCategory::DecodedPayload as usize] =
+            (PAGE_SIZE * 4) as u64;
+        let resources = resource::BlinkResourceManager::new(resource::ResourceLimits {
+            global_bytes: 4_194_304,
+            per_tenant_bytes: 4_194_304,
+            progress_pool_bytes: 65_536,
+            max_tenants: 2,
+            max_pending_waiters: 16,
+            global_category_bytes,
+            per_tenant_category_bytes,
+        })
+        .unwrap();
+        let index = Arc::new(
+            version_index::VersionIndex::open(
+                &index_directory,
+                store_identity,
+                resources.clone(),
+                11,
+                2,
+            )
+            .unwrap(),
+        );
+        let mut root = index.empty_root();
+        for (page_id, image) in &page_images {
+            let image_crc32c = crc32c::crc32c(image);
+            root = index
+                .insert(
+                    root,
+                    *page_id,
+                    version_index::VersionDescriptor {
+                        page_id: *page_id,
+                        token: version_index::VersionToken::Bootstrap { page_id: *page_id },
+                        image_lsn: Lsn::new(1),
+                        image_crc32c,
+                        locator: version_index::VersionLocator::CheckpointImage {
+                            source: source_identity,
+                            offset: page_offsets[page_id],
+                            source_length,
+                            image_lsn: Lsn::new(1),
+                            image_crc32c,
+                        },
+                    },
+                )
+                .unwrap();
+        }
+        let sources = source_manager::SourceManager::new(
+            source_manager::SourceManagerConfig {
+                store_identity,
+                checkpoint_directory: checkpoint_directory.clone(),
+                wal_directory: wal_directory.clone(),
+                scratch_directory: scratch_directory.clone(),
+                tenant_id: 11,
+                maximum_open_handles: 2,
+                maximum_roots: 2,
+                handle_charge_bytes: 128,
+                gc_reservation_bytes: 8192,
+            },
+            resources.clone(),
+        )
+        .unwrap();
+        let handle = PagedReadHandle::new(
+            PagedReadConfig {
+                tenant_id: 11,
+                root,
+                root_page_id,
+                high_water_page_id,
+                loader: page_cache::PageLoaderConfig {
+                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 2) as u64,
+                    maximum_concurrent_loads: 2,
+                    maximum_followers: 8,
+                },
+            },
+            Arc::clone(&index),
+            resources.clone(),
+            sources.clone(),
+            |_| Ok(PAGE_SIZE),
+        )
+        .unwrap();
+        let primary_key = PrimaryKey::new(b"p".to_vec());
+        let key_b = DocumentKey::new(b"p".to_vec(), b"k07".to_vec());
+        let tombstone_key = DocumentKey::new(b"p".to_vec(), b"k16".to_vec());
+        let missing_key = DocumentKey::new(b"p".to_vec(), b"missing".to_vec());
+        assert_eq!(
+            handle.get(&key_b).unwrap().value(),
+            Some(&b"0123456789"[..])
+        );
+        assert!(handle.get(&tombstone_key).unwrap().value().is_none());
+        assert!(handle.get(&missing_key).unwrap().value().is_none());
+        let query = handle.query(&primary_key, None, 16).unwrap();
+        assert_eq!(
+            query
+                .iter()
+                .map(|document| document.key.sk.as_bytes().to_vec())
+                .collect::<Vec<_>>(),
+            randomized_values
+                .keys()
+                .map(|sort_key| sort_key.as_bytes().to_vec())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            query
+                .iter()
+                .map(|document| document.value.clone())
+                .collect::<Vec<_>>(),
+            randomized_values
+                .iter()
+                .map(|(sort_key, value)| {
+                    if sort_key == "k07" {
+                        b"0123456789".to_vec()
+                    } else {
+                        value.clone()
+                    }
+                })
+                .collect::<Vec<_>>()
+        );
+        let query_after = handle
+            .query(&primary_key, Some(&SortKey::new(b"k07".to_vec())), 16)
+            .unwrap();
+        assert_eq!(query_after.len(), 8);
+        assert_eq!(
+            query_after[0].key,
+            DocumentKey::new(b"p".to_vec(), b"k08".to_vec())
+        );
+        let scan = handle.scan(None, 17).unwrap();
+        assert_eq!(scan.len(), 17);
+        assert_eq!(scan[16].key, DocumentKey::new(b"q".to_vec(), b"a".to_vec()));
+        let scan_after = handle
+            .scan(Some(&DocumentKey::new(b"p".to_vec(), b"k07".to_vec())), 16)
+            .unwrap();
+        assert_eq!(scan_after.len(), 9);
+        assert_eq!(
+            scan_after[0].key,
+            DocumentKey::new(b"p".to_vec(), b"k08".to_vec())
+        );
+        assert!(
+            handle
+                .query_with_response_budget(&primary_key, None, 16, 1)
+                .is_err()
+        );
+        assert!(handle.source_read_count() >= 3);
+        let overlay_segment = Arc::new(
+            ImmutableOverlaySegment::from_sorted_entries(vec![
+                (
+                    DocumentKey::new(b"p".to_vec(), b"k02".to_vec()).encode(),
+                    None,
+                    Revision::new(100),
+                ),
+                (
+                    key_b.encode(),
+                    Some(b"overlay-value".to_vec()),
+                    Revision::new(101),
+                ),
+                (
+                    tombstone_key.encode(),
+                    Some(b"resurrected".to_vec()),
+                    Revision::new(102),
+                ),
+            ])
+            .unwrap(),
+        );
+        let overlay_handle = PagedReadHandle::new(
+            PagedReadConfig {
+                tenant_id: 11,
+                root,
+                root_page_id,
+                high_water_page_id,
+                loader: page_cache::PageLoaderConfig {
+                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 2) as u64,
+                    maximum_concurrent_loads: 2,
+                    maximum_followers: 8,
+                },
+            },
+            Arc::clone(&index),
+            resources.clone(),
+            sources.clone(),
+            |_| Ok(PAGE_SIZE),
+        )
+        .unwrap()
+        .with_overlay_segments(vec![overlay_segment])
+        .unwrap();
+        assert!(
+            overlay_handle
+                .get(&DocumentKey::new(b"p".to_vec(), b"k02".to_vec()))
+                .unwrap()
+                .value()
+                .is_none()
+        );
+        assert_eq!(
+            overlay_handle.get(&key_b).unwrap().value(),
+            Some(&b"overlay-value"[..])
+        );
+        assert_eq!(
+            overlay_handle.get(&tombstone_key).unwrap().value(),
+            Some(&b"resurrected"[..])
+        );
+        let overlay_query = overlay_handle.query(&primary_key, None, 16).unwrap();
+        assert_eq!(overlay_query.len(), 16);
+        assert_eq!(overlay_query[6].value, b"overlay-value");
+        drop(overlay_handle);
+        let current_leaf = BlinkPage::Leaf {
+            lsn: Lsn::new(2),
+            high_key: Some(DocumentKey::new(b"p".to_vec(), b"k08".to_vec()).encode()),
+            right_sibling: Some(right_page_id),
+            entries: pack_leaf(
+                &(0..8)
+                    .map(|row_index| {
+                        let sort_key = format!("k{row_index:02}");
+                        let value = if row_index == 7 {
+                            b"new-value".to_vec()
+                        } else {
+                            randomized_values[&sort_key].clone()
+                        };
+                        LeafEntry {
+                            key: DocumentKey::new(b"p".to_vec(), sort_key.into_bytes()).encode(),
+                            revision: Revision::new(row_index + 1),
+                            value: Some(OwnedValue::Inline(value)),
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+            ),
+        };
+        let current_image = encode_blink_page(left_page_id, &current_leaf).unwrap();
+        let current_header = vec![0x62; PAGE_SIZE];
+        let current_source_identity = version_index::SourceIdentity {
+            kind: version_index::SourceFileKind::CheckpointPack,
+            file_number: 2,
+            header_identity: *blake3::hash(&current_header).as_bytes(),
+        };
+        let current_source_path = checkpoint_directory.join("base-00000000000000000002.pages");
+        let mut current_source_file = std::fs::File::create(&current_source_path).unwrap();
+        current_source_file.write_all(&current_header).unwrap();
+        current_source_file.write_all(&current_image).unwrap();
+        drop(current_source_file);
+        let current_image_crc32c = crc32c::crc32c(&current_image);
+        let current_root = index
+            .insert(
+                root,
+                left_page_id,
+                version_index::VersionDescriptor {
+                    page_id: left_page_id,
+                    token: version_index::VersionToken::Bootstrap {
+                        page_id: left_page_id,
+                    },
+                    image_lsn: Lsn::new(2),
+                    image_crc32c: current_image_crc32c,
+                    locator: version_index::VersionLocator::CheckpointImage {
+                        source: current_source_identity,
+                        offset: PAGE_SIZE as u64,
+                        source_length: (PAGE_SIZE * 2) as u64,
+                        image_lsn: Lsn::new(2),
+                        image_crc32c: current_image_crc32c,
+                    },
+                },
+            )
+            .unwrap();
+        let old_handle = Arc::new(handle);
+        let current_handle = Arc::new(
+            PagedReadHandle::new(
+                PagedReadConfig {
+                    tenant_id: 11,
+                    root: current_root,
+                    root_page_id,
+                    high_water_page_id,
+                    loader: page_cache::PageLoaderConfig {
+                        maximum_cache_bytes: PAGE_SIZE as u64,
+                        minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                        maximum_load_reconstruction_bytes: (PAGE_SIZE * 2) as u64,
+                        maximum_concurrent_loads: 2,
+                        maximum_followers: 8,
+                    },
+                },
+                Arc::clone(&index),
+                resources.clone(),
+                sources.clone(),
+                |_| Ok(PAGE_SIZE),
+            )
+            .unwrap(),
+        );
+        let read_barrier = Arc::new(std::sync::Barrier::new(2));
+        let old_reader = {
+            let old_handle = Arc::clone(&old_handle);
+            let read_barrier = Arc::clone(&read_barrier);
+            let key_b = key_b.clone();
+            std::thread::spawn(move || {
+                read_barrier.wait();
+                old_handle.get(&key_b).unwrap().value().unwrap().to_vec()
+            })
+        };
+        let current_reader = {
+            let current_handle = Arc::clone(&current_handle);
+            let read_barrier = Arc::clone(&read_barrier);
+            let key_b = key_b.clone();
+            let primary_key = primary_key.clone();
+            std::thread::spawn(move || {
+                read_barrier.wait();
+                let value = current_handle
+                    .get(&key_b)
+                    .unwrap()
+                    .value()
+                    .unwrap()
+                    .to_vec();
+                let query = current_handle.query(&primary_key, None, 16).unwrap();
+                (value, query.len())
+            })
+        };
+        assert_eq!(old_reader.join().unwrap(), b"0123456789");
+        assert_eq!(current_reader.join().unwrap(), (b"new-value".to_vec(), 16));
+        drop(current_handle);
+        drop(old_handle);
+        drop(source_file);
+        let mut corrupted_source = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&source_path)
+            .unwrap();
+        use std::io::{Seek, SeekFrom};
+        corrupted_source
+            .seek(SeekFrom::Start(
+                page_offsets[&root_page_id] + PAGE_SIZE as u64 - 1,
+            ))
+            .unwrap();
+        let root_tail = page_images
+            .iter()
+            .find(|(page_id, _)| *page_id == root_page_id)
+            .unwrap()
+            .1[PAGE_SIZE - 1];
+        corrupted_source.write_all(&[root_tail ^ 1]).unwrap();
+        drop(corrupted_source);
+        let corrupted_handle = PagedReadHandle::new(
+            PagedReadConfig {
+                tenant_id: 11,
+                root,
+                root_page_id,
+                high_water_page_id,
+                loader: page_cache::PageLoaderConfig {
+                    maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
+                    minimum_decoded_page_bytes: PAGE_SIZE as u64,
+                    maximum_load_reconstruction_bytes: (PAGE_SIZE * 2) as u64,
+                    maximum_concurrent_loads: 2,
+                    maximum_followers: 8,
+                },
+            },
+            index,
+            resources,
+            sources,
+            |_| Ok(PAGE_SIZE),
+        )
+        .unwrap();
+        assert!(corrupted_handle.get(&key_b).is_err());
+        drop(corrupted_handle);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

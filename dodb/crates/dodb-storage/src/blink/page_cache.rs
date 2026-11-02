@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 use std::io::ErrorKind;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 
 use dodb_core::{Error, Lsn, PageId, Result};
@@ -202,6 +202,7 @@ pub struct PageLoader<K, V> {
     resources: BlinkResourceManager,
     config: PageLoaderConfig,
     state: Mutex<CacheState<K, V>>,
+    source_reads: AtomicU64,
 }
 
 impl<K, V> PageLoader<K, V>
@@ -229,6 +230,7 @@ where
                 active_followers: 0,
                 closed: false,
             }),
+            source_reads: AtomicU64::new(0),
         })
     }
 
@@ -374,6 +376,10 @@ where
         Ok(true)
     }
 
+    pub fn source_read_count(&self) -> u64 {
+        self.source_reads.load(Ordering::Relaxed)
+    }
+
     pub fn close(&self) -> Result<()> {
         let tickets = {
             let mut state = self
@@ -404,15 +410,15 @@ where
     }
 }
 
-impl PageLoader<PageVersionKey, [u8; crate::page::PAGE_SIZE]> {
-    pub fn load_version<F>(
+impl PageLoader<PageVersionKey, super::BlinkPage> {
+    pub(crate) fn load_version<F>(
         &self,
         index: &VersionIndex,
         root: VersionIndexRoot,
         page_id: PageId,
         sources: &SourceManager,
         mut header_length: F,
-    ) -> Result<PageGuard<[u8; crate::page::PAGE_SIZE]>>
+    ) -> Result<PageGuard<super::BlinkPage>>
     where
         F: FnMut(SourceIdentity) -> Result<usize>,
     {
@@ -478,11 +484,12 @@ impl PageLoader<PageVersionKey, [u8; crate::page::PAGE_SIZE]> {
                 .ok_or_else(|| Error::overloaded("page reconstruction size overflows"))
         })?;
         self.get_or_load(key, encoded_bytes, crate::page::PAGE_SIZE as u64, || {
-            chain.reconstruct(|entry| match entry {
+            let image = chain.reconstruct(|entry| match entry {
                 DeltaChainEntry::CheckpointImage { source, offset, .. } => {
                     let mut lease = sources.acquire(source, header_length(source)?)?;
                     let mut image = vec![0; crate::page::PAGE_SIZE];
                     lease.read_exact_at(offset, &mut image)?;
+                    self.source_reads.fetch_add(1, Ordering::Relaxed);
                     Ok(image)
                 }
                 DeltaChainEntry::WalImage {
@@ -490,6 +497,7 @@ impl PageLoader<PageVersionKey, [u8; crate::page::PAGE_SIZE]> {
                 } => read_wal_payload(
                     sources,
                     &mut header_length,
+                    &self.source_reads,
                     frame,
                     page_id,
                     record_lsn,
@@ -500,12 +508,14 @@ impl PageLoader<PageVersionKey, [u8; crate::page::PAGE_SIZE]> {
                 } => read_wal_payload(
                     sources,
                     &mut header_length,
+                    &self.source_reads,
                     frame,
                     page_id,
                     record_lsn,
                     true,
                 ),
-            })
+            })?;
+            super::decode_blink_page(&image, page_id)
         })
     }
 }
@@ -513,6 +523,7 @@ impl PageLoader<PageVersionKey, [u8; crate::page::PAGE_SIZE]> {
 fn read_wal_payload<F>(
     sources: &SourceManager,
     header_length: &mut F,
+    source_reads: &AtomicU64,
     frame: WalFrameLocator,
     page_id: PageId,
     record_lsn: Lsn,
@@ -526,6 +537,7 @@ where
     let mut lease: SourceLease = sources.acquire(frame.source, header_length(frame.source)?)?;
     let mut bytes = vec![0; frame_length];
     lease.read_exact_at(frame.frame_offset, &mut bytes)?;
+    source_reads.fetch_add(1, Ordering::Relaxed);
     crate::wal::validate_paged_frame_bytes(&bytes, frame, page_id, record_lsn, is_delta)
 }
 
@@ -862,7 +874,10 @@ mod tests {
                 })
             })
             .unwrap();
-        assert_eq!(old_guard.as_ref(), &old_image);
+        assert!(matches!(
+            old_guard.as_ref(),
+            BlinkPage::Leaf { lsn, entries, .. } if *lsn == Lsn::new(10) && entries.len() == 0
+        ));
         let old_key = PageVersionKey::from_descriptor(
             store,
             index.lookup(old_root, page_id).unwrap().unwrap(),
@@ -878,7 +893,10 @@ mod tests {
                 })
             })
             .unwrap();
-        assert_eq!(current_guard.as_ref(), &current_image);
+        assert!(matches!(
+            current_guard.as_ref(),
+            BlinkPage::Leaf { lsn, entries, .. } if *lsn == Lsn::new(12) && entries.len() == 0
+        ));
         page_loader
             .evict(&PageVersionKey::from_descriptor(
                 store,
@@ -895,7 +913,10 @@ mod tests {
                 })
             })
             .unwrap();
-        assert_eq!(reloaded_old_guard.as_ref(), &old_image);
+        assert!(matches!(
+            reloaded_old_guard.as_ref(),
+            BlinkPage::Leaf { lsn, entries, .. } if *lsn == Lsn::new(10) && entries.len() == 0
+        ));
         fs::remove_dir_all(root_directory).unwrap();
     }
 
