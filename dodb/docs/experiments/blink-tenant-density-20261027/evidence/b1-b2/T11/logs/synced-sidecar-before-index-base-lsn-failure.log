@@ -1,0 +1,21 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.48s
+     Running unittests src/lib.rs (target/debug/deps/dodb_storage-70634b21c90c24df)
+
+running 1 test
+test blink::paged_manifest::tests::synced_delta_chain_before_index_publication_survives_sigkill_as_orphan ... 
+running 1 test
+
+thread 'blink::paged_manifest::tests::synced_delta_chain_before_index_publication_survives_sigkill_as_orphan' (444190920) panicked at dodb/crates/dodb-storage/src/blink/paged_manifest.rs:1332:18:
+called `Result::unwrap()` on an `Err` value: Corruption("WAL delta-chain entry is invalid")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    blink::paged_manifest::tests::synced_delta_chain_before_index_publication_survives_sigkill_as_orphan
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 321 filtered out; finished in 0.30s
+
+error: test failed, to rerun pass `-p dodb-storage --lib`

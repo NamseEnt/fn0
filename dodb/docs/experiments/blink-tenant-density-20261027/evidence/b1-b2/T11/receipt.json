@@ -15,14 +15,15 @@
     "72a63c511",
     "3f4847ed6",
     "a5a54e533",
-    "969be9876"
+    "969be9876",
+    "71483f8b2"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "969be9876"
+    "source_commit": "71483f8b2"
   },
   "features": [
     "blink-demand-paging",
@@ -121,7 +122,7 @@
       "name": "dodb_storage_full_library_suite_after_sigkill_cases",
       "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- --test-threads=1",
       "exit_status": 0,
-      "result": "317 passed, 4 ignored; 0 failed"
+      "result": "318 passed, 4 ignored; 0 failed"
     },
     {
       "name": "background_materialization_timeout_focused_retry",
@@ -140,13 +141,19 @@
       "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' durable_index_nodes_before_manifest_pointer_survive_sigkill -- --test-threads=1 --nocapture",
       "exit_status": 0,
       "result": "1 passed; child killed after durable index nodes and pointer temporary sync but before rename; reopen selected parent-created old manifest/root and ignored orphan new index nodes"
+    },
+    {
+      "name": "synced_delta_chain_before_index_publication_sigkill",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' synced_delta_chain_before_index_publication_survives_sigkill_as_orphan -- --test-threads=1 --nocapture",
+      "exit_status": 0,
+      "result": "1 passed; child killed after sidecar file and directory sync before index insertion; reopen selected the old checkpoint-image descriptor and the complete sidecar remained unreferenced"
     }
   ],
   "source_hashes": {
     "dodb/crates/dodb-storage/src/blink/mod.rs": "e3c91c56e60c17de54088c1caf90f358ddde88c74d00d0f8b8d06918fe24d788",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "20560bff3b3715642417335a71bd80e5990f8d157398dbbf4e1fa541dd7db6cd",
-    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "61f97701ddf8ea7190aa57b4caca8e567289010b2565d9ecc3925beb93f4e146",
-    "dodb/crates/dodb-storage/src/blink/version_chain.rs": "972dccca0a282fe0f3bd201b62b00d61e7b1ba14bccdef6c13a313f7b7cf55ec",
+    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "fead0f023fb9eace22359d72b81a09bdd846e3af3d29e8855ca3b926ab2138c7",
+    "dodb/crates/dodb-storage/src/blink/version_chain.rs": "c86233ee1715992282fb272f449017aef79223eb1affe6cc60531ba6f3dadfe5",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "42c750672725f2ce591e01c6ce63e369c2e9d8d0f16f3c84b292993518dc4991"
   },
   "logs": [
@@ -219,7 +226,7 @@
     {
       "name": "full_dodb_storage_library_suite_final",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-bounded-structure-full-lib-final.log",
-      "sha256": "e43d4b9c4d22c69b5c35d5ceec817d39bb62bb4cf3a4b70a3a57040ba764eb80",
+      "sha256": "d6d4755c27979c0ed1f0c7390ac47a8b76113efa1fca6c7f9523a56fb0aa5137",
       "exit_status": 0
     },
     {
@@ -371,11 +378,23 @@
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/index-before-manifest-sigkill-assert-expression-compile-failure.log",
       "sha256": "764ebb1a6a8b074d67a750cea0774c384543988b4bb9489070c24ed408de128c",
       "exit_status": 101
+    },
+    {
+      "name": "synced_delta_chain_before_index_publication_sigkill",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-synced-sidecar-before-index-sigkill.log",
+      "sha256": "80f23cb970d3bac167eba672efc8954242d3cde0c5f007d8299e1b484f805f7c",
+      "exit_status": 0
+    },
+    {
+      "name": "synced_delta_chain_before_index_base_lsn_failure",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/synced-sidecar-before-index-base-lsn-failure.log",
+      "sha256": "46743ab3dc585bdfe7bc2cf94e82a05220bbe7eb16186d9eba225ef9411e9846",
+      "exit_status": 101
     }
   ],
   "remaining_work": [
     "Route tenant service opening through complete bounded validation and prove failure cleanup as part of T12.",
-    "Complete the actual transaction-writer delta-chain sidecar-to-index crash boundary, page-ID reuse and pinned-version/checkpoint race coverage, and recovery followed by a successful write and a second process crash."
+    "Complete process-kill coverage for page-ID reuse and pinned-version/checkpoint races, and recovery followed by a successful write and a second process crash."
   ],
   "next_task": "T11",
   "push": {
