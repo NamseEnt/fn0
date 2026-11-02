@@ -8,7 +8,7 @@ The validator reserves three pages from `CheckpointValidation` and reserves one 
 
 The validator also checks internal child types and levels, separator/child fences, leaf and internal sibling continuity, overflow ownership and lengths, and free-list page types. A corrupt leaf not touched by the requested read fails validation. Test fixtures cover missing allocation, an omitted free list, a free-list cycle, multiply owned tree child, and scratch release. The validated-open arguments are grouped in `PagedValidatedOpenConfig`.
 
-Additional storage tests cover all four paged manifest pointer publication fault boundaries and real process `SIGKILL` at all four pointer stages; source GC is also killed before and after unlink, then reopened and retried and fail-closed delta-chain sidecar checks for wrong embedded identity, corrupted payload, truncation, and missing sidecar.
+Additional storage tests cover all four paged manifest pointer publication fault boundaries and real process `SIGKILL` at all four pointer stages; source GC is also killed before and after unlink, then reopened and retried; source GC is also killed before and after unlink, then reopened and retried and fail-closed delta-chain sidecar checks for wrong embedded identity, corrupted payload, truncation, and missing sidecar.
 
 ## Validation
 

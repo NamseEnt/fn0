@@ -10,6 +10,7 @@
     "9729a5f07",
     "b8e57e68d",
     "0c5104b3b",
+    "72a88fb07",
     "72a88fb07"
   ],
   "host": {
@@ -75,6 +76,12 @@
       "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_manifest_pointer_publication_survives_sigkill -- --test-threads=1 --nocapture",
       "exit_status": 0,
       "result": "1 passed; child processes were SIGKILLed at four pointer publication boundaries and reopened generation matched the durable pointer state"
+    },
+    {
+      "name": "source_gc_sigkill_boundaries",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' source_gc_survives_sigkill_before_and_after_unlink -- --test-threads=1 --nocapture",
+      "exit_status": 0,
+      "result": "1 passed; before-unlink kill retained the candidate and retry removed it; after-unlink kill left it absent and retry was clean"
     },
     {
       "name": "dodb_storage_full_library_suite",
@@ -196,6 +203,12 @@
       "name": "paged_manifest_pointer_sigkill_boundaries",
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-pointer-publication-sigkill.log",
       "sha256": "748a465a6be786a80b96850c9b6bc99827dd00f84d4806b6e0c11a41c3f24f39",
+      "exit_status": 0
+    },
+    {
+      "name": "source_gc_sigkill_boundaries",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-source-gc-sigkill.log",
+      "sha256": "5eaaf73ac81f4427c71fe1ede2b05a03a07c9f08a5d953cabce36c9cdb9c65f7",
       "exit_status": 0
     },
     {
