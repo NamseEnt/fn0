@@ -1,0 +1,21 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+error: expected expression, found `>`
+    --> dodb/crates/dodb-storage/src/blink/paged_manifest.rs:1152:13
+     |
+1152 |             > 1,
+     |             ^ expected expression
+
+error[E0308]: mismatched types
+    --> dodb/crates/dodb-storage/src/blink/paged_manifest.rs:1146:9
+     |
+1146 | /         assert!(
+1147 | |             fs::read_dir(version_index_directory(&directory.database_path()))
+1148 | |                 .unwrap()
+1149 | |                 .filter_map(Result::ok)
+...    |
+1152 | |             > 1,
+1153 | |         );
+     | |_________^ expected `bool`, found `usize`
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `dodb-storage` (lib test) due to 2 previous errors

@@ -1,0 +1,11 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+error: no rules expected `>`
+    --> dodb/crates/dodb-storage/src/blink/paged_manifest.rs:1152:13
+     |
+1152 |             > 1
+     |             ^ no rules expected this token in macro call
+     |
+note: while trying to match meta-variable `$right:expr`
+    --> /rustc/8bab26f4f68e0e26f0bb7960be334d5b520ea452/library/core/src/macros/mod.rs:43:17
+
+error: could not compile `dodb-storage` (lib test) due to 1 previous error
