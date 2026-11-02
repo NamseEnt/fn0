@@ -8,7 +8,8 @@ use std::sync::{Arc, Mutex};
 use dodb_core::{Error, Lsn, PageId, Result};
 
 use super::resource::{
-    BlinkResourceManager, Reservation, ReservationClass, ResourceCategory, ResourceError,
+    BlinkResourceManager, DiskCategory, DiskReservation, Reservation, ReservationClass,
+    ResourceCategory, ResourceError,
 };
 use super::version_chain::{DeltaChainRef, DeltaChainStore};
 
@@ -343,12 +344,19 @@ struct VersionIndexStore {
     directory: PathBuf,
     identity: StoreIdentity,
     next_file_number: AtomicU64,
+    disk_reservation: Mutex<DiskReservation>,
 }
 
 impl VersionIndexStore {
-    fn open(directory: &Path, identity: StoreIdentity) -> Result<Self> {
+    fn open(
+        directory: &Path,
+        identity: StoreIdentity,
+        resources: &BlinkResourceManager,
+        tenant_id: u64,
+    ) -> Result<Self> {
         fs::create_dir_all(directory)?;
         let mut maximum_file_number = 0u64;
+        let mut existing_node_bytes = 0u64;
         for entry in fs::read_dir(directory)? {
             let entry = entry?;
             let file_name = entry.file_name();
@@ -357,16 +365,29 @@ impl VersionIndexStore {
             };
             if let Some(number) = parse_node_file_number(file_name)? {
                 maximum_file_number = maximum_file_number.max(number);
+                let metadata = entry.metadata()?;
+                if metadata.is_file() {
+                    existing_node_bytes = existing_node_bytes
+                        .checked_add(metadata.len())
+                        .ok_or_else(|| {
+                            Error::invalid_input("version-index disk byte count overflows")
+                        })?;
+                }
             }
         }
         let next_file_number = maximum_file_number
             .checked_add(1)
             .ok_or_else(|| Error::invalid_input("version-index file number exhausted"))?
             .max(1);
+        let disk_reservation = resources
+            .disk()
+            .reserve(tenant_id, DiskCategory::VersionIndex, existing_node_bytes)
+            .map_err(|_| Error::overloaded("version-index disk budget is exhausted"))?;
         Ok(Self {
             directory: directory.to_path_buf(),
             identity,
             next_file_number: AtomicU64::new(next_file_number),
+            disk_reservation: Mutex::new(disk_reservation),
         })
     }
 
@@ -394,18 +415,66 @@ impl VersionIndexStore {
             let node_checksum = *blake3::hash(&bytes[..NODE_CHECKSUM_OFFSET]).as_bytes();
             bytes[NODE_CHECKSUM_OFFSET..].copy_from_slice(&node_checksum);
             let path = self.node_path(file_number);
+            self.disk_reservation
+                .lock()
+                .map_err(|_| Error::invariant("version-index disk reservation lock poisoned"))?
+                .grow(VERSION_INDEX_NODE_BYTES as u64)
+                .map_err(|_| Error::overloaded("version-index disk budget is exhausted"))?;
             match OpenOptions::new().write(true).create_new(true).open(path) {
                 Ok(mut file) => {
-                    file.write_all(&bytes)?;
-                    file.flush()?;
+                    let write_result = file.write_all(&bytes).and_then(|()| file.flush());
+                    if let Err(error) = write_result {
+                        let actual_bytes = file
+                            .metadata()
+                            .map(|metadata| metadata.len())
+                            .unwrap_or(VERSION_INDEX_NODE_BYTES as u64);
+                        let unused_bytes =
+                            (VERSION_INDEX_NODE_BYTES as u64).saturating_sub(actual_bytes);
+                        if unused_bytes > 0 {
+                            self.disk_reservation
+                                .lock()
+                                .map_err(|_| {
+                                    Error::invariant("version-index disk reservation lock poisoned")
+                                })?
+                                .shrink(unused_bytes)
+                                .map_err(|_| {
+                                    Error::invariant(
+                                        "version-index disk reservation release failed",
+                                    )
+                                })?;
+                        }
+                        return Err(error.into());
+                    }
                     return Ok(NodeRef {
                         file_number,
                         offset: 0,
                         checksum: node_checksum,
                     });
                 }
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                Err(error) => return Err(error.into()),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                    self.disk_reservation
+                        .lock()
+                        .map_err(|_| {
+                            Error::invariant("version-index disk reservation lock poisoned")
+                        })?
+                        .shrink(VERSION_INDEX_NODE_BYTES as u64)
+                        .map_err(|_| {
+                            Error::invariant("version-index disk reservation release failed")
+                        })?;
+                    continue;
+                }
+                Err(error) => {
+                    self.disk_reservation
+                        .lock()
+                        .map_err(|_| {
+                            Error::invariant("version-index disk reservation lock poisoned")
+                        })?
+                        .shrink(VERSION_INDEX_NODE_BYTES as u64)
+                        .map_err(|_| {
+                            Error::invariant("version-index disk reservation release failed")
+                        })?;
+                    return Err(error.into());
+                }
             }
         }
     }
@@ -464,7 +533,9 @@ impl VersionIndex {
             ));
         }
         Ok(Self {
-            store: Arc::new(VersionIndexStore::open(directory, identity)?),
+            store: Arc::new(VersionIndexStore::open(
+                directory, identity, &resources, tenant_id,
+            )?),
             delta_chains: DeltaChainStore::open(directory, identity, resources.clone(), tenant_id)?,
             resources,
             tenant_id,

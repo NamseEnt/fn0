@@ -16190,11 +16190,11 @@ mod tests {
                 per_tenant_category_bytes: [4_194_304; 7],
             },
             resource::DiskResourceLimits {
-                global_bytes: 131_072,
-                per_tenant_bytes: 131_072,
+                global_bytes: 2_097_152,
+                per_tenant_bytes: 2_097_152,
                 max_tenants: 2,
-                global_category_bytes: [131_072; 5],
-                per_tenant_category_bytes: [131_072; 5],
+                global_category_bytes: [2_097_152; 5],
+                per_tenant_category_bytes: [2_097_152; 5],
             },
         )
         .unwrap();
@@ -16691,7 +16691,10 @@ mod tests {
         );
         let disk_snapshot = resources.disk().snapshot().unwrap();
         assert!(disk_snapshot.current_total > initial_pack_output.entry.bytes);
-        assert!(disk_snapshot.peak_total <= 131_072);
+        assert!(disk_snapshot.peak_total <= 2_097_152);
+        assert!(
+            disk_snapshot.current_by_category[resource::DiskCategory::VersionIndex as usize] > 0
+        );
         let reopened_root = reopened_index
             .root_from_node_reference(reopened_manifest.current().durable_index_root)
             .unwrap();
