@@ -1804,10 +1804,13 @@ pub struct PagedCheckpointJob {
     target: PagedReadHandle,
     request: PagedCheckpointPackRequest,
     target_lsn: Lsn,
-    previous_checkpoint_lsn: Lsn,
     manifest_generation: u64,
     pack_written: bool,
+    pack_failed: bool,
     pack_output: Option<durable_bases::PagedBasePackOutput>,
+    descriptor_cursor: Option<version_index::VersionIndexDescriptorCursor>,
+    pack_writer: Option<durable_bases::PagedBasePackWriter>,
+    _checkpoint_reservation: Option<resource::Reservation>,
     _worker_lease: PagedCheckpointWorkerLease,
 }
 
@@ -1845,7 +1848,7 @@ impl PagedCheckpointJob {
 
     pub fn write_pack_with_fault_injector(
         &mut self,
-        injector: Option<Box<dyn FaultInjector + Send>>,
+        mut injector: Option<Box<dyn FaultInjector + Send>>,
     ) -> Result<bool> {
         if self.pack_written {
             return Err(Error::invalid_input(
@@ -1853,27 +1856,181 @@ impl PagedCheckpointJob {
             ));
         }
         self.pack_written = true;
-        let output = if self.request.previous_checkpoint_lsn.is_some() {
-            self.target.write_incremental_checkpoint_pack(
-                PagedCheckpointPackRequest {
-                    checkpoint_lsn: self.target_lsn,
-                    previous_checkpoint_lsn: Some(self.previous_checkpoint_lsn),
-                    ..self.request.clone()
-                },
-                injector,
-            )?
+        let result = (|| {
+            self.begin_pack_stream(injector.take())?;
+            while self.pack_writer.is_some() {
+                self.write_pack_slice_inner(usize::MAX)?;
+            }
+            Ok(self.pack_output.is_some())
+        })();
+        if result.is_err() {
+            self.fail_pack_attempt();
+        }
+        result
+    }
+
+    pub fn write_pack_slice(
+        &mut self,
+        maximum_pages: usize,
+        injector: Option<Box<dyn FaultInjector + Send>>,
+    ) -> Result<bool> {
+        if maximum_pages == 0 {
+            return Err(Error::invalid_input(
+                "paged checkpoint slice must allow at least one page",
+            ));
+        }
+        if self.pack_output.is_some()
+            || self.pack_failed
+            || (self.pack_written && self.pack_writer.is_none())
+        {
+            return Err(Error::invalid_input(
+                "paged checkpoint pack output has already finished or failed",
+            ));
+        }
+        if self.pack_written && injector.is_some() {
+            return Err(Error::invalid_input(
+                "paged checkpoint fault injector can only be set on the first slice",
+            ));
+        }
+        let result = if !self.pack_written {
+            self.pack_written = true;
+            self.begin_pack_stream(injector)
         } else {
-            Some(self.target.write_checkpoint_pack(
-                PagedCheckpointPackRequest {
-                    checkpoint_lsn: self.target_lsn,
-                    previous_checkpoint_lsn: None,
-                    ..self.request.clone()
-                },
-                injector,
-            )?)
+            Ok(())
         };
-        self.pack_output = output;
+        if let Err(error) = result {
+            self.fail_pack_attempt();
+            return Err(error);
+        }
+        let result = if self.pack_writer.is_some() {
+            self.write_pack_slice_inner(maximum_pages)
+        } else {
+            Ok(())
+        };
+        if let Err(error) = result {
+            self.fail_pack_attempt();
+            return Err(error);
+        }
         Ok(self.pack_output.is_some())
+    }
+
+    fn fail_pack_attempt(&mut self) {
+        self.pack_failed = true;
+        self.pack_writer = None;
+        self.descriptor_cursor = None;
+        self._checkpoint_reservation = None;
+    }
+
+    fn begin_pack_stream(&mut self, injector: Option<Box<dyn FaultInjector + Send>>) -> Result<()> {
+        let request = PagedCheckpointPackRequest {
+            checkpoint_lsn: self.target_lsn,
+            previous_checkpoint_lsn: self.request.previous_checkpoint_lsn,
+            ..self.request.clone()
+        };
+        if request.file_number == 0
+            || request.identity.database_uuid != self.target.index.store_identity().database_uuid
+            || request.identity.shard_epoch.get() != self.target.index.store_identity().wal_epoch
+        {
+            return Err(Error::invalid_input(
+                "paged checkpoint identity or source number is invalid",
+            ));
+        }
+        let buffer_page_count = if request.coalesce { 6 } else { 3 };
+        let reservation_bytes = u64::try_from(buffer_page_count)
+            .ok()
+            .and_then(|page_count| page_count.checked_mul(PAGE_SIZE as u64))
+            .ok_or_else(|| Error::overloaded("paged checkpoint reservation overflows"))?;
+        self._checkpoint_reservation = Some(
+            self.target
+                .resources
+                .reserve(
+                    self.target.tenant_id,
+                    resource::ResourceCategory::CheckpointValidation,
+                    resource::ReservationClass::Progress,
+                    reservation_bytes,
+                )
+                .map_err(page_cache::map_resource_error)?,
+        );
+        let mut page_count = 0u64;
+        self.target
+            .index
+            .visit_descriptors(self.target.root, &mut |descriptor| {
+                if request
+                    .previous_checkpoint_lsn
+                    .is_some_and(|previous_lsn| descriptor.image_lsn <= previous_lsn)
+                {
+                    return Ok(());
+                }
+                page_count = page_count
+                    .checked_add(1)
+                    .ok_or_else(|| Error::overloaded("paged checkpoint page count overflows"))?;
+                Ok(())
+            })?;
+        if page_count == 0 {
+            if request.previous_checkpoint_lsn.is_none() {
+                return Err(Error::corruption(
+                    "paged checkpoint index contains no page images",
+                ));
+            }
+            self._checkpoint_reservation = None;
+            return Ok(());
+        }
+        let pack_writer = durable_bases::PagedBasePackJob {
+            directory: request.directory,
+            identity: request.identity,
+            number: request.file_number,
+            checkpoint_lsn: request.checkpoint_lsn,
+            page_count,
+            complete: request.previous_checkpoint_lsn.is_none(),
+            coalesce: request.coalesce,
+        }
+        .begin(injector)?;
+        self.descriptor_cursor = Some(self.target.index.descriptor_cursor(self.target.root)?);
+        self.pack_writer = Some(pack_writer);
+        Ok(())
+    }
+
+    fn write_pack_slice_inner(&mut self, maximum_pages: usize) -> Result<()> {
+        let previous_checkpoint_lsn = self.request.previous_checkpoint_lsn;
+        let mut written_pages = 0usize;
+        while written_pages < maximum_pages {
+            let cursor = self
+                .descriptor_cursor
+                .as_mut()
+                .ok_or_else(|| Error::invariant("paged checkpoint descriptor cursor is missing"))?;
+            let Some(descriptor) = cursor.next_descriptor(&self.target.index)? else {
+                let pack_writer = self
+                    .pack_writer
+                    .take()
+                    .ok_or_else(|| Error::invariant("paged checkpoint pack writer is missing"))?;
+                self.pack_output = Some(pack_writer.finish()?);
+                self.descriptor_cursor = None;
+                return Ok(());
+            };
+            if previous_checkpoint_lsn
+                .is_some_and(|previous_lsn| descriptor.image_lsn <= previous_lsn)
+            {
+                continue;
+            }
+            let page = self
+                .target
+                .load_mutation_base_page(descriptor.page_id)?
+                .ok_or_else(|| Error::corruption("paged checkpoint page image is missing"))?;
+            let image = encode_blink_page(descriptor.page_id, page.as_ref())?;
+            if crc32c::crc32c(&image) != descriptor.image_crc32c
+                || page.as_ref().lsn() != descriptor.image_lsn
+            {
+                return Err(Error::corruption(
+                    "paged checkpoint page differs from its captured index descriptor",
+                ));
+            }
+            self.pack_writer
+                .as_mut()
+                .ok_or_else(|| Error::invariant("paged checkpoint pack writer is missing"))?
+                .append_page(descriptor.page_id, &image)?;
+            written_pages += 1;
+        }
+        Ok(())
     }
 }
 
@@ -2589,10 +2746,13 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             target,
             request: pack_request,
             target_lsn,
-            previous_checkpoint_lsn: previous_manifest.committed_prefix_lsn,
             manifest_generation: previous_manifest.generation,
             pack_written: false,
+            pack_failed: false,
             pack_output: None,
+            descriptor_cursor: None,
+            pack_writer: None,
+            _checkpoint_reservation: None,
             _worker_lease: worker_lease,
         }))
     }
@@ -16129,6 +16289,16 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(complete_job.target_lsn(), first_checkpoint_lsn);
+        let mut complete_target_page_count = 0usize;
+        complete_job
+            .target
+            .index
+            .visit_descriptors(complete_job.target.root, &mut |_| {
+                complete_target_page_count += 1;
+                Ok(())
+            })
+            .unwrap();
+        assert!(complete_target_page_count > 0);
         assert!(
             writer
                 .begin_checkpoint(
@@ -16145,8 +16315,7 @@ mod tests {
                 )
                 .is_err()
         );
-        assert!(complete_job.write_pack().unwrap());
-        assert!(complete_job.write_pack().is_err());
+        assert!(!complete_job.write_pack_slice(1, None).unwrap());
         let second_write = TransactionRequest::new(
             vec![TransactionCondition::Exists { key: key.clone() }],
             vec![TransactionMutation::Put {
@@ -16158,6 +16327,8 @@ mod tests {
             .transact(&second_write, &StorageLimits::default(), Revision::new(2))
             .unwrap();
         let second_checkpoint_lsn = second_result.commit_lsn.unwrap();
+        while !complete_job.write_pack_slice(1, None).unwrap() {}
+        assert!(complete_job.write_pack().is_err());
         assert_eq!(
             writer
                 .publish_checkpoint(
@@ -16290,12 +16461,16 @@ mod tests {
             .unwrap();
         assert!(
             failed_pack_job
-                .write_pack_with_fault_injector(Some(Box::new(FailOnOccurrence {
-                    point: "during_base_pack_page_write",
-                    remaining: 1,
-                })))
+                .write_pack_slice(
+                    1,
+                    Some(Box::new(FailOnOccurrence {
+                        point: "during_base_pack_page_write",
+                        remaining: 1,
+                    }))
+                )
                 .is_err()
         );
+        assert!(failed_pack_job.write_pack_slice(1, None).is_err());
         drop(failed_pack_job);
         assert_eq!(manifest_store.current().generation, 3);
         assert_eq!(

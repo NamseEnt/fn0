@@ -207,6 +207,111 @@ struct IndexNode {
     content: NodeContent,
 }
 
+#[derive(Clone, Copy)]
+struct DescriptorCursorFrame {
+    node_reference: NodeRef,
+    expected_level: u8,
+    parent_generation: u64,
+    key_prefix: u64,
+    next_slot: usize,
+}
+
+pub struct VersionIndexDescriptorCursor {
+    root_generation: u64,
+    frames: Vec<DescriptorCursorFrame>,
+}
+
+impl VersionIndexDescriptorCursor {
+    pub fn next_descriptor(&mut self, index: &VersionIndex) -> Result<Option<VersionDescriptor>> {
+        loop {
+            let Some(frame) = self.frames.last().copied() else {
+                return Ok(None);
+            };
+            let cached = index.load_node(frame.node_reference)?;
+            if cached.node.level != frame.expected_level
+                || cached.node.generation > frame.parent_generation
+                || cached.node.generation > self.root_generation
+            {
+                return Err(Error::corruption(
+                    "version-index descriptor cursor ancestry is invalid",
+                ));
+            }
+            let node_generation = cached.node.generation;
+            let leaf_descriptors = match &cached.node.content {
+                NodeContent::Leaf(descriptors) if frame.expected_level == 0 => Some(**descriptors),
+                _ => None,
+            };
+            let internal_children = match &cached.node.content {
+                NodeContent::Internal(children) if frame.expected_level > 0 => Some(**children),
+                _ => None,
+            };
+            drop(cached);
+            if let Some(descriptors) = leaf_descriptors {
+                while self
+                    .frames
+                    .last()
+                    .is_some_and(|current| current.next_slot < 16)
+                {
+                    let current = self
+                        .frames
+                        .last_mut()
+                        .ok_or_else(|| Error::invariant("descriptor cursor lost its leaf"))?;
+                    let slot = current.next_slot;
+                    current.next_slot += 1;
+                    let Some(descriptor) = descriptors[slot] else {
+                        continue;
+                    };
+                    if descriptor.page_id.get() != (frame.key_prefix | slot as u64)
+                        || descriptor.page_id.get() < 2
+                    {
+                        return Err(Error::corruption(
+                            "version-index descriptor cursor found a mismatched key",
+                        ));
+                    }
+                    return Ok(Some(descriptor));
+                }
+                self.frames.pop();
+                continue;
+            }
+            if let Some(children) = internal_children {
+                let mut next_child = None;
+                while self
+                    .frames
+                    .last()
+                    .is_some_and(|current| current.next_slot < 16)
+                {
+                    let current = self
+                        .frames
+                        .last_mut()
+                        .ok_or_else(|| Error::invariant("descriptor cursor lost its branch"))?;
+                    let slot = current.next_slot;
+                    current.next_slot += 1;
+                    if let Some(child_reference) = children[slot] {
+                        next_child = Some((slot, child_reference));
+                        break;
+                    }
+                }
+                if let Some((slot, child_reference)) = next_child {
+                    self.frames.push(DescriptorCursorFrame {
+                        node_reference: child_reference,
+                        expected_level: frame.expected_level - 1,
+                        parent_generation: node_generation,
+                        key_prefix: frame.key_prefix
+                            | ((slot as u64) << (u32::from(frame.expected_level) * 4)),
+                        next_slot: 0,
+                    });
+                } else {
+                    self.frames.pop();
+                }
+                continue;
+            }
+            return Err(Error::corruption(
+                "version-index descriptor cursor found a node at a wrong level",
+            ));
+        }
+    }
+}
+
 impl IndexNode {
     fn empty(level: u8, generation: u64, kind: NodeFileKind) -> Self {
         let content = if level == 0 {
@@ -872,6 +977,35 @@ impl VersionIndex {
             0,
             visitor,
         )
+    }
+
+    pub fn descriptor_cursor(
+        &self,
+        root: VersionIndexRoot,
+    ) -> Result<VersionIndexDescriptorCursor> {
+        let mut frames = Vec::with_capacity(usize::from(MAX_RADIX_LEVEL) + 1);
+        if let Some(node_reference) = root.node {
+            if root.generation == 0 {
+                return Err(Error::corruption(
+                    "version-index descriptor cursor root generation is zero",
+                ));
+            }
+            frames.push(DescriptorCursorFrame {
+                node_reference,
+                expected_level: MAX_RADIX_LEVEL,
+                parent_generation: root.generation,
+                key_prefix: 0,
+                next_slot: 0,
+            });
+        } else if root.generation != 0 {
+            return Err(Error::corruption(
+                "empty version-index descriptor cursor root has a generation",
+            ));
+        }
+        Ok(VersionIndexDescriptorCursor {
+            root_generation: root.generation,
+            frames,
+        })
     }
 
     pub fn insert(
@@ -2050,7 +2184,7 @@ mod tests {
         let mut root = index.empty_root();
         let mut reference = BTreeMap::new();
         let mut retained_root_handles = Vec::new();
-        for update_number in 0..28u64 {
+        for update_number in 1..29u64 {
             let page_value = update_number.wrapping_mul(0x9e37_79b9_7f4a_7c15);
             let page_id = PageId::new(page_value);
             let descriptor = if page_id.get() >= 2 && update_number % 3 == 0 {
@@ -2063,7 +2197,7 @@ mod tests {
             retained_root_handles.push(root);
         }
         for page_value in
-            (0..28u64).map(|update_number| update_number.wrapping_mul(0x9e37_79b9_7f4a_7c15))
+            (1..29u64).map(|update_number| update_number.wrapping_mul(0x9e37_79b9_7f4a_7c15))
         {
             let page_id = PageId::new(page_value);
             assert_eq!(
@@ -2071,6 +2205,19 @@ mod tests {
                 reference.get(&page_value).copied()
             );
         }
+        let mut expected_descriptors = Vec::new();
+        index
+            .visit_descriptors(root, &mut |descriptor| {
+                expected_descriptors.push(descriptor);
+                Ok(())
+            })
+            .unwrap();
+        let mut descriptor_cursor = index.descriptor_cursor(root).unwrap();
+        let mut actual_descriptors = Vec::new();
+        while let Some(descriptor) = descriptor_cursor.next_descriptor(&index).unwrap() {
+            actual_descriptors.push(descriptor);
+        }
+        assert_eq!(actual_descriptors, expected_descriptors);
         assert_eq!(index.cached_node_count().unwrap(), 2);
         assert_eq!(retained_root_handles.len(), 28);
         assert!(fs::read_dir(directory.path()).unwrap().count() >= 28 * 16);
