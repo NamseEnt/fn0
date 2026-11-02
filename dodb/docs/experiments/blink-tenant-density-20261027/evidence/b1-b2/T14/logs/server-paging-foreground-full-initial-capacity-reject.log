@@ -1,0 +1,6 @@
+Probe: paged_checkpoint_progresses_while_foreground_queue_budget_is_full
+Command: cargo test -p dodb-server --features blink-demand-paging --lib paged_checkpoint_progresses_while_foreground_queue_budget_is_full -- --nocapture --test-threads=1
+Result: failed before checkpoint execution while reserving the full QueuedForeground category.
+Observed error: ResourceError::CapacityExceeded at the test reservation unwrap.
+Cause: the probe set the per-tenant QueuedForeground category cap equal to the full per-tenant aggregate memory cap, leaving no aggregate headroom for the already charged metadata.
+Correction: the test now raises the aggregate global and per-tenant memory limits while keeping the QueuedForeground category ceiling fixed, then verifies checkpoint completion at that category ceiling.
