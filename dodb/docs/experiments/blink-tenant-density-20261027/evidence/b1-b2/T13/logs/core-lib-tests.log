@@ -1,0 +1,13 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running unittests src/lib.rs (target/debug/deps/dodb_core-460999a7f644ec0b)
+
+running 6 tests
+test key::tests::malformed_encodings_are_rejected ... ok
+test key::tests::validator_matches_decode_for_malformed_and_boundary_encodings ... ok
+test key::tests::encoded_len_matches_canonical_encoding_and_counts_zero_escapes ... ok
+test key::tests::encoding_preserves_document_order ... ok
+test key::tests::validator_matches_decode_for_arbitrary_bytes ... ok
+test key::tests::round_trip_arbitrary_binary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

@@ -1321,7 +1321,9 @@ pub struct BlinkTenantService {
     #[cfg(test)]
     open_test_gate: StdMutex<Option<(TenantId, Arc<Semaphore>)>>,
     #[cfg(all(test, feature = "blink-demand-paging"))]
-    page_read_test_gate: StdMutex<Option<Arc<PagedReadTestGate>>>,
+    page_read_test_gate: StdMutex<Option<Arc<OneShotTestGate>>>,
+    #[cfg(all(test, feature = "blink-demand-paging"))]
+    commit_test_gate: StdMutex<Option<Arc<OneShotTestGate>>>,
 }
 
 struct BlinkShardRegistry {
@@ -1421,6 +1423,10 @@ struct AsyncBlinkShard {
     failed_message: Arc<StdMutex<Option<String>>>,
     activity: Arc<CoordinatorActivity>,
     #[cfg(feature = "blink-demand-paging")]
+    tenant_id: u64,
+    #[cfg(feature = "blink-demand-paging")]
+    foreground_resources: Option<dodb_storage::blink::resource::BlinkResourceManager>,
+    #[cfg(feature = "blink-demand-paging")]
     _metadata_reservation: Option<dodb_storage::blink::resource::Reservation>,
 }
 
@@ -1432,7 +1438,7 @@ enum BlinkShardReadHandle {
         blocking_workers: Arc<Semaphore>,
         activity: Arc<CoordinatorActivity>,
         #[cfg(test)]
-        read_test_gate: Option<Arc<PagedReadTestGate>>,
+        read_test_gate: Option<Arc<OneShotTestGate>>,
     },
 }
 
@@ -1466,7 +1472,7 @@ impl BlinkShardReadHandle {
                     let _worker_permit = worker_permit;
                     let _activity_guard = activity_guard;
                     #[cfg(test)]
-                    wait_for_paged_read_test_gate(read_test_gate);
+                    wait_for_one_shot_test_gate(read_test_gate);
                     handle.get_with_response_budget(&key, maximum_response_bytes)
                 })
                 .await
@@ -1512,7 +1518,7 @@ impl BlinkShardReadHandle {
                     let _worker_permit = worker_permit;
                     let _activity_guard = activity_guard;
                     #[cfg(test)]
-                    wait_for_paged_read_test_gate(read_test_gate);
+                    wait_for_one_shot_test_gate(read_test_gate);
                     handle.query_with_response_budget(
                         &primary_key,
                         exclusive_after_sort_key.as_ref(),
@@ -1558,7 +1564,7 @@ impl BlinkShardReadHandle {
                     let _worker_permit = worker_permit;
                     let _activity_guard = activity_guard;
                     #[cfg(test)]
-                    wait_for_paged_read_test_gate(read_test_gate);
+                    wait_for_one_shot_test_gate(read_test_gate);
                     handle.scan_with_response_budget(
                         exclusive_after.as_ref(),
                         limit,
@@ -1581,15 +1587,15 @@ impl BlinkShardReadHandle {
 }
 
 #[cfg(all(test, feature = "blink-demand-paging"))]
-struct PagedReadTestGate {
+struct OneShotTestGate {
     barrier: std::sync::Barrier,
-    first_read: std::sync::atomic::AtomicBool,
+    blocks_next_worker: std::sync::atomic::AtomicBool,
 }
 
 #[cfg(all(test, feature = "blink-demand-paging"))]
-fn wait_for_paged_read_test_gate(gate: Option<Arc<PagedReadTestGate>>) {
+fn wait_for_one_shot_test_gate(gate: Option<Arc<OneShotTestGate>>) {
     if let Some(gate) = gate {
-        if gate.first_read.swap(false, Ordering::SeqCst) {
+        if gate.blocks_next_worker.swap(false, Ordering::SeqCst) {
             gate.barrier.wait();
         }
     }
@@ -1598,6 +1604,10 @@ fn wait_for_paged_read_test_gate(gate: Option<Arc<PagedReadTestGate>>) {
 struct QueuedBlinkTransaction {
     request: TransactionRequest,
     response_tx: tokio::sync::oneshot::Sender<Result<TransactionResult, Error>>,
+    #[cfg(feature = "blink-demand-paging")]
+    _queued_reservation: Option<dodb_storage::blink::resource::Reservation>,
+    #[cfg(feature = "blink-demand-paging")]
+    _preparation_reservation: Option<dodb_storage::blink::resource::Reservation>,
 }
 
 impl BlinkTenantService {
@@ -1665,6 +1675,9 @@ impl BlinkTenantService {
         {
             Some(resource_config) => {
                 if resource_config.open_tenant_metadata_bytes == 0
+                    || config.coordinator_config.queue_capacity == 0
+                    || config.coordinator_config.max_group_requests == 0
+                    || config.coordinator_config.max_group_bytes == 0
                     || resource_config.memory.max_tenants < config.max_open_shards
                     || resource_config.memory.max_pending_waiters < config.blink_open_waiter_limit
                     || resource_config.disk.max_tenants < config.max_open_shards
@@ -1734,6 +1747,8 @@ impl BlinkTenantService {
             open_test_gate: StdMutex::new(None),
             #[cfg(all(test, feature = "blink-demand-paging"))]
             page_read_test_gate: StdMutex::new(None),
+            #[cfg(all(test, feature = "blink-demand-paging"))]
+            commit_test_gate: StdMutex::new(None),
         })
     }
 
@@ -1846,6 +1861,11 @@ impl BlinkTenantService {
         request: Request,
         budget: ExecutionBudget,
     ) -> Result<Response, Error> {
+        #[cfg(feature = "blink-demand-paging")]
+        let request_reservation = self.reserve_request(tenant, &request)?;
+        #[cfg(feature = "blink-demand-paging")]
+        let _response_reservation =
+            self.reserve_response_budget(tenant, budget.max_response_bytes)?;
         match request {
             Request::Get { key } => {
                 let state = match self.read_shard(tenant).await? {
@@ -1864,10 +1884,14 @@ impl BlinkTenantService {
             Request::Put { key, value } => {
                 let shard = self.open_shard(tenant).await?;
                 let result = shard
-                    .transact(TransactionRequest::new(
-                        Vec::new(),
-                        vec![TransactionMutation::Put { key, value }],
-                    ))
+                    .transact(
+                        TransactionRequest::new(
+                            Vec::new(),
+                            vec![TransactionMutation::Put { key, value }],
+                        ),
+                        #[cfg(feature = "blink-demand-paging")]
+                        request_reservation,
+                    )
                     .await?;
                 let response =
                     Response::Put(result.revision.ok_or_else(|| {
@@ -1879,10 +1903,14 @@ impl BlinkTenantService {
             Request::Delete { key } => {
                 let shard = self.open_shard(tenant).await?;
                 let result = shard
-                    .transact(TransactionRequest::new(
-                        Vec::new(),
-                        vec![TransactionMutation::Delete { key }],
-                    ))
+                    .transact(
+                        TransactionRequest::new(
+                            Vec::new(),
+                            vec![TransactionMutation::Delete { key }],
+                        ),
+                        #[cfg(feature = "blink-demand-paging")]
+                        request_reservation,
+                    )
                     .await?;
                 let response =
                     Response::Delete(result.revision.ok_or_else(|| {
@@ -1954,7 +1982,13 @@ impl BlinkTenantService {
                         ensure_synthesized_response_budget(&response, budget.max_response_bytes)?;
                         return Ok(response);
                     };
-                    let result = shard.transact(request).await?;
+                    let result = shard
+                        .transact(
+                            request,
+                            #[cfg(feature = "blink-demand-paging")]
+                            request_reservation,
+                        )
+                        .await?;
                     let response = Response::Transact(match result.commit_lsn {
                         Some(commit_lsn) => TransactionOutcome::committed(commit_lsn),
                         None => TransactionOutcome::conditions_satisfied(),
@@ -1962,7 +1996,15 @@ impl BlinkTenantService {
                     ensure_synthesized_response_budget(&response, budget.max_response_bytes)?;
                     return Ok(response);
                 }
-                let result = self.open_shard(tenant).await?.transact(request).await?;
+                let result = self
+                    .open_shard(tenant)
+                    .await?
+                    .transact(
+                        request,
+                        #[cfg(feature = "blink-demand-paging")]
+                        request_reservation,
+                    )
+                    .await?;
                 let response = Response::Transact(match result.commit_lsn {
                     Some(commit_lsn) => TransactionOutcome::committed(commit_lsn),
                     None => TransactionOutcome::conditions_satisfied(),
@@ -1971,6 +2013,49 @@ impl BlinkTenantService {
                 Ok(response)
             }
         }
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    fn reserve_request(
+        &self,
+        tenant: TenantId,
+        request: &Request,
+    ) -> Result<Option<dodb_storage::blink::resource::Reservation>, Error> {
+        let Some(resources) = &self.shared_resources else {
+            return Ok(None);
+        };
+        let bytes = queued_request_allocation_bytes(request)?;
+        resources
+            .reserve(
+                tenant.get(),
+                dodb_storage::blink::resource::ResourceCategory::QueuedForeground,
+                dodb_storage::blink::resource::ReservationClass::Foreground,
+                bytes,
+            )
+            .map(Some)
+            .map_err(|_| Error::overloaded("B-link queued request budget is exhausted"))
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    fn reserve_response_budget(
+        &self,
+        tenant: TenantId,
+        maximum_response_bytes: usize,
+    ) -> Result<Option<dodb_storage::blink::resource::Reservation>, Error> {
+        let Some(resources) = &self.shared_resources else {
+            return Ok(None);
+        };
+        let bytes = u64::try_from(maximum_response_bytes)
+            .map_err(|_| Error::overloaded("B-link response reservation exceeds u64"))?;
+        resources
+            .reserve(
+                tenant.get(),
+                dodb_storage::blink::resource::ResourceCategory::LoadReconstruction,
+                dodb_storage::blink::resource::ReservationClass::Foreground,
+                bytes,
+            )
+            .map(Some)
+            .map_err(|_| Error::overloaded("B-link response budget is exhausted"))
     }
 
     async fn read_shard(&self, tenant: TenantId) -> Result<Option<Arc<AsyncBlinkShard>>, Error> {
@@ -2127,26 +2212,40 @@ impl BlinkTenantService {
                     }
                 };
                 let shard = match store {
-                    OpenedBlinkStore::Resident(store) => Arc::new(AsyncBlinkShard::start(
-                        store,
-                        self.coordinator_config,
-                        self.checkpoint_policy,
-                        match wal_layout {
-                            BlinkWalLayout::Legacy => None,
-                            BlinkWalLayout::Segmented { .. }
-                            | BlinkWalLayout::SegmentedBases { .. } => {
-                                Some(physical_checkpoint::PhysicalCheckpointConfig {
-                                    execution: checkpoint_execution,
-                                    injector_factory: factory
-                                        .map(|factory| (factory, tenant, shard_id)),
-                                })
-                            }
-                        },
-                        Arc::clone(&self.checkpoint_metrics),
-                        Arc::clone(&self.coordinator_activity),
-                        #[cfg(feature = "blink-demand-paging")]
-                        metadata_reservation,
-                    )),
+                    OpenedBlinkStore::Resident(store) => {
+                        #[cfg(all(test, feature = "blink-demand-paging"))]
+                        let commit_test_gate = self
+                            .commit_test_gate
+                            .lock()
+                            .ok()
+                            .and_then(|current| current.clone());
+                        Arc::new(AsyncBlinkShard::start(
+                            store,
+                            self.coordinator_config,
+                            self.checkpoint_policy,
+                            match wal_layout {
+                                BlinkWalLayout::Legacy => None,
+                                BlinkWalLayout::Segmented { .. }
+                                | BlinkWalLayout::SegmentedBases { .. } => {
+                                    Some(physical_checkpoint::PhysicalCheckpointConfig {
+                                        execution: checkpoint_execution,
+                                        injector_factory: factory
+                                            .map(|factory| (factory, tenant, shard_id)),
+                                    })
+                                }
+                            },
+                            Arc::clone(&self.checkpoint_metrics),
+                            Arc::clone(&self.coordinator_activity),
+                            #[cfg(feature = "blink-demand-paging")]
+                            tenant.get(),
+                            #[cfg(feature = "blink-demand-paging")]
+                            self.shared_resources.clone(),
+                            #[cfg(all(test, feature = "blink-demand-paging"))]
+                            commit_test_gate,
+                            #[cfg(feature = "blink-demand-paging")]
+                            metadata_reservation,
+                        ))
+                    }
                     #[cfg(feature = "blink-demand-paging")]
                     OpenedBlinkStore::Paged(read_handle) => {
                         #[cfg(test)]
@@ -2161,6 +2260,8 @@ impl BlinkTenantService {
                             Arc::clone(&self.open_workers),
                             #[cfg(test)]
                             page_read_test_gate,
+                            tenant.get(),
+                            self.shared_resources.clone(),
                             metadata_reservation,
                         ))
                     }
@@ -2188,8 +2289,15 @@ impl BlinkTenantService {
     }
 
     #[cfg(all(test, feature = "blink-demand-paging"))]
-    fn set_page_read_test_gate(&self, gate: Arc<PagedReadTestGate>) {
+    fn set_page_read_test_gate(&self, gate: Arc<OneShotTestGate>) {
         if let Ok(mut current) = self.page_read_test_gate.lock() {
+            *current = Some(gate);
+        }
+    }
+
+    #[cfg(all(test, feature = "blink-demand-paging"))]
+    fn set_commit_test_gate(&self, gate: Arc<OneShotTestGate>) {
+        if let Ok(mut current) = self.commit_test_gate.lock() {
             *current = Some(gate);
         }
     }
@@ -2363,6 +2471,13 @@ impl AsyncBlinkShard {
         physical_config: Option<physical_checkpoint::PhysicalCheckpointConfig>,
         checkpoint_metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
         activity: Arc<CoordinatorActivity>,
+        #[cfg(feature = "blink-demand-paging")] tenant_id: u64,
+        #[cfg(feature = "blink-demand-paging")] foreground_resources: Option<
+            dodb_storage::blink::resource::BlinkResourceManager,
+        >,
+        #[cfg(all(test, feature = "blink-demand-paging"))] commit_test_gate: Option<
+            Arc<OneShotTestGate>,
+        >,
         #[cfg(feature = "blink-demand-paging")] metadata_reservation: Option<
             dodb_storage::blink::resource::Reservation,
         >,
@@ -2373,6 +2488,8 @@ impl AsyncBlinkShard {
         let failed_message = Arc::new(StdMutex::new(None));
         let coordinator_failed_message = Arc::clone(&failed_message);
         let coordinator_activity = Arc::clone(&activity);
+        #[cfg(all(test, feature = "blink-demand-paging"))]
+        let coordinator_commit_test_gate = commit_test_gate;
         let coordinator_task = tokio::spawn(async move {
             if let Some(physical_config) = physical_config {
                 physical_checkpoint::PhysicalCoordinator::new(
@@ -2384,6 +2501,8 @@ impl AsyncBlinkShard {
                         metrics: checkpoint_metrics,
                         activity: coordinator_activity,
                         failed_message: coordinator_failed_message,
+                        #[cfg(all(test, feature = "blink-demand-paging"))]
+                        commit_test_gate: coordinator_commit_test_gate.clone(),
                     },
                     request_rx,
                 )
@@ -2440,8 +2559,12 @@ impl AsyncBlinkShard {
                     .iter()
                     .map(|entry| entry.request.clone())
                     .collect::<Vec<_>>();
+                #[cfg(all(test, feature = "blink-demand-paging"))]
+                let commit_test_gate = coordinator_commit_test_gate.clone();
                 let (updated_store, wal_before, wal_after, results) =
                     match tokio::task::spawn_blocking(move || {
+                        #[cfg(all(test, feature = "blink-demand-paging"))]
+                        wait_for_one_shot_test_gate(commit_test_gate);
                         let wal_before = store.wal_metrics().ok().flatten();
                         let results = store.apply_transaction_group(&requests);
                         let wal_after = store.wal_metrics().ok().flatten();
@@ -2704,6 +2827,10 @@ impl AsyncBlinkShard {
             failed_message,
             activity,
             #[cfg(feature = "blink-demand-paging")]
+            tenant_id,
+            #[cfg(feature = "blink-demand-paging")]
+            foreground_resources,
+            #[cfg(feature = "blink-demand-paging")]
             _metadata_reservation: metadata_reservation,
         }
     }
@@ -2713,7 +2840,9 @@ impl AsyncBlinkShard {
         read_handle: dodb_storage::blink::PagedReadHandle,
         activity: Arc<CoordinatorActivity>,
         blocking_workers: Arc<Semaphore>,
-        #[cfg(test)] read_test_gate: Option<Arc<PagedReadTestGate>>,
+        #[cfg(test)] read_test_gate: Option<Arc<OneShotTestGate>>,
+        tenant_id: u64,
+        foreground_resources: Option<dodb_storage::blink::resource::BlinkResourceManager>,
         metadata_reservation: Option<dodb_storage::blink::resource::Reservation>,
     ) -> Self {
         Self {
@@ -2728,11 +2857,19 @@ impl AsyncBlinkShard {
             coordinator_task: Mutex::new(None),
             failed_message: Arc::new(StdMutex::new(None)),
             activity,
+            tenant_id,
+            foreground_resources,
             _metadata_reservation: metadata_reservation,
         }
     }
 
-    async fn transact(&self, request: TransactionRequest) -> Result<TransactionResult, Error> {
+    async fn transact(
+        &self,
+        request: TransactionRequest,
+        #[cfg(feature = "blink-demand-paging")] queued_reservation: Option<
+            dodb_storage::blink::resource::Reservation,
+        >,
+    ) -> Result<TransactionResult, Error> {
         if self.read_handle.is_read_only() {
             return Err(Error::unsupported_format(
                 "paged Blink service is configured read-only",
@@ -2743,6 +2880,32 @@ impl AsyncBlinkShard {
         {
             return Err(Error::durability(message.clone()));
         }
+        #[cfg(feature = "blink-demand-paging")]
+        let preparation_reservation = match &self.foreground_resources {
+            Some(resources) => {
+                let preparation_bytes = transaction_request_allocation_bytes(
+                    &request,
+                    std::mem::size_of::<TransactionRequest>()
+                        .checked_mul(2)
+                        .ok_or_else(|| {
+                            Error::overloaded("B-link transaction preparation size overflows")
+                        })?,
+                )?;
+                Some(
+                    resources
+                        .reserve(
+                            self.tenant_id,
+                            dodb_storage::blink::resource::ResourceCategory::WritePreparation,
+                            dodb_storage::blink::resource::ReservationClass::Foreground,
+                            preparation_bytes,
+                        )
+                        .map_err(|_| {
+                            Error::overloaded("B-link transaction preparation budget is exhausted")
+                        })?,
+                )
+            }
+            None => None,
+        };
         let (response_tx, response_rx) = tokio::sync::oneshot::channel();
         let send_result = self
             .request_tx
@@ -2753,6 +2916,10 @@ impl AsyncBlinkShard {
             .try_send(QueuedBlinkTransaction {
                 request,
                 response_tx,
+                #[cfg(feature = "blink-demand-paging")]
+                _queued_reservation: queued_reservation,
+                #[cfg(feature = "blink-demand-paging")]
+                _preparation_reservation: preparation_reservation,
             });
         if let Err(error) = send_result {
             if matches!(error, tokio::sync::mpsc::error::TrySendError::Closed(_))
@@ -2807,6 +2974,113 @@ fn transaction_size(request: &TransactionRequest) -> usize {
             }
         }))
         .fold(0usize, usize::saturating_add)
+}
+
+#[cfg(feature = "blink-demand-paging")]
+fn transaction_request_allocation_bytes(
+    request: &TransactionRequest,
+    additional_bytes: usize,
+) -> Result<u64, Error> {
+    let condition_slots = request
+        .conditions
+        .capacity()
+        .checked_mul(std::mem::size_of::<TransactionCondition>());
+    let mutation_slots = request
+        .mutations
+        .capacity()
+        .checked_mul(std::mem::size_of::<TransactionMutation>());
+    let mut allocated_bytes = std::mem::size_of::<TransactionRequest>()
+        .checked_add(additional_bytes)
+        .and_then(|bytes| bytes.checked_add(condition_slots?))
+        .and_then(|bytes| bytes.checked_add(mutation_slots?))
+        .ok_or_else(|| Error::overloaded("B-link transaction allocation size overflows"))?;
+    for condition in &request.conditions {
+        allocated_bytes = allocated_bytes
+            .checked_add(condition.key().allocated_capacity_bytes())
+            .ok_or_else(|| Error::overloaded("B-link transaction allocation size overflows"))?;
+    }
+    for mutation in &request.mutations {
+        allocated_bytes = allocated_bytes
+            .checked_add(mutation.key().allocated_capacity_bytes())
+            .ok_or_else(|| Error::overloaded("B-link transaction allocation size overflows"))?;
+        if let TransactionMutation::Put { value, .. } = mutation {
+            allocated_bytes = allocated_bytes
+                .checked_add(value.capacity())
+                .ok_or_else(|| Error::overloaded("B-link transaction allocation size overflows"))?;
+        }
+    }
+    u64::try_from(allocated_bytes)
+        .map_err(|_| Error::overloaded("B-link transaction allocation size exceeds u64"))
+}
+
+#[cfg(feature = "blink-demand-paging")]
+fn request_owned_allocation_bytes(request: &Request) -> Result<u64, Error> {
+    let mut allocated_bytes = std::mem::size_of::<Request>();
+    let add_bytes = |total: &mut usize, bytes: usize| -> Result<(), Error> {
+        *total = total
+            .checked_add(bytes)
+            .ok_or_else(|| Error::overloaded("B-link request allocation size overflows"))?;
+        Ok(())
+    };
+    match request {
+        Request::Get { key } => add_bytes(&mut allocated_bytes, key.allocated_capacity_bytes())?,
+        Request::Put { key, value } => {
+            add_bytes(&mut allocated_bytes, key.allocated_capacity_bytes())?;
+            add_bytes(&mut allocated_bytes, value.capacity())?;
+            add_bytes(
+                &mut allocated_bytes,
+                std::mem::size_of::<TransactionRequest>()
+                    .checked_add(std::mem::size_of::<TransactionMutation>())
+                    .ok_or_else(|| Error::overloaded("B-link request allocation size overflows"))?,
+            )?;
+        }
+        Request::Delete { key } => {
+            add_bytes(&mut allocated_bytes, key.allocated_capacity_bytes())?;
+            add_bytes(
+                &mut allocated_bytes,
+                std::mem::size_of::<TransactionRequest>()
+                    .checked_add(std::mem::size_of::<TransactionMutation>())
+                    .ok_or_else(|| Error::overloaded("B-link request allocation size overflows"))?,
+            )?;
+        }
+        Request::Query {
+            pk,
+            exclusive_after_sk,
+            ..
+        } => {
+            add_bytes(&mut allocated_bytes, pk.allocated_capacity_bytes())?;
+            if let Some(sort_key) = exclusive_after_sk {
+                add_bytes(&mut allocated_bytes, sort_key.allocated_capacity_bytes())?;
+            }
+        }
+        Request::Scan {
+            exclusive_after_key,
+            ..
+        } => {
+            if let Some(key) = exclusive_after_key {
+                add_bytes(&mut allocated_bytes, key.allocated_capacity_bytes())?;
+            }
+        }
+        Request::Transact { request } => {
+            let transaction_bytes = transaction_request_allocation_bytes(request, 0)?;
+            let transaction_bytes = usize::try_from(transaction_bytes).map_err(|_| {
+                Error::overloaded("B-link transaction allocation size exceeds usize")
+            })?;
+            add_bytes(&mut allocated_bytes, transaction_bytes)?;
+        }
+    }
+    u64::try_from(allocated_bytes)
+        .map_err(|_| Error::overloaded("B-link request allocation size exceeds u64"))
+}
+
+#[cfg(feature = "blink-demand-paging")]
+fn queued_request_allocation_bytes(request: &Request) -> Result<u64, Error> {
+    request_owned_allocation_bytes(request)?
+        .checked_add(
+            u64::try_from(std::mem::size_of::<QueuedBlinkTransaction>())
+                .map_err(|_| Error::overloaded("B-link queue entry size exceeds u64"))?,
+        )
+        .ok_or_else(|| Error::overloaded("B-link queued request size overflows"))
 }
 
 impl DodbService for BlinkTenantService {
@@ -3367,6 +3641,44 @@ mod tests {
     }
 
     #[cfg(feature = "blink-demand-paging")]
+    fn foreground_blink_shared_resources() -> BlinkSharedResourceConfig {
+        let mut resources = constrained_blink_shared_resources();
+        resources.memory.global_bytes = 131_072;
+        resources.memory.per_tenant_bytes = 65_536;
+        resources.memory.progress_pool_bytes = 4_096;
+        resources.memory.max_tenants = 2;
+        resources.memory.max_pending_waiters = 4;
+        resources.memory.global_category_bytes = [131_072; 7];
+        resources.memory.per_tenant_category_bytes = [65_536; 7];
+        resources.open_tenant_metadata_bytes = 512;
+        resources.paged_read_only = false;
+        resources
+    }
+
+    #[test]
+    #[cfg(feature = "blink-demand-paging")]
+    fn shared_blink_admission_rejects_zero_queue_and_group_limits() {
+        let directory = blink_test_directory();
+        for invalid_limit in 0..3 {
+            let mut config = LocalTenantServiceConfig {
+                data_dir: directory.path().join(format!("invalid-{invalid_limit}")),
+                max_open_shards: 1,
+                blink_open_waiter_limit: 4,
+                blink_shared_resources: Some(foreground_blink_shared_resources()),
+                ..LocalTenantServiceConfig::default()
+            };
+            match invalid_limit {
+                0 => config.coordinator_config.queue_capacity = 0,
+                1 => config.coordinator_config.max_group_requests = 0,
+                _ => config.coordinator_config.max_group_bytes = 0,
+            }
+            let data_dir = config.data_dir.clone();
+            assert!(BlinkTenantService::new(config).is_err());
+            assert!(!data_dir.exists());
+        }
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
     fn paged_blink_shared_resources() -> BlinkSharedResourceConfig {
         BlinkSharedResourceConfig {
             memory: dodb_storage::blink::resource::ResourceLimits {
@@ -3869,6 +4181,336 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[cfg(feature = "blink-demand-paging")]
+    async fn foreground_preparation_limit_rejects_before_queue_and_releases_charge() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(713);
+        let mut shared_resources = foreground_blink_shared_resources();
+        let write_preparation =
+            dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize;
+        shared_resources.memory.global_category_bytes[write_preparation] = 1_024;
+        shared_resources.memory.per_tenant_category_bytes[write_preparation] = 1_024;
+        let load_reconstruction =
+            dodb_storage::blink::resource::ResourceCategory::LoadReconstruction as usize;
+        shared_resources.memory.global_category_bytes[load_reconstruction] = 2_048;
+        shared_resources.memory.per_tenant_category_bytes[load_reconstruction] = 2_048;
+        let service = BlinkTenantService::new(LocalTenantServiceConfig {
+            data_dir: directory.path().to_path_buf(),
+            max_open_shards: 1,
+            blink_open_waiter_limit: 4,
+            blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce: true,
+            },
+            blink_shared_resources: Some(shared_resources),
+            ..LocalTenantServiceConfig::default()
+        })
+        .unwrap();
+        let mut oversized_pk = Vec::with_capacity(1_024);
+        oversized_pk.push(b'p');
+        let mut oversized_value = Vec::with_capacity(2_048);
+        oversized_value.push(7);
+        let rejected = service
+            .execute_request(
+                tenant,
+                Request::Put {
+                    key: dodb_core::DocumentKey::new(oversized_pk, b"sk".to_vec()),
+                    value: oversized_value,
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await;
+        assert!(rejected.is_err());
+        let resources = service.shared_resources.as_ref().unwrap();
+        let snapshot = resources.snapshot().unwrap();
+        assert_eq!(
+            snapshot.current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize],
+            0
+        );
+        assert_eq!(snapshot.current_by_category[write_preparation], 0);
+        assert!(
+            service
+                .execute_request(
+                    tenant,
+                    Request::Scan {
+                        exclusive_after_key: None,
+                        limit: 8,
+                    },
+                    ExecutionBudget::new(4096),
+                )
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            resources.snapshot().unwrap().current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize],
+            0
+        );
+        assert_eq!(
+            resources.snapshot().unwrap().current_by_category[load_reconstruction],
+            0
+        );
+        assert_eq!(
+            snapshot.current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::Metadata as usize],
+            512
+        );
+        match service
+            .execute_request(
+                tenant,
+                Request::Get {
+                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"sk".to_vec()),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap()
+        {
+            Response::Get(state) => assert!(state.value().is_none()),
+            response => panic!("unexpected response: {response:?}"),
+        }
+        service.shutdown_checked().await.unwrap();
+        assert_eq!(resources.snapshot().unwrap().current_total, 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn cancelled_transaction_keeps_foreground_charges_until_commit_finishes() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(714);
+        let write_request = Request::Put {
+            key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"sk".to_vec()),
+            value: b"committed-after-cancel".to_vec(),
+        };
+        let queued_limit = queued_request_allocation_bytes(&write_request).unwrap();
+        let mut shared_resources = foreground_blink_shared_resources();
+        let queued_foreground =
+            dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize;
+        shared_resources.memory.global_category_bytes[queued_foreground] = queued_limit;
+        shared_resources.memory.per_tenant_category_bytes[queued_foreground] = queued_limit;
+        let service = Arc::new(
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                max_open_shards: 1,
+                blink_open_waiter_limit: 4,
+                blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                    max_segment_bytes: 1_048_576,
+                    coalesce: true,
+                },
+                blink_shared_resources: Some(shared_resources),
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap(),
+        );
+        let commit_gate = Arc::new(OneShotTestGate {
+            barrier: std::sync::Barrier::new(2),
+            blocks_next_worker: std::sync::atomic::AtomicBool::new(true),
+        });
+        service.set_commit_test_gate(Arc::clone(&commit_gate));
+        let write_service = Arc::clone(&service);
+        let write_task = tokio::spawn(async move {
+            write_service
+                .execute_request(tenant, write_request, ExecutionBudget::new(1024))
+                .await
+        });
+        let resources = service.shared_resources.as_ref().unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                let snapshot = resources.snapshot().unwrap();
+                if service.coordinator_activity.active.load(Ordering::SeqCst) > 0
+                    && snapshot.current_by_category
+                        [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize]
+                        > 0
+                    && snapshot.current_by_category
+                        [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize]
+                        > 0
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let rejected_tenant = TenantId::new(715);
+        let rejected_path = service.database_path(rejected_tenant);
+        assert!(
+            service
+                .execute_request(
+                    rejected_tenant,
+                    Request::Put {
+                        key: dodb_core::DocumentKey::new(b"other".to_vec(), b"key".to_vec()),
+                        value: b"global-limit".to_vec(),
+                    },
+                    ExecutionBudget::new(1024),
+                )
+                .await
+                .is_err()
+        );
+        assert!(!rejected_path.exists());
+        write_task.abort();
+        assert!(write_task.await.unwrap_err().is_cancelled());
+        let held_snapshot = resources.snapshot().unwrap();
+        assert!(
+            held_snapshot.current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize]
+                > 0
+        );
+        assert!(
+            held_snapshot.current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize]
+                > 0
+        );
+        tokio::task::spawn_blocking({
+            let commit_gate = Arc::clone(&commit_gate);
+            move || commit_gate.barrier.wait()
+        })
+        .await
+        .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                let snapshot = resources.snapshot().unwrap();
+                if snapshot.current_by_category
+                    [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize]
+                    == 0
+                    && snapshot.current_by_category
+                        [dodb_storage::blink::resource::ResourceCategory::WritePreparation as usize]
+                        == 0
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        match service
+            .execute_request(
+                tenant,
+                Request::Get {
+                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"sk".to_vec()),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap()
+        {
+            Response::Get(state) => {
+                assert_eq!(state.value(), Some(b"committed-after-cancel".as_slice()))
+            }
+            response => panic!("unexpected response: {response:?}"),
+        }
+        service.shutdown_checked().await.unwrap();
+        assert_eq!(resources.snapshot().unwrap().current_total, 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn foreground_queue_count_limit_rejects_excess_without_leaking_charges() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(716);
+        let first_request = Request::Put {
+            key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"first".to_vec()),
+            value: b"first-value".to_vec(),
+        };
+        let second_request = Request::Put {
+            key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"second".to_vec()),
+            value: b"second-value".to_vec(),
+        };
+        let first_charge = queued_request_allocation_bytes(&first_request).unwrap();
+        let second_charge = queued_request_allocation_bytes(&second_request).unwrap();
+        let service = Arc::new(
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                max_open_shards: 1,
+                blink_open_waiter_limit: 4,
+                coordinator_config: CoordinatorConfig {
+                    queue_capacity: 1,
+                    max_group_requests: 1,
+                    ..CoordinatorConfig::default()
+                },
+                blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                    max_segment_bytes: 1_048_576,
+                    coalesce: true,
+                },
+                blink_shared_resources: Some(foreground_blink_shared_resources()),
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap(),
+        );
+        let commit_gate = Arc::new(OneShotTestGate {
+            barrier: std::sync::Barrier::new(2),
+            blocks_next_worker: std::sync::atomic::AtomicBool::new(true),
+        });
+        service.set_commit_test_gate(Arc::clone(&commit_gate));
+        let first_service = Arc::clone(&service);
+        let first_task = tokio::spawn(async move {
+            first_service
+                .execute_request(tenant, first_request, ExecutionBudget::new(1024))
+                .await
+        });
+        let resources = service.shared_resources.as_ref().unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if service.coordinator_activity.active.load(Ordering::SeqCst) > 0 {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let second_service = Arc::clone(&service);
+        let second_task = tokio::spawn(async move {
+            second_service
+                .execute_request(tenant, second_request, ExecutionBudget::new(1024))
+                .await
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                let snapshot = resources.snapshot().unwrap();
+                let queued_bytes = snapshot.current_by_category
+                    [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize];
+                if queued_bytes >= first_charge + second_charge {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let rejected = service
+            .execute_request(
+                tenant,
+                Request::Put {
+                    key: dodb_core::DocumentKey::new(b"pk".to_vec(), b"third".to_vec()),
+                    value: b"third-value".to_vec(),
+                },
+                ExecutionBudget::new(1024),
+            )
+            .await
+            .unwrap_err();
+        assert!(rejected.to_string().contains("coordinator queue is full"));
+        let held_snapshot = resources.snapshot().unwrap();
+        assert!(
+            held_snapshot.current_by_category
+                [dodb_storage::blink::resource::ResourceCategory::QueuedForeground as usize]
+                >= first_charge + second_charge
+        );
+        tokio::task::spawn_blocking({
+            let commit_gate = Arc::clone(&commit_gate);
+            move || commit_gate.barrier.wait()
+        })
+        .await
+        .unwrap();
+        first_task.await.unwrap().unwrap();
+        second_task.await.unwrap().unwrap();
+        service.shutdown_checked().await.unwrap();
+        assert_eq!(resources.snapshot().unwrap().current_total, 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
     async fn paged_route_rejects_incomplete_store_before_creating_open_sidecars() {
         let directory = blink_test_directory();
         let service = BlinkTenantService::new(LocalTenantServiceConfig {
@@ -3939,9 +4581,9 @@ mod tests {
         );
         let database_path = service.database_path(tenant);
         create_empty_paged_service_fixture(&database_path, tenant);
-        let page_read_gate = Arc::new(PagedReadTestGate {
+        let page_read_gate = Arc::new(OneShotTestGate {
             barrier: std::sync::Barrier::new(2),
-            first_read: std::sync::atomic::AtomicBool::new(true),
+            blocks_next_worker: std::sync::atomic::AtomicBool::new(true),
         });
         service.set_page_read_test_gate(Arc::clone(&page_read_gate));
         let get_service = Arc::clone(&service);

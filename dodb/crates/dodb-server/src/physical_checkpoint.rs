@@ -24,6 +24,8 @@ pub(super) struct CoordinatorSettings {
     pub metrics: Arc<StdMutex<BlinkWalCheckpointMetrics>>,
     pub activity: Arc<CoordinatorActivity>,
     pub failed_message: Arc<StdMutex<Option<String>>>,
+    #[cfg(all(test, feature = "blink-demand-paging"))]
+    pub commit_test_gate: Option<Arc<super::OneShotTestGate>>,
 }
 
 struct RunningCheckpoint {
@@ -286,8 +288,12 @@ impl PhysicalCoordinator {
             .iter()
             .map(|entry| entry.request.clone())
             .collect::<Vec<_>>();
+        #[cfg(all(test, feature = "blink-demand-paging"))]
+        let commit_test_gate = self.settings.commit_test_gate.clone();
         let mut store = self.store.take().unwrap();
         let (store, before, after, results) = tokio::task::spawn_blocking(move || {
+            #[cfg(all(test, feature = "blink-demand-paging"))]
+            super::wait_for_one_shot_test_gate(commit_test_gate);
             let before = store.wal_metrics().ok().flatten();
             let results = store.apply_transaction_group(&requests);
             let after = store.wal_metrics().ok().flatten();

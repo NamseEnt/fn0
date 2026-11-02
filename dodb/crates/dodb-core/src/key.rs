@@ -21,6 +21,10 @@ impl PrimaryKey {
         &self.0
     }
 
+    pub fn allocated_capacity_bytes(&self) -> usize {
+        self.0.capacity()
+    }
+
     pub fn into_bytes(self) -> Vec<u8> {
         self.0
     }
@@ -33,6 +37,10 @@ impl SortKey {
 
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
+    }
+
+    pub fn allocated_capacity_bytes(&self) -> usize {
+        self.0.capacity()
     }
 
     pub fn into_bytes(self) -> Vec<u8> {
@@ -50,6 +58,10 @@ impl DocumentKey {
 
     pub fn from_parts(pk: PrimaryKey, sk: SortKey) -> Self {
         Self { pk, sk }
+    }
+
+    pub fn allocated_capacity_bytes(&self) -> usize {
+        self.pk.0.capacity().saturating_add(self.sk.0.capacity())
     }
 
     /// Encodes `(pk, sk)` as two escaped components.
