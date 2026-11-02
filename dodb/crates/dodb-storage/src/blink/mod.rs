@@ -13526,6 +13526,7 @@ mod tests {
             old_reader.get(&second_writer_key).unwrap().value(),
             handle.get(&second_writer_key).unwrap().value()
         );
+        let mut rotation_recovery_context = None;
         for update_number in 2..=9 {
             let updated_value = format!("writer-updated-{update_number:02}").into_bytes();
             let update_request = TransactionRequest::new(
@@ -13575,6 +13576,155 @@ mod tests {
                     latest_descriptor.locator,
                     version_index::VersionLocator::WalImage { .. }
                 ));
+            }
+            if update_number == 3 {
+                let mut rotation_base_pages = BTreeMap::new();
+                for page_number in 1..=writer.current().high_water_page_id.get() {
+                    let page_id = PageId::new(page_number);
+                    if let Some(page) = writer.current().load_mutation_base_page(page_id).unwrap() {
+                        let image = encode_blink_page(page_id, page.as_ref()).unwrap();
+                        rotation_base_pages.insert(
+                            page_id,
+                            RecoveredWalPage {
+                                commit_lsn: page.as_ref().lsn(),
+                                image: Box::new(image),
+                            },
+                        );
+                    }
+                }
+                let rotation_start_lsn = writer.wal.last_commit_lsn().unwrap();
+                let rotation_start_batch_id = writer.wal.next_batch_id();
+                let rotation_superblock_image =
+                    encode_blink_superblock(&writer.superblock).unwrap();
+                let rotation_wal_path = wal_directory.join("segment-00000000000000000004.wal");
+                let rotation_wal = WalLog::open_with_segment_bases(
+                    crate::durable_file::ProductionFile::open(&rotation_wal_path).unwrap(),
+                    wal_identity.clone(),
+                    WalPageImageFormat::ExperimentalBlink,
+                    crate::wal::WalSegmentBoundary {
+                        start_after_lsn: rotation_start_lsn,
+                        start_batch_id: Some(rotation_start_batch_id),
+                        truncate_torn_tail: true,
+                        defer_initial_sync: false,
+                    },
+                    rotation_base_pages.clone(),
+                    None,
+                )
+                .unwrap();
+                let rotation_wal_bytes = std::fs::read(&rotation_wal_path).unwrap();
+                let rotation_init_length =
+                    u32::from_le_bytes(rotation_wal_bytes[8..12].try_into().unwrap()) as usize;
+                let rotation_source = version_index::SourceIdentity {
+                    kind: version_index::SourceFileKind::WalSegment,
+                    file_number: 4,
+                    header_identity: *blake3::hash(&rotation_wal_bytes[..rotation_init_length])
+                        .as_bytes(),
+                };
+                rotation_recovery_context = Some((
+                    rotation_wal_path,
+                    rotation_start_lsn,
+                    rotation_start_batch_id,
+                    rotation_base_pages.clone(),
+                    rotation_source,
+                ));
+                let rotated_writer = PagedTransactionWriter::new(
+                    writer.snapshot().unwrap(),
+                    rotation_wal,
+                    rotation_source,
+                    &rotation_superblock_image,
+                    writer.active_slot,
+                    32,
+                )
+                .unwrap();
+                writer = rotated_writer;
+            }
+            if update_number == 8 {
+                let (
+                    rotation_wal_path,
+                    rotation_start_lsn,
+                    rotation_start_batch_id,
+                    bases,
+                    rotation_source,
+                ) = rotation_recovery_context.as_ref().unwrap();
+                let descriptor = writer
+                    .current()
+                    .index
+                    .lookup(writer.current().root, delta_page_id)
+                    .unwrap()
+                    .unwrap();
+                let version_index::VersionLocator::WalDelta { chain, depth, .. } =
+                    descriptor.locator
+                else {
+                    panic!("eighth paged-writer update did not retain a delta chain");
+                };
+                assert_eq!(depth, 8);
+                let chain_entries = writer
+                    .current()
+                    .index
+                    .delta_chains()
+                    .read(chain, delta_page_id)
+                    .unwrap()
+                    .entries;
+                assert_eq!(chain_entries.len(), 9);
+                assert!(
+                    chain_entries[..4]
+                        .iter()
+                        .all(|entry| entry.source_identity().file_number == 1)
+                );
+                assert!(
+                    chain_entries[4..]
+                        .iter()
+                        .all(|entry| entry.source_identity().file_number == 4)
+                );
+                let expected_page = writer
+                    .current()
+                    .load_mutation_base_page(delta_page_id)
+                    .unwrap()
+                    .unwrap();
+                let expected_image =
+                    encode_blink_page(delta_page_id, expected_page.as_ref()).unwrap();
+                let expected_page_lsn = expected_page.as_ref().lsn();
+                let expected_image_crc = crc32c::crc32c(&expected_image);
+                drop(expected_page);
+                let reopen_handle = writer.snapshot().unwrap();
+                let reopen_superblock_image = encode_blink_superblock(&writer.superblock).unwrap();
+                let reopen_active_slot = writer.active_slot;
+                drop(writer);
+                let recovered_wal = WalLog::open_with_segment_bases(
+                    crate::durable_file::ProductionFile::open(&rotation_wal_path).unwrap(),
+                    wal_identity.clone(),
+                    WalPageImageFormat::ExperimentalBlink,
+                    crate::wal::WalSegmentBoundary {
+                        start_after_lsn: *rotation_start_lsn,
+                        start_batch_id: Some(*rotation_start_batch_id),
+                        truncate_torn_tail: true,
+                        defer_initial_sync: false,
+                    },
+                    bases.clone(),
+                    None,
+                )
+                .unwrap();
+                let recovered_page = recovered_wal.recovery_pages().get(&delta_page_id).unwrap();
+                assert_eq!(recovered_page.image.as_ref(), &expected_image);
+                assert_eq!(recovered_page.commit_lsn, expected_page_lsn);
+                assert_eq!(
+                    crc32c::crc32c(&recovered_page.image[..]),
+                    expected_image_crc
+                );
+                assert_eq!(chain_entries.last().unwrap().image_lsn(), expected_page_lsn);
+                assert_eq!(
+                    chain_entries.last().unwrap().image_crc32c(),
+                    expected_image_crc
+                );
+                writer = PagedTransactionWriter::new(
+                    reopen_handle,
+                    recovered_wal,
+                    *rotation_source,
+                    &reopen_superblock_image,
+                    reopen_active_slot,
+                    32,
+                )
+                .unwrap();
             }
         }
         assert_eq!(
