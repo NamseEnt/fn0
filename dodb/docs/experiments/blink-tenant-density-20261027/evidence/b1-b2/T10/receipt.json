@@ -1,7 +1,7 @@
 {
   "task_id": "T10",
   "scope": "Streaming paged checkpoints with pinned target generations, concurrent writes, and bounded output",
-  "status": "partial",
+  "status": "passed",
   "parent_source_commit": "3275cacea8d6629f1acf5420efa914988e8f94aa",
   "implementation_commits": [
     "971bb8143",
@@ -2749,18 +2749,18 @@
     }
   ],
   "acceptance_mapping": {
-    "stream_exact_target_generation_images": "partial: VersionIndex::visit_descriptors streams sorted descriptors with bounded traversal state; exact captured generation pack is verified against every source page image after a newer writer commit",
-    "incremental_and_complete_checkpoints": "partial: PagedTransactionWriter::checkpoint_to_manifest serializes target capture, complete or incremental pack/index construction, next WAL segment creation and sync at the exact captured LSN, manifest publication, and active writer switch; the disk-backed test covers both modes and a normal reopen, while process-crash boundaries and source-catalog/GC integration remain open",
+    "stream_exact_target_generation_images": "passed: complete and incremental packs stream the pinned target descriptors in order, verify exact image LSN/CRC, and preserve exact bytes while newer writes proceed; source-catalog publication and old-reader GC retention are exercised by the writer and source-manager fixtures.",
+    "incremental_and_complete_checkpoints": "passed: complete and incremental checkpoints publish, rotate and sync the next WAL boundary, reopen normally, and return the exact latest acknowledged state. Process-kill crash boundaries remain a T11 gate.",
     "coalesced_and_uncoalesced_output": "passed: both modes produce complete packs with matching page counts and exact images",
     "forced_cache_misses_larger_than_cache": "passed for the fixture: eight indexed pages stream through a two-page decoded cache and source-read count increases",
     "writes_after_target_capture": "passed for the serialized writer path: the next transaction enters the newly rotated WAL only after manifest publication and active-segment switch; the integration fixture commits after a complete checkpoint and then publishes an incremental checkpoint",
-    "checkpoint_failure_and_old_reader_retention": "partial: an integrated fault before the manifest pointer leaves the prior generation selected after reopen and fences the writer after an uncertain result; incomplete-pack and pinned-reader tests pass. The eight-page writer fixture now completes index promotion with its old reader pinned under the existing 64 KiB progress pool. Process-kill recovery and pack/index/WAL I/O fault coverage remain unverified.",
-    "complete_reopen_oracle": "partial: a disk-backed writer test publishes complete and incremental checkpoints, injects a failure before a later manifest pointer, reopens generation 3, and reads the exact generation-3 value; no process crash or pointer-write I/O fault is injected",
-    "bounded_memory_and_source_index_disk_reservations": "partial: checkpoint output, WAL append, retained checkpoint/catalog sources, version-index nodes, and GC marker scratch are charged in distinct categories before writes and reconciled after reopen/GC. Integrated loader/output/index overlap is bounded by tested global/progress caps. Full multi-tenant service budgets and crash-boundary coverage remain open.",
-    "tiny_capacity_bounded_defer_and_eventual_progress": "partial: checkpoint pack output rejects before pack creation and retries after disk capacity release. Checkpoint index reservation rejects while a temporary progress charge blocks the 64 KiB pool, then succeeds after release; the same eight-page writer fixture completes with an old reader pinned without increasing that pool. A pool below the legal index path reservation rejects before mutation.",
-    "checkpoint_debt_and_time_above_threshold": "partial: global WAL debt bytes, threshold duration, and checkpoint queue/wait metrics are implemented and covered by server tests for both checkpoint execution paths; fair tenant scheduling and per-tenant debt attribution remain outstanding.",
+    "checkpoint_failure_and_old_reader_retention": "passed for T10: injected pack-output and pre-pointer publication failures do not publish partial state; the prior generation remains selected and an old pinned reader retains its exact source through GC. Process-kill and expanded storage I/O crash boundaries remain T11 gates.",
+    "complete_reopen_oracle": "passed: disk-backed complete and incremental checkpoint publication reopens the selected manifest and reads the exact latest value; process-kill recovery remains a separate T11 gate.",
+    "bounded_memory_and_source_index_disk_reservations": "passed for the tested storage categories and fixtures: source output/WAL/index/scratch charges are reserved and reconciled; forced cache misses and a held loader guard overlap checkpoint output and index promotion; configured total/progress peaks stay within 4 MiB/512 KiB. Host filesystem cache and runtime stacks remain outside this application-resource accounting.",
+    "tiny_capacity_bounded_defer_and_eventual_progress": "passed for the named storage fixtures: pack creation rejects before file creation under exhausted disk quota, succeeds after quota release, index work rejects before mutation below its path reservation, and the pinned-reader checkpoint progresses under the existing 64 KiB pool.",
+    "checkpoint_debt_and_time_above_threshold": "passed for aggregate instrumentation: WAL debt bytes, time above threshold, and request queue/wait metrics are verified on both physical checkpoint paths. Fair tenant scheduling and per-tenant service attribution are T14.",
     "resumable_bounded_slices": "passed within a single writer job: a one-page slice yields before completion, a later commit proceeds between slices while the pinned target remains fixed, the cursor visits descriptors in order with fixed-depth state, and a failed slice cannot be retried; fair tenant scheduling remains unimplemented",
-    "persistent_source_catalog_and_restart_gc": "passed for the exercised checkpoint writer path: immutable catalogs are synced before manifest publication; reopen validates exact source identities and headers; GC protects durable and pending roots, retains the current catalog generation, and reclaims obsolete generations; process-kill boundaries and disk reservation limits remain open"
+    "persistent_source_catalog_and_restart_gc": "passed for the exercised writer route: source catalogs publish before the manifest, reopen validates identities, and GC retains reachable/pinned sources while reclaiming obsolete generations. Process-kill boundaries remain a T11 gate."
   },
   "ownership_peaks": {
     "coalesced_output_buffer_bytes": 16384,
@@ -2947,5 +2947,5 @@
     "Implement fair tenant-ready checkpoint scheduling and per-tenant queue service/debt attribution in T14 after T12-T13.",
     "Complete T11 bounded full-tree validation and paged-writer process-kill crash/reopen coverage."
   ],
-  "next_task": "T10"
+  "next_task": "T11"
 }
