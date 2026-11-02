@@ -1,0 +1,20 @@
+T14 WAL accounting fix and rejected assertion probes
+
+Source defect
+- Service transactions use PagedTransactionWriter::transact_group.
+- Before the fix, the group append reserved WAL buffer memory but did not reserve WAL disk growth or reconcile the WAL directory bytes in DiskResourceManager.
+- The preserved diagnostic run measured 2,085,008 bytes in the WAL directory and 834,704 bytes in the WAL ledger. The 1,250,304-byte gap exceeded the 716,800 bytes of available headroom, so the checkpoint failed before registering its capacity waiter.
+- The fix reserves the checked sum of per-commit WAL append bounds before group append, then reconciles actual WAL directory usage after success or append failure.
+
+Rejected assertions after the fix
+- Requiring every WAL path present before the first checkpoint to be deleted after the second checkpoint failed because segment-00000000000000000002.wal remained referenced by the current root.
+- Requiring any path retained after the first checkpoint to disappear also failed in one run: the only path retained across the first publication was segment-00000000000000000002.wal, still referenced by the current root.
+- Requiring total RetainedSource usage to decrease after the second checkpoint failed: it was 421,892 bytes before checkpoint work and 1,253,384 bytes afterward because the new checkpoint output adds a retained pack.
+- These probes rejected the test assumptions; they do not invalidate waiter resumption. The accepted contract directly observes pending_waiters == 1 with the 700 KiB scratch blocker held, drops the old reader, awaits checkpoint completion while the blocker is still held, then confirms pending_waiters == 0 and verifies the latest value after reopen.
+
+Accepted validation
+- Targeted service integration: 1 passed in 8.28 seconds.
+- Full dodb-server paging library suite: 49 passed, 0 failed, 19.66 seconds.
+- dodb-storage source-manager tests: 14 passed, 0 failed, 0.73 seconds.
+- dodb-server paging Clippy with -D warnings: passed.
+- Scoped cargo fmt for dodb-server and dodb-storage: passed.

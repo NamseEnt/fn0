@@ -6624,6 +6624,19 @@ mod tests {
         let service = BlinkTenantService::new(config.clone()).unwrap();
         let database_path = service.database_path(tenant);
         create_empty_paged_service_fixture(&database_path, tenant);
+        let wal_directory =
+            dodb_storage::blink::paged_manifest::PagedManifestStore::sidecar_directory(
+                &database_path,
+            )
+            .join("segments");
+        let wal_directory_bytes = || {
+            std::fs::read_dir(&wal_directory)
+                .unwrap()
+                .flatten()
+                .map(|entry| entry.metadata().unwrap().len())
+                .sum::<u64>()
+        };
+        let disk = service.shared_resources.as_ref().unwrap().disk();
         let keys = (0u32..50)
             .map(|key_number| {
                 dodb_core::DocumentKey::new(
@@ -6648,6 +6661,13 @@ mod tests {
                 .await
                 .unwrap();
         }
+        let disk_usage_after_seed = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
+        assert_eq!(
+            disk_usage_after_seed.current_by_category
+                [dodb_storage::blink::resource::DiskCategory::Wal as usize],
+            wal_directory_bytes(),
+            "service transaction groups must account their complete WAL directory"
+        );
         let shard = service
             .shards
             .lock()
@@ -6669,11 +6689,6 @@ mod tests {
         let old_reader_value = old_reader.get(&key).unwrap();
         assert_eq!(old_reader_value.value(), Some(old_value.as_slice()));
         drop(old_reader_value);
-        let wal_directory =
-            dodb_storage::blink::paged_manifest::PagedManifestStore::sidecar_directory(
-                &database_path,
-            )
-            .join("segments");
         let wal_paths_before_checkpoint = std::fs::read_dir(&wal_directory)
             .unwrap()
             .flatten()
@@ -6681,10 +6696,14 @@ mod tests {
             .filter(|path| path.extension().is_some_and(|extension| extension == "wal"))
             .collect::<Vec<_>>();
         writable.run_threshold_checkpoint(1).await.unwrap();
-        let previous_wal_path = wal_paths_before_checkpoint
+        let retained_old_wal_paths = wal_paths_before_checkpoint
             .into_iter()
-            .find(|path| path.is_file())
-            .expect("old reader should retain a WAL source after checkpoint publication");
+            .filter(|path| path.is_file())
+            .collect::<Vec<_>>();
+        assert!(
+            !retained_old_wal_paths.is_empty(),
+            "old reader should retain at least one WAL source after checkpoint publication"
+        );
         assert_eq!(
             old_reader.get(&key).unwrap().value(),
             Some(old_value.as_slice())
@@ -6703,15 +6722,56 @@ mod tests {
                 .await
                 .unwrap();
         }
-        assert!(previous_wal_path.is_file());
+        let disk_usage_after_overwrites = disk.tenant_snapshot(tenant.get()).unwrap().unwrap();
+        assert_eq!(
+            disk_usage_after_overwrites.current_by_category
+                [dodb_storage::blink::resource::DiskCategory::Wal as usize],
+            wal_directory_bytes(),
+            "post-checkpoint transaction groups must account their new WAL segment"
+        );
+        let disk_usage_before_blocker = disk.snapshot().unwrap().current_total;
+        let headroom = 700 * 1024;
+        let blocker_bytes = disk_capacity
+            .saturating_sub(disk_usage_before_blocker)
+            .saturating_sub(headroom);
+        assert!(blocker_bytes > 0);
+        let blocker = disk
+            .reserve(
+                tenant.get(),
+                dodb_storage::blink::resource::DiskCategory::Scratch,
+                blocker_bytes,
+            )
+            .unwrap();
+        assert!(retained_old_wal_paths.iter().any(|path| path.is_file()));
         assert_eq!(
             old_reader.get(&key).unwrap().value(),
             Some(old_value.as_slice())
         );
+        let checkpoint = {
+            let writable = Arc::clone(&writable);
+            tokio::spawn(async move { writable.run_threshold_checkpoint(1).await })
+        };
+        tokio::time::timeout(std::time::Duration::from_secs(15), async {
+            loop {
+                if disk.snapshot().unwrap().pending_waiters == 1 {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "checkpoint did not wait for old-reader source capacity: finished={}, metrics={:?}",
+                checkpoint.is_finished(),
+                service.checkpoint_metrics_snapshot()
+            )
+        });
         drop(old_reader);
-        writable.run_threshold_checkpoint(1).await.unwrap();
+        checkpoint.await.unwrap().unwrap();
+        drop(blocker);
 
-        assert!(!previous_wal_path.exists());
+        assert_eq!(disk.snapshot().unwrap().pending_waiters, 0);
         let metrics = service.checkpoint_metrics_snapshot();
         assert_eq!(metrics.checkpoints_completed, 2);
         assert_eq!(metrics.checkpoints_failed, 0);

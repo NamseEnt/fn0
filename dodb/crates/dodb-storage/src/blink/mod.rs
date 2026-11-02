@@ -4436,6 +4436,12 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
                 .sources
                 .reserve_root_slot(&self.current.index)?
         };
+        let wal_growth_bytes = commits.iter().try_fold(0u64, |total_bytes, commit| {
+            total_bytes
+                .checked_add(paged_wal_append_bound(commit.pages.len())?)
+                .ok_or_else(|| Error::overloaded("paged transaction group WAL bound overflows"))
+        })?;
+        let wal_growth_reservation = self.current.sources.reserve_wal_growth(wal_growth_bytes)?;
         let committed_prefix_length;
         let reports = {
             let mut base_source = |page_id| base_images.get(&page_id).map(Cow::Borrowed);
@@ -4451,10 +4457,29 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             ) {
                 Ok(reports) => reports,
                 Err(error) => {
+                    let accounting_result = self
+                        .current
+                        .sources
+                        .retain_disk_reservation(wal_growth_reservation);
                     self.broken = Some(error.to_string());
+                    if let Err(accounting_error) = accounting_result {
+                        return Err(Error::durability(format!(
+                            "paged transaction group WAL append failed and disk accounting could not reconcile its file: {accounting_error}"
+                        )));
+                    }
                     return Err(error);
                 }
             };
+            if let Err(error) = self
+                .current
+                .sources
+                .retain_disk_reservation(wal_growth_reservation)
+            {
+                self.broken = Some(error.to_string());
+                return Err(Error::durability(format!(
+                    "paged transaction group committed but WAL disk accounting failed: {error}"
+                )));
+            }
             committed_prefix_length = match self.wal.file_length() {
                 Ok(length) => length,
                 Err(error) => {
