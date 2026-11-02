@@ -3281,19 +3281,28 @@ impl BlinkTenantService {
                 let open_result = tokio::task::spawn_blocking(move || {
                     let _worker_permit = worker_permit;
                     #[cfg(feature = "blink-demand-paging")]
-                    if dodb_storage::blink::paged_manifest::PagedManifestStore::has_format_marker(
-                        &database_path,
-                    ) {
-                        let Some(paged_config) = paged_open_config else {
-                            return Err(Error::unsupported_format(
-                                "paged Blink database requires the explicit paging service route",
-                            ));
-                        };
+                    if let Some(paged_config) = paged_open_config {
                         let Some(resources) = shared_resources else {
                             return Err(Error::invalid_request(
                                 "paged Blink service route requires shared resource limits",
                             ));
                         };
+                        if !dodb_storage::blink::paged_manifest::PagedManifestStore::has_format_marker(
+                            &database_path,
+                        ) {
+                            if database_path.exists() || database_path.with_extension("wal").exists() {
+                                return Err(Error::unsupported_format(
+                                    "paged Blink service route requires a paged format marker",
+                                ));
+                            }
+                            initialize_empty_paged_blink_store(
+                                &database_path,
+                                &database_config,
+                                tenant,
+                                paged_config,
+                                resources.clone(),
+                            )?;
+                        }
                         return open_paged_blink_store(
                             database_path,
                             database_config,
@@ -3303,9 +3312,11 @@ impl BlinkTenantService {
                         );
                     }
                     #[cfg(feature = "blink-demand-paging")]
-                    if paged_open_config.is_some() {
+                    if dodb_storage::blink::paged_manifest::PagedManifestStore::has_format_marker(
+                        &database_path,
+                    ) {
                         return Err(Error::unsupported_format(
-                            "paged Blink service route requires a paged format marker",
+                            "paged Blink database requires the explicit paging service route",
                         ));
                     }
                     open_blink_store(ResidentBlinkOpenConfig {
@@ -3581,6 +3592,216 @@ fn create_next_paged_wal_segment(
             Err(error) => return Err(error.into()),
         }
     }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+fn initialize_empty_paged_blink_store(
+    database_path: &std::path::Path,
+    database_config: &DatabaseConfig,
+    tenant: TenantId,
+    paging_config: BlinkSharedResourceConfig,
+    resources: dodb_storage::blink::resource::BlinkResourceManager,
+) -> Result<(), Error> {
+    use dodb_storage::blink::paged_manifest::{PagedManifest, PagedManifestStore};
+    use dodb_storage::blink::paged_recovery::build_checkpoint_index;
+    use dodb_storage::blink::source_manager::{SourceManager, SourceManagerConfig};
+    use dodb_storage::blink::version_index::{
+        SourceFileKind, StoreIdentity, VersionDescriptor, VersionIndex, VersionLocator,
+        VersionToken, WalFrameLocator,
+    };
+
+    let store_identity = StoreIdentity {
+        database_uuid: database_config.database_uuid,
+        wal_epoch: database_config.shard_epoch.get(),
+    };
+    let wal_identity = dodb_storage::WalIdentity::new(
+        database_config.database_uuid,
+        tenant,
+        database_config.shard_id,
+        database_config.shard_epoch,
+    );
+    PagedManifestStore::prepare_format(database_path, store_identity)?;
+    let sidecar_directory = PagedManifestStore::sidecar_directory(database_path);
+    let pack_directory = sidecar_directory.join("packs");
+    let wal_directory = sidecar_directory.join("segments");
+    let scratch_directory = sidecar_directory.join("scratch");
+    std::fs::create_dir_all(&pack_directory)?;
+    std::fs::create_dir_all(&wal_directory)?;
+    let index = Arc::new(VersionIndex::open(
+        PagedManifestStore::version_index_directory(database_path).as_path(),
+        store_identity,
+        resources.clone(),
+        tenant.get(),
+        paging_config.maximum_cached_index_nodes,
+    )?);
+    let sources = SourceManager::new(
+        SourceManagerConfig {
+            store_identity,
+            checkpoint_directory: pack_directory.clone(),
+            wal_directory: wal_directory.clone(),
+            scratch_directory,
+            tenant_id: tenant.get(),
+            maximum_open_handles: paging_config.maximum_open_source_handles,
+            maximum_roots: paging_config.maximum_roots_per_tenant,
+            handle_charge_bytes: paging_config.source_handle_charge_bytes,
+            gc_reservation_bytes: paging_config.source_gc_reservation_bytes,
+        },
+        resources.clone(),
+    )?;
+    let recovery_wal_path = wal_directory.join("segment-00000000000000000001.wal");
+    let mut wal = dodb_storage::WalLog::<ProductionFile>::open_with_page_image_format(
+        ProductionFile::open(&recovery_wal_path)?,
+        wal_identity.clone(),
+        dodb_storage::WalPageImageFormat::ExperimentalBlink,
+    )?;
+    let mut leaf_body = vec![0; dodb_storage::PAGE_SIZE - dodb_storage::PAGE_HEADER_SIZE];
+    leaf_body[0..4].copy_from_slice(b"BLKL");
+    leaf_body[4..6].copy_from_slice(&2u16.to_le_bytes());
+    leaf_body[10..12].copy_from_slice(&48u16.to_le_bytes());
+    leaf_body[12..14].copy_from_slice(&48u16.to_le_bytes());
+    let leaf_body_length = leaf_body.len() as u16;
+    leaf_body[18..20].copy_from_slice(&leaf_body_length.to_le_bytes());
+    leaf_body[20..28].copy_from_slice(&u64::MAX.to_le_bytes());
+    let root_page_id = dodb_core::PageId::new(2);
+    let page_image = dodb_storage::encode_page(
+        dodb_storage::PageHeader::new(
+            dodb_storage::PageType::Leaf,
+            root_page_id,
+            dodb_core::Lsn::new(2),
+        ),
+        &leaf_body,
+    )?;
+    wal.append_commit(
+        1,
+        dodb_core::Lsn::new(2),
+        &[dodb_storage::WalPageImage {
+            page_id: root_page_id,
+            image: page_image,
+        }],
+        None,
+    )?;
+    drop(wal);
+    let recovery_source = PagedManifestStore::recovery_source_identity(&recovery_wal_path, 1)?;
+    let mut wal_file = ProductionFile::open_existing(&recovery_wal_path)?;
+    let wal_scan = dodb_storage::WalLog::scan_committed_page_locations(
+        &mut wal_file,
+        &wal_identity,
+        dodb_storage::WalPageImageFormat::ExperimentalBlink,
+        None,
+        std::collections::BTreeMap::new(),
+    )?;
+    let recovered_location = wal_scan
+        .locations
+        .first()
+        .ok_or_else(|| Error::corruption("paged bootstrap WAL has no committed root page"))?;
+    let image_lsn = recovered_location
+        .image_lsn
+        .ok_or_else(|| Error::corruption("paged bootstrap root page has no image LSN"))?;
+    let image_crc32c = recovered_location
+        .image_crc32c
+        .ok_or_else(|| Error::corruption("paged bootstrap root page has no image checksum"))?;
+    let root = index.insert(
+        index.empty_root(),
+        root_page_id,
+        VersionDescriptor {
+            page_id: root_page_id,
+            token: VersionToken::Wal {
+                source_file_number: 1,
+                record_lsn: recovered_location.record_lsn,
+            },
+            image_lsn,
+            image_crc32c,
+            locator: VersionLocator::WalImage {
+                frame: WalFrameLocator {
+                    source: recovery_source,
+                    frame_offset: recovered_location.frame_offset,
+                    frame_length: recovered_location.frame_length,
+                    header_crc32c: recovered_location.header_crc32c,
+                    payload_offset: recovered_location.payload_offset,
+                    payload_length: recovered_location.payload_length,
+                    payload_crc32c: recovered_location.payload_crc32c,
+                    committed_prefix_length: wal_scan.committed_prefix_length,
+                    commit_frame_offset: recovered_location.commit_frame_offset,
+                    commit_lsn: recovered_location.commit_lsn,
+                },
+            },
+        },
+    )?;
+    let initial_handle = dodb_storage::blink::PagedReadHandle::new(
+        dodb_storage::blink::PagedReadConfig {
+            tenant_id: tenant.get(),
+            root,
+            root_page_id,
+            free_list_head: None,
+            high_water_page_id: root_page_id,
+            loader: paging_config.page_loader,
+        },
+        Arc::clone(&index),
+        resources,
+        sources,
+        |source| {
+            Ok(if source.kind == SourceFileKind::WalSegment {
+                dodb_storage::wal::INIT_FRAME_SIZE
+            } else {
+                dodb_storage::PAGE_SIZE
+            })
+        },
+    )?;
+    let checkpoint_pack = initial_handle.write_checkpoint_pack(
+        dodb_storage::blink::PagedCheckpointPackRequest {
+            directory: pack_directory.clone(),
+            file_number: 1,
+            identity: wal_identity.clone(),
+            checkpoint_lsn: dodb_core::Lsn::new(2),
+            previous_checkpoint_lsn: None,
+            coalesce: false,
+        },
+        None,
+    )?;
+    let checkpoint_pack_path = pack_directory.join("base-00000000000000000001.pages");
+    let (durable_root, checkpoint_source) = build_checkpoint_index(
+        &index,
+        root,
+        &checkpoint_pack_path,
+        &checkpoint_pack.entry,
+        true,
+        &wal_identity,
+        root_page_id,
+    )?;
+    if checkpoint_source.kind != SourceFileKind::CheckpointPack {
+        return Err(Error::invariant(
+            "paged bootstrap checkpoint index has a non-checkpoint source",
+        ));
+    }
+    let active_wal_path = wal_directory.join("segment-00000000000000000002.wal");
+    let active_wal = dodb_storage::WalLog::<ProductionFile>::open_with_page_image_format_and_fault_injector_and_start_lsn(
+        ProductionFile::open(&active_wal_path)?,
+        wal_identity,
+        dodb_storage::WalPageImageFormat::ExperimentalBlink,
+        dodb_core::Lsn::new(2),
+        None,
+    )?;
+    drop(active_wal);
+    PagedManifestStore::create_with_index(
+        database_path,
+        PagedManifest {
+            identity: store_identity,
+            generation: 1,
+            tree_root: root_page_id,
+            free_list_root: None,
+            high_water_page_id: root_page_id,
+            durable_index_root: durable_root
+                .node_reference()
+                .ok_or_else(|| Error::invariant("paged bootstrap index root is empty"))?,
+            source_catalog_root: None,
+            recovery_wal_file_number: 2,
+            recovery_offset: std::fs::metadata(active_wal_path)?.len(),
+            committed_prefix_lsn: dodb_core::Lsn::new(2),
+            previous_generation: 0,
+        },
+        &index,
+    )?;
+    Ok(())
 }
 
 #[cfg(feature = "blink-demand-paging")]
@@ -5168,14 +5389,6 @@ mod tests {
 
     #[cfg(feature = "blink-demand-paging")]
     fn create_empty_paged_service_fixture(database_path: &std::path::Path, tenant: TenantId) {
-        use dodb_storage::blink::paged_manifest::{PagedManifest, PagedManifestStore};
-        use dodb_storage::blink::paged_recovery::build_checkpoint_index;
-        use dodb_storage::blink::source_manager::{SourceManager, SourceManagerConfig};
-        use dodb_storage::blink::version_index::{
-            SourceFileKind, StoreIdentity, VersionDescriptor, VersionIndex, VersionLocator,
-            VersionToken, WalFrameLocator,
-        };
-
         let shard_id = ShardId::new(tenant.get());
         let database_config = DatabaseConfig {
             tenant_id: tenant,
@@ -5183,206 +5396,18 @@ mod tests {
             database_uuid: database_uuid(tenant, shard_id),
             ..DatabaseConfig::default()
         };
-        let store_identity = StoreIdentity {
-            database_uuid: database_config.database_uuid,
-            wal_epoch: database_config.shard_epoch.get(),
-        };
-        let wal_identity = dodb_storage::WalIdentity::new(
-            database_config.database_uuid,
-            tenant,
-            shard_id,
-            database_config.shard_epoch,
-        );
-        PagedManifestStore::prepare_format(database_path, store_identity).unwrap();
-        let sidecar_directory = PagedManifestStore::sidecar_directory(database_path);
-        let pack_directory = sidecar_directory.join("packs");
-        let wal_directory = sidecar_directory.join("segments");
-        let scratch_directory = sidecar_directory.join("scratch");
-        std::fs::create_dir_all(&pack_directory).unwrap();
-        std::fs::create_dir_all(&wal_directory).unwrap();
         let resource_config = paged_blink_shared_resources();
         let resources = dodb_storage::blink::resource::BlinkResourceManager::new_with_disk_limits(
             resource_config.memory,
             resource_config.disk,
         )
         .unwrap();
-        let index = Arc::new(
-            VersionIndex::open(
-                PagedManifestStore::version_index_directory(database_path).as_path(),
-                store_identity,
-                resources.clone(),
-                tenant.get(),
-                resource_config.maximum_cached_index_nodes,
-            )
-            .unwrap(),
-        );
-        let sources = SourceManager::new(
-            SourceManagerConfig {
-                store_identity,
-                checkpoint_directory: pack_directory.clone(),
-                wal_directory: wal_directory.clone(),
-                scratch_directory,
-                tenant_id: tenant.get(),
-                maximum_open_handles: resource_config.maximum_open_source_handles,
-                maximum_roots: resource_config.maximum_roots_per_tenant,
-                handle_charge_bytes: resource_config.source_handle_charge_bytes,
-                gc_reservation_bytes: resource_config.source_gc_reservation_bytes,
-            },
-            resources.clone(),
-        )
-        .unwrap();
-        let recovery_wal_path = wal_directory.join("segment-00000000000000000001.wal");
-        let mut leaf_body = vec![0; dodb_storage::PAGE_SIZE - dodb_storage::PAGE_HEADER_SIZE];
-        leaf_body[0..4].copy_from_slice(b"BLKL");
-        leaf_body[4..6].copy_from_slice(&2u16.to_le_bytes());
-        leaf_body[10..12].copy_from_slice(&48u16.to_le_bytes());
-        leaf_body[12..14].copy_from_slice(&48u16.to_le_bytes());
-        let leaf_body_length = leaf_body.len() as u16;
-        leaf_body[18..20].copy_from_slice(&leaf_body_length.to_le_bytes());
-        leaf_body[20..28].copy_from_slice(&u64::MAX.to_le_bytes());
-        let root_page_id = dodb_core::PageId::new(2);
-        let page_image = dodb_storage::encode_page(
-            dodb_storage::PageHeader::new(
-                dodb_storage::PageType::Leaf,
-                root_page_id,
-                dodb_core::Lsn::new(2),
-            ),
-            &leaf_body,
-        )
-        .unwrap();
-        let mut wal = dodb_storage::WalLog::<ProductionFile>::open_with_page_image_format(
-            ProductionFile::open(&recovery_wal_path).unwrap(),
-            wal_identity.clone(),
-            dodb_storage::WalPageImageFormat::ExperimentalBlink,
-        )
-        .unwrap();
-        wal.append_commit(
-            1,
-            dodb_core::Lsn::new(2),
-            &[dodb_storage::WalPageImage {
-                page_id: root_page_id,
-                image: page_image,
-            }],
-            None,
-        )
-        .unwrap();
-        drop(wal);
-        let recovery_source =
-            PagedManifestStore::recovery_source_identity(&recovery_wal_path, 1).unwrap();
-        let mut wal_file = ProductionFile::open_existing(&recovery_wal_path).unwrap();
-        let wal_scan = dodb_storage::WalLog::scan_committed_page_locations(
-            &mut wal_file,
-            &wal_identity,
-            dodb_storage::WalPageImageFormat::ExperimentalBlink,
-            None,
-            std::collections::BTreeMap::new(),
-        )
-        .unwrap();
-        let recovered_location = wal_scan.locations.first().unwrap();
-        let image_lsn = recovered_location.image_lsn.unwrap();
-        let image_crc32c = recovered_location.image_crc32c.unwrap();
-        let mut root = index.empty_root();
-        root = index
-            .insert(
-                root,
-                root_page_id,
-                VersionDescriptor {
-                    page_id: root_page_id,
-                    token: VersionToken::Wal {
-                        source_file_number: 1,
-                        record_lsn: recovered_location.record_lsn,
-                    },
-                    image_lsn,
-                    image_crc32c,
-                    locator: VersionLocator::WalImage {
-                        frame: WalFrameLocator {
-                            source: recovery_source,
-                            frame_offset: recovered_location.frame_offset,
-                            frame_length: recovered_location.frame_length,
-                            header_crc32c: recovered_location.header_crc32c,
-                            payload_offset: recovered_location.payload_offset,
-                            payload_length: recovered_location.payload_length,
-                            payload_crc32c: recovered_location.payload_crc32c,
-                            committed_prefix_length: wal_scan.committed_prefix_length,
-                            commit_frame_offset: recovered_location.commit_frame_offset,
-                            commit_lsn: recovered_location.commit_lsn,
-                        },
-                    },
-                },
-            )
-            .unwrap();
-        let initial_handle = dodb_storage::blink::PagedReadHandle::new(
-            dodb_storage::blink::PagedReadConfig {
-                tenant_id: tenant.get(),
-                root,
-                root_page_id,
-                free_list_head: None,
-                high_water_page_id: root_page_id,
-                loader: resource_config.page_loader,
-            },
-            Arc::clone(&index),
-            resources.clone(),
-            sources,
-            |source| {
-                Ok(if source.kind == SourceFileKind::WalSegment {
-                    dodb_storage::wal::INIT_FRAME_SIZE
-                } else {
-                    dodb_storage::PAGE_SIZE
-                })
-            },
-        )
-        .unwrap();
-        let checkpoint_pack = initial_handle
-            .write_checkpoint_pack(
-                dodb_storage::blink::PagedCheckpointPackRequest {
-                    directory: pack_directory.clone(),
-                    file_number: 1,
-                    identity: wal_identity.clone(),
-                    checkpoint_lsn: dodb_core::Lsn::new(2),
-                    previous_checkpoint_lsn: None,
-                    coalesce: false,
-                },
-                None,
-            )
-            .unwrap();
-        let checkpoint_pack_path = pack_directory.join("base-00000000000000000001.pages");
-        let (durable_root, checkpoint_source) = build_checkpoint_index(
-            &index,
-            root,
-            &checkpoint_pack_path,
-            &checkpoint_pack.entry,
-            true,
-            &wal_identity,
-            root_page_id,
-        )
-        .unwrap();
-        assert_eq!(checkpoint_source.kind, SourceFileKind::CheckpointPack);
-        let active_wal_path = wal_directory.join("segment-00000000000000000002.wal");
-        let active_wal = dodb_storage::WalLog::<ProductionFile>::open_with_page_image_format_and_fault_injector_and_start_lsn(
-            ProductionFile::open(&active_wal_path).unwrap(),
-            wal_identity,
-            dodb_storage::WalPageImageFormat::ExperimentalBlink,
-            dodb_core::Lsn::new(2),
-            None,
-        )
-        .unwrap();
-        drop(active_wal);
-        PagedManifestStore::create_with_index(
+        super::initialize_empty_paged_blink_store(
             database_path,
-            PagedManifest {
-                identity: store_identity,
-                generation: 1,
-                tree_root: root_page_id,
-                free_list_root: None,
-                high_water_page_id: root_page_id,
-                durable_index_root: durable_root.node_reference().unwrap(),
-                source_catalog_root: None,
-                recovery_wal_file_number: 2,
-                recovery_offset: std::fs::metadata(active_wal_path).unwrap().len(),
-                committed_prefix_lsn: dodb_core::Lsn::new(2),
-                previous_generation: 0,
-            },
-            &index,
+            &database_config,
+            tenant,
+            resource_config,
+            resources,
         )
         .unwrap();
     }
@@ -5893,6 +5918,70 @@ mod tests {
                 let _ = self.child.wait();
             }
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_service_initializes_a_fresh_tenant_store() {
+        let directory = blink_test_directory();
+        let tenant = TenantId::new(601);
+        let key = DocumentKey::new(b"fresh-paged-tenant".to_vec(), b"root".to_vec());
+        let value = b"fresh paged tenant value".to_vec();
+        let service = BlinkTenantService::new(paged_crash_service_config(
+            directory.path().to_path_buf(),
+            true,
+        ))
+        .unwrap();
+        let database_path = service.database_path(tenant);
+        let revision = paged_crash_put(&service, tenant, key.clone(), value.clone()).await;
+        assert!(
+            dodb_storage::blink::paged_manifest::PagedManifestStore::has_format_marker(
+                &database_path
+            )
+        );
+        assert_paged_crash_value(&service, tenant, key.clone(), &value, revision).await;
+        let revised_value = b"fresh paged tenant conditional value".to_vec();
+        match service
+            .execute_request(
+                tenant,
+                Request::Transact {
+                    request: TransactionRequest::new(
+                        vec![TransactionCondition::RevisionEquals {
+                            key: key.clone(),
+                            expected_revision: dodb_core::Revision::new(revision),
+                        }],
+                        vec![TransactionMutation::Put {
+                            key: key.clone(),
+                            value: revised_value.clone(),
+                        }],
+                    ),
+                },
+                ExecutionBudget::new(64 * 1024),
+            )
+            .await
+            .unwrap()
+        {
+            Response::Transact(outcome) => assert!(outcome.commit_lsn.is_some()),
+            response => panic!("unexpected response: {response:?}"),
+        }
+        let revised_revision = paged_crash_current_revision(&service, tenant, key.clone()).await;
+        assert_paged_crash_value(
+            &service,
+            tenant,
+            key.clone(),
+            &revised_value,
+            revised_revision,
+        )
+        .await;
+        service.shutdown_checked().await.unwrap();
+
+        let reopened = BlinkTenantService::new(paged_crash_service_config(
+            directory.path().to_path_buf(),
+            true,
+        ))
+        .unwrap();
+        assert_paged_crash_value(&reopened, tenant, key, &revised_value, revised_revision).await;
+        reopened.shutdown_checked().await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

@@ -4074,7 +4074,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
         }
         Ok(TransactionResult {
             commit_lsn: Some(report.commit_lsn),
-            revision: Some(provisional_revision),
+            revision: Some(Revision::from(report.commit_lsn)),
         })
     }
 
@@ -4227,10 +4227,6 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
         commit_positions.try_reserve(requests.len()).map_err(|_| {
             Error::overloaded("paged transaction group result capacity is exhausted")
         })?;
-        let mut commit_revisions = Vec::new();
-        commit_revisions.try_reserve(requests.len()).map_err(|_| {
-            Error::overloaded("paged transaction group revision capacity is exhausted")
-        })?;
         let mut dirty_page_ids = BTreeSet::new();
         let mut dirty_record_count = 0usize;
         let mut wal_buffer_reservations = Vec::new();
@@ -4371,7 +4367,6 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
                 pages: commit_pages,
             });
             commit_positions.push(request_index);
-            commit_revisions.push(provisional_revision);
             eligible_commits.push(self.allow_page_deltas);
             outcomes[request_index] = Some(Ok(TransactionResult {
                 commit_lsn: Some(Lsn::ZERO),
@@ -4684,14 +4679,10 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
         self.current = next_handle;
         self.superblock = staged_superblock;
         self.active_slot = staged_active_slot;
-        for ((request_index, report), provisional_revision) in commit_positions
-            .into_iter()
-            .zip(reports)
-            .zip(commit_revisions)
-        {
+        for (request_index, report) in commit_positions.into_iter().zip(reports) {
             outcomes[request_index] = Some(Ok(TransactionResult {
                 commit_lsn: Some(report.commit_lsn),
-                revision: Some(provisional_revision),
+                revision: Some(Revision::from(report.commit_lsn)),
             }));
         }
         drop(page_reuse_reservation);
