@@ -16679,6 +16679,7 @@ mod tests {
             .unwrap();
         assert_eq!(restarted_gc.protected_sources, 1);
         assert!(restarted_gc.unlinked_catalog_pages > 0);
+        assert!(restarted_gc.unlinked_index_nodes > 0);
         assert!(recovery_wal_path.is_file());
         let catalog_root = reopened_manifest.current().source_catalog_root.unwrap();
         assert!(

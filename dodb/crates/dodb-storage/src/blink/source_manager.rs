@@ -129,6 +129,8 @@ pub struct SourceGcReport {
     pub unlinked_open_bytes: u64,
     pub unlinked_catalog_pages: u64,
     pub unlinked_catalog_bytes: u64,
+    pub unlinked_index_nodes: u64,
+    pub unlinked_index_bytes: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -778,8 +780,8 @@ impl SourceManager {
         let _scratch = GcScratch {
             path: scratch_path.clone(),
         };
-        for root in roots {
-            index.visit_sources(root, &mut |source| match source {
+        for root in &roots {
+            index.visit_sources(*root, &mut |source| match source {
                 SourceReachability::Exact(identity) => write_source_marker(&scratch_path, identity),
                 SourceReachability::AllWalSegments => {
                     OpenOptions::new()
@@ -812,7 +814,13 @@ impl SourceManager {
                 })?;
         }
 
-        let mut report = SourceGcReport::default();
+        let (unlinked_index_nodes, unlinked_index_bytes) =
+            index.reclaim_unreachable_nodes(&roots, &scratch_path)?;
+        let mut report = SourceGcReport {
+            unlinked_index_nodes,
+            unlinked_index_bytes,
+            ..SourceGcReport::default()
+        };
         for candidate in candidates {
             report.candidates_examined = report
                 .candidates_examined

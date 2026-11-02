@@ -579,6 +579,123 @@ impl VersionIndex {
             .len())
     }
 
+    pub fn reclaim_unreachable_nodes(
+        &self,
+        roots: &[VersionIndexRoot],
+        marker_directory: &Path,
+    ) -> Result<(u64, u64)> {
+        fn mark_node(
+            index: &VersionIndex,
+            node_reference: NodeRef,
+            expected_level: u8,
+            parent_generation: u64,
+            root_generation: u64,
+            marker_directory: &Path,
+        ) -> Result<()> {
+            let node = index.store.read_node(node_reference)?;
+            if node.level != expected_level
+                || node.generation > parent_generation
+                || node.generation > root_generation
+            {
+                return Err(Error::corruption(
+                    "version-index GC found invalid node ancestry",
+                ));
+            }
+            let marker_path =
+                marker_directory.join(format!("version-index-{:020}", node_reference.file_number));
+            match OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(marker_path)
+            {
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
+                Err(error) => return Err(error.into()),
+            }
+            match node.content {
+                NodeContent::Internal(children) if expected_level > 0 => {
+                    for child_reference in children.into_iter().flatten() {
+                        mark_node(
+                            index,
+                            child_reference,
+                            expected_level - 1,
+                            node.generation,
+                            root_generation,
+                            marker_directory,
+                        )?;
+                    }
+                    Ok(())
+                }
+                NodeContent::Leaf(_) if expected_level == 0 => Ok(()),
+                _ => Err(Error::corruption(
+                    "version-index GC found node content at a wrong level",
+                )),
+            }
+        }
+
+        for root in roots {
+            self.visit_descriptors(*root, &mut |_| Ok(()))?;
+            match root.node {
+                Some(node_reference) => mark_node(
+                    self,
+                    node_reference,
+                    MAX_RADIX_LEVEL,
+                    root.generation,
+                    root.generation,
+                    marker_directory,
+                )?,
+                None if root.generation == 0 => {}
+                None => {
+                    return Err(Error::corruption(
+                        "version-index GC found an invalid empty root",
+                    ));
+                }
+            }
+        }
+
+        let mut unlinked_nodes = 0u64;
+        let mut unlinked_bytes = 0u64;
+        for entry in fs::read_dir(&self.store.directory)? {
+            let entry = entry?;
+            let file_name = entry.file_name();
+            let Some(file_name) = file_name.to_str() else {
+                continue;
+            };
+            let Some(file_number) = parse_node_file_number(file_name)? else {
+                continue;
+            };
+            if marker_directory
+                .join(format!("version-index-{file_number:020}"))
+                .exists()
+            {
+                continue;
+            }
+            let metadata = entry.metadata()?;
+            if !metadata.is_file() {
+                return Err(Error::corruption(
+                    "unreachable version-index node path is not a file",
+                ));
+            }
+            fs::remove_file(entry.path())?;
+            unlinked_nodes = unlinked_nodes
+                .checked_add(1)
+                .ok_or_else(|| Error::invalid_input("version-index GC node count overflows"))?;
+            unlinked_bytes = unlinked_bytes
+                .checked_add(metadata.len())
+                .ok_or_else(|| Error::invalid_input("version-index GC byte count overflows"))?;
+        }
+        if unlinked_nodes > 0 {
+            self.store.sync_directory()?;
+            self.store
+                .disk_reservation
+                .lock()
+                .map_err(|_| Error::invariant("version-index disk reservation lock poisoned"))?
+                .shrink(unlinked_bytes)
+                .map_err(|_| Error::invariant("version-index disk reservation release failed"))?;
+        }
+        Ok((unlinked_nodes, unlinked_bytes))
+    }
+
     pub fn root_node_is_rebuildable(&self, root: VersionIndexRoot) -> Result<bool> {
         let Some(node_reference) = root.node else {
             if root.generation != 0 {
@@ -2160,6 +2277,57 @@ mod tests {
             maximum_cached_nodes,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn version_index_gc_keeps_pinned_roots_and_reclaims_old_nodes() {
+        let directory = TestDirectory::new("node-gc");
+        let pinned_markers = directory.path().join("pinned-markers");
+        let current_markers = directory.path().join("current-markers");
+        fs::create_dir_all(&pinned_markers).unwrap();
+        fs::create_dir_all(&current_markers).unwrap();
+        let resources = resource_manager();
+        let index = open_index_with_manager(directory.path(), ([51; 16], 52), 2, resources.clone());
+        let page_id = PageId::new(23);
+        let old_root = index
+            .insert(index.empty_root(), page_id, checkpoint_descriptor(page_id))
+            .unwrap();
+        let new_root = index
+            .insert(old_root, page_id, wal_image_descriptor(page_id))
+            .unwrap();
+
+        let (pinned_unlinked_nodes, _) = index
+            .reclaim_unreachable_nodes(&[old_root, new_root], &pinned_markers)
+            .unwrap();
+        assert_eq!(pinned_unlinked_nodes, 0);
+        let (unlinked_nodes, unlinked_bytes) = index
+            .reclaim_unreachable_nodes(&[new_root], &current_markers)
+            .unwrap();
+
+        assert!(unlinked_nodes > 0);
+        assert_eq!(
+            unlinked_bytes,
+            unlinked_nodes * super::VERSION_INDEX_NODE_BYTES as u64
+        );
+        assert_eq!(
+            index.lookup(new_root, page_id).unwrap(),
+            Some(wal_image_descriptor(page_id))
+        );
+        let disk_snapshot = resources.disk().snapshot().unwrap();
+        assert_eq!(
+            disk_snapshot.current_by_category
+                [super::super::resource::DiskCategory::VersionIndex as usize],
+            fs::read_dir(directory.path())
+                .unwrap()
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| {
+                    entry.file_name().to_str().is_some_and(|name| {
+                        name.starts_with("version-index-") && name.ends_with(".node")
+                    })
+                })
+                .map(|entry| entry.metadata().unwrap().len())
+                .sum::<u64>()
+        );
     }
 
     #[test]
