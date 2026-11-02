@@ -152,7 +152,7 @@ Dependencies: completed B1.0. Ownership: documentation only.
 
 Create `B1-B2-CONTRACTS.md`: exact version/source key fields, radix node/manifest/spill layouts and limits, compatibility marker, durable versus runtime roots, version-token recovery, sync/publication order, active-WAL committed-prefix ownership, lock order, reservation categories, error taxonomy, cancellation, and GC algorithm. Include a state-transition table for append, sync, publish, checkpoint, recovery, and GC, identifying which sources protect acknowledged state at each transition. List existing source functions to replace and call sites to migrate.
 
-Acceptance: every decision in section 3 maps to a concrete layout/API/invariant and planned test. No unresolved alternative such as "LRU or disk map". No claim of implementation. Freeze the specification in a separate commit before implementing disk structures.
+Acceptance: every decision in section 3 maps to a concrete layout/API/invariant and planned test. No unresolved alternative such as "LRU or disk map". No claim of implementation. Freeze the specification in a separate commit before implementing disk structures. The 2026-11-02 amendment closes the missing persisted delta-ancestry path and adds explicit T05, T07, T11, and T16 acceptance.
 
 ### T01 - Shared byte ledger and reservation ownership
 
@@ -192,7 +192,7 @@ Dependencies: T03-T04. Ownership: source manager/GC modules, segmented reclamati
 
 Implement runtime root/load/snapshot leases, durable-root discovery, bounded mark/sweep or equivalent external traversal from the frozen contract, handle pooling, and safe file retirement. Replace every deletion path on the paged route, including startup cleanup. Keep old resident reclamation unchanged.
 
-Acceptance: pin an old generation, checkpoint/consolidate, evict/drop original payloads, close/reopen source handles, and read exact old bytes; release the pin and prove sources become reclaimable only when all other roots/dependencies drop. Race load acquisition with retirement using barriers. Crash before/after manifest publish and before/during/after unlink; recover acknowledged state. Missing reachable source rejects open/read. Foreign files and uncertain orphans are preserved. Show allocated/unlinked-open bytes separately; an open descriptor after unlink alone cannot pass this card.
+Acceptance: pin an old generation, checkpoint/consolidate, evict/drop original payloads, close/reopen source handles, and read exact old bytes; release the pin and prove sources become reclaimable only when all other roots/dependencies drop. Race load acquisition with retirement using barriers. Crash before/after manifest publish and before/during/after unlink; recover acknowledged state. Missing reachable source rejects open/read. Foreign files, unreferenced delta-chain sidecars, and uncertain orphans are preserved. Mark all source dependencies in each referenced delta-chain sidecar. Show allocated/unlinked-open bytes separately; an open descriptor after unlink alone cannot pass this card.
 
 ### T06 - Fallible page access and writer interfaces
 
@@ -204,11 +204,11 @@ Acceptance: Get/Query/Scan and mutation regressions pass on resident adapter; in
 
 ### T07 - Bounded decoded cache and coalesced loads
 
-Dependencies: T01-T06. Ownership: new cache/load modules and guard wiring.
+Dependencies: T01-T06 and the T00 bounded-delta-ancestry amendment. Ownership: cache/load modules, bounded delta-chain sidecars, and guard wiring.
 
-Implement one shared budgeted cache keyed by exact version, bounded loader jobs/followers, source reads/reconstruction, byte charges for encoded/decoded overlap, and eviction of cache ownership. An old generation retains a small index root rather than all decoded payloads.
+Implement one shared budgeted cache keyed by exact version, bounded loader jobs/followers, direct source reads and bounded WAL-delta reconstruction from the immutable ancestry sidecar, byte charges for encoded/decoded overlap, and eviction of cache ownership. Sync the ancestry sidecar before publishing an index root that references it. An old generation retains a small index root rather than all decoded payloads.
 
-Acceptance: repeated misses trigger one physical load; distinct-version misses never coalesce; all followers see failure/cancellation/shutdown terminal state; no permit leak; cache removal does not release live guard bytes; all-pinned capacity produces bounded overload/backpressure, not allocation bypass. Force both current and old versions out of cache and load exact bytes from still-live sources. Test capacity below one legal load is rejected at configuration.
+Acceptance: repeated misses trigger one physical load; distinct-version misses never coalesce; all followers see failure/cancellation/shutdown terminal state; no permit leak; cache removal does not release live guard bytes; all-pinned capacity produces bounded overload/backpressure, not allocation bypass. Force both current and old versions out of cache and load exact bytes from still-live sources. Reconstruct one-, two-, and eight-delta chains across WAL rotation after source handles close/reopen without scanning WAL; validate every intermediate and final LSN/CRC. Reject missing/corrupt chain sidecars as corruption. Test capacity below one legal load is rejected at configuration.
 
 ### T08 - Demand-loaded read route
 
@@ -240,7 +240,7 @@ Dependencies: T04-T10. Ownership: bounded invariant checker/recovery integration
 
 Replace paged-route whole-page/high-water sets in `check_state` and opening validation with bounded traversal and external sort/visited scratch. Preserve detection of duplicate ownership, cycles, missing/unreachable allocated pages, invalid free lists, cross-page links/order, overflow lengths, checksums, and malformed page formats. Scratch consumes explicit memory/disk capacity and is distinguishable from durable sources.
 
-Acceptance: corruption in an unrequested page still fails complete validation; do not substitute lazy validation. Reopen a store above cache and replay a large WAL without an all-page temporary map. Test torn active tails, corrupt closed tails, invalid delta/base, pack construction failure, every publication/GC crash boundary, page-ID reuse, pinned-version/checkpoint race, and write after recovery followed by another crash/recovery. Storage tests complement but cannot replace T15's service test.
+Acceptance: corruption in an unrequested page still fails complete validation; do not substitute lazy validation. Reopen a store above cache and replay a large WAL without an all-page temporary map. Test torn active tails, corrupt closed tails, invalid delta/base, missing/truncated/wrong-identity delta-chain sidecars, sidecar-before-index and index-before-manifest crash boundaries, pack construction failure, every publication/GC crash boundary, page-ID reuse, pinned-version/checkpoint race, and write after recovery followed by another crash/recovery. Storage tests complement but cannot replace T15's service test.
 
 ### T12 - Explicit service configuration and shared resources
 
@@ -282,7 +282,7 @@ Acceptance: all required correctness cases pass with nonzero eviction/miss/WAL r
 
 Dependencies: T15. Ownership: density harness supporting modules, reviewer, new result schema/tests and frozen plan.
 
-Add explicit feature/runtime options to the existing isolated backend worker. Record actual applied limits, every category/current/peak, pin count/age, cache/load/coalescing counts, source opens, reconstructed chain depths, queue/admission waits/rejections, maintenance wait/debt, reachable/retained/temporary disk bytes, phase process/cgroup observations, and sampling gaps. Final report reads must not allocate an entire historical trace in the backend.
+Add explicit feature/runtime options to the existing isolated backend worker. Record actual applied limits, every category/current/peak, pin count/age, cache/load/coalescing counts, source opens, reconstructed chain depths, version-index v2 and delta-chain sidecar format identities, queue/admission waits/rejections, maintenance wait/debt, reachable/retained/temporary disk bytes, phase process/cgroup observations, and sampling gaps. Final report reads must not allocate an entire historical trace in the backend.
 
 Acceptance: matched fingerprints and full/reopen oracle on tiny paired correctness cells; actual paged route verified; bounded diagnostics; failed worker yields preserved partial evidence; default reports retain compatible semantics. Use the existing reference options and shared budget boundaries. Implementation tests can be local; OCI timing/density conclusions cannot be derived from local tests.
 
@@ -316,7 +316,7 @@ Each cell needs a named test or collected artifact in the final receipt. "Covere
 | Payload bound | Data >= 4x decoded cache; misses and eviction proven | T08-T11, T15 |
 | Global ownership | Multiple active tenants and shared Arc/guards | T01, T12-T15 |
 | Preparation/checkpoint peak | Full queue plus full/consolidating checkpoint and misses | T09-T10, T13-T15 |
-| Bounded recovery/validation | Long WAL and complete tree validation above cache | T04, T11, T15 |
+| Bounded recovery/validation | Long WAL and complete tree validation above cache, including delta ancestry sidecars | T04, T07, T11, T15 |
 | Fairness/progress | All tenants pressured, one hot writer and one old reader | T14-T15 |
 | Request semantics | Conditional/multi-key, ABA/tombstone, cursor/response limits | T08-T09, T15 |
 | Real-service durability | Incomplete recovery -> acknowledged write -> second crash/recovery | T15 |
