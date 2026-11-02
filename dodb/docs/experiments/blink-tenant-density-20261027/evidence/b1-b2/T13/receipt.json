@@ -1,0 +1,128 @@
+{
+  "task_id": "T13",
+  "scope": "Byte-bounded foreground admission progress",
+  "status": "partial",
+  "parent_source_commit": "de0185ad2",
+  "implementation_commits": [
+    "26b70593b943c9b8a19536cb82ef417765a455c5"
+  ],
+  "host": {
+    "os": "macOS arm64",
+    "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+    "branch": "experiment/blink-tenant-density-20261027",
+    "source_commit": "26b70593b943c9b8a19536cb82ef417765a455c5"
+  },
+  "validated": [
+    {
+      "name": "server_feature_library_tests",
+      "command": "cargo test -p dodb-server --features blink-demand-paging --lib",
+      "exit_status": 0,
+      "result": "25 passed, 0 failed"
+    },
+    {
+      "name": "server_default_library_tests",
+      "command": "cargo test -p dodb-server --lib",
+      "exit_status": 0,
+      "result": "17 passed, 0 failed"
+    },
+    {
+      "name": "core_library_tests",
+      "command": "cargo test -p dodb-core --lib",
+      "exit_status": 0,
+      "result": "6 passed, 0 failed"
+    },
+    {
+      "name": "server_default_all_targets_check",
+      "command": "cargo check -p dodb-server --all-targets",
+      "exit_status": 0,
+      "result": "passed"
+    },
+    {
+      "name": "server_feature_all_targets_check",
+      "command": "cargo check -p dodb-server --all-targets --features blink-demand-paging",
+      "exit_status": 0,
+      "result": "passed"
+    },
+    {
+      "name": "workspace_format",
+      "command": "cargo fmt --check",
+      "exit_status": 0,
+      "result": "passed"
+    },
+    {
+      "name": "server_feature_strict_clippy",
+      "command": "cargo clippy -p dodb-server --features blink-demand-paging --lib -- -D warnings",
+      "exit_status": 101,
+      "result": "blocked in dodb-storage by 12 existing Blink and WAL diagnostics; the server target had no reported diagnostics"
+    }
+  ],
+  "source_hashes": {
+    "dodb/crates/dodb-server/src/lib.rs": "a5d7c48d31e6faf3ae549a02c6f205a54d1accb7c8e96d4e606ca257bf371ab7",
+    "dodb/crates/dodb-server/src/physical_checkpoint.rs": "ac2b6ee16bcb75d14f9e0060b03892d6741228d1f1b220161a34f5c75f0ae3d2",
+    "dodb/crates/dodb-core/src/key.rs": "f4f8a2841ff1ab75fed97a6323b7614ac19091c5c6213705f026a865b8538d96",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T13/RESULTS.md": "c3e570c28b22a55b370c720d91d04ac33966d499cb5db305b5f47cbc99d6a841"
+  },
+  "logs": [
+    {
+      "name": "server_feature_library_tests",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T13/logs/server-lib-tests-feature.log",
+      "sha256": "724a2d80abdc6bd9a2f2102d7cb34f5f3b679c8d5903667e008942b74760eceb",
+      "exit_status": 0
+    },
+    {
+      "name": "server_default_library_tests",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T13/logs/server-lib-tests-default.log",
+      "sha256": "40ee6830decb70acad9f649dde3a44b683e0cfeb88aa44896c13154addcb7973",
+      "exit_status": 0
+    },
+    {
+      "name": "core_library_tests",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T13/logs/core-lib-tests.log",
+      "sha256": "fafa25508f3772b8b205dab63abc7f577bb4f9228396aee06cc9295aec2b2709",
+      "exit_status": 0
+    },
+    {
+      "name": "server_default_all_targets_check",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T13/logs/server-check-default.log",
+      "sha256": "d0028f16a3be0efb3788f0b1b69af5f95d538aa2972f48efbc730dcff34c9878",
+      "exit_status": 0
+    },
+    {
+      "name": "server_feature_all_targets_check",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T13/logs/server-check-feature.log",
+      "sha256": "cac778d29a036543f7d8ebbec09065787b48c61d978b6161c312c70f29e733f5",
+      "exit_status": 0
+    },
+    {
+      "name": "workspace_format",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T13/logs/server-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_status": 0
+    },
+    {
+      "name": "server_feature_strict_clippy",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T13/logs/server-clippy-feature.log",
+      "sha256": "5a3467b07b16679cd209f8dcb149baad053c4d806ae7bd7877ba8b51dc082742",
+      "exit_status": 101
+    }
+  ],
+  "remaining_work": [
+    "Reserve the complete storage publication and post-sync bookkeeping envelope before WAL append in the paged writer service route.",
+    "Add exact queue-closure, cancellation-before-enqueue, shutdown-drain, and publication failure handoff acceptance tests.",
+    "Continue with fair maintenance scheduling and service crash/write/crash acceptance in T14-T15 before experiment readiness."
+  ],
+  "next_task": "T13",
+  "push": {
+    "remote": "origin",
+    "branch": "experiment/blink-tenant-density-20261027",
+    "status": "pending"
+  },
+  "preserved_failures": [
+    {
+      "name": "server_feature_strict_clippy_existing_storage_findings",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T13/logs/server-clippy-feature.log",
+      "reason": "Strict Clippy stopped in dodb-storage with 12 existing Blink and WAL findings before reporting on dodb-server."
+    }
+  ]
+}
