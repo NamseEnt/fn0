@@ -6,14 +6,15 @@
   "implementation_commits": [
     "54eaa434c43bd6b6faadb4ed5a4622d334b373e4",
     "8f636469b1af80e44caf7221166721e9fabd4f62",
-    "53d6451f91836dda6b3079c871abf737766e2d9d"
+    "53d6451f91836dda6b3079c871abf737766e2d9d",
+    "ab526c8b245075358b71b4ca5729461b8ac4a468"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "53d6451f91836dda6b3079c871abf737766e2d9d"
+    "source_commit": "ab526c8b245075358b71b4ca5729461b8ac4a468"
   },
   "validated": [
     {
@@ -63,6 +64,24 @@
       "command": "cargo check -p dodb-server --all-targets",
       "exit_status": 0,
       "result": "passed"
+    },
+    {
+      "name": "bounded_open_waiters_and_reserved_tenant_capacity",
+      "command": "cargo test -p dodb-server blink_open_waiters_and_inflight_tenants_obey_configured_limits --lib -- --test-threads=1",
+      "exit_status": 0,
+      "result": "1 passed; excess same-tenant waiters and a different tenant are rejected while the sole opening tenant owns capacity"
+    },
+    {
+      "name": "server_library_tests_after_open_limits",
+      "command": "cargo test -p dodb-server --lib -- --test-threads=1",
+      "exit_status": 0,
+      "result": "17 passed, 0 failed"
+    },
+    {
+      "name": "server_all_targets_check_after_open_limits",
+      "command": "cargo check -p dodb-server --all-targets",
+      "exit_status": 0,
+      "result": "passed"
     }
   ],
   "prerequisite_receipts": [
@@ -78,8 +97,8 @@
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/receipt.json"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-server/src/lib.rs": "53e7d623364bfead66a133df916780caa274d17f3cef13558ac0039a2b0144d7",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "3b9d3a0aee378760be8b3a498f2eb7975a68b278221a180550f3add1ce4255f0"
+    "dodb/crates/dodb-server/src/lib.rs": "24656529c3ab450f68cb9e4133d049a092f370f0df13c7ee943e3dce640fe651",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "fb86ad7a3eb2edbddf5640a8fdbb5aa5001bffedfd9babcabdcb73f0034498ad"
   },
   "logs": [
     {
@@ -151,6 +170,30 @@
     {
       "name": "server_format_after_cancellation",
       "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-format-after-cancellation.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_status": 0
+    },
+    {
+      "name": "bounded_open_waiters_and_reserved_tenant_capacity",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/open-limits-focused.log",
+      "sha256": "f7b82f203be363896de9dd98abcbea1bc268a7e5b9293e1e0a487c3e37935d7b",
+      "exit_status": 0
+    },
+    {
+      "name": "server_library_tests_after_open_limits",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-lib-tests-after-open-limits.log",
+      "sha256": "6afa415a95cf0bc4d0c083bd755281eb47ffc0fd5f3e8c9ce2a54f25ec4a1b29",
+      "exit_status": 0
+    },
+    {
+      "name": "server_all_targets_check_after_open_limits",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-all-targets-check-after-open-limits.log",
+      "sha256": "a9ea22c85eeca93d422689bf0f358e3ed5a28accc6be38774e4095ba3d21407b",
+      "exit_status": 0
+    },
+    {
+      "name": "server_format_after_open_limits",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-format-after-open-limits.log",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "exit_status": 0
     }
