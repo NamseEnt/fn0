@@ -1,0 +1,394 @@
+{
+  "task_id": "T05",
+  "scope": "Store-bound source root pins, bounded identity-checked source handles, dependency traversal, spill-backed reachability marks, safe source retirement and fault/race tests",
+  "status": "accepted",
+  "parent_source_commit": "8545e31770f457f06781d5767c83df91247395f6",
+  "implementation_commit": "5d7d267ab2f0fc0ac2b00f3047c596fbaad0a84f",
+  "implementation_commits": [
+    "5d7d267ab"
+  ],
+  "push": {
+    "remote": "origin",
+    "branch": "experiment/blink-tenant-density-20261027",
+    "status": "pushed"
+  },
+  "prerequisite_receipts": [
+    {
+      "task_id": "T00",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T00/receipt.json",
+      "sha256": "f974b64083768aa4c0ea7af41afabb799af17b01d702eac2c67373bcd5d3c2bb"
+    },
+    {
+      "task_id": "T01",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T01/receipt.json",
+      "sha256": "8ea1e270b5890c7dfc7af45541b985e842d4718d498b93d60c40d304c2f9e319"
+    },
+    {
+      "task_id": "T02",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T02/receipt.json",
+      "sha256": "18986e7dd63bd9139c4eefb078876d76ce50535eb63a32d3b8b741e374a85389"
+    },
+    {
+      "task_id": "T03",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T03/receipt.json",
+      "sha256": "be70f4734290831956e799b2f94139a8471873ea6432b7224085d409ce6c289c"
+    },
+    {
+      "task_id": "T04",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T04/receipt.json",
+      "sha256": "2ada0eda80d5226157d8407707dd304861cca5cc40f3b1d3e3605de91f7b71e6"
+    }
+  ],
+  "owned_paths": [
+    "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs",
+    "dodb/crates/dodb-storage/src/blink/version_index.rs"
+  ],
+  "source_hashes": {
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "af40523e793c1539b7ed2d46e681862535b69cea8e436386f769913ffe9c13c9",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "863ff0f5bbde7142a89b150c5eaa25c2fc278ceb3a36aba819e04298577933a4",
+    "dodb/crates/dodb-storage/src/blink/version_index.rs": "b529070bb1f3cf2fa9dba1abc914a08b71e6114fa1ee12f2206153f219b1188d"
+  },
+  "host": {
+    "os": "macOS-26.4-arm64-arm-64bit-Mach-O",
+    "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+    "branch": "experiment/blink-tenant-density-20261027"
+  },
+  "features": [
+    "blink-demand-paging"
+  ],
+  "runtime_configuration": {
+    "route": "storage-library tests using isolated temporary index, manifest, pack, WAL, and scratch directories",
+    "service_route_activated": false,
+    "service_startup_checkpoint_scheduler_and_segment_cleanup_wired": false,
+    "defaults_changed": false,
+    "oci_experiment": false,
+    "performance_matrix_started": false
+  },
+  "checks": [
+    {
+      "name": "storage_library_feature_tests_serial",
+      "argv": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "dodb/crates/dodb-storage/Cargo.toml",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "271 passed, 0 failed, 4 ignored; finished in 122.94s",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-tests-final.log.gz",
+        "sha256": "a82e48eb5250140c2720606250068815edff3b23a90b5a100dfe1c21c93a281d"
+      }
+    },
+    {
+      "name": "storage_library_feature_check",
+      "argv": [
+        "cargo",
+        "check",
+        "--manifest-path",
+        "dodb/crates/dodb-storage/Cargo.toml",
+        "--features",
+        "blink-demand-paging",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-check-final.log.gz",
+        "sha256": "d984a63d6b5dca77eae41f7e596aaf60b46bd4c44127b849696b8218b713dd72"
+      }
+    },
+    {
+      "name": "storage_library_default_check",
+      "argv": [
+        "cargo",
+        "check",
+        "--manifest-path",
+        "dodb/crates/dodb-storage/Cargo.toml",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-default-check-final.log.gz",
+        "sha256": "8c1440a6b33c0f13c95e6b8e4f9c11d9a65c581fbca6dfda2f7aed2aefda3470"
+      }
+    },
+    {
+      "name": "storage_library_feature_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "dodb/crates/dodb-storage/Cargo.toml",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 101,
+      "summary": "12 pre-existing findings in blink/mod.rs and wal.rs; no finding in T05 paths",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-clippy-final.log.gz",
+        "sha256": "0dedd9b76c88969711d45184d441f01b2d3a5b4440fbb7a3f25c3b1bf5eb5639"
+      }
+    },
+    {
+      "name": "targeted_rustfmt_check",
+      "argv": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "dodb/crates/dodb-storage/src/blink/mod.rs",
+        "dodb/crates/dodb-storage/src/blink/source_manager.rs",
+        "dodb/crates/dodb-storage/src/blink/version_index.rs"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/rustfmt-check-final.log.gz",
+        "sha256": "59869db34853933b239f1e2219cf7d431da006aa919635478511fabbfc8849d2"
+      }
+    },
+    {
+      "name": "tracked_diff_whitespace_check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "passed",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/diff-check-final.log.gz",
+        "sha256": "59869db34853933b239f1e2219cf7d431da006aa919635478511fabbfc8849d2"
+      }
+    }
+  ],
+  "focused_tests": [
+    "indexed_and_pinned_sources_are_retained_until_every_root_drops",
+    "delta_roots_retain_earlier_wal_segments_as_a_conservative_dependency_run",
+    "manifest_roots_keep_old_reader_sources_across_checkpoint_publication",
+    "active_read_lease_blocks_retirement_and_reopen_checks_exact_header",
+    "load_acquisition_racing_retirement_never_reads_an_unlinked_source",
+    "source_gc_preserves_reachable_files_across_unlink_fault_boundaries",
+    "source_handles_and_roots_have_explicit_limits",
+    "missing_index_reachable_source_is_corruption"
+  ],
+  "acceptance_mapping": [
+    {
+      "criterion": "Runtime roots and selected durable manifest root are pinned and identity-bound",
+      "evidence": "manifest_roots_keep_old_reader_sources_across_checkpoint_publication; pin_root checks VersionIndex store identity and pin_manifest_root selects the current durable root",
+      "result": "pass"
+    },
+    {
+      "criterion": "Checkpoint publication does not invalidate an old reader source; exact prior bytes remain readable after handle close/reopen",
+      "evidence": "manifest_roots_keep_old_reader_sources_across_checkpoint_publication reads exact checkpoint page bytes before and after reopening the source handle",
+      "result": "pass"
+    },
+    {
+      "criterion": "Sources become reclaimable only after protected roots/dependencies and active handles drop",
+      "evidence": "old and current manifest roots protect both sources; dropping only old root reclaims only its source; active source lease blocks unlink",
+      "result": "pass"
+    },
+    {
+      "criterion": "Load acquisition races retirement without reading an unlinked source",
+      "evidence": "load_acquisition_racing_retirement_never_reads_an_unlinked_source uses a three-party barrier and validates either lease-first or GC-first outcome",
+      "result": "pass"
+    },
+    {
+      "criterion": "Bounded mark/sweep preserves delta predecessors and unknown/foreign files",
+      "evidence": "VersionIndex::visit_sources streams descriptors into per-run disk marks; WAL-based delta roots conservatively retain WAL candidates; foreign unrecognized file remains",
+      "result": "pass"
+    },
+    {
+      "criterion": "Missing reachable source and wrong identity fail closed",
+      "evidence": "missing_index_reachable_source_is_corruption and active_read_lease_blocks_retirement_and_reopen_checks_exact_header",
+      "result": "pass"
+    },
+    {
+      "criterion": "Fault boundaries before and after unlink preserve accurate state",
+      "evidence": "source_gc_preserves_reachable_files_across_unlink_fault_boundaries verifies pre-unlink failure retains source and post-unlink failure reports an already removed unreachable source",
+      "result": "pass"
+    },
+    {
+      "criterion": "Bound open handles, root registrations, and GC progress; report byte categories separately",
+      "evidence": "source_handles_and_roots_have_explicit_limits and SourceGcReport candidate/protected/leased/unlinked byte counters; unlinked_open_bytes remains zero",
+      "result": "pass"
+    },
+    {
+      "criterion": "Full feature regression, default/feature checks, formatting, and no new strict Clippy findings",
+      "evidence": "checks and raw logs; final Clippy has 12 prior findings only in blink/mod.rs and wal.rs",
+      "result": "pass_with_existing_baseline_findings"
+    }
+  ],
+  "ownership_peaks": {
+    "test_configuration": {
+      "maximum_open_handles": 2,
+      "maximum_roots": 4,
+      "handle_charge_bytes": 128,
+      "gc_progress_reservation_bytes": 8192
+    },
+    "root_registry_charge_bytes_each": 256,
+    "index_root_pin_charge": "VersionIndex pin reservation plus a separately charged SourceManager root registration",
+    "reachability_marks": "one create-new scratch marker per exact source identity, plus a retain-all-WAL marker when a WAL delta base requires conservative ancestry retention",
+    "whole_process_rss_cap": "not measured",
+    "filesystem_and_kernel_cache": "not measured or charged to application counters"
+  },
+  "failed_attempts": [
+    {
+      "attempt": "Initial source-manager test compilation",
+      "outcome": "compile errors for locator type import, hash bounds, and unavailable tempfile dependency; fixed with the existing test-directory pattern and source identity derives",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-attempt1.log.gz",
+        "sha256": "8d6d8da506df767ef444f32928081d48a5e0120242bad4db37cf5c5f8fbfedb0"
+      }
+    },
+    {
+      "attempt": "Source identity derive follow-up",
+      "outcome": "compile error because SourceFileKind also needed Hash; derived Hash without changing serialized format",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-attempt2.log.gz",
+        "sha256": "727d1a5a68d7249bee54cc166e5fea72c957d4ce925874249026c3ec79a27415"
+      }
+    },
+    {
+      "attempt": "Initial delta dependency fixture",
+      "outcome": "rejected inconsistent test base frame length; corrected the fixture to use a complete page image frame",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-attempt3.log.gz",
+        "sha256": "0e4e419637ede13ce72a0c8bdc286e48334584b620d7513c272d168082309a97"
+      }
+    },
+    {
+      "attempt": "Missing-source fixture validation",
+      "outcome": "The test fixture used a WAL frame with invalid payload bounds; corrected the fixture frame boundaries before the successful missing-source rejection test.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-attempt6.log.gz",
+        "sha256": "7ef0d5ca31f3e4b8ba58de24a8a099887068a8a939fb26529749c115f021afd8"
+      }
+    },
+    {
+      "attempt": "Initial strict feature Clippy",
+      "outcome": "14 findings, including two in the new source manager; refactored constructor config and collapsed the release branch; final run has no new finding",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-clippy-attempt1.log.gz",
+        "sha256": "9ee3d85dae45a20e454851d139c82dae0144830ced84ba1952959b8726eb82bc"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/diff-check-final.log.gz",
+      "sha256": "59869db34853933b239f1e2219cf7d431da006aa919635478511fabbfc8849d2"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/rustfmt-check-final.log.gz",
+      "sha256": "59869db34853933b239f1e2219cf7d431da006aa919635478511fabbfc8849d2"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-attempt1.log.gz",
+      "sha256": "8d6d8da506df767ef444f32928081d48a5e0120242bad4db37cf5c5f8fbfedb0"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-attempt2.log.gz",
+      "sha256": "727d1a5a68d7249bee54cc166e5fea72c957d4ce925874249026c3ec79a27415"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-attempt3.log.gz",
+      "sha256": "0e4e419637ede13ce72a0c8bdc286e48334584b620d7513c272d168082309a97"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-attempt4-success.log.gz",
+      "sha256": "d006853d1cc4de4d073e89bec6073c008998eef2e0b97efcbd7b7ca8742264d2"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-attempt5-success.log.gz",
+      "sha256": "a2f8096147d829d2f736e628786af28ee9796dfd95cbf3e228f8e0a0e5df085c"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-attempt6.log.gz",
+      "sha256": "7ef0d5ca31f3e4b8ba58de24a8a099887068a8a939fb26529749c115f021afd8"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-final.log.gz",
+      "sha256": "102a9506f9b974c30d277b72a0087985c954eff58bcdbdee85d3b833f53fc86d"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-focused-v3.log.gz",
+      "sha256": "25456370951099ae1823aed9b4b075dbca3132c7093e2ad302a3b7ad758b64df"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/source-manager-tests-pre-final.log.gz",
+      "sha256": "a09b02cad35bf922fcd1b6c99578b2e56ebba2a4730bd850544bd7ad75d272bb"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-default-check-attempt1.log.gz",
+      "sha256": "6b23e8ba744df032afade3ff2faaaa0fcb9568e72e3738e93feadf168214a6db"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-default-check-final.log.gz",
+      "sha256": "8c1440a6b33c0f13c95e6b8e4f9c11d9a65c581fbca6dfda2f7aed2aefda3470"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-check-attempt1.log.gz",
+      "sha256": "865bbd0f427367bbe500a4d2dbeabe2613c5aa43d1f9336f02d481a46cefdeae"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-check-final.log.gz",
+      "sha256": "d984a63d6b5dca77eae41f7e596aaf60b46bd4c44127b849696b8218b713dd72"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-clippy-attempt1.log.gz",
+      "sha256": "9ee3d85dae45a20e454851d139c82dae0144830ced84ba1952959b8726eb82bc"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-clippy-attempt2.log.gz",
+      "sha256": "c4f10e48945ecae8864d62af228d76a3744381df86cde116b502f9c4ae0a241a"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-clippy-attempt3.log.gz",
+      "sha256": "0dedd9b76c88969711d45184d441f01b2d3a5b4440fbb7a3f25c3b1bf5eb5639"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-clippy-final.log.gz",
+      "sha256": "0dedd9b76c88969711d45184d441f01b2d3a5b4440fbb7a3f25c3b1bf5eb5639"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-tests-attempt1.log.gz",
+      "sha256": "f08e7a1ebf9a321fa798fb066730e32156670b42a120b6d6259b3d2c0df91b5a"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-tests-attempt2.log.gz",
+      "sha256": "6d9128160561147dad9195964b7a301951017a56921d18b0d43fbe89d7082fd1"
+    },
+    {
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T05/logs/storage-feature-tests-final.log.gz",
+      "sha256": "a82e48eb5250140c2720606250068815edff3b23a90b5a100dfe1c21c93a281d"
+    }
+  ],
+  "remaining_work": [
+    "Connect candidate enumeration and SourceManager collection to paged checkpoint/startup maintenance before the service route is activated; existing resident cleanup remains unchanged.",
+    "The WAL-delta fallback retains all WAL segment candidates while a current root has a WAL-based delta; measure and refine only with an exact dependency representation.",
+    "T06-T16 fallible page access, cache/read/write routes, streaming checkpointing, service admission/fairness, crash recovery, and experiment-ready handoff remain.",
+    "T17 comparative performance matrix remains unstarted pending a separately frozen matrix."
+  ],
+  "next_task": "T06 fallible page access and writer interfaces"
+}
