@@ -458,7 +458,7 @@ fn is_superblock_page(page_id: dodb_core::PageId) -> bool {
 mod tests {
     use super::{PagedRecoveryIndexBuilder, build_checkpoint_index};
     use crate::blink::durable_bases::{BasePackJob, pack_path};
-    use crate::blink::paged_manifest::PagedManifest;
+    use crate::blink::paged_manifest::{PagedManifest, PagedManifestStore};
     use crate::blink::resource::{BlinkResourceManager, ResourceLimits};
     use crate::blink::version_chain::DeltaChainEntry;
     use crate::blink::version_index::{
@@ -769,14 +769,8 @@ mod tests {
             database_uuid: [0x73; 16],
             wal_epoch: 11,
         };
-        let index = VersionIndex::open(
-            &directory.path().join("index"),
-            identity,
-            resources(),
-            76,
-            2,
-        )
-        .unwrap();
+        let index_directory = directory.path().join("index");
+        let index = VersionIndex::open(&index_directory, identity, resources(), 76, 2).unwrap();
         let page_id = PageId::new(2);
         let checkpoint_image = encode_blink_page(
             page_id,
@@ -903,6 +897,10 @@ mod tests {
             committed_prefix_lsn: Lsn::ZERO,
             previous_generation: 0,
         };
+        let manifest_database_path = directory.path().join("database");
+        let manifest_store =
+            PagedManifestStore::create_with_index(&manifest_database_path, manifest, &index)
+                .unwrap();
         let wal_source_identity = wal_identity(identity);
         let wal_path = directory.path().join("wal");
         let wal_file = ProductionFile::open(&wal_path).unwrap();
@@ -934,9 +932,10 @@ mod tests {
             },
         )
         .unwrap();
+        let expected_image = image;
         let eligible_commits = [true];
         let mut base_source = |requested_page_id| {
-            (requested_page_id == page_id).then(|| Cow::Borrowed(&checkpoint_image))
+            (requested_page_id == page_id).then_some(Cow::Borrowed(&checkpoint_image))
         };
         let mut delta_request = WalDeltaRequest {
             eligible_commits: &eligible_commits,
@@ -958,6 +957,12 @@ mod tests {
         let init_frame_length = u32::from_le_bytes(wal_bytes[8..12].try_into().unwrap()) as usize;
         let wal_header_identity = *blake3::hash(&wal_bytes[..init_frame_length]).as_bytes();
         let mut wal_file = ProductionFile::open(&wal_path).unwrap();
+        drop(manifest_store);
+        drop(index);
+        let index = VersionIndex::open(&index_directory, identity, resources(), 76, 2).unwrap();
+        let mut manifest_store =
+            PagedManifestStore::open_with_index(&manifest_database_path, identity, &index).unwrap();
+        let manifest = manifest_store.current();
         let mut wrong_source_builder = PagedRecoveryIndexBuilder::new(
             &index,
             manifest,
@@ -1033,6 +1038,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(recovered.image_lsn, Lsn::new(12));
+        assert_eq!(recovered.image_crc32c, crc32c::crc32c(&expected_image));
         assert_eq!(
             recovered.token,
             VersionToken::Wal {
@@ -1043,6 +1049,35 @@ mod tests {
         assert_eq!(summary.last_commit_lsn, Some(Lsn::new(12)));
         assert_eq!(summary.torn_tail_bytes, 0);
         assert_eq!(summary.source_header_identity, wal_header_identity);
+        let restarted_wal = WalLog::open_with_segment_bases(
+            ProductionFile::open(&wal_path).unwrap(),
+            wal_identity(identity),
+            WalPageImageFormat::ExperimentalBlink,
+            WalSegmentBoundary {
+                start_after_lsn: Lsn::new(10),
+                start_batch_id: None,
+                truncate_torn_tail: true,
+                defer_initial_sync: false,
+            },
+            std::collections::BTreeMap::from([(
+                page_id,
+                crate::wal::RecoveredWalPage {
+                    commit_lsn: Lsn::new(10),
+                    image: Box::new(checkpoint_image),
+                },
+            )]),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            restarted_wal
+                .recovery_pages()
+                .get(&page_id)
+                .unwrap()
+                .image
+                .as_ref(),
+            &expected_image
+        );
         assert_eq!(
             builder.committed_prefix_length,
             summary.committed_prefix_length
@@ -1067,5 +1102,45 @@ mod tests {
                 && *image_crc32c == checkpoint_descriptor.image_crc32c
         ));
         assert_eq!(depth, 1);
+        let recovered_root = index
+            .promote_root_to_durable(builder.current_root())
+            .unwrap();
+        manifest_store
+            .publish_with_index(
+                PagedManifest {
+                    identity,
+                    generation: 2,
+                    tree_root: page_id,
+                    free_list_root: None,
+                    high_water_page_id: second_page_id,
+                    durable_index_root: recovered_root.node_reference().unwrap(),
+                    source_catalog_root: None,
+                    recovery_wal_file_number: 1,
+                    recovery_offset: summary.committed_prefix_length,
+                    committed_prefix_lsn: summary.last_commit_lsn.unwrap(),
+                    previous_generation: 1,
+                },
+                &index,
+            )
+            .unwrap();
+        drop(manifest_store);
+        drop(index);
+        let reopened_index =
+            VersionIndex::open(&index_directory, identity, resources(), 76, 2).unwrap();
+        let reopened_manifest =
+            PagedManifestStore::open_with_index(&manifest_database_path, identity, &reopened_index)
+                .unwrap();
+        let reopened_root = reopened_index
+            .root_from_node_reference(reopened_manifest.current().durable_index_root)
+            .unwrap();
+        let reopened_descriptor = reopened_index
+            .lookup(reopened_root, page_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(reopened_descriptor.image_lsn, Lsn::new(12));
+        assert_eq!(
+            reopened_descriptor.image_crc32c,
+            crc32c::crc32c(&expected_image)
+        );
     }
 }
