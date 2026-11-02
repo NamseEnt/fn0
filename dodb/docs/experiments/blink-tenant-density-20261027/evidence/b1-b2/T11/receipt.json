@@ -6,14 +6,15 @@
   "implementation_commits": [
     "98544131a",
     "866261924",
-    "3640e74c3"
+    "3640e74c3",
+    "9729a5f07"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "3640e74c3"
+    "source_commit": "9729a5f07"
   },
   "features": [
     "blink-demand-paging",
@@ -53,11 +54,18 @@
       "command": "cargo clippy -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' -- -D warnings",
       "exit_status": 101,
       "result": "12 existing diagnostics in blink/mod.rs and wal.rs; none in the new validator or source_manager.rs"
+    },
+    {
+      "name": "manifest_open_returns_fully_validated_reader",
+      "command": "cargo test -p dodb-storage --lib --features 'blink-demand-paging blink-writer-pin-reuse' paged_transaction_writer_publishes_complete_and_incremental_checkpoints -- --test-threads=1",
+      "exit_status": 0,
+      "result": "1 passed; reopened manifest creates the returned reader through full bounded validation"
     }
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "d0ed5595e2867dc9e70a0910576a534922f986f61dfa45f328ece008b8219d48",
-    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "830b50eaa186f014496497aba3438979e1c27cc896ab2026bab9e65ff0491dd5"
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "a1309bfd59d7e4d6f4c76b45c0fde898a6e8bcc26d6b9c31e755cb4eef0fb63f",
+    "dodb/crates/dodb-storage/src/blink/source_manager.rs": "830b50eaa186f014496497aba3438979e1c27cc896ab2026bab9e65ff0491dd5",
+    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs": "338456f77f26f19314d27be0dc5a6e0b42cfa9ce77ffb9873496325875daadf7"
   },
   "logs": [
     {
@@ -113,6 +121,12 @@
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/logs/structural-validator-invalid-free-fixture.log",
       "sha256": "3fb658f8acf796a0158ae6f51c16015bb2ba4ed785d8911446eb799c42213c9e",
       "exit_status": 101
+    },
+    {
+      "name": "validated_manifest_open_regression",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11-validated-manifest-open.log",
+      "sha256": "3592e5613521880b43b07c9706245eaf43610fbc79cf7278e0cfbc861912221f",
+      "exit_status": 0
     }
   ],
   "remaining_work": [
