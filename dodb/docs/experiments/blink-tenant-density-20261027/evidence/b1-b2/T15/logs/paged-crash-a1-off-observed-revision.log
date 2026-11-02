@@ -1,0 +1,22 @@
+
+running 1 test
+
+running 1 test
+test tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes ... FAILED
+
+failures:
+
+failures:
+    tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 50 filtered out; finished in 1.21s
+
+test tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes ... FAILED
+
+failures:
+
+failures:
+    tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 50 filtered out; finished in 1.40s
+

@@ -1,0 +1,66 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.48s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-300bb259f2fc591f)
+
+running 51 tests
+test physical_checkpoint::tests::cancelled_checkpoint_waiter_releases_its_ready_ticket ... ok
+test physical_checkpoint::tests::checkpoint_continuation_returns_behind_other_ready_tenants ... ok
+test physical_checkpoint::tests::failed_progress_job_releases_worker_and_checkpoint_capacity ... ok
+test physical_checkpoint::tests::fair_ready_queue_bounds_synchronized_and_staggered_pressure_wait ... ok
+test physical_checkpoint::tests::fair_ready_queue_deduplicates_tickets_and_bounds_turn_wait ... ok
+test physical_checkpoint::tests::fair_ready_queue_drops_idle_failed_and_cancelled_tickets ... ok
+test physical_checkpoint::tests::panicking_progress_job_does_not_stop_the_dedicated_worker ... ok
+test physical_checkpoint::tests::shared_checkpoint_capacity_serves_waiters_in_ticket_order ... ok
+test tests::abandoned_checkpoint_request_clears_tenant_pending_metrics ... ok
+test tests::absent_blink_reads_preserve_capacity_and_do_not_cache_absence ... ok
+test tests::blink_open_limits_must_be_nonzero ... ok
+test tests::blink_open_waiters_and_inflight_tenants_obey_configured_limits ... ok
+test tests::blink_shutdown_bounds_wait_for_inflight_open_and_drains_it ... ok
+test tests::blocked_blink_open_does_not_hold_registry_and_same_tenant_open_coalesces ... ok
+test tests::cached_blink_reads_do_not_depend_on_repeated_path_checks ... ok
+test tests::cancelled_blink_open_releases_reservation_and_worker_capacity ... ok
+test tests::cancelled_paged_write_keeps_charges_until_shutdown_drain ... ok
+test tests::cancelled_transaction_before_enqueue_releases_foreground_charges ... ok
+test tests::cancelled_transaction_keeps_foreground_charges_until_commit_finishes ... ok
+test tests::checkpoint_debt_admission_enforces_global_and_tenant_limits ... ok
+test tests::checkpoint_debt_metrics_track_excess_time_and_request_wait ... ok
+test tests::closed_blink_coordinator_releases_foreground_charges ... ok
+test tests::database_uuid_includes_all_shard_bits ... ok
+test tests::failed_blink_open_releases_tenant_reservation ... ok
+test tests::foreground_preparation_limit_rejects_before_queue_and_releases_charge ... ok
+test tests::foreground_queue_count_limit_rejects_excess_without_leaking_charges ... ok
+test tests::logical_database_uuid_is_stable_for_reopen ... ok
+test tests::paged_checkpoint_progresses_while_foreground_queue_budget_is_full ... ok
+test tests::paged_checkpoint_reclaims_old_reader_source_before_publication ... ok
+test tests::paged_checkpoint_resumes_after_disk_capacity_release ... ok
+test tests::paged_open_rejects_checkpoint_debt_cap_below_one_worst_case_transaction ... ok
+test tests::paged_route_rejects_incomplete_store_before_creating_open_sidecars ... ok
+test tests::paged_service_backpressures_writes_at_checkpoint_debt_limit ... ok
+test tests::paged_service_opens_recovered_store_for_get_query_and_scan ... ok
+test tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes ... 
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+ok
+test tests::paged_service_shutdown_cancels_checkpoint_waiting_for_disk_capacity ... ok
+test tests::paged_writer_admission_releases_charges_before_dispatch ... ok
+test tests::paged_writer_checkpoint_releases_the_global_worker_between_slices ... ok
+test tests::paged_writer_fairness_serves_four_active_tenants_under_synchronized_and_staggered_pressure ... ok
+test tests::paged_writer_service_commits_and_recovers_service_requests ... ok
+test tests::paged_writer_service_failures_release_admission_and_recover_atomic_state ... ok
+test tests::peer_stream_reset_and_stop_are_benign_diagnostic_events ... ok
+test tests::racing_blink_read_and_open_share_one_shard ... ok
+test tests::request_latency_histogram_records_cumulative_operation_buckets ... ok
+test tests::shared_blink_admission_rejects_zero_queue_and_group_limits ... ok
+test tests::shared_blink_metadata_budget_precedes_open_and_releases_on_shutdown ... ok
+test tests::shared_paging_resources_reject_incompatible_layout_before_filesystem_access ... ok
+test tests::storage_metrics_count_database_wal_and_persisted_files_separately_from_open_shards ... ok
+test tests::tenant_checkpoint_metrics_aggregate_debt_wait_and_service ... ok
+test tests::transport_classification_separates_disconnects_from_actionable_failures ... ok
+test tests::transport_metric_labels_are_bounded_and_only_actionable_events_raise_errors ... ok
+
+test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 63.77s
+

@@ -1,0 +1,22 @@
+   Compiling dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+   Compiling dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.11s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-300bb259f2fc591f)
+
+running 1 test
+
+running 1 test
+
+thread 'tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes' (444786614) panicked at dodb/crates/dodb-server/src/lib.rs:5421:37:
+paged crash Get failed for DocumentKey { pk: PrimaryKey([112, 97, 103, 101, 100, 45, 99, 114, 97, 115, 104]), sk: SortKey([112, 114, 105, 109, 97, 114, 121]) }: corruption: paged validation reference 39 is outside the allocated range ending at 38
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes ... FAILED
+
+failures:
+
+failures:
+    tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 50 filtered out; finished in 1.64s
+
+error: test failed, to rerun pass `-p dodb-server --lib`
