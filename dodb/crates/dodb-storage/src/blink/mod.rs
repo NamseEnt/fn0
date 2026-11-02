@@ -2183,6 +2183,8 @@ pub struct PagedReadHandle {
     root_page_id: PageId,
     free_list_head: Option<PageId>,
     high_water_page_id: PageId,
+    superblock_generation: u64,
+    active_superblock_slot: SuperblockSlot,
     loader: Arc<page_cache::PageLoader<page_cache::PageVersionKey, BlinkPage>>,
     loader_config: page_cache::PageLoaderConfig,
     resources: resource::BlinkResourceManager,
@@ -2275,6 +2277,8 @@ impl PagedReadHandle {
             root_page_id: config.root_page_id,
             free_list_head: config.free_list_head,
             high_water_page_id: config.high_water_page_id,
+            superblock_generation: 0,
+            active_superblock_slot: SuperblockSlot::A,
             loader,
             loader_config: config.loader,
             resources,
@@ -2312,6 +2316,15 @@ impl PagedReadHandle {
         let mut budget = Some(&mut budget);
         let mut right_link_corrections = 0;
         read_published_state_with_budget(self, key, &mut right_link_corrections, &mut budget)
+    }
+
+    pub(crate) fn set_recovered_superblock_state(
+        &mut self,
+        generation: u64,
+        active_slot: SuperblockSlot,
+    ) {
+        self.superblock_generation = generation;
+        self.active_superblock_slot = active_slot;
     }
 
     pub fn query(
@@ -2742,9 +2755,11 @@ impl PagedReadHandle {
         role: u8,
     ) -> Result<()> {
         if page_id.get() < FIRST_DATA_PAGE || page_id > high_water_page_id {
-            return Err(Error::corruption(
-                "paged validation reference is outside the allocated range",
-            ));
+            return Err(Error::corruption(format!(
+                "paged validation reference {} is outside the allocated range ending at {}",
+                page_id.get(),
+                high_water_page_id.get()
+            )));
         }
         if scratch.read_marker(page_id.get())? != 0 {
             return Err(Error::corruption(
@@ -3335,9 +3350,6 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
     {
         let manifest = manifest_store.current();
         if manifest.identity != current.index.store_identity()
-            || manifest.tree_root != current.root_page_id
-            || manifest.free_list_root != current.free_list_head
-            || manifest.high_water_page_id != current.high_water_page_id
             || manifest.recovery_wal_file_number == 0
             || database_config.database_uuid != wal_identity.database_uuid
             || database_config.tenant_id != wal_identity.tenant_id
@@ -3371,20 +3383,21 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
                 "paged writer recovery WAL identity differs from the manifest source",
             ));
         }
-        let mut superblock = BlinkSuperblock::new(database_config, manifest.tree_root);
-        superblock.generation = manifest.generation;
-        superblock.root_page_id = manifest.tree_root;
-        superblock.free_list_head = manifest.free_list_root;
-        superblock.high_water_page_id = manifest.high_water_page_id;
+        let mut superblock = BlinkSuperblock::new(database_config, current.root_page_id);
+        superblock.generation = current.superblock_generation.max(manifest.generation);
+        superblock.root_page_id = current.root_page_id;
+        superblock.free_list_head = current.free_list_head;
+        superblock.high_water_page_id = current.high_water_page_id;
         superblock.checkpoint_lsn = manifest.committed_prefix_lsn;
         superblock.checkpoint_sequence = manifest.committed_prefix_lsn.get();
         let superblock_image = encode_blink_superblock(&superblock)?;
+        let active_superblock_slot = current.active_superblock_slot;
         let mut writer = Self::new(
             current,
             wal,
             wal_source,
             &superblock_image,
-            SuperblockSlot::A,
+            active_superblock_slot,
             maximum_working_pages,
         )?;
         writer.allow_page_deltas = false;

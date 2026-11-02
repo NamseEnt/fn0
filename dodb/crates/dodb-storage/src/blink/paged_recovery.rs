@@ -341,6 +341,11 @@ pub fn build_checkpoint_index_for_generation(
 pub struct PagedRecoveryIndexBuilder<'index> {
     index: &'index VersionIndex,
     root: VersionIndexRoot,
+    root_page_id: dodb_core::PageId,
+    free_list_head: Option<dodb_core::PageId>,
+    high_water_page_id: dodb_core::PageId,
+    superblock_generation: u64,
+    active_superblock_slot: super::SuperblockSlot,
     manifest: PagedManifest,
     source: SourceIdentity,
     committed_prefix_length: u64,
@@ -368,6 +373,11 @@ impl<'index> PagedRecoveryIndexBuilder<'index> {
         Ok(Self {
             index,
             root,
+            root_page_id: manifest.tree_root,
+            free_list_head: manifest.free_list_root,
+            high_water_page_id: manifest.high_water_page_id,
+            superblock_generation: manifest.generation,
+            active_superblock_slot: super::SuperblockSlot::A,
             manifest,
             source,
             committed_prefix_length,
@@ -378,6 +388,26 @@ impl<'index> PagedRecoveryIndexBuilder<'index> {
 
     pub fn current_root(&self) -> VersionIndexRoot {
         self.root
+    }
+
+    pub fn current_root_page_id(&self) -> dodb_core::PageId {
+        self.root_page_id
+    }
+
+    pub fn current_free_list_head(&self) -> Option<dodb_core::PageId> {
+        self.free_list_head
+    }
+
+    pub fn current_high_water_page_id(&self) -> dodb_core::PageId {
+        self.high_water_page_id
+    }
+
+    pub fn current_superblock_generation(&self) -> u64 {
+        self.superblock_generation
+    }
+
+    pub fn current_active_superblock_slot(&self) -> super::SuperblockSlot {
+        self.active_superblock_slot
     }
 
     #[cfg(feature = "blink-demand-paging")]
@@ -398,9 +428,9 @@ impl<'index> PagedRecoveryIndexBuilder<'index> {
             PagedReadConfig {
                 tenant_id: config.tenant_id,
                 root: self.root,
-                root_page_id: config.root_page_id,
-                free_list_head: config.free_list_head,
-                high_water_page_id: config.high_water_page_id,
+                root_page_id: self.root_page_id,
+                free_list_head: self.free_list_head,
+                high_water_page_id: self.high_water_page_id,
                 loader: config.loader,
             },
             index,
@@ -468,20 +498,55 @@ impl<'index> PagedRecoveryIndexBuilder<'index> {
         result
     }
 
-    fn staging_state(&self) -> (VersionIndexRoot, u64, Option<Lsn>, Option<Lsn>) {
+    fn staging_state(
+        &self,
+    ) -> (
+        VersionIndexRoot,
+        dodb_core::PageId,
+        Option<dodb_core::PageId>,
+        dodb_core::PageId,
+        u64,
+        super::SuperblockSlot,
+        u64,
+        Option<Lsn>,
+        Option<Lsn>,
+    ) {
         (
             self.root,
+            self.root_page_id,
+            self.free_list_head,
+            self.high_water_page_id,
+            self.superblock_generation,
+            self.active_superblock_slot,
             self.committed_prefix_length,
             self.last_record_lsn,
             self.last_commit_lsn,
         )
     }
 
-    fn restore_staging_state(&mut self, state: (VersionIndexRoot, u64, Option<Lsn>, Option<Lsn>)) {
+    fn restore_staging_state(
+        &mut self,
+        state: (
+            VersionIndexRoot,
+            dodb_core::PageId,
+            Option<dodb_core::PageId>,
+            dodb_core::PageId,
+            u64,
+            super::SuperblockSlot,
+            u64,
+            Option<Lsn>,
+            Option<Lsn>,
+        ),
+    ) {
         self.root = state.0;
-        self.committed_prefix_length = state.1;
-        self.last_record_lsn = state.2;
-        self.last_commit_lsn = state.3;
+        self.root_page_id = state.1;
+        self.free_list_head = state.2;
+        self.high_water_page_id = state.3;
+        self.superblock_generation = state.4;
+        self.active_superblock_slot = state.5;
+        self.committed_prefix_length = state.6;
+        self.last_record_lsn = state.7;
+        self.last_commit_lsn = state.8;
     }
 
     fn validate_committed_location(&mut self, location: &WalPageLocation) -> Result<()> {
@@ -722,12 +787,38 @@ where
             ));
         }
         self.builder.validate_committed_location(&location)?;
-        if location.page_id.get() >= 2 {
+        if location.page_id.get() < 2 {
+            let superblock = super::decode_blink_superblock_image(&page.image)?;
+            if superblock.database_uuid != self.builder.manifest.identity.database_uuid
+                || superblock.shard_epoch.get() != self.builder.manifest.identity.wal_epoch
+                || superblock.tenant_id != location.source_identity.tenant_id
+                || superblock.shard_id != location.source_identity.shard_id
+            {
+                return Err(Error::corruption(
+                    "paged recovery superblock differs from the manifest identity",
+                ));
+            }
+            if superblock.generation >= self.builder.superblock_generation {
+                self.builder.superblock_generation = superblock.generation;
+                self.builder.root_page_id = superblock.root_page_id;
+                self.builder.free_list_head = superblock.free_list_head;
+                self.builder.high_water_page_id = self
+                    .builder
+                    .high_water_page_id
+                    .max(superblock.high_water_page_id);
+                self.builder.active_superblock_slot = if location.page_id.get() == 0 {
+                    super::SuperblockSlot::A
+                } else {
+                    super::SuperblockSlot::B
+                };
+            }
+        } else {
             let descriptor = self.builder.descriptor_for_location(&location)?;
             self.builder.root =
                 self.builder
                     .index
                     .insert(self.builder.root, location.page_id, descriptor)?;
+            self.builder.high_water_page_id = self.builder.high_water_page_id.max(location.page_id);
         }
         Ok(())
     }

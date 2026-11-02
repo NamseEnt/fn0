@@ -345,13 +345,15 @@ impl PagedManifestStore {
                 "paged recovery WAL header identity differs from its source identity",
             ));
         }
-        let handle = PagedReadHandle::open_with_indexed_page_validation(
+        let recovered_superblock_generation = builder.current_superblock_generation();
+        let recovered_superblock_slot = builder.current_active_superblock_slot();
+        let mut handle = PagedReadHandle::open_with_indexed_page_validation(
             PagedReadConfig {
                 tenant_id: config.tenant_id,
                 root: builder.current_root(),
-                root_page_id: manifest.tree_root,
-                free_list_head: manifest.free_list_root,
-                high_water_page_id: manifest.high_water_page_id,
+                root_page_id: builder.current_root_page_id(),
+                free_list_head: builder.current_free_list_head(),
+                high_water_page_id: builder.current_high_water_page_id(),
                 loader: config.loader,
             },
             config.index,
@@ -359,6 +361,10 @@ impl PagedManifestStore {
             config.sources,
             move |source| header_length(source),
         )?;
+        handle.set_recovered_superblock_state(
+            recovered_superblock_generation,
+            recovered_superblock_slot,
+        );
         Ok((store, handle))
     }
 

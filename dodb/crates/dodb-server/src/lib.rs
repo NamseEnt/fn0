@@ -5316,6 +5316,646 @@ mod tests {
         .unwrap();
     }
 
+    #[cfg(feature = "blink-demand-paging")]
+    fn paged_crash_service_config(
+        data_dir: std::path::PathBuf,
+        coalesce: bool,
+    ) -> LocalTenantServiceConfig {
+        let mut resources = writable_paged_blink_shared_resources();
+        resources.page_loader.maximum_cache_bytes = 8 * dodb_storage::PAGE_SIZE as u64;
+        resources.maximum_working_pages = 32;
+        LocalTenantServiceConfig {
+            data_dir,
+            max_open_shards: 1,
+            blink_open_waiter_limit: 4,
+            blink_wal_layout: BlinkWalLayout::SegmentedBases {
+                max_segment_bytes: 1_048_576,
+                coalesce,
+            },
+            blink_checkpoint_policy: BlinkCheckpointPolicy::WalBytesThreshold {
+                threshold_bytes: u64::MAX,
+            },
+            blink_checkpoint_execution: BlinkCheckpointExecution::Background,
+            blink_shared_resources: Some(resources),
+            ..LocalTenantServiceConfig::default()
+        }
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    struct PausePagedWriterBeforeCommit {
+        marker_path: std::path::PathBuf,
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    impl FaultInjector for PausePagedWriterBeforeCommit {
+        fn hit(&mut self, point: &str) -> Result<(), Error> {
+            if point == "before_commit_record" {
+                std::fs::write(&self.marker_path, b"paused")?;
+                std::thread::sleep(std::time::Duration::from_secs(60));
+            }
+            Ok(())
+        }
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    fn paged_crash_writable_shard(
+        service: &BlinkTenantService,
+        tenant: TenantId,
+    ) -> Arc<PagedWritableShard> {
+        let shard = service
+            .shards
+            .lock()
+            .unwrap()
+            .shards
+            .get(&tenant)
+            .cloned()
+            .unwrap();
+        match &shard.read_handle {
+            BlinkShardReadHandle::Paged {
+                writable: Some(writable),
+                ..
+            } => Arc::clone(writable),
+            BlinkShardReadHandle::Resident(_) | BlinkShardReadHandle::Paged { .. } => {
+                panic!("crash recovery did not open the writable paged service route")
+            }
+        }
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_crash_put(
+        service: &BlinkTenantService,
+        tenant: TenantId,
+        key: DocumentKey,
+        value: Vec<u8>,
+    ) -> u64 {
+        match service
+            .execute_request(
+                tenant,
+                Request::Put { key, value },
+                ExecutionBudget::new(64 * 1024),
+            )
+            .await
+            .unwrap()
+        {
+            Response::Put(revision) => revision.get(),
+            response => panic!("unexpected response: {response:?}"),
+        }
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    async fn assert_paged_crash_value(
+        service: &BlinkTenantService,
+        tenant: TenantId,
+        key: DocumentKey,
+        expected_value: &[u8],
+        expected_revision: u64,
+    ) {
+        let request_key = key.clone();
+        match service
+            .execute_request(
+                tenant,
+                Request::Get { key },
+                ExecutionBudget::new(64 * 1024),
+            )
+            .await
+            .unwrap_or_else(|error| panic!("paged crash Get failed for {request_key:?}: {error}"))
+        {
+            Response::Get(state) => {
+                assert_eq!(state.value(), Some(expected_value));
+                assert_eq!(
+                    state.revision().get(),
+                    expected_revision,
+                    "unexpected revision for {request_key:?}"
+                );
+            }
+            response => panic!("unexpected response: {response:?}"),
+        }
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    async fn assert_paged_crash_value_only(
+        service: &BlinkTenantService,
+        tenant: TenantId,
+        key: DocumentKey,
+        expected_value: &[u8],
+    ) {
+        let request_key = key.clone();
+        match service
+            .execute_request(
+                tenant,
+                Request::Get { key },
+                ExecutionBudget::new(64 * 1024),
+            )
+            .await
+            .unwrap_or_else(|error| panic!("paged crash Get failed for {request_key:?}: {error}"))
+        {
+            Response::Get(state) => assert_eq!(state.value(), Some(expected_value)),
+            response => panic!("unexpected response: {response:?}"),
+        }
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    async fn paged_crash_current_revision(
+        service: &BlinkTenantService,
+        tenant: TenantId,
+        key: DocumentKey,
+    ) -> u64 {
+        match service
+            .execute_request(
+                tenant,
+                Request::Get { key },
+                ExecutionBudget::new(64 * 1024),
+            )
+            .await
+            .unwrap()
+        {
+            Response::Get(state) => state.revision().get(),
+            response => panic!("unexpected response: {response:?}"),
+        }
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
+    async fn run_paged_crash_child(
+        data_dir: std::path::PathBuf,
+        marker_directory: &std::path::Path,
+        stage: &str,
+        coalesce: bool,
+    ) {
+        let tenant = TenantId::new(1);
+        let primary_key = DocumentKey::new(b"paged-crash".to_vec(), b"primary".to_vec());
+        let secondary_key = DocumentKey::new(b"paged-crash".to_vec(), b"secondary".to_vec());
+        let config = paged_crash_service_config(data_dir, coalesce);
+        let service = Arc::new(BlinkTenantService::new(config).unwrap());
+        let writable = service.open_shard(tenant).await.unwrap();
+        assert!(matches!(
+            &writable.read_handle,
+            BlinkShardReadHandle::Paged {
+                writable: Some(_),
+                ..
+            }
+        ));
+        if stage == "first" {
+            for key_number in 0..16u32 {
+                paged_crash_put(
+                    &service,
+                    tenant,
+                    DocumentKey::new(
+                        b"paged-crash-dataset".to_vec(),
+                        key_number.to_be_bytes().to_vec(),
+                    ),
+                    vec![key_number as u8; 4_096],
+                )
+                .await;
+            }
+            paged_crash_put(&service, tenant, primary_key.clone(), vec![3; 4_096]).await;
+            let secondary_revision =
+                paged_crash_put(&service, tenant, secondary_key.clone(), vec![4; 4_096]).await;
+            std::fs::write(
+                marker_directory.join("paged-first-secondary-revision"),
+                secondary_revision.to_string(),
+            )
+            .unwrap();
+            let writable = paged_crash_writable_shard(&service, tenant);
+            writable.run_threshold_checkpoint(1).await.unwrap();
+            let secondary_revision =
+                paged_crash_current_revision(&service, tenant, secondary_key.clone()).await;
+            std::fs::write(
+                marker_directory.join("paged-first-secondary-revision"),
+                secondary_revision.to_string(),
+            )
+            .unwrap();
+            std::fs::write(
+                marker_directory.join("paged-first-checkpoint-completed"),
+                b"checkpointed",
+            )
+            .unwrap();
+            let pack_directory = service
+                .database_path(tenant)
+                .with_file_name("tenant-1-shard-1.db.blink-paged")
+                .join("packs");
+            assert!(
+                std::fs::read_dir(pack_directory)
+                    .unwrap()
+                    .flatten()
+                    .any(|entry| entry
+                        .path()
+                        .extension()
+                        .is_some_and(|extension| extension == "pages")),
+                "paged service checkpoint did not create a durable base pack"
+            );
+            for key_number in 0..16u32 {
+                assert_paged_crash_value_only(
+                    &service,
+                    tenant,
+                    DocumentKey::new(
+                        b"paged-crash-dataset".to_vec(),
+                        key_number.to_be_bytes().to_vec(),
+                    ),
+                    &vec![key_number as u8; 4_096],
+                )
+                .await;
+            }
+            paged_crash_put(&service, tenant, primary_key.clone(), vec![6; 4_096]).await;
+            let primary_revision = match service
+                .execute_request(
+                    tenant,
+                    Request::Get {
+                        key: primary_key.clone(),
+                    },
+                    ExecutionBudget::new(64 * 1024),
+                )
+                .await
+                .unwrap()
+            {
+                Response::Get(state) => state.revision().get(),
+                response => panic!("unexpected response: {response:?}"),
+            };
+            let secondary_revision =
+                paged_crash_current_revision(&service, tenant, secondary_key.clone()).await;
+            std::fs::write(
+                marker_directory.join("paged-first-secondary-revision"),
+                secondary_revision.to_string(),
+            )
+            .unwrap();
+            std::fs::write(
+                marker_directory.join("paged-first-primary-revision"),
+                primary_revision.to_string(),
+            )
+            .unwrap();
+            std::fs::write(
+                marker_directory.join("paged-first-writes-acknowledged"),
+                b"acknowledged",
+            )
+            .unwrap();
+        } else {
+            let primary_revision = std::fs::read_to_string(
+                marker_directory.join("paged-second-acknowledged-revision"),
+            )
+            .unwrap()
+            .parse::<u64>()
+            .unwrap();
+            assert_paged_crash_value(
+                &service,
+                tenant,
+                primary_key.clone(),
+                &[7; 4_096],
+                primary_revision,
+            )
+            .await;
+            assert_paged_crash_value(
+                &service,
+                tenant,
+                secondary_key.clone(),
+                &[8; 4_096],
+                primary_revision,
+            )
+            .await;
+            std::fs::write(
+                marker_directory.join("paged-second-write-verified"),
+                b"verified",
+            )
+            .unwrap();
+        }
+
+        let marker_path = marker_directory.join(format!("paged-{stage}-paused"));
+        paged_crash_writable_shard(&service, tenant)
+            .writer
+            .lock()
+            .unwrap()
+            .set_boxed_wal_fault_injector(Box::new(PausePagedWriterBeforeCommit { marker_path }));
+        let expected_revision = if stage == "first" {
+            std::fs::read_to_string(marker_directory.join("paged-first-primary-revision"))
+                .unwrap()
+                .parse::<u64>()
+                .unwrap()
+        } else {
+            std::fs::read_to_string(marker_directory.join("paged-second-acknowledged-revision"))
+                .unwrap()
+                .parse::<u64>()
+                .unwrap()
+        };
+        let incomplete_transaction = TransactionRequest::new(
+            vec![TransactionCondition::RevisionEquals {
+                key: primary_key.clone(),
+                expected_revision: dodb_core::Revision::new(expected_revision),
+            }],
+            vec![
+                TransactionMutation::Put {
+                    key: primary_key,
+                    value: vec![99; 4_096],
+                },
+                TransactionMutation::Put {
+                    key: secondary_key,
+                    value: vec![100; 4_096],
+                },
+            ],
+        );
+        let result = service
+            .execute_request(
+                tenant,
+                Request::Transact {
+                    request: incomplete_transaction,
+                },
+                ExecutionBudget::new(64 * 1024),
+            )
+            .await;
+        panic!("incomplete paged transaction returned before the crash barrier: {result:?}");
+    }
+
+    #[cfg(all(unix, feature = "blink-demand-paging"))]
+    struct PagedCrashChildGuard {
+        child: std::process::Child,
+    }
+
+    #[cfg(all(unix, feature = "blink-demand-paging"))]
+    impl PagedCrashChildGuard {
+        fn new(child: std::process::Child) -> Self {
+            Self { child }
+        }
+
+        fn id(&self) -> u32 {
+            self.child.id()
+        }
+
+        async fn wait_for_markers(&mut self, marker_paths: &[std::path::PathBuf]) {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+            while std::time::Instant::now() < deadline
+                && marker_paths.iter().any(|path| !path.exists())
+            {
+                if self.child.try_wait().unwrap().is_some() {
+                    panic!("paged crash child exited before reaching its pause markers");
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+            for marker_path in marker_paths {
+                assert!(
+                    marker_path.exists(),
+                    "paged crash child did not create marker {marker_path:?}"
+                );
+            }
+        }
+
+        fn kill_and_wait(&mut self) -> std::process::ExitStatus {
+            self.child.kill().unwrap();
+            self.child.wait().unwrap()
+        }
+    }
+
+    #[cfg(all(unix, feature = "blink-demand-paging"))]
+    impl Drop for PagedCrashChildGuard {
+        fn drop(&mut self) {
+            if self.child.try_wait().ok().flatten().is_none() {
+                let _ = self.child.kill();
+                let _ = self.child.wait();
+            }
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    #[cfg(all(unix, feature = "blink-demand-paging"))]
+    async fn paged_service_process_kill_recovers_acknowledged_state_across_two_crashes() {
+        use std::os::unix::process::ExitStatusExt;
+
+        if let Some(data_dir) = std::env::var_os("DODB_PAGED_CRASH_CHILD_DIR") {
+            let stage = std::env::var("DODB_PAGED_CRASH_STAGE").unwrap();
+            let coalesce = std::env::var("DODB_PAGED_CRASH_COALESCE")
+                .unwrap()
+                .parse::<bool>()
+                .unwrap();
+            run_paged_crash_child(
+                std::path::PathBuf::from(data_dir),
+                std::path::Path::new(&std::env::var("DODB_PAGED_CRASH_MARKERS").unwrap()),
+                &stage,
+                coalesce,
+            )
+            .await;
+            return;
+        }
+
+        let preserved_root =
+            std::env::var_os("DODB_PAGED_CRASH_EVIDENCE_DIR").map(std::path::PathBuf::from);
+        for coalesce in [false, true] {
+            let temporary_directory = preserved_root
+                .is_none()
+                .then(|| tempfile::tempdir().unwrap());
+            let run_parent = preserved_root.as_ref().map_or_else(
+                || temporary_directory.as_ref().unwrap().path().to_path_buf(),
+                Clone::clone,
+            );
+            let run_directory =
+                run_parent.join(format!("coalesce-{coalesce}-parent-{}", std::process::id()));
+            std::fs::create_dir_all(&run_directory).unwrap();
+            let data_dir = run_directory.join("data");
+            let marker_directory = run_directory.join("markers");
+            std::fs::create_dir_all(&marker_directory).unwrap();
+            let tenant = TenantId::new(1);
+            let config = paged_crash_service_config(data_dir.clone(), coalesce);
+            let database_path = data_dir.join("blink/tenant-1-shard-1.db");
+            create_empty_paged_service_fixture(&database_path, tenant);
+            std::fs::write(
+                run_directory.join("configuration.txt"),
+                format!(
+                    "paged_writer_enabled=true\nblink_wal_layout=segmented_bases\ncoalesce={coalesce}\ncache_bytes={}\n",
+                    8 * dodb_storage::PAGE_SIZE
+                ),
+            )
+            .unwrap();
+
+            for stage in ["first", "second"] {
+                let marker_paths = if stage == "first" {
+                    vec![
+                        marker_directory.join("paged-first-writes-acknowledged"),
+                        marker_directory.join("paged-first-checkpoint-completed"),
+                        marker_directory.join("paged-first-paused"),
+                    ]
+                } else {
+                    vec![
+                        marker_directory.join("paged-second-write-verified"),
+                        marker_directory.join("paged-second-paused"),
+                    ]
+                };
+                let child = std::process::Command::new(std::env::current_exe().unwrap())
+                    .arg("--exact")
+                    .arg("tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes")
+                    .arg("--nocapture")
+                    .env("DODB_PAGED_CRASH_CHILD_DIR", &data_dir)
+                    .env("DODB_PAGED_CRASH_MARKERS", &marker_directory)
+                    .env("DODB_PAGED_CRASH_STAGE", stage)
+                    .env("DODB_PAGED_CRASH_COALESCE", coalesce.to_string())
+                    .spawn()
+                    .unwrap();
+                let mut child = PagedCrashChildGuard::new(child);
+                std::fs::write(
+                    marker_directory.join(format!("paged-{stage}-child-pid")),
+                    child.id().to_string(),
+                )
+                .unwrap();
+                child.wait_for_markers(&marker_paths).await;
+                let status = child.kill_and_wait();
+                assert_eq!(
+                    status.signal(),
+                    Some(9),
+                    "paged {stage} child did not terminate by SIGKILL"
+                );
+                if stage == "first" {
+                    let recovered = BlinkTenantService::new(config.clone()).unwrap();
+                    let first_revision = std::fs::read_to_string(
+                        marker_directory.join("paged-first-primary-revision"),
+                    )
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap();
+                    let secondary_revision = std::fs::read_to_string(
+                        marker_directory.join("paged-first-secondary-revision"),
+                    )
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap();
+                    assert_paged_crash_value(
+                        &recovered,
+                        tenant,
+                        DocumentKey::new(b"paged-crash".to_vec(), b"primary".to_vec()),
+                        &[6; 4_096],
+                        first_revision,
+                    )
+                    .await;
+                    assert_paged_crash_value(
+                        &recovered,
+                        tenant,
+                        DocumentKey::new(b"paged-crash".to_vec(), b"secondary".to_vec()),
+                        &[4; 4_096],
+                        secondary_revision,
+                    )
+                    .await;
+                    assert_paged_crash_value_only(
+                        &recovered,
+                        tenant,
+                        DocumentKey::new(
+                            b"paged-crash-dataset".to_vec(),
+                            15u32.to_be_bytes().to_vec(),
+                        ),
+                        &[15; 4_096],
+                    )
+                    .await;
+                    let response = recovered
+                        .execute_request(
+                            tenant,
+                            Request::Transact {
+                                request: TransactionRequest::new(
+                                    vec![TransactionCondition::RevisionEquals {
+                                        key: DocumentKey::new(
+                                            b"paged-crash".to_vec(),
+                                            b"primary".to_vec(),
+                                        ),
+                                        expected_revision: dodb_core::Revision::new(first_revision),
+                                    }],
+                                    vec![
+                                        TransactionMutation::Put {
+                                            key: DocumentKey::new(
+                                                b"paged-crash".to_vec(),
+                                                b"primary".to_vec(),
+                                            ),
+                                            value: vec![7; 4_096],
+                                        },
+                                        TransactionMutation::Put {
+                                            key: DocumentKey::new(
+                                                b"paged-crash".to_vec(),
+                                                b"secondary".to_vec(),
+                                            ),
+                                            value: vec![8; 4_096],
+                                        },
+                                    ],
+                                ),
+                            },
+                            ExecutionBudget::new(64 * 1024),
+                        )
+                        .await
+                        .unwrap();
+                    match response {
+                        Response::Transact(outcome) => assert!(outcome.commit_lsn.is_some()),
+                        response => panic!("unexpected response: {response:?}"),
+                    }
+                    let acknowledged_revision = match recovered
+                        .execute_request(
+                            tenant,
+                            Request::Get {
+                                key: DocumentKey::new(b"paged-crash".to_vec(), b"primary".to_vec()),
+                            },
+                            ExecutionBudget::new(64 * 1024),
+                        )
+                        .await
+                        .unwrap()
+                    {
+                        Response::Get(state) => state.revision().get(),
+                        response => panic!("unexpected response: {response:?}"),
+                    };
+                    assert!(acknowledged_revision > first_revision);
+                    std::fs::write(
+                        marker_directory.join("paged-second-acknowledged-revision"),
+                        acknowledged_revision.to_string(),
+                    )
+                    .unwrap();
+                    std::fs::write(
+                        marker_directory.join("paged-second-write-acknowledged"),
+                        b"acknowledged",
+                    )
+                    .unwrap();
+                    recovered.shutdown_checked().await.unwrap();
+                } else {
+                    let recovered = BlinkTenantService::new(config.clone()).unwrap();
+                    let acknowledged_revision = std::fs::read_to_string(
+                        marker_directory.join("paged-second-acknowledged-revision"),
+                    )
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap();
+                    assert_paged_crash_value(
+                        &recovered,
+                        tenant,
+                        DocumentKey::new(b"paged-crash".to_vec(), b"primary".to_vec()),
+                        &[7; 4_096],
+                        acknowledged_revision,
+                    )
+                    .await;
+                    assert_paged_crash_value(
+                        &recovered,
+                        tenant,
+                        DocumentKey::new(b"paged-crash".to_vec(), b"secondary".to_vec()),
+                        &[8; 4_096],
+                        acknowledged_revision,
+                    )
+                    .await;
+                    recovered.shutdown_checked().await.unwrap();
+                }
+            }
+
+            let final_service = BlinkTenantService::new(config).unwrap();
+            let acknowledged_revision = std::fs::read_to_string(
+                marker_directory.join("paged-second-acknowledged-revision"),
+            )
+            .unwrap()
+            .parse::<u64>()
+            .unwrap();
+            assert_paged_crash_value(
+                &final_service,
+                tenant,
+                DocumentKey::new(b"paged-crash".to_vec(), b"primary".to_vec()),
+                &[7; 4_096],
+                acknowledged_revision,
+            )
+            .await;
+            assert_paged_crash_value(
+                &final_service,
+                tenant,
+                DocumentKey::new(b"paged-crash".to_vec(), b"secondary".to_vec()),
+                &[8; 4_096],
+                acknowledged_revision,
+            )
+            .await;
+            final_service.shutdown_checked().await.unwrap();
+        }
+    }
+
     #[tokio::test]
     async fn cached_blink_reads_do_not_depend_on_repeated_path_checks() {
         for wal_layout in [
@@ -6599,11 +7239,12 @@ mod tests {
         let directory = blink_test_directory();
         let tenant = TenantId::new(726);
         let mut shared_resources = writable_paged_blink_shared_resources();
-        let disk_capacity = 64 * 1024 * 1024;
+        let disk_capacity = 256 * 1024 * 1024;
         shared_resources.disk.global_bytes = disk_capacity;
         shared_resources.disk.per_tenant_bytes = disk_capacity;
         shared_resources.disk.global_category_bytes = [disk_capacity; 5];
         shared_resources.disk.per_tenant_category_bytes = [disk_capacity; 5];
+        shared_resources.maximum_working_pages = 16;
         shared_resources.maximum_checkpoint_debt_bytes_global = 1024 * 1024;
         shared_resources.maximum_checkpoint_debt_bytes_per_tenant = 1024 * 1024;
         let config = LocalTenantServiceConfig {
@@ -6637,7 +7278,7 @@ mod tests {
                 .sum::<u64>()
         };
         let disk = service.shared_resources.as_ref().unwrap().disk();
-        let keys = (0u32..50)
+        let keys = (0u32..100)
             .map(|key_number| {
                 dodb_core::DocumentKey::new(
                     b"pinned-reader".to_vec(),
@@ -6646,9 +7287,25 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let key = keys[0].clone();
-        let old_value = vec![17; 4096];
-        let new_value = vec![29; 4096];
-        for write_key in &keys {
+        let value_for_key = |key_number: u32, seed: u64| {
+            let mut state = seed ^ (u64::from(key_number).wrapping_mul(0x9e3779b97f4a7c15));
+            (0..8_192)
+                .map(|_| {
+                    state ^= state << 13;
+                    state ^= state >> 7;
+                    state ^= state << 17;
+                    state as u8
+                })
+                .collect::<Vec<_>>()
+        };
+        let old_values = (0..100u32)
+            .map(|key_number| value_for_key(key_number, 17))
+            .collect::<Vec<_>>();
+        let new_values = (0..100u32)
+            .map(|key_number| value_for_key(key_number, 29))
+            .collect::<Vec<_>>();
+        let old_value = old_values[0].clone();
+        for (write_key, old_value) in keys.iter().zip(&old_values) {
             service
                 .execute_request(
                     tenant,
@@ -6709,7 +7366,7 @@ mod tests {
             Some(old_value.as_slice())
         );
 
-        for write_key in &keys {
+        for (write_key, new_value) in keys.iter().zip(&new_values) {
             service
                 .execute_request(
                     tenant,
@@ -6729,19 +7386,6 @@ mod tests {
             wal_directory_bytes(),
             "post-checkpoint transaction groups must account their new WAL segment"
         );
-        let disk_usage_before_blocker = disk.snapshot().unwrap().current_total;
-        let headroom = 700 * 1024;
-        let blocker_bytes = disk_capacity
-            .saturating_sub(disk_usage_before_blocker)
-            .saturating_sub(headroom);
-        assert!(blocker_bytes > 0);
-        let blocker = disk
-            .reserve(
-                tenant.get(),
-                dodb_storage::blink::resource::DiskCategory::Scratch,
-                blocker_bytes,
-            )
-            .unwrap();
         assert!(retained_old_wal_paths.iter().any(|path| path.is_file()));
         assert_eq!(
             old_reader.get(&key).unwrap().value(),
@@ -6751,26 +7395,13 @@ mod tests {
             let writable = Arc::clone(&writable);
             tokio::spawn(async move { writable.run_threshold_checkpoint(1).await })
         };
-        tokio::time::timeout(std::time::Duration::from_secs(15), async {
-            loop {
-                if disk.snapshot().unwrap().pending_waiters == 1 {
-                    break;
-                }
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| {
-            panic!(
-                "checkpoint did not wait for old-reader source capacity: finished={}, metrics={:?}",
-                checkpoint.is_finished(),
-                service.checkpoint_metrics_snapshot()
-            )
-        });
-        drop(old_reader);
         checkpoint.await.unwrap().unwrap();
-        drop(blocker);
-
+        assert!(retained_old_wal_paths.iter().any(|path| path.is_file()));
+        assert_eq!(
+            old_reader.get(&key).unwrap().value(),
+            Some(old_value.as_slice())
+        );
+        drop(old_reader);
         assert_eq!(disk.snapshot().unwrap().pending_waiters, 0);
         let metrics = service.checkpoint_metrics_snapshot();
         assert_eq!(metrics.checkpoints_completed, 2);
@@ -6786,7 +7417,7 @@ mod tests {
             .await
             .unwrap()
         {
-            Response::Get(state) => assert_eq!(state.value(), Some(new_value.as_slice())),
+            Response::Get(state) => assert_eq!(state.value(), Some(new_values[0].as_slice())),
             response => panic!("unexpected response: {response:?}"),
         }
         reopened_service.shutdown_checked().await.unwrap();
