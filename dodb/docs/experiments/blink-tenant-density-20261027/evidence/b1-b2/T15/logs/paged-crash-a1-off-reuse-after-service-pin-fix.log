@@ -1,0 +1,22 @@
+   Compiling dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.08s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-300bb259f2fc591f)
+
+running 1 test
+
+running 1 test
+recovered page reuse: high_water_before=40 high_water_after=40 reused=true
+
+thread 'tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes' (444846831) panicked at dodb/crates/dodb-server/src/lib.rs:5903:43:
+page allocation reused a free page while reuse was disabled
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes ... FAILED
+
+failures:
+
+failures:
+    tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 51 filtered out; finished in 3.97s
+
+error: test failed, to rerun pass `-p dodb-server --lib`

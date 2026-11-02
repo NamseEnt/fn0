@@ -1,0 +1,29 @@
+   Compiling dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
+warning: unexpected `cfg` condition value: `blink-writer-pin-reuse`
+    --> dodb/crates/dodb-server/src/lib.rs:5916:29
+     |
+5916 |                     if cfg!(feature = "blink-writer-pin-reuse") {
+     |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: expected values for `feature` are: `blink-demand-paging`
+     = help: consider adding `blink-writer-pin-reuse` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+     = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: `dodb-server` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.37s
+     Running unittests src/lib.rs (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/deps/dodb_server-300bb259f2fc591f)
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+test tests::paged_service_process_kill_recovers_acknowledged_state_across_two_crashes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 51 filtered out; finished in 8.70s
+

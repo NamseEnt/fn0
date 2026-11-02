@@ -1,0 +1,4 @@
+paged_writer_enabled=true
+blink_wal_layout=segmented_bases
+coalesce=true
+cache_bytes=32768

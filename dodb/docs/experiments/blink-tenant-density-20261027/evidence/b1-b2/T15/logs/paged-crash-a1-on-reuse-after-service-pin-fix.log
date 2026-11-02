@@ -1,0 +1,11 @@
+   Compiling dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
+error[E0609]: no field `latest` on type `&std::sync::Arc<PagedWritableShard>`
+    --> dodb/crates/dodb-server/src/lib.rs:2291:14
+     |
+2291 |             .latest
+     |              ^^^^^^ unknown field
+     |
+     = note: available fields are: `writer`, `manifest_store`, `checkpoint_directory`, `wal_directory`, `wal_identity` ... and 13 others
+
+For more information about this error, try `rustc --explain E0609`.
+error: could not compile `dodb-server` (lib test) due to 1 previous error
