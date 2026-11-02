@@ -1,0 +1,53 @@
+{
+  "archive": {
+    "all_recorded_files_verified": true,
+    "bytes": 5064,
+    "original_directory_preserved": true,
+    "path": "failed-development-db.tar.gz",
+    "sha256": "6eda10a123869b5d2864ad70f77fd717803897c5a0ec6a296ffe3772cf5f5747"
+  },
+  "engine_policy_changed": false,
+  "initial_attempt": {
+    "classification": "test did not reach intended pack-unlink boundary; two live owning packs remained",
+    "condition": "sixteen checkpoints overwriting only key 90",
+    "observed_failure_marker": "assertion failed: original_reclaimed",
+    "resolution": "vary seeded keys across leaf pages to exercise the unchanged MAX_PACKS consolidation policy; final test uses unlink terminology",
+    "test": "held_checkpoint_locator_keeps_exact_image_across_real_pack_reclamation"
+  },
+  "note": "Failure marker is transcribed from the observed test output; this receipt is not a full terminal transcript.",
+  "preserved_failed_databases": [
+    {
+      "base_pack_count": 2,
+      "files": [
+        {
+          "bytes": 12288,
+          "path": "tenant.db",
+          "sha256": "f8ae931062201225103db7abdf9ea38c2a7e0414d99840020f6d5f83f507f1d3"
+        },
+        {
+          "bytes": 266244,
+          "path": "tenant.db.segments/base-00000000000000000001.pages",
+          "sha256": "8395b4e6f03aa0b80e50c0326cf73224cbf2322a5ae9f1b725ba7498e7ec1617"
+        },
+        {
+          "bytes": 8196,
+          "path": "tenant.db.segments/base-00000000000000000017.pages",
+          "sha256": "4acbb97471087357027cfd7fffc29f9df67b4ea2933d2accf04694f418e7129e"
+        },
+        {
+          "bytes": 104,
+          "path": "tenant.db.segments/segment-00000000000000000209.wal",
+          "sha256": "c44e7a2480464d255c886fabf40c93ca5ab70d83a6716aa9dc494d9de666d268"
+        },
+        {
+          "bytes": 260,
+          "path": "tenant.db.segments.manifest",
+          "sha256": "ac2a1bb46d3d8665a0e5e102f102a6752c8358135ac655c2d3a54e6205952e64"
+        }
+      ],
+      "path": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-bases-checkpoint-locator-reclamation-64298-1793581282737799000",
+      "preserved": true
+    }
+  ],
+  "scope": "development correctness attempt, not an OCI benchmark or capacity result"
+}

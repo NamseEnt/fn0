@@ -418,6 +418,7 @@ If shared-resource minimal-native meets the service objective with no meaningful
 - [ ] Allocation/representation-level shutdown attribution without relaxing the twenty-second parent or fifteen-second worker deadlines. The phase and kernel wait are located; the unique allocating call site and the prior unprofiled failure's cause remain unproven.
 - [x] Matched arrival-phase controls and a bounded small-store active frontier; see [E2-ARRIVAL-PHASE-RESULTS.md](E2-ARRIVAL-PHASE-RESULTS.md) and [E2-RESIDENT-FRONTIER-RESULTS.md](E2-RESIDENT-FRONTIER-RESULTS.md). The accepted staggered populations are B-link 24 and shared RocksDB 28 under this bounded policy, not engine maxima.
 - [x] Three matched five-minute fixed-key N24 maintenance pairs, both routes 3/3 SLO passes; see [E4-COMMON-POPULATION-RESULTS.md](E4-COMMON-POPULATION-RESULTS.md). No memory/debt plateau or higher population is established.
+- [x] B1.0 opt-in validated checkpoint-image locator primitive and shared-scanner correctness/compatibility; see [B1-CHECKPOINT-LOCATOR-RESULTS.md](B1-CHECKPOINT-LOCATOR-RESULTS.md). This adds no service eviction, WAL-backed reconstruction, durable old-generation retention, or new performance evidence.
 - [ ] Broader steady-state/density acceptance, including growing-key, larger-than-budget, physical disk-return, and host-ARC boundaries.
 - [ ] Decision on B1/B2/B3/B4 implementation and adoption.
 

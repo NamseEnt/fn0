@@ -1,0 +1,247 @@
+{
+  "accepted_scope": "checkpoint-image locator primitive and shared-scanner correctness/compatibility only",
+  "checks": [
+    {
+      "command": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "--config",
+        "skip_children=true",
+        "dodb/crates/dodb-storage/src/blink/durable_bases.rs",
+        "dodb/crates/dodb-storage/src/blink/page_locator.rs",
+        "dodb/crates/dodb-storage/tests/durable_base_checkpoint.rs"
+      ],
+      "elapsed_seconds": 0.1416042484343052,
+      "exit_code": 0,
+      "log_path": "targeted-format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "name": "targeted-format",
+      "test_results": []
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-checkpoint-locators",
+        "--lib",
+        "--test",
+        "durable_base_checkpoint",
+        "--test",
+        "durable_base_sigkill",
+        "--test",
+        "durable_base_background_sigkill",
+        "--test",
+        "segmented_checkpoint_sigkill",
+        "--test",
+        "segmented_wal_sigkill"
+      ],
+      "elapsed_seconds": 137.79423129186034,
+      "exit_code": 0,
+      "log_path": "locator-storage-and-recovery.log",
+      "log_sha256": "38c03841d1fdba10c88d023c624fb1bed8bc796f150478cac9ca08de845bdd7e",
+      "name": "locator-storage-and-recovery",
+      "test_results": [
+        "test result: ok. 216 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 50.49s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.24s",
+        "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 58.09s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.01s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.41s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--test",
+        "durable_base_checkpoint"
+      ],
+      "elapsed_seconds": 112.42295533418655,
+      "exit_code": 0,
+      "log_path": "default-storage-and-checkpoints.log",
+      "log_sha256": "23da17c435dfc46763240f3497a607048dc383f39a5486232daa5e15c8958a12",
+      "name": "default-storage-and-checkpoints",
+      "test_results": [
+        "test result: ok. 205 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 52.02s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 49.89s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-checkpoint-locators,blink-writer-pin-reuse",
+        "--lib"
+      ],
+      "elapsed_seconds": 59.36942224949598,
+      "exit_code": 0,
+      "log_path": "locator-writer-reuse-compatibility.log",
+      "log_sha256": "816056b9a01f09136ac79254a0aaf1075440127eed8f7ea1cfe66432a69392a4",
+      "name": "locator-writer-reuse-compatibility",
+      "test_results": [
+        "test result: ok. 216 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 51.17s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-checkpoint-locators",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 5.389582917094231,
+      "exit_code": 101,
+      "log_path": "strict-feature-clippy.log",
+      "log_sha256": "59caea18363b0ba04c5a086105567a27be9b672bac4346cf13fffe43a3e0db27",
+      "name": "strict-feature-clippy",
+      "test_results": []
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "log_path": "strict-default-clippy.log",
+      "log_sha256": "dc798092be5a82d2f04ef7db6cc530531cdf27a940d609fbab3b6f21208aa630",
+      "name": "strict-default-clippy"
+    }
+  ],
+  "clippy_assessment": {
+    "diagnostic_count": 12,
+    "diagnostics": [
+      {
+        "column": 5,
+        "line": 1425,
+        "message": "this function has too many arguments (8/7)",
+        "path": "dodb/crates/dodb-storage/src/blink/mod.rs"
+      },
+      {
+        "column": 21,
+        "line": 4148,
+        "message": "this `if` statement can be collapsed",
+        "path": "dodb/crates/dodb-storage/src/blink/mod.rs"
+      },
+      {
+        "column": 21,
+        "line": 4192,
+        "message": "this `if` statement can be collapsed",
+        "path": "dodb/crates/dodb-storage/src/blink/mod.rs"
+      },
+      {
+        "column": 1,
+        "line": 5947,
+        "message": "this function has too many arguments (9/7)",
+        "path": "dodb/crates/dodb-storage/src/blink/mod.rs"
+      },
+      {
+        "column": 35,
+        "line": 6479,
+        "message": "derefed type is same as origin",
+        "path": "dodb/crates/dodb-storage/src/blink/mod.rs"
+      },
+      {
+        "column": 43,
+        "line": 6594,
+        "message": "redundant slicing of the whole range",
+        "path": "dodb/crates/dodb-storage/src/blink/mod.rs"
+      },
+      {
+        "column": 1,
+        "line": 7790,
+        "message": "this function has too many arguments (9/7)",
+        "path": "dodb/crates/dodb-storage/src/blink/mod.rs"
+      },
+      {
+        "column": 1,
+        "line": 7832,
+        "message": "this function has too many arguments (8/7)",
+        "path": "dodb/crates/dodb-storage/src/blink/mod.rs"
+      },
+      {
+        "column": 1,
+        "line": 7942,
+        "message": "this function has too many arguments (10/7)",
+        "path": "dodb/crates/dodb-storage/src/blink/mod.rs"
+      },
+      {
+        "column": 5,
+        "line": 569,
+        "message": "this function has too many arguments (8/7)",
+        "path": "dodb/crates/dodb-storage/src/wal.rs"
+      },
+      {
+        "column": 1,
+        "line": 3167,
+        "message": "this function has too many arguments (8/7)",
+        "path": "dodb/crates/dodb-storage/src/wal.rs"
+      },
+      {
+        "column": 1,
+        "line": 3197,
+        "message": "this function has too many arguments (10/7)",
+        "path": "dodb/crates/dodb-storage/src/wal.rs"
+      }
+    ],
+    "new_locator_or_shared_scanner_diagnostics": 0,
+    "same_default_and_feature_diagnostics": true,
+    "scope": "pre-existing functions in blink/mod.rs and wal.rs; implementation diff leaves these functions unchanged; no suppressions added",
+    "strict_pass": false
+  },
+  "failed_development_database_archive_verified": true,
+  "failed_development_database_preservation_rechecked": true,
+  "files": [
+    {
+      "path": "dodb/crates/dodb-storage/Cargo.toml",
+      "sha256": "69a20e022bc1c09c6ab74eea72d765f2b0bf10141317af99d88710df0b5caf6b"
+    },
+    {
+      "path": "dodb/crates/dodb-storage/src/blink/mod.rs",
+      "sha256": "fc2195479182f4a02e0bf54f80593541934415b29b2f20cb507af0e3dfd69360"
+    },
+    {
+      "path": "dodb/crates/dodb-storage/src/blink/durable_bases.rs",
+      "sha256": "90d04a9b596e156a4c4ffa219c953c34d3e13b952fa1f13e7933de2239383a50"
+    },
+    {
+      "path": "dodb/crates/dodb-storage/src/blink/page_locator.rs",
+      "sha256": "304e7eea427a60bbcc0dffda3d669066569f80b72a2cca8e4c3b9b9dbae782d0"
+    },
+    {
+      "path": "dodb/crates/dodb-storage/tests/durable_base_checkpoint.rs",
+      "sha256": "47a57997a21c79a2ee0ba875df79da0ad1884ec42ee89cbe0b8c6746df7ddc76"
+    }
+  ],
+  "new_tests": {
+    "actual_store_pack_unlink_integration_tests": 1,
+    "locator_unit_tests": 11
+  },
+  "platform": "macOS-26.4-arm64-arm-64bit-Mach-O",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: aarch64-apple-darwin\nrelease: 1.97.1\nLLVM version: 22.1.6\n",
+  "scope": "local storage correctness and compatibility; no service eviction or performance evidence",
+  "source_commit": "aca32bbab2dd3136eebd9cacf20c42cac65194ce",
+  "storage_correctness_checks_passed": true
+}

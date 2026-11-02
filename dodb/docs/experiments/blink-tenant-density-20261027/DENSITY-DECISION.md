@@ -36,6 +36,8 @@ These facts explain why larger-than-resident activity would require the B1/B2 ar
 
 ## What remains before a stronger claim or another implementation
 
+The first structural increment is now the default-disabled [B1.0 checkpoint-image locator](B1-CHECKPOINT-LOCATOR-RESULTS.md), source `aca32bbab`. It proves exact validated checkpoint reloads and held-file ownership across unlink with twelve new correctness tests and existing recovery compatibility checks. It does not change the adoption assessment or supply service eviction, WAL reconstruction, crash-safe generation retention, or a global cache/byte budget. Continue with committed-WAL reconstruction and durable source reachability before reader/writer cache integration; do not treat a process-local open file as a persistent retention root.
+
 - Preserve the stopped shutdown/pressure cohorts and their located kernel wait evidence. Unique allocator/representation attribution remains unproven; do not resume omitted cells or relax deadlines to obtain acceptance.
 - Keep the historical and current-source frontier cohorts distinct. The latest matched maintenance accepts N24 for five-minute windows; it does not reconfirm N28 for B-link or attribute historical differences to source. Do not tune the load, cadence, or SLO to obtain a pass.
 - A larger-than-backend-budget dataset would still leave ARC and previously charged shared file pages outside this limit. A physical disk-miss or total-machine-density claim needs an explicit host-cache policy and measured reads. None follows from the current small read coverage.
