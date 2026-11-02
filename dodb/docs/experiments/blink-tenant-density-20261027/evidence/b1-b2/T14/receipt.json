@@ -3,7 +3,7 @@
   "scope": "Fair debt-driven checkpoint admission and root-release source recovery",
   "status": "partial",
   "parent_source_commit": "d41719694b0b78653737ad91599ef24257f146a3",
-  "implementation_commit": "7fec41de9abadd71623fb87390d945c82cfb1d3b",
+  "implementation_commit": "3c61a1a7b0e8559e004695db26c420eabc7d36c9",
   "prerequisite_receipts": [
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/receipt.json",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/receipt.json",
@@ -11,61 +11,156 @@
   ],
   "owned_paths": [
     "dodb/crates/dodb-server/src/lib.rs",
+    "dodb/crates/dodb-storage/src/blink/mod.rs",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/RESULTS.md",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-library-old-reader-lifecycle.log",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-old-reader-capacity-probe-failures.log",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-old-reader-accounting-diagnostic.log",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/storage-paging-source-manager-final.log",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/storage-paging-clippy-accounting-diagnostic.log"
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/storage-paging-clippy-accounting-diagnostic.log",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-library-wal-accounting-fix.log",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-wal-accounting-fix-followup.log"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-server/src/lib.rs": "1140ba19fe95ddb93803421fb8d7dd6c710e3ba02144cc155dc589ed02222876",
+    "dodb/crates/dodb-server/src/lib.rs": "93e305b039ebbf6f41ac80b410190f79ad33f3a970cb5e84b5686184be1603e4",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "c3233e701da44205372b2130164ab2ee0cb49e6bfa081b41814d7fe98f4ef304",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "e267412905cb2f2e82138dfcc0fc4c21c5f899966557cf26e16dcd7e09a9cd29",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/RESULTS.md": "86c3618eedffe1a5a0172e5fe4a6076e0f266f8086e7afefd82de03fca6fd6bc",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/RESULTS.md": "a4b4077f1afc72a48e2bbb81460b298ce7700bd30e186899016c8494b0e39f8c",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-library-old-reader-lifecycle.log": "b1a4eb016d8cec1f9f30a8b3cd579e16d8d1cdd8abe7719d1b79ffdef26adc1d",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-old-reader-capacity-probe-failures.log": "c3d12d02f1b964efb5daba9e7821f4b0c182370aca2df7165a358deb0ad3a393",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-old-reader-accounting-diagnostic.log": "1213d0299281ce37d9d5337c34ae5856ac4b832e677aab1b8eda9a47c6ec76d8",
     "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/storage-paging-source-manager-final.log": "ced26f0bee505d7664cf73312c67d7da15e9e2b3a02b809883c6c0c3127671ac",
-    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/storage-paging-clippy-accounting-diagnostic.log": "7824fe48216da6fcc6fa4cf35f81be39a46609617b95ca71c06a1f159e24e337"
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/storage-paging-clippy-accounting-diagnostic.log": "7824fe48216da6fcc6fa4cf35f81be39a46609617b95ca71c06a1f159e24e337",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-library-wal-accounting-fix.log": "c21df539b5de303a52bfc73132f86f7cc9b1d4d29ff066ea45c151a3ee984ecf",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T14/logs/server-paging-wal-accounting-fix-followup.log": "5ddff1fb94a2e1250294a4e6fec534c2f60d82609ae101544951f9ded72885fe"
   },
   "host": "local worktree / macOS",
   "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
-  "features": ["blink-demand-paging"],
+  "features": [
+    "blink-demand-paging"
+  ],
   "runtime_configuration": "local service integration tests; 64 MiB test disk cap; 50 distinct 4 KiB values; no performance measurement",
   "checks": [
     {
-      "argv": ["cargo", "test", "-p", "dodb-server", "--features", "blink-demand-paging", "--lib", "--", "--test-threads=1"],
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-server",
+        "--features",
+        "blink-demand-paging",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
       "exit_status": 0,
       "result": "49 passed; 0 failed; log retained"
     },
     {
-      "argv": ["cargo", "clippy", "-p", "dodb-server", "--features", "blink-demand-paging", "--all-targets", "--no-deps", "--", "-D", "warnings"],
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-server",
+        "--features",
+        "blink-demand-paging",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
       "exit_status": 0,
       "result": "passed"
     },
     {
-      "argv": ["cargo", "test", "-p", "dodb-storage", "--features", "blink-demand-paging", "blink::source_manager::tests", "--lib", "--", "--test-threads=1"],
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "blink::source_manager::tests",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
       "exit_status": 0,
       "result": "14 passed; 0 failed; log retained"
     },
     {
-      "argv": ["cargo", "clippy", "-p", "dodb-storage", "--features", "blink-demand-paging", "--all-targets", "--no-deps", "--", "-D", "warnings"],
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
       "exit_status": 101,
       "result": "32 existing workspace findings; none referenced source_manager.rs; full log retained"
     },
     {
-      "argv": ["rustfmt", "--check", "--edition", "2024", "crates/dodb-server/src/lib.rs"],
+      "argv": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "crates/dodb-server/src/lib.rs"
+      ],
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
       "exit_status": 0,
       "result": "passed"
     },
     {
-      "argv": ["git", "diff", "--check"],
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "passed"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-server",
+        "--features",
+        "blink-demand-paging",
+        "paged_checkpoint_reclaims_old_reader_source_before_publication",
+        "--lib",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "result": "1 passed; combined old-reader release and waiting checkpoint integration"
+    },
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "-p",
+        "dodb-server",
+        "-p",
+        "dodb-storage",
+        "--",
+        "--check"
+      ],
       "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
       "exit_status": 0,
       "result": "passed"
@@ -73,11 +168,11 @@
   ],
   "acceptance_mapping": {
     "old service reader retains WAL through checkpoint publication": "Passed by tests::paged_checkpoint_reclaims_old_reader_source_before_publication",
-    "root release permits old WAL source collection before the following checkpoint publishes": "Passed by tests::paged_checkpoint_reclaims_old_reader_source_before_publication; final value also verified after service reopen",
+    "root release permits old WAL source collection before the following checkpoint publishes": "Not claimed by the service test: a WAL segment may remain referenced by the current root; exact root pin and unlink lifecycle is covered by source-manager tests",
     "capacity waiter resumes and checkpoint publishes after capacity release": "Existing tests::paged_checkpoint_resumes_after_disk_capacity_release passed in the 49-test paging library run",
     "root-release waiter wakes and unregisters": "Existing blink::resource::tests::disk_capacity_waiter_wakes_when_a_root_releases covered by the T14 storage paging library results",
     "deterministic synchronized and staggered queue wait bound": "Existing physical_checkpoint::tests::fair_ready_queue_bounds_synchronized_and_staggered_pressure_wait reports three service turns",
-    "combined old-reader source release unblocks a waiting checkpoint": "Not proven; rejected capacity probes are preserved",
+    "combined old-reader source release unblocks a waiting checkpoint": "Passed by tests::paged_checkpoint_reclaims_old_reader_source_before_publication; pending_waiters reaches 1 with the scratch blocker held, then checkpoint completes after old-reader release while the blocker remains held",
     "four-tenant service-integrated all-active pressure and measured wall-clock wait": "Not proven",
     "long pinned reader under pressure, all foreground categories full, and capacity recovery": "Not proven",
     "performance, SLO, or tenant-capacity result": "None"
@@ -90,14 +185,16 @@
     "128 KiB single value exceeded the working-page limit",
     "Hard-coded initial WAL filename was absent; final test discovers the source actually held by the old root",
     "One-key update produced output below the artificial capacity headroom",
-    "Artificial total-disk blockers reached WAL reconciliation or version-index capacity before the intended waiter; details and exact error classes are in the preserved probe log"
-    ,"At 64 MiB, actual WAL usage was 2,085,008 bytes versus 834,704 accounted, requiring 1,250,304 bytes more than the 716,800 bytes available; source collection rejected before checkpoint capacity waiting"
+    "Artificial total-disk blockers reached WAL reconciliation or version-index capacity before the intended waiter; details and exact error classes are in the preserved probe log",
+    "At 64 MiB, actual WAL usage was 2,085,008 bytes versus 834,704 accounted, requiring 1,250,304 bytes more than the 716,800 bytes available; source collection rejected before checkpoint capacity waiting",
+    "Requiring every pre-checkpoint WAL path to disappear after the second checkpoint failed because segment-00000000000000000002.wal remained referenced by the current root; the assertion was rejected",
+    "Requiring retained-source bytes to decrease failed because the new checkpoint pack increased that category from 421,892 to 1,253,384 bytes; this is not an old-reader collection oracle",
+    "cargo fmt --all -- --check could not resolve the separate vendored Deno workspace from the parent workspace; the scoped dodb-server and dodb-storage package formatting check passed"
   ],
   "remaining_work": [
-    "Prove that releasing this exact old reader's retained source unblocks the waiting checkpoint and permits publication",
     "Exercise four continuously active tenants through service-integrated synchronized and staggered pressure and record bounded waits",
     "Exercise a long pinned reader under pressure, all foreground categories full, and capacity recovery",
-    "Do not start T15 until T14 acceptance is complete"
+    "Do not start T15 until remaining T14 acceptance gates are complete"
   ],
   "next_task": "T14"
 }
