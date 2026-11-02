@@ -703,7 +703,10 @@ mod tests {
     use dodb_core::{Error, Lsn, PageId};
     use std::fs;
     use std::path::{Path, PathBuf};
+    use std::process::Command;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::thread;
+    use std::time::{Duration, Instant};
 
     static DIRECTORY_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
@@ -926,6 +929,92 @@ mod tests {
                 PagedManifestPointerStage::AfterRename
                 | PagedManifestPointerStage::AfterDirectorySync => 2,
             };
+            assert_eq!(reopened.current().generation, expected_generation);
+        }
+    }
+
+    #[test]
+    fn paged_manifest_pointer_publication_survives_sigkill() {
+        const CHILD_DIRECTORY: &str = "DODB_PAGED_MANIFEST_SIGKILL_DIRECTORY";
+        const CHILD_STAGE: &str = "DODB_PAGED_MANIFEST_SIGKILL_STAGE";
+        const CHILD_READY: &str = "DODB_PAGED_MANIFEST_SIGKILL_READY";
+        if let Ok(directory_path) = std::env::var(CHILD_DIRECTORY) {
+            let stage_number = std::env::var(CHILD_STAGE).unwrap().parse::<u8>().unwrap();
+            let target_stage = match stage_number {
+                0 => PagedManifestPointerStage::BeforeTemporaryCreate,
+                1 => PagedManifestPointerStage::AfterTemporarySync,
+                2 => PagedManifestPointerStage::AfterRename,
+                3 => PagedManifestPointerStage::AfterDirectorySync,
+                _ => panic!("invalid pointer stage number"),
+            };
+            let database_path = PathBuf::from(directory_path).join("tenant.db");
+            let identity = StoreIdentity {
+                database_uuid: [0x35; 16],
+                wal_epoch: 21,
+            };
+            let mut store = PagedManifestStore::open_unchecked(&database_path, identity).unwrap();
+            let _ = store.publish_with_pointer_hook(
+                manifest(identity, 2, 1),
+                || Ok(()),
+                &mut |stage| {
+                    if stage == target_stage {
+                        fs::write(std::env::var(CHILD_READY).unwrap(), b"ready").unwrap();
+                        loop {
+                            thread::sleep(Duration::from_secs(1));
+                        }
+                    }
+                    Ok(())
+                },
+            );
+            panic!("child publication did not stop at the requested boundary");
+        }
+
+        for (stage_number, stage) in [
+            PagedManifestPointerStage::BeforeTemporaryCreate,
+            PagedManifestPointerStage::AfterTemporarySync,
+            PagedManifestPointerStage::AfterRename,
+            PagedManifestPointerStage::AfterDirectorySync,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let directory = TestDirectory::new("pointer-sigkill");
+            let (identity, _store) = write_manifest_store(&directory);
+            let ready_path = directory.0.join(format!("ready-{stage_number}"));
+            let mut child = Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "blink::paged_manifest::tests::paged_manifest_pointer_publication_survives_sigkill",
+                    "--nocapture",
+                ])
+                .env(CHILD_DIRECTORY, &directory.0)
+                .env(CHILD_STAGE, stage_number.to_string())
+                .env(CHILD_READY, &ready_path)
+                .spawn()
+                .unwrap();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while !ready_path.exists() && Instant::now() < deadline {
+                if let Some(status) = child.try_wait().unwrap() {
+                    panic!("SIGKILL child exited before {stage:?}: {status}");
+                }
+                thread::sleep(Duration::from_millis(1));
+            }
+            assert!(ready_path.exists(), "child did not reach {stage:?}");
+            assert_eq!(
+                unsafe { libc::kill(child.id() as libc::pid_t, libc::SIGKILL) },
+                0
+            );
+            let status = child.wait().unwrap();
+            use std::os::unix::process::ExitStatusExt;
+            assert_eq!(status.signal(), Some(libc::SIGKILL));
+            let expected_generation = match stage {
+                PagedManifestPointerStage::BeforeTemporaryCreate
+                | PagedManifestPointerStage::AfterTemporarySync => 1,
+                PagedManifestPointerStage::AfterRename
+                | PagedManifestPointerStage::AfterDirectorySync => 2,
+            };
+            let reopened =
+                PagedManifestStore::open_unchecked(&directory.database_path(), identity).unwrap();
             assert_eq!(reopened.current().generation, expected_generation);
         }
     }
