@@ -17,14 +17,15 @@
     "a5a54e533",
     "969be9876",
     "71483f8b2",
-    "432ef0585"
+    "432ef0585",
+    "4e0b2350b"
   ],
   "host": {
     "os": "macOS arm64",
     "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "432ef0585"
+    "source_commit": "4e0b2350b"
   },
   "features": [
     "blink-demand-paging",
@@ -494,5 +495,6 @@
     "remote": "origin",
     "branch": "experiment/blink-tenant-density-20261027",
     "status": "pushed"
-  }
+  },
+  "source_commit": "4e0b2350b"
 }
