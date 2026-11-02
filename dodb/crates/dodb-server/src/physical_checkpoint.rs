@@ -791,6 +791,7 @@ fn unix_nanos() -> u128 {
 #[cfg(test)]
 mod tests {
     use super::{FairCheckpointScheduler, FairTenantReadyQueue, submit_checkpoint_progress};
+    use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
 
     async fn wait_until_pending(scheduler: &FairCheckpointScheduler, tenant: u64) {
@@ -822,6 +823,50 @@ mod tests {
             assert!(queue.enqueue(tenant));
         }
         assert_eq!(queue.len(), 4);
+    }
+
+    #[test]
+    fn fair_ready_queue_bounds_synchronized_and_staggered_pressure_wait() {
+        fn observe_pressure_waits(arrivals: &[(usize, u64)], service_turns: usize) -> usize {
+            let mut queue = FairTenantReadyQueue::default();
+            let mut active_tenants = HashSet::new();
+            let mut arrival_turns = HashMap::new();
+            let mut turn_bounds = HashMap::new();
+            let mut arrival_cursor = 0;
+            let mut maximum_wait_turns = 0;
+
+            for service_turn in 0..service_turns {
+                while arrival_cursor < arrivals.len() && arrivals[arrival_cursor].0 == service_turn
+                {
+                    let tenant = arrivals[arrival_cursor].1;
+                    active_tenants.insert(tenant);
+                    arrival_turns.insert(tenant, service_turn);
+                    turn_bounds.insert(tenant, queue.len() + 1);
+                    assert!(queue.enqueue(tenant));
+                    arrival_cursor += 1;
+                }
+
+                let tenant = queue.take_next().unwrap();
+                let wait_turns = service_turn - arrival_turns[&tenant];
+                maximum_wait_turns = maximum_wait_turns.max(wait_turns);
+                assert!(wait_turns <= turn_bounds[&tenant]);
+                arrival_turns.insert(tenant, service_turn + 1);
+                turn_bounds.insert(tenant, queue.len() + 1);
+                if active_tenants.contains(&tenant) {
+                    assert!(queue.enqueue(tenant));
+                }
+            }
+
+            assert_eq!(arrival_cursor, arrivals.len());
+            maximum_wait_turns
+        }
+
+        let synchronized_wait =
+            observe_pressure_waits(&[(0, 101), (0, 102), (0, 103), (0, 104)], 20);
+        let staggered_wait = observe_pressure_waits(&[(0, 201), (2, 202), (4, 203), (6, 204)], 20);
+
+        assert_eq!(synchronized_wait, 3);
+        assert_eq!(staggered_wait, 3);
     }
 
     #[test]

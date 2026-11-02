@@ -57,9 +57,11 @@ Named tests and validation:
 - `tests::paged_open_rejects_checkpoint_debt_cap_below_one_worst_case_transaction`: passed.
 - `tests::paged_service_backpressures_writes_at_checkpoint_debt_limit`: passed; the service rejects at the configured ceiling and actual tenant debt stays at or below the cap.
 - `blink::tests::maximum_paged_transaction_wal_reservation_includes_images_and_segment_header`: passed.
-- `tests::foreground_queue_count_limit_rejects_excess_without_leaking_charges`: passed in isolation and in the serial full-suite run. A parallel full-suite run stalled at this test and was interrupted; the serial rerun passed all 45 paging server library tests.
-- `cargo test -p dodb-server --lib -- --test-threads=1`: 25 passed.
-- `cargo test -p dodb-server --features blink-demand-paging --lib -- --test-threads=1`: 45 passed.
+- `physical_checkpoint::tests::fair_ready_queue_bounds_synchronized_and_staggered_pressure_wait`: passed; under synchronized and staggered arrivals, queue-level maximum wait was 3 service turns. This is a deterministic scheduler test, not a service SLO result.
+- `tests::foreground_queue_count_limit_rejects_excess_without_leaking_charges`: passed in isolation and in the serial full-suite run. A parallel full-suite run stalled at this test and was interrupted; the serial rerun passed all 45 paging server library tests at that point.
+- `tests::cancelled_paged_write_keeps_charges_until_shutdown_drain`: passed with a bounded wait for asynchronous metadata-charge release after shutdown. An earlier full-suite run observed a transient 512-byte metadata charge immediately after shutdown; the failed logs are retained.
+- `cargo test -p dodb-server --lib -- --test-threads=1`: 26 passed.
+- `cargo test -p dodb-server --features blink-demand-paging --lib -- --test-threads=1`: 46 passed.
 - `cargo test -p dodb-storage --features blink-demand-paging --lib -- --test-threads=1`: 322 passed, 4 ignored.
 - `cargo check -p dodb-server --all-targets`: passed.
 - `cargo check -p dodb-server --all-targets --features blink-demand-paging`: passed.
@@ -67,6 +69,6 @@ Named tests and validation:
 - `cargo clippy -p dodb-server --all-targets --features blink-demand-paging --no-deps -- -D warnings`: passed.
 - Storage-wide Clippy did not pass: pre-existing storage-source findings remain, with preserved output in `storage-paging-clippy-capacity-wake.log` and `storage-paging-clippy-lib-capacity-wake.log`; no lint suppressions were added.
 
-Logs: `storage-paging-library-capacity-wake.log`, `server-default-library-capacity-wake.log`, `server-paging-library-capacity-wake.log`, `server-default-all-targets-debt-cap-final.log`, `server-paging-all-targets-debt-cap-final.log`, `server-default-clippy-debt-cap-final.log`, `server-paging-clippy-debt-cap-final.log`, `server-paging-library-debt-cap-serial.log`, `server-default-library-debt-cap-final.log`, and `storage-paging-library-debt-cap-final.log`, alongside earlier debt-cap-specific logs in this directory.
+Logs: `storage-paging-library-capacity-wake.log`, `server-default-all-targets-debt-cap-final.log`, `server-paging-all-targets-debt-cap-final.log`, `server-default-clippy-pressure-bound.log`, `server-paging-clippy-shutdown-drain.log`, `server-default-library-pressure-bound-confirmation.log`, `server-paging-library-shutdown-drain-wakeup.log`, `server-paging-library-pressure-bound-confirmation.log`, `server-paging-cancelled-write-shutdown-recheck.log`, and `storage-paging-library-debt-cap-final.log`, alongside earlier debt-cap-specific and failed diagnostic logs in this directory.
 
 Remaining T14 gates: the capacity waiter is proven to resume after retained-source accounting is released, but the complete old-reader pin-release lifecycle has not been shown to release retained bytes and resume checkpoint publication. Synchronized and staggered all-active pressure runs with a deterministic maximum service-wait bound are not implemented. Full foreground-pool interaction, a long pinned reader under pressure, shutdown with queued capacity waiters, and recovery after capacity release remain unverified. Debt-cap tests show configured foreground backpressure, not a multi-tenant SLO bound. T14 acceptance remains open; T15, T16, and T17 have not started.

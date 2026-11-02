@@ -1,0 +1,7 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.59s
+     Running unittests src/lib.rs (target/debug/deps/dodb_server-300bb259f2fc591f)
+
+running 1 test
+test tests::cancelled_paged_write_keeps_charges_until_shutdown_drain ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.22s

@@ -6239,7 +6239,21 @@ mod tests {
         .unwrap();
         gate_release.await.unwrap();
         shutdown_task.await.unwrap().unwrap();
-        assert_eq!(resources.snapshot().unwrap().current_total, 0);
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if resources.snapshot().unwrap().current_total == 0 {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let drained_resources = resources.snapshot().unwrap();
+        assert_eq!(
+            drained_resources.current_total, 0,
+            "remaining resources after cancelled paged write shutdown: {drained_resources:?}"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
