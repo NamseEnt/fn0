@@ -13824,10 +13824,69 @@ mod tests {
                 ));
             }
         }
+        let count_reachable_leaf_pages = |handle: &PagedReadHandle| {
+            let mut pending_page_ids = vec![handle.root_page_id];
+            let mut visited_page_ids = HashSet::new();
+            let mut leaf_count = 0usize;
+            while let Some(page_id) = pending_page_ids.pop() {
+                assert!(visited_page_ids.insert(page_id));
+                match handle.page(page_id).unwrap().as_ref() {
+                    BlinkPage::Internal {
+                        leftmost_child,
+                        entries,
+                        ..
+                    } => {
+                        pending_page_ids.push(*leftmost_child);
+                        pending_page_ids.extend(entries.iter().map(|entry| entry.right_child));
+                    }
+                    BlinkPage::Leaf { .. } => leaf_count += 1,
+                    _ => panic!("reachable paged tree node is not an internal or leaf page"),
+                }
+            }
+            leaf_count
+        };
+        let leaf_count_before_split = count_reachable_leaf_pages(writer.current());
+        let split_keys = (0..48)
+            .map(|row_index| {
+                DocumentKey::new(
+                    b"writer-split".to_vec(),
+                    format!("split-{row_index:03}").into_bytes(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let split_request = TransactionRequest::new(
+            split_keys
+                .iter()
+                .cloned()
+                .map(|key| TransactionCondition::NotExists { key })
+                .collect(),
+            split_keys
+                .iter()
+                .map(|key| TransactionMutation::Put {
+                    key: key.clone(),
+                    value: vec![b's'; 96],
+                })
+                .collect(),
+        );
+        let split_result = writer
+            .transact(
+                &split_request,
+                &StorageLimits::default(),
+                Revision::new(2056),
+            )
+            .unwrap();
+        assert!(split_result.commit_lsn.is_some());
+        assert!(count_reachable_leaf_pages(writer.current()) > leaf_count_before_split);
+        for key in &split_keys {
+            width_readback_expectations.push((key.clone(), vec![b's'; 96]));
+        }
         assert_eq!(
             old_reader.get(&writer_key).unwrap().value(),
             Some(randomized_values["k00"].as_slice())
         );
+        for (key, _) in &width_readback_expectations {
+            assert!(old_reader.get(key).unwrap().is_missing());
+        }
         drop(old_reader);
         let make_fault_writer = |file_number: u64| {
             let wal_path = wal_directory.join(format!("segment-{file_number:020}.wal"));
