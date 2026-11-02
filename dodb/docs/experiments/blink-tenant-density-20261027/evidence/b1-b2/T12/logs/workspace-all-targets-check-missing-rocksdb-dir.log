@@ -1,0 +1,24 @@
+    Checking dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
+   Compiling dodb-rocksdb v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-rocksdb)
+   Compiling wiggle-generate v47.0.2
+    Checking wasmtime-wasi-io v47.0.2
+   Compiling prost-derive v0.12.6
+    Checking asn1-rs v0.6.2
+    Checking cap-fs-ext v4.0.2
+   Compiling proc-macro2-diagnostics v0.10.1
+error: failed to run custom build command for `dodb-rocksdb v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-rocksdb)`
+
+Caused by:
+  process didn't exit successfully: `/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/target/debug/build/dodb-rocksdb-94bab25744cb5561/build-script-build` (exit status: 101)
+  --- stdout
+  cargo:rustc-env=DODB_BUILD_GIT_COMMIT=3ba28c7a233ed936bf92a1c1d47eebeea26607ec
+  cargo:rerun-if-changed=/Users/namse/fn0/.git/worktrees/dodb-tenant-density-20261027/HEAD
+  cargo:rerun-if-changed=/Users/namse/fn0/.git/refs/heads/experiment/blink-tenant-density-20261027
+  cargo:rerun-if-env-changed=DODB_ROCKSDB_DIR
+
+  --- stderr
+
+  thread 'main' (444242917) panicked at dodb/crates/dodb-rocksdb/build.rs:45:14:
+  DODB_ROCKSDB_DIR must name a RocksDB 11.8.1 build: NotPresent
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+warning: build failed, waiting for other jobs to finish...

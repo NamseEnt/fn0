@@ -1477,16 +1477,10 @@ impl BlinkTenantService {
     }
 
     pub async fn shutdown_checked(&self) -> Result<(), Error> {
-        let shards = {
-            let mut registry = self
-                .shards
-                .lock()
-                .map_err(|_| Error::invariant("B-link tenant registry lock poisoned"))?;
-            registry.shutting_down = true;
-            std::mem::take(&mut registry.shards)
-                .into_values()
-                .collect::<Vec<_>>()
-        };
+        self.shards
+            .lock()
+            .map_err(|_| Error::invariant("B-link tenant registry lock poisoned"))?
+            .shutting_down = true;
         let deadline = tokio::time::Instant::now() + self.open_shutdown_timeout;
         loop {
             let changed = self.open_changed.notified();
@@ -1507,16 +1501,25 @@ impl BlinkTenantService {
                     Error::overloaded("B-link tenant opens did not drain before shutdown")
                 })?;
         }
-        self.shards
-            .lock()
-            .map_err(|_| Error::invariant("B-link tenant registry lock poisoned"))?
-            .shutting_down = false;
+        let shards = {
+            let mut registry = self
+                .shards
+                .lock()
+                .map_err(|_| Error::invariant("B-link tenant registry lock poisoned"))?;
+            std::mem::take(&mut registry.shards)
+                .into_values()
+                .collect::<Vec<_>>()
+        };
         let mut failure = None;
         for shard in shards {
             if let Err(error) = shard.shutdown().await {
                 failure.get_or_insert(error);
             }
         }
+        self.shards
+            .lock()
+            .map_err(|_| Error::invariant("B-link tenant registry lock poisoned"))?
+            .shutting_down = false;
         match failure {
             Some(error) => Err(error),
             None => Ok(()),
@@ -3058,6 +3061,7 @@ mod tests {
             })
             .unwrap(),
         );
+        service.open_shard(TenantId::new(105)).await.unwrap();
         let tenant = TenantId::new(104);
         service.set_open_test_gate(tenant, Arc::new(Semaphore::new(0)));
         let open_service = Arc::clone(&service);
@@ -3076,6 +3080,14 @@ mod tests {
             service.shutdown_checked().await,
             Err(Error::Overloaded(_))
         ));
+        assert!(
+            service
+                .shards
+                .lock()
+                .unwrap()
+                .shards
+                .contains_key(&TenantId::new(105))
+        );
         service
             .open_test_gate
             .lock()
