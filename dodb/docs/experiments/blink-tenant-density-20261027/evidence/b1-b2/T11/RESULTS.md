@@ -2,7 +2,7 @@
 
 ## Scope
 
-`PagedReadHandle::open_with_indexed_page_validation` and `validate_all_indexed_pages` now perform a complete storage-graph validation over a paged generation. The index descriptor cursor visits every allocated page in order. Page images are decoded through the bounded loader and checked against descriptor LSNs and checksums.
+`PagedReadHandle::open_with_indexed_page_validation` and `validate_all_indexed_pages` perform a complete storage-graph validation over a paged generation. `PagedManifestStore::open_with_validated_pages` combines durable manifest/index opening with that validation before it returns a reader. The index descriptor cursor visits every allocated page in order. Page images are decoded through the bounded loader and checked against descriptor LSNs and checksums.
 
 The validator reserves three pages from `CheckpointValidation` and reserves one scratch byte per page ID from the tenant `Scratch` disk budget. It uses the scratch file to mark the root, internal-child, overflow, and free-list roles. This detects duplicate ownership, cycles, unreachable pages, unlisted free pages, and references outside the high-water range without an all-page in-memory set. Scratch files and reservations are released on success and error.
 
@@ -18,4 +18,4 @@ The validator also checks internal child types and levels, separator/child fence
 
 ## Remaining T11 Work
 
-The bounded structural checker is implemented for explicit paged validation opens. Recovery/service open-path integration, above-cache reopen with a large WAL, and the required storage process-kill/crash-boundary matrix remain. T11 is partial until those gates have evidence.
+The bounded structural checker is implemented for explicit paged validation opens and the manifest-plus-reader open helper. Route recovery and service opens through this helper or validate the recovered root before publication. Above-cache reopen with a large WAL and the required storage process-kill/crash-boundary matrix remain. T11 is partial until those gates have evidence.

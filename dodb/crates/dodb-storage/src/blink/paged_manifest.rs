@@ -1,11 +1,13 @@
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use dodb_core::{Error, Lsn, PageId, Result};
 
 use super::version_index::{NodeRef, StoreIdentity, VersionIndex};
+use super::{PagedReadConfig, PagedReadHandle, page_cache, resource, source_manager};
 
 const MARKER_MAGIC: [u8; 8] = *b"DBLKPAG1";
 const POINTER_MAGIC: [u8; 8] = *b"DBLKCUR1";
@@ -167,6 +169,39 @@ impl PagedManifestStore {
         let store = Self::open_unchecked(database_path, identity)?;
         validate_index_root(index, store.current)?;
         Ok(store)
+    }
+
+    pub fn open_with_validated_pages<F>(
+        database_path: &Path,
+        identity: StoreIdentity,
+        index: Arc<VersionIndex>,
+        tenant_id: u64,
+        resources: resource::BlinkResourceManager,
+        sources: source_manager::SourceManager,
+        loader: page_cache::PageLoaderConfig,
+        header_length: F,
+    ) -> Result<(Self, PagedReadHandle)>
+    where
+        F: Fn(super::version_index::SourceIdentity) -> Result<usize> + Send + Sync + 'static,
+    {
+        let store = Self::open_with_index(database_path, identity, &index)?;
+        let manifest = store.current;
+        let root = index.root_from_node_reference(manifest.durable_index_root)?;
+        let handle = PagedReadHandle::open_with_indexed_page_validation(
+            PagedReadConfig {
+                tenant_id,
+                root,
+                root_page_id: manifest.tree_root,
+                free_list_head: manifest.free_list_root,
+                high_water_page_id: manifest.high_water_page_id,
+                loader,
+            },
+            index,
+            resources,
+            sources,
+            header_length,
+        )?;
+        Ok((store, handle))
     }
 
     fn open_unchecked(database_path: &Path, identity: StoreIdentity) -> Result<Self> {

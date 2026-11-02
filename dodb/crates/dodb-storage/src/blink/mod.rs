@@ -17625,38 +17625,37 @@ mod tests {
         assert!(
             disk_snapshot.current_by_category[resource::DiskCategory::VersionIndex as usize] > 0
         );
-        let reopened_root = reopened_index
-            .root_from_node_reference(reopened_manifest.current().durable_index_root)
-            .unwrap();
-        let reopened_handle = PagedReadHandle::new(
-            PagedReadConfig {
-                tenant_id: 7,
-                root: reopened_root,
-                root_page_id: reopened_manifest.current().tree_root,
-                free_list_head: reopened_manifest.current().free_list_root,
-                high_water_page_id: reopened_manifest.current().high_water_page_id,
-                loader: page_cache::PageLoaderConfig {
+        let (validated_manifest, reopened_handle) =
+            paged_manifest::PagedManifestStore::open_with_validated_pages(
+                &database_path,
+                store_identity,
+                Arc::clone(&reopened_index),
+                7,
+                resources.clone(),
+                reopened_sources.clone(),
+                page_cache::PageLoaderConfig {
                     maximum_cache_bytes: (PAGE_SIZE * 2) as u64,
                     minimum_decoded_page_bytes: PAGE_SIZE as u64,
                     maximum_load_reconstruction_bytes: (PAGE_SIZE * 10) as u64,
                     maximum_concurrent_loads: 2,
                     maximum_followers: 8,
                 },
-            },
-            reopened_index,
-            resources,
-            reopened_sources,
-            |source| {
-                Ok(
-                    if source.kind == version_index::SourceFileKind::WalSegment {
-                        crate::wal::INIT_FRAME_SIZE
-                    } else {
-                        PAGE_SIZE
-                    },
-                )
-            },
-        )
-        .unwrap();
+                |source| {
+                    Ok(
+                        if source.kind == version_index::SourceFileKind::WalSegment {
+                            crate::wal::INIT_FRAME_SIZE
+                        } else {
+                            PAGE_SIZE
+                        },
+                    )
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            validated_manifest.current().generation,
+            reopened_manifest.current().generation
+        );
+        assert!(reopened_handle.validate_all_indexed_pages().unwrap() > 0);
         assert_eq!(
             reopened_handle.get(&key).unwrap().value(),
             Some(&b"after-incremental-target"[..])
