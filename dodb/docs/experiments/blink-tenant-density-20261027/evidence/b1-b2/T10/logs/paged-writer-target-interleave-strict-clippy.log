@@ -1,0 +1,16 @@
+    Checking dodb-storage v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-storage)
+dodb/crates/dodb-storage/src/blink/paged_recovery.rs:185:1: error: this function has too many arguments (9/7)
+dodb/crates/dodb-storage/src/blink/paged_recovery.rs:305:5: error: enclosing `Ok` and `?` operator are unneeded
+dodb/crates/dodb-storage/src/blink/mod.rs:1500:5: error: this function has too many arguments (8/7)
+dodb/crates/dodb-storage/src/blink/mod.rs:6248:21: error: this `if` statement can be collapsed
+dodb/crates/dodb-storage/src/blink/mod.rs:6292:21: error: this `if` statement can be collapsed
+dodb/crates/dodb-storage/src/blink/mod.rs:8085:1: error: this function has too many arguments (9/7)
+dodb/crates/dodb-storage/src/blink/mod.rs:8620:35: error: derefed type is same as origin: help: try: `budget`
+dodb/crates/dodb-storage/src/blink/mod.rs:8735:43: error: redundant slicing of the whole range: help: use the original value instead: `entry.key`
+dodb/crates/dodb-storage/src/blink/mod.rs:9955:1: error: this function has too many arguments (9/7)
+dodb/crates/dodb-storage/src/blink/mod.rs:9997:1: error: this function has too many arguments (8/7)
+dodb/crates/dodb-storage/src/blink/mod.rs:10107:1: error: this function has too many arguments (10/7)
+dodb/crates/dodb-storage/src/wal.rs:671:5: error: this function has too many arguments (8/7)
+dodb/crates/dodb-storage/src/wal.rs:3938:1: error: this function has too many arguments (8/7)
+dodb/crates/dodb-storage/src/wal.rs:3968:1: error: this function has too many arguments (10/7)
+error: could not compile `dodb-storage` (lib) due to 14 previous errors

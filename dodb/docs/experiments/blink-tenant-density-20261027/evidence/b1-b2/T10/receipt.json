@@ -1,6 +1,6 @@
 {
   "task_id": "T10",
-  "scope": "Bounded streaming of complete paged checkpoint packs from an immutable version-index generation",
+  "scope": "Streaming paged checkpoints with pinned target generations, concurrent writes, and bounded output",
   "status": "partial",
   "parent_source_commit": "3275cacea8d6629f1acf5420efa914988e8f94aa",
   "implementation_commits": [
@@ -8,7 +8,8 @@
     "e741dd19d",
     "0bdce39d1",
     "d99c3e465ca4a72d54e74caa723536a09b62cc02",
-    "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b"
+    "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b",
+    "163961877f966e076c66d772dd3310724b2a1cbb"
   ],
   "push": {
     "remote": "origin",
@@ -28,15 +29,21 @@
     }
   ],
   "owned_paths": [
-    "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "dodb/crates/dodb-storage/src/bin/phase0-bench.rs",
     "dodb/crates/dodb-storage/src/blink/durable_bases.rs",
-    "dodb/crates/dodb-storage/src/blink/version_index.rs",
+    "dodb/crates/dodb-storage/src/blink/mod.rs",
+    "dodb/crates/dodb-storage/src/blink/page_locator.rs",
+    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs",
+    "dodb/crates/dodb-storage/src/blink/paged_recovery.rs",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs",
-    "dodb/crates/dodb-storage/src/wal.rs",
-    "dodb/crates/dodb-storage/src/blink/paged_manifest.rs"
+    "dodb/crates/dodb-storage/src/blink/version_index.rs",
+    "dodb/crates/dodb-storage/src/wal.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "0ed3db14f8d22418c838a2ada5fdfe778bb45ac4cb66a793db10a4784716d832",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "f0496c4e9fb5eb584204e7c9db7bbd65972ba4414e6289845462b281b3f194f3",
+    "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "a4b1321c4793fb086fdf77900d3a33f7bfef51bd46fce9c2d3b83748247e461c",
+    "dodb/crates/dodb-storage/src/blink/page_locator.rs": "80fbbdc6a569b379b563e8ad65b396c047bb4e63524240e3126c15710d59b48a",
+    "dodb/crates/dodb-storage/src/bin/phase0-bench.rs": "2cf4d0a7d12caaa477046445f3a4675c861b85628105c81496115e2e03c50c81",
     "dodb/crates/dodb-storage/src/blink/durable_bases.rs": "26fd15c75154e71c42394f50e9f97b3bad8e6f7992e3161d35a6fd35ddaa9f08",
     "dodb/crates/dodb-storage/src/blink/version_index.rs": "e60ab5bc5981aed2d216d28f28ff8710e0f68f61dfdb8f39561c181482ed3880",
     "dodb/crates/dodb-storage/src/blink/source_manager.rs": "dece389300575f090e393780fc1a9a31aaf6f2689774ec604677c0c3967d8a4f",
@@ -48,7 +55,7 @@
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b"
+    "source_commit": "163961877f966e076c66d772dd3310724b2a1cbb"
   },
   "features": [
     "blink-demand-paging",
@@ -56,10 +63,10 @@
   ],
   "runtime_configuration": {
     "route": "storage-only PagedReadHandle snapshot and file-backed durable base pack; no service route activated",
-    "target": "The mutable PagedTransactionWriter captures its current committed LSN while excluding later transactions.",
+    "target": "The writer pins a synced committed target; pack streaming accepts later commits, and publication merges only matching target images while retaining newer WAL locators.",
     "pack_output": "sorted exact page images; coalesced buffer is four pages (16 KiB), uncoalesced buffer is one page (4 KiB)",
     "memory_reservation": "CheckpointValidation progress reservation is 6 pages for coalesced output or 3 pages for uncoalesced output; page loader separately charges decoded pages",
-    "publication": "Synced complete or incremental pack and durable index root, synced next WAL segment at the captured LSN, WAL directory sync, atomic PagedManifest pointer publication, then writer WAL/root switch; process-crash and publication-fault matrices remain unverified.",
+    "publication": "Sync complete or incremental pack; validate it against the pinned target; merge into the latest root without overwriting later writes; sync a next WAL segment at the latest committed LSN; sync WAL directory; publish manifest pointer; then switch writer generation. Process-crash and actual pointer-write faults remain unverified.",
     "service_route_activated": false,
     "defaults_changed": false,
     "oci_experiment": false,
@@ -713,6 +720,110 @@
         "sha256": "07af284317399bfae81f6bf87d9c9077f9e0f087f5b579752c03b1a29deead04"
       },
       "source_commit": "8415bcd7c979cc676f3e413bb9f10217bd9a2a0b"
+    },
+    {
+      "name": "paged_writer_target_interleave_feature_library_tests",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "297 passed, 0 failed, 4 ignored; includes writes after complete and incremental target capture and the reopened latest value.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-target-interleave-feature-lib-final2.log",
+        "sha256": "305d6520a315a828ca363cbd90b9fd12e6bcd38d0bf74683cf9c6a546298c7aa"
+      },
+      "source_commit": "163961877f966e076c66d772dd3310724b2a1cbb"
+    },
+    {
+      "name": "paged_writer_target_interleave_default_library_tests",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "221 passed, 0 failed, 4 ignored.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-target-interleave-default-lib-final.log",
+        "sha256": "d7ff4137396b0f833aab75137a30d7ee3a77794dcf4922127b8c5fb259a8e36c"
+      },
+      "source_commit": "163961877f966e076c66d772dd3310724b2a1cbb"
+    },
+    {
+      "name": "paged_locator_parallel_fixture_name",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "blink::page_locator::tests::concurrent_locators_do_not_share_loaded_payloads_or_mix_seek_positions"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "1 passed after adding a process-local unique fixture sequence.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-locator-fixture-unique-focused.log",
+        "sha256": "1ec218a693ba2cdb0293aa2453a2f1ece055e5ec673c4ea8408e6432465769e5"
+      },
+      "source_commit": "163961877f966e076c66d772dd3310724b2a1cbb"
+    },
+    {
+      "name": "paged_writer_target_interleave_all_target_compile",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--features",
+        "blink-demand-paging",
+        "--no-run"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 0,
+      "summary": "All library, binary, and integration test executables compiled. Existing harness dead-code warnings remain.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-target-interleave-all-targets-compile-final2.log",
+        "sha256": "e831dabc254b875a3b113773bd0609620852e23f7adc3a7a74dcee9492a5e458"
+      },
+      "source_commit": "163961877f966e076c66d772dd3310724b2a1cbb"
+    },
+    {
+      "name": "paged_writer_target_interleave_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging",
+        "--message-format",
+        "short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+      "exit_status": 101,
+      "summary": "12 existing crate diagnostics remain; initial run found 2 new checkpoint diagnostics, which were removed in the final run.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-target-interleave-strict-clippy-final.log",
+        "sha256": "56bec4e88409a5a6b51078a0d98e36c1c1f5170ebfcebbf01667c7173995c752"
+      },
+      "source_commit": "163961877f966e076c66d772dd3310724b2a1cbb"
     }
   ],
   "acceptance_mapping": {
@@ -796,10 +907,31 @@
       "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-manifest-header-length-fixture-failure.log",
       "sha256": "6893eb1adff3fab18a161aeeb4fc4910172476b76f887ecd9626c2403cc259c7",
       "preserved_artifact": "/var/folders/wp/zy07g4zs3vg61f9pb50tl0kw0000gn/T/dodb-paged-writer-checkpoint-26259-1793610626036774000"
+    },
+    {
+      "name": "paged_writer_target_interleave_parallel_fixture_name_collision",
+      "exit_status": 101,
+      "reason": "Parallel page-locator fixtures collided because paths used only a timestamp; a process-local atomic sequence now makes each fixture path unique.",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-target-interleave-feature-lib.log",
+      "sha256": "6d23b4f9e3ca36e33a37633afe47378ce2cdf5fab5f2959a402d208ec4910f48"
+    },
+    {
+      "name": "paged_writer_target_interleave_all_targets_missing_stats_field",
+      "exit_status": 101,
+      "reason": "The benchmark helper omitted the new image_delta_chain_limit counter from its delta calculation; added the matching saturating subtraction and all targets now compile.",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-target-interleave-all-targets-failure.log",
+      "sha256": "8e5950a4e08080bbf7d84ae6a0a63bc74fc485857cd32a7bff6a488ae7e8f17b"
+    },
+    {
+      "name": "paged_writer_target_interleave_initial_clippy_findings",
+      "exit_status": 101,
+      "reason": "Initial strict Clippy found excessive arguments and redundant Result wrapping in the new checkpoint generation function; moved the generation values into a request struct and returned the promoted root directly.",
+      "preserved_log": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/paged-writer-target-interleave-strict-clippy.log",
+      "sha256": "6a25c216ffcde19c004cfb6eee17d69064964b8142917a8d84326b2e1062f3c2"
     }
   ],
   "remaining_work": [
-    "Add integrated pack/index/WAL I/O and actual pointer-write faults plus process-crash/reopen, old-reader, and GC retention oracles; integrate source-catalog registration and old-root collection",
+    "Add actual pointer-write I/O faults plus process-crash/reopen, old-reader, and GC retention oracles; integrate source-catalog registration and old-root collection",
     "Reserve source/index disk overlap and required loader memory together with checkpoint output and index promotion",
     "Resolve the eight-page pinned-root index-capacity attempt without increasing the cap to hide the bound; test defer and progress after capacity release",
     "Implement one-worker resumable slices, bounded checkpoint debt, and time-above-threshold accounting"
