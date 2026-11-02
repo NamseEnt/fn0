@@ -13783,6 +13783,7 @@ mod tests {
             writer.current().get(&writer_key).unwrap().value(),
             Some(&b"writer-resurrected"[..])
         );
+        let mut width_readback_expectations = Vec::new();
         for mutation_width in [1, 4, 16] {
             let width_keys = (0..mutation_width)
                 .map(|row_index| {
@@ -13816,6 +13817,12 @@ mod tests {
                 )
                 .unwrap();
             assert!(width_result.commit_lsn.is_some());
+            for (row_index, key) in width_keys.iter().enumerate() {
+                width_readback_expectations.push((
+                    key.clone(),
+                    format!("writer-width-{mutation_width:02}-{row_index:02}").into_bytes(),
+                ));
+            }
         }
         assert_eq!(
             old_reader.get(&writer_key).unwrap().value(),
@@ -14113,6 +14120,12 @@ mod tests {
         drop(overlay_handle);
         drop(handle);
         assert_eq!(sources.registered_root_count().unwrap(), 1);
+        for (key, expected_value) in &width_readback_expectations {
+            assert_eq!(
+                writer.current().get(key).unwrap().value(),
+                Some(expected_value.as_slice())
+            );
+        }
         let reuse_key = second_writer_key.clone();
         let overflow_value = vec![b'r'; PAGE_SIZE * 3];
         let overflow_write = TransactionRequest::new(
