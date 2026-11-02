@@ -1,0 +1,85 @@
+{
+  "task_id": "T12",
+  "scope": "Bounded B-link tenant open lifecycle progress",
+  "status": "partial",
+  "parent_source_commit": "a122e574cd12c8156e4b5a2bc02754d173997700",
+  "implementation_commits": [
+    "54eaa434c43bd6b6faadb4ed5a4622d334b373e4"
+  ],
+  "host": {
+    "os": "macOS arm64",
+    "toolchain": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
+    "branch": "experiment/blink-tenant-density-20261027",
+    "source_commit": "54eaa434c43bd6b6faadb4ed5a4622d334b373e"
+  },
+  "validated": [
+    {
+      "name": "server_library_tests",
+      "command": "cargo test -p dodb-server --lib -- --test-threads=1",
+      "exit_status": 0,
+      "result": "15 passed, 0 failed"
+    },
+    {
+      "name": "server_all_targets_check",
+      "command": "cargo check -p dodb-server --all-targets",
+      "exit_status": 0,
+      "result": "passed"
+    },
+    {
+      "name": "server_format",
+      "command": "cargo fmt --check -p dodb-server",
+      "exit_status": 0,
+      "result": "passed"
+    }
+  ],
+  "prerequisite_receipts": [
+    {
+      "task_id": "T11",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T11/receipt.json",
+      "sha256": "8142ec5f4b4fc9115056bed2b48858ba5d94413aae58899f83478694f6471519"
+    }
+  ],
+  "owned_paths": [
+    "dodb/crates/dodb-server/src/lib.rs",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/receipt.json"
+  ],
+  "source_hashes": {
+    "dodb/crates/dodb-server/src/lib.rs": "c656514450eaa716a1ffa8a829a7bae91947fb164a4eeedba7a170b1f3a85c2e",
+    "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/RESULTS.md": "98135f4b07fc5275828f90ba96f8d5dc072395623399b6d91946dfa3993618fd"
+  },
+  "logs": [
+    {
+      "name": "server_library_tests",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-lib-tests.log",
+      "sha256": "05416f85975b16df15bf19d019409e708bc374b9044de92ce753ae1e6bbaba05",
+      "exit_status": 0
+    },
+    {
+      "name": "server_all_targets_check",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-all-targets-check.log",
+      "sha256": "4f27ac380b22e1d975eee20ce727fa8cbc09061177f6253af0777fd4de7b7506",
+      "exit_status": 0
+    },
+    {
+      "name": "server_format",
+      "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T12/logs/server-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_status": 0
+    }
+  ],
+  "remaining_work": [
+    "Route paged manifests through complete validated page opening in the service.",
+    "Pass one shared resource manager and validated paging configuration to every shard.",
+    "Account for open-tenant metadata charges and release all task-owned resource charges on failure and shutdown.",
+    "Reject all unsupported feature and layout combinations before touching database files.",
+    "Complete dependent service tasks before the density comparison matrix."
+  ],
+  "next_task": "T12",
+  "push": {
+    "remote": "origin",
+    "branch": "experiment/blink-tenant-density-20261027",
+    "status": "pending"
+  }
+}
