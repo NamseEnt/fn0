@@ -12842,6 +12842,17 @@ mod tests {
                 .unwrap();
             assert!(preparation.dirty_page_ids().next().is_some());
             assert!(preparation.encode_commit_images(Lsn::new(1200)).is_ok());
+            let preparation_snapshot = resources.snapshot().unwrap();
+            assert!(
+                preparation_snapshot.current_by_category
+                    [resource::ResourceCategory::WritePreparation as usize]
+                    > 0
+            );
+            assert!(
+                preparation_snapshot.current_by_category
+                    [resource::ResourceCategory::DirtyImages as usize]
+                    > 0
+            );
         }
         let conditional_key = DocumentKey::new(b"p".to_vec(), b"prepared-conditional".to_vec());
         let conditional_request = TransactionRequest::new(
