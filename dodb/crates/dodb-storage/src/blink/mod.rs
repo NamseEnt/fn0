@@ -30,6 +30,8 @@ mod leaf;
 #[cfg(feature = "blink-checkpoint-locators")]
 pub mod page_locator;
 mod physical_checkpoint;
+#[cfg(feature = "blink-demand-paging")]
+pub mod resource;
 pub mod segmented_wal;
 pub use physical_checkpoint::{BlinkCheckpointOutput, BlinkCheckpointSnapshot};
 

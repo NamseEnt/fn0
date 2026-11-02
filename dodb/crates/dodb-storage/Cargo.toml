@@ -20,6 +20,7 @@ blink-read-metrics-disabled = []
 blink-borrowed-page-views = []
 blink-writer-pin-reuse = []
 blink-checkpoint-locators = []
+blink-demand-paging = ["blink-checkpoint-locators"]
 
 [dev-dependencies]
 proptest.workspace = true
