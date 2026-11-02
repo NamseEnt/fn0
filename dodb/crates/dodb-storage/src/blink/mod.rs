@@ -2578,7 +2578,14 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             committed_prefix_lsn: checkpoint_lsn,
             previous_generation: previous_manifest.generation,
         };
-        if let Err(error) = manifest_store.publish_with_index(manifest, &self.current.index) {
+        let publication_result =
+            manifest_store.publish_with_index_and_hook(manifest, &self.current.index, || {
+                if let Some(injector) = self.publication_fault_injector.as_deref_mut() {
+                    injector.hit("before_paged_checkpoint_manifest_pointer")?;
+                }
+                Ok(())
+            });
+        if let Err(error) = publication_result {
             self.broken = Some(error.to_string());
             return Err(error);
         }
@@ -15998,7 +16005,7 @@ mod tests {
                     PagedCheckpointPackRequest {
                         directory: checkpoint_directory.clone(),
                         file_number: 3,
-                        identity: wal_identity,
+                        identity: wal_identity.clone(),
                         checkpoint_lsn: first_checkpoint_lsn,
                         previous_checkpoint_lsn: Some(Lsn::ZERO),
                         coalesce: true,
@@ -16024,6 +16031,51 @@ mod tests {
                 .len(),
             durable_bases::encoded_size(1)
         );
+        let third_write = TransactionRequest::new(
+            vec![TransactionCondition::Exists { key: key.clone() }],
+            vec![TransactionMutation::Put {
+                key: key.clone(),
+                value: b"not-published".to_vec(),
+            }],
+        );
+        writer
+            .transact(&third_write, &StorageLimits::default(), Revision::new(3))
+            .unwrap();
+        writer.set_boxed_publication_fault_injector(Box::new(FailOnOccurrence {
+            point: "before_paged_checkpoint_manifest_pointer",
+            remaining: 1,
+        }));
+        assert!(
+            writer
+                .checkpoint_to_manifest(
+                    &mut manifest_store,
+                    PagedCheckpointPackRequest {
+                        directory: checkpoint_directory.clone(),
+                        file_number: 4,
+                        identity: wal_identity.clone(),
+                        checkpoint_lsn: second_checkpoint_lsn,
+                        previous_checkpoint_lsn: Some(first_checkpoint_lsn),
+                        coalesce: true,
+                    },
+                    4,
+                    crate::durable_file::ProductionFile::open(
+                        wal_directory.join("segment-00000000000000000004.wal"),
+                    )
+                    .unwrap(),
+                    true,
+                )
+                .is_err()
+        );
+        assert_eq!(manifest_store.current().generation, 3);
+        assert_eq!(
+            writer.current().get(&key).unwrap().value(),
+            Some(&b"not-published"[..])
+        );
+        assert!(
+            writer
+                .transact(&third_write, &StorageLimits::default(), Revision::new(4))
+                .is_err()
+        );
         drop(writer);
         drop(manifest_store);
         let reopened_manifest = paged_manifest::PagedManifestStore::open_with_index(
@@ -16032,6 +16084,11 @@ mod tests {
             &index,
         )
         .unwrap();
+        assert_eq!(reopened_manifest.current().generation, 3);
+        assert_eq!(
+            reopened_manifest.current().committed_prefix_lsn,
+            second_checkpoint_lsn
+        );
         let reopened_root = index
             .root_from_node_reference(reopened_manifest.current().durable_index_root)
             .unwrap();

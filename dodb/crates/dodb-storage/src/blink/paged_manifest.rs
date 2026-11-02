@@ -201,8 +201,20 @@ impl PagedManifestStore {
         manifest: PagedManifest,
         index: &VersionIndex,
     ) -> Result<()> {
+        self.publish_with_index_and_hook(manifest, index, || Ok(()))
+    }
+
+    pub(crate) fn publish_with_index_and_hook<F>(
+        &mut self,
+        manifest: PagedManifest,
+        index: &VersionIndex,
+        before_pointer: F,
+    ) -> Result<()>
+    where
+        F: FnOnce() -> Result<()>,
+    {
         validate_index_root(index, manifest)?;
-        self.publish_with_hook(manifest, || Ok(()))
+        self.publish_with_hook(manifest, before_pointer)
     }
 
     fn publish_with_hook<F>(&mut self, manifest: PagedManifest, before_pointer: F) -> Result<()>
