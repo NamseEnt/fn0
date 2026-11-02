@@ -16681,18 +16681,22 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(fault_job.write_pack().unwrap());
-        assert!(
-            writer
-                .publish_checkpoint(
-                    &mut manifest_store,
-                    fault_job,
-                    4,
-                    crate::durable_file::ProductionFile::open(
-                        wal_directory.join("segment-00000000000000000004.wal"),
-                    )
-                    .unwrap(),
+        let publication_error = writer
+            .publish_checkpoint(
+                &mut manifest_store,
+                fault_job,
+                4,
+                crate::durable_file::ProductionFile::open(
+                    wal_directory.join("segment-00000000000000000004.wal"),
                 )
-                .is_err()
+                .unwrap(),
+            )
+            .unwrap_err();
+        assert!(
+            publication_error
+                .to_string()
+                .contains("injected failure at after_paged_checkpoint_pointer_temporary_sync"),
+            "unexpected checkpoint publication error: {publication_error}"
         );
         assert_eq!(manifest_store.current().generation, 3);
         assert!(

@@ -23,6 +23,19 @@ const NODE_CACHE_RESERVATION_BYTES: u64 = 8192;
 const ROOT_PIN_RESERVATION_BYTES: u64 = 256;
 const MAX_RADIX_LEVEL: u8 = 15;
 const INSERT_RESERVATION_BYTES: u64 = 16 * NODE_CACHE_RESERVATION_BYTES;
+const NODE_ALLOCATION_OVERHEAD_BYTES: usize = 64;
+const INDEX_INTERNAL_NODE_HEAP_BYTES: usize = std::mem::size_of::<[Option<NodeRef>; 16]>()
+    + std::mem::size_of::<IndexNode>()
+    + NODE_ALLOCATION_OVERHEAD_BYTES;
+const INDEX_LEAF_NODE_HEAP_BYTES: usize = std::mem::size_of::<[Option<VersionDescriptor>; 16]>()
+    + std::mem::size_of::<IndexNode>()
+    + NODE_ALLOCATION_OVERHEAD_BYTES;
+const CHECKPOINT_PATH_RESERVATION_BYTES: u64 = (MAX_RADIX_LEVEL as u64
+    * INDEX_INTERNAL_NODE_HEAP_BYTES as u64
+    + INDEX_LEAF_NODE_HEAP_BYTES as u64
+    + std::mem::size_of::<[Option<IndexNode>; 16]>() as u64)
+    .div_ceil(4096)
+    * 4096;
 const NODE_MAGIC: [u8; 8] = *b"DDBVIDX1";
 const NODE_FORMAT_VERSION: u16 = 2;
 const NODE_KIND_DURABLE: u16 = 1;
@@ -792,7 +805,7 @@ impl VersionIndex {
                 self.tenant_id,
                 ResourceCategory::WritePreparation,
                 ReservationClass::Progress,
-                u64::from(MAX_RADIX_LEVEL + 1) * NODE_CACHE_RESERVATION_BYTES,
+                CHECKPOINT_PATH_RESERVATION_BYTES,
             )
             .map_err(map_resource_error)?;
         let durable_root = self.copy_node_to_durable(
@@ -1233,7 +1246,7 @@ impl VersionIndex {
                 self.tenant_id,
                 ResourceCategory::WritePreparation,
                 ReservationClass::Progress,
-                INSERT_RESERVATION_BYTES,
+                CHECKPOINT_PATH_RESERVATION_BYTES,
             )
             .map_err(map_resource_error)
     }
@@ -1246,7 +1259,7 @@ impl VersionIndex {
         reservation: &Reservation,
     ) -> Result<VersionIndexRoot> {
         if reservation.category() != ResourceCategory::WritePreparation
-            || reservation.bytes() < INSERT_RESERVATION_BYTES
+            || reservation.bytes() < CHECKPOINT_PATH_RESERVATION_BYTES
         {
             return Err(Error::invariant(
                 "version-index publication reservation is insufficient",
@@ -2067,7 +2080,7 @@ mod tests {
         encode_descriptor,
     };
     use crate::blink::resource::{
-        BlinkResourceManager, DiskCategory, ResourceCategory, ResourceLimits,
+        BlinkResourceManager, DiskCategory, ReservationClass, ResourceCategory, ResourceLimits,
     };
     use dodb_core::{Lsn, PageId};
     use std::collections::BTreeMap;
@@ -2284,7 +2297,7 @@ mod tests {
         let resources = BlinkResourceManager::new(ResourceLimits {
             global_bytes: 2 * 1024 * 1024,
             per_tenant_bytes: 2 * 1024 * 1024,
-            progress_pool_bytes: 64 * 1024,
+            progress_pool_bytes: super::CHECKPOINT_PATH_RESERVATION_BYTES - 4096,
             max_tenants: 4,
             max_pending_waiters: 4,
             global_category_bytes: [2 * 1024 * 1024; 7],
@@ -2306,6 +2319,72 @@ mod tests {
         assert_eq!(
             index.lookup(root, page_id).unwrap(),
             Some(checkpoint_descriptor(page_id))
+        );
+    }
+
+    #[test]
+    fn checkpoint_index_path_reservation_fits_the_existing_small_progress_pool() {
+        let directory = TestDirectory::new("checkpoint-progress-small-pool");
+        let resources = BlinkResourceManager::new(ResourceLimits {
+            global_bytes: 2 * 1024 * 1024,
+            per_tenant_bytes: 2 * 1024 * 1024,
+            progress_pool_bytes: 64 * 1024,
+            max_tenants: 4,
+            max_pending_waiters: 4,
+            global_category_bytes: [2 * 1024 * 1024; 7],
+            per_tenant_category_bytes: [2 * 1024 * 1024; 7],
+        })
+        .unwrap();
+        let index =
+            open_index_with_manager(directory.path(), ([0x93; 16], 34), 2, resources.clone());
+
+        let reservation = index.reserve_checkpoint_insert_work().unwrap();
+        assert_eq!(
+            reservation.bytes(),
+            super::CHECKPOINT_PATH_RESERVATION_BYTES
+        );
+        assert_eq!(
+            resources.snapshot().unwrap().current_progress,
+            reservation.bytes()
+        );
+    }
+
+    #[test]
+    fn checkpoint_index_reservation_retries_after_progress_capacity_is_released() {
+        let directory = TestDirectory::new("checkpoint-progress-retry");
+        let resources = BlinkResourceManager::new(ResourceLimits {
+            global_bytes: 2 * 1024 * 1024,
+            per_tenant_bytes: 2 * 1024 * 1024,
+            progress_pool_bytes: 64 * 1024,
+            max_tenants: 4,
+            max_pending_waiters: 4,
+            global_category_bytes: [2 * 1024 * 1024; 7],
+            per_tenant_category_bytes: [2 * 1024 * 1024; 7],
+        })
+        .unwrap();
+        let index =
+            open_index_with_manager(directory.path(), ([0x94; 16], 35), 2, resources.clone());
+        let blocking_bytes = 64 * 1024 - super::CHECKPOINT_PATH_RESERVATION_BYTES + 1;
+        let blocker = resources
+            .reserve(
+                35,
+                ResourceCategory::WritePreparation,
+                ReservationClass::Progress,
+                blocking_bytes,
+            )
+            .unwrap();
+
+        assert!(index.reserve_checkpoint_insert_work().is_err());
+        drop(blocker);
+
+        let reservation = index.reserve_checkpoint_insert_work().unwrap();
+        assert_eq!(
+            reservation.bytes(),
+            super::CHECKPOINT_PATH_RESERVATION_BYTES
+        );
+        assert_eq!(
+            resources.snapshot().unwrap().current_progress,
+            reservation.bytes()
         );
     }
 

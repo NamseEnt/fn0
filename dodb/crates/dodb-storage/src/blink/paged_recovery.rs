@@ -85,6 +85,7 @@ pub fn build_checkpoint_index(
             Ok(())
         },
     )?;
+    drop(checkpoint_insert_reservation);
     Ok((index.promote_root_to_durable(root)?, source))
 }
 
@@ -179,6 +180,7 @@ pub fn build_incremental_checkpoint_index(
             "incremental checkpoint scan count differs from the target",
         ));
     }
+    drop(checkpoint_insert_reservation);
     Ok((index.promote_root_to_durable(root)?, source))
 }
 
@@ -316,6 +318,7 @@ pub fn build_checkpoint_index_for_generation(
             "checkpoint scan count differs from the captured target",
         ));
     }
+    drop(checkpoint_insert_reservation);
     index.promote_root_to_durable(root)
 }
 
