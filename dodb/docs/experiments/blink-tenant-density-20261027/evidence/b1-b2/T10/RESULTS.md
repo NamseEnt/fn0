@@ -195,3 +195,12 @@ T10 remains partial. Active WAL growth is now reserved before writing and source
 - Raw logs: `logs/persistent-index-disk-focused.log`, `logs/persistent-index-disk-default-check.log`, `logs/persistent-index-disk-all-targets-check.log`, `logs/persistent-index-disk-strict-clippy.log`, `logs/persistent-index-disk-final-feature-library.log` (preserved first failure), `logs/persistent-index-disk-background-materializer-focused.log`, and `logs/persistent-index-disk-confirmation-feature-library.log`.
 
 T10 remains partial. Source and version-index disk charges now survive manager teardown and reopening. Active WAL growth remains charged in `RetainedSource` rather than a distinct `Wal` category. Pinned-root capacity defer and progress, no-pack checkpoint quota rejection and retry, loader overlap, fair maintenance slices, debt/time-above-threshold accounting, and paged-writer process-kill recovery remain outstanding. Service routing and defaults remain unchanged; T17 was not started.
+
+## Partial substep: checkpoint output quota defer and retry
+
+- Source commit: `f7ab8c76bc74145ad98687f8cdb9712448f98104`.
+- The disk-backed writer fixture now consumes all remaining disk quota before starting a complete checkpoint. Output reservation fails before creation of the requested pack file. After dropping the deferred job and releasing quota, the same checkpoint file number is used successfully and the checkpoint publishes.
+- Focused writer quota reject/retry fixture: 1 passed. The latest full feature suite remains 308 passed, 0 failed, 4 ignored; this fixture-only extension was separately verified. Strict Clippy exits 101 with 32 existing crate diagnostics and no finding in the new test.
+- Raw logs: `logs/checkpoint-output-quota-reject-retry-focused.log` and `logs/checkpoint-output-quota-strict-clippy.log`.
+
+T10 remains partial. Checkpoint output rejection before pack creation and progress after capacity release now pass for the writer fixture. Pinned-root index capacity defer/progress, fair maintenance scheduling, debt/time-above-threshold accounting, separate active-WAL disk category accounting, loader overlap, and paged-writer process-kill recovery remain outstanding. Service routing and defaults remain unchanged; T17 was not started.

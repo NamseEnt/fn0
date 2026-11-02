@@ -22,7 +22,8 @@
     "8039b0edb32990a357e87e04acd945135fa4d9ea",
     "c613f9ba42178609b9ff5269a206844b32c8c4a3",
     "eadacccfac2e80cd36eab298581317263dd02f05",
-    "c3d84e5e7f7500d7df18a8eb45a8597de645e463"
+    "c3d84e5e7f7500d7df18a8eb45a8597de645e463",
+    "f7ab8c76bc74145ad98687f8cdb9712448f98104"
   ],
   "push": {
     "remote": "origin",
@@ -55,7 +56,7 @@
     "dodb/crates/dodb-storage/src/blink/resource.rs"
   ],
   "source_hashes": {
-    "dodb/crates/dodb-storage/src/blink/mod.rs": "7bb97ebf1e1aec3fd7c8a5354deef50dd4a622934441845ff5523368dc8801c1",
+    "dodb/crates/dodb-storage/src/blink/mod.rs": "8cbb40461bb9bf081f3f9a55a04fcce18198d04cc4b7063f488613bad395b647",
     "dodb/crates/dodb-storage/src/blink/paged_recovery.rs": "a4b1321c4793fb086fdf77900d3a33f7bfef51bd46fce9c2d3b83748247e461c",
     "dodb/crates/dodb-storage/src/blink/page_locator.rs": "80fbbdc6a569b379b563e8ad65b396c047bb4e63524240e3126c15710d59b48a",
     "dodb/crates/dodb-storage/src/bin/phase0-bench.rs": "2cf4d0a7d12caaa477046445f3a4675c861b85628105c81496115e2e03c50c81",
@@ -72,7 +73,7 @@
     "toolchain": "rustc 1.97.1",
     "worktree": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027",
     "branch": "experiment/blink-tenant-density-20261027",
-    "source_commit": "c3d84e5e7f7500d7df18a8eb45a8597de645e463"
+    "source_commit": "f7ab8c76bc74145ad98687f8cdb9712448f98104"
   },
   "features": [
     "blink-demand-paging",
@@ -2307,6 +2308,53 @@
         "sha256": "8c9b3e0e4a7d1eb181a9ffb1ae69a10d822372aac9efd863360024e03614a702"
       },
       "source_commit": "c3d84e5e7f7500d7df18a8eb45a8597de645e463"
+    },
+    {
+      "name": "paged_checkpoint_output_quota_rejects_before_pack_and_retries_after_release",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "paged_transaction_writer_publishes_complete_and_incremental_checkpoints",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 0,
+      "summary": "1 passed; consuming the remaining disk capacity causes checkpoint pack output reservation to fail before the pack file is created; after dropping the deferred job and releasing capacity, the same checkpoint number is written and published successfully.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-output-quota-reject-retry-focused.log",
+        "sha256": "88579ba8f98d40e0c0885f26fa2150cabb5ce0cbc7873eccb5a2c1af375eebeb"
+      },
+      "source_commit": "f7ab8c76bc74145ad98687f8cdb9712448f98104"
+    },
+    {
+      "name": "checkpoint_output_quota_strict_clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "dodb-storage",
+        "--lib",
+        "--tests",
+        "--features",
+        "blink-demand-paging blink-writer-pin-reuse",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb",
+      "exit_status": 101,
+      "summary": "32 existing crate lint findings; no new diagnostic in the checkpoint quota fixture; no lint suppressions added.",
+      "raw_log": {
+        "path": "dodb/docs/experiments/blink-tenant-density-20261027/evidence/b1-b2/T10/logs/checkpoint-output-quota-strict-clippy.log",
+        "sha256": "af514f2e65c03d11d99ce057d2793a93c69dd5bae15f5566d42bce8ba8e8f997"
+      },
+      "source_commit": "f7ab8c76bc74145ad98687f8cdb9712448f98104"
     }
   ],
   "acceptance_mapping": {
@@ -2317,7 +2365,7 @@
     "writes_after_target_capture": "passed for the serialized writer path: the next transaction enters the newly rotated WAL only after manifest publication and active-segment switch; the integration fixture commits after a complete checkpoint and then publishes an incremental checkpoint",
     "checkpoint_failure_and_old_reader_retention": "partial: an integrated fault before the manifest pointer leaves the prior generation selected after reopen and fences the writer after an uncertain result; incomplete-pack and pinned-reader tests pass, while pack/index/WAL I/O faults, process crash recovery, old-reader overlap through the writer API, and pinned-root capacity remain unverified",
     "complete_reopen_oracle": "partial: a disk-backed writer test publishes complete and incremental checkpoints, injects a failure before a later manifest pointer, reopens generation 3, and reads the exact generation-3 value; no process crash or pointer-write I/O fault is injected",
-    "bounded_memory_and_source_index_disk_reservations": "partial: checkpoint pack and source catalog output are reserved before creation; retained source and version-index node usage persists across manager teardown and reconciles without duplicate charging on reopen; source GC reclaims unreachable index nodes and updates their persistent charge; paged WAL growth is reserved before append; source marker scratch is reserved before marker creation. Disk category separation for active WAL remains incomplete, as do checkpoint-wide output preflight, loader overlap, pinned-root capacity defer/progress, and other T10 capacity cases.",
+    "bounded_memory_and_source_index_disk_reservations": "partial: checkpoint pack reservation rejects before pack creation and retries after capacity release; source catalog output is reserved before creation; retained source and version-index node usage persists across manager teardown and reconciles without duplicate charging on reopen; source GC reclaims unreachable index nodes and updates their persistent charge; paged WAL growth is reserved before append; source marker scratch is reserved before marker creation. Disk category separation for active WAL remains incomplete, as do loader overlap and pinned-root capacity defer/progress.",
     "tiny_capacity_bounded_defer_and_eventual_progress": "partial: disk reservation primitives reject over-capacity work and release allows a later reservation; the 128 KiB reopen fixture exposed combined source/index usage and the 2 MiB checkpoint fixture passed. A checkpoint-specific no-pack-on-rejection and integrated retry after release remain unverified",
     "checkpoint_debt_and_time_above_threshold": "not implemented; no maintenance scheduler or tenant debt accounting exists yet",
     "resumable_bounded_slices": "passed within a single writer job: a one-page slice yields before completion, a later commit proceeds between slices while the pinned target remains fixed, the cursor visits descriptors in order with fixed-depth state, and a failed slice cannot be retried; fair tenant scheduling remains unimplemented",
@@ -2459,7 +2507,7 @@
   "remaining_work": [
     "Resolve the eight-page pinned-root index-capacity attempt without increasing the cap to hide the bound; test defer and progress after capacity release",
     "Implement a fair multi-tenant continuation scheduler and bounded checkpoint debt/time-above-threshold accounting",
-    "Separate active WAL persistent usage from retained-source usage; prove no pack creation on checkpoint quota rejection and progress after release; reserve loader memory with index promotion; complete paged-writer crash/reopen coverage"
+    "Separate active WAL persistent usage from retained-source usage; reserve loader memory with index promotion; complete paged-writer process-kill recovery coverage"
   ],
   "next_task": "T10"
 }
