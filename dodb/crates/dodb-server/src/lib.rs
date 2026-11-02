@@ -6,8 +6,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 #[cfg(feature = "blink-demand-paging")]
-use std::sync::RwLock as StdRwLock;
-#[cfg(feature = "blink-demand-paging")]
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -1796,7 +1794,6 @@ struct PagedWritableShard {
     checkpoint_pending: AtomicBool,
     checkpoint_shutdown: AtomicBool,
     checkpoint_shutdown_notify: tokio::sync::Notify,
-    latest: StdRwLock<Arc<dodb_storage::blink::PagedReadHandle>>,
     transaction_worker: Arc<Semaphore>,
     #[cfg(all(test, feature = "blink-demand-paging"))]
     commit_test_gate: Option<Arc<OneShotTestGate>>,
@@ -1912,7 +1909,6 @@ impl PagedWritableShard {
             BlinkCheckpointPolicy::WalBytesThreshold { .. } => 0,
         };
         checkpoint_debt_ledger.set_tenant_debt(tenant_id, initial_debt_bytes)?;
-        let latest = Arc::new(writer.snapshot()?);
         Ok(Arc::new(Self {
             writer: StdMutex::new(writer),
             manifest_store: StdMutex::new(manifest_store),
@@ -1930,7 +1926,6 @@ impl PagedWritableShard {
             checkpoint_pending: AtomicBool::new(false),
             checkpoint_shutdown: AtomicBool::new(false),
             checkpoint_shutdown_notify: tokio::sync::Notify::new(),
-            latest: StdRwLock::new(latest),
             transaction_worker: Arc::new(Semaphore::new(1)),
             #[cfg(all(test, feature = "blink-demand-paging"))]
             commit_test_gate,
@@ -1938,10 +1933,11 @@ impl PagedWritableShard {
     }
 
     fn snapshot(&self) -> Result<Arc<dodb_storage::blink::PagedReadHandle>, Error> {
-        self.latest
-            .read()
-            .map(|current| Arc::clone(&current))
-            .map_err(|_| Error::invariant("paged writer snapshot lock poisoned"))
+        let writer = self
+            .writer
+            .lock()
+            .map_err(|_| Error::invariant("paged writer lock poisoned"))?;
+        Ok(Arc::new(writer.snapshot()?))
     }
 
     fn schedule_checkpoint_after_commit(
@@ -2254,36 +2250,34 @@ impl PagedWritableShard {
             return Ok(None);
         };
         let writable = Arc::clone(self);
-        let (wal_bytes, has_uncheckpointed, next_snapshot) =
+        let (wal_bytes, has_uncheckpointed) =
             physical_checkpoint::submit_checkpoint_progress(move || {
                 let _activity_guard = writable.activity.enter();
-                let result: Result<(u64, bool, Arc<dodb_storage::blink::PagedReadHandle>), Error> =
-                    (|| {
-                        let mut writer = writable
-                            .writer
-                            .lock()
-                            .map_err(|_| Error::invariant("paged writer lock poisoned"))?;
-                        let mut manifest_store = writable
-                            .manifest_store
-                            .lock()
-                            .map_err(|_| Error::invariant("paged manifest lock poisoned"))?;
-                        let previous_manifest = manifest_store.current();
-                        let (next_wal_number, next_wal_file) = create_next_paged_wal_segment(
-                            &writable.wal_directory,
-                            previous_manifest.recovery_wal_file_number,
-                        )?;
-                        writer.publish_checkpoint(
-                            &mut manifest_store,
-                            job,
-                            next_wal_number,
-                            next_wal_file,
-                        )?;
-                        let wal_bytes = writer.wal_metrics()?.wal_bytes;
-                        let has_uncheckpointed =
-                            writer.has_commits_after(manifest_store.current().committed_prefix_lsn);
-                        let next_snapshot = Arc::new(writer.snapshot()?);
-                        Ok((wal_bytes, has_uncheckpointed, next_snapshot))
-                    })();
+                let result: Result<(u64, bool), Error> = (|| {
+                    let mut writer = writable
+                        .writer
+                        .lock()
+                        .map_err(|_| Error::invariant("paged writer lock poisoned"))?;
+                    let mut manifest_store = writable
+                        .manifest_store
+                        .lock()
+                        .map_err(|_| Error::invariant("paged manifest lock poisoned"))?;
+                    let previous_manifest = manifest_store.current();
+                    let (next_wal_number, next_wal_file) = create_next_paged_wal_segment(
+                        &writable.wal_directory,
+                        previous_manifest.recovery_wal_file_number,
+                    )?;
+                    writer.publish_checkpoint(
+                        &mut manifest_store,
+                        job,
+                        next_wal_number,
+                        next_wal_file,
+                    )?;
+                    let wal_bytes = writer.wal_metrics()?.wal_bytes;
+                    let has_uncheckpointed =
+                        writer.has_commits_after(manifest_store.current().committed_prefix_lsn);
+                    Ok((wal_bytes, has_uncheckpointed))
+                })();
                 drop(publish_permit);
                 result
             })?
@@ -2291,11 +2285,6 @@ impl PagedWritableShard {
             .map_err(|error| {
                 Error::durability(format!("paged checkpoint publish worker failed: {error}"))
             })??;
-        *self
-            .latest
-            .write()
-            .map_err(|_| Error::durability("paged committed root lock is poisoned"))? =
-            next_snapshot;
         if let Ok(mut metrics) = self.checkpoint_metrics.lock() {
             metrics.tenant_checkpoint_slice_completed(self.tenant_id);
         }
@@ -2353,91 +2342,77 @@ impl PagedWritableShard {
         let activity_guard = activity.enter();
         let writable = Arc::clone(self);
         let runtime = tokio::runtime::Handle::current();
-        let (transaction_result, checkpoint_waiter) =
-            tokio::task::spawn_blocking(move || {
-                let _worker_permit = worker_permit;
-                let _transaction_permit = transaction_permit;
-                let _activity_guard = activity_guard;
-                let _queued_reservation = queued_reservation;
-                let _preparation_reservation = preparation_reservation;
-                let mut debt_reservation = debt_reservation;
-                #[cfg(all(test, feature = "blink-demand-paging"))]
-                wait_for_one_shot_test_gate(writable.commit_test_gate.clone());
-                let mut writer = writable
-                    .writer
-                    .lock()
-                    .map_err(|_| Error::invariant("paged writer lock poisoned"))?;
-                let revision = writer.next_revision()?;
-                let transaction_results = writer.transact_group(
-                    std::slice::from_ref(&request),
-                    &dodb_storage::StorageLimits::default(),
-                    &[revision],
-                )?;
-                let transaction_result =
-                    transaction_results.into_iter().next().ok_or_else(|| {
-                        Error::invariant("paged writer returned no transaction result")
-                    })?;
-                let checkpoint_waiter = if transaction_result
-                    .as_ref()
-                    .is_ok_and(|result| result.commit_lsn.is_some())
-                {
-                    let wal_bytes = writer
-                        .wal_metrics()
-                        .map_err(|error| {
-                            Error::durability(format!(
-                                "paged transaction committed but WAL accounting failed: {error}"
-                            ))
-                        })?
-                        .wal_bytes;
-                    let manifest_store = writable.manifest_store.lock().map_err(|_| {
-                        Error::durability(
-                            "paged transaction committed but manifest state is unavailable",
-                        )
-                    })?;
-                    let has_uncheckpointed_commits =
-                        writer.has_commits_after(manifest_store.current().committed_prefix_lsn);
-                    let debt_bytes = match writable.checkpoint_policy {
-                        BlinkCheckpointPolicy::Disabled => 0,
-                        BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes }
-                            if has_uncheckpointed_commits =>
-                        {
-                            wal_bytes.saturating_sub(threshold_bytes)
-                        }
-                        BlinkCheckpointPolicy::WalBytesThreshold { .. } => 0,
-                    };
-                    if let Some(reservation) = debt_reservation.take() {
-                        reservation.commit(debt_bytes)?;
-                    }
-                    writable
-                        .checkpoint_debt_ledger
-                        .set_tenant_debt(writable.tenant_id, debt_bytes)?;
-                    writable.schedule_checkpoint_after_commit(
-                        wal_bytes,
-                        has_uncheckpointed_commits,
-                        &runtime,
+        let (transaction_result, checkpoint_waiter) = tokio::task::spawn_blocking(move || {
+            let _worker_permit = worker_permit;
+            let _transaction_permit = transaction_permit;
+            let _activity_guard = activity_guard;
+            let _queued_reservation = queued_reservation;
+            let _preparation_reservation = preparation_reservation;
+            let mut debt_reservation = debt_reservation;
+            #[cfg(all(test, feature = "blink-demand-paging"))]
+            wait_for_one_shot_test_gate(writable.commit_test_gate.clone());
+            let mut writer = writable
+                .writer
+                .lock()
+                .map_err(|_| Error::invariant("paged writer lock poisoned"))?;
+            let revision = writer.next_revision()?;
+            let transaction_results = writer.transact_group(
+                std::slice::from_ref(&request),
+                &dodb_storage::StorageLimits::default(),
+                &[revision],
+            )?;
+            let transaction_result = transaction_results
+                .into_iter()
+                .next()
+                .ok_or_else(|| Error::invariant("paged writer returned no transaction result"))?;
+            let checkpoint_waiter = if transaction_result
+                .as_ref()
+                .is_ok_and(|result| result.commit_lsn.is_some())
+            {
+                let wal_bytes = writer
+                    .wal_metrics()
+                    .map_err(|error| {
+                        Error::durability(format!(
+                            "paged transaction committed but WAL accounting failed: {error}"
+                        ))
+                    })?
+                    .wal_bytes;
+                let manifest_store = writable.manifest_store.lock().map_err(|_| {
+                    Error::durability(
+                        "paged transaction committed but manifest state is unavailable",
                     )
-                } else {
-                    None
+                })?;
+                let has_uncheckpointed_commits =
+                    writer.has_commits_after(manifest_store.current().committed_prefix_lsn);
+                let debt_bytes = match writable.checkpoint_policy {
+                    BlinkCheckpointPolicy::Disabled => 0,
+                    BlinkCheckpointPolicy::WalBytesThreshold { threshold_bytes }
+                        if has_uncheckpointed_commits =>
+                    {
+                        wal_bytes.saturating_sub(threshold_bytes)
+                    }
+                    BlinkCheckpointPolicy::WalBytesThreshold { .. } => 0,
                 };
-                if transaction_result
-                    .as_ref()
-                    .is_ok_and(|result| result.commit_lsn.is_some())
-                {
-                    let next_snapshot = Arc::new(writer.snapshot().map_err(|error| {
-                    Error::durability(format!(
-                        "paged transaction committed but its read root could not be pinned: {error}"
-                    ))
-                })?);
-                    *writable.latest.write().map_err(|_| {
-                        Error::durability("paged committed root lock is poisoned")
-                    })? = next_snapshot;
+                if let Some(reservation) = debt_reservation.take() {
+                    reservation.commit(debt_bytes)?;
                 }
-                Ok::<_, Error>((transaction_result, checkpoint_waiter))
-            })
-            .await
-            .map_err(|error| {
-                Error::durability(format!("paged transaction worker failed: {error}"))
-            })??;
+                writable
+                    .checkpoint_debt_ledger
+                    .set_tenant_debt(writable.tenant_id, debt_bytes)?;
+                writable.schedule_checkpoint_after_commit(
+                    wal_bytes,
+                    has_uncheckpointed_commits,
+                    &runtime,
+                )
+            } else {
+                None
+            };
+            Ok::<_, Error>((transaction_result, checkpoint_waiter))
+        })
+        .await
+        .map_err(|error| {
+            Error::durability(format!("paged transaction worker failed: {error}"))
+        })??;
         if self.checkpoint_execution == BlinkCheckpointExecution::Sync
             && let Some(checkpoint_waiter) = checkpoint_waiter
         {
@@ -2470,13 +2445,8 @@ impl BlinkShardReadHandle {
                     .clone()
                     .try_acquire_owned()
                     .map_err(|_| Error::overloaded("paged read worker capacity is full"))?;
-                let handle =
-                    match writable {
-                        Some(writable) => writable.snapshot()?,
-                        None => Arc::clone(handle.as_ref().ok_or_else(|| {
-                            Error::invariant("read-only paged handle is missing")
-                        })?),
-                    };
+                let read_handle = handle.clone();
+                let writable = writable.clone();
                 let key = key.clone();
                 let activity = Arc::clone(activity);
                 let activity_guard = activity.enter();
@@ -2485,6 +2455,11 @@ impl BlinkShardReadHandle {
                 tokio::task::spawn_blocking(move || {
                     let _worker_permit = worker_permit;
                     let _activity_guard = activity_guard;
+                    let handle = match writable {
+                        Some(writable) => writable.snapshot()?,
+                        None => read_handle
+                            .ok_or_else(|| Error::invariant("read-only paged handle is missing"))?,
+                    };
                     #[cfg(test)]
                     wait_for_one_shot_test_gate(read_test_gate);
                     handle.get_with_response_budget(&key, maximum_response_bytes)
@@ -2522,13 +2497,8 @@ impl BlinkShardReadHandle {
                     .clone()
                     .try_acquire_owned()
                     .map_err(|_| Error::overloaded("paged read worker capacity is full"))?;
-                let handle =
-                    match writable {
-                        Some(writable) => writable.snapshot()?,
-                        None => Arc::clone(handle.as_ref().ok_or_else(|| {
-                            Error::invariant("read-only paged handle is missing")
-                        })?),
-                    };
+                let read_handle = handle.clone();
+                let writable = writable.clone();
                 let primary_key = primary_key.clone();
                 let exclusive_after_sort_key = exclusive_after_sort_key.cloned();
                 let activity = Arc::clone(activity);
@@ -2538,6 +2508,11 @@ impl BlinkShardReadHandle {
                 tokio::task::spawn_blocking(move || {
                     let _worker_permit = worker_permit;
                     let _activity_guard = activity_guard;
+                    let handle = match writable {
+                        Some(writable) => writable.snapshot()?,
+                        None => read_handle
+                            .ok_or_else(|| Error::invariant("read-only paged handle is missing"))?,
+                    };
                     #[cfg(test)]
                     wait_for_one_shot_test_gate(read_test_gate);
                     handle.query_with_response_budget(
@@ -2576,13 +2551,8 @@ impl BlinkShardReadHandle {
                     .clone()
                     .try_acquire_owned()
                     .map_err(|_| Error::overloaded("paged read worker capacity is full"))?;
-                let handle =
-                    match writable {
-                        Some(writable) => writable.snapshot()?,
-                        None => Arc::clone(handle.as_ref().ok_or_else(|| {
-                            Error::invariant("read-only paged handle is missing")
-                        })?),
-                    };
+                let read_handle = handle.clone();
+                let writable = writable.clone();
                 let exclusive_after = exclusive_after.cloned();
                 let activity = Arc::clone(activity);
                 let activity_guard = activity.enter();
@@ -2591,6 +2561,11 @@ impl BlinkShardReadHandle {
                 tokio::task::spawn_blocking(move || {
                     let _worker_permit = worker_permit;
                     let _activity_guard = activity_guard;
+                    let handle = match writable {
+                        Some(writable) => writable.snapshot()?,
+                        None => read_handle
+                            .ok_or_else(|| Error::invariant("read-only paged handle is missing"))?,
+                    };
                     #[cfg(test)]
                     wait_for_one_shot_test_gate(read_test_gate);
                     handle.scan_with_response_budget(
@@ -5492,6 +5467,18 @@ mod tests {
     }
 
     #[cfg(feature = "blink-demand-paging")]
+    fn paged_crash_current_manifest(
+        service: &BlinkTenantService,
+        tenant: TenantId,
+    ) -> dodb_storage::blink::paged_manifest::PagedManifest {
+        paged_crash_writable_shard(service, tenant)
+            .manifest_store
+            .lock()
+            .unwrap()
+            .current()
+    }
+
+    #[cfg(feature = "blink-demand-paging")]
     async fn run_paged_crash_child(
         data_dir: std::path::PathBuf,
         marker_directory: &std::path::Path,
@@ -5864,6 +5851,74 @@ mod tests {
                         source_reads_after_dataset > source_reads_before_dataset,
                         "recovered service dataset reads did not load any durable page sources"
                     );
+                    for key_number in 0..16u32 {
+                        recovered
+                            .execute_request(
+                                tenant,
+                                Request::Delete {
+                                    key: DocumentKey::new(
+                                        b"paged-crash-dataset".to_vec(),
+                                        key_number.to_be_bytes().to_vec(),
+                                    ),
+                                },
+                                ExecutionBudget::new(64 * 1024),
+                            )
+                            .await
+                            .unwrap();
+                    }
+                    let writable = paged_crash_writable_shard(&recovered, tenant);
+                    writable.run_threshold_checkpoint(1).await.unwrap();
+                    let free_page_manifest = paged_crash_current_manifest(&recovered, tenant);
+                    assert!(
+                        free_page_manifest.free_list_root.is_some(),
+                        "deleting the recovered dataset did not persist a reusable free page"
+                    );
+                    let high_water_before_reuse = free_page_manifest.high_water_page_id;
+                    for key_number in 0..16u32 {
+                        paged_crash_put(
+                            &recovered,
+                            tenant,
+                            DocumentKey::new(
+                                b"paged-crash-dataset".to_vec(),
+                                key_number.to_be_bytes().to_vec(),
+                            ),
+                            vec![key_number.wrapping_add(20) as u8; 4_096],
+                        )
+                        .await;
+                    }
+                    writable.run_threshold_checkpoint(1).await.unwrap();
+                    let reused_page_manifest = paged_crash_current_manifest(&recovered, tenant);
+                    let page_ids_reused =
+                        reused_page_manifest.high_water_page_id <= high_water_before_reuse;
+                    eprintln!(
+                        "recovered page reuse: high_water_before={} high_water_after={} reused={page_ids_reused}",
+                        high_water_before_reuse.get(),
+                        reused_page_manifest.high_water_page_id.get()
+                    );
+                    match std::env::var("DODB_PAGED_CRASH_EXPECT_REUSE").as_deref() {
+                        Ok("enabled") => assert!(
+                            page_ids_reused,
+                            "page allocation grew high-water while reuse was expected"
+                        ),
+                        Ok("observe") => {}
+                        Ok(value) => panic!("invalid expected page reuse mode: {value}"),
+                        Err(std::env::VarError::NotPresent) => {}
+                        Err(error) => panic!("failed to read expected page reuse mode: {error}"),
+                    }
+                    recovered.shutdown_checked().await.unwrap();
+                    let recovered = BlinkTenantService::new(config.clone()).unwrap();
+                    for key_number in 0..16u32 {
+                        assert_paged_crash_value_only(
+                            &recovered,
+                            tenant,
+                            DocumentKey::new(
+                                b"paged-crash-dataset".to_vec(),
+                                key_number.to_be_bytes().to_vec(),
+                            ),
+                            &vec![key_number.wrapping_add(20) as u8; 4_096],
+                        )
+                        .await;
+                    }
                     let response = recovered
                         .execute_request(
                             tenant,
@@ -5979,6 +6034,18 @@ mod tests {
                 acknowledged_revision,
             )
             .await;
+            for key_number in 0..16u32 {
+                assert_paged_crash_value_only(
+                    &final_service,
+                    tenant,
+                    DocumentKey::new(
+                        b"paged-crash-dataset".to_vec(),
+                        key_number.to_be_bytes().to_vec(),
+                    ),
+                    &vec![key_number.wrapping_add(20) as u8; 4_096],
+                )
+                .await;
+            }
             final_service.shutdown_checked().await.unwrap();
         }
     }
