@@ -4,6 +4,8 @@ Tracking issue: [NamseEnt/fn0#126](https://github.com/NamseEnt/fn0/issues/126).
 
 Read [PLAN.md](PLAN.md) for the complete cost audit, source map, evidence boundaries, prioritized candidates, experiment design, and correctness gates.
 
+For the planned B1/B2 implementation after the completed B1.0 locator primitive, start with [B1-B2-IMPLEMENTATION-PLAN.md](B1-B2-IMPLEMENTATION-PLAN.md) and [B1-B2-LUNA-RUNBOOK.md](B1-B2-LUNA-RUNBOOK.md). These documents define sequential GPT-6 Luna tasks, fixed architecture contracts, ownership, acceptance, and stop conditions. They are planning artifacts only; no B1/B2 implementation or new experiment is claimed by their publication. Historical next-action and worker-assignment paragraphs below remain evidence of earlier increments.
+
 ## Enter the correct workspace
 
 ```sh
