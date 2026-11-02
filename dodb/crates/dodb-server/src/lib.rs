@@ -3051,6 +3051,48 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn cancelled_blink_open_releases_reservation_and_worker_capacity() {
+        let directory = blink_test_directory();
+        let service = Arc::new(
+            BlinkTenantService::new(LocalTenantServiceConfig {
+                data_dir: directory.path().to_path_buf(),
+                blink_open_worker_count: 1,
+                ..LocalTenantServiceConfig::default()
+            })
+            .unwrap(),
+        );
+        let tenant = TenantId::new(106);
+        service.set_open_test_gate(tenant, Arc::new(Semaphore::new(0)));
+        let open_service = Arc::clone(&service);
+        let opening = tokio::spawn(async move { open_service.open_shard(tenant).await });
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if service.shards.lock().unwrap().opening.contains(&tenant) {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        opening.abort();
+        let join_error = match opening.await {
+            Ok(_) => panic!("cancelled B-link open task completed"),
+            Err(error) => error,
+        };
+        assert!(join_error.is_cancelled());
+        assert!(service.shards.lock().unwrap().opening.is_empty());
+        service.set_open_test_gate(tenant, Arc::new(Semaphore::new(1)));
+        let shard = service.open_shard(tenant).await.unwrap();
+        assert!(Arc::ptr_eq(
+            &shard,
+            &service.read_shard(tenant).await.unwrap().unwrap()
+        ));
+        assert!(service.shards.lock().unwrap().opening.is_empty());
+        service.shutdown_checked().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn blink_shutdown_bounds_wait_for_inflight_open_and_drains_it() {
         let directory = blink_test_directory();
         let service = Arc::new(

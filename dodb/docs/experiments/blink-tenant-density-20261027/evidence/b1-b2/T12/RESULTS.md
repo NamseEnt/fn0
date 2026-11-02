@@ -15,9 +15,9 @@ The new open worker, waiter, and shutdown limits reject zero values. Defaults ar
 
 The tests cover same-tenant open coalescing, a read joining a blocked open, unrelated tenant progress, failed-open reservation cleanup, invalid open limits, and bounded shutdown waiting.
 
-A shutdown-timeout retry regression test verifies that previously open shards stay registered when an in-flight open exceeds the drain deadline. After the blocked open exits, a later shutdown attempt drains the open attempt and retained shard.
+A shutdown-timeout retry regression test verifies that previously open shards stay registered when an in-flight open exceeds the drain deadline. After the blocked open exits, a later shutdown attempt drains the open attempt and retained shard. A cancellation test aborts a blocked open, verifies its tenant reservation is removed, then successfully reopens with a single-worker limit, proving the worker permit was released.
 
-After this fix, the full server library suite again passed with 15 tests, and the server all-target check and formatting check passed. Raw outputs are recorded as `logs/server-lib-tests-after-shutdown-fix.log`, `logs/server-all-targets-check-after-shutdown-fix.log`, and `logs/server-format-after-shutdown-fix.log`.
+After the shutdown retry and cancellation changes, the full server library suite passed with 16 tests. The server all-target check and formatting check passed. The initial cancellation-test compile failure and corrected run are both preserved in `logs/`.
 
 ## Remaining T12 work
 

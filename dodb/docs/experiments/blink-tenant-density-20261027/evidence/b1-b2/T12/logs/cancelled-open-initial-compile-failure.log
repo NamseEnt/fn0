@@ -1,0 +1,23 @@
+   Compiling dodb-server v0.1.0 (/Users/namse/fn0/.worktrees/dodb-tenant-density-20261027/dodb/crates/dodb-server)
+error[E0277]: `AsyncBlinkShard` doesn't implement `Debug`
+    --> dodb/crates/dodb-server/src/lib.rs:3079:31
+     |
+3079 |         assert!(opening.await.unwrap_err().is_cancelled());
+     |                               ^^^^^^^^^^ unsatisfied trait bound
+     |
+help: the trait `Debug` is not implemented for `AsyncBlinkShard`
+    --> dodb/crates/dodb-server/src/lib.rs:1337:1
+     |
+1337 | struct AsyncBlinkShard {
+     | ^^^^^^^^^^^^^^^^^^^^^^
+     = note: add `#[derive(Debug)]` to `AsyncBlinkShard` or manually `impl Debug for AsyncBlinkShard`
+help: the trait `Debug` is implemented for `Result<T, E>`
+    --> /rustc/8bab26f4f68e0e26f0bb7960be334d5b520ea452/library/core/src/result.rs:552:15
+     = note: required for `std::sync::Arc<AsyncBlinkShard>` to implement `Debug`
+     = note: 1 redundant requirement hidden
+     = note: required for `Result<std::sync::Arc<AsyncBlinkShard>, dodb_core::Error>` to implement `Debug`
+note: required by a bound in `Result::<T, E>::unwrap_err`
+    --> /rustc/8bab26f4f68e0e26f0bb7960be334d5b520ea452/library/core/src/result.rs:1324:4
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `dodb-server` (lib test) due to 1 previous error
