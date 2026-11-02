@@ -1813,6 +1813,7 @@ pub struct PagedCheckpointJob {
     descriptor_cursor: Option<version_index::VersionIndexDescriptorCursor>,
     pack_writer: Option<durable_bases::PagedBasePackWriter>,
     _checkpoint_reservation: Option<resource::Reservation>,
+    disk_reservation: Option<resource::DiskReservation>,
     _worker_lease: PagedCheckpointWorkerLease,
 }
 
@@ -1977,6 +1978,17 @@ impl PagedCheckpointJob {
             self._checkpoint_reservation = None;
             return Ok(());
         }
+        self.disk_reservation = Some(
+            self.target
+                .resources
+                .disk()
+                .reserve(
+                    self.target.tenant_id,
+                    resource::DiskCategory::RetainedSource,
+                    durable_bases::encoded_size(page_count),
+                )
+                .map_err(|_| Error::overloaded("paged checkpoint disk budget is exhausted"))?,
+        );
         let pack_writer = durable_bases::PagedBasePackJob {
             directory: request.directory,
             identity: request.identity,
@@ -2033,6 +2045,29 @@ impl PagedCheckpointJob {
             written_pages += 1;
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "blink-demand-paging")]
+impl Drop for PagedCheckpointJob {
+    fn drop(&mut self) {
+        let Some(mut reservation) = self.disk_reservation.take() else {
+            return;
+        };
+        let pack_path = durable_bases::pack_path(&self.request.directory, self.request.file_number);
+        let written_bytes = match std::fs::metadata(pack_path) {
+            Ok(metadata) => metadata.len(),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => 0,
+            Err(_) => reservation.bytes(),
+        };
+        if written_bytes < reservation.bytes() {
+            let _ = reservation.shrink(reservation.bytes() - written_bytes);
+        } else if written_bytes > reservation.bytes() {
+            let _ = reservation.grow(written_bytes - reservation.bytes());
+        }
+        if written_bytes > 0 {
+            let _ = self.target.sources.retain_disk_reservation(reservation);
+        }
     }
 }
 
@@ -2755,6 +2790,7 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             descriptor_cursor: None,
             pack_writer: None,
             _checkpoint_reservation: None,
+            disk_reservation: None,
             _worker_lease: worker_lease,
         }))
     }
@@ -2840,6 +2876,13 @@ impl<F: DurableFile> PagedTransactionWriter<F> {
             next_wal_source,
         )?;
         let catalog_publication = catalog_build.reserve_root(source_catalog_root)?;
+        let pack_disk_reservation = job
+            .disk_reservation
+            .take()
+            .ok_or_else(|| Error::invariant("paged checkpoint disk reservation is missing"))?;
+        self.current
+            .sources
+            .retain_disk_reservation(pack_disk_reservation)?;
         let next_handle = self.current.fork_with_generation(
             checkpoint_root,
             self.current.root_page_id,
@@ -16136,15 +16179,24 @@ mod tests {
             file_number: 1,
             header_identity: *blake3::hash(&initial_pack_header[..PAGE_SIZE]).as_bytes(),
         };
-        let resources = resource::BlinkResourceManager::new(resource::ResourceLimits {
-            global_bytes: 4_194_304,
-            per_tenant_bytes: 4_194_304,
-            progress_pool_bytes: 524_288,
-            max_tenants: 2,
-            max_pending_waiters: 8,
-            global_category_bytes: [4_194_304; 7],
-            per_tenant_category_bytes: [4_194_304; 7],
-        })
+        let resources = resource::BlinkResourceManager::new_with_disk_limits(
+            resource::ResourceLimits {
+                global_bytes: 4_194_304,
+                per_tenant_bytes: 4_194_304,
+                progress_pool_bytes: 524_288,
+                max_tenants: 2,
+                max_pending_waiters: 8,
+                global_category_bytes: [4_194_304; 7],
+                per_tenant_category_bytes: [4_194_304; 7],
+            },
+            resource::DiskResourceLimits {
+                global_bytes: 131_072,
+                per_tenant_bytes: 131_072,
+                max_tenants: 2,
+                global_category_bytes: [131_072; 5],
+                per_tenant_category_bytes: [131_072; 5],
+            },
+        )
         .unwrap();
         let index = Arc::new(
             version_index::VersionIndex::open(
@@ -16637,6 +16689,9 @@ mod tests {
                 ))
                 .is_file()
         );
+        let disk_snapshot = resources.disk().snapshot().unwrap();
+        assert!(disk_snapshot.current_total > initial_pack_output.entry.bytes);
+        assert!(disk_snapshot.peak_total <= 131_072);
         let reopened_root = reopened_index
             .root_from_node_reference(reopened_manifest.current().durable_index_root)
             .unwrap();

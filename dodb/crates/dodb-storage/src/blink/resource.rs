@@ -5,6 +5,7 @@ use std::time::Duration;
 use tokio::sync::Notify;
 
 const CATEGORY_COUNT: usize = 7;
+const DISK_CATEGORY_COUNT: usize = 5;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(usize)]
@@ -22,6 +23,37 @@ pub enum ResourceCategory {
 pub enum ReservationClass {
     Foreground,
     Progress,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[repr(usize)]
+pub enum DiskCategory {
+    Wal = 0,
+    CheckpointOutput = 1,
+    VersionIndex = 2,
+    Scratch = 3,
+    RetainedSource = 4,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DiskResourceLimits {
+    pub global_bytes: u64,
+    pub per_tenant_bytes: u64,
+    pub max_tenants: usize,
+    pub global_category_bytes: [u64; DISK_CATEGORY_COUNT],
+    pub per_tenant_category_bytes: [u64; DISK_CATEGORY_COUNT],
+}
+
+impl DiskResourceLimits {
+    fn unbounded(max_tenants: usize) -> Self {
+        Self {
+            global_bytes: u64::MAX,
+            per_tenant_bytes: u64::MAX,
+            max_tenants,
+            global_category_bytes: [u64::MAX; DISK_CATEGORY_COUNT],
+            per_tenant_category_bytes: [u64::MAX; DISK_CATEGORY_COUNT],
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -61,6 +93,24 @@ pub struct ResourceSnapshot {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DiskResourceSnapshot {
+    pub current_by_category: [u64; DISK_CATEGORY_COUNT],
+    pub peak_by_category: [u64; DISK_CATEGORY_COUNT],
+    pub current_total: u64,
+    pub peak_total: u64,
+    pub active_tenants: usize,
+    pub rejected_reservations: u64,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct TenantDiskResourceSnapshot {
+    pub current_by_category: [u64; DISK_CATEGORY_COUNT],
+    pub peak_by_category: [u64; DISK_CATEGORY_COUNT],
+    pub current_total: u64,
+    pub peak_total: u64,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TenantResourceSnapshot {
     pub current_by_category: [u64; CATEGORY_COUNT],
     pub peak_by_category: [u64; CATEGORY_COUNT],
@@ -89,10 +139,33 @@ struct State {
     tenants: BTreeMap<u64, TenantState>,
 }
 
+#[derive(Default)]
+struct DiskTenantState {
+    current_by_category: [u64; DISK_CATEGORY_COUNT],
+    peak_by_category: [u64; DISK_CATEGORY_COUNT],
+    current_total: u64,
+    peak_total: u64,
+}
+
+#[derive(Default)]
+struct DiskState {
+    current_by_category: [u64; DISK_CATEGORY_COUNT],
+    peak_by_category: [u64; DISK_CATEGORY_COUNT],
+    current_total: u64,
+    peak_total: u64,
+    rejected_reservations: u64,
+    tenants: BTreeMap<u64, DiskTenantState>,
+}
+
 struct Inner {
     limits: ResourceLimits,
     state: Mutex<State>,
     capacity_changed: Notify,
+}
+
+struct DiskInner {
+    limits: DiskResourceLimits,
+    state: Mutex<DiskState>,
 }
 
 struct WaiterRegistration {
@@ -102,6 +175,12 @@ struct WaiterRegistration {
 #[derive(Clone)]
 pub struct BlinkResourceManager {
     inner: Arc<Inner>,
+    disk: BlinkDiskResourceManager,
+}
+
+#[derive(Clone)]
+pub struct BlinkDiskResourceManager {
+    inner: Arc<DiskInner>,
 }
 
 struct Charge {
@@ -116,8 +195,27 @@ pub struct Reservation {
     charge: Arc<Charge>,
 }
 
+struct DiskCharge {
+    inner: Arc<DiskInner>,
+    tenant_id: u64,
+    category: DiskCategory,
+    bytes: u64,
+}
+
+pub struct DiskReservation {
+    charge: Arc<DiskCharge>,
+}
+
 impl BlinkResourceManager {
     pub fn new(limits: ResourceLimits) -> Result<Self, ResourceError> {
+        let disk_limits = DiskResourceLimits::unbounded(limits.max_tenants);
+        Self::new_with_disk_limits(limits, disk_limits)
+    }
+
+    pub fn new_with_disk_limits(
+        limits: ResourceLimits,
+        disk_limits: DiskResourceLimits,
+    ) -> Result<Self, ResourceError> {
         if limits.global_bytes == 0
             || limits.per_tenant_bytes == 0
             || limits.max_tenants == 0
@@ -136,15 +234,145 @@ impl BlinkResourceManager {
         {
             return Err(ResourceError::InvalidLimits);
         }
+        if disk_limits.global_bytes == 0
+            || disk_limits.per_tenant_bytes == 0
+            || disk_limits.max_tenants == 0
+            || disk_limits.per_tenant_bytes > disk_limits.global_bytes
+            || disk_limits
+                .global_category_bytes
+                .iter()
+                .any(|limit| *limit == 0 || *limit > disk_limits.global_bytes)
+            || disk_limits
+                .per_tenant_category_bytes
+                .iter()
+                .any(|limit| *limit == 0 || *limit > disk_limits.per_tenant_bytes)
+        {
+            return Err(ResourceError::InvalidLimits);
+        }
         Ok(Self {
             inner: Arc::new(Inner {
                 limits,
                 state: Mutex::new(State::default()),
                 capacity_changed: Notify::new(),
             }),
+            disk: BlinkDiskResourceManager {
+                inner: Arc::new(DiskInner {
+                    limits: disk_limits,
+                    state: Mutex::new(DiskState::default()),
+                }),
+            },
         })
     }
 
+    pub fn disk(&self) -> BlinkDiskResourceManager {
+        self.disk.clone()
+    }
+}
+
+impl BlinkDiskResourceManager {
+    pub fn reserve(
+        &self,
+        tenant_id: u64,
+        category: DiskCategory,
+        bytes: u64,
+    ) -> Result<DiskReservation, ResourceError> {
+        let mut state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| ResourceError::Poisoned)?;
+        let category_index = category as usize;
+        let next_total = state
+            .current_total
+            .checked_add(bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let tenant_state = state.tenants.get(&tenant_id);
+        let tenant_total = tenant_state.map_or(0, |entry| entry.current_total);
+        let next_tenant_total = tenant_total
+            .checked_add(bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let current_category = state.current_by_category[category_index];
+        let next_category = current_category
+            .checked_add(bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let tenant_category =
+            tenant_state.map_or(0, |entry| entry.current_by_category[category_index]);
+        let next_tenant_category = tenant_category
+            .checked_add(bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        if next_total > self.inner.limits.global_bytes
+            || next_tenant_total > self.inner.limits.per_tenant_bytes
+            || next_category > self.inner.limits.global_category_bytes[category_index]
+            || next_tenant_category > self.inner.limits.per_tenant_category_bytes[category_index]
+        {
+            state.rejected_reservations = state.rejected_reservations.saturating_add(1);
+            return Err(ResourceError::CapacityExceeded);
+        }
+        if !state.tenants.contains_key(&tenant_id)
+            && state.tenants.len() == self.inner.limits.max_tenants
+        {
+            state.rejected_reservations = state.rejected_reservations.saturating_add(1);
+            return Err(ResourceError::TooManyTenants);
+        }
+        let tenant_state = state.tenants.entry(tenant_id).or_default();
+        tenant_state.current_by_category[category_index] = next_tenant_category;
+        tenant_state.peak_by_category[category_index] =
+            tenant_state.peak_by_category[category_index].max(next_tenant_category);
+        tenant_state.current_total = next_tenant_total;
+        tenant_state.peak_total = tenant_state.peak_total.max(next_tenant_total);
+        state.current_by_category[category_index] = next_category;
+        state.peak_by_category[category_index] =
+            state.peak_by_category[category_index].max(next_category);
+        state.current_total = next_total;
+        state.peak_total = state.peak_total.max(next_total);
+        Ok(DiskReservation {
+            charge: Arc::new(DiskCharge {
+                inner: Arc::clone(&self.inner),
+                tenant_id,
+                category,
+                bytes,
+            }),
+        })
+    }
+
+    pub fn snapshot(&self) -> Result<DiskResourceSnapshot, ResourceError> {
+        let state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| ResourceError::Poisoned)?;
+        Ok(DiskResourceSnapshot {
+            current_by_category: state.current_by_category,
+            peak_by_category: state.peak_by_category,
+            current_total: state.current_total,
+            peak_total: state.peak_total,
+            active_tenants: state.tenants.len(),
+            rejected_reservations: state.rejected_reservations,
+        })
+    }
+
+    pub fn tenant_snapshot(
+        &self,
+        tenant_id: u64,
+    ) -> Result<Option<TenantDiskResourceSnapshot>, ResourceError> {
+        let state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| ResourceError::Poisoned)?;
+        Ok(state
+            .tenants
+            .get(&tenant_id)
+            .map(|tenant_state| TenantDiskResourceSnapshot {
+                current_by_category: tenant_state.current_by_category,
+                peak_by_category: tenant_state.peak_by_category,
+                current_total: tenant_state.current_total,
+                peak_total: tenant_state.peak_total,
+            }))
+    }
+}
+
+impl BlinkResourceManager {
     pub fn reserve(
         &self,
         tenant_id: u64,
@@ -385,6 +613,138 @@ impl Reservation {
     }
 }
 
+impl DiskReservation {
+    pub fn bytes(&self) -> u64 {
+        self.charge.bytes
+    }
+
+    pub fn category(&self) -> DiskCategory {
+        self.charge.category
+    }
+
+    pub fn share(&self) -> Self {
+        Self {
+            charge: Arc::clone(&self.charge),
+        }
+    }
+
+    pub fn grow(&mut self, bytes: u64) -> Result<(), ResourceError> {
+        if bytes == 0 {
+            return Ok(());
+        }
+        let charge = Arc::get_mut(&mut self.charge).ok_or(ResourceError::SharedOwnership)?;
+        let manager = BlinkDiskResourceManager {
+            inner: Arc::clone(&charge.inner),
+        };
+        let additional = manager.reserve(charge.tenant_id, charge.category, bytes)?;
+        self.merge(additional)
+    }
+
+    pub fn shrink(&mut self, bytes: u64) -> Result<(), ResourceError> {
+        if bytes == 0 {
+            return Ok(());
+        }
+        let charge = Arc::get_mut(&mut self.charge).ok_or(ResourceError::SharedOwnership)?;
+        if bytes > charge.bytes {
+            return Err(ResourceError::ArithmeticOverflow);
+        }
+        let mut state = charge
+            .inner
+            .state
+            .lock()
+            .map_err(|_| ResourceError::Poisoned)?;
+        let category_index = charge.category as usize;
+        state.current_by_category[category_index] = state.current_by_category[category_index]
+            .checked_sub(bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        state.current_total = state
+            .current_total
+            .checked_sub(bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let tenant_state = state
+            .tenants
+            .get_mut(&charge.tenant_id)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        tenant_state.current_by_category[category_index] = tenant_state.current_by_category
+            [category_index]
+            .checked_sub(bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        tenant_state.current_total = tenant_state
+            .current_total
+            .checked_sub(bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let remove_tenant = tenant_state.current_total == 0;
+        charge.bytes = charge
+            .bytes
+            .checked_sub(bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        if remove_tenant {
+            state.tenants.remove(&charge.tenant_id);
+        }
+        Ok(())
+    }
+
+    pub fn merge(&mut self, mut additional: Self) -> Result<(), ResourceError> {
+        if !Arc::ptr_eq(&self.charge.inner, &additional.charge.inner)
+            || self.charge.tenant_id != additional.charge.tenant_id
+            || self.charge.category != additional.charge.category
+        {
+            return Err(ResourceError::SharedOwnership);
+        }
+        let charge = Arc::get_mut(&mut self.charge).ok_or(ResourceError::SharedOwnership)?;
+        let additional_charge =
+            Arc::get_mut(&mut additional.charge).ok_or(ResourceError::SharedOwnership)?;
+        charge.bytes = charge
+            .bytes
+            .checked_add(additional_charge.bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        additional_charge.bytes = 0;
+        Ok(())
+    }
+
+    pub fn transfer_to(&mut self, category: DiskCategory) -> Result<(), ResourceError> {
+        if self.charge.category == category {
+            return Ok(());
+        }
+        let charge = Arc::get_mut(&mut self.charge).ok_or(ResourceError::SharedOwnership)?;
+        let mut state = charge
+            .inner
+            .state
+            .lock()
+            .map_err(|_| ResourceError::Poisoned)?;
+        let old_index = charge.category as usize;
+        let new_index = category as usize;
+        let new_global = state.current_by_category[new_index]
+            .checked_add(charge.bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let tenant_state = state
+            .tenants
+            .get_mut(&charge.tenant_id)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let new_tenant = tenant_state.current_by_category[new_index]
+            .checked_add(charge.bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        if new_global > charge.inner.limits.global_category_bytes[new_index]
+            || new_tenant > charge.inner.limits.per_tenant_category_bytes[new_index]
+        {
+            return Err(ResourceError::CapacityExceeded);
+        }
+        tenant_state.current_by_category[old_index] = tenant_state.current_by_category[old_index]
+            .checked_sub(charge.bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        tenant_state.current_by_category[new_index] = new_tenant;
+        tenant_state.peak_by_category[new_index] =
+            tenant_state.peak_by_category[new_index].max(new_tenant);
+        state.current_by_category[old_index] = state.current_by_category[old_index]
+            .checked_sub(charge.bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        state.current_by_category[new_index] = new_global;
+        state.peak_by_category[new_index] = state.peak_by_category[new_index].max(new_global);
+        charge.category = category;
+        Ok(())
+    }
+}
+
 impl Drop for Charge {
     fn drop(&mut self) {
         let Ok(mut state) = self.inner.state.lock() else {
@@ -413,11 +773,34 @@ impl Drop for Charge {
     }
 }
 
+impl Drop for DiskCharge {
+    fn drop(&mut self) {
+        let Ok(mut state) = self.inner.state.lock() else {
+            return;
+        };
+        let category_index = self.category as usize;
+        state.current_by_category[category_index] =
+            state.current_by_category[category_index].saturating_sub(self.bytes);
+        state.current_total = state.current_total.saturating_sub(self.bytes);
+        let remove_tenant = if let Some(tenant_state) = state.tenants.get_mut(&self.tenant_id) {
+            tenant_state.current_by_category[category_index] =
+                tenant_state.current_by_category[category_index].saturating_sub(self.bytes);
+            tenant_state.current_total = tenant_state.current_total.saturating_sub(self.bytes);
+            tenant_state.current_total == 0
+        } else {
+            false
+        };
+        if remove_tenant {
+            state.tenants.remove(&self.tenant_id);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        BlinkResourceManager, CATEGORY_COUNT, ReservationClass, ResourceCategory, ResourceError,
-        ResourceLimits,
+        BlinkResourceManager, CATEGORY_COUNT, DISK_CATEGORY_COUNT, DiskCategory,
+        DiskResourceLimits, ReservationClass, ResourceCategory, ResourceError, ResourceLimits,
     };
     use std::time::Duration;
 
@@ -432,6 +815,70 @@ mod tests {
             per_tenant_category_bytes: [80; CATEGORY_COUNT],
         })
         .unwrap()
+    }
+
+    fn disk_manager() -> BlinkResourceManager {
+        BlinkResourceManager::new_with_disk_limits(
+            ResourceLimits {
+                global_bytes: 100,
+                per_tenant_bytes: 80,
+                progress_pool_bytes: 20,
+                max_tenants: 2,
+                max_pending_waiters: 2,
+                global_category_bytes: [100; CATEGORY_COUNT],
+                per_tenant_category_bytes: [80; CATEGORY_COUNT],
+            },
+            DiskResourceLimits {
+                global_bytes: 100,
+                per_tenant_bytes: 80,
+                max_tenants: 2,
+                global_category_bytes: [100; DISK_CATEGORY_COUNT],
+                per_tenant_category_bytes: [80; DISK_CATEGORY_COUNT],
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn disk_reservations_enforce_global_tenant_and_category_limits() {
+        let manager = disk_manager().disk();
+        let retained = manager
+            .reserve(1, DiskCategory::RetainedSource, 60)
+            .unwrap();
+        assert!(manager.reserve(1, DiskCategory::Wal, 21).is_err());
+        assert!(manager.reserve(2, DiskCategory::Wal, 41).is_err());
+        assert_eq!(retained.bytes(), 60);
+        let snapshot = manager.snapshot().unwrap();
+        assert_eq!(snapshot.current_total, 60);
+        assert_eq!(snapshot.rejected_reservations, 2);
+        drop(retained);
+        assert_eq!(manager.snapshot().unwrap().current_total, 0);
+        let later_reservation = manager.reserve(2, DiskCategory::Wal, 40).unwrap();
+        assert_eq!(later_reservation.bytes(), 40);
+    }
+
+    #[test]
+    fn disk_reservations_transfer_grow_shrink_and_merge_charges() {
+        let manager = disk_manager().disk();
+        let mut output = manager
+            .reserve(7, DiskCategory::CheckpointOutput, 20)
+            .unwrap();
+        output.grow(10).unwrap();
+        output.transfer_to(DiskCategory::RetainedSource).unwrap();
+        let extra = manager
+            .reserve(7, DiskCategory::RetainedSource, 15)
+            .unwrap();
+        output.merge(extra).unwrap();
+        assert_eq!(output.bytes(), 45);
+        output.shrink(5).unwrap();
+        let snapshot = manager.tenant_snapshot(7).unwrap().unwrap();
+        assert_eq!(snapshot.current_total, 40);
+        assert_eq!(
+            snapshot.current_by_category[DiskCategory::RetainedSource as usize],
+            40
+        );
+        drop(output);
+        assert_eq!(manager.snapshot().unwrap().current_total, 0);
     }
 
     #[test]

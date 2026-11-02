@@ -155,6 +155,49 @@ impl SourceCatalogStore {
         next_reference.ok_or_else(|| Error::invariant("source catalog root was not written"))
     }
 
+    pub(super) fn estimate_marker_run_bytes(&self, marker_directory: &Path) -> Result<u64> {
+        let mut record_count = 0u64;
+        for entry in fs::read_dir(marker_directory)? {
+            let entry = entry?;
+            let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            if name == "retain-all-wal-segments" {
+                record_count = record_count
+                    .checked_add(1)
+                    .ok_or_else(|| Error::overloaded("source catalog record count overflows"))?;
+                continue;
+            }
+            let Some(source_hash) = name.strip_prefix("source-") else {
+                continue;
+            };
+            if source_hash.len() != 64 || !source_hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+            {
+                continue;
+            }
+            let metadata = entry.metadata()?;
+            if !metadata.is_file() || metadata.len() != RECORD_BYTES as u64 {
+                return Err(Error::corruption("source catalog marker length is invalid"));
+            }
+            let mut bytes = [0u8; RECORD_BYTES];
+            File::open(entry.path())?.read_exact(&mut bytes)?;
+            decode_source_record(&bytes)?;
+            record_count = record_count
+                .checked_add(1)
+                .ok_or_else(|| Error::overloaded("source catalog record count overflows"))?;
+        }
+        if record_count == 0 {
+            return Err(Error::corruption("source catalog cannot be empty"));
+        }
+        let page_count = record_count
+            .checked_add(RECORDS_PER_PAGE as u64 - 1)
+            .ok_or_else(|| Error::overloaded("source catalog page count overflows"))?
+            / RECORDS_PER_PAGE as u64;
+        page_count
+            .checked_mul(PAGE_BYTES as u64)
+            .ok_or_else(|| Error::overloaded("source catalog byte count overflows"))
+    }
+
     pub(super) fn visit<F>(&self, root: NodeRef, visitor: &mut F) -> Result<()>
     where
         F: FnMut(SourceCatalogRecord) -> Result<()>,

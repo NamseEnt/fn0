@@ -8,7 +8,10 @@ use std::sync::{Arc, Mutex};
 use dodb_core::{Error, Result};
 
 use super::paged_manifest::PagedManifestStore;
-use super::resource::{BlinkResourceManager, Reservation, ReservationClass, ResourceCategory};
+use super::resource::{
+    BlinkResourceManager, DiskCategory, DiskReservation, Reservation, ReservationClass,
+    ResourceCategory,
+};
 use super::source_catalog::{SourceCatalogRecord, SourceCatalogStore, encode_source_record};
 use super::version_index::{
     SourceFileKind, SourceIdentity, SourceReachability, StoreIdentity, VersionIndex,
@@ -50,6 +53,7 @@ struct SourceManagerInner {
     handle_charge_bytes: u64,
     gc_reservation_bytes: u64,
     source_catalog: SourceCatalogStore,
+    retained_disk_reservation: Mutex<DiskReservation>,
     state: Mutex<SourceState>,
 }
 
@@ -165,8 +169,20 @@ impl SourceManager {
             ));
         }
         fs::create_dir_all(&config.scratch_directory)?;
+        fs::create_dir_all(&config.wal_directory)?;
         let source_catalog =
             SourceCatalogStore::open(&config.checkpoint_directory, config.store_identity)?;
+        let retained_disk_bytes = directory_file_bytes(&config.checkpoint_directory)?
+            .checked_add(directory_file_bytes(&config.wal_directory)?)
+            .ok_or_else(|| Error::invalid_input("paged source disk byte count overflows"))?;
+        let retained_disk_reservation = resources
+            .disk()
+            .reserve(
+                config.tenant_id,
+                DiskCategory::RetainedSource,
+                retained_disk_bytes,
+            )
+            .map_err(|_| Error::overloaded("paged source disk budget is exhausted"))?;
         Ok(Self {
             inner: Arc::new(SourceManagerInner {
                 store_identity: config.store_identity,
@@ -180,6 +196,7 @@ impl SourceManager {
                 handle_charge_bytes: config.handle_charge_bytes,
                 gc_reservation_bytes: config.gc_reservation_bytes,
                 source_catalog,
+                retained_disk_reservation: Mutex::new(retained_disk_reservation),
                 state: Mutex::new(SourceState {
                     roots: HashMap::new(),
                     active_handles: HashMap::new(),
@@ -459,10 +476,41 @@ impl SourceManager {
             }
         })?;
         write_source_marker(&marker_directory, recovery_source)?;
-        let catalog_root = self
+        let reserved_bytes = self
             .inner
             .source_catalog
-            .build_from_marker_run(&marker_directory)?;
+            .estimate_marker_run_bytes(&marker_directory)?;
+        let checkpoint_bytes_before = directory_file_bytes(&self.inner.checkpoint_directory)?;
+        let mut disk_reservation = self
+            .inner
+            .resources
+            .disk()
+            .reserve(
+                self.inner.tenant_id,
+                DiskCategory::RetainedSource,
+                reserved_bytes,
+            )
+            .map_err(|_| Error::overloaded("source catalog disk budget is exhausted"))?;
+        let catalog_build = self
+            .inner
+            .source_catalog
+            .build_from_marker_run(&marker_directory);
+        let checkpoint_bytes_after = directory_file_bytes(&self.inner.checkpoint_directory)?;
+        let written_bytes = checkpoint_bytes_after
+            .checked_sub(checkpoint_bytes_before)
+            .ok_or_else(|| Error::invariant("source catalog directory shrank during build"))?;
+        if written_bytes > disk_reservation.bytes() {
+            disk_reservation
+                .grow(written_bytes - disk_reservation.bytes())
+                .map_err(|_| Error::overloaded("source catalog disk usage exceeded reservation"))?;
+        } else {
+            let unused_bytes = disk_reservation.bytes() - written_bytes;
+            disk_reservation
+                .shrink(unused_bytes)
+                .map_err(|_| Error::invariant("source catalog disk reservation shrink failed"))?;
+        }
+        self.retain_disk_reservation(disk_reservation)?;
+        let catalog_root = catalog_build?;
         self.inner
             .source_catalog
             .visit(catalog_root, &mut |_| Ok(()))?;
@@ -488,6 +536,23 @@ impl SourceManager {
             manager: self.clone(),
             active: true,
         })
+    }
+
+    pub(super) fn retain_disk_reservation(&self, reservation: DiskReservation) -> Result<()> {
+        if reservation.category() != DiskCategory::RetainedSource {
+            return Err(Error::invariant(
+                "paged source disk reservation has the wrong category",
+            ));
+        }
+        let mut retained = self
+            .inner
+            .retained_disk_reservation
+            .lock()
+            .map_err(|_| Error::invariant("paged source disk reservation lock poisoned"))?;
+        retained
+            .merge(reservation)
+            .map_err(|_| Error::invariant("paged source disk reservation cannot be merged"))?;
+        Ok(())
     }
 
     pub(super) fn install_source_catalog_root(
@@ -654,6 +719,7 @@ impl SourceManager {
         I: IntoIterator<Item = SourceCandidate>,
         F: FnMut(SourceGcFaultPoint) -> Result<()>,
     {
+        self.reconcile_retained_disk_usage()?;
         let _gc_reservation = self
             .inner
             .resources
@@ -835,6 +901,16 @@ impl SourceManager {
             )?;
         report.unlinked_catalog_pages = unlinked_catalog_pages;
         report.unlinked_catalog_bytes = unlinked_catalog_bytes;
+        let reclaimed_bytes = report
+            .unlinked_bytes
+            .checked_add(report.unlinked_catalog_bytes)
+            .ok_or_else(|| Error::invalid_input("paged source reclaimed byte count overflows"))?;
+        self.inner
+            .retained_disk_reservation
+            .lock()
+            .map_err(|_| Error::invariant("paged source disk reservation lock poisoned"))?
+            .shrink(reclaimed_bytes)
+            .map_err(|_| Error::invariant("paged source disk reservation release failed"))?;
         Ok(report)
     }
 
@@ -858,6 +934,28 @@ impl SourceManager {
                 .wal_directory
                 .join(format!("segment-{:020}.wal", identity.file_number)),
         }
+    }
+
+    fn reconcile_retained_disk_usage(&self) -> Result<()> {
+        let actual_bytes = directory_file_bytes(&self.inner.checkpoint_directory)?
+            .checked_add(directory_file_bytes(&self.inner.wal_directory)?)
+            .ok_or_else(|| Error::invalid_input("paged source disk byte count overflows"))?;
+        let mut reservation = self
+            .inner
+            .retained_disk_reservation
+            .lock()
+            .map_err(|_| Error::invariant("paged source disk reservation lock poisoned"))?;
+        let reserved_bytes = reservation.bytes();
+        if actual_bytes > reserved_bytes {
+            reservation
+                .grow(actual_bytes - reserved_bytes)
+                .map_err(|_| Error::overloaded("paged source disk budget is exhausted"))?;
+        } else if actual_bytes < reserved_bytes {
+            reservation
+                .shrink(reserved_bytes - actual_bytes)
+                .map_err(|_| Error::invariant("paged source disk reconciliation failed"))?;
+        }
+        Ok(())
     }
 
     fn release_handle(&self, identity: SourceIdentity) {
@@ -1036,6 +1134,20 @@ fn source_header_bytes(kind: SourceFileKind) -> usize {
         SourceFileKind::CheckpointPack => super::PAGE_SIZE,
         SourceFileKind::WalSegment => crate::wal::INIT_FRAME_SIZE,
     }
+}
+
+fn directory_file_bytes(directory: &Path) -> Result<u64> {
+    let mut total_bytes = 0u64;
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        let metadata = entry.metadata()?;
+        if metadata.is_file() {
+            total_bytes = total_bytes
+                .checked_add(metadata.len())
+                .ok_or_else(|| Error::invalid_input("paged source disk byte count overflows"))?;
+        }
+    }
+    Ok(total_bytes)
 }
 
 fn write_all_wal_marker(directory: &Path) -> Result<()> {
