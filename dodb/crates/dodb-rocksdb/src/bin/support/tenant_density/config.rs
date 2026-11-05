@@ -125,6 +125,7 @@ pub struct Options {
     pub recovery_duration_ms: u64,
     pub slo_window_ms: Option<u64>,
     pub long_reader_retention_ms: u64,
+    pub drop_page_cache_before_warmup: bool,
     pub mutation_key_mode: MutationKeyMode,
     pub mutation_key_epoch: u64,
     pub operation_count: Option<u64>,
@@ -178,6 +179,7 @@ impl Options {
             "--recovery-duration-ms",
             "--slo-window-ms",
             "--long-reader-retention-ms",
+            "--drop-page-cache-before-warmup",
             "--mutation-key-mode",
             "--mutation-key-epoch",
             "--operation-count",
@@ -264,6 +266,16 @@ impl Options {
         let slo_window_ms = parse_optional_number(&values, "--slo-window-ms")?;
         let long_reader_retention_ms =
             parse_optional_number(&values, "--long-reader-retention-ms")?.unwrap_or(0);
+        let drop_page_cache_before_warmup =
+            match values.get("--drop-page-cache-before-warmup").copied() {
+                None | Some("off") => false,
+                Some("on") => true,
+                Some(value) => {
+                    return Err(format!(
+                        "unsupported page-cache preconditioning mode {value}"
+                    ));
+                }
+            };
         let mutation_key_mode = match values
             .get("--mutation-key-mode")
             .copied()
@@ -414,6 +426,7 @@ impl Options {
             recovery_duration_ms,
             slo_window_ms,
             long_reader_retention_ms,
+            drop_page_cache_before_warmup,
             mutation_key_mode,
             mutation_key_epoch,
             operation_count,
@@ -447,6 +460,11 @@ impl Options {
         }
         if self.warmup_duration_ms > 86_400_000 || self.recovery_duration_ms > 86_400_000 {
             return Err("warm-up and recovery durations must not exceed 24 hours".to_owned());
+        }
+        if self.drop_page_cache_before_warmup && self.warmup_duration_ms != 300_000 {
+            return Err(
+                "page-cache preconditioning requires the fixed 5-minute warm-up".to_owned(),
+            );
         }
         if self.slo_window_ms == Some(0) {
             return Err("SLO window duration must be positive".to_owned());
@@ -747,6 +765,24 @@ mod tests {
             + 1;
         argument_values[layout_position] = "legacy".to_owned();
         assert!(Options::parse(&argument_values).is_err());
+    }
+
+    #[test]
+    fn page_cache_preconditioning_requires_the_frozen_five_minute_warmup() {
+        let (_directory, arguments) = arguments(&[
+            "--drop-page-cache-before-warmup",
+            "on",
+            "--warmup-duration-ms",
+            "300000",
+        ]);
+        assert!(
+            Options::parse(&arguments)
+                .unwrap()
+                .drop_page_cache_before_warmup
+        );
+
+        let (_directory, arguments) = arguments(&["--drop-page-cache-before-warmup", "on"]);
+        assert!(Options::parse(&arguments).is_err());
     }
 
     #[test]

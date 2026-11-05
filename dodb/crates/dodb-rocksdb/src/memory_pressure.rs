@@ -9,7 +9,13 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use serde_json::{Value, json};
 
-pub const EPOCHS: [&str; 4] = ["setup", "measurement", "oracle", "reopen-oracle"];
+pub const EPOCHS: [&str; 5] = [
+    "setup",
+    "measurement",
+    "recovery",
+    "oracle",
+    "reopen-oracle",
+];
 const MAX_SAMPLES: usize = 4096;
 
 #[derive(Clone, Debug, Serialize)]

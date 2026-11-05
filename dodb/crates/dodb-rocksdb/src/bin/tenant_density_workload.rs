@@ -15,6 +15,7 @@ use std::collections::BTreeMap;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
+use std::process::Command;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -233,6 +234,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "seed_manifest_sha256": seed_manifest_sha256.clone(),
         "source_revision": source_revision.clone(),
         "topology": options.topology.as_str(),
+        "host_cache_controls": {
+            "zfs_arc_max_bytes": 2 * 1024 * 1024 * 1024_u64,
+            "drop_page_cache_before_warmup": options.drop_page_cache_before_warmup,
+            "warmup_duration_ms": options.warmup_duration_ms
+        },
         "warmup": scheduler::deterministic_fingerprints(&warmup_options, options.topology.as_str()),
         "measurement": scheduler::deterministic_fingerprints(&options, options.topology.as_str()),
         "measurement_maximum_extension": {
@@ -252,6 +258,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     open_measurement_tenants(&service, &options).await?;
     session.set_phase("measurement-correctness-preflight");
     let preflight_mutations = correctness_preflight(&service, &options).await?;
+    let host_cache_preconditioning = if options.drop_page_cache_before_warmup {
+        if let Some(monitor) = &pressure_monitor {
+            monitor.boundary("before-page-cache-drop");
+        }
+        let cache_state = drop_page_cache_and_capture()?;
+        if let Some(monitor) = &pressure_monitor {
+            monitor.boundary("after-page-cache-drop");
+        }
+        cache_state
+    } else {
+        json!({"status": "not_requested"})
+    };
     let mut workload_seed_expected = preflight_mutations.clone();
     let mut phase_reports = serde_json::Map::new();
     if options.warmup_duration_ms > 0 {
@@ -274,6 +292,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         workload_seed_expected.extend(warmup_mutations);
         phase_reports.insert("warmup".to_owned(), warmup_report);
     }
+    let host_cache_after_warmup = if options.drop_page_cache_before_warmup {
+        host_cache_snapshot()?
+    } else {
+        json!({"status": "not_requested"})
+    };
     measurement_worker
         .start_measurement()
         .map_err(std::io::Error::other)?;
@@ -568,6 +591,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         "workload": workload,
         "pre_execution_inputs_manifest": schedule_manifest_path,
+        "host_cache_preconditioning": host_cache_preconditioning,
+        "host_cache_after_warmup": host_cache_after_warmup,
         "post_measurement_full_population_oracle": oracle,
         "reopened_full_population_oracle": reopened_oracle,
         "memory_diagnostic": diagnostic,
@@ -621,6 +646,7 @@ async fn spawn_worker(
     phase: &str,
 ) -> Result<dodb_rocksdb::memory_diagnostic::MemoryDiagnosticWorker, Box<dyn std::error::Error>> {
     session.set_phase(phase);
+    let pressure_epoch = pressure_epoch_for_phase(phase);
     let mut worker_arguments = vec![
         "--backend".to_owned(),
         options.backend.as_str().to_owned(),
@@ -638,7 +664,7 @@ async fn spawn_worker(
     if let Some(monitor) = pressure_monitor {
         worker_arguments.extend(
             monitor
-                .worker_arguments(phase)
+                .worker_arguments(pressure_epoch)
                 .map_err(std::io::Error::other)?,
         );
     }
@@ -702,6 +728,49 @@ async fn spawn_worker(
         )
         .await
         .map_err(|error| Box::new(std::io::Error::other(error)) as Box<dyn std::error::Error>)
+}
+
+fn pressure_epoch_for_phase(phase: &str) -> &str {
+    if phase.starts_with("measurement-extension-") {
+        "measurement"
+    } else {
+        phase
+    }
+}
+
+fn drop_page_cache_and_capture() -> Result<Value, Box<dyn std::error::Error>> {
+    if !cfg!(target_os = "linux") || !Path::new("/proc/sys/vm/drop_caches").exists() {
+        return Err(std::io::Error::other("Linux page-cache control is unavailable").into());
+    }
+    let before = host_cache_snapshot()?;
+    let sync_status = Command::new("sync").status()?;
+    if !sync_status.success() {
+        return Err(std::io::Error::other("sync failed before page-cache drop").into());
+    }
+    std::fs::write("/proc/sys/vm/drop_caches", "3\n")?;
+    let after = host_cache_snapshot()?;
+    Ok(json!({
+        "status": "page_cache_dropped_before_fixed_warmup",
+        "drop_caches_value": 3,
+        "before": before,
+        "after": after,
+        "warmup_duration_ms": 300_000,
+        "warmup_scope": "fixed five-minute pass excluded from measurement"
+    }))
+}
+
+fn host_cache_snapshot() -> Result<Value, Box<dyn std::error::Error>> {
+    let memory = std::fs::read_to_string("/proc/meminfo")?;
+    let arcstats = std::fs::read_to_string("/proc/spl/kstat/zfs/arcstats")?;
+    let arc_summary = Command::new("arc_summary").output()?;
+    Ok(json!({
+        "meminfo": memory,
+        "arcstats": arcstats,
+        "arc_summary_status": arc_summary.status.code(),
+        "arc_summary_stdout": String::from_utf8_lossy(&arc_summary.stdout),
+        "arc_summary_stderr": String::from_utf8_lossy(&arc_summary.stderr),
+        "device_counters": resources::host_device_snapshot()
+    }))
 }
 
 async fn seed_population(
@@ -1385,6 +1454,7 @@ fn effective_configuration(options: &Options) -> Value {
         "seed": options.seed, "duration_ms": options.duration_ms, "warmup_duration_ms": options.warmup_duration_ms,
         "recovery_duration_ms": options.recovery_duration_ms, "slo_window_ms": options.slo_window_ms, "operation_count": options.operation_count,
         "long_reader_retention_ms": options.long_reader_retention_ms,
+        "drop_page_cache_before_warmup": options.drop_page_cache_before_warmup,
         "mutation_key_mode": options.mutation_key_mode.as_str(),
         "request_timeout_ms": options.request_timeout_ms, "drain_timeout_ms": options.drain_timeout_ms,
         "active_tenants": options.active_tenants, "opened_idle_tenants": options.opened_idle_tenants,
@@ -1415,7 +1485,10 @@ fn effective_configuration(options: &Options) -> Value {
 
 #[cfg(test)]
 mod tests {
-    use super::{effective_configuration, score_slo_window, validate_long_reader_retention};
+    use super::{
+        effective_configuration, pressure_epoch_for_phase, score_slo_window,
+        validate_long_reader_retention,
+    };
     use crate::config::{
         Backend, MutationKeyMode, Options, Profile, TenantArrivalPhase, Topology, Width,
     };
@@ -1437,6 +1510,7 @@ mod tests {
             recovery_duration_ms: 0,
             slo_window_ms: None,
             long_reader_retention_ms: 0,
+            drop_page_cache_before_warmup: false,
             mutation_key_mode: MutationKeyMode::Fixed,
             mutation_key_epoch: 0,
             operation_count: None,
@@ -1460,6 +1534,16 @@ mod tests {
             blink_disk_limit_bytes: 4 * 1024 * 1024 * 1024,
             blink_disk_per_tenant_bytes: 512 * 1024 * 1024,
         }
+    }
+
+    #[test]
+    fn recovery_and_checkpoint_extensions_use_valid_pressure_epochs() {
+        assert_eq!(pressure_epoch_for_phase("recovery"), "recovery");
+        assert_eq!(
+            pressure_epoch_for_phase("measurement-extension-30"),
+            "measurement"
+        );
+        assert_eq!(pressure_epoch_for_phase("measurement"), "measurement");
     }
 
     #[test]

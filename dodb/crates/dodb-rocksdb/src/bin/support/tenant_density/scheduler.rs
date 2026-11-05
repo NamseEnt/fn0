@@ -1730,6 +1730,7 @@ mod tests {
             recovery_duration_ms: 0,
             slo_window_ms: None,
             long_reader_retention_ms: 0,
+            drop_page_cache_before_warmup: false,
             mutation_key_mode: MutationKeyMode::Fixed,
             mutation_key_epoch: 0,
             operation_count: Some(20_000),
