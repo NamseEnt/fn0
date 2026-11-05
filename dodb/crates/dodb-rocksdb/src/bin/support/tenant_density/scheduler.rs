@@ -1534,8 +1534,12 @@ pub fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
         options.initial_rows,
         options.value_bytes
     );
+    let service_memory_identity = options
+        .service_memory_admission_bytes
+        .map(|budget| format!(";service_memory_admission_bytes={budget}"))
+        .unwrap_or_default();
     let mut schedule_identity = format!(
-        "hash=fnv1a64;topology={topology};profile={};width={:?};mutation_key_mode={};mutation_key_epoch={};clients={};queue_bound={};max_in_flight={};service_memory_admission_bytes={:?};rate={:?};duration={:?};operations={:?};fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
+        "hash=fnv1a64;topology={topology};profile={};width={:?};mutation_key_mode={};mutation_key_epoch={};clients={};queue_bound={};max_in_flight={}{};rate={:?};duration={:?};operations={:?};fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
         options.profile.as_str(),
         options.width,
         options.mutation_key_mode.as_str(),
@@ -1543,7 +1547,7 @@ pub fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
         options.client_count,
         options.queue_bound,
         options.max_in_flight,
-        options.service_memory_admission_bytes,
+        service_memory_identity,
         options.per_tenant_rate,
         options.duration_ms,
         options.operation_count
@@ -1579,12 +1583,9 @@ fn ordered_request_schedule_sha256(options: &Options, topology: &str) -> String 
     digest.update(options.value_bytes.to_be_bytes());
     digest.update(options.queue_bound.to_be_bytes());
     digest.update(options.max_in_flight.to_be_bytes());
-    digest.update(
-        options
-            .service_memory_admission_bytes
-            .unwrap_or(0)
-            .to_be_bytes(),
-    );
+    if let Some(budget_bytes) = options.service_memory_admission_bytes {
+        digest.update(budget_bytes.to_be_bytes());
+    }
     digest.update(options.profile.weights());
     digest.update(format!("{:?}", options.width).as_bytes());
     digest.update(options.tenant_arrival_phase.as_str().as_bytes());
@@ -1791,6 +1792,13 @@ mod tests {
         options.service_memory_admission_bytes = Some(6 * 1024 * 1024 * 1024);
         assert_eq!(bounded_in_flight_limit(&options, 2_048), 96);
         assert_eq!(bounded_in_flight_limit(&options, 8), 8);
+        let limited_schedule = deterministic_fingerprints(&options, "fixed-per-tenant");
+        options.service_memory_admission_bytes = None;
+        let default_schedule = deterministic_fingerprints(&options, "fixed-per-tenant");
+        assert_ne!(
+            limited_schedule["ordered_request_schedule_sha256"],
+            default_schedule["ordered_request_schedule_sha256"]
+        );
     }
 
     #[test]
