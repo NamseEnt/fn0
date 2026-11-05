@@ -45,6 +45,7 @@ BLINK_RESOURCES = [
     "--blink-checkpoint-wal-bytes",
     str(1024**2),
 ]
+ACTIVE_RUN_DIR = None
 
 
 def sha256(path):
@@ -90,11 +91,52 @@ def host_state(zfs_path):
     }
 
 
+def active_workload_processes():
+    active = []
+    for process_path in Path("/proc").glob("[0-9]*"):
+        executable_path = process_path / "exe"
+        try:
+            executable = Path(os.readlink(executable_path)).name
+        except (FileNotFoundError, PermissionError, ProcessLookupError):
+            continue
+        if executable in ["tenant_density_workload", "memory_diagnostic_worker"]:
+            active.append({"pid": int(process_path.name), "executable": executable})
+    return active
+
+
 def write_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
     temporary.replace(path)
+
+
+def append_progress(run_dir, outcome, accepted_populations, completed_cells):
+    progress_path = run_dir / "progress.jsonl"
+    event = {
+        "event": "cell_completed",
+        "label": outcome["label"],
+        "accepted_populations": accepted_populations,
+        "validated": outcome["validated"],
+        "database_allocated_bytes": outcome["database_allocated_bytes"],
+        "metrics": outcome["metrics"],
+        "input_identity": outcome["input_identity"],
+        "physical_read_coverage": outcome["physical_read_coverage"],
+        "ended_unix_seconds": outcome["ended_unix_seconds"],
+    }
+    with progress_path.open("a") as progress_file:
+        progress_file.write(json.dumps(event, sort_keys=True) + "\n")
+        progress_file.flush()
+        os.fsync(progress_file.fileno())
+    write_json(
+        run_dir / "progress.json",
+        {
+            "status": "running",
+            "accepted_populations": accepted_populations,
+            "completed_cells": completed_cells,
+            "last_completed_cell": outcome["label"],
+        },
+    )
 
 
 def create_cgroup(path):
@@ -476,6 +518,9 @@ def physical_read_coverage(report, scenario, population, recipe):
 def run_cell(args, recipe, binary, run_root, cgroup_base, scenario_id, population, repetition, backend, expected_hashes):
     scenario = scenario_values(recipe, scenario_id)
     label = f"n{population}-{scenario_id}-r{repetition}-{backend}"
+    active_processes = active_workload_processes()
+    if active_processes:
+        raise RuntimeError(f"workload process was active before {label}: {active_processes}")
     cell_root = run_root / label
     cell_root.mkdir(parents=True, exist_ok=False)
     data_path = args.zfs_path / "databases" / label
@@ -544,7 +589,6 @@ def run_cell(args, recipe, binary, run_root, cgroup_base, scenario_id, populatio
             start_new_session=True,
         )
         cgroup_initial = checkpoint_cgroup_deltas(cgroup_path)
-        last_size_check = 0.0
         stop_reason = None
         while child.poll() is None:
             time.sleep(5)
@@ -552,11 +596,8 @@ def run_cell(args, recipe, binary, run_root, cgroup_base, scenario_id, populatio
                 stop_reason = "ZFS available space fell below 10 GiB"
             current_counters = checkpoint_cgroup_deltas(cgroup_path)
             stop_reason = stop_reason or cgroup_stop_reason(cgroup_initial, current_counters)
-            now = time.monotonic()
-            if now - last_size_check >= 300:
-                last_size_check = now
-                if data_path.exists() and allocated_bytes(data_path) > BACKEND_DISK_BYTES:
-                    stop_reason = "backend allocated data exceeded the 32 GiB disk cap"
+            if data_path.exists() and allocated_bytes(data_path) > BACKEND_DISK_BYTES:
+                stop_reason = "backend allocated data exceeded the 32 GiB disk cap"
             if stop_reason:
                 os.killpg(child.pid, signal.SIGTERM)
                 try:
@@ -566,15 +607,22 @@ def run_cell(args, recipe, binary, run_root, cgroup_base, scenario_id, populatio
                     child.wait()
                 break
         exit_code = child.wait()
+    remaining_processes = active_workload_processes()
+    if remaining_processes:
+        stop_reason = stop_reason or f"workload processes remained after {label}: {remaining_processes}"
     after = host_state(args.zfs_path)
+    database_allocated_bytes = allocated_bytes(data_path) if data_path.exists() else None
+    if database_allocated_bytes is not None and database_allocated_bytes > BACKEND_DISK_BYTES:
+        stop_reason = stop_reason or "backend allocated data exceeded the 32 GiB disk cap"
     outcome = {
         "label": label,
         "exit_code": exit_code,
         "controller_stop_reason": stop_reason,
+        "remaining_workload_processes": remaining_processes,
         "started_unix_seconds": started,
         "ended_unix_seconds": time.time(),
         "host_after": after,
-        "database_allocated_bytes": allocated_bytes(data_path) if data_path.exists() else None,
+        "database_allocated_bytes": database_allocated_bytes,
         "report_sha256": sha256(report_path) if report_path.exists() else None,
         "process_log_sha256": sha256(log_path),
     }
@@ -635,6 +683,7 @@ def run_cell(args, recipe, binary, run_root, cgroup_base, scenario_id, populatio
 
 
 def main():
+    global ACTIVE_RUN_DIR
     parser = argparse.ArgumentParser()
     parser.add_argument("--recipe", type=Path, required=True)
     parser.add_argument("--binary-dir", type=Path, required=True)
@@ -646,6 +695,7 @@ def main():
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--cgroup-base", type=Path, required=True)
     args = parser.parse_args()
+    ACTIVE_RUN_DIR = args.run_dir
     if os.geteuid() != 0:
         raise RuntimeError("T17 runner requires root for the frozen ARC, page-cache, and cgroup controls")
     if sha256(args.recipe) != RECIPE_SHA256:
@@ -689,20 +739,20 @@ def main():
                 )
                 if available_bytes(args.zfs_path) < MATRIX_FREE_BYTES:
                     raise RuntimeError("47 GiB gate failed before a screening cell")
-                outcomes.append(
-                    run_cell(
-                        args,
-                        recipe,
-                        binary,
-                        args.run_dir,
-                        args.cgroup_base,
-                        screening,
-                        population,
-                        0,
-                        backend,
-                        expected_hashes,
-                    )
+                outcome = run_cell(
+                    args,
+                    recipe,
+                    binary,
+                    args.run_dir,
+                    args.cgroup_base,
+                    screening,
+                    population,
+                    0,
+                    backend,
+                    expected_hashes,
                 )
+                outcomes.append(outcome)
+                append_progress(args.run_dir, outcome, accepted_populations, len(outcomes))
             accepted_populations.append(population)
         for population_index, population in enumerate(accepted_populations):
             for scenario_id in [
@@ -722,31 +772,31 @@ def main():
                         )
                         if available_bytes(args.zfs_path) < MATRIX_FREE_BYTES:
                             raise RuntimeError("47 GiB gate failed before a stress cell")
-                        outcomes.append(
-                            run_cell(
-                                args,
-                                recipe,
-                                binary,
-                                args.run_dir,
-                                args.cgroup_base,
-                                scenario_id,
-                                population,
-                                repetition,
-                                backend,
-                                expected_hashes,
-                            )
+                        outcome = run_cell(
+                            args,
+                            recipe,
+                            binary,
+                            args.run_dir,
+                            args.cgroup_base,
+                            scenario_id,
+                            population,
+                            repetition,
+                            backend,
+                            expected_hashes,
                         )
-                    write_json(
-                        args.run_dir / "progress.json",
-                        {
-                            "accepted_populations": accepted_populations,
-                            "completed_cells": len(outcomes),
-                            "outcomes": outcomes,
-                        },
-                    )
+                        outcomes.append(outcome)
+                        append_progress(args.run_dir, outcome, accepted_populations, len(outcomes))
         write_json(
             args.run_dir / "summary.json",
             {"status": "complete", "accepted_populations": accepted_populations, "outcomes": outcomes},
+        )
+        write_json(
+            args.run_dir / "progress.json",
+            {
+                "status": "complete",
+                "accepted_populations": accepted_populations,
+                "completed_cells": len(outcomes),
+            },
         )
     finally:
         Path("/sys/module/zfs/parameters/zfs_arc_max").write_text(original_arc_max)
@@ -760,5 +810,15 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as error:
+        if ACTIVE_RUN_DIR is not None and ACTIVE_RUN_DIR.is_dir():
+            write_json(
+                ACTIVE_RUN_DIR / "controller-failure.json",
+                {"error": str(error), "timestamp_unix_seconds": time.time()},
+            )
+            progress_path = ACTIVE_RUN_DIR / "progress.json"
+            progress = json.loads(progress_path.read_text()) if progress_path.exists() else {}
+            progress["status"] = "stopped"
+            progress["stop_reason"] = str(error)
+            write_json(progress_path, progress)
         print(f"T17 stopped: {error}", file=sys.stderr, flush=True)
         raise

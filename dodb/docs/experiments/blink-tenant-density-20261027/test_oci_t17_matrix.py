@@ -1,5 +1,7 @@
 import importlib.util
+import json
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -23,6 +25,28 @@ def window(index, passed=True):
 
 
 class SloWindowTests(unittest.TestCase):
+    def test_cell_progress_is_durable_and_compact(self):
+        outcome = {
+            "label": "n1-synchronized-r1-blink-paged",
+            "validated": True,
+            "database_allocated_bytes": 4096,
+            "metrics": {"measurement_successful_per_second": 250.0},
+            "input_identity": {"recipe_sha256": "abc"},
+            "physical_read_coverage": {"physical_read_gate": "passed"},
+            "ended_unix_seconds": 1.0,
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            MATRIX.append_progress(run_dir, outcome, [1], 1)
+
+            progress = json.loads((run_dir / "progress.json").read_text())
+            events = (run_dir / "progress.jsonl").read_text().splitlines()
+
+        self.assertEqual(progress["completed_cells"], 1)
+        self.assertEqual(progress["last_completed_cell"], outcome["label"])
+        self.assertTrue(json.loads(events[0])["validated"])
+
     def test_measurement_extension_and_recovery_windows_are_scored(self):
         report = {
             "workload": {
@@ -33,7 +57,13 @@ class SloWindowTests(unittest.TestCase):
                     ],
                     "recovery_after_reopen": {"slo_windows": [window(0)]},
                 },
-            }
+            },
+            "backend_memory_pressure": {
+                "epochs": {
+                    "measurement": {"final": {"memory.peak": 100}},
+                    "recovery": {"final": {"memory.peak": 200}},
+                }
+            },
         }
 
         windows = MATRIX.slo_windows(report)
@@ -53,7 +83,18 @@ class SloWindowTests(unittest.TestCase):
             "reopened_full_population_oracle": {"passed": True},
             "host_cache_preconditioning": {"status": "page_cache_dropped_before_fixed_warmup"},
             "host_cache_after_warmup": {"arcstats": "size 4 2147483648"},
-            "backend_memory_pressure": {"enabled": True, "samples_truncated": False, "epochs": {}},
+            "backend_memory_pressure": {
+                "enabled": True,
+                "samples_truncated": False,
+                "epochs": {
+                    epoch_name: {
+                        "initial": {"memory.max": 8 * 1024**3, "memory.high": 7 * 1024**3, "memory.swap.max": 0},
+                        "final": {"memory.max": 8 * 1024**3, "memory.high": 7 * 1024**3, "memory.swap.max": 0, "memory.peak": 6 * 1024**3},
+                        "local_event_delta": {},
+                    }
+                    for epoch_name in ["measurement", "recovery"]
+                },
+            },
             "workload": {
                 "cell_valid": True,
                 "valid_for_oracle": True,
@@ -65,7 +106,12 @@ class SloWindowTests(unittest.TestCase):
                 "measured_duration_ms_including_extensions": 1800000,
                 "slo_windows": [window(index) for index in range(6)],
                 "phase_workloads": {
-                    "recovery_after_reopen": {"slo_stop_reason": "duration_completed", "slo_windows": [window(index) for index in range(6)]}
+                    "recovery_after_reopen": {
+                        "service_memory_admission_bytes": 6 * 1024**3,
+                        "service_memory_admission_in_flight_limit": 96,
+                        "slo_stop_reason": "duration_completed",
+                        "slo_windows": [window(index) for index in range(6)],
+                    }
                 },
             },
         }
