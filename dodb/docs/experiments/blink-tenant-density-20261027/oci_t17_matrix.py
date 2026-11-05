@@ -334,6 +334,17 @@ def validate_report(report, backend, scenario):
     recovery_report = workload.get("phase_workloads", {}).get("recovery_after_reopen", {})
     if recovery_report.get("slo_stop_reason") != "duration_completed":
         raise RuntimeError("recovery stopped before completing its fixed duration")
+    all_phase_reports = [workload]
+    all_phase_reports.extend(
+        extension.get("workload", {})
+        for extension in workload.get("phase_workloads", {}).get("checkpoint_cycle_extensions", [])
+    )
+    all_phase_reports.append(recovery_report)
+    for phase_report in all_phase_reports:
+        if phase_report.get("service_memory_admission_bytes") != 6 * 1024**3:
+            raise RuntimeError("the fixed service memory admission budget was not applied in every phase")
+        if phase_report.get("service_memory_admission_in_flight_limit") != 96:
+            raise RuntimeError("the 6 GiB request admission ceiling was not applied in every phase")
     if any(
         extension.get("workload", {}).get("slo_stop_reason") != "duration_completed"
         for extension in workload.get("phase_workloads", {}).get("checkpoint_cycle_extensions", [])
@@ -347,6 +358,18 @@ def validate_report(report, backend, scenario):
     pressure = report.get("backend_memory_pressure", {})
     if pressure.get("enabled") is not True or pressure.get("samples_truncated") is not False:
         raise RuntimeError("cgroup pressure evidence is absent or truncated")
+    for epoch_name in ["measurement", "recovery"]:
+        epoch = pressure.get("epochs", {}).get(epoch_name, {})
+        for boundary in ["initial", "final"]:
+            snapshot = epoch.get(boundary, {})
+            if snapshot.get("memory.max") != MEMORY_MAX_BYTES:
+                raise RuntimeError(f"{epoch_name} cgroup memory.max differs from 8 GiB")
+            if snapshot.get("memory.high") != MEMORY_HIGH_BYTES:
+                raise RuntimeError(f"{epoch_name} cgroup memory.high differs from 7 GiB")
+            if snapshot.get("memory.swap.max") != 0:
+                raise RuntimeError(f"{epoch_name} cgroup swap limit differs from zero")
+        if not isinstance(epoch.get("final", {}).get("memory.peak"), int):
+            raise RuntimeError(f"{epoch_name} cgroup peak memory is missing")
     for epoch in pressure.get("epochs", {}).values():
         for counter in ["high", "max", "oom", "oom_kill"]:
             if epoch.get("local_event_delta", {}).get(counter, 0) != 0:
@@ -364,10 +387,19 @@ def decision_metrics(report):
     workload = report["workload"]
     measurement_windows = [window for window in windows if window["phase"] != "recovery"]
     recovery_windows = [window for window in windows if window["phase"] == "recovery"]
+    pressure_epochs = report["backend_memory_pressure"]["epochs"]
     return {
         "measurement_scheduled": workload.get("scheduled"),
         "measurement_successful": workload.get("successful"),
         "measurement_dropped": workload.get("dropped"),
+        "measurement_elapsed_ms": workload.get("offered_load_elapsed_ms"),
+        "measurement_successful_per_second": (
+            workload["successful"] / (workload["offered_load_elapsed_ms"] / 1000)
+            if isinstance(workload.get("successful"), (int, float))
+            and isinstance(workload.get("offered_load_elapsed_ms"), (int, float))
+            and workload["offered_load_elapsed_ms"] > 0
+            else None
+        ),
         "measurement_max_p99_read_ms": max(
             window["read_p99_upper_bound_ms"]
             for window in measurement_windows
@@ -383,6 +415,8 @@ def decision_metrics(report):
         "recovery_max_p99_write_ms": max(
             window["write_p99_upper_bound_ms"] for window in recovery_windows
         ),
+        "measurement_cgroup_peak_memory_bytes": pressure_epochs["measurement"]["final"]["memory.peak"],
+        "recovery_cgroup_peak_memory_bytes": pressure_epochs["recovery"]["final"]["memory.peak"],
         "checkpoint_cycles": workload.get("successful_checkpoint_cycles"),
         "measured_duration_ms_including_extensions": workload.get(
             "measured_duration_ms_including_extensions"
