@@ -769,20 +769,20 @@ mod tests {
 
     #[test]
     fn page_cache_preconditioning_requires_the_frozen_five_minute_warmup() {
-        let (_directory, arguments) = arguments(&[
+        let (_directory, valid_arguments) = arguments(&[
             "--drop-page-cache-before-warmup",
             "on",
             "--warmup-duration-ms",
             "300000",
         ]);
         assert!(
-            Options::parse(&arguments)
+            Options::parse(&valid_arguments)
                 .unwrap()
                 .drop_page_cache_before_warmup
         );
 
-        let (_directory, arguments) = arguments(&["--drop-page-cache-before-warmup", "on"]);
-        assert!(Options::parse(&arguments).is_err());
+        let (_directory, invalid_arguments) = arguments(&["--drop-page-cache-before-warmup", "on"]);
+        assert!(Options::parse(&invalid_arguments).is_err());
     }
 
     #[test]
