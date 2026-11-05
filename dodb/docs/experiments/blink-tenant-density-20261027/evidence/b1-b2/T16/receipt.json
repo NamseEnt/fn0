@@ -181,7 +181,7 @@
     "required_free_bytes": 10737418240
   },
   "implementation_commit": "cb427a3b83ae97ed4017cedfba84714fc0da3a45",
-  "next_task": "Resolve T16 instrumentation gaps, then review/freeze the separately authorized T17 matrix and recheck OCI capacity.",
+  "next_task": "Close the two reviewed measurement gaps or amend the T16 contract with explicit unavailable boundaries; then freeze and review the numeric T17 matrix without launching it.",
   "owned_paths": [
     "crates/dodb-server/src/bin/tenant_density_workload.rs",
     "crates/dodb-server/src/bin/tenant_density_workload/memory_diagnostic_worker.rs",
@@ -280,9 +280,9 @@
     "final_smoke_root": "/bench/zfs/db/product-build/b1-b2-t16-cb427a3b8/smoke"
   },
   "remaining_work": [
-    "Complete bounded reachable-source byte reporting or record a reviewed, contract-conforming measurement boundary with exact source ownership.",
-    "Close the allocator retained-byte observation gap or explicitly establish its permitted unavailable boundary in the T16 contract and evidence schema.",
-    "Freeze T17 numeric matrix, input recipes and hashes, setup expansion/overlap, source/native/binary identity, host-cache controls, SLO, offered rates, run lengths, repetitions, stop rules, reviewer, and capacity.",
+    "Reachable-source bytes are captured at explicit worker and health-report boundaries, but are unavailable in periodic samples because the bounded reachability walk is omitted there.",
+    "Allocator-retained bytes remain unavailable in all phases; define and validate a contract-conforming observation boundary or explicitly bound this gap with process/cgroup evidence.",
+    "Freeze the numeric T17 matrix, input recipes and hashes, setup expansion/overlap sizing, source/native/binary identity, host-cache controls, SLO, offered rates, run lengths, repetition/stop rules, evidence reviewer, and available capacity.",
     "Do not launch T17 until at least 10 GiB ZFS free space remains after worst-case overlap and failed-cell preservation."
   ],
   "runtime_configuration": {
@@ -336,5 +336,20 @@
     "cargo": "1.97.1",
     "native_dependency": "RocksDB pinned at abeebd9630f11bd08c28b7bd43c7bdfc62050654",
     "rust": "1.97.1"
+  },
+  "follow_up_evidence": {
+    "source_commit": "85c0ffac08dce0328be8193d6a8a4a657034dec4",
+    "paired_reports": "remote/smoke-instrumented-85c0ffac0/",
+    "candidate_reachable_source_bytes": {
+      "measurement_start": 2282528,
+      "measurement_end": 3195260,
+      "measurement_end_files": 4,
+      "unit": "logical file bytes",
+      "periodic_samples": "unavailable because reachability walk is omitted from periodic sample"
+    },
+    "allocator_retained_bytes": null,
+    "paired_operations_each_route": 400,
+    "post_measurement_and_reopened_oracles_passed": true,
+    "classification": "correctness and instrumentation evidence only; not performance evidence"
   }
 }

@@ -33,3 +33,11 @@ At the capacity check, `/bench/zfs/db` had 10,982,387,712 bytes free, only 244,9
 The raw reports, logs, and failed databases are preserved under `remote/smoke-failed/98df8edc9` and on OCI. See `receipt.json` for exact paths, hashes, configuration, checks, and remaining gates.
 
 Capacity provenance: see logs/oci-capacity-gate.log for the raw OCI resource snapshot and terminal-state checks.
+
+## Follow-up source-boundary measurement
+
+Commit `85c0ffac08dce0328be8193d6a8a4a657034dec4` adds reachable-source measurement at explicit service observation boundaries. The preserved paired reports under `remote/smoke-instrumented-85c0ffac0/` show the candidate's reachable logical source bytes at the measurement start and end as 2,282,528 and 3,195,260 bytes across four files. The post-measurement health snapshots also report 3,195,260 bytes. These values cover logical file lengths; they are not allocated filesystem blocks or physical disk-return measurements.
+
+The measurement-worker snapshot includes 3,195,260 reachable bytes. Periodic resource samples still report `reachable_source_bytes` as unavailable because the full reachability walk is deliberately not performed at every sample. Allocator-retained bytes remain unavailable in every phase. The pair completed 400/400 operations per route with matching request/schedule fingerprints and passing full-population and reopen oracles; it remains correctness and instrumentation evidence, not a performance result.
+
+T16 remains partial. Before accepting readiness, either add and validate bounded periodic reachability and allocator-retention observations, or amend the T16 measurement contract with a reviewed explicit boundary for each unavailable quantity and show how the existing cgroup/process observations bound the experiment. Then freeze the numeric T17 matrix and its input recipes, hashes, overlap sizing, acceptance rules, reviewer, and capacity. Do not run T17 under this receipt.
