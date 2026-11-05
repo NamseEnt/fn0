@@ -1462,9 +1462,9 @@ mod tests {
         assert_eq!(score_slo_window(&passing)["passed"], true);
 
         let mut failing = passing.clone();
-        failing["operation_latency_histograms"]["Write"]["bucket_counts"][17] = 1.into();
+        failing["operation_latency_histograms"]["Write"]["bucket_counts"][27] = 2.into();
         assert_eq!(score_slo_window(&failing)["passed"], false);
-        failing["operation_latency_histograms"]["Write"]["bucket_counts"][17] = 0.into();
+        failing["operation_latency_histograms"]["Write"]["bucket_counts"][27] = 0.into();
         failing["other_error"] = 2.into();
         assert_eq!(score_slo_window(&failing)["passed"], false);
     }

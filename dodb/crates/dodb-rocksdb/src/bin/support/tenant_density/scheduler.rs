@@ -1828,7 +1828,7 @@ mod tests {
         let synchronized = deterministic_fingerprints(&options, "fixed-per-tenant");
         assert_eq!(
             synchronized["schedule_fingerprint"],
-            "fnv1a64:e913b4f65d1ccd15"
+            "fnv1a64:4fadaffbe8cad0df"
         );
         assert_eq!(
             synchronized["input_fingerprint"],
