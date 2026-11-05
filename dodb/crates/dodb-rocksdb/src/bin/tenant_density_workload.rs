@@ -32,6 +32,59 @@ fn filesystem_snapshot(path: &Path) -> Value {
     }
 }
 
+fn measurement_resource_samples(diagnostic: &Value) -> Value {
+    let Some(measurement_report) = diagnostic
+        .get("engine_health_reports")
+        .and_then(Value::as_array)
+        .and_then(|reports| {
+            reports
+                .iter()
+                .find(|report| report["worker_phase"].as_str() == Some("measurement"))
+        })
+    else {
+        return json!({"status": "unavailable", "reason": "measurement worker report is missing"});
+    };
+    let samples = measurement_report["periodic_pressure"]["samples"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let allocator_samples = samples
+        .iter()
+        .filter_map(|sample| sample["allocator_retained"]["retained_free_arena_bytes"].as_u64())
+        .collect::<Vec<_>>();
+    let reachable_samples = samples
+        .iter()
+        .filter_map(|sample| {
+            sample["blink_paged_resources"]["disk_bytes"]["reachable_source_bytes"].as_u64()
+        })
+        .collect::<Vec<_>>();
+    let minimum_allocator_retained_bytes = allocator_samples.iter().copied().min();
+    let maximum_allocator_retained_bytes = allocator_samples.iter().copied().max();
+    let minimum_reachable_source_bytes = reachable_samples.iter().copied().min();
+    let maximum_reachable_source_bytes = reachable_samples.iter().copied().max();
+    json!({
+        "status": "sampled",
+        "worker_phase": "measurement-including-drain",
+        "periodic_sample_count": samples.len(),
+        "allocator_retained": {
+            "allocator": "glibc mallinfo2",
+            "field": "fordblks",
+            "sample_count": allocator_samples.len(),
+            "missing_sample_count": samples.len().saturating_sub(allocator_samples.len()),
+            "minimum_bytes": minimum_allocator_retained_bytes,
+            "maximum_bytes": maximum_allocator_retained_bytes,
+            "meaning": "free arena bytes retained by glibc; excludes allocated blocks and separately mmap-allocated blocks"
+        },
+        "reachable_source": {
+            "sample_count": reachable_samples.len(),
+            "missing_sample_count": samples.len().saturating_sub(reachable_samples.len()),
+            "minimum_logical_file_bytes": minimum_reachable_source_bytes,
+            "maximum_logical_file_bytes": maximum_reachable_source_bytes,
+            "meaning": "unique reachable checkpoint pack and WAL segment logical lengths; not allocated filesystem blocks or device writes"
+        },
+    })
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments = std::env::args().skip(1).collect::<Vec<_>>();
@@ -180,6 +233,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &offer_process_before,
         &offer_process_after,
     );
+    let measurement_resource_report = measurement_resource_samples(&diagnostic);
     Ok(json!({
         "status": if cell_is_valid { "completed" } else { "inconclusive" },
         "requested_source_revision": source_revision,
@@ -218,7 +272,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "reopened_full_population_oracle": reopened_oracle,
         "memory_diagnostic": diagnostic,
         "measurement_worker_process_sampling": measurement_process_summary,
-        "retained_heap_bytes": {"value": null, "status": "unsupported", "reason": "allocator retained heap is not instrumented"},
+        "measurement_periodic_resources": measurement_resource_report,
+        "retained_heap_bytes": measurement_resource_report["allocator_retained"].clone(),
         "filesystem_write_amplification": {"value": null, "status": "unsupported", "reason": "allocated blocks are not device or ZFS write amplification"}
     }))
     }
