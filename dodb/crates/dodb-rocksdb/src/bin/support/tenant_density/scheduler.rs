@@ -117,6 +117,21 @@ fn roll_fingerprint(current: u64, value: u64) -> u64 {
     })
 }
 
+fn mutation_row_belongs_to_client(
+    options: &Options,
+    row_number: usize,
+    client_number: usize,
+) -> bool {
+    if row_number < options.initial_rows {
+        return false;
+    }
+    let row_offset = row_number - options.initial_rows;
+    match options.mutation_key_mode {
+        MutationKeyMode::Fixed => row_offset / 16 == client_number,
+        MutationKeyMode::Growing => (row_offset % 1_000_000_000) / 1_000_000 == client_number,
+    }
+}
+
 fn phase_offset_nanos(tenant_number: usize, active_tenants: usize, rate: u64) -> Option<u64> {
     if tenant_number == 0 || tenant_number > active_tenants || active_tenants == 0 || rate == 0 {
         return None;
@@ -172,18 +187,6 @@ impl Drop for TenantInFlightGuard {
     }
 }
 
-pub async fn run_fixed_per_tenant<S, F>(
-    service: Arc<S>,
-    options: &Options,
-    on_offer_end: F,
-) -> WorkloadResult
-where
-    S: DodbService + 'static,
-    F: Fn() -> Value + Send + Sync + 'static,
-{
-    run_fixed_per_tenant_seeded(service, options, &BTreeMap::new(), on_offer_end).await
-}
-
 pub async fn run_fixed_per_tenant_seeded<S, F>(
     service: Arc<S>,
     options: &Options,
@@ -195,7 +198,11 @@ where
     F: Fn() -> Value + Send + Sync + 'static,
 {
     let started = Instant::now();
-    let semaphore = Arc::new(Semaphore::new(options.max_in_flight));
+    let total_in_flight_limit = options
+        .max_in_flight
+        .saturating_mul(options.client_count)
+        .saturating_mul(options.active_tenants);
+    let semaphore = Arc::new(Semaphore::new(total_in_flight_limit));
     let observed_in_flight = Arc::new(AtomicU64::new(0));
     let mut tasks = JoinSet::new();
     let mut producers = JoinSet::new();
@@ -214,11 +221,13 @@ where
         .ok_or_else(|| "tenant arrival phase offset is outside the supported range".to_owned())?;
     for (tenant_index, phase_offset_nanos) in tenant_phase_offsets.iter().copied().enumerate() {
         let tenant_number = tenant_index + 1;
-        let (sender, mut receiver) = mpsc::channel::<Arrival>(options.queue_bound);
+        let (senders, receivers): (Vec<_>, Vec<_>) = (0..options.client_count)
+            .map(|_| mpsc::channel::<Arrival>(options.queue_bound))
+            .unzip();
         let counters = Arc::new(Mutex::new(Counters::default()));
         tenant_counter_handles.push((tenant_number, Arc::clone(&counters)));
         let producer_counters = Arc::clone(&counters);
-        let queue_bound = options.queue_bound as u64;
+        let client_count = options.client_count;
         let duration_deadline = options
             .duration_ms
             .map(|duration| started + Duration::from_millis(duration));
@@ -258,14 +267,8 @@ where
                         deadline_nanos,
                         tenant_arrival_phase,
                     );
-                    if state.queued >= queue_bound {
-                        state.dropped += 1;
-                        state.scheduled_fingerprint =
-                            roll_fingerprint(state.scheduled_fingerprint, 0);
-                        operation_number += 1;
-                        continue;
-                    }
-                    match sender.try_send(Arrival {
+                    let client_index = operation_number as usize % client_count;
+                    match senders[client_index].try_send(Arrival {
                         operation_number,
                         scheduled_at,
                     }) {
@@ -297,146 +300,192 @@ where
         });
         let tenant_service = Arc::clone(&service);
         let consumer_counters = Arc::clone(&counters);
-        let tenant_semaphore = Arc::clone(&semaphore);
-        let tenant_observed_in_flight = Arc::clone(&observed_in_flight);
-        let max_in_flight = options.max_in_flight as u64;
         let tenant_options = options.clone();
-        let tenant_expected = initial_expected
+        let tenant_seed_expected = initial_expected
             .iter()
             .filter(|((expected_tenant, _), _)| *expected_tenant == tenant_number as u64)
             .map(|((_, row_number), value)| ((tenant_number, *row_number), value.clone()))
             .collect::<BTreeMap<_, _>>();
+        let tenant_initial_expected = tenant_seed_expected.clone();
+        let shared_expected = Arc::new(Mutex::new(tenant_seed_expected));
         tasks.spawn(async move {
-            let mut expected = tenant_expected;
-            let mut write_ordinal = 0_u64;
-            let mut mutation_ordinal = 0_u64;
-            while let Some(arrival) = receiver.recv().await {
-                let prepared = prepare_request(
-                    &tenant_options,
-                    RequestAddress {
-                        tenant_number,
-                        operation_number: arrival.operation_number,
-                        selection_offset: 0,
-                        write_ordinal,
-                        mutation_ordinal,
-                        lane_start: 0,
-                    },
-                    &expected,
-                );
-                if prepared.operation_kind == 2 {
-                    write_ordinal += 1;
-                    mutation_ordinal += prepared.width as u64;
-                }
-                if let Ok(mut state) = consumer_counters.lock() {
-                    state.request_count += 1;
-                    state.request_fingerprint =
-                        roll_fingerprint(state.request_fingerprint, prepared.fingerprint);
-                }
-                let is_mutation = prepared.request.is_mutation();
-                let permit = tenant_semaphore
-                    .acquire()
-                    .await
-                    .map_err(|error| error.to_string())?;
-                let in_flight = max_in_flight - tenant_semaphore.available_permits() as u64;
-                tenant_observed_in_flight.fetch_max(in_flight, Ordering::Relaxed);
-                if let Ok(mut state) = consumer_counters.lock() {
-                    state.queued = state.queued.saturating_sub(1);
-                    state.in_flight += 1;
-                    state.in_flight_high_water = state.in_flight_high_water.max(state.in_flight);
-                }
-                let response = tokio::time::timeout(
-                    Duration::from_millis(tenant_options.request_timeout_ms),
-                    tenant_service.execute(
-                        TenantId::new(tenant_number as u64),
-                        prepared.request,
-                        ExecutionBudget::new(RESPONSE_BUDGET_BYTES),
-                    ),
-                )
-                .await;
-                let mut uncertain = false;
-                match response {
-                    Ok(Ok(response))
-                        if valid_response(
-                            &response,
-                            prepared.operation_kind,
-                            &tenant_options,
-                            tenant_number,
-                            arrival.operation_number,
-                        ) =>
-                    {
-                        for (row_number, value) in prepared.acknowledgements {
-                            expected.insert((tenant_number, row_number), value);
+            let mut client_tasks = JoinSet::new();
+            for (client_number, mut receiver) in receivers.into_iter().enumerate() {
+                let client_service = Arc::clone(&tenant_service);
+                let client_counters = Arc::clone(&consumer_counters);
+                let client_semaphore = Arc::clone(&semaphore);
+                let client_observed_in_flight = Arc::clone(&observed_in_flight);
+                let client_expected_state = Arc::clone(&shared_expected);
+                let client_options = tenant_options.clone();
+                let client_initial_expected = tenant_initial_expected
+                    .iter()
+                    .filter(|((_, row_number), _)| {
+                        mutation_row_belongs_to_client(&tenant_options, *row_number, client_number)
+                    })
+                    .map(|(key, value)| (*key, value.clone()))
+                    .collect::<BTreeMap<_, _>>();
+                client_tasks.spawn(async move {
+                    let mut expected = client_initial_expected;
+                    let mut write_ordinal = 0_u64;
+                    let mut mutation_ordinal = 0_u64;
+                    let mut request_count = 0_u64;
+                    let mut request_fingerprint = 0xcbf2_9ce4_8422_2325_u64;
+                    while let Some(arrival) = receiver.recv().await {
+                        let lane_start =
+                            if client_options.mutation_key_mode == MutationKeyMode::Growing {
+                                client_number * 1_000_000
+                            } else {
+                                client_number * 16
+                            };
+                        let prepared = prepare_request(
+                            &client_options,
+                            RequestAddress {
+                                tenant_number,
+                                operation_number: arrival.operation_number,
+                                selection_offset: 0,
+                                write_ordinal,
+                                mutation_ordinal,
+                                lane_start,
+                            },
+                            &expected,
+                        );
+                        request_count += 1;
+                        request_fingerprint =
+                            roll_fingerprint(request_fingerprint, prepared.fingerprint);
+                        if prepared.operation_kind == 2 {
+                            write_ordinal += 1;
+                            mutation_ordinal += prepared.width as u64;
                         }
-                        if let Ok(mut state) = consumer_counters.lock() {
-                            state.successful += 1;
+                        let is_mutation = prepared.request.is_mutation();
+                        let permit = client_semaphore
+                            .acquire()
+                            .await
+                            .map_err(|error| error.to_string())?;
+                        let in_flight = total_in_flight_limit as u64
+                            - client_semaphore.available_permits() as u64;
+                        client_observed_in_flight.fetch_max(in_flight, Ordering::Relaxed);
+                        if let Ok(mut state) = client_counters.lock() {
+                            state.queued = state.queued.saturating_sub(1);
+                            state.in_flight += 1;
+                            state.in_flight_high_water =
+                                state.in_flight_high_water.max(state.in_flight);
                         }
+                        let response = tokio::time::timeout(
+                            Duration::from_millis(client_options.request_timeout_ms),
+                            client_service.execute(
+                                TenantId::new(tenant_number as u64),
+                                prepared.request,
+                                ExecutionBudget::new(RESPONSE_BUDGET_BYTES),
+                            ),
+                        )
+                        .await;
+                        let mut uncertain = false;
+                        match response {
+                            Ok(Ok(response))
+                                if valid_response(
+                                    &response,
+                                    prepared.operation_kind,
+                                    &client_options,
+                                    tenant_number,
+                                    arrival.operation_number,
+                                ) =>
+                            {
+                                for (row_number, value) in prepared.acknowledgements {
+                                    expected.insert((tenant_number, row_number), value.clone());
+                                    if let Ok(mut shared) = client_expected_state.lock() {
+                                        shared.insert((tenant_number, row_number), value);
+                                    }
+                                }
+                                if let Ok(mut state) = client_counters.lock() {
+                                    state.successful += 1;
+                                }
+                            }
+                            Ok(Ok(_)) => {
+                                uncertain = is_mutation;
+                                if let Ok(mut state) = client_counters.lock() {
+                                    state.errors += 1;
+                                }
+                            }
+                            Ok(Err(CoreError::Conflict(_))) => {
+                                if let Ok(mut state) = client_counters.lock() {
+                                    state.rejected_conflicts += 1;
+                                }
+                            }
+                            Ok(Err(_)) => {
+                                uncertain = is_mutation;
+                                if let Ok(mut state) = client_counters.lock() {
+                                    state.errors += 1;
+                                }
+                            }
+                            Err(_) => {
+                                uncertain = is_mutation;
+                                if let Ok(mut state) = client_counters.lock() {
+                                    state.timeouts += 1;
+                                }
+                            }
+                        }
+                        let elapsed_nanos = Instant::now()
+                            .saturating_duration_since(arrival.scheduled_at)
+                            .as_nanos()
+                            .min(u64::MAX as u128)
+                            as u64;
+                        let bucket = if elapsed_nanos == 0 {
+                            0
+                        } else {
+                            (u64::BITS - elapsed_nanos.leading_zeros()).min(63) as usize
+                        };
+                        if let Ok(mut state) = client_counters.lock() {
+                            state.completed += 1;
+                            state.in_flight = state.in_flight.saturating_sub(1);
+                            state.latency_histogram[bucket] += 1;
+                            state.maximum_latency_nanos =
+                                state.maximum_latency_nanos.max(elapsed_nanos);
+                            state.operation_counts[prepared.operation_kind] += 1;
+                            state.operation_latency_histograms[prepared.operation_kind][bucket] +=
+                                1;
+                            state.operation_maximum_latency_nanos[prepared.operation_kind] = state
+                                .operation_maximum_latency_nanos[prepared.operation_kind]
+                                .max(elapsed_nanos);
+                            if prepared.operation_kind == 2 {
+                                state.transaction_counts[0] += 1;
+                                state.transaction_counts[1] += prepared.width as u64;
+                                state.transaction_counts[2] += prepared.deletes;
+                                state.transaction_counts
+                                    [if prepared.conditional { 3 } else { 4 }] += 1;
+                                if let Some(width_index) = match prepared.width {
+                                    1 => Some(0),
+                                    4 => Some(1),
+                                    16 => Some(2),
+                                    _ => None,
+                                } {
+                                    state.width_counts[width_index] += 1;
+                                }
+                            }
+                            state.uncertain_mutation |= uncertain;
+                        }
+                        drop(permit);
                     }
-                    Ok(Ok(_)) => {
-                        uncertain = is_mutation;
-                        if let Ok(mut state) = consumer_counters.lock() {
-                            state.errors += 1;
-                        }
-                    }
-                    Ok(Err(CoreError::Conflict(_))) => {
-                        if let Ok(mut state) = consumer_counters.lock() {
-                            state.rejected_conflicts += 1;
-                        }
-                    }
-                    Ok(Err(_)) => {
-                        uncertain = is_mutation;
-                        if let Ok(mut state) = consumer_counters.lock() {
-                            state.errors += 1;
-                        }
-                    }
-                    Err(_) => {
-                        uncertain = is_mutation;
-                        if let Ok(mut state) = consumer_counters.lock() {
-                            state.timeouts += 1;
-                        }
-                    }
-                }
-                let elapsed_nanos = Instant::now()
-                    .saturating_duration_since(arrival.scheduled_at)
-                    .as_nanos()
-                    .min(u64::MAX as u128) as u64;
-                let bucket = if elapsed_nanos == 0 {
-                    0
-                } else {
-                    (u64::BITS - elapsed_nanos.leading_zeros()).min(63) as usize
-                };
-                if let Ok(mut state) = consumer_counters.lock() {
-                    state.completed += 1;
-                    state.in_flight = state.in_flight.saturating_sub(1);
-                    state.latency_histogram[bucket] += 1;
-                    state.maximum_latency_nanos = state.maximum_latency_nanos.max(elapsed_nanos);
-                    state.operation_counts[prepared.operation_kind] += 1;
-                    state.operation_latency_histograms[prepared.operation_kind][bucket] += 1;
-                    state.operation_maximum_latency_nanos[prepared.operation_kind] = state
-                        .operation_maximum_latency_nanos[prepared.operation_kind]
-                        .max(elapsed_nanos);
-                    if prepared.operation_kind == 2 {
-                        state.transaction_counts[0] += 1;
-                        state.transaction_counts[1] += prepared.width as u64;
-                        state.transaction_counts[2] += prepared.deletes;
-                        state.transaction_counts[if prepared.conditional { 3 } else { 4 }] += 1;
-                        if let Some(width_index) = match prepared.width {
-                            1 => Some(0),
-                            4 => Some(1),
-                            16 => Some(2),
-                            _ => None,
-                        } {
-                            state.width_counts[width_index] += 1;
-                        }
-                    }
-                    state.uncertain_mutation |= uncertain;
-                }
-                drop(permit);
+                    Ok::<_, String>((client_number, request_count, request_fingerprint))
+                });
             }
+            let mut client_results = Vec::new();
+            while let Some(result) = client_tasks.join_next().await {
+                client_results.push(result.map_err(|error| error.to_string())??);
+            }
+            client_results.sort_by_key(|(client_number, _, _)| *client_number);
             let mut state = consumer_counters
                 .lock()
-                .map_err(|_| "tenant counter lock poisoned".to_owned())?
+                .map_err(|_| "tenant counter lock poisoned".to_owned())?;
+            for (_, request_count, request_fingerprint) in client_results {
+                state.request_count += request_count;
+                state.request_fingerprint =
+                    roll_fingerprint(state.request_fingerprint, request_fingerprint);
+            }
+            state.expected = shared_expected
+                .lock()
+                .map_err(|_| "shared expected mutation lock poisoned".to_owned())?
                 .clone();
-            state.expected = expected;
+            let state = state.clone();
             Ok::<_, String>((tenant_number, state))
         });
     }
@@ -608,6 +657,9 @@ where
             "queued_at_end": state.queued,
             "in_flight_at_end": state.in_flight,
             "in_flight_high_water": state.in_flight_high_water,
+            "client_count": options.client_count,
+            "client_max_in_flight_configured": options.max_in_flight,
+            "client_observed_max_in_flight": 1,
             "queue_high_water": state.queue_high_water,
             "request_count": state.request_count,
             "request_fingerprint": format!("fnv1a64:{:016x}", state.request_fingerprint),
@@ -656,7 +708,7 @@ where
     let report = json!({
         "topology": "fixed-per-tenant",
         "deterministic_fingerprints": deterministic_fingerprints(options, "fixed-per-tenant"),
-        "offered_schedule": "one independent absolute-deadline producer and sequential consumer lane per active tenant; bounded nonblocking channel admission",
+        "offered_schedule": "one independent absolute-deadline producer per active tenant, round-robin across per-client bounded queues, and one sequential service lane per client",
         "scheduled": totals.scheduled,
         "admitted": totals.admitted,
         "dropped": totals.dropped,
@@ -668,11 +720,13 @@ where
         "timed_out": totals.timeouts,
         "queued_at_end": 0,
         "in_flight_at_end": 0,
-        "configured_max_in_flight": options.max_in_flight,
+        "configured_max_in_flight_per_client": options.max_in_flight,
+        "configured_clients_per_tenant": options.client_count,
+        "configured_total_in_flight_ceiling": total_in_flight_limit,
         "observed_max_in_flight": observed_in_flight.load(Ordering::Relaxed),
         "queue_high_water_sum_across_tenants": totals.queue_high_water,
         "request_count": totals.request_count,
-        "request_fingerprint_algorithm": "FNV-1a 64-bit over admitted requests in tenant order",
+        "request_fingerprint_algorithm": "FNV-1a 64-bit over admitted requests in tenant order, then client-number order and per-client issue order",
         "request_fingerprint": format!("fnv1a64:{:016x}", totals.request_fingerprint),
         "scheduled_fingerprint": format!("fnv1a64:{:016x}", totals.scheduled_fingerprint),
         "latency_histogram": {"unit": "nanoseconds; logarithmic power-of-two buckets; scheduled-to-completion", "bucket_counts": totals.latency_histogram, "observation_count": totals.completed, "maximum_nanos": totals.maximum_latency_nanos},
@@ -1268,7 +1322,7 @@ fn prepare_request(
     let mut acknowledgements = Vec::new();
     let mut deletes = 0;
     let growing_key_offset = if options.mutation_key_mode == MutationKeyMode::Growing {
-        let epoch_offset = options.mutation_key_epoch.saturating_mul(1_000_000);
+        let epoch_offset = options.mutation_key_epoch.saturating_mul(1_000_000_000);
         usize::try_from(epoch_offset.saturating_add(write_ordinal.saturating_mul(16)))
             .unwrap_or(usize::MAX)
     } else {
@@ -1457,12 +1511,14 @@ fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
         options.value_bytes
     );
     let mut schedule_identity = format!(
-        "hash=fnv1a64;topology={topology};profile={};width={:?};mutation_key_mode={};mutation_key_epoch={};clients={};rate={:?};duration={:?};operations={:?};selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
+        "hash=fnv1a64;topology={topology};profile={};width={:?};mutation_key_mode={};mutation_key_epoch={};clients={};queue_bound={};max_in_flight={};rate={:?};duration={:?};operations={:?};fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
         options.profile.as_str(),
         options.width,
         options.mutation_key_mode.as_str(),
         options.mutation_key_epoch,
         options.client_count,
+        options.queue_bound,
+        options.max_in_flight,
         options.per_tenant_rate,
         options.duration_ms,
         options.operation_count
@@ -1519,7 +1575,7 @@ mod tests {
     use super::{
         RequestAddress, TenantArrivalPhase, deterministic_fingerprints,
         nominal_deadline_offset_nanos, phase_offset_nanos, prepare_request,
-        roll_scheduled_fingerprint, run_fixed_per_tenant, run_fixed_total,
+        roll_scheduled_fingerprint, run_fixed_per_tenant_seeded, run_fixed_total,
     };
     use crate::config::{Options, Profile, Topology, Width};
     use dodb_core::TenantId;
@@ -1643,6 +1699,19 @@ mod tests {
         assert_eq!(growing.operation_kind, 2);
         assert_eq!(fixed.acknowledgements[0].0, 288);
         assert_eq!(growing.acknowledgements[0].0, 336);
+    }
+
+    #[test]
+    fn per_tenant_clients_own_disjoint_fixed_and_growing_mutation_ranges() {
+        let mut options = test_options();
+        options.client_count = 8;
+        options.mutation_key_mode = MutationKeyMode::Fixed;
+        assert!(mutation_row_belongs_to_client(&options, 272, 1));
+        assert!(!mutation_row_belongs_to_client(&options, 272, 0));
+        options.mutation_key_mode = MutationKeyMode::Growing;
+        let growing_row = options.initial_rows + 5 * 1_000_000_000 + 3 * 1_000_000 + 16 * 7;
+        assert!(mutation_row_belongs_to_client(&options, growing_row, 3));
+        assert!(!mutation_row_belongs_to_client(&options, growing_row, 2));
     }
 
     #[test]
@@ -1911,10 +1980,14 @@ mod tests {
         options.request_timeout_ms = 1000;
         options.drain_timeout_ms = 3000;
         let service = delayed_service(&options, Duration::from_millis(80));
-        let (report, _) =
-            run_fixed_per_tenant(Arc::clone(&service), &options, || json!({"captured": true}))
-                .await
-                .unwrap();
+        let (report, _) = run_fixed_per_tenant_seeded(
+            Arc::clone(&service),
+            &options,
+            &BTreeMap::new(),
+            || json!({"captured": true}),
+        )
+        .await
+        .unwrap();
         assert!(report["dropped"].as_u64().unwrap() > 0);
         assert!(report["accounting"]["scheduled_equals_admitted_plus_dropped"] == true);
         assert!(report["accounting"]["pending_equals_queued_plus_in_flight_at_offer_end"] == true);
