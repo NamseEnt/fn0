@@ -33,6 +33,46 @@ use dodb_storage::{CoordinatorConfig, DatabaseConfig};
 use serde_json::json;
 use tokio::sync::mpsc;
 
+#[cfg(target_os = "linux")]
+#[repr(C)]
+struct AllocatorMallinfo2 {
+    arena: usize,
+    ordblks: usize,
+    smblks: usize,
+    hblks: usize,
+    hblkhd: usize,
+    usmblks: usize,
+    fsmblks: usize,
+    uordblks: usize,
+    fordblks: usize,
+    keepcost: usize,
+}
+
+#[cfg(target_os = "linux")]
+unsafe extern "C" {
+    fn mallinfo2() -> AllocatorMallinfo2;
+}
+
+fn allocator_retained_snapshot() -> serde_json::Value {
+    #[cfg(target_os = "linux")]
+    {
+        let allocator = unsafe { mallinfo2() };
+        return json!({
+            "status": "sampled",
+            "allocator": "glibc mallinfo2",
+            "retained_free_arena_bytes": allocator.fordblks,
+            "allocated_arena_bytes": allocator.uordblks,
+            "mmap_allocated_bytes": allocator.hblkhd,
+            "arena_bytes": allocator.arena,
+            "retained_definition": "free bytes reported by mallinfo2.fordblks; excludes allocated blocks and separately mmap-allocated blocks",
+        });
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        json!({"status": "unsupported", "reason": "mallinfo2 is available only on Linux glibc"})
+    }
+}
+
 type WorkerError = Box<dyn std::error::Error + Send + Sync>;
 type WorkerResult<T> = Result<T, WorkerError>;
 
@@ -881,7 +921,8 @@ async fn run(
                         "shared_resources": backend.shared_resource_snapshot(),
                         "rocksdb_properties": backend.engine_health_observer().map(|observer| observer.sample()),
                         "blink_checkpoints": backend.periodic_blink_checkpoint_metrics(),
-                        "blink_paged_resources": backend.blink_paged_resource_snapshot(false),
+                        "blink_paged_resources": backend.blink_paged_resource_snapshot(true),
+                        "allocator_retained": allocator_retained_snapshot(),
                     });
                     pressure_samples.record(&sample)?;
                 } else { pressure_samples.mark_truncated(); }
@@ -1033,16 +1074,12 @@ async fn run(
                 "storage_scope": "serialized sample bytes bound retained observation volume, not exact serde_json heap allocation; observations are charged to the worker budget",
                 "samples_truncated": pressure_samples.truncated(),
                 "scope": "worker lifetime after readiness; non-atomic sampled observations; not instantaneous peaks; measurement phase includes drain; shared cache/WBM counted once in shared_resources; repeated per-DB cache properties must not be summed",
-                "unsupported": ["allocator retained heap", "generation pin ages", "request and checkpoint queue representation bytes"],
+                "unsupported": ["generation pin ages", "request and checkpoint queue representation bytes"],
             },
             "blink_checkpoint_metrics": blink_checkpoint_metrics,
             "blink_paged_resources_before_shutdown": paged_resources_before_shutdown,
             "blink_checkpoint_metrics_scope": "worker_lifetime_including setup/preflight, offered load, measurement drain, and shutdown; measurement start/stop controls the RocksDB sampler only and does not reset or snapshot B-link checkpoint counters at offer boundaries",
-            "retained_heap_bytes": {
-                "value": null,
-                "status": "unsupported",
-                "reason": "worker does not expose allocator retained heap or representation-specific retained bytes",
-            },
+            "allocator_retained_heap": allocator_retained_snapshot(),
             "response_budget_bytes": arguments.response_budget,
             "max_mutations": arguments.max_mutations,
             "max_concurrent_requests": arguments.max_concurrent_requests,
