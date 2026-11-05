@@ -1549,9 +1549,17 @@ fn ordered_request_schedule_sha256(options: &Options, topology: &str) -> String 
     digest.update(topology.as_bytes());
     digest.update([0]);
     digest.update(options.seed.to_be_bytes());
+    digest.update(options.registered_tenants.to_be_bytes());
     digest.update(options.active_tenants.to_be_bytes());
+    digest.update(options.opened_idle_tenants.to_be_bytes());
     digest.update(options.client_count.to_be_bytes());
+    digest.update(options.initial_rows.to_be_bytes());
+    digest.update(options.value_bytes.to_be_bytes());
+    digest.update(options.queue_bound.to_be_bytes());
+    digest.update(options.max_in_flight.to_be_bytes());
     digest.update(options.profile.weights());
+    digest.update(format!("{:?}", options.width).as_bytes());
+    digest.update(options.tenant_arrival_phase.as_str().as_bytes());
     digest.update(options.duration_ms.unwrap_or(0).to_be_bytes());
     digest.update(options.per_tenant_rate.unwrap_or(0).to_be_bytes());
     digest.update(options.slo_window_ms.unwrap_or(0).to_be_bytes());
@@ -1611,8 +1619,41 @@ fn ordered_request_schedule_sha256(options: &Options, topology: &str) -> String 
                 lane_digest.update(deadline_nanos.to_be_bytes());
                 lane_digest.update([operation_kind]);
                 lane_digest.update(width.to_be_bytes());
+                if operation_kind == 0 {
+                    lane_digest.update(
+                        (seeded_read_row(options, tenant_number, operation_number) as u64)
+                            .to_be_bytes(),
+                    );
+                }
                 if operation_kind == 2 {
+                    lane_digest.update([u8::from(write_ordinal % 2 == 0)]);
                     lane_digest.update(mutation_ordinal.to_be_bytes());
+                    let lane_start = match options.mutation_key_mode {
+                        MutationKeyMode::Fixed => client_number.saturating_mul(16),
+                        MutationKeyMode::Growing => client_number.saturating_mul(1_000_000),
+                    };
+                    let growing_key_offset =
+                        if options.mutation_key_mode == MutationKeyMode::Growing {
+                            options
+                                .mutation_key_epoch
+                                .saturating_mul(1_000_000_000)
+                                .saturating_add(write_ordinal.saturating_mul(16))
+                        } else {
+                            0
+                        };
+                    for mutation_offset in 0..width as usize {
+                        let row_number = options
+                            .initial_rows
+                            .saturating_add(lane_start)
+                            .saturating_add(
+                                usize::try_from(growing_key_offset).unwrap_or(usize::MAX),
+                            )
+                            .saturating_add(mutation_offset);
+                        lane_digest.update((row_number as u64).to_be_bytes());
+                        lane_digest.update([u8::from(
+                            mutation_ordinal.saturating_add(mutation_offset as u64) % 10 == 0,
+                        )]);
+                    }
                     write_ordinal = write_ordinal.saturating_add(1);
                     mutation_ordinal = mutation_ordinal.saturating_add(width);
                 }
