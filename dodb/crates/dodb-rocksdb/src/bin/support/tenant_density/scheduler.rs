@@ -1514,7 +1514,7 @@ pub fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
         options.value_bytes
     );
     let mut schedule_identity = format!(
-        "hash=sha256-ordered-lanes-v1;topology={topology};profile={};width={:?};mutation_key_mode={};mutation_key_epoch={};clients={};queue_bound={};max_in_flight={};rate={:?};duration={:?};slo_window_ms={:?};long_reader_retention_ms={};operations={:?};fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
+        "hash=fnv1a64;topology={topology};profile={};width={:?};mutation_key_mode={};mutation_key_epoch={};clients={};queue_bound={};max_in_flight={};rate={:?};duration={:?};operations={:?};fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
         options.profile.as_str(),
         options.width,
         options.mutation_key_mode.as_str(),
@@ -1524,8 +1524,6 @@ pub fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
         options.max_in_flight,
         options.per_tenant_rate,
         options.duration_ms,
-        options.slo_window_ms,
-        options.long_reader_retention_ms,
         options.operation_count
     );
     if options.tenant_arrival_phase == TenantArrivalPhase::Staggered {
