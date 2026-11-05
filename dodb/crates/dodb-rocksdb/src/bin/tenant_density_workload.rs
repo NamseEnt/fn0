@@ -360,7 +360,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if options.recovery_duration_ms > 0
         && workload["valid_for_oracle"] == true
-        && workload["cell_valid"] == true
+        && workload["slo_stop_reason"] == "duration_completed"
     {
         let recovery_worker = spawn_worker(&session, &worker_path, &options, pressure_monitor.as_ref(), "recovery").await?;
         let recovery_service = RemoteDodbService::new(recovery_worker.connection().clone());
@@ -1101,13 +1101,16 @@ async fn run_slo_windowed_workload_seeded(
             }
         }
     }
-    final_report["slo_window_duration_ms"] = json!(window_duration_ms);
-    final_report["slo_windows"] = Value::Array(windows);
-    final_report["slo_stop_reason"] = json!(stop_reason);
-    final_report["slo_passed"] = json!(stop_reason != "two_consecutive_failed_slo_windows");
+    let every_window_slo_passed = windows
+        .iter()
+        .all(|window| window["score"]["passed"] == true);
     let every_window_valid = windows
         .iter()
         .all(|window| window["workload"]["cell_valid"] == true);
+    final_report["slo_window_duration_ms"] = json!(window_duration_ms);
+    final_report["slo_windows"] = Value::Array(windows);
+    final_report["slo_stop_reason"] = json!(stop_reason);
+    final_report["slo_passed"] = json!(every_window_slo_passed);
     final_report["maintenance_debt_windows"] = json!(maintenance_debt_windows);
     final_report["cell_valid"] = json!(
         final_report["cell_valid"] == true
