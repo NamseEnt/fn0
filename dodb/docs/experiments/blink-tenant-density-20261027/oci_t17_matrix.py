@@ -394,6 +394,14 @@ def validate_report(report, backend, scenario):
         raise RuntimeError("checkpoint extension stopped before completing its fixed duration")
     if backend.startswith("blink-") and workload.get("checkpoint_cycle_gate_passed") is not True:
         raise RuntimeError("B-link checkpoint cycle gate failed")
+    if backend.startswith("blink-"):
+        debt_windows = list(workload.get("maintenance_debt_windows", []))
+        for extension in workload.get("phase_workloads", {}).get("checkpoint_cycle_extensions", []):
+            debt_windows.extend(extension.get("workload", {}).get("maintenance_debt_windows", []))
+        if len(debt_windows) < 4 or any(not isinstance(debt, int) for debt in debt_windows[-4:]):
+            raise RuntimeError("B-link checkpoint debt is missing from the final 20 minutes")
+        if any(current > previous for previous, current in zip(debt_windows[-4:], debt_windows[-3:])):
+            raise RuntimeError("B-link checkpoint debt increased during the final 20 minutes")
     if scenario["long_reader_retention_ms"] > 0:
         if report.get("long_reader_retention", {}).get("passed") is not True:
             raise RuntimeError("long-reader retention gate failed")
@@ -460,6 +468,16 @@ def decision_metrics(report):
         "measurement_cgroup_peak_memory_bytes": pressure_epochs["measurement"]["final"]["memory.peak"],
         "recovery_cgroup_peak_memory_bytes": pressure_epochs["recovery"]["final"]["memory.peak"],
         "checkpoint_cycles": workload.get("successful_checkpoint_cycles"),
+        "final_20_minute_checkpoint_debt_bytes": (
+            [
+                *workload.get("maintenance_debt_windows", []),
+                *[
+                    debt
+                    for extension in workload.get("phase_workloads", {}).get("checkpoint_cycle_extensions", [])
+                    for debt in extension.get("workload", {}).get("maintenance_debt_windows", [])
+                ],
+            ][-4:]
+        ),
         "measured_duration_ms_including_extensions": workload.get(
             "measured_duration_ms_including_extensions"
         ),

@@ -70,7 +70,7 @@ def main():
     if sha256(native_path) != NATIVE_SHA256:
         raise RuntimeError("pinned RocksDB archive hash changed")
     args.run_dir.mkdir(parents=True)
-    data_path = args.zfs_path / "databases" / "t17-smoke-bfb735f04-blink-paged"
+    data_path = args.zfs_path / "databases" / f"t17-smoke-{args.run_dir.name}"
     if data_path.exists():
         raise RuntimeError(f"smoke database path already exists: {data_path}")
     data_path.mkdir(parents=True)
@@ -98,7 +98,7 @@ def main():
         "--drop-page-cache-before-warmup", "on",
         "--mutation-key-mode", "fixed",
         "--mutation-key-epoch", "0",
-        "--initial-rows", "32",
+        "--initial-rows", "256",
         "--value-bytes", "512",
         "--topology", "fixed-per-tenant",
         "--tenant-arrival-phase", "synchronized",
