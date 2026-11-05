@@ -9,6 +9,7 @@ SCRIPT = Path(__file__).with_name("oci_t17_matrix.py")
 SPEC = importlib.util.spec_from_file_location("oci_t17_matrix", SCRIPT)
 MATRIX = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MATRIX)
+RECIPE = json.loads((Path(__file__).parent / "T17-STRESS-RECIPES.json").read_text())
 
 
 def window(index, passed=True):
@@ -25,6 +26,18 @@ def window(index, passed=True):
 
 
 class SloWindowTests(unittest.TestCase):
+    def test_each_stress_recipe_has_a_stable_fingerprint(self):
+        fingerprints = {
+            item["id"]: MATRIX.scenario_values(RECIPE, item["id"])[
+                "scenario_recipe_sha256"
+            ]
+            for item in RECIPE["recipes"]
+        }
+
+        self.assertEqual(len(fingerprints), len(RECIPE["recipes"]))
+        self.assertEqual(len(set(fingerprints.values())), len(fingerprints))
+        self.assertTrue(all(len(value) == 64 for value in fingerprints.values()))
+
     def test_cell_progress_is_durable_and_compact(self):
         outcome = {
             "label": "n1-synchronized-r1-blink-paged",

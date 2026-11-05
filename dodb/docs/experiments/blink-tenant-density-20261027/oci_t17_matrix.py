@@ -56,6 +56,11 @@ def sha256(path):
     return digest.hexdigest()
 
 
+def canonical_sha256(value):
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def available_bytes(path):
     filesystem = os.statvfs(path)
     return filesystem.f_bavail * filesystem.f_frsize
@@ -233,6 +238,9 @@ def scenario_values(recipe, scenario_id):
         "long_reader_retention_ms": selected.get("long_reader_retention_ms", 0),
         "profile": selected["profile"],
         "recipe": selected,
+        "scenario_recipe_sha256": canonical_sha256(
+            {"common": common, "recipe": selected}
+        ),
     }
 
 
@@ -587,6 +595,7 @@ def run_cell(args, recipe, binary, run_root, cgroup_base, scenario_id, populatio
             "worker_sha256": args.worker_sha256,
             "native_archive_sha256": args.native_sha256,
             "recipe_sha256": RECIPE_SHA256,
+            "scenario_recipe_sha256": scenario["scenario_recipe_sha256"],
             "scenario": scenario,
             "command": invocation_args,
             "host_before": before,
@@ -602,6 +611,7 @@ def run_cell(args, recipe, binary, run_root, cgroup_base, scenario_id, populatio
             "worker_sha256": args.worker_sha256,
             "native_archive_sha256": args.native_sha256,
             "recipe_sha256": RECIPE_SHA256,
+            "scenario_recipe_sha256": scenario["scenario_recipe_sha256"],
         },
     )
     environment = os.environ.copy()
@@ -683,6 +693,7 @@ def run_cell(args, recipe, binary, run_root, cgroup_base, scenario_id, populatio
             "seed_manifest_sha256": manifest["seed_manifest_sha256"],
             "ordered_request_schedule_sha256": schedules,
             "recipe_sha256": RECIPE_SHA256,
+            "scenario_recipe_sha256": scenario["scenario_recipe_sha256"],
         }
         comparison_key = (population, scenario_id, repetition)
         expected = expected_hashes.setdefault(comparison_key, identity)
