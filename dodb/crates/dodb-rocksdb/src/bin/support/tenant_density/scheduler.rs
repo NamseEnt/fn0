@@ -304,7 +304,7 @@ where
         let tenant_expected = initial_expected
             .iter()
             .filter(|((expected_tenant, _), _)| *expected_tenant == tenant_number as u64)
-            .map(|(key, value)| (*key, value.clone()))
+            .map(|((_, row_number), value)| ((tenant_number, *row_number), value.clone()))
             .collect::<BTreeMap<_, _>>();
         tasks.spawn(async move {
             let mut expected = tenant_expected;
