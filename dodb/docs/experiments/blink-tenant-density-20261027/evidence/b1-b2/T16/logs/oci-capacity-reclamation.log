@@ -1,0 +1,19 @@
+T16 ZFS inventory and reclamation receipt
+Host: opc@217.142.246.204
+Dataset: /bench/zfs/db
+Reserve: 10,737,418,240 bytes (10 GiB)
+
+Pre-cleanup available: 10,797,957,120 bytes
+
+Inspected failed build roots and target directory sizes:
+/bench/zfs/db/product-build/b1-b2-t16-18679ccff/target 1,793,584,640 bytes
+/bench/zfs/db/product-build/b1-b2-t16-f2b5eccee/target 1,793,528,320 bytes
+/bench/zfs/db/product-build/b1-b2-t16-98df8edc9/target 3,369,096,704 bytes
+Total apparent target size: 6,956,209,664 bytes
+
+Removed only the three listed regenerable target directories. Preserved each source snapshot; all T16 reports and logs; all failed and successful smoke databases; all frozen binaries and SHA-256 manifests; and the pinned RocksDB source/native build. The empty failed root cfbb23821 and successful build root cb427a3b8 were not removed.
+
+Post-cleanup available after sync/settling: 17,304,760,320 bytes
+Observed free-space increase: 6,506,803,200 bytes, reflecting ZFS allocation/compression and shared-block accounting rather than apparent directory lengths.
+
+T16 build, smoke, and Clippy subsequently used ZFS space. Latest observed available: 11,463,950,336 bytes. This retains 726,532,096 bytes above the 10 GiB reserve. T17 corrected free-space threshold is 50,465,865,728 bytes (47 GiB), so the current host remains 39,001,915,392 bytes below that threshold.

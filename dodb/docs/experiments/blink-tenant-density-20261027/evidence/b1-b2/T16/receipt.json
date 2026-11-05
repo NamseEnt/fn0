@@ -35,24 +35,50 @@
     },
     {
       "criterion": "Bounded diagnostics with applied limits, category current and peaks, loader/cache and source counts, and phase/cgroup observations",
-      "evidence": "remote/smoke-final/paging.json",
-      "gap": "reachable source bytes and allocator retained bytes are explicitly unavailable; no substitute value inferred",
+      "evidence": "remote/instrumentation-0d7c59a/paging-report.json",
       "observed": {
-        "allocator_retained_bytes": null,
+        "allocator_retained_bytes": {
+          "allocator": "glibc mallinfo2",
+          "field": "fordblks",
+          "min": 304160,
+          "max": 729008,
+          "sample_count": 27,
+          "missing_sample_count": 0,
+          "unit": "free arena bytes"
+        },
         "allocator_retained_bytes_reason": "allocator and representation-specific retained heap are not exposed",
         "cache_misses": 2459,
         "cgroup_memory_peak_paging_bytes": 34410496,
         "cgroup_memory_peak_resident_bytes": 12218368,
         "evictions": 2427,
-        "reachable_source_bytes": null,
+        "reachable_source_bytes": {
+          "min": 0,
+          "max": 3186812,
+          "sample_count": 27,
+          "missing_sample_count": 0,
+          "unit": "unique reachable checkpoint pack and WAL segment logical file bytes"
+        },
         "reachable_source_bytes_reason": "the service does not expose a bounded reachability walk in periodic snapshots",
         "resource_disk_current_bytes": 80971052,
         "resource_disk_peak_bytes": 80971052,
         "resource_memory_current_bytes": 91359232,
         "resource_memory_peak_bytes": 159141633,
-        "source_opens": 2459
+        "source_opens": 2459,
+        "measurement_periodic_samples": 27,
+        "sampling_interval_ms": 100,
+        "actual_paged_route_verified": true,
+        "post_measurement_full_population_oracle_passed": true,
+        "reopened_full_population_oracle_passed": true,
+        "classification": "instrumentation and correctness only; not performance evidence",
+        "periodic_sample_source": "memory_diagnostic.engine_health_reports[measurement].periodic_pressure.samples",
+        "reachability_field": "blink_paged_resources.disk_bytes.reachable_source_bytes",
+        "allocator_field": "allocator_retained.retained_free_arena_bytes",
+        "limitations": [
+          "reachable values are logical file lengths, not allocated blocks or device writes",
+          "mallinfo2.fordblks measures free arena bytes; mmap-allocated bytes are reported separately"
+        ]
       },
-      "status": "partial"
+      "status": "passed"
     },
     {
       "criterion": "Failed worker preserves partial evidence and default reports retain compatible semantics",
@@ -62,9 +88,15 @@
     },
     {
       "criterion": "Freeze a separate T17 matrix and capacity before any performance workload",
-      "evidence": "host capacity gate and plan acceptance",
-      "observed": "not frozen; current ZFS free space exceeds the 10 GiB reserve by only 244,969,472 bytes; T16 reachability accounting remains incomplete",
-      "status": "not_started"
+      "evidence": "../T17-FROZEN-MATRIX.md and logs/oci-capacity-reclamation.log",
+      "observed": {
+        "matrix_frozen": true,
+        "corrected_required_free_bytes": 50465865728,
+        "current_available_bytes": 11574050816,
+        "reserve_bytes": 10737418240,
+        "execution_gate": "blocked by capacity; T17 not launched"
+      },
+      "status": "passed"
     }
   ],
   "checks": [
@@ -127,6 +159,38 @@
       "name": "OCI capacity and terminal-state gate",
       "raw_log": "logs/oci-capacity-gate.log",
       "result": "10,982,387,712 bytes ZFS free; 244,969,472 bytes above the 10 GiB reserve; MemAvailable 5,163,736 KiB; ARC size 5,476,982,528 bytes; no workload processes listed"
+    },
+    {
+      "exit_status": 0,
+      "name": "OCI optimized paging workload and diagnostic worker build",
+      "source_commit": "0d7c59a3092c79632590e5faffaec9adcf629a10",
+      "raw_log": "remote/instrumentation-0d7c59a/build-release-final.log",
+      "binary_manifest": "remote/instrumentation-0d7c59a/SHA256SUMS"
+    },
+    {
+      "exit_status": 0,
+      "name": "OCI paging instrumentation smoke with periodic cgroup samples",
+      "source_commit": "0d7c59a3092c79632590e5faffaec9adcf629a10",
+      "raw_log": "remote/instrumentation-0d7c59a/paging-run.log",
+      "raw_report": "remote/instrumentation-0d7c59a/paging-report.json",
+      "result": "400/400 operations, 27 periodic samples, zero missing allocator or reachability values, actual paged route verified, full and reopen oracles passed"
+    },
+    {
+      "exit_status": 0,
+      "name": "rustfmt and git diff --check for changed Rust files",
+      "scope": "memory_diagnostic_worker.rs and tenant_density_workload.rs"
+    },
+    {
+      "exit_status": 101,
+      "name": "Strict package Clippy including dependencies",
+      "raw_log": "remote/instrumentation-0d7c59a/clippy-with-dependency-findings.log",
+      "result": "14 existing dodb-storage findings; no diagnostics in the changed worker or harness binary files; no lint suppressions added"
+    },
+    {
+      "exit_status": 101,
+      "name": "Strict dodb-rocksdb binary Clippy with dependencies excluded",
+      "raw_log": "remote/instrumentation-0d7c59a/clippy-bins-only.log",
+      "result": "16 existing dodb-rocksdb library findings prevent package Clippy completion; no diagnostics in memory_diagnostic_worker.rs or tenant_density_workload.rs"
     }
   ],
   "evidence_commit": null,
@@ -161,6 +225,21 @@
       "attempt": "Storage feature Clippy",
       "failure": "34 existing findings in unrelated code",
       "raw_log": "logs/storage-paging-clippy-fresh-init.log"
+    },
+    {
+      "attempt": "New debug instrumentation smoke",
+      "failure": "diagnostic worker readiness timed out",
+      "detail": "debug-profile process did not reach worker readiness within the harness timeout; failed report and log preserved under remote/instrumentation-0d7c59a"
+    },
+    {
+      "attempt": "Initial cgroup-enabled instrumentation smoke",
+      "failure": "Permission denied writing memory.max and memory.oom.group",
+      "detail": "cgroup pseudo-files remained root-owned; retry used a fresh delegated group and root execution; failed reports and logs preserved"
+    },
+    {
+      "attempt": "First optimized cgroup smoke",
+      "failure": "requested source revision did not match compiled revision",
+      "detail": "corrected to the full build-script revision; failed report and log preserved"
     }
   ],
   "features": {
@@ -174,14 +253,15 @@
   "host": {
     "active_workload_processes_after_cells": 0,
     "architecture": "OCI ARM64",
-    "available_bytes_at_gate": 10982387712,
+    "available_bytes_at_gate": 11463950336,
     "filesystem": "/bench/zfs/db",
-    "headroom_above_reserve_bytes": 244969472,
+    "headroom_above_reserve_bytes": 726532096,
     "name": "opc@217.142.246.204",
-    "required_free_bytes": 10737418240
+    "required_free_bytes": 10737418240,
+    "t17_required_free_bytes": 50465865728
   },
-  "implementation_commit": "cb427a3b83ae97ed4017cedfba84714fc0da3a45",
-  "next_task": "Close the two reviewed measurement gaps or amend the T16 contract with explicit unavailable boundaries; then freeze and review the numeric T17 matrix without launching it.",
+  "implementation_commit": "0d7c59a3092c79632590e5faffaec9adcf629a10",
+  "next_task": "T17 remains separate and was not executed; obtain at least 47 GiB free on the designated ZFS dataset and separate execution authorization.",
   "owned_paths": [
     "crates/dodb-server/src/bin/tenant_density_workload.rs",
     "crates/dodb-server/src/bin/tenant_density_workload/memory_diagnostic_worker.rs",
@@ -253,9 +333,18 @@
         "peak_bytes": 1098929
       }
     },
-    "unavailable": {
-      "allocator_retained_bytes": "allocator and representation-specific retained heap are not exposed",
-      "reachable_source_bytes": "the service does not expose a bounded reachability walk in periodic snapshots"
+    "unavailable": {},
+    "allocator_retained_free_arena_bytes": {
+      "measurement_min": 304160,
+      "measurement_max": 729008,
+      "sampling_interval_ms": 100,
+      "sample_count": 27
+    },
+    "reachable_source_logical_bytes": {
+      "measurement_min": 0,
+      "measurement_max": 3186812,
+      "sample_count": 27,
+      "missing_sample_count": 0
     }
   },
   "parent_source_commit": "0e4891e55",
@@ -279,12 +368,7 @@
     ],
     "final_smoke_root": "/bench/zfs/db/product-build/b1-b2-t16-cb427a3b8/smoke"
   },
-  "remaining_work": [
-    "Reachable-source bytes are captured at explicit worker and health-report boundaries, but are unavailable in periodic samples because the bounded reachability walk is omitted there.",
-    "Allocator-retained bytes remain unavailable in all phases; define and validate a contract-conforming observation boundary or explicitly bound this gap with process/cgroup evidence.",
-    "Freeze the numeric T17 matrix, input recipes and hashes, setup expansion/overlap sizing, source/native/binary identity, host-cache controls, SLO, offered rates, run lengths, repetition/stop rules, evidence reviewer, and available capacity.",
-    "Do not launch T17 until at least 10 GiB ZFS free space remains after worst-case overlap and failed-cell preservation."
-  ],
+  "remaining_work": [],
   "runtime_configuration": {
     "active_tenants": 4,
     "backend": "blink",
@@ -318,19 +402,21 @@
     "topology": "fixed-total",
     "value_bytes": 512,
     "wal_segment_bytes": 262144,
-    "width": "mixed 80/15/5 for 1/4/16"
+    "width": "mixed 80/15/5 for 1/4/16",
+    "pressure_sample_interval_ms": 100
   },
   "scope": "Demand-paging worker instrumentation, matched correctness smoke, and experiment-readiness handoff",
   "source_hashes": {
     "harness_binary_sha256_default": "4fe7477c0a609185da89c4a2ed3df2e7eae537642b43b7a4e37275334e49cf9d",
-    "harness_binary_sha256_paging": "d629cbfcfa87c88268014ad75fd4614ca70c9cb5cc7449418c2facfc7318064a",
-    "implementation_commit": "cb427a3b83ae97ed4017cedfba84714fc0da3a45",
+    "harness_binary_sha256_paging": "8222cd31df4bdab41cc0cd81221c1c50d83359dfeef464bba74f5c5847b6ee1c",
+    "implementation_commit": "0d7c59a3092c79632590e5faffaec9adcf629a10",
     "librocksdb_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
     "rocksdb_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
     "worker_binary_sha256_default": "fe34f0e63089e887d0c7cc3c1657bd09b977d01b96b6bac5f095b6bb41eb83c3",
-    "worker_binary_sha256_paging": "f90559c7a5e39bd7299183162a4f568140b1417aed05a37fa8b275e69368f925"
+    "worker_binary_sha256_paging": "e7f2bd38baf417fe567030c1deeb1ed024029414b9a387fdfd235b13f621c5cc",
+    "t16_binary_manifest": "remote/instrumentation-0d7c59a/SHA256SUMS"
   },
-  "status": "partial",
+  "status": "complete",
   "task_id": "T16",
   "toolchain": {
     "cargo": "1.97.1",
@@ -351,5 +437,58 @@
     "paired_operations_each_route": 400,
     "post_measurement_and_reopened_oracles_passed": true,
     "classification": "correctness and instrumentation evidence only; not performance evidence"
+  },
+  "instrumentation_observations": {
+    "measurement_periodic_samples": 27,
+    "sampling_interval_ms": 100,
+    "reachable_source_bytes": {
+      "min": 0,
+      "max": 3186812,
+      "sample_count": 27,
+      "missing_sample_count": 0,
+      "unit": "unique reachable checkpoint pack and WAL segment logical file bytes"
+    },
+    "allocator_retained_bytes": {
+      "allocator": "glibc mallinfo2",
+      "field": "fordblks",
+      "min": 304160,
+      "max": 729008,
+      "sample_count": 27,
+      "missing_sample_count": 0,
+      "unit": "free arena bytes"
+    },
+    "actual_paged_route_verified": true,
+    "post_measurement_full_population_oracle_passed": true,
+    "reopened_full_population_oracle_passed": true,
+    "classification": "instrumentation and correctness only; not performance evidence"
+  },
+  "cleanup": {
+    "removed_regenerable_paths": [
+      {
+        "path": "/bench/zfs/db/product-build/b1-b2-t16-18679ccff/target",
+        "apparent_bytes": 1793584640
+      },
+      {
+        "path": "/bench/zfs/db/product-build/b1-b2-t16-f2b5eccee/target",
+        "apparent_bytes": 1793528320
+      },
+      {
+        "path": "/bench/zfs/db/product-build/b1-b2-t16-98df8edc9/target",
+        "apparent_bytes": 3369096704
+      }
+    ],
+    "preserved": [
+      "source snapshots",
+      "all logs and reports",
+      "all failed and successful databases",
+      "frozen binaries and manifests",
+      "pinned RocksDB source and native artifacts"
+    ],
+    "available_bytes_before": 10797957120,
+    "available_bytes_after_settling": 17304760320,
+    "latest_available_bytes_after_T16_build_and_smoke": 11463950336,
+    "reserve_bytes": 10737418240,
+    "latest_available_bytes_after_T16_build_smoke_and_clippy": 11463950336,
+    "latest_headroom_above_reserve_bytes": 726532096
   }
 }

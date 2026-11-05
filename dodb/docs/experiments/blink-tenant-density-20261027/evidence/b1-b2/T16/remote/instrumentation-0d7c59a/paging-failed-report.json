@@ -1,0 +1,3837 @@
+{
+  "backend_memory_pressure": {
+    "enabled": false
+  },
+  "data_directory_preserved": true,
+  "effective_configuration": {
+    "active_tenants": 4,
+    "backend": "blink",
+    "backend_memory_budget": null,
+    "blink_demand_paging_requested": true,
+    "blink_disk_limit_bytes_requested": 4294967296,
+    "blink_disk_per_tenant_bytes_requested": 536870912,
+    "blink_layout": {
+      "execution": "background",
+      "layout": "segmented-bases-coalesced",
+      "primary_base_storage": "live allocated checkpoint page image",
+      "recovery_extra_limit_bytes": 536870912,
+      "retained_image_limit_bytes": 536870912,
+      "retained_wal_limit_bytes": 536870912,
+      "segment_bytes": 262144
+    },
+    "blink_memory_limit_bytes_requested": 268435456,
+    "blink_memory_per_tenant_bytes_requested": 134217728,
+    "blink_paged_cache_bytes_requested": 32768,
+    "checkpoint_policy": "WalBytesThreshold { threshold_bytes: 1048576 }",
+    "client_count": 1,
+    "drain_timeout_ms": 15000,
+    "duration_ms": null,
+    "initial_rows_per_tenant": 256,
+    "max_in_flight": 8,
+    "measurement_never_opened_tenants": 0,
+    "minimal_native_condition_locks": "exclusive",
+    "minimal_native_revisions": "reserved-ranges",
+    "opened_idle_tenants": 0,
+    "operation_count": 400,
+    "per_tenant_rate": null,
+    "primary_key_bytes": 16,
+    "profile": "mixed",
+    "profile_weights_get_query_write": [
+      40,
+      20,
+      40
+    ],
+    "query_limit": 16,
+    "queue_bound": 8,
+    "registered_tenants": 4,
+    "request_timeout_ms": 5000,
+    "rocksdb_shared_resources": null,
+    "seed": 20261027,
+    "sort_key_bytes": 16,
+    "tenant_arrival_phase": null,
+    "tenant_arrival_phase_applies": false,
+    "tenant_arrival_phase_selected": "synchronized",
+    "topology": "fixed-total",
+    "value_bytes": 512,
+    "width": "mixed 80/15/5 for 1/4/16"
+  },
+  "failure_reason": "diagnostic worker readiness timed out: timed out waiting on channel",
+  "memory_diagnostic": {
+    "backend_process_definition": "backend, service adapter, runtime, and loopback transport in the worker process; not a pure native allocator RSS measurement",
+    "binary_hash_stream_buffer_bytes": 65536,
+    "enabled": true,
+    "engine_health_reports": [],
+    "harness_binary": "/bench/zfs/db/product-build/t16-b17880d5/target/debug/tenant_density_workload",
+    "harness_binary_sha256": "de334a5456c8350df789036501ced49fae7ebf79078558c7ce97589e28591b62",
+    "host_sample_count": 71,
+    "host_samples": [
+      {
+        "mem_available_kb": 5208744,
+        "timestamp_unix_ms": 1793839344717,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222648714,
+          "demand_data_misses": 12637761,
+          "hits": 2925710133,
+          "misses": 58749555,
+          "size": 5659795256,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5208984,
+        "timestamp_unix_ms": 1793839345718,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222651195,
+          "demand_data_misses": 12637761,
+          "hits": 2925715136,
+          "misses": 58749555,
+          "size": 5658637728,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5209064,
+        "timestamp_unix_ms": 1793839346720,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222653675,
+          "demand_data_misses": 12637761,
+          "hits": 2925720102,
+          "misses": 58749555,
+          "size": 5658421536,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5209064,
+        "timestamp_unix_ms": 1793839347721,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222656152,
+          "demand_data_misses": 12637761,
+          "hits": 2925725068,
+          "misses": 58749555,
+          "size": 5658506248,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5209068,
+        "timestamp_unix_ms": 1793839348723,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222658632,
+          "demand_data_misses": 12637761,
+          "hits": 2925730037,
+          "misses": 58749555,
+          "size": 5658506248,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5209068,
+        "timestamp_unix_ms": 1793839349725,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222661128,
+          "demand_data_misses": 12637761,
+          "hits": 2925735038,
+          "misses": 58749555,
+          "size": 5658468304,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5214664,
+        "timestamp_unix_ms": 1793839350726,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222663608,
+          "demand_data_misses": 12637761,
+          "hits": 2925740006,
+          "misses": 58749555,
+          "size": 5658383592,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5214696,
+        "timestamp_unix_ms": 1793839351727,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222666088,
+          "demand_data_misses": 12637761,
+          "hits": 2925744972,
+          "misses": 58749555,
+          "size": 5658336824,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5214696,
+        "timestamp_unix_ms": 1793839352729,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222668568,
+          "demand_data_misses": 12637761,
+          "hits": 2925749941,
+          "misses": 58749555,
+          "size": 5658349472,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5214696,
+        "timestamp_unix_ms": 1793839353730,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222671048,
+          "demand_data_misses": 12637761,
+          "hits": 2925754907,
+          "misses": 58749555,
+          "size": 5658120632,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5214696,
+        "timestamp_unix_ms": 1793839354732,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222673528,
+          "demand_data_misses": 12637761,
+          "hits": 2925759879,
+          "misses": 58749555,
+          "size": 5658217992,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5214728,
+        "timestamp_unix_ms": 1793839355733,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222676018,
+          "demand_data_misses": 12637761,
+          "hits": 2925764858,
+          "misses": 58749555,
+          "size": 5658073864,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5214728,
+        "timestamp_unix_ms": 1793839356734,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222678504,
+          "demand_data_misses": 12637761,
+          "hits": 2925769846,
+          "misses": 58749555,
+          "size": 5658120632,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5214728,
+        "timestamp_unix_ms": 1793839357736,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222680984,
+          "demand_data_misses": 12637761,
+          "hits": 2925774812,
+          "misses": 58749555,
+          "size": 5658133280,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5218340,
+        "timestamp_unix_ms": 1793839358737,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222683464,
+          "demand_data_misses": 12637761,
+          "hits": 2925779778,
+          "misses": 58749555,
+          "size": 5657929328,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5218120,
+        "timestamp_unix_ms": 1793839359739,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222685944,
+          "demand_data_misses": 12637761,
+          "hits": 2925784750,
+          "misses": 58749555,
+          "size": 5657988744,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5215856,
+        "timestamp_unix_ms": 1793839360740,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222688440,
+          "demand_data_misses": 12637761,
+          "hits": 2925789748,
+          "misses": 58749555,
+          "size": 5658014040,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5214924,
+        "timestamp_unix_ms": 1793839361742,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222690920,
+          "demand_data_misses": 12637761,
+          "hits": 2925794717,
+          "misses": 58749555,
+          "size": 5657785200,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5212072,
+        "timestamp_unix_ms": 1793839362743,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222693400,
+          "demand_data_misses": 12637761,
+          "hits": 2925799683,
+          "misses": 58749555,
+          "size": 5657136624,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5212116,
+        "timestamp_unix_ms": 1793839363744,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222695864,
+          "demand_data_misses": 12637761,
+          "hits": 2925804620,
+          "misses": 58749555,
+          "size": 5657196040,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5209848,
+        "timestamp_unix_ms": 1793839364746,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222698312,
+          "demand_data_misses": 12637761,
+          "hits": 2925809525,
+          "misses": 58749555,
+          "size": 5656979848,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5209848,
+        "timestamp_unix_ms": 1793839365747,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222700792,
+          "demand_data_misses": 12637761,
+          "hits": 2925814491,
+          "misses": 58749555,
+          "size": 5657005144,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5209848,
+        "timestamp_unix_ms": 1793839366748,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222703272,
+          "demand_data_misses": 12637761,
+          "hits": 2925819460,
+          "misses": 58749555,
+          "size": 5656920432,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5209848,
+        "timestamp_unix_ms": 1793839367750,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222705752,
+          "demand_data_misses": 12637761,
+          "hits": 2925824426,
+          "misses": 58749555,
+          "size": 5656848368,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5207832,
+        "timestamp_unix_ms": 1793839368751,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222708232,
+          "demand_data_misses": 12637761,
+          "hits": 2925829395,
+          "misses": 58749555,
+          "size": 5656632176,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5207832,
+        "timestamp_unix_ms": 1793839369753,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222710728,
+          "demand_data_misses": 12637761,
+          "hits": 2925834396,
+          "misses": 58749555,
+          "size": 5656729536,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5205420,
+        "timestamp_unix_ms": 1793839370754,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222713208,
+          "demand_data_misses": 12637761,
+          "hits": 2925839362,
+          "misses": 58749555,
+          "size": 5656644824,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5199012,
+        "timestamp_unix_ms": 1793839371755,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222715672,
+          "demand_data_misses": 12637761,
+          "hits": 2925844299,
+          "misses": 58749555,
+          "size": 5656475400,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5199012,
+        "timestamp_unix_ms": 1793839372757,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222718168,
+          "demand_data_misses": 12637761,
+          "hits": 2925849297,
+          "misses": 58749555,
+          "size": 5656500696,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5208916,
+        "timestamp_unix_ms": 1793839373758,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222720648,
+          "demand_data_misses": 12637761,
+          "hits": 2925854266,
+          "misses": 58749555,
+          "size": 5656488048,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5208948,
+        "timestamp_unix_ms": 1793839374760,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222723128,
+          "demand_data_misses": 12637761,
+          "hits": 2925859235,
+          "misses": 58749555,
+          "size": 5656428632,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5208980,
+        "timestamp_unix_ms": 1793839375761,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222725608,
+          "demand_data_misses": 12637761,
+          "hits": 2925864204,
+          "misses": 58749555,
+          "size": 5656488048,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5209016,
+        "timestamp_unix_ms": 1793839376763,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222728104,
+          "demand_data_misses": 12637761,
+          "hits": 2925869202,
+          "misses": 58749555,
+          "size": 5656356568,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5209016,
+        "timestamp_unix_ms": 1793839377764,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222730584,
+          "demand_data_misses": 12637761,
+          "hits": 2925874168,
+          "misses": 58749555,
+          "size": 5656297152,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5206784,
+        "timestamp_unix_ms": 1793839378765,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222733064,
+          "demand_data_misses": 12637761,
+          "hits": 2925879133,
+          "misses": 58749555,
+          "size": 5656309800,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5206124,
+        "timestamp_unix_ms": 1793839379767,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222735544,
+          "demand_data_misses": 12637761,
+          "hits": 2925884098,
+          "misses": 58749555,
+          "size": 5656131552,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5195128,
+        "timestamp_unix_ms": 1793839380768,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222738024,
+          "demand_data_misses": 12637761,
+          "hits": 2925889063,
+          "misses": 58749555,
+          "size": 5656165672,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5195128,
+        "timestamp_unix_ms": 1793839381770,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222740504,
+          "demand_data_misses": 12637761,
+          "hits": 2925894025,
+          "misses": 58749555,
+          "size": 5656034192,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5195128,
+        "timestamp_unix_ms": 1793839382771,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222742984,
+          "demand_data_misses": 12637761,
+          "hits": 2925898988,
+          "misses": 58749555,
+          "size": 5656118904,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5195132,
+        "timestamp_unix_ms": 1793839383772,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222745464,
+          "demand_data_misses": 12637761,
+          "hits": 2925903950,
+          "misses": 58749555,
+          "size": 5655902712,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5195132,
+        "timestamp_unix_ms": 1793839384774,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007296,
+          "demand_data_hits": 1222747944,
+          "demand_data_misses": 12637761,
+          "hits": 2925908915,
+          "misses": 58749555,
+          "size": 5655843296,
+          "uncompressed_size": 6256741376
+        }
+      },
+      {
+        "mem_available_kb": 5201032,
+        "timestamp_unix_ms": 1793839385776,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007808,
+          "demand_data_hits": 1222751331,
+          "demand_data_misses": 12637761,
+          "hits": 2925917273,
+          "misses": 58749555,
+          "size": 5655768096,
+          "uncompressed_size": 6256741888
+        }
+      },
+      {
+        "mem_available_kb": 5201076,
+        "timestamp_unix_ms": 1793839386778,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007808,
+          "demand_data_hits": 1222753271,
+          "demand_data_misses": 12637761,
+          "hits": 2925921153,
+          "misses": 58749555,
+          "size": 5655557456,
+          "uncompressed_size": 6256741888
+        }
+      },
+      {
+        "mem_available_kb": 5201076,
+        "timestamp_unix_ms": 1793839387780,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007808,
+          "demand_data_hits": 1222755315,
+          "demand_data_misses": 12637761,
+          "hits": 2925925281,
+          "misses": 58749555,
+          "size": 5655813320,
+          "uncompressed_size": 6256741888
+        }
+      },
+      {
+        "mem_available_kb": 5204552,
+        "timestamp_unix_ms": 1793839388782,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024410112,
+        "vdev_read_sectors_512_bytes": 492235176,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662007808,
+          "demand_data_hits": 1222757747,
+          "demand_data_misses": 12637761,
+          "hits": 2925930151,
+          "misses": 58749555,
+          "size": 5656097936,
+          "uncompressed_size": 6256741888
+        }
+      },
+      {
+        "mem_available_kb": 5203220,
+        "timestamp_unix_ms": 1793839389784,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222760195,
+          "demand_data_misses": 12637761,
+          "hits": 2925935204,
+          "misses": 58749556,
+          "size": 5656426696,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5207276,
+        "timestamp_unix_ms": 1793839390786,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222762659,
+          "demand_data_misses": 12637761,
+          "hits": 2925940139,
+          "misses": 58749556,
+          "size": 5656223152,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5204932,
+        "timestamp_unix_ms": 1793839391788,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222765139,
+          "demand_data_misses": 12637761,
+          "hits": 2925945103,
+          "misses": 58749556,
+          "size": 5656223152,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5204932,
+        "timestamp_unix_ms": 1793839392790,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222767603,
+          "demand_data_misses": 12637761,
+          "hits": 2925950036,
+          "misses": 58749556,
+          "size": 5656138440,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5204936,
+        "timestamp_unix_ms": 1793839393792,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222770067,
+          "demand_data_misses": 12637761,
+          "hits": 2925954968,
+          "misses": 58749556,
+          "size": 5656091672,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5204936,
+        "timestamp_unix_ms": 1793839394794,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222772547,
+          "demand_data_misses": 12637761,
+          "hits": 2925959937,
+          "misses": 58749556,
+          "size": 5655947544,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5204936,
+        "timestamp_unix_ms": 1793839395795,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222775027,
+          "demand_data_misses": 12637761,
+          "hits": 2925964904,
+          "misses": 58749556,
+          "size": 5656066376,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5199516,
+        "timestamp_unix_ms": 1793839396797,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222777395,
+          "demand_data_misses": 12637761,
+          "hits": 2925969646,
+          "misses": 58749556,
+          "size": 5655358384,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5193648,
+        "timestamp_unix_ms": 1793839397799,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222779811,
+          "demand_data_misses": 12637761,
+          "hits": 2925974483,
+          "misses": 58749556,
+          "size": 5655633992,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5193648,
+        "timestamp_unix_ms": 1793839398801,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222782275,
+          "demand_data_misses": 12637761,
+          "hits": 2925979415,
+          "misses": 58749556,
+          "size": 5655587224,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5193648,
+        "timestamp_unix_ms": 1793839399803,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222784739,
+          "demand_data_misses": 12637761,
+          "hits": 2925984347,
+          "misses": 58749556,
+          "size": 5655561928,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5186648,
+        "timestamp_unix_ms": 1793839400806,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222787187,
+          "demand_data_misses": 12637761,
+          "hits": 2925989257,
+          "misses": 58749556,
+          "size": 5655346960,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5186648,
+        "timestamp_unix_ms": 1793839401808,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222789667,
+          "demand_data_misses": 12637761,
+          "hits": 2925994221,
+          "misses": 58749556,
+          "size": 5655215480,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5186988,
+        "timestamp_unix_ms": 1793839402810,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222792147,
+          "demand_data_misses": 12637761,
+          "hits": 2925999188,
+          "misses": 58749556,
+          "size": 5655130768,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5198492,
+        "timestamp_unix_ms": 1793839403812,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222794611,
+          "demand_data_misses": 12637761,
+          "hits": 2926004122,
+          "misses": 58749556,
+          "size": 5655156064,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5198492,
+        "timestamp_unix_ms": 1793839404814,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222797075,
+          "demand_data_misses": 12637761,
+          "hits": 2926009056,
+          "misses": 58749556,
+          "size": 5654934504,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5198524,
+        "timestamp_unix_ms": 1793839405816,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222799539,
+          "demand_data_misses": 12637761,
+          "hits": 2926013992,
+          "misses": 58749556,
+          "size": 5654861168,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5197056,
+        "timestamp_unix_ms": 1793839406820,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222802019,
+          "demand_data_misses": 12637761,
+          "hits": 2926018958,
+          "misses": 58749556,
+          "size": 5654861624,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5194544,
+        "timestamp_unix_ms": 1793839407822,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222804467,
+          "demand_data_misses": 12637761,
+          "hits": 2926023865,
+          "misses": 58749556,
+          "size": 5654946336,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5194544,
+        "timestamp_unix_ms": 1793839408824,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222806931,
+          "demand_data_misses": 12637761,
+          "hits": 2926028797,
+          "misses": 58749556,
+          "size": 5654789560,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5194544,
+        "timestamp_unix_ms": 1793839409826,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222809411,
+          "demand_data_misses": 12637761,
+          "hits": 2926033763,
+          "misses": 58749556,
+          "size": 5654802208,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5194544,
+        "timestamp_unix_ms": 1793839410828,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222811891,
+          "demand_data_misses": 12637761,
+          "hits": 2926038731,
+          "misses": 58749556,
+          "size": 5654802208,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5194544,
+        "timestamp_unix_ms": 1793839411830,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222814355,
+          "demand_data_misses": 12637761,
+          "hits": 2926043665,
+          "misses": 58749556,
+          "size": 5654658080,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5194544,
+        "timestamp_unix_ms": 1793839412832,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222816835,
+          "demand_data_misses": 12637761,
+          "hits": 2926048632,
+          "misses": 58749556,
+          "size": 5654789560,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5194580,
+        "timestamp_unix_ms": 1793839413834,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222819299,
+          "demand_data_misses": 12637761,
+          "hits": 2926053564,
+          "misses": 58749556,
+          "size": 5654573368,
+          "uncompressed_size": 6257004544
+        }
+      },
+      {
+        "mem_available_kb": 5190492,
+        "timestamp_unix_ms": 1793839414836,
+        "vdev_block_device": "sda4",
+        "vdev_device_stat_path": "/sys/class/block/sda4/stat",
+        "vdev_read_bytes": 252024471552,
+        "vdev_read_sectors_512_bytes": 492235296,
+        "zfs_arcstats": {
+          "c": 5713788928,
+          "c_max": 5713788928,
+          "c_min": 357111808,
+          "compressed_size": 4662073856,
+          "demand_data_hits": 1222821763,
+          "demand_data_misses": 12637761,
+          "hits": 2926058505,
+          "misses": 58749556,
+          "size": 5654730144,
+          "uncompressed_size": 6257004544
+        }
+      }
+    ],
+    "host_samples_truncated": false,
+    "host_sampling_interval_ms": 1000,
+    "label": "memory-only diagnostic; loopback QUIC/TLS transport adds costs and does not replace direct-path throughput or latency evidence",
+    "process_group_scope": "sum of sampled harness-process and backend-process RSS/PSS for the recorded PID/starttime identities",
+    "process_memory_sample_count": 71,
+    "process_memory_sample_limit": 4096,
+    "process_memory_samples": [
+      {
+        "elapsed_ms": 1,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1376,
+          "file_kb": 6127,
+          "pss_kb": 7503,
+          "rss_kb": 9020,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1376,
+            "file_kb": 6127,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7503,
+            "role": "harness-process",
+            "rss_kb": 9020,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9020
+          }
+        ],
+        "timestamp_unix_ms": 1793839344715
+      },
+      {
+        "elapsed_ms": 1002,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1460,
+          "file_kb": 6251,
+          "pss_kb": 7711,
+          "rss_kb": 9236,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1460,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7711,
+            "role": "harness-process",
+            "rss_kb": 9236,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9236
+          }
+        ],
+        "timestamp_unix_ms": 1793839345717
+      },
+      {
+        "elapsed_ms": 2004,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1472,
+          "file_kb": 6251,
+          "pss_kb": 7723,
+          "rss_kb": 9248,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1472,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7723,
+            "role": "harness-process",
+            "rss_kb": 9248,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9248
+          }
+        ],
+        "timestamp_unix_ms": 1793839346719
+      },
+      {
+        "elapsed_ms": 3005,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1476,
+          "file_kb": 6245,
+          "pss_kb": 7721,
+          "rss_kb": 9252,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1476,
+            "file_kb": 6245,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7721,
+            "role": "harness-process",
+            "rss_kb": 9252,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9252
+          }
+        ],
+        "timestamp_unix_ms": 1793839347720
+      },
+      {
+        "elapsed_ms": 4006,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1488,
+          "file_kb": 6245,
+          "pss_kb": 7733,
+          "rss_kb": 9264,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1488,
+            "file_kb": 6245,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7733,
+            "role": "harness-process",
+            "rss_kb": 9264,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9264
+          }
+        ],
+        "timestamp_unix_ms": 1793839348721
+      },
+      {
+        "elapsed_ms": 5008,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1500,
+          "file_kb": 6245,
+          "pss_kb": 7745,
+          "rss_kb": 9276,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1500,
+            "file_kb": 6245,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7745,
+            "role": "harness-process",
+            "rss_kb": 9276,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9276
+          }
+        ],
+        "timestamp_unix_ms": 1793839349723
+      },
+      {
+        "elapsed_ms": 6010,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1504,
+          "file_kb": 6251,
+          "pss_kb": 7755,
+          "rss_kb": 9280,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1504,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7755,
+            "role": "harness-process",
+            "rss_kb": 9280,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9280
+          }
+        ],
+        "timestamp_unix_ms": 1793839350725
+      },
+      {
+        "elapsed_ms": 7011,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1516,
+          "file_kb": 6251,
+          "pss_kb": 7767,
+          "rss_kb": 9292,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1516,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7767,
+            "role": "harness-process",
+            "rss_kb": 9292,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9292
+          }
+        ],
+        "timestamp_unix_ms": 1793839351726
+      },
+      {
+        "elapsed_ms": 8013,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1524,
+          "file_kb": 6251,
+          "pss_kb": 7775,
+          "rss_kb": 9300,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1524,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7775,
+            "role": "harness-process",
+            "rss_kb": 9300,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9300
+          }
+        ],
+        "timestamp_unix_ms": 1793839352727
+      },
+      {
+        "elapsed_ms": 9014,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1532,
+          "file_kb": 6251,
+          "pss_kb": 7783,
+          "rss_kb": 9308,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1532,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7783,
+            "role": "harness-process",
+            "rss_kb": 9308,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9308
+          }
+        ],
+        "timestamp_unix_ms": 1793839353729
+      },
+      {
+        "elapsed_ms": 10015,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1536,
+          "file_kb": 6251,
+          "pss_kb": 7787,
+          "rss_kb": 9312,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1536,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7787,
+            "role": "harness-process",
+            "rss_kb": 9312,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9312
+          }
+        ],
+        "timestamp_unix_ms": 1793839354730
+      },
+      {
+        "elapsed_ms": 11017,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1544,
+          "file_kb": 6251,
+          "pss_kb": 7795,
+          "rss_kb": 9320,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1544,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7795,
+            "role": "harness-process",
+            "rss_kb": 9320,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9320
+          }
+        ],
+        "timestamp_unix_ms": 1793839355732
+      },
+      {
+        "elapsed_ms": 12018,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1548,
+          "file_kb": 6251,
+          "pss_kb": 7799,
+          "rss_kb": 9324,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1548,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7799,
+            "role": "harness-process",
+            "rss_kb": 9324,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9324
+          }
+        ],
+        "timestamp_unix_ms": 1793839356733
+      },
+      {
+        "elapsed_ms": 13020,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1552,
+          "file_kb": 6251,
+          "pss_kb": 7803,
+          "rss_kb": 9328,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1552,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7803,
+            "role": "harness-process",
+            "rss_kb": 9328,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9328
+          }
+        ],
+        "timestamp_unix_ms": 1793839357734
+      },
+      {
+        "elapsed_ms": 14021,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1560,
+          "file_kb": 6251,
+          "pss_kb": 7811,
+          "rss_kb": 9336,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1560,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7811,
+            "role": "harness-process",
+            "rss_kb": 9336,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9336
+          }
+        ],
+        "timestamp_unix_ms": 1793839358736
+      },
+      {
+        "elapsed_ms": 15022,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1568,
+          "file_kb": 6251,
+          "pss_kb": 7819,
+          "rss_kb": 9344,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1568,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7819,
+            "role": "harness-process",
+            "rss_kb": 9344,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9344
+          }
+        ],
+        "timestamp_unix_ms": 1793839359737
+      },
+      {
+        "elapsed_ms": 16024,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1576,
+          "file_kb": 6245,
+          "pss_kb": 7821,
+          "rss_kb": 9352,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1576,
+            "file_kb": 6245,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7821,
+            "role": "harness-process",
+            "rss_kb": 9352,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9352
+          }
+        ],
+        "timestamp_unix_ms": 1793839360739
+      },
+      {
+        "elapsed_ms": 17025,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1580,
+          "file_kb": 6247,
+          "pss_kb": 7827,
+          "rss_kb": 9356,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1580,
+            "file_kb": 6247,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7827,
+            "role": "harness-process",
+            "rss_kb": 9356,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9356
+          }
+        ],
+        "timestamp_unix_ms": 1793839361740
+      },
+      {
+        "elapsed_ms": 18027,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1592,
+          "file_kb": 6247,
+          "pss_kb": 7839,
+          "rss_kb": 9368,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1592,
+            "file_kb": 6247,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7839,
+            "role": "harness-process",
+            "rss_kb": 9368,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9368
+          }
+        ],
+        "timestamp_unix_ms": 1793839362742
+      },
+      {
+        "elapsed_ms": 19028,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1592,
+          "file_kb": 6251,
+          "pss_kb": 7843,
+          "rss_kb": 9368,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1592,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7843,
+            "role": "harness-process",
+            "rss_kb": 9368,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9368
+          }
+        ],
+        "timestamp_unix_ms": 1793839363743
+      },
+      {
+        "elapsed_ms": 20029,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1600,
+          "file_kb": 6251,
+          "pss_kb": 7851,
+          "rss_kb": 9376,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1600,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7851,
+            "role": "harness-process",
+            "rss_kb": 9376,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9376
+          }
+        ],
+        "timestamp_unix_ms": 1793839364744
+      },
+      {
+        "elapsed_ms": 21031,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1604,
+          "file_kb": 6251,
+          "pss_kb": 7855,
+          "rss_kb": 9380,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1604,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7855,
+            "role": "harness-process",
+            "rss_kb": 9380,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9380
+          }
+        ],
+        "timestamp_unix_ms": 1793839365746
+      },
+      {
+        "elapsed_ms": 22032,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1612,
+          "file_kb": 6251,
+          "pss_kb": 7863,
+          "rss_kb": 9388,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1612,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7863,
+            "role": "harness-process",
+            "rss_kb": 9388,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9388
+          }
+        ],
+        "timestamp_unix_ms": 1793839366747
+      },
+      {
+        "elapsed_ms": 23034,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1612,
+          "file_kb": 6251,
+          "pss_kb": 7863,
+          "rss_kb": 9388,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1612,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7863,
+            "role": "harness-process",
+            "rss_kb": 9388,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9388
+          }
+        ],
+        "timestamp_unix_ms": 1793839367749
+      },
+      {
+        "elapsed_ms": 24035,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1620,
+          "file_kb": 6251,
+          "pss_kb": 7871,
+          "rss_kb": 9396,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1620,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7871,
+            "role": "harness-process",
+            "rss_kb": 9396,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9396
+          }
+        ],
+        "timestamp_unix_ms": 1793839368750
+      },
+      {
+        "elapsed_ms": 25036,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1624,
+          "file_kb": 6251,
+          "pss_kb": 7875,
+          "rss_kb": 9400,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1624,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7875,
+            "role": "harness-process",
+            "rss_kb": 9400,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9400
+          }
+        ],
+        "timestamp_unix_ms": 1793839369751
+      },
+      {
+        "elapsed_ms": 26038,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1632,
+          "file_kb": 6247,
+          "pss_kb": 7879,
+          "rss_kb": 9408,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1632,
+            "file_kb": 6247,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7879,
+            "role": "harness-process",
+            "rss_kb": 9408,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9408
+          }
+        ],
+        "timestamp_unix_ms": 1793839370753
+      },
+      {
+        "elapsed_ms": 27039,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1632,
+          "file_kb": 6251,
+          "pss_kb": 7883,
+          "rss_kb": 9408,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1632,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7883,
+            "role": "harness-process",
+            "rss_kb": 9408,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9408
+          }
+        ],
+        "timestamp_unix_ms": 1793839371754
+      },
+      {
+        "elapsed_ms": 28041,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1644,
+          "file_kb": 6251,
+          "pss_kb": 7895,
+          "rss_kb": 9420,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1644,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7895,
+            "role": "harness-process",
+            "rss_kb": 9420,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9420
+          }
+        ],
+        "timestamp_unix_ms": 1793839372756
+      },
+      {
+        "elapsed_ms": 29042,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1644,
+          "file_kb": 6251,
+          "pss_kb": 7895,
+          "rss_kb": 9420,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1644,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7895,
+            "role": "harness-process",
+            "rss_kb": 9420,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9420
+          }
+        ],
+        "timestamp_unix_ms": 1793839373757
+      },
+      {
+        "elapsed_ms": 30044,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1652,
+          "file_kb": 6251,
+          "pss_kb": 7903,
+          "rss_kb": 9428,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1652,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7903,
+            "role": "harness-process",
+            "rss_kb": 9428,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9428
+          }
+        ],
+        "timestamp_unix_ms": 1793839374758
+      },
+      {
+        "elapsed_ms": 31045,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1656,
+          "file_kb": 6251,
+          "pss_kb": 7907,
+          "rss_kb": 9432,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1656,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7907,
+            "role": "harness-process",
+            "rss_kb": 9432,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9432
+          }
+        ],
+        "timestamp_unix_ms": 1793839375760
+      },
+      {
+        "elapsed_ms": 32046,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1664,
+          "file_kb": 6251,
+          "pss_kb": 7915,
+          "rss_kb": 9440,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1664,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7915,
+            "role": "harness-process",
+            "rss_kb": 9440,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9440
+          }
+        ],
+        "timestamp_unix_ms": 1793839376761
+      },
+      {
+        "elapsed_ms": 33048,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1664,
+          "file_kb": 6251,
+          "pss_kb": 7915,
+          "rss_kb": 9440,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1664,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7915,
+            "role": "harness-process",
+            "rss_kb": 9440,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9440
+          }
+        ],
+        "timestamp_unix_ms": 1793839377763
+      },
+      {
+        "elapsed_ms": 34049,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1672,
+          "file_kb": 6245,
+          "pss_kb": 7917,
+          "rss_kb": 9448,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1672,
+            "file_kb": 6245,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7917,
+            "role": "harness-process",
+            "rss_kb": 9448,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9448
+          }
+        ],
+        "timestamp_unix_ms": 1793839378764
+      },
+      {
+        "elapsed_ms": 35050,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1680,
+          "file_kb": 6246,
+          "pss_kb": 7926,
+          "rss_kb": 9456,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1680,
+            "file_kb": 6246,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7926,
+            "role": "harness-process",
+            "rss_kb": 9456,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9456
+          }
+        ],
+        "timestamp_unix_ms": 1793839379765
+      },
+      {
+        "elapsed_ms": 36052,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1688,
+          "file_kb": 6246,
+          "pss_kb": 7934,
+          "rss_kb": 9464,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1688,
+            "file_kb": 6246,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7934,
+            "role": "harness-process",
+            "rss_kb": 9464,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9464
+          }
+        ],
+        "timestamp_unix_ms": 1793839380767
+      },
+      {
+        "elapsed_ms": 37053,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1688,
+          "file_kb": 6251,
+          "pss_kb": 7939,
+          "rss_kb": 9464,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1688,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7939,
+            "role": "harness-process",
+            "rss_kb": 9464,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9464
+          }
+        ],
+        "timestamp_unix_ms": 1793839381768
+      },
+      {
+        "elapsed_ms": 38055,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1700,
+          "file_kb": 6251,
+          "pss_kb": 7951,
+          "rss_kb": 9476,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1700,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "harness-process",
+            "rss_kb": 9476,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9476
+          }
+        ],
+        "timestamp_unix_ms": 1793839382770
+      },
+      {
+        "elapsed_ms": 39056,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1700,
+          "file_kb": 6251,
+          "pss_kb": 7951,
+          "rss_kb": 9476,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1700,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "harness-process",
+            "rss_kb": 9476,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9476
+          }
+        ],
+        "timestamp_unix_ms": 1793839383771
+      },
+      {
+        "elapsed_ms": 40058,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 1708,
+          "file_kb": 6251,
+          "pss_kb": 7959,
+          "rss_kb": 9484,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1708,
+            "file_kb": 6251,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7959,
+            "role": "harness-process",
+            "rss_kb": 9484,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9484
+          }
+        ],
+        "timestamp_unix_ms": 1793839384772
+      },
+      {
+        "elapsed_ms": 41059,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3236,
+          "file_kb": 11821,
+          "pss_kb": 15057,
+          "rss_kb": 20180,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1756,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7106,
+            "role": "harness-process",
+            "rss_kb": 9660,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9660
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839385774
+      },
+      {
+        "elapsed_ms": 42062,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3248,
+          "file_kb": 11812,
+          "pss_kb": 15060,
+          "rss_kb": 20192,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1768,
+            "file_kb": 5346,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7114,
+            "role": "harness-process",
+            "rss_kb": 9672,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9672
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6466,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7946,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839386776
+      },
+      {
+        "elapsed_ms": 43064,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3256,
+          "file_kb": 11812,
+          "pss_kb": 15068,
+          "rss_kb": 20200,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1776,
+            "file_kb": 5346,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7122,
+            "role": "harness-process",
+            "rss_kb": 9680,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9680
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6466,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7946,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839387778
+      },
+      {
+        "elapsed_ms": 44065,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3264,
+          "file_kb": 11804,
+          "pss_kb": 15068,
+          "rss_kb": 20208,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1784,
+            "file_kb": 5342,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7126,
+            "role": "harness-process",
+            "rss_kb": 9688,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9688
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6462,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7942,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839388780
+      },
+      {
+        "elapsed_ms": 45068,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3268,
+          "file_kb": 11804,
+          "pss_kb": 15072,
+          "rss_kb": 20212,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1788,
+            "file_kb": 5342,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7130,
+            "role": "harness-process",
+            "rss_kb": 9692,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9692
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6462,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7942,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839389782
+      },
+      {
+        "elapsed_ms": 46070,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3280,
+          "file_kb": 11804,
+          "pss_kb": 15084,
+          "rss_kb": 20224,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1800,
+            "file_kb": 5342,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7142,
+            "role": "harness-process",
+            "rss_kb": 9704,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9704
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6462,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7942,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839390784
+      },
+      {
+        "elapsed_ms": 47071,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3280,
+          "file_kb": 11821,
+          "pss_kb": 15101,
+          "rss_kb": 20224,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1800,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7150,
+            "role": "harness-process",
+            "rss_kb": 9704,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9704
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839391786
+      },
+      {
+        "elapsed_ms": 48073,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3292,
+          "file_kb": 11821,
+          "pss_kb": 15113,
+          "rss_kb": 20236,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1812,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7162,
+            "role": "harness-process",
+            "rss_kb": 9716,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9716
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839392788
+      },
+      {
+        "elapsed_ms": 49075,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3296,
+          "file_kb": 11821,
+          "pss_kb": 15117,
+          "rss_kb": 20240,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1816,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7166,
+            "role": "harness-process",
+            "rss_kb": 9720,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9720
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839393790
+      },
+      {
+        "elapsed_ms": 50077,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3308,
+          "file_kb": 11821,
+          "pss_kb": 15129,
+          "rss_kb": 20252,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1828,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7178,
+            "role": "harness-process",
+            "rss_kb": 9732,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9732
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839394792
+      },
+      {
+        "elapsed_ms": 51079,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3308,
+          "file_kb": 11821,
+          "pss_kb": 15129,
+          "rss_kb": 20252,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1828,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7178,
+            "role": "harness-process",
+            "rss_kb": 9732,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9732
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839395794
+      },
+      {
+        "elapsed_ms": 52081,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3316,
+          "file_kb": 11805,
+          "pss_kb": 15121,
+          "rss_kb": 20260,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1836,
+            "file_kb": 5343,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7179,
+            "role": "harness-process",
+            "rss_kb": 9740,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9740
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6462,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7942,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839396796
+      },
+      {
+        "elapsed_ms": 53083,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3328,
+          "file_kb": 11813,
+          "pss_kb": 15141,
+          "rss_kb": 20272,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1848,
+            "file_kb": 5346,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7194,
+            "role": "harness-process",
+            "rss_kb": 9752,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9752
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6467,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7947,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839397797
+      },
+      {
+        "elapsed_ms": 54085,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3328,
+          "file_kb": 11813,
+          "pss_kb": 15141,
+          "rss_kb": 20272,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1848,
+            "file_kb": 5346,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7194,
+            "role": "harness-process",
+            "rss_kb": 9752,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9752
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6467,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7947,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839398800
+      },
+      {
+        "elapsed_ms": 55087,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3340,
+          "file_kb": 11806,
+          "pss_kb": 15146,
+          "rss_kb": 20284,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1860,
+            "file_kb": 5343,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7203,
+            "role": "harness-process",
+            "rss_kb": 9764,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9764
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6463,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7943,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839399801
+      },
+      {
+        "elapsed_ms": 56090,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3348,
+          "file_kb": 11813,
+          "pss_kb": 15161,
+          "rss_kb": 20292,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1868,
+            "file_kb": 5346,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7214,
+            "role": "harness-process",
+            "rss_kb": 9772,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9772
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6467,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7947,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839400803
+      },
+      {
+        "elapsed_ms": 57092,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3352,
+          "file_kb": 11813,
+          "pss_kb": 15165,
+          "rss_kb": 20296,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1872,
+            "file_kb": 5346,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7218,
+            "role": "harness-process",
+            "rss_kb": 9776,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9776
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6467,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7947,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839401806
+      },
+      {
+        "elapsed_ms": 58094,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3360,
+          "file_kb": 11813,
+          "pss_kb": 15173,
+          "rss_kb": 20304,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1880,
+            "file_kb": 5346,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7226,
+            "role": "harness-process",
+            "rss_kb": 9784,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9784
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6467,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7947,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839402808
+      },
+      {
+        "elapsed_ms": 59096,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3360,
+          "file_kb": 11813,
+          "pss_kb": 15173,
+          "rss_kb": 20304,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1880,
+            "file_kb": 5346,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7226,
+            "role": "harness-process",
+            "rss_kb": 9784,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9784
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6467,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7947,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839403810
+      },
+      {
+        "elapsed_ms": 60098,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3372,
+          "file_kb": 11813,
+          "pss_kb": 15185,
+          "rss_kb": 20316,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1892,
+            "file_kb": 5346,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7238,
+            "role": "harness-process",
+            "rss_kb": 9796,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9796
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6467,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7947,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839404812
+      },
+      {
+        "elapsed_ms": 61099,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3380,
+          "file_kb": 11813,
+          "pss_kb": 15193,
+          "rss_kb": 20324,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1900,
+            "file_kb": 5346,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7246,
+            "role": "harness-process",
+            "rss_kb": 9804,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9804
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6467,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7947,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839405814
+      },
+      {
+        "elapsed_ms": 62103,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3388,
+          "file_kb": 11806,
+          "pss_kb": 15194,
+          "rss_kb": 20332,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1908,
+            "file_kb": 5343,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7251,
+            "role": "harness-process",
+            "rss_kb": 9812,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9812
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6463,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7943,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839406818
+      },
+      {
+        "elapsed_ms": 63105,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3392,
+          "file_kb": 11821,
+          "pss_kb": 15213,
+          "rss_kb": 20336,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1912,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7262,
+            "role": "harness-process",
+            "rss_kb": 9816,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9816
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839407820
+      },
+      {
+        "elapsed_ms": 64107,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3396,
+          "file_kb": 11821,
+          "pss_kb": 15217,
+          "rss_kb": 20340,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1916,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7266,
+            "role": "harness-process",
+            "rss_kb": 9820,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9820
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839408822
+      },
+      {
+        "elapsed_ms": 65110,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3404,
+          "file_kb": 11821,
+          "pss_kb": 15225,
+          "rss_kb": 20348,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1924,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7274,
+            "role": "harness-process",
+            "rss_kb": 9828,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9828
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839409824
+      },
+      {
+        "elapsed_ms": 66112,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3412,
+          "file_kb": 11821,
+          "pss_kb": 15233,
+          "rss_kb": 20356,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1932,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7282,
+            "role": "harness-process",
+            "rss_kb": 9836,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9836
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839410826
+      },
+      {
+        "elapsed_ms": 67114,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3420,
+          "file_kb": 11821,
+          "pss_kb": 15241,
+          "rss_kb": 20364,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1940,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7290,
+            "role": "harness-process",
+            "rss_kb": 9844,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9844
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839411828
+      },
+      {
+        "elapsed_ms": 68116,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3428,
+          "file_kb": 11821,
+          "pss_kb": 15249,
+          "rss_kb": 20372,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1948,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7298,
+            "role": "harness-process",
+            "rss_kb": 9852,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9852
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839412830
+      },
+      {
+        "elapsed_ms": 69118,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3428,
+          "file_kb": 11812,
+          "pss_kb": 15240,
+          "rss_kb": 20372,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1948,
+            "file_kb": 5346,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7294,
+            "role": "harness-process",
+            "rss_kb": 9852,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9852
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6466,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7946,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839413832
+      },
+      {
+        "elapsed_ms": 70119,
+        "phase": "setup",
+        "process_group_total": {
+          "anonymous_kb": 3436,
+          "file_kb": 11821,
+          "pss_kb": 15257,
+          "rss_kb": 20380,
+          "swap_kb": 0
+        },
+        "processes": [
+          {
+            "anonymous_kb": 1956,
+            "file_kb": 5350,
+            "pid": 2844282,
+            "process_group_id": 2844250,
+            "pss_kb": 7306,
+            "role": "harness-process",
+            "rss_kb": 9860,
+            "start_time_ticks": 310097646,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 9860
+          },
+          {
+            "anonymous_kb": 1480,
+            "file_kb": 6471,
+            "pid": 2844488,
+            "process_group_id": 2844250,
+            "pss_kb": 7951,
+            "role": "backend-process",
+            "rss_kb": 10520,
+            "start_time_ticks": 310105662,
+            "status": "sampled",
+            "swap_kb": 0,
+            "vm_hwm_kb": 10520
+          }
+        ],
+        "timestamp_unix_ms": 1793839414834
+      }
+    ],
+    "process_memory_samples_truncated": false,
+    "process_memory_sampling_interval_ms": 1000,
+    "processes": [
+      {
+        "pid": 2844282,
+        "process_group_id": 2844250,
+        "role": "harness-process",
+        "start_time_ticks": 310097646,
+        "start_time_unix_ms": 1793839344715
+      },
+      {
+        "pid": 2844488,
+        "process_group_id": 2844250,
+        "role": "backend-process",
+        "start_time_ticks": 310105662,
+        "start_time_unix_ms": 1793839385206
+      }
+    ],
+    "residency_scans": [],
+    "source_revision": "b17880d5bd6b5d17d6865313e46589092a6a4161",
+    "vdev_mapping": {
+      "block_device": "sda4",
+      "read_sector_size_bytes": 512,
+      "scope": "whole host device counter; unrelated concurrent I/O is not attributed to this workload",
+      "source": "/sys/class/block/<device>/stat field 3"
+    },
+    "worker_lifecycle": [],
+    "workload_process_group_id": 2844250
+  },
+  "partial_workload_counters": {
+    "status": "unavailable_after_early_abort"
+  },
+  "status": "failed_or_inconclusive"
+}

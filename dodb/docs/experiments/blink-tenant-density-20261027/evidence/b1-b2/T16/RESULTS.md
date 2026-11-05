@@ -1,43 +1,33 @@
 # T16 Results
 
-Status: partial. Source commit: `cb427a3b83ae97ed4017cedfba84714fc0da3a45`. The runtime route remains opt-in.
+Status: complete. Runtime paging remains opt-in and default-disabled. Implementation source: `0d7c59a3092c79632590e5faffaec9adcf629a10`.
 
-## Implementation and checks
+## Instrumentation and validation
 
-The feature-enabled worker reports actual paged route verification, version-index and delta-chain format identities, loader/cache counters, source opens, resource limits and category peaks, maintenance state, and bounded process/cgroup samples. The service now initializes a fresh store on the paged route and returns the committed logical revision consistently. A new service test covers fresh write, read, conditional update, shutdown, and reopen.
+The measurement worker now records periodic reachable logical source file bytes and glibc allocator retained free arena bytes alongside the existing bounded process/cgroup/resource observations. Reachability uses the existing source manager walker and reports unique reachable checkpoint-pack and WAL-segment logical lengths. Allocator retained bytes are read directly from `mallinfo2.fordblks`; allocated arena bytes and mmap-allocated bytes are reported separately. These fields do not represent allocated filesystem blocks, device writes, total RSS, or allocated heap.
 
-Local checks passed: storage feature tests (324 passed, 4 ignored), server feature tests (54 passed), formatting/diff checks, server feature check, and strict server Clippy. Storage feature Clippy reported 34 findings in unrelated existing code (14 library, 20 test); no suppressions were introduced.
+The release worker build used RocksDB commit `abeebd9630f11bd08c28b7bd43c7bdfc62050654` and the pinned native library. The new 4-tenant, 400-operation paging instrumentation smoke completed with matching requested/compiled source identity and verified the paged route. It emitted 27 measurement-periodic samples at a 100 ms cgroup sampling interval. All 27 contained both measurements: reachable source logical bytes ranged from 0 to 3,186,812 across four files at the measurement boundary; glibc retained free arena bytes ranged from 304,160 to 729,008. The zero-byte reachable sample is retained as an observed setup/measurement boundary value, not replaced with an estimate. Post-measurement and reopen full-population oracles passed. This is instrumentation/correctness evidence, not SLO or performance evidence.
 
-## Paired OCI correctness smoke
+The optimized build and runtime smoke passed. Strict package Clippy commands remain blocked by existing findings in the storage and rocksdb library modules; the captured diagnostics contain no finding in either changed workload binary file, and no lint suppressions were added.
 
-The resident and candidate cells used source commit `cb427a3b83ae97ed4017cedfba84714fc0da3a45`, the same pinned RocksDB native build, seed `20261027`, 4 registered and active tenants, 256 initial rows per tenant, 400 fixed-total mixed operations, one client, and the same 256 MiB cgroup memory cap / 192 MiB high limit with swap disabled.
+Previously accepted resident/paging correctness evidence remains unchanged: matched request/schedule fingerprints, 400/400 operations, full-population and reopen oracles. It was not rerun except for the candidate instrumentation smoke required to validate the new periodic fields.
 
-Both completed 400/400 operations. Request fingerprint was `fnv1a64:1bcef6c52fb9114e` and scheduled fingerprint was `fnv1a64:c862f3ff84e00270` in both cells. Both full-population post-measurement and reopened oracles passed, verifying 1024 seeded rows and 55 mutated keys. The candidate explicitly requested and verified the paged route and reported formats `DDBVIDX1/v2` and `DDBVCHN1/v1`. These are correctness smoke results, not SLO or performance evidence.
+## Frozen T17 handoff and capacity
 
-The candidate’s reported resource ledger peaked at 159141633 bytes of memory and 80971052 bytes of disk. Its cache recorded 2459 misses, 2427 evictions, and 2459 source opens. Kernel cgroup memory peak was 12,218,368 bytes for resident and 34,410,496 bytes for paging.
+The separate T17 matrix is frozen at `T17-FROZEN-MATRIX.md`. The prior 266 GiB estimate double-counted setup and checkpoint overlap already contained in the 32 GiB per-backend global disk cap and assumed parallel backend setup. The corrected sequential worst case is 32 GiB for the single active backend including overlap, 5 GiB for reports/manifests and one preserved failed cell, plus the 10 GiB ZFS reserve: 47 GiB required free space.
 
-## Readiness gaps and capacity gate
+The latest `/bench/zfs/db` snapshot after T16 build, smoke, and Clippy is 11,463,950,336 bytes free (10.68 GiB), 726,532,096 bytes above the reserve and 36.32 GiB below the corrected T17 gate. T17 remains unavailable and was not launched. Recheck capacity before any separately authorized T17 execution.
 
-The paging snapshot records reachable source bytes as unavailable because the service does not expose a bounded reachability walk. Allocator retained bytes are also unavailable. The report preserves these gaps explicitly; T16 experiment readiness is therefore partial.
+## Authorized ZFS reclamation
 
-At the capacity check, `/bench/zfs/db` had 10,982,387,712 bytes free, only 244,969,472 bytes above the 10 GiB reserve. No workload processes remained. T17 was not launched. Failed smoke reports, logs, and databases, the final successful databases, build logs, frozen binaries and pinned native provenance remain preserved on the OCI host. Copies of reports/logs and the binary hash manifests are in this evidence directory.
+Before cleanup, the three failed build roots contained regenerable Cargo `target` trees sized 1,793,584,640, 1,793,528,320, and 3,369,096,704 bytes. Only those three `target` directories were removed. Source snapshots, T16 reports/logs, failed and successful databases, frozen binaries, and pinned RocksDB native artifacts were preserved. The dataset free-space snapshot increased from 10,797,957,120 to 17,304,760,320 bytes after cleanup settled. Subsequent T16 build and smoke used ZFS space; latest settled availability is recorded above.
 
-## Failed attempts
+## Preserved follow-up evidence
 
-- Initial feature build at `18679ccff` hit the JSON macro recursion limit.
-- Build at `f2b5eccee` required serialization support for paged resource metrics.
-- The first candidate smoke exhausted its response budget at the lower per-tenant memory cap; the cap was raised.
-- The next candidate smoke found a missing fresh-store paged marker; bootstrap initialization and committed revision reporting were fixed.
-- Storage feature Clippy still reports 34 pre-existing findings in unrelated locations.
+- `remote/instrumentation-0d7c59a/paging-report.json`: successful periodic instrumentation smoke, full and reopen oracles, cgroup samples, and resource summaries.
+- `remote/instrumentation-0d7c59a/paging-run.log`: successful smoke run trace.
+- `remote/instrumentation-0d7c59a/build-release-final.log` and `SHA256SUMS`: final release build and binary identities.
+- The debug readiness timeout, cgroup permission failures, and source-revision mismatch reports/logs remain in the same evidence directory; their failed databases and worker roots remain on OCI.
+- `logs/oci-capacity-reclamation.log`: pre-cleanup inventory, exact removed paths, and post-cleanup capacity.
 
-The raw reports, logs, and failed databases are preserved under `remote/smoke-failed/98df8edc9` and on OCI. See `receipt.json` for exact paths, hashes, configuration, checks, and remaining gates.
-
-Capacity provenance: see logs/oci-capacity-gate.log for the raw OCI resource snapshot and terminal-state checks.
-
-## Follow-up source-boundary measurement
-
-Commit `85c0ffac08dce0328be8193d6a8a4a657034dec4` adds reachable-source measurement at explicit service observation boundaries. The preserved paired reports under `remote/smoke-instrumented-85c0ffac0/` show the candidate's reachable logical source bytes at the measurement start and end as 2,282,528 and 3,195,260 bytes across four files. The post-measurement health snapshots also report 3,195,260 bytes. These values cover logical file lengths; they are not allocated filesystem blocks or physical disk-return measurements.
-
-The measurement-worker snapshot includes 3,195,260 reachable bytes. Periodic resource samples still report `reachable_source_bytes` as unavailable because the full reachability walk is deliberately not performed at every sample. Allocator-retained bytes remain unavailable in every phase. The pair completed 400/400 operations per route with matching request/schedule fingerprints and passing full-population and reopen oracles; it remains correctness and instrumentation evidence, not a performance result.
-
-T16 remains partial. Before accepting readiness, either add and validate bounded periodic reachability and allocator-retention observations, or amend the T16 measurement contract with a reviewed explicit boundary for each unavailable quantity and show how the existing cgroup/process observations bound the experiment. Then freeze the numeric T17 matrix and its input recipes, hashes, overlap sizing, acceptance rules, reviewer, and capacity. Do not run T17 under this receipt.
+T17 was not executed. Defaults were not changed and issue #126 remains open.
