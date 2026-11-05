@@ -740,11 +740,12 @@ mod tests {
         } else {
             assert!(parsed.is_err());
         }
-        argument_values[argument_values
+        let layout_position = argument_values
             .iter()
             .position(|argument| argument == "--blink-wal-layout")
             .unwrap()
-            + 1] = "legacy".to_owned();
+            + 1;
+        argument_values[layout_position] = "legacy".to_owned();
         assert!(Options::parse(&argument_values).is_err());
     }
 

@@ -1379,7 +1379,9 @@ fn effective_configuration(options: &Options) -> Value {
 #[cfg(test)]
 mod tests {
     use super::{effective_configuration, score_slo_window, validate_long_reader_retention};
-    use crate::config::{Backend, Options, Profile, TenantArrivalPhase, Topology, Width};
+    use crate::config::{
+        Backend, MutationKeyMode, Options, Profile, TenantArrivalPhase, Topology, Width,
+    };
 
     fn options(topology: Topology) -> Options {
         Options {
@@ -1398,7 +1400,7 @@ mod tests {
             recovery_duration_ms: 0,
             slo_window_ms: None,
             long_reader_retention_ms: 0,
-            mutation_key_mode: config::MutationKeyMode::Fixed,
+            mutation_key_mode: MutationKeyMode::Fixed,
             mutation_key_epoch: 0,
             operation_count: None,
             initial_rows: 256,

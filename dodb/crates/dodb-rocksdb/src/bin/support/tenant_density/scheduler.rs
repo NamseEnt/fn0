@@ -301,6 +301,8 @@ where
         let tenant_service = Arc::clone(&service);
         let consumer_counters = Arc::clone(&counters);
         let tenant_options = options.clone();
+        let tenant_semaphore = Arc::clone(&semaphore);
+        let tenant_observed_in_flight = Arc::clone(&observed_in_flight);
         let tenant_seed_expected = initial_expected
             .iter()
             .filter(|((expected_tenant, _), _)| *expected_tenant == tenant_number as u64)
@@ -313,8 +315,8 @@ where
             for (client_number, mut receiver) in receivers.into_iter().enumerate() {
                 let client_service = Arc::clone(&tenant_service);
                 let client_counters = Arc::clone(&consumer_counters);
-                let client_semaphore = Arc::clone(&semaphore);
-                let client_observed_in_flight = Arc::clone(&observed_in_flight);
+                let client_semaphore = Arc::clone(&tenant_semaphore);
+                let client_observed_in_flight = Arc::clone(&tenant_observed_in_flight);
                 let client_expected_state = Arc::clone(&shared_expected);
                 let client_options = tenant_options.clone();
                 let client_initial_expected = tenant_initial_expected
@@ -1574,10 +1576,10 @@ async fn abort_and_reap<T: 'static>(tasks: &mut JoinSet<T>) {
 mod tests {
     use super::{
         RequestAddress, TenantArrivalPhase, deterministic_fingerprints,
-        nominal_deadline_offset_nanos, phase_offset_nanos, prepare_request,
-        roll_scheduled_fingerprint, run_fixed_per_tenant_seeded, run_fixed_total,
+        mutation_row_belongs_to_client, nominal_deadline_offset_nanos, phase_offset_nanos,
+        prepare_request, roll_scheduled_fingerprint, run_fixed_per_tenant_seeded, run_fixed_total,
     };
-    use crate::config::{Options, Profile, Topology, Width};
+    use crate::config::{MutationKeyMode, Options, Profile, Topology, Width};
     use dodb_core::TenantId;
     use dodb_service::{DodbService, ExecutionBudget, Request, Response};
     use serde_json::json;
