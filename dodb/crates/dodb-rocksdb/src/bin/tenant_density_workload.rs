@@ -286,6 +286,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &workload_seed_expected,
         )
         .await?;
+        retained_workload = Some(warmup_report.clone());
         if warmup_report["cell_valid"] != true {
             return Err(std::io::Error::other("warm-up workload was not operationally valid").into());
         }
