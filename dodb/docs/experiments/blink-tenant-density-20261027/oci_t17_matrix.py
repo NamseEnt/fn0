@@ -449,6 +449,7 @@ def run_cell(args, recipe, binary, run_root, cgroup_base, scenario_id, populatio
     report_path = cell_root / "report.json"
     log_path = cell_root / "process.log"
     command_path = cell_root / "command.json"
+    binary_manifest_path = cell_root / "binary-manifest.json"
     cgroup_path = cgroup_base / label
     create_cgroup(cgroup_path)
     before = host_state(args.zfs_path)
@@ -477,12 +478,24 @@ def run_cell(args, recipe, binary, run_root, cgroup_base, scenario_id, populatio
             "source_commit": args.source_commit,
             "controller_sha256": sha256(Path(__file__).resolve()),
             "binary_sha256": sha256(binary),
+            "worker_sha256": args.worker_sha256,
             "native_archive_sha256": args.native_sha256,
             "recipe_sha256": RECIPE_SHA256,
             "scenario": scenario,
             "command": invocation_args,
             "host_before": before,
             "scope": "T17 fixed-policy workload; warm-up includes the five-minute cache preconditioning pass",
+        },
+    )
+    write_json(
+        binary_manifest_path,
+        {
+            "source_commit": args.source_commit,
+            "controller_sha256": sha256(Path(__file__).resolve()),
+            "workload_sha256": sha256(binary),
+            "worker_sha256": args.worker_sha256,
+            "native_archive_sha256": args.native_sha256,
+            "recipe_sha256": RECIPE_SHA256,
         },
     )
     environment = os.environ.copy()
@@ -592,6 +605,7 @@ def main():
     parser.add_argument("--recipe", type=Path, required=True)
     parser.add_argument("--binary-dir", type=Path, required=True)
     parser.add_argument("--workload-sha256", required=True)
+    parser.add_argument("--worker-sha256", required=True)
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--native-sha256", required=True)
     parser.add_argument("--zfs-path", type=Path, default=Path("/bench/zfs/db"))
@@ -620,8 +634,11 @@ def main():
     if common["blink_checkpoint"]["threshold_bytes"] != 1024**2:
         raise RuntimeError("recipe checkpoint threshold differs from the frozen 1 MiB setting")
     binary = args.binary_dir / "tenant_density_workload"
+    worker = args.binary_dir / "memory_diagnostic_worker"
     if sha256(binary) != args.workload_sha256:
         raise RuntimeError("workload binary hash does not match the frozen matrix")
+    if sha256(worker) != args.worker_sha256:
+        raise RuntimeError("memory diagnostic worker hash does not match the frozen matrix")
     original_arc_max = Path("/sys/module/zfs/parameters/zfs_arc_max").read_text().strip()
     try:
         outcomes = []
