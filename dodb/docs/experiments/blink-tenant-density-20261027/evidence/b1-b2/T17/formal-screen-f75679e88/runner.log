@@ -1,0 +1,9 @@
+T17 stopped: n1-synchronized-arrival-r0-blink-paged failed; exit=1, report=True
+Traceback (most recent call last):
+  File "/bench/zfs/db/product-build/t17-f75679e88/artifacts/release-f75679e88/oci_t17_matrix.py", line 849, in <module>
+    raise SystemExit(main())
+  File "/bench/zfs/db/product-build/t17-f75679e88/artifacts/release-f75679e88/oci_t17_matrix.py", line 780, in main
+    outcome = run_cell(
+  File "/bench/zfs/db/product-build/t17-f75679e88/artifacts/release-f75679e88/oci_t17_matrix.py", line 673, in run_cell
+    raise RuntimeError(f"{label} failed; exit={exit_code}, report={report_path.exists()}")
+RuntimeError: n1-synchronized-arrival-r0-blink-paged failed; exit=1, report=True

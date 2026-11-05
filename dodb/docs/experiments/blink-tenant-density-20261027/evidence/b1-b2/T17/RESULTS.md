@@ -1,6 +1,6 @@
 # T17 Readiness and Capacity Results
 
-Status: matrix frozen and fresh preflight passed; formal execution is about to start with zero T17 workload cells completed. The earlier readiness record omitted a harness and recipe prerequisite and incorrectly labeled the unmeasured adoption decision as evidence insufficient. T17 adoption remains not evaluated until the exact first screening cell is recorded.
+Status: the frozen T17 first screening cell completed with an operational setup failure; the runner stopped the matrix under the first-failure rule. The earlier readiness record omitted harness and recipe prerequisites and incorrectly described the unstarted adoption decision as evidence insufficient; that record is corrected below.
 
 ## T16 completion
 
@@ -35,12 +35,28 @@ The frozen matrix and runner implement and validate five-minute SLO windows, two
 
 The new source commit is `f75679e88618ebc018a61158e6b02acb5dd574e3`; the clean source is preserved in the verified bundle. Rust/Cargo are 1.97.1, target is `aarch64-unknown-linux-gnu`, linker is `/usr/bin/gcc` 11.5.0, and the only enabled feature is `blink-demand-paging`. New workload and memory-worker SHA-256 values are `7356e1b06e1f25354a3d194d04beb52f77f819328c9ee1753982cf663785969a` and `fb3fe085aa88f34238c8a7f0f1040fbe208ebc2a57b99f09a602a6f30fd7ab72`. The previous T16 fixed binaries and pinned RocksDB archive retain their original hashes. Full build provenance and log hashes are in `logs/build-f75679e88/artifact-manifest.json`.
 
-A full 1,048,576-row smoke at the frozen offered rate and resource limits failed during seed setup with `overloaded: paged source root admission is paused during source collection`. Its report and failed database are preserved at `smoke-f75679e88-full-seed/` and on the OCI host. This did not reach warm-up, measurement, recovery, SLO, or performance comparison. The formal runner will start with `n=1`, `synchronized-arrival`, repetition 0, `blink-paged`; if it records the same operational failure, the frozen first-failure stop rule ends the matrix without launching later backends or cells.
+A full 1,048,576-row smoke at the frozen offered rate and resource limits failed during seed setup with `overloaded: paged source root admission is paused during source collection`. Its report and failed database are preserved at `smoke-f75679e88-full-seed/` and on the OCI host. This did not reach warm-up, measurement, recovery, SLO, or performance comparison. The formal runner executed `n=1`, `synchronized-arrival`, repetition 0, `blink-paged` and stopped the entire matrix on this first failed cell without launching later backends or cells. The process failed during seed source collection with `Overloaded("paged source reads are paused during source collection")` before warm-up or workload measurement. The outcome recorded exit code 1, `data_directory_preserved=true`, 19,574,784 allocated database bytes, and no remaining workload process. The full database remains on OCI and is preserved locally as a verified 3,872-entry archive. Cell command, binary manifest, report, process log, outcome, runner log, and post-run state are in `formal-screen-f75679e88/` and `logs/post-run-state-f75679e88.log`.
 
-## Adoption status
+## T17 first-screen result
 
-Adoption decision for the T17 target condition: **not evaluated**. T16 correctness and instrumentation checks remain valid, but no T17 correctness, operational, SLO, resource-acceptance, or performance comparison was measured. Defaults were not changed, deployment was not performed, and issue #126 remains open.
+The sole formal cell was `n=1`, `synchronized-arrival`, repetition 0, `blink-paged`, at the frozen 1,048,576 initial rows per tenant and 250 requests/s/tenant. Its exact candidate process log says `Error: Overloaded("paged source reads are paused during source collection")`; it exited 1 during seed setup before warm-up, workload measurement, oracles, recovery, and SLO windows. The runner wrote a complete failure report and stopped the matrix immediately under the frozen first-failure rule. No resident B-link or TransactionDB comparator ran.
+
+| Evidence dimension | Result |
+| --- | --- |
+| Correctness and reopen oracles | Not assessed; setup aborted before the oracle phases. |
+| Operational result and evidence validity | The candidate failed setup under matching source, binary, native archive, recipe, and scenario identities; the exact failed-cell report and database are preserved. The report status is `failed_or_inconclusive`, and the paired comparison is incomplete because no comparator ran. |
+| SLO | Not measured; no warm-up or five-minute window ran. |
+| Resource acceptance | The host reserve passed after the run with 51,531,583,488 bytes free, 1,065,717,760 bytes above the 47 GiB gate. The setup cgroup recorded no OOM or high/max events; full workload resource acceptance was not assessed. |
+| Comparative performance | Not compared; no comparator or measured phase ran. |
+
+The first-cell database uses 19,574,784 allocated bytes and remains preserved on the OCI ZFS dataset. Its compressed local archive SHA-256 is `8d1288cddddd973a8415cd382681ba14a5f56b2caa4cb5d13b30bcb40f50a748` and contains 3,872 entries. The exact cell report SHA-256 is `20f2dad5df99845de9985fb9a01c15f278262a7ba344cf2aa9b9c2ed80cbede2`; process log SHA-256 is `de38ef2447e79faa9c1c15958d5b8d0ba4bcfdfb520494a5ec3f3e5a6077d60d`.
+
+## Adoption decision
+
+For the frozen tested condition, the decision is **not adopted**. The candidate could not complete seed collection in the lowest-tenant screening cell at the prescribed offer, so it failed the operational gate for that condition. This is not a comparative performance result or a general ranking against RocksDB. Correctness, SLO, full resource acceptance, and comparative performance remain unmeasured because the frozen stop rule correctly prevented later cells.
+
+Defaults remain unchanged, no production deployment occurred, and issue #126 remains open. The matrix remains frozen; this execution does not authorize continuation past the first failed cell.
 
 ## Readiness correction
 
-This record's prior evidence_insufficient value described missing readiness evidence as an adoption result. That was incorrect: an unstarted experiment cannot support an adoption outcome. The corrected value was `not_evaluated`. T16 remains complete; its earlier capacity snapshot remains historical. The T17 matrix is now frozen and the fresh 47 GiB/10 GiB capacity and host preflight have passed. Formal execution has not yet begun; no adoption conclusion is drawn from preparation or smoke evidence.
+Before execution, the readiness record incorrectly mapped missing harness phases and stress recipes to `evidence_insufficient`. Those were preparation gaps while zero workload cells had started. The corrected pre-execution adoption status was `not_evaluated`. After validation, re-freezing, and passing fresh capacity and identity gates, one formal cell ran and produced the operational failure above. T16 remains complete; T17 now has a condition-specific non-adoption decision based on that measured failure, with all unmeasured dimensions explicitly separated.

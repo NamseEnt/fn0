@@ -1,0 +1,8 @@
+timestamp_utc=2026-11-05T05:58:15Z
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159122923520 107591340032 51531583488  68% /bench/zfs/db
+threshold_bytes=50465865728 reserve_bytes=10737418240
+available_bytes=51531583488
+database_allocated_bytes=19574784
+active_workloads=none
+cgroup_base=removed

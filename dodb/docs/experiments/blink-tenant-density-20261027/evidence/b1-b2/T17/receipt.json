@@ -1,7 +1,7 @@
 {
   "task_id": "T17",
   "scope": "Frozen B-link and shared-resource TransactionDB comparison readiness, capacity reclamation, and adoption decision",
-  "status": "preflight_passed_execution_not_started",
+  "status": "completed_first_screen_failure",
   "matrix": "dodb/docs/experiments/blink-tenant-density-20261027/T17-FROZEN-MATRIX.md",
   "reviewer_authorization": {
     "reviewer": "Namse, DODB storage maintainer",
@@ -31,7 +31,10 @@
     "initial_free_bytes": 11463950336,
     "final_free_bytes": 51568455680,
     "headroom_over_gate_bytes": 1102589952,
-    "status": "passed"
+    "status": "passed",
+    "post_run_free_bytes": 51531583488,
+    "post_run_headroom_over_gate_bytes": 1065717760,
+    "post_run_status": "passed"
   },
   "preflight": {
     "timestamp_utc": "2026-11-05T05:53:43Z",
@@ -119,14 +122,14 @@
       "evidence": "../T16/RESULTS.md and ../T16/receipt.json"
     },
     {
-      "criterion": "47 GiB capacity threshold and 10 GiB reserve",
+      "criterion": "47 GiB capacity threshold and 10 GiB ZFS reserve before and after first cell",
       "status": "passed",
-      "evidence": "logs/final-preflight-host-state-f75679e88.log"
+      "evidence": "logs/final-preflight-execution-f75679e88.log and logs/post-run-state-f75679e88.log"
     },
     {
-      "criterion": "Frozen native and binary identities preserved and rechecked",
+      "criterion": "Frozen native, source, recipe, and binary identities preserved and rechecked",
       "status": "passed",
-      "evidence": "logs/final-preflight-host-state-f75679e88.log and logs/build-f75679e88/artifact-manifest.json"
+      "evidence": "formal-screen-f75679e88/n1-synchronized-arrival-r0-blink-paged/binary-manifest.json"
     },
     {
       "criterion": "Five-minute SLO windows, recovery load, checkpoint-cycle extension, long-reader retention, and six fixed stress recipes",
@@ -134,9 +137,29 @@
       "evidence": "RESULTS.md and source commit f75679e88618ebc018a61158e6b02acb5dd574e3"
     },
     {
-      "criterion": "T17 correctness, operational completeness, SLO, resource acceptance, and comparative performance",
+      "criterion": "Correctness and reopen oracles",
+      "status": "not_assessed",
+      "evidence": "formal-screen-f75679e88/n1-synchronized-arrival-r0-blink-paged/report.json"
+    },
+    {
+      "criterion": "Operational ability to complete candidate setup at frozen n=1 condition",
+      "status": "failed",
+      "evidence": "formal-screen-f75679e88/n1-synchronized-arrival-r0-blink-paged/process.log and report.json"
+    },
+    {
+      "criterion": "SLO acceptance",
       "status": "not_measured",
       "evidence": null
+    },
+    {
+      "criterion": "Per-cell application/cgroup resource acceptance",
+      "status": "not_assessed; no OOM or cgroup high/max events during setup",
+      "evidence": "formal-screen-f75679e88/n1-synchronized-arrival-r0-blink-paged/report.json"
+    },
+    {
+      "criterion": "Comparative performance and paired active-tenant frontier",
+      "status": "not_compared; first-failure stop rule ended the matrix before comparators",
+      "evidence": "formal-screen-f75679e88/runner.log"
     }
   ],
   "readiness_correction": {
@@ -146,11 +169,42 @@
     "matrix_reopened_for_revision": true,
     "matrix_refrozen_after_validation": true
   },
-  "adoption_decision": "not_evaluated",
-  "workload_cells_started": 0,
+  "adoption_decision": "not_adopted_for_tested_condition",
+  "workload_cells_started": 1,
   "defaults_changed": false,
   "production_deployment": false,
   "issue_126_closed": false,
-  "next_task": "Launch the first frozen n=1 synchronized-arrival screening cell; the runner stops the entire matrix after its first failed cell.",
-  "matrix_sha256": "fc43fe095fa819653a817f3010cd0e8eeacff0f6b9a07aa5b628cc9fd9dcc649"
+  "next_task": null,
+  "matrix_sha256": "fc43fe095fa819653a817f3010cd0e8eeacff0f6b9a07aa5b628cc9fd9dcc649",
+  "final_execution": {
+    "started_utc": "2026-11-05T05:54:34Z",
+    "ended_utc": "2026-11-05T05:54:44Z",
+    "matrix_commit": "b373db31d9138eaf61a3c3c308d41e8742a56b97",
+    "matrix_sha256": "fc43fe095fa819653a817f3010cd0e8eeacff0f6b9a07aa5b628cc9fd9dcc649",
+    "cell": "n1-synchronized-arrival-r0-blink-paged",
+    "backend": "blink-paged",
+    "registered_active_tenants": 1,
+    "initial_rows_per_tenant": 1048576,
+    "scenario": "synchronized-arrival",
+    "repetition": 0,
+    "exit_code": 1,
+    "runner_stop_rule": "first failed cell stopped the entire matrix; no later backend or cell launched",
+    "failure_phase": "seed source collection before warmup or workload measurement",
+    "failure_reason": "Overloaded(\"paged source reads are paused during source collection\")",
+    "report_status": "failed_or_inconclusive",
+    "report_sha256": "20f2dad5df99845de9985fb9a01c15f278262a7ba344cf2aa9b9c2ed80cbede2",
+    "process_log_sha256": "de38ef2447e79faa9c1c15958d5b8d0ba4bcfdfb520494a5ec3f3e5a6077d60d",
+    "outcome_sha256": "e594a77a9ffd30f02753dae378f839d2d30d59328e455850b61e61699e074ba1",
+    "binary_manifest_sha256": "cb45e6a61e15471f208538dff249219222fbcdbc1166912bc18d1545bbe03414",
+    "command_sha256": "332dfcf9377fa0fabbc993a927b21e9db82311e3acccb4fc9ce5095e911e7a1e",
+    "runner_log_sha256": "ff86ea12496c0ba12039958a2307d03226ccca9e6f58cd6a2991f8e689e12984",
+    "data_directory_preserved": true,
+    "database_allocated_bytes": 19574784,
+    "database_archive_local": "formal-screen-f75679e88/failed-database.tar.zst",
+    "database_archive_sha256": "8d1288cddddd973a8415cd382681ba14a5f56b2caa4cb5d13b30bcb40f50a748",
+    "database_archive_entries": 3872,
+    "post_run_state_log": "logs/post-run-state-f75679e88.log",
+    "post_run_state_log_sha256": "1033754fdc4499f5634cf988c97b6367096bfb8f90bf4c1ad3d3bf17a7bae799"
+  },
+  "adoption_decision_reason": "The frozen blink-paged candidate failed during seed source collection at the first n=1 synchronized-arrival screening cell under the fixed 250 requests/s/tenant offer. This is a candidate operational failure for the tested condition; no comparative performance or general backend ranking was measured."
 }
