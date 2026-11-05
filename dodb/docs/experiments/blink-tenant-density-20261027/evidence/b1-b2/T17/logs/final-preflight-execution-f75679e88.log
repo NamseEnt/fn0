@@ -1,0 +1,16 @@
+timestamp_utc=2026-11-05T05:53:43Z
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159122972672 107554537472 51568435200  68% /bench/zfs/db
+threshold_bytes=50465865728 reserve_bytes=10737418240
+available_bytes=51568435200
+7356e1b06e1f25354a3d194d04beb52f77f819328c9ee1753982cf663785969a  /bench/zfs/db/product-build/t17-f75679e88/artifacts/release-f75679e88/tenant_density_workload
+fb3fe085aa88f34238c8a7f0f1040fbe208ebc2a57b99f09a602a6f30fd7ab72  /bench/zfs/db/product-build/t17-f75679e88/artifacts/release-f75679e88/memory_diagnostic_worker
+5c2773034216a942486197a64400c70d8ac20fc22e78ac381ec39aba4a2b3bab  /bench/zfs/db/product-build/t17-f75679e88/artifacts/release-f75679e88/T17-STRESS-RECIPES.json
+9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5  /bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+MemTotal:       11159744 kB
+MemAvailable:    8360508 kB
+SwapFree:        3774900 kB
+cgroup_controllers=cpuset cpu io memory hugetlb pids rdma misc
+active_workloads=none
+run_directory_absent=yes
+cgroup_base_absent=yes

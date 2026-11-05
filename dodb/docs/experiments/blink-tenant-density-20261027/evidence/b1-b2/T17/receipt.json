@@ -34,12 +34,12 @@
     "status": "passed"
   },
   "preflight": {
-    "timestamp_utc": "2026-11-05T05:48:10Z",
+    "timestamp_utc": "2026-11-05T05:53:43Z",
     "mem_total_kib": 11159744,
-    "mem_available_kib": 8560888,
+    "mem_available_kib": 8360508,
     "swap_free_kib": 3774900,
     "arc_max_bytes": 0,
-    "arc_size_bytes": 2087831488,
+    "arc_size_bytes": null,
     "cgroup_version": "v2",
     "cgroup_controllers": [
       "cpuset",
@@ -55,8 +55,11 @@
     "workload_processes_present": 0,
     "run_directory_present": false,
     "cgroup_base_present": false,
-    "raw_log": "logs/final-preflight-host-state-f75679e88.log",
-    "raw_log_sha256": "d09bd9fc950ae1eb1839a1d6f2f015121c8dc8a64f814c3a7343a78b5c86d86a"
+    "available_bytes": 51568435200,
+    "required_free_bytes": 50465865728,
+    "headroom_over_gate_bytes": 1102569472,
+    "raw_log": "logs/final-preflight-execution-f75679e88.log",
+    "raw_log_sha256": "9a2f9068b4c7719d63632c4b8b4dd1de5c84e9fd5368828a7cd0ae8b3d0c1107"
   },
   "preserved_runtime_identity": {
     "rocksdb_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
@@ -148,5 +151,6 @@
   "defaults_changed": false,
   "production_deployment": false,
   "issue_126_closed": false,
-  "next_task": "Repeat the final 47 GiB capacity and host preflight immediately before launching the first frozen n=1 screening cell."
+  "next_task": "Launch the first frozen n=1 synchronized-arrival screening cell; the runner stops the entire matrix after its first failed cell.",
+  "matrix_sha256": "fc43fe095fa819653a817f3010cd0e8eeacff0f6b9a07aa5b628cc9fd9dcc649"
 }
