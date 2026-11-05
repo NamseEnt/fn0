@@ -96,7 +96,7 @@ def main():
         "--drop-page-cache-before-warmup", "on",
         "--mutation-key-mode", "fixed",
         "--mutation-key-epoch", "0",
-        "--initial-rows", "256",
+        "--initial-rows", "1048576",
         "--value-bytes", "512",
         "--topology", "fixed-per-tenant",
         "--tenant-arrival-phase", "synchronized",
@@ -130,7 +130,7 @@ def main():
             "harness_sha256": HARNESS_SHA256,
             "worker_sha256": WORKER_SHA256,
             "native_archive_sha256": NATIVE_SHA256,
-            "scope": "five-minute cache, measurement, and reopen-recovery smoke; not a T17 comparison cell",
+            "scope": "full frozen per-tenant seed with five-minute cache, measurement, and reopen-recovery smoke; not a T17 comparison cell",
             "command": command,
         },
     )
