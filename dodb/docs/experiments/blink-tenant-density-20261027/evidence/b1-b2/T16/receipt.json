@@ -262,6 +262,12 @@
   },
   "implementation_commit": "0d7c59a3092c79632590e5faffaec9adcf629a10",
   "next_task": "T17 remains separate and was not executed; obtain at least 47 GiB free on the designated ZFS dataset and separate execution authorization.",
+  "t17_readiness_correction": {
+    "workload_started": false,
+    "adoption_decision": "not_evaluated",
+    "reason": "T17 harness phase and recipe prerequisites were missing; the prior T17 receipt incorrectly described the preflight gap as an adoption outcome.",
+    "t16_completion_and_historical_capacity_snapshot_unchanged": true
+  },
   "owned_paths": [
     "crates/dodb-server/src/bin/tenant_density_workload.rs",
     "crates/dodb-server/src/bin/tenant_density_workload/memory_diagnostic_worker.rs",

@@ -1,7 +1,7 @@
 {
   "task_id": "T17",
   "scope": "Frozen B-link and shared-resource TransactionDB comparison readiness, capacity reclamation, and adoption decision",
-  "status": "blocked_before_execution",
+  "status": "preflight_incomplete_execution_not_started",
   "matrix": "dodb/docs/experiments/blink-tenant-density-20261027/T17-FROZEN-MATRIX.md",
   "reviewer_authorization": {
     "reviewer": "Namse, DODB storage maintainer",
@@ -103,10 +103,16 @@
       "evidence": null
     }
   ],
-  "adoption_decision": "evidence_insufficient",
+  "readiness_correction": {
+    "prior_adoption_decision_was": "evidence_insufficient",
+    "corrected_adoption_decision": "not_evaluated",
+    "reason": "No T17 workload cell had started; missing harness phases and stress recipes are preparation gaps, not adoption evidence.",
+    "matrix_reopened_for_revision": true
+  },
+  "adoption_decision": "not_evaluated",
   "workload_cells_started": 0,
   "defaults_changed": false,
   "production_deployment": false,
   "issue_126_closed": false,
-  "next_task": "Review and authorize a revised T17 matrix and matching harness/controller identities before starting any T17 workload."
+  "next_task": "Implement and validate the authorized harness and matrix revision, re-freeze the matrix, then repeat the 47 GiB capacity and execution preflight."
 }

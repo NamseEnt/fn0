@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use tokio::sync::{Semaphore, mpsc};
 use tokio::task::JoinSet;
 
-use crate::config::{Options, TenantArrivalPhase};
+use crate::config::{MutationKeyMode, Options, TenantArrivalPhase};
 
 const RESPONSE_BUDGET_BYTES: usize = 64 * 1024 * 1024;
 type ExpectedMutations = BTreeMap<(u64, usize), Option<Vec<u8>>>;
@@ -181,6 +181,19 @@ where
     S: DodbService + 'static,
     F: Fn() -> Value + Send + Sync + 'static,
 {
+    run_fixed_per_tenant_seeded(service, options, &BTreeMap::new(), on_offer_end).await
+}
+
+pub async fn run_fixed_per_tenant_seeded<S, F>(
+    service: Arc<S>,
+    options: &Options,
+    initial_expected: &BTreeMap<(u64, usize), Option<Vec<u8>>>,
+    on_offer_end: F,
+) -> WorkloadResult
+where
+    S: DodbService + 'static,
+    F: Fn() -> Value + Send + Sync + 'static,
+{
     let started = Instant::now();
     let semaphore = Arc::new(Semaphore::new(options.max_in_flight));
     let observed_in_flight = Arc::new(AtomicU64::new(0));
@@ -288,8 +301,13 @@ where
         let tenant_observed_in_flight = Arc::clone(&observed_in_flight);
         let max_in_flight = options.max_in_flight as u64;
         let tenant_options = options.clone();
+        let tenant_expected = initial_expected
+            .iter()
+            .filter(|((expected_tenant, _), _)| *expected_tenant == tenant_number as u64)
+            .map(|(key, value)| (*key, value.clone()))
+            .collect::<BTreeMap<_, _>>();
         tasks.spawn(async move {
-            let mut expected = BTreeMap::new();
+            let mut expected = tenant_expected;
             let mut write_ordinal = 0_u64;
             let mut mutation_ordinal = 0_u64;
             while let Some(arrival) = receiver.recv().await {
@@ -1249,8 +1267,19 @@ fn prepare_request(
     let mut mutations = Vec::new();
     let mut acknowledgements = Vec::new();
     let mut deletes = 0;
+    let growing_key_offset = if options.mutation_key_mode == MutationKeyMode::Growing {
+        let epoch_offset = options.mutation_key_epoch.saturating_mul(1_000_000);
+        usize::try_from(epoch_offset.saturating_add(write_ordinal.saturating_mul(16)))
+            .unwrap_or(usize::MAX)
+    } else {
+        0
+    };
     for offset in 0..width {
-        let row_number = options.initial_rows + lane_start + offset;
+        let row_number = options
+            .initial_rows
+            .saturating_add(lane_start)
+            .saturating_add(growing_key_offset)
+            .saturating_add(offset);
         let key = DocumentKey::new(vec![0; 16], (row_number as u128).to_be_bytes().to_vec());
         if conditional {
             conditions.push(
@@ -1428,9 +1457,11 @@ fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
         options.value_bytes
     );
     let mut schedule_identity = format!(
-        "hash=fnv1a64;topology={topology};profile={};width={:?};clients={};rate={:?};duration={:?};operations={:?};selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
+        "hash=fnv1a64;topology={topology};profile={};width={:?};mutation_key_mode={};mutation_key_epoch={};clients={};rate={:?};duration={:?};operations={:?};selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
         options.profile.as_str(),
         options.width,
+        options.mutation_key_mode.as_str(),
+        options.mutation_key_epoch,
         options.client_count,
         options.per_tenant_rate,
         options.duration_ms,
@@ -1512,6 +1543,12 @@ mod tests {
             opened_idle_tenants: 8,
             client_count: 4,
             duration_ms: None,
+            warmup_duration_ms: 0,
+            recovery_duration_ms: 0,
+            slo_window_ms: None,
+            long_reader_retention_ms: 0,
+            mutation_key_mode: MutationKeyMode::Fixed,
+            mutation_key_epoch: 0,
             operation_count: Some(20_000),
             initial_rows: 256,
             value_bytes: 512,
@@ -1582,6 +1619,30 @@ mod tests {
         assert!((width_counts[2] as f64 / write_ordinal as f64 - 0.05).abs() < 0.03);
         assert!((conditional_count as f64 / write_ordinal as f64 - 0.5).abs() < 0.01);
         assert!((delete_count as f64 / mutation_count as f64 - 0.1).abs() < 0.02);
+    }
+
+    #[test]
+    fn growing_mutation_keys_advance_by_reserved_lane_width() {
+        let mut fixed_options = test_options();
+        fixed_options.profile = Profile::WriteHeavy;
+        fixed_options.mutation_key_mode = MutationKeyMode::Fixed;
+        let mut growing_options = fixed_options.clone();
+        growing_options.mutation_key_mode = MutationKeyMode::Growing;
+        let expected = BTreeMap::new();
+        let address = RequestAddress {
+            tenant_number: 1,
+            operation_number: 1,
+            selection_offset: 0,
+            write_ordinal: 3,
+            mutation_ordinal: 0,
+            lane_start: 32,
+        };
+        let fixed = prepare_request(&fixed_options, address, &expected);
+        let growing = prepare_request(&growing_options, address, &expected);
+        assert_eq!(fixed.operation_kind, 2);
+        assert_eq!(growing.operation_kind, 2);
+        assert_eq!(fixed.acknowledgements[0].0, 288);
+        assert_eq!(growing.acknowledgements[0].0, 336);
     }
 
     #[test]

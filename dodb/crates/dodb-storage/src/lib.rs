@@ -11,9 +11,10 @@ pub mod wal;
 
 pub use blink::{
     BatchPlan, BlinkBatchMetrics, BlinkCheckpointMetrics, BlinkCheckpointOutput,
-    BlinkCheckpointReport, BlinkCheckpointSnapshot, BlinkReadHandle, BlinkSplitMetrics, BlinkStore,
-    BlinkVersionedReadMetrics, DependencyEdge, DependencyKind, DependencyMetadata, LeafGroupPlan,
-    PhysicalTransactionPlan, PlannedMutation, PlannedWrite, ProvisionalRevisionToken, RouteHint,
+    BlinkCheckpointReport, BlinkCheckpointSnapshot, BlinkReadGenerationPin, BlinkReadHandle,
+    BlinkSplitMetrics, BlinkStore, BlinkVersionedReadMetrics, DependencyEdge, DependencyKind,
+    DependencyMetadata, LeafGroupPlan, PhysicalTransactionPlan, PlannedMutation, PlannedWrite,
+    ProvisionalRevisionToken, RouteHint,
 };
 pub use btree::{
     AsyncShard, BTreeStore, BatchRequest, BatchResponse, CheckpointReport, CoordinatorConfig,

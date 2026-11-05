@@ -62,6 +62,21 @@ pub enum Width {
     Fixed(usize),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MutationKeyMode {
+    Fixed,
+    Growing,
+}
+
+impl MutationKeyMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Fixed => "fixed",
+            Self::Growing => "growing",
+        }
+    }
+}
+
 impl Width {
     pub fn for_operation(self, operation_number: u64) -> usize {
         match self {
@@ -106,6 +121,12 @@ pub struct Options {
     pub opened_idle_tenants: usize,
     pub client_count: usize,
     pub duration_ms: Option<u64>,
+    pub warmup_duration_ms: u64,
+    pub recovery_duration_ms: u64,
+    pub slo_window_ms: Option<u64>,
+    pub long_reader_retention_ms: u64,
+    pub mutation_key_mode: MutationKeyMode,
+    pub mutation_key_epoch: u64,
     pub operation_count: Option<u64>,
     pub initial_rows: usize,
     pub value_bytes: usize,
@@ -153,6 +174,12 @@ impl Options {
             "--opened-idle-tenants",
             "--client-count",
             "--duration-ms",
+            "--warmup-duration-ms",
+            "--recovery-duration-ms",
+            "--slo-window-ms",
+            "--long-reader-retention-ms",
+            "--mutation-key-mode",
+            "--mutation-key-epoch",
             "--operation-count",
             "--initial-rows",
             "--value-bytes",
@@ -230,6 +257,24 @@ impl Options {
         let opened_idle_tenants = parse_number(&values, "--opened-idle-tenants")?;
         let client_count = parse_number(&values, "--client-count")?;
         let duration_ms = parse_optional_number(&values, "--duration-ms")?;
+        let warmup_duration_ms =
+            parse_optional_number(&values, "--warmup-duration-ms")?.unwrap_or(0);
+        let recovery_duration_ms =
+            parse_optional_number(&values, "--recovery-duration-ms")?.unwrap_or(0);
+        let slo_window_ms = parse_optional_number(&values, "--slo-window-ms")?;
+        let long_reader_retention_ms =
+            parse_optional_number(&values, "--long-reader-retention-ms")?.unwrap_or(0);
+        let mutation_key_mode = match values
+            .get("--mutation-key-mode")
+            .copied()
+            .unwrap_or("fixed")
+        {
+            "fixed" => MutationKeyMode::Fixed,
+            "growing" => MutationKeyMode::Growing,
+            value => return Err(format!("unsupported mutation key mode {value}")),
+        };
+        let mutation_key_epoch =
+            parse_optional_number(&values, "--mutation-key-epoch")?.unwrap_or(0);
         let operation_count = parse_optional_number(&values, "--operation-count")?;
         let initial_rows = parse_number(&values, "--initial-rows")?;
         let value_bytes = parse_number(&values, "--value-bytes")?;
@@ -365,6 +410,12 @@ impl Options {
             opened_idle_tenants,
             client_count,
             duration_ms,
+            warmup_duration_ms,
+            recovery_duration_ms,
+            slo_window_ms,
+            long_reader_retention_ms,
+            mutation_key_mode,
+            mutation_key_epoch,
             operation_count,
             initial_rows,
             value_bytes,
@@ -393,6 +444,22 @@ impl Options {
     pub fn validate(&self) -> Result<(), String> {
         if let Some(budget) = &self.memory_budget {
             budget.validate()?;
+        }
+        if self.warmup_duration_ms > 86_400_000 || self.recovery_duration_ms > 86_400_000 {
+            return Err("warm-up and recovery durations must not exceed 24 hours".to_owned());
+        }
+        if self.slo_window_ms == Some(0) {
+            return Err("SLO window duration must be positive".to_owned());
+        }
+        if self.long_reader_retention_ms > 86_400_000 {
+            return Err("long-reader retention must not exceed 24 hours".to_owned());
+        }
+        if self.long_reader_retention_ms > 0
+            && !matches!(self.backend, Backend::Blink | Backend::MinimalNativeShared)
+        {
+            return Err(
+                "long-reader retention requires B-link or minimal-native-shared".to_owned(),
+            );
         }
         if self.registered_tenants == 0 || self.registered_tenants > 65_536 {
             return Err("registered tenants must be between 1 and 65536".to_owned());

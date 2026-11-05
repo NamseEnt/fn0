@@ -22,6 +22,7 @@ use dodb_core::{
 use dodb_rocksdb::memory_diagnostic::{MemoryDiagnosticSession, RemoteDodbService};
 use dodb_service::{DodbService, ExecutionBudget, Request, Response};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 
 const RESPONSE_BUDGET_BYTES: usize = 64 * 1024 * 1024;
 
@@ -85,6 +86,98 @@ fn measurement_resource_samples(diagnostic: &Value) -> Value {
     })
 }
 
+fn successful_checkpoint_cycles(session: &MemoryDiagnosticSession) -> u64 {
+    session
+        .health_reports_snapshot()
+        .iter()
+        .map(|report| {
+            let measurement_start_ms =
+                report["shared_resource_snapshots"]["measurement_started_unix_ms"]
+                    .as_u64()
+                    .unwrap_or(u64::MAX);
+            let measurement_end_ms =
+                report["shared_resource_snapshots"]["measurement_stopped_unix_ms"]
+                    .as_u64()
+                    .unwrap_or(0);
+            report["blink_checkpoint_metrics"]["checkpoint_events"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|event| {
+                    event["succeeded"] == true
+                        && event["started_unix_nanos"]
+                            .as_u64()
+                            .is_some_and(|started| started / 1_000_000 >= measurement_start_ms)
+                        && event["ended_unix_nanos"]
+                            .as_u64()
+                            .is_some_and(|ended| ended / 1_000_000 <= measurement_end_ms)
+                })
+                .count() as u64
+        })
+        .sum()
+}
+
+fn validate_long_reader_retention(
+    diagnostic: &Value,
+    required_duration_ms: u64,
+    require_checkpoint_overlap: bool,
+) -> Value {
+    if required_duration_ms == 0 {
+        return json!({ "status": "not_requested", "passed": true });
+    }
+    let mut retained_duration_ms = 0_u64;
+    let mut successful_checkpoints_during_reader = 0_u64;
+    let mut passed_event = false;
+    let mut events = Vec::new();
+    if let Some(reports) = diagnostic["engine_health_reports"].as_array() {
+        for report in reports {
+            let reader_events = report["long_reader_retention"]["events"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default();
+            let checkpoint_events = report["blink_checkpoint_metrics"]["checkpoint_events"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default();
+            for reader_event in reader_events {
+                let start_ms = reader_event["started_unix_ms"].as_u64().unwrap_or(0);
+                let end_ms = reader_event["released_unix_ms"].as_u64().unwrap_or(0);
+                let held_ms = reader_event["retained_ms"].as_u64().unwrap_or(0);
+                retained_duration_ms = retained_duration_ms.max(held_ms);
+                let start_ns = u128::from(start_ms) * 1_000_000;
+                let end_ns = u128::from(end_ms) * 1_000_000;
+                let overlap_count = checkpoint_events
+                    .iter()
+                    .filter(|checkpoint| {
+                        checkpoint["succeeded"] == true
+                            && checkpoint["started_unix_nanos"]
+                                .as_u64()
+                                .is_some_and(|value| u128::from(value) >= start_ns)
+                            && checkpoint["ended_unix_nanos"]
+                                .as_u64()
+                                .is_some_and(|value| u128::from(value) <= end_ns)
+                    })
+                    .count() as u64;
+                successful_checkpoints_during_reader =
+                    successful_checkpoints_during_reader.max(overlap_count);
+                passed_event |= held_ms >= required_duration_ms
+                    && (!require_checkpoint_overlap || overlap_count >= 1);
+                events.push(json!({ "reader": reader_event, "successful_checkpoints_during_reader": overlap_count }));
+            }
+        }
+    }
+    let passed = passed_event;
+    json!({
+        "status": if passed { "passed" } else { "failed" },
+        "passed": passed,
+        "required_retained_duration_ms": required_duration_ms,
+        "maximum_observed_retained_duration_ms": retained_duration_ms,
+        "minimum_successful_checkpoints_during_reader": u64::from(require_checkpoint_overlap),
+        "maximum_successful_checkpoints_during_reader": successful_checkpoints_during_reader,
+        "events": events,
+    })
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments = std::env::args().skip(1).collect::<Vec<_>>();
@@ -112,7 +205,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filesystem_before_setup = filesystem_snapshot(&options.data_dir);
     let setup_worker = spawn_worker(&session, &worker_path, &options, pressure_monitor.as_ref(), "setup").await?;
     let setup_service = RemoteDodbService::new(setup_worker.connection().clone());
-    seed_population(&setup_service, &options).await?;
+    let seed_manifest_sha256 = seed_population(&setup_service, &options).await?;
     setup_worker.shutdown().map_err(std::io::Error::other)?;
     let filesystem_after_setup = filesystem_snapshot(&options.data_dir);
 
@@ -121,6 +214,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     open_measurement_tenants(&service, &options).await?;
     session.set_phase("measurement-correctness-preflight");
     let preflight_mutations = correctness_preflight(&service, &options).await?;
+    let mut workload_seed_expected = preflight_mutations.clone();
+    let mut phase_reports = serde_json::Map::new();
+    if options.warmup_duration_ms > 0 {
+        let mut warmup_options = options.clone();
+        warmup_options.duration_ms = Some(options.warmup_duration_ms);
+        warmup_options.operation_count = None;
+        warmup_options.mutation_key_mode = config::MutationKeyMode::Growing;
+        warmup_options.mutation_key_epoch = 5_000;
+        session.set_phase("warm-up");
+        let (warmup_report, warmup_mutations) = run_workload_seeded(
+            &service,
+            &warmup_options,
+            &session,
+            &workload_seed_expected,
+        )
+        .await?;
+        if warmup_report["cell_valid"] != true {
+            return Err(std::io::Error::other("warm-up workload was not operationally valid").into());
+        }
+        workload_seed_expected.extend(warmup_mutations);
+        phase_reports.insert("warmup".to_owned(), warmup_report);
+    }
     measurement_worker
         .start_measurement()
         .map_err(std::io::Error::other)?;
@@ -131,12 +246,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let offer_io_before = resources::process_io_from_boundary(&offer_process_before);
     let driver_io_before = blink_checkpoint::process_write_io();
     let started = Instant::now();
-    let workload = run_workload(&service, &options, &session).await;
+    if options.long_reader_retention_ms > 0 {
+        measurement_worker
+            .hold_reader(1)
+            .map_err(std::io::Error::other)?;
+    }
+    let workload = run_slo_windowed_workload_seeded(
+        &service,
+        &measurement_worker,
+        &options,
+        &session,
+        &workload_seed_expected,
+    )
+    .await;
     retained_workload = workload
         .as_ref()
         .ok()
         .map(|(workload, _)| workload.clone());
     let elapsed_after_drain = started.elapsed();
+    if options.long_reader_retention_ms > 0 {
+        measurement_worker
+            .release_readers()
+            .map_err(std::io::Error::other)?;
+    }
     if let Some(monitor) = &pressure_monitor { monitor.boundary("after-drain"); }
     session.set_phase("measurement-drain");
     measurement_worker
@@ -146,11 +278,132 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .shutdown()
         .map_err(std::io::Error::other)?;
     let filesystem_after_measurement = filesystem_snapshot(&options.data_dir);
-    let (workload, mut expected_mutations) = workload?;
-    for (key, value) in preflight_mutations {
-        if expected_mutations.insert(key, value).is_some() {
-            return Err(std::io::Error::other("preflight arena overlaps acknowledged workload mutations").into());
+    let (mut workload, mut expected_mutations) = workload?;
+    let mut checkpoint_extension_reports = Vec::new();
+    let mut measured_duration_ms = options.duration_ms.unwrap_or(0);
+    let mut checkpoint_cycles = successful_checkpoint_cycles(&session);
+    if options.backend == config::Backend::Blink
+        && options.slo_window_ms == Some(300_000)
+        && measured_duration_ms >= 1_800_000
+    {
+        while workload["cell_valid"] == true
+            && checkpoint_cycles < 20
+            && measured_duration_ms < 7_200_000
+        {
+            let extension_ms = 900_000_u64.min(7_200_000 - measured_duration_ms);
+            let extension_phase = format!("measurement-extension-{}", measured_duration_ms / 60_000);
+            let extension_worker = spawn_worker(
+                &session,
+                &worker_path,
+                &options,
+                pressure_monitor.as_ref(),
+                &extension_phase,
+            )
+            .await?;
+            let extension_service = RemoteDodbService::new(extension_worker.connection().clone());
+            open_measurement_tenants(&extension_service, &options).await?;
+            extension_worker
+                .start_measurement()
+                .map_err(std::io::Error::other)?;
+            let mut extension_options = options.clone();
+            extension_options.duration_ms = Some(extension_ms);
+            extension_options.operation_count = None;
+            extension_options.mutation_key_epoch = options
+                .mutation_key_epoch
+                .saturating_add(measured_duration_ms / 300_000);
+            session.set_phase("checkpoint-cycle-extension");
+            let (extension_report, extension_mutations) =
+                run_slo_windowed_workload_seeded(
+                    &extension_service,
+                    &extension_worker,
+                    &extension_options,
+                    &session,
+                    &expected_mutations,
+                )
+                    .await?;
+            extension_worker
+                .stop_measurement()
+                .map_err(std::io::Error::other)?;
+            extension_worker
+                .shutdown()
+                .map_err(std::io::Error::other)?;
+            expected_mutations.extend(extension_mutations);
+            measured_duration_ms = measured_duration_ms.saturating_add(extension_ms);
+            checkpoint_cycles = successful_checkpoint_cycles(&session);
+            checkpoint_extension_reports.push(json!({
+                "phase": extension_phase,
+                "duration_ms": extension_ms,
+                "workload": extension_report,
+                "successful_checkpoint_cycles_cumulative": checkpoint_cycles,
+            }));
+            if extension_report["cell_valid"] != true {
+                workload["cell_valid"] = json!(false);
+                break;
+            }
         }
+        workload["checkpoint_cycle_gate_passed"] = json!(checkpoint_cycles >= 20);
+        workload["successful_checkpoint_cycles"] = json!(checkpoint_cycles);
+        workload["measured_duration_ms_including_extensions"] = json!(measured_duration_ms);
+        if checkpoint_cycles < 20 {
+            workload["cell_valid"] = json!(false);
+            workload["checkpoint_cycle_gate_status"] = json!("failed_at_120_minute_limit");
+        } else {
+            workload["checkpoint_cycle_gate_status"] = json!("passed");
+        }
+    }
+    phase_reports.insert("measurement".to_owned(), workload.clone());
+    if !checkpoint_extension_reports.is_empty() {
+        phase_reports.insert(
+            "checkpoint_cycle_extensions".to_owned(),
+            Value::Array(checkpoint_extension_reports),
+        );
+    }
+    if options.recovery_duration_ms > 0
+        && workload["valid_for_oracle"] == true
+        && workload["cell_valid"] == true
+    {
+        let recovery_worker = spawn_worker(&session, &worker_path, &options, pressure_monitor.as_ref(), "recovery").await?;
+        let recovery_service = RemoteDodbService::new(recovery_worker.connection().clone());
+        open_measurement_tenants(&recovery_service, &options).await?;
+        recovery_worker
+            .start_measurement()
+            .map_err(std::io::Error::other)?;
+        let mut recovery_options = options.clone();
+        recovery_options.duration_ms = Some(options.recovery_duration_ms);
+        recovery_options.operation_count = None;
+        recovery_options.mutation_key_epoch = options.mutation_key_epoch.saturating_add(1_000);
+        if options.long_reader_retention_ms > 0 {
+            recovery_worker
+                .hold_reader(1)
+                .map_err(std::io::Error::other)?;
+        }
+        session.set_phase("recovery-offered-load");
+        let (recovery_report, recovery_mutations) = run_slo_windowed_workload_seeded(
+            &recovery_service,
+            &recovery_worker,
+            &recovery_options,
+            &session,
+            &expected_mutations,
+        )
+        .await?;
+        if options.long_reader_retention_ms > 0 {
+            recovery_worker
+                .release_readers()
+                .map_err(std::io::Error::other)?;
+        }
+        recovery_worker
+            .stop_measurement()
+            .map_err(std::io::Error::other)?;
+        recovery_worker.shutdown().map_err(std::io::Error::other)?;
+        workload["cell_valid"] = json!(workload["cell_valid"] == true && recovery_report["cell_valid"] == true);
+        workload["valid_for_oracle"] = json!(workload["valid_for_oracle"] == true && recovery_report["valid_for_oracle"] == true);
+        for (key, value) in recovery_mutations {
+            expected_mutations.insert(key, value);
+        }
+        phase_reports.insert("recovery_after_reopen".to_owned(), recovery_report);
+        workload["phase_workloads"] = Value::Object(phase_reports.clone());
+    } else {
+        workload["phase_workloads"] = Value::Object(phase_reports.clone());
     }
     let offered_elapsed = workload["offer_window_elapsed_ms"]
         .as_u64()
@@ -228,6 +481,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         paged_resource_report.is_none_or(|resources| resources["status"].as_str() == Some("resident"))
     };
     cell_is_valid &= paged_route_verified;
+    let long_reader_retention = validate_long_reader_retention(
+        &diagnostic,
+        options.long_reader_retention_ms,
+        options.backend == config::Backend::Blink,
+    );
+    cell_is_valid &= long_reader_retention["passed"] == true;
     let measurement_process_summary = resources::summarize_measurement_processes(
         &diagnostic,
         &offer_process_before,
@@ -236,6 +495,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let measurement_resource_report = measurement_resource_samples(&diagnostic);
     Ok(json!({
         "status": if cell_is_valid { "completed" } else { "inconclusive" },
+        "seed_manifest_sha256": seed_manifest_sha256,
         "requested_source_revision": source_revision,
         "compiled_source_revision": compiled_source_revision,
         "effective_configuration": effective_configuration(&options),
@@ -245,6 +505,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "verified": paged_route_verified,
             "measurement_worker_snapshot": paged_resource_report.cloned().unwrap_or(Value::Null),
         },
+        "long_reader_retention": long_reader_retention,
         "correctness_preflight_key_scope": {
             "tenant": 1,
             "rows": [options.initial_rows + options.client_count * 16 + 16, options.initial_rows + options.client_count * 16 + 17, options.initial_rows + options.client_count * 16 + 18],
@@ -407,14 +668,22 @@ async fn spawn_worker(
 async fn seed_population(
     service: &RemoteDodbService,
     options: &Options,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<String, Box<dyn std::error::Error>> {
+    let mut seed_manifest = Sha256::new();
     for tenant_number in 1..=options.registered_tenants {
         let tenant = TenantId::new(tenant_number as u64);
         for first_row in (0..options.initial_rows).step_by(16) {
             let mutations = (first_row..(first_row + 16).min(options.initial_rows))
-                .map(|row_number| TransactionMutation::Put {
-                    key: document_key(row_number),
-                    value: seeded_value(options, tenant_number, row_number),
+                .map(|row_number| {
+                    let value = seeded_value(options, tenant_number, row_number);
+                    seed_manifest.update((tenant_number as u64).to_be_bytes());
+                    seed_manifest.update((row_number as u64).to_be_bytes());
+                    seed_manifest.update((value.len() as u64).to_be_bytes());
+                    seed_manifest.update(&value);
+                    TransactionMutation::Put {
+                        key: document_key(row_number),
+                        value,
+                    }
                 })
                 .collect();
             let request = Request::Transact {
@@ -428,7 +697,7 @@ async fn seed_population(
             )?;
         }
     }
-    Ok(())
+    Ok(format!("{:x}", seed_manifest.finalize()))
 }
 
 async fn open_measurement_tenants(
@@ -721,10 +990,11 @@ async fn get_state(
     }
 }
 
-async fn run_workload(
+async fn run_workload_seeded(
     service: &RemoteDodbService,
     options: &Options,
     session: &Arc<MemoryDiagnosticSession>,
+    initial_expected: &BTreeMap<(u64, usize), Option<Vec<u8>>>,
 ) -> Result<(Value, BTreeMap<(u64, usize), Option<Vec<u8>>>), Box<dyn std::error::Error>> {
     let scheduler_service = Arc::new(RemoteDodbService::new(service.connection().clone()));
     let callback_session = Arc::clone(session);
@@ -747,13 +1017,220 @@ async fn run_workload(
         })
     };
     if options.topology == Topology::FixedPerTenant {
-        return scheduler::run_fixed_per_tenant(scheduler_service, options, on_offer_end)
-            .await
-            .map_err(|error| Box::new(std::io::Error::other(error)) as Box<dyn std::error::Error>);
+        return scheduler::run_fixed_per_tenant_seeded(
+            scheduler_service,
+            options,
+            initial_expected,
+            on_offer_end,
+        )
+        .await
+        .map_err(|error| Box::new(std::io::Error::other(error)) as Box<dyn std::error::Error>);
     }
     return scheduler::run_fixed_total(scheduler_service, options, on_offer_end)
         .await
         .map_err(|error| Box::new(std::io::Error::other(error)) as Box<dyn std::error::Error>);
+}
+
+async fn run_slo_windowed_workload_seeded(
+    service: &RemoteDodbService,
+    worker: &dodb_rocksdb::memory_diagnostic::MemoryDiagnosticWorker,
+    options: &Options,
+    session: &Arc<MemoryDiagnosticSession>,
+    initial_expected: &BTreeMap<(u64, usize), Option<Vec<u8>>>,
+) -> Result<(Value, BTreeMap<(u64, usize), Option<Vec<u8>>>), Box<dyn std::error::Error>> {
+    let (Some(total_duration_ms), Some(window_duration_ms)) =
+        (options.duration_ms, options.slo_window_ms)
+    else {
+        return Ok(run_workload_seeded(service, options, session, initial_expected).await?);
+    };
+    let mut elapsed_ms = 0_u64;
+    let mut consecutive_failed_windows = 0_u8;
+    let mut windows = Vec::new();
+    let mut maintenance_debt_windows = Vec::new();
+    let mut expected_mutations = initial_expected.clone();
+    let mut final_report = Value::Null;
+    let mut stop_reason = "duration_completed";
+    while elapsed_ms < total_duration_ms {
+        let window_ms = window_duration_ms.min(total_duration_ms - elapsed_ms);
+        let mut window_options = options.clone();
+        window_options.duration_ms = Some(window_ms);
+        window_options.operation_count = None;
+        window_options.mutation_key_epoch = options
+            .mutation_key_epoch
+            .saturating_add(windows.len() as u64);
+        let (report, mutations) =
+            run_workload_with_stop_monitor(service, &window_options, session, &expected_mutations)
+                .await?;
+        expected_mutations.extend(mutations);
+        let score = score_slo_window(&report);
+        let checkpoint_metrics = worker
+            .checkpoint_metrics_snapshot()
+            .unwrap_or_else(|error| json!({ "status": "unavailable", "reason": error }));
+        let current_debt = checkpoint_metrics["checkpoint_debt_bytes_current"].as_u64();
+        if let Some(debt) = current_debt {
+            maintenance_debt_windows.push(debt);
+        }
+        consecutive_failed_windows = if score["passed"] == true {
+            0
+        } else {
+            consecutive_failed_windows.saturating_add(1)
+        };
+        final_report = report.clone();
+        windows.push(json!({
+            "window_index": windows.len(),
+            "start_elapsed_ms": elapsed_ms,
+            "duration_ms": window_ms,
+            "score": score,
+            "checkpoint_metrics": checkpoint_metrics,
+            "workload": report,
+        }));
+        elapsed_ms = elapsed_ms.saturating_add(window_ms);
+        if consecutive_failed_windows >= 2 {
+            stop_reason = "two_consecutive_failed_slo_windows";
+            break;
+        }
+        if maintenance_debt_windows.len() >= 3 {
+            let debt_window_count = maintenance_debt_windows.len();
+            if maintenance_debt_windows[debt_window_count - 3]
+                < maintenance_debt_windows[debt_window_count - 2]
+                && maintenance_debt_windows[debt_window_count - 2]
+                    < maintenance_debt_windows[debt_window_count - 1]
+            {
+                stop_reason = "maintenance_debt_increased_across_three_windows";
+                break;
+            }
+        }
+    }
+    final_report["slo_window_duration_ms"] = json!(window_duration_ms);
+    final_report["slo_windows"] = Value::Array(windows);
+    final_report["slo_stop_reason"] = json!(stop_reason);
+    final_report["slo_passed"] = json!(stop_reason != "two_consecutive_failed_slo_windows");
+    let every_window_valid = windows
+        .iter()
+        .all(|window| window["workload"]["cell_valid"] == true);
+    final_report["maintenance_debt_windows"] = json!(maintenance_debt_windows);
+    final_report["cell_valid"] = json!(
+        final_report["cell_valid"] == true
+            && every_window_valid
+            && stop_reason == "duration_completed"
+    );
+    Ok((final_report, expected_mutations))
+}
+
+async fn run_workload_with_stop_monitor(
+    service: &RemoteDodbService,
+    options: &Options,
+    session: &Arc<MemoryDiagnosticSession>,
+    initial_expected: &BTreeMap<(u64, usize), Option<Vec<u8>>>,
+) -> Result<(Value, BTreeMap<(u64, usize), Option<Vec<u8>>>), Box<dyn std::error::Error>> {
+    let initial_memory_snapshot = options
+        .memory_budget
+        .as_ref()
+        .map(|budget| dodb_rocksdb::memory_pressure::group_snapshot(&budget.cgroup_root));
+    let workload = run_workload_seeded(service, options, session, initial_expected);
+    tokio::pin!(workload);
+    let mut interval = tokio::time::interval(Duration::from_secs(1));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        tokio::select! {
+            result = &mut workload => return Ok(result?),
+            _ = interval.tick() => {
+                let available_bytes = resources::filesystem_available_bytes(&options.data_dir)
+                    .map_err(|error| std::io::Error::other(format!("could not verify live ZFS reserve: {error}")))?;
+                if available_bytes < 10 * 1024 * 1024 * 1024 {
+                    return Err(std::io::Error::other(format!("live ZFS reserve crossed 10 GiB: {available_bytes} bytes remain")).into());
+                }
+                if let (Some(budget), Some(initial)) = (&options.memory_budget, &initial_memory_snapshot) {
+                    let current = dodb_rocksdb::memory_pressure::group_snapshot(&budget.cgroup_root);
+                    if let Some(event) = cgroup_stop_event(initial, &current) {
+                        return Err(std::io::Error::other(format!("cgroup stop condition triggered: {event}")).into());
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn cgroup_stop_event(initial: &Value, current: &Value) -> Option<&'static str> {
+    for (counter, reason) in [
+        ("high", "memory.high stall"),
+        ("max", "memory.max limit event"),
+        ("oom", "cgroup OOM"),
+        ("oom_kill", "cgroup OOM kill"),
+    ] {
+        let Some(initial_count) = initial["memory.events"][counter].as_u64() else {
+            return Some("cgroup event counters unavailable");
+        };
+        let Some(current_count) = current["memory.events"][counter].as_u64() else {
+            return Some("cgroup event counters unavailable");
+        };
+        if current_count > initial_count {
+            return Some(reason);
+        }
+    }
+    None
+}
+
+fn score_slo_window(report: &Value) -> Value {
+    let mut read_counts = vec![0_u64; 64];
+    for operation_name in ["Get", "Query"] {
+        if let Some(buckets) =
+            report["operation_latency_histograms"][operation_name]["bucket_counts"].as_array()
+        {
+            for (bucket_index, bucket_count) in buckets.iter().enumerate().take(read_counts.len()) {
+                read_counts[bucket_index] =
+                    read_counts[bucket_index].saturating_add(bucket_count.as_u64().unwrap_or(0));
+            }
+        }
+    }
+    let write_counts = report["operation_latency_histograms"]["Write"]["bucket_counts"]
+        .as_array()
+        .map(|buckets| {
+            buckets
+                .iter()
+                .map(|count| count.as_u64().unwrap_or(0))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let read_p99_upper_bound_ms = percentile_bucket_ms(&read_counts, 0.99);
+    let write_p99_upper_bound_ms = percentile_bucket_ms(&write_counts, 0.99);
+    let scheduled = report["scheduled"].as_u64().unwrap_or(0);
+    let rejected_or_failed = ["rejected_conflicts", "other_error", "timed_out", "dropped"]
+        .iter()
+        .map(|field| report[*field].as_u64().unwrap_or(0))
+        .sum::<u64>();
+    let rejection_rate = if scheduled == 0 {
+        1.0
+    } else {
+        rejected_or_failed as f64 / scheduled as f64
+    };
+    let passed = read_p99_upper_bound_ms <= 50.0
+        && write_p99_upper_bound_ms <= 100.0
+        && rejection_rate <= 0.001;
+    json!({
+        "passed": passed,
+        "read_p99_upper_bound_ms": read_p99_upper_bound_ms,
+        "write_p99_upper_bound_ms": write_p99_upper_bound_ms,
+        "rejection_rate": rejection_rate,
+        "rejected_or_failed_requests": rejected_or_failed,
+        "scheduled_requests": scheduled
+    })
+}
+
+fn percentile_bucket_ms(bucket_counts: &[u64], percentile: f64) -> f64 {
+    let observation_count = bucket_counts.iter().sum::<u64>();
+    if observation_count == 0 {
+        return f64::INFINITY;
+    }
+    let target = (observation_count as f64 * percentile).ceil() as u64;
+    let mut cumulative = 0_u64;
+    for (bucket_index, bucket_count) in bucket_counts.iter().copied().enumerate() {
+        cumulative = cumulative.saturating_add(bucket_count);
+        if cumulative >= target {
+            return 2_f64.powi(bucket_index.min(63) as i32) / 1_000_000.0;
+        }
+    }
+    f64::INFINITY
 }
 
 async fn validate_population(
@@ -863,7 +1340,10 @@ fn effective_configuration(options: &Options) -> Value {
         "rocksdb_shared_resources": options.shared_resources.map(|resources| resources.report()),
         "backend_memory_budget": options.memory_budget,
         "backend": options.backend.as_str(), "registered_tenants": options.registered_tenants,
-        "seed": options.seed, "duration_ms": options.duration_ms, "operation_count": options.operation_count,
+        "seed": options.seed, "duration_ms": options.duration_ms, "warmup_duration_ms": options.warmup_duration_ms,
+        "recovery_duration_ms": options.recovery_duration_ms, "slo_window_ms": options.slo_window_ms, "operation_count": options.operation_count,
+        "long_reader_retention_ms": options.long_reader_retention_ms,
+        "mutation_key_mode": options.mutation_key_mode.as_str(),
         "request_timeout_ms": options.request_timeout_ms, "drain_timeout_ms": options.drain_timeout_ms,
         "active_tenants": options.active_tenants, "opened_idle_tenants": options.opened_idle_tenants,
         "measurement_never_opened_tenants": options.registered_tenants - options.active_tenants - options.opened_idle_tenants,
@@ -890,7 +1370,7 @@ fn effective_configuration(options: &Options) -> Value {
 
 #[cfg(test)]
 mod tests {
-    use super::effective_configuration;
+    use super::{effective_configuration, score_slo_window, validate_long_reader_retention};
     use crate::config::{Backend, Options, Profile, TenantArrivalPhase, Topology, Width};
 
     fn options(topology: Topology) -> Options {
@@ -906,6 +1386,12 @@ mod tests {
             opened_idle_tenants: 0,
             client_count: 1,
             duration_ms: Some(1_000),
+            warmup_duration_ms: 0,
+            recovery_duration_ms: 0,
+            slo_window_ms: None,
+            long_reader_retention_ms: 0,
+            mutation_key_mode: config::MutationKeyMode::Fixed,
+            mutation_key_epoch: 0,
             operation_count: None,
             initial_rows: 256,
             value_bytes: 512,
@@ -943,5 +1429,74 @@ mod tests {
         );
         assert_eq!(fixed_per_tenant["tenant_arrival_phase_applies"], true);
         assert_eq!(fixed_per_tenant["tenant_arrival_phase"], "synchronized");
+    }
+
+    #[test]
+    fn slo_window_score_enforces_latency_and_rejection_thresholds() {
+        let mut read_buckets = vec![0_u64; 64];
+        read_buckets[15] = 100;
+        let mut write_buckets = vec![0_u64; 64];
+        write_buckets[16] = 100;
+        let passing = serde_json::json!({
+            "operation_latency_histograms": {
+                "Get": { "bucket_counts": read_buckets },
+                "Query": { "bucket_counts": vec![0_u64; 64] },
+                "Write": { "bucket_counts": write_buckets }
+            },
+            "scheduled": 1000,
+            "rejected_conflicts": 0,
+            "other_error": 0,
+            "timed_out": 0,
+            "dropped": 0
+        });
+        assert_eq!(score_slo_window(&passing)["passed"], true);
+
+        let mut failing = passing.clone();
+        failing["operation_latency_histograms"]["Write"]["bucket_counts"][17] = 1.into();
+        assert_eq!(score_slo_window(&failing)["passed"], false);
+        failing["operation_latency_histograms"]["Write"]["bucket_counts"][17] = 0.into();
+        failing["other_error"] = 2.into();
+        assert_eq!(score_slo_window(&failing)["passed"], false);
+    }
+
+    #[test]
+    fn long_reader_gate_requires_duration_and_backend_specific_overlap() {
+        let diagnostic = serde_json::json!({
+            "engine_health_reports": [{
+                "long_reader_retention": { "events": [{
+                    "tenant": 1,
+                    "started_unix_ms": 1000,
+                    "released_unix_ms": 3000,
+                    "retained_ms": 2000
+                }] },
+                "blink_checkpoint_metrics": { "checkpoint_events": [{
+                    "succeeded": true,
+                    "started_unix_nanos": 1500000000_u64,
+                    "ended_unix_nanos": 2000000000_u64
+                }] }
+            }]
+        });
+        assert_eq!(
+            validate_long_reader_retention(&diagnostic, 1000, true)["passed"],
+            true
+        );
+        assert_eq!(
+            validate_long_reader_retention(&diagnostic, 2001, true)["passed"],
+            false
+        );
+        let no_checkpoint = serde_json::json!({
+            "engine_health_reports": [{
+                "long_reader_retention": { "events": [{
+                    "started_unix_ms": 1000,
+                    "released_unix_ms": 3000,
+                    "retained_ms": 2000
+                }] },
+                "blink_checkpoint_metrics": { "checkpoint_events": [] }
+            }]
+        });
+        assert_eq!(
+            validate_long_reader_retention(&no_checkpoint, 2000, false)["passed"],
+            true
+        );
     }
 }

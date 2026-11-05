@@ -121,6 +121,13 @@ impl MemoryDiagnosticSession {
         }
     }
 
+    pub fn health_reports_snapshot(&self) -> Vec<Value> {
+        self.health_reports
+            .lock()
+            .map(|reports| reports.clone())
+            .unwrap_or_default()
+    }
+
     pub fn boundary_snapshot(&self) -> Value {
         host_snapshot()
     }
@@ -461,6 +468,26 @@ impl MemoryDiagnosticWorker {
         self.send_command("start-measurement")
     }
 
+    pub fn hold_reader(&self, tenant_number: u64) -> Result<(), String> {
+        if tenant_number == 0 {
+            return Err("reader retention tenant number must be positive".to_owned());
+        }
+        let event = format!("reader-held:{tenant_number}");
+        self.send_reader_command(&format!("hold-reader:{tenant_number}"), &event)
+    }
+
+    pub fn release_readers(&self) -> Result<(), String> {
+        self.send_reader_command("release-readers", "readers-released")
+    }
+
+    pub fn checkpoint_metrics_snapshot(&self) -> Result<Value, String> {
+        let snapshot_path = self.health_path.with_extension("checkpoint-metrics.json");
+        let _ = fs::remove_file(&snapshot_path);
+        self.send_reader_command("snapshot-checkpoints", "checkpoint-snapshot-written")?;
+        let bytes = fs::read(snapshot_path).map_err(|error| error.to_string())?;
+        serde_json::from_slice(&bytes).map_err(|error| error.to_string())
+    }
+
     pub fn stop_measurement(&self) -> Result<(), String> {
         self.send_command("stop-measurement")
     }
@@ -523,6 +550,27 @@ impl MemoryDiagnosticWorker {
             .map_err(|_| "diagnostic worker command pipe lock poisoned".to_owned())?;
         writeln!(stdin, "{command}").map_err(|error| error.to_string())?;
         stdin.flush().map_err(|error| error.to_string())
+    }
+
+    fn send_reader_command(&self, command: &str, expected_event: &str) -> Result<(), String> {
+        let event_path = self.health_path.with_extension("reader-command.json");
+        let _ = fs::remove_file(&event_path);
+        self.send_command(command)?;
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while Instant::now() < deadline {
+            if let Ok(bytes) = fs::read(&event_path)
+                && let Ok(event) = serde_json::from_slice::<Value>(&bytes)
+            {
+                if event["event"].as_str() == Some(expected_event) {
+                    let _ = fs::remove_file(&event_path);
+                    return Ok(());
+                }
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        Err(format!(
+            "diagnostic worker did not acknowledge {expected_event}"
+        ))
     }
 
     fn record_event(&self, event_name: &str) {

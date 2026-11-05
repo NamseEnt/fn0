@@ -1,6 +1,6 @@
 # T17 Readiness and Capacity Results
 
-Status: blocked before workload execution. The capacity gate now passes, but the frozen source and harness cannot produce all required T17 acceptance evidence. No T17 workload cell was launched.
+Status: preflight incomplete; workload execution not started. No T17 workload cell was launched. The earlier readiness record omitted a harness and recipe prerequisite and incorrectly labeled the unmeasured adoption decision as evidence insufficient. T17 adoption has not been evaluated.
 
 ## T16 completion
 
@@ -29,10 +29,14 @@ All cleanup attempts and settled capacity readings are preserved in `logs/`. His
 
 The T17 code and artifact identities match the frozen matrix: generator, scheduler, and argument-parser hashes are respectively `7a04a2e32212ce312293dcadd4428148c484ab5da933b295bd05c34271ede837`, `b108d33e05a4c444530f14076a3533bd57906bad6e282756a7fefeddd2b6d032`, and `dc3200451d8fb446b97ba56e115d45ac7d7f603bbf442c582c04a7806a3b8c51`. The preserved worker and harness hashes match the frozen values, and the pinned native archive hash matches.
 
-The frozen worker does not expose a recovery-phase workload duration, rolling five-minute latency/error windows, dynamic duration extension based on checkpoint-cycle count, or a long-reader retention control. It performs one measurement epoch followed by full-population and reopen oracles; the reopen phase is an oracle, not a 30-minute workload. Its reports therefore cannot verify all frozen SLO and stop conditions. The frozen matrix also names five accepted-population stress cases without freezing their complete per-case input recipes and acceptance fingerprints. No existing T17 controller or reducer resolves these gaps. Running the available single-epoch worker would produce a partial, non-comparable result and would violate the frozen acceptance rules.
+The frozen worker does not expose a recovery-phase workload duration, rolling five-minute latency/error windows, dynamic duration extension based on checkpoint-cycle count, or a long-reader retention control. It performs one measurement epoch followed by full-population and reopen oracles; the reopen phase is an oracle, not a 30-minute workload. Its reports therefore cannot verify all frozen SLO and stop conditions. The frozen matrix also names five accepted-population stress cases without freezing their complete per-case input recipes and acceptance fingerprints. No existing T17 controller or reducer resolves these gaps. Running the available single-epoch worker would produce a partial, non-comparable result and would violate the frozen acceptance rules. These are preparation defects, not T17 adoption evidence.
 
-## Decision
+## Adoption status
 
-Adoption decision for the T17 target condition: **evidence insufficient**. T16 correctness and instrumentation checks remain valid, but no T17 correctness, operational, SLO, resource-acceptance, or performance comparison was measured. Defaults were not changed, deployment was not performed, and issue #126 remains open.
+Adoption decision for the T17 target condition: **not evaluated**. T16 correctness and instrumentation checks remain valid, but no T17 correctness, operational, SLO, resource-acceptance, or performance comparison was measured. Defaults were not changed, deployment was not performed, and issue #126 remains open.
 
-The T17 performance work can proceed after a separately reviewed matrix revision adds complete stress recipes and acceptance rules, a runner that captures the required time windows/recovery/checkpoint evidence, and matching source/native/binary identities. The present frozen matrix remains unmodified.
+## Readiness correction
+
+This record's prior evidence_insufficient value described the missing readiness evidence as an adoption result. That was incorrect: an unstarted experiment cannot support an adoption outcome. The matrix is reopened for an authorized revision that implements its stated phases and gates without lowering them. T16 remains complete; its earlier capacity snapshot remains historical. The prior cleanup receipt and all existing logs and binaries remain preserved.
+
+The T17 matrix and runner must be revised, validated, and re-frozen before execution. The 47 GiB capacity gate, 10 GiB reserve, and existing stop criteria remain in force and must be rechecked after the build and other prerequisites.

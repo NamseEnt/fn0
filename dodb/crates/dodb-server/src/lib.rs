@@ -1528,6 +1528,12 @@ pub struct BlinkTenantService {
     commit_test_gate: StdMutex<Option<Arc<OneShotTestGate>>>,
 }
 
+pub struct BlinkReadRetention {
+    _resident: Option<dodb_storage::BlinkReadGenerationPin>,
+    #[cfg(feature = "blink-demand-paging")]
+    _paged: Option<Arc<dodb_storage::blink::PagedReadHandle>>,
+}
+
 struct BlinkShardRegistry {
     shards: BTreeMap<TenantId, Arc<AsyncBlinkShard>>,
     opening: HashSet<TenantId>,
@@ -2853,6 +2859,38 @@ impl BlinkTenantService {
             .lock()
             .map(|metrics| metrics.snapshot_at(current_unix_nanos()))
             .unwrap_or_default()
+    }
+
+    pub async fn retain_reader_generation(
+        &self,
+        tenant: TenantId,
+    ) -> Result<BlinkReadRetention, Error> {
+        let shard = self
+            .read_shard(tenant)
+            .await?
+            .ok_or_else(|| Error::invalid_request("reader retention tenant is not open"))?;
+        match &shard.read_handle {
+            BlinkShardReadHandle::Resident(handle) => Ok(BlinkReadRetention {
+                _resident: Some(handle.retain_generation()),
+                #[cfg(feature = "blink-demand-paging")]
+                _paged: None,
+            }),
+            #[cfg(feature = "blink-demand-paging")]
+            BlinkShardReadHandle::Paged {
+                handle, writable, ..
+            } => {
+                let snapshot = match writable {
+                    Some(writable) => writable.snapshot()?,
+                    None => Arc::clone(handle.as_ref().ok_or_else(|| {
+                        Error::invariant("paged reader retention handle is missing")
+                    })?),
+                };
+                Ok(BlinkReadRetention {
+                    _resident: None,
+                    _paged: Some(Arc::new(snapshot.retain_snapshot()?)),
+                })
+            }
+        }
     }
 
     #[cfg(feature = "blink-demand-paging")]

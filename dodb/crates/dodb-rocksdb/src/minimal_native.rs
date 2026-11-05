@@ -64,6 +64,10 @@ struct MinimalIterator {
     _database: Arc<RocksDbHandle>,
 }
 
+pub struct MinimalNativeReaderSnapshot {
+    _iterator: MinimalIterator,
+}
+
 unsafe impl Send for MinimalIterator {}
 
 impl MinimalNativeService {
@@ -96,6 +100,21 @@ impl MinimalNativeService {
 
     pub fn tenant_path(&self, tenant: TenantId) -> PathBuf {
         self.data_dir.join(format!("tenant-{}", tenant.get()))
+    }
+
+    pub fn retain_reader_snapshot(
+        &self,
+        tenant: TenantId,
+    ) -> Result<MinimalNativeReaderSnapshot, Error> {
+        let tenant_database = self
+            .tenants
+            .get(&tenant)
+            .map(|entry| Arc::clone(entry.value()))
+            .ok_or_else(|| Error::invalid_request("reader retention tenant is not open"))?;
+        let iterator = tenant_database.handle.iterator(&[USER_KEY_PREFIX])?;
+        Ok(MinimalNativeReaderSnapshot {
+            _iterator: iterator,
+        })
     }
 
     pub fn shared_resource_snapshot(&self) -> Option<serde_json::Value> {

@@ -120,7 +120,35 @@ enum BackendService {
     Raw(Arc<RawRocksDb>),
 }
 
+enum ReaderRetention {
+    Blink {
+        _retention: dodb_server::BlinkReadRetention,
+    },
+    Rocks {
+        _retention: dodb_rocksdb::minimal_native::MinimalNativeReaderSnapshot,
+    },
+}
+
 impl BackendService {
+    async fn retain_reader_generation(&self, tenant: TenantId) -> WorkerResult<ReaderRetention> {
+        match self {
+            Self::Blink(service) => service
+                .retain_reader_generation(tenant)
+                .await
+                .map(|retention| ReaderRetention::Blink {
+                    _retention: retention,
+                })
+                .map_err(|error| Box::new(error) as WorkerError),
+            Self::MinimalNative(service) => service
+                .retain_reader_snapshot(tenant)
+                .map(|retention| ReaderRetention::Rocks {
+                    _retention: retention,
+                })
+                .map_err(|error| Box::new(error) as WorkerError),
+            _ => Err("long-reader retention is unsupported by this backend".into()),
+        }
+    }
+
     fn open(arguments: &Arguments) -> WorkerResult<Self> {
         match arguments.backend.as_str() {
             "blink" => {
@@ -900,10 +928,14 @@ async fn run(
     let mut health_report = engine_health_disabled_report();
     let mut shared_measurement_start = serde_json::Value::Null;
     let mut shared_measurement_end = serde_json::Value::Null;
+    let mut measurement_started_unix_ms = serde_json::Value::Null;
+    let mut measurement_stopped_unix_ms = serde_json::Value::Null;
     let mut paged_measurement_start = serde_json::Value::Null;
     let mut paged_measurement_end = serde_json::Value::Null;
     let mut pressure_samples = pressure_observations::PressureObservations::default();
     let mut pressure_phase = "before-measurement";
+    let mut retained_readers = BTreeMap::<u64, (ReaderRetention, std::time::Instant, u64)>::new();
+    let mut reader_retention_events = Vec::new();
     let mut pressure_interval =
         tokio::time::interval(Duration::from_millis(arguments.pressure_interval_ms.max(1)));
     pressure_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -930,8 +962,77 @@ async fn run(
             }
         };
         match command.as_str() {
+            command if command.starts_with("hold-reader:") => {
+                let tenant_number = command
+                    .strip_prefix("hold-reader:")
+                    .and_then(|value| value.parse::<u64>().ok())
+                    .filter(|tenant_number| *tenant_number > 0)
+                    .ok_or_else(|| {
+                        "hold-reader command requires a positive tenant number".to_owned()
+                    })?;
+                let retained = backend
+                    .retain_reader_generation(TenantId::new(tenant_number))
+                    .await?;
+                if retained_readers.contains_key(&tenant_number) {
+                    return Err("reader retention is already held for this tenant".into());
+                }
+                retained_readers.insert(
+                    tenant_number,
+                    (
+                        retained,
+                        std::time::Instant::now(),
+                        dodb_rocksdb::memory_pressure::unix_time_ms(),
+                    ),
+                );
+                let acknowledgement_path =
+                    arguments.health_path.with_extension("reader-command.json");
+                std::fs::write(
+                    acknowledgement_path,
+                    serde_json::to_vec(
+                        &json!({ "event": format!("reader-held:{tenant_number}") }),
+                    )?,
+                )?;
+                trace.emit("long_reader_pin_acquired");
+            }
+            "release-readers" => {
+                let now_unix_ms = dodb_rocksdb::memory_pressure::unix_time_ms();
+                for (tenant_number, (_, started, started_unix_ms)) in
+                    std::mem::take(&mut retained_readers)
+                {
+                    reader_retention_events.push(json!({
+                        "tenant": tenant_number,
+                        "started_unix_ms": started_unix_ms,
+                        "released_unix_ms": now_unix_ms,
+                        "retained_ms": started.elapsed().as_millis(),
+                        "status": "released",
+                    }));
+                }
+                let acknowledgement_path =
+                    arguments.health_path.with_extension("reader-command.json");
+                std::fs::write(
+                    acknowledgement_path,
+                    serde_json::to_vec(&json!({ "event": "readers-released" }))?,
+                )?;
+                trace.emit("long_reader_pin_released");
+            }
+            "snapshot-checkpoints" => {
+                let snapshot_path = arguments
+                    .health_path
+                    .with_extension("checkpoint-metrics.json");
+                std::fs::write(
+                    &snapshot_path,
+                    serde_json::to_vec(&backend.periodic_blink_checkpoint_metrics())?,
+                )?;
+                let acknowledgement_path =
+                    arguments.health_path.with_extension("reader-command.json");
+                std::fs::write(
+                    acknowledgement_path,
+                    serde_json::to_vec(&json!({ "event": "checkpoint-snapshot-written" }))?,
+                )?;
+            }
             "start-measurement" => {
                 trace.emit("command_received_start_measurement");
+                measurement_started_unix_ms = json!(dodb_rocksdb::memory_pressure::unix_time_ms());
                 pressure_phase = "measurement-including-drain";
                 shared_measurement_start = backend.shared_resource_snapshot();
                 paged_measurement_start = backend.blink_paged_resource_snapshot(true);
@@ -951,6 +1052,7 @@ async fn run(
             }
             "stop-measurement" => {
                 trace.emit("command_received_stop_measurement");
+                measurement_stopped_unix_ms = json!(dodb_rocksdb::memory_pressure::unix_time_ms());
                 trace.emit("final_sampler_capture_start");
                 pressure_phase = "after-measurement";
                 shared_measurement_end = backend.shared_resource_snapshot();
@@ -1002,6 +1104,16 @@ async fn run(
     let shared_before_shutdown = backend.shared_resource_snapshot();
     let paged_resources_before_shutdown = backend.blink_paged_resource_snapshot(true);
     trace.emit("final_property_capture_end");
+    let now_unix_ms = dodb_rocksdb::memory_pressure::unix_time_ms();
+    for (tenant_number, (_, started, started_unix_ms)) in std::mem::take(&mut retained_readers) {
+        reader_retention_events.push(json!({
+            "tenant": tenant_number,
+            "started_unix_ms": started_unix_ms,
+            "released_unix_ms": now_unix_ms,
+            "retained_ms": started.elapsed().as_millis(),
+            "status": "released_at_shutdown",
+        }));
+    }
     trace.emit("async_server_shutdown_start");
     let shutdown = tokio::time::timeout(Duration::from_secs(15), async {
         server.shutdown().await;
@@ -1058,6 +1170,8 @@ async fn run(
             "shared_resource_snapshots": {
                 "measurement_start": shared_measurement_start,
                 "measurement_end": shared_measurement_end,
+                "measurement_started_unix_ms": measurement_started_unix_ms,
+                "measurement_stopped_unix_ms": measurement_stopped_unix_ms,
                 "paged_measurement_start": paged_measurement_start,
                 "paged_measurement_end": paged_measurement_end,
                 "before_shutdown": shared_before_shutdown,
@@ -1074,7 +1188,11 @@ async fn run(
                 "storage_scope": "serialized sample bytes bound retained observation volume, not exact serde_json heap allocation; observations are charged to the worker budget",
                 "samples_truncated": pressure_samples.truncated(),
                 "scope": "worker lifetime after readiness; non-atomic sampled observations; not instantaneous peaks; measurement phase includes drain; shared cache/WBM counted once in shared_resources; repeated per-DB cache properties must not be summed",
-                "unsupported": ["generation pin ages", "request and checkpoint queue representation bytes"],
+                "unsupported": ["request and checkpoint queue representation bytes"],
+            },
+            "long_reader_retention": {
+                "events": reader_retention_events,
+                "scope": "held B-link generation or paged source-root lease; measured from worker command receipt through explicit release or shutdown",
             },
             "blink_checkpoint_metrics": blink_checkpoint_metrics,
             "blink_paged_resources_before_shutdown": paged_resources_before_shutdown,

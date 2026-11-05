@@ -31,3 +31,7 @@ Before cleanup, the three failed build roots contained regenerable Cargo `target
 - `logs/oci-capacity-reclamation.log`: pre-cleanup inventory, exact removed paths, and post-cleanup capacity.
 
 T17 was not executed. Defaults were not changed and issue #126 remains open.
+
+## T17 readiness record correction
+
+The later T17 review found that the frozen plan's 30-minute recovery workload, five-minute SLO windows, checkpoint-cycle extension, long-reader retention, and stress-case recipes were not supported by the then-frozen harness and matrix. The T17 receipt incorrectly represented that preflight gap as an adoption decision of evidence insufficient. No T17 cells had run, so adoption was not evaluated. This correction does not change T16 completion, its historical capacity readings, or its evidence. T17 has been reopened for the separately authorized implementation, matrix revision, validation, and re-freeze.

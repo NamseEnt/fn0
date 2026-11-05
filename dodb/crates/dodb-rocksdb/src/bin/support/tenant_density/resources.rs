@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::ffi::CString;
 use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
@@ -65,6 +66,28 @@ pub fn filesystem_snapshot(root: &Path) -> Result<Value, String> {
         "scope": "reachable files at this phase boundary; not continuous peak, ZFS dataset usage, or device writes",
         "unlinked_open_files": {"status": "unsupported", "bytes": null},
     }))
+}
+
+pub fn filesystem_available_bytes(path: &Path) -> Result<u64, String> {
+    let path_string = path
+        .to_str()
+        .ok_or_else(|| "filesystem path is not valid UTF-8".to_owned())?;
+    let path_c =
+        CString::new(path_string).map_err(|_| "filesystem path contains a null byte".to_owned())?;
+    let mut statistics = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    let result = unsafe { libc::statvfs(path_c.as_ptr(), statistics.as_mut_ptr()) };
+    if result != 0 {
+        return Err(std::io::Error::last_os_error().to_string());
+    }
+    let statistics = unsafe { statistics.assume_init() };
+    u64::try_from(statistics.f_bavail)
+        .ok()
+        .and_then(|available_blocks| {
+            u64::try_from(statistics.f_frsize)
+                .ok()
+                .and_then(|fragment_size| available_blocks.checked_mul(fragment_size))
+        })
+        .ok_or_else(|| "filesystem available-byte calculation overflowed".to_owned())
 }
 
 fn live_backend(boundary: &Value) -> Option<&Value> {

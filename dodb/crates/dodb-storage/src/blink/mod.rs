@@ -1677,6 +1677,12 @@ pub struct BlinkReadHandle {
 }
 
 impl BlinkReadHandle {
+    pub fn retain_generation(&self) -> BlinkReadGenerationPin {
+        BlinkReadGenerationPin {
+            pin: self.publisher.pin(),
+        }
+    }
+
     pub fn get(&self, key: &DocumentKey) -> Result<RevisionState> {
         self.get_with_response_budget(key, usize::MAX)
     }
@@ -1784,6 +1790,16 @@ impl BlinkReadHandle {
 
     pub fn metrics(&self) -> BlinkVersionedReadMetrics {
         self.publisher.metrics(0, 0)
+    }
+}
+
+pub struct BlinkReadGenerationPin {
+    pin: GenerationPin,
+}
+
+impl BlinkReadGenerationPin {
+    pub fn generation(&self) -> u64 {
+        self.pin.generation.epoch
     }
 }
 
@@ -2206,6 +2222,15 @@ struct PagedValidationEdges {
 
 #[cfg(feature = "blink-demand-paging")]
 impl PagedReadHandle {
+    pub fn retain_snapshot(&self) -> Result<Self> {
+        self.fork_with_generation(
+            self.root,
+            self.root_page_id,
+            self.free_list_head,
+            self.high_water_page_id,
+        )
+    }
+
     pub fn open_with_indexed_page_validation<F>(
         config: PagedReadConfig,
         index: Arc<version_index::VersionIndex>,
@@ -21365,6 +21390,31 @@ mod tests {
             Some(vec![0x85; INLINE_VALUE_LIMIT].as_slice())
         );
         reopened.check_invariants().unwrap();
+    }
+
+    #[test]
+    fn diagnostic_reader_retention_keeps_a_generation_pin_until_drop() {
+        let mut store = planned_store();
+        store
+            .put(
+                DocumentKey::new(b"reader-retention".to_vec(), b"key".to_vec()),
+                vec![0x42; INLINE_VALUE_LIMIT],
+            )
+            .unwrap();
+        let handle = store.versioned_read_handle();
+        assert_eq!(handle.metrics().active_generation_pins, 0);
+        let retained = handle.retain_generation();
+        assert!(retained.generation() > 0);
+        assert_eq!(handle.metrics().active_generation_pins, 1);
+        store
+            .put(
+                DocumentKey::new(b"reader-retention".to_vec(), b"key".to_vec()),
+                vec![0x24; INLINE_VALUE_LIMIT],
+            )
+            .unwrap();
+        assert_eq!(handle.metrics().active_generation_pins, 1);
+        drop(retained);
+        assert_eq!(handle.metrics().active_generation_pins, 0);
     }
 
     #[cfg(not(feature = "blink-read-metrics-disabled"))]
