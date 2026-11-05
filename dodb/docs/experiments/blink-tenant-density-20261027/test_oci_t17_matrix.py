@@ -61,6 +61,7 @@ class SloWindowTests(unittest.TestCase):
             "backend_memory_pressure": {
                 "epochs": {
                     "measurement": {"final": {"memory.peak": 100}},
+                    "measurement-extension-30": {"final": {"memory.peak": 120}},
                     "recovery": {"final": {"memory.peak": 200}},
                 }
             },
@@ -92,7 +93,7 @@ class SloWindowTests(unittest.TestCase):
                         "final": {"memory.max": 8 * 1024**3, "memory.high": 7 * 1024**3, "memory.swap.max": 0, "memory.peak": 6 * 1024**3},
                         "local_event_delta": {},
                     }
-                    for epoch_name in ["measurement", "recovery"]
+                    for epoch_name in ["measurement", "measurement-extension-30", "recovery"]
                 },
             },
             "workload": {

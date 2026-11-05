@@ -41,11 +41,9 @@ def allocated_bytes(path):
 
 
 def remove_cgroup(path):
-    for child in sorted(path.iterdir(), key=lambda entry: len(entry.parts), reverse=True):
+    for child in path.iterdir():
         if child.is_dir():
-            if (child / "cgroup.procs").read_text().strip():
-                raise RuntimeError(f"cgroup still has processes: {child}")
-            child.rmdir()
+            remove_cgroup(child)
     if (path / "cgroup.procs").read_text().strip():
         raise RuntimeError(f"smoke cgroup still has processes: {path}")
     path.rmdir()

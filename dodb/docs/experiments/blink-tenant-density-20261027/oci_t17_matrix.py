@@ -147,15 +147,11 @@ def create_cgroup(path):
 
 
 def remove_cgroup(path):
-    children = sorted(
-        [entry for entry in path.iterdir() if entry.is_dir()],
-        key=lambda entry: len(entry.parts),
-        reverse=True,
-    )
-    for child in children:
-        if (child / "cgroup.procs").read_text().strip():
-            raise RuntimeError(f"cgroup still has processes: {child}")
-        child.rmdir()
+    for child in path.iterdir():
+        if child.is_dir():
+            remove_cgroup(child)
+    if (path / "cgroup.procs").read_text().strip():
+        raise RuntimeError(f"cgroup still has processes: {path}")
     path.rmdir()
 
 
@@ -408,7 +404,11 @@ def validate_report(report, backend, scenario):
     pressure = report.get("backend_memory_pressure", {})
     if pressure.get("enabled") is not True or pressure.get("samples_truncated") is not False:
         raise RuntimeError("cgroup pressure evidence is absent or truncated")
-    for epoch_name in ["measurement", "recovery"]:
+    extension_names = [
+        extension.get("phase")
+        for extension in workload.get("phase_workloads", {}).get("checkpoint_cycle_extensions", [])
+    ]
+    for epoch_name in ["measurement", *extension_names, "recovery"]:
         epoch = pressure.get("epochs", {}).get(epoch_name, {})
         for boundary in ["initial", "final"]:
             snapshot = epoch.get(boundary, {})
@@ -465,7 +465,16 @@ def decision_metrics(report):
         "recovery_max_p99_write_ms": max(
             window["write_p99_upper_bound_ms"] for window in recovery_windows
         ),
-        "measurement_cgroup_peak_memory_bytes": pressure_epochs["measurement"]["final"]["memory.peak"],
+        "measurement_cgroup_peak_memory_bytes": max(
+            pressure_epochs[epoch_name]["final"]["memory.peak"]
+            for epoch_name in [
+                "measurement",
+                *[
+                    extension.get("phase")
+                    for extension in workload.get("phase_workloads", {}).get("checkpoint_cycle_extensions", [])
+                ],
+            ]
+        ),
         "recovery_cgroup_peak_memory_bytes": pressure_epochs["recovery"]["final"]["memory.peak"],
         "checkpoint_cycles": workload.get("successful_checkpoint_cycles"),
         "final_20_minute_checkpoint_debt_bytes": (

@@ -731,11 +731,7 @@ async fn spawn_worker(
 }
 
 fn pressure_epoch_for_phase(phase: &str) -> &str {
-    if phase.starts_with("measurement-extension-") {
-        "measurement"
-    } else {
-        phase
-    }
+    phase
 }
 
 fn drop_page_cache_and_capture() -> Result<Value, Box<dyn std::error::Error>> {
@@ -1544,8 +1540,10 @@ mod tests {
         assert_eq!(pressure_epoch_for_phase("recovery"), "recovery");
         assert_eq!(
             pressure_epoch_for_phase("measurement-extension-30"),
-            "measurement"
+            "measurement-extension-30"
         );
+        assert!(dodb_rocksdb::memory_pressure::EPOCHS.contains(&"measurement-extension-30"));
+        assert!(dodb_rocksdb::memory_pressure::EPOCHS.contains(&"measurement-extension-105"));
         assert_eq!(pressure_epoch_for_phase("measurement"), "measurement");
     }
 

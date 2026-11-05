@@ -9,9 +9,15 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use serde_json::{Value, json};
 
-pub const EPOCHS: [&str; 5] = [
+pub const EPOCHS: [&str; 11] = [
     "setup",
     "measurement",
+    "measurement-extension-30",
+    "measurement-extension-45",
+    "measurement-extension-60",
+    "measurement-extension-75",
+    "measurement-extension-90",
+    "measurement-extension-105",
     "recovery",
     "oracle",
     "reopen-oracle",
