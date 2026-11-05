@@ -10,7 +10,7 @@ import sys
 import time
 
 
-RECIPE_SHA256 = "a547ed02333d945a1d6c76bcabaa469d5ce7056cb89762fb00b093a7dedcbff8"
+RECIPE_SHA256 = "5c2773034216a942486197a64400c70d8ac20fc22e78ac381ec39aba4a2b3bab"
 POPULATIONS = [1, 8, 16, 24, 28, 32]
 BACKENDS = ["blink-paged", "blink-resident", "minimal-native-shared"]
 MINIMUM_ZFS_RESERVE_BYTES = 10 * 1024**3
@@ -247,6 +247,8 @@ def invocation(binary, backend, scenario, population, repetition, data_path, rep
         str(common["queue_bound_per_client"]),
         "--max-in-flight",
         str(common["maximum_in_flight_per_client"]),
+        "--service-memory-admission-bytes",
+        str(common["service_memory_admission_bytes"]),
         "--request-timeout-ms",
         "5000",
         "--drain-timeout-ms",
@@ -269,7 +271,10 @@ def invocation(binary, backend, scenario, population, repetition, data_path, rep
 def slo_windows(report):
     workload = report.get("workload", {})
     phases = [("measurement", workload)]
-    recovery = workload.get("phase_workloads", {}).get("recovery_after_reopen")
+    phase_workloads = workload.get("phase_workloads", {})
+    for extension in phase_workloads.get("checkpoint_cycle_extensions", []):
+        phases.append((extension.get("phase", "measurement-extension"), extension.get("workload", {})))
+    recovery = phase_workloads.get("recovery_after_reopen")
     if recovery is not None:
         phases.append(("recovery", recovery))
     windows = []
@@ -277,9 +282,16 @@ def slo_windows(report):
         phase_windows = phase_report.get("slo_windows", [])
         if not phase_windows:
             raise RuntimeError(f"{phase_name} has no SLO windows")
-        if not all(window.get("passed") is True for window in phase_windows):
+        if not all(window.get("score", {}).get("passed") is True for window in phase_windows):
             raise RuntimeError(f"{phase_name} has a failed SLO window")
-        windows.extend({"phase": phase_name, **window} for window in phase_windows)
+        windows.extend(
+            {
+                "phase": phase_name,
+                **{key: value for key, value in window.items() if key != "score"},
+                **window["score"],
+            }
+            for window in phase_windows
+        )
     return windows
 
 
@@ -293,6 +305,10 @@ def validate_report(report, backend, scenario):
     workload = report.get("workload", {})
     if workload.get("cell_valid") is not True or workload.get("valid_for_oracle") is not True:
         raise RuntimeError("workload correctness or operational validity failed")
+    if workload.get("service_memory_admission_bytes") != 6 * 1024**3:
+        raise RuntimeError("the fixed service memory admission budget was not applied")
+    if workload.get("service_memory_admission_in_flight_limit") != 96:
+        raise RuntimeError("the 6 GiB request admission ceiling was not applied")
     if report.get("host_cache_preconditioning", {}).get("status") != (
         "page_cache_dropped_before_fixed_warmup"
     ):
@@ -300,6 +316,29 @@ def validate_report(report, backend, scenario):
     if not report.get("host_cache_after_warmup", {}).get("arcstats"):
         raise RuntimeError("host cache state after warm-up is missing")
     windows = slo_windows(report)
+    measurement_windows = [
+        window
+        for window in windows
+        if window["phase"] == "measurement"
+        or window["phase"].startswith("measurement-extension-")
+    ]
+    recovery_windows = [window for window in windows if window["phase"] == "recovery"]
+    if len(measurement_windows) < 6:
+        raise RuntimeError("the 30-minute measurement SLO windows are incomplete")
+    if len(recovery_windows) != 6:
+        raise RuntimeError("the 30-minute recovery SLO windows are incomplete")
+    if any(window.get("duration_ms") != 300000 for window in windows):
+        raise RuntimeError("an SLO window does not match the fixed 5-minute duration")
+    if workload.get("slo_stop_reason") != "duration_completed":
+        raise RuntimeError("measurement stopped before completing its fixed duration")
+    recovery_report = workload.get("phase_workloads", {}).get("recovery_after_reopen", {})
+    if recovery_report.get("slo_stop_reason") != "duration_completed":
+        raise RuntimeError("recovery stopped before completing its fixed duration")
+    if any(
+        extension.get("workload", {}).get("slo_stop_reason") != "duration_completed"
+        for extension in workload.get("phase_workloads", {}).get("checkpoint_cycle_extensions", [])
+    ):
+        raise RuntimeError("checkpoint extension stopped before completing its fixed duration")
     if backend.startswith("blink-") and workload.get("checkpoint_cycle_gate_passed") is not True:
         raise RuntimeError("B-link checkpoint cycle gate failed")
     if scenario["long_reader_retention_ms"] > 0:
@@ -323,21 +362,27 @@ def percentile(values, percentile_value):
 def decision_metrics(report):
     windows = slo_windows(report)
     workload = report["workload"]
+    measurement_windows = [window for window in windows if window["phase"] != "recovery"]
+    recovery_windows = [window for window in windows if window["phase"] == "recovery"]
     return {
         "measurement_scheduled": workload.get("scheduled"),
         "measurement_successful": workload.get("successful"),
         "measurement_dropped": workload.get("dropped"),
         "measurement_max_p99_read_ms": max(
             window["read_p99_upper_bound_ms"]
-            for window in windows
-            if window["phase"] == "measurement"
+            for window in measurement_windows
         ),
         "measurement_max_p99_write_ms": max(
             window["write_p99_upper_bound_ms"]
-            for window in windows
-            if window["phase"] == "measurement"
+            for window in measurement_windows
         ),
-        "recovery_windows": len([window for window in windows if window["phase"] == "recovery"]),
+        "recovery_windows": len(recovery_windows),
+        "recovery_max_p99_read_ms": max(
+            window["read_p99_upper_bound_ms"] for window in recovery_windows
+        ),
+        "recovery_max_p99_write_ms": max(
+            window["write_p99_upper_bound_ms"] for window in recovery_windows
+        ),
         "checkpoint_cycles": workload.get("successful_checkpoint_cycles"),
         "measured_duration_ms_including_extensions": workload.get(
             "measured_duration_ms_including_extensions"
@@ -567,6 +612,13 @@ def main():
     args.cgroup_base.mkdir()
     (args.cgroup_base / "cgroup.subtree_control").write_text("+memory")
     recipe = json.loads(args.recipe.read_text())
+    common = recipe["common"]
+    if common["service_memory_admission_bytes"] != APPLICATION_MEMORY_BYTES:
+        raise RuntimeError("recipe service memory admission differs from the frozen 6 GiB budget")
+    if common["service_memory_request_budget_bytes"] != 64 * 1024**2:
+        raise RuntimeError("recipe request reservation differs from the fixed 64 MiB budget")
+    if common["blink_checkpoint"]["threshold_bytes"] != 1024**2:
+        raise RuntimeError("recipe checkpoint threshold differs from the frozen 1 MiB setting")
     binary = args.binary_dir / "tenant_density_workload"
     if sha256(binary) != args.workload_sha256:
         raise RuntimeError("workload binary hash does not match the frozen matrix")

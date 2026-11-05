@@ -16,6 +16,7 @@ use tokio::task::JoinSet;
 use crate::config::{MutationKeyMode, Options, TenantArrivalPhase};
 
 const RESPONSE_BUDGET_BYTES: usize = 64 * 1024 * 1024;
+const SERVICE_MEMORY_REQUEST_RESERVATION_BYTES: u64 = 64 * 1024 * 1024;
 type ExpectedMutations = BTreeMap<(u64, usize), Option<Vec<u8>>>;
 type WorkloadResult = Result<(Value, ExpectedMutations), String>;
 
@@ -118,6 +119,18 @@ fn roll_fingerprint(current: u64, value: u64) -> u64 {
     })
 }
 
+fn bounded_in_flight_limit(options: &Options, configured_limit: usize) -> usize {
+    options
+        .service_memory_admission_bytes
+        .map(|budget_bytes| {
+            usize::try_from(budget_bytes / SERVICE_MEMORY_REQUEST_RESERVATION_BYTES)
+                .unwrap_or(usize::MAX)
+        })
+        .map_or(configured_limit, |reserved_request_count| {
+            configured_limit.min(reserved_request_count)
+        })
+}
+
 fn mutation_row_belongs_to_client(
     options: &Options,
     row_number: usize,
@@ -199,10 +212,11 @@ where
     F: Fn() -> Value + Send + Sync + 'static,
 {
     let started = Instant::now();
-    let total_in_flight_limit = options
+    let configured_in_flight_limit = options
         .max_in_flight
         .saturating_mul(options.client_count)
         .saturating_mul(options.active_tenants);
+    let total_in_flight_limit = bounded_in_flight_limit(options, configured_in_flight_limit);
     let semaphore = Arc::new(Semaphore::new(total_in_flight_limit));
     let observed_in_flight = Arc::new(AtomicU64::new(0));
     let mut tasks = JoinSet::new();
@@ -726,6 +740,9 @@ where
         "configured_max_in_flight_per_client": options.max_in_flight,
         "configured_clients_per_tenant": options.client_count,
         "configured_total_in_flight_ceiling": total_in_flight_limit,
+        "service_memory_admission_bytes": options.service_memory_admission_bytes,
+        "service_memory_request_budget_bytes": RESPONSE_BUDGET_BYTES,
+        "service_memory_admission_in_flight_limit": total_in_flight_limit,
         "observed_max_in_flight": observed_in_flight.load(Ordering::Relaxed),
         "queue_high_water_sum_across_tenants": totals.queue_high_water,
         "request_count": totals.request_count,
@@ -759,7 +776,8 @@ where
     let deadline = options
         .duration_ms
         .map(|duration| start + Duration::from_millis(duration));
-    let semaphore = Arc::new(Semaphore::new(options.max_in_flight));
+    let total_in_flight_limit = bounded_in_flight_limit(options, options.max_in_flight);
+    let semaphore = Arc::new(Semaphore::new(total_in_flight_limit));
     let observed_in_flight = Arc::new(AtomicU64::new(0));
     let boundary_counters = Arc::new(Mutex::new(Counters::default()));
     let tenant_in_flight = Arc::new(Mutex::new(BTreeMap::<usize, u64>::new()));
@@ -836,7 +854,7 @@ where
                     .acquire()
                     .await
                     .map_err(|error| error.to_string())?;
-                let in_flight = options.max_in_flight as u64 - semaphore.available_permits() as u64;
+                let in_flight = total_in_flight_limit as u64 - semaphore.available_permits() as u64;
                 observed.fetch_max(in_flight, Ordering::Relaxed);
                 let tenant_in_flight_now = if let Ok(mut counts) = tenant_in_flight_counts.lock() {
                     let count = counts.entry(tenant_number).or_default();
@@ -1228,6 +1246,9 @@ where
         "queued_at_end": 0,
         "in_flight_at_end": 0,
         "configured_max_in_flight": options.max_in_flight,
+        "service_memory_admission_bytes": options.service_memory_admission_bytes,
+        "service_memory_request_budget_bytes": RESPONSE_BUDGET_BYTES,
+        "service_memory_admission_in_flight_limit": total_in_flight_limit,
         "observed_max_in_flight": observed_in_flight.load(Ordering::Relaxed),
         "latency_histogram": {"unit": "nanoseconds; logarithmic power-of-two buckets", "bucket_counts": total.latency_histogram, "observation_count": total.completed, "maximum_nanos": total.maximum_latency_nanos},
         "operation_latency_histograms": operation_latency_json(&total),
@@ -1514,7 +1535,7 @@ pub fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
         options.value_bytes
     );
     let mut schedule_identity = format!(
-        "hash=fnv1a64;topology={topology};profile={};width={:?};mutation_key_mode={};mutation_key_epoch={};clients={};queue_bound={};max_in_flight={};rate={:?};duration={:?};operations={:?};fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
+        "hash=fnv1a64;topology={topology};profile={};width={:?};mutation_key_mode={};mutation_key_epoch={};clients={};queue_bound={};max_in_flight={};service_memory_admission_bytes={:?};rate={:?};duration={:?};operations={:?};fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
         options.profile.as_str(),
         options.width,
         options.mutation_key_mode.as_str(),
@@ -1522,6 +1543,7 @@ pub fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
         options.client_count,
         options.queue_bound,
         options.max_in_flight,
+        options.service_memory_admission_bytes,
         options.per_tenant_rate,
         options.duration_ms,
         options.operation_count
@@ -1557,6 +1579,12 @@ fn ordered_request_schedule_sha256(options: &Options, topology: &str) -> String 
     digest.update(options.value_bytes.to_be_bytes());
     digest.update(options.queue_bound.to_be_bytes());
     digest.update(options.max_in_flight.to_be_bytes());
+    digest.update(
+        options
+            .service_memory_admission_bytes
+            .unwrap_or(0)
+            .to_be_bytes(),
+    );
     digest.update(options.profile.weights());
     digest.update(format!("{:?}", options.width).as_bytes());
     digest.update(options.tenant_arrival_phase.as_str().as_bytes());
@@ -1700,7 +1728,7 @@ async fn abort_and_reap<T: 'static>(tasks: &mut JoinSet<T>) {
 #[cfg(test)]
 mod tests {
     use super::{
-        RequestAddress, TenantArrivalPhase, deterministic_fingerprints,
+        RequestAddress, TenantArrivalPhase, bounded_in_flight_limit, deterministic_fingerprints,
         mutation_row_belongs_to_client, nominal_deadline_offset_nanos, phase_offset_nanos,
         prepare_request, roll_scheduled_fingerprint, run_fixed_per_tenant_seeded, run_fixed_total,
     };
@@ -1731,6 +1759,7 @@ mod tests {
             slo_window_ms: None,
             long_reader_retention_ms: 0,
             drop_page_cache_before_warmup: false,
+            service_memory_admission_bytes: None,
             mutation_key_mode: MutationKeyMode::Fixed,
             mutation_key_epoch: 0,
             operation_count: Some(20_000),
@@ -1754,6 +1783,14 @@ mod tests {
             blink_disk_limit_bytes: 4 * 1024 * 1024 * 1024,
             blink_disk_per_tenant_bytes: 512 * 1024 * 1024,
         }
+    }
+
+    #[test]
+    fn service_memory_admission_reserves_each_request_budget() {
+        let mut options = test_options();
+        options.service_memory_admission_bytes = Some(6 * 1024 * 1024 * 1024);
+        assert_eq!(bounded_in_flight_limit(&options, 2_048), 96);
+        assert_eq!(bounded_in_flight_limit(&options, 8), 8);
     }
 
     #[test]

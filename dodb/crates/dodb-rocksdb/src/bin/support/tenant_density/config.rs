@@ -126,6 +126,7 @@ pub struct Options {
     pub slo_window_ms: Option<u64>,
     pub long_reader_retention_ms: u64,
     pub drop_page_cache_before_warmup: bool,
+    pub service_memory_admission_bytes: Option<u64>,
     pub mutation_key_mode: MutationKeyMode,
     pub mutation_key_epoch: u64,
     pub operation_count: Option<u64>,
@@ -180,6 +181,7 @@ impl Options {
             "--slo-window-ms",
             "--long-reader-retention-ms",
             "--drop-page-cache-before-warmup",
+            "--service-memory-admission-bytes",
             "--mutation-key-mode",
             "--mutation-key-epoch",
             "--operation-count",
@@ -276,6 +278,8 @@ impl Options {
                     ));
                 }
             };
+        let service_memory_admission_bytes =
+            parse_optional_number(&values, "--service-memory-admission-bytes")?;
         let mutation_key_mode = match values
             .get("--mutation-key-mode")
             .copied()
@@ -427,6 +431,7 @@ impl Options {
             slo_window_ms,
             long_reader_retention_ms,
             drop_page_cache_before_warmup,
+            service_memory_admission_bytes,
             mutation_key_mode,
             mutation_key_epoch,
             operation_count,
@@ -464,6 +469,13 @@ impl Options {
         if self.drop_page_cache_before_warmup && self.warmup_duration_ms != 300_000 {
             return Err(
                 "page-cache preconditioning requires the fixed 5-minute warm-up".to_owned(),
+            );
+        }
+        if self.service_memory_admission_bytes.is_some_and(|budget| {
+            budget < 64 * 1024 * 1024 || !budget.is_multiple_of(64 * 1024 * 1024)
+        }) {
+            return Err(
+                "service memory admission must reserve whole 64 MiB request budgets".to_owned(),
             );
         }
         if self.slo_window_ms == Some(0) {
@@ -782,6 +794,22 @@ mod tests {
         );
 
         let (_directory, invalid_arguments) = arguments(&["--drop-page-cache-before-warmup", "on"]);
+        assert!(Options::parse(&invalid_arguments).is_err());
+    }
+
+    #[test]
+    fn service_memory_admission_reserves_whole_request_budgets() {
+        let (_directory, valid_arguments) =
+            arguments(&["--service-memory-admission-bytes", "6442450944"]);
+        assert_eq!(
+            Options::parse(&valid_arguments)
+                .unwrap()
+                .service_memory_admission_bytes,
+            Some(6 * 1024 * 1024 * 1024)
+        );
+
+        let (_directory, invalid_arguments) =
+            arguments(&["--service-memory-admission-bytes", "67108865"]);
         assert!(Options::parse(&invalid_arguments).is_err());
     }
 
