@@ -9,6 +9,7 @@ use dodb_core::{
 };
 use dodb_service::{DodbService, ExecutionBudget, Request, Response};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use tokio::sync::{Semaphore, mpsc};
 use tokio::task::JoinSet;
 
@@ -1531,13 +1532,94 @@ fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
             options.active_tenants
         ));
     }
+    let ordered_request_schedule_sha256 = ordered_request_schedule_sha256(options, topology);
     json!({
         "input_fingerprint": stable_fingerprint(input_identity.as_bytes()),
         "input_identity": input_identity,
         "schedule_fingerprint": stable_fingerprint(schedule_identity.as_bytes()),
+        "ordered_request_schedule_sha256": ordered_request_schedule_sha256,
         "schedule_identity": schedule_identity,
-        "scope": "deterministic input and schedule recipe; observed operation and width counts describe the realized prefix"
+        "scope": "SHA-256 covers every intended ordered tenant/client arrival and derived operation kind and width; observed fingerprints describe the realized prefix"
     })
+}
+
+fn ordered_request_schedule_sha256(options: &Options, topology: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"dodb-tenant-density-ordered-request-schedule-v1\0");
+    digest.update(topology.as_bytes());
+    digest.update([0]);
+    digest.update(options.seed.to_be_bytes());
+    digest.update(options.active_tenants.to_be_bytes());
+    digest.update(options.client_count.to_be_bytes());
+    digest.update(options.profile.weights());
+    digest.update(options.duration_ms.unwrap_or(0).to_be_bytes());
+    digest.update(options.per_tenant_rate.unwrap_or(0).to_be_bytes());
+    digest.update(options.mutation_key_mode.as_str().as_bytes());
+    digest.update(options.mutation_key_epoch.to_be_bytes());
+    if topology != "fixed-per-tenant"
+        || options.duration_ms.is_none()
+        || options.per_tenant_rate.is_none()
+        || options.client_count == 0
+    {
+        return format!("{:x}", digest.finalize());
+    }
+    let duration_nanos = u128::from(options.duration_ms.unwrap_or(0)) * 1_000_000;
+    let rate = options.per_tenant_rate.unwrap_or(0);
+    if rate == 0 {
+        return format!("{:x}", digest.finalize());
+    }
+    for tenant_number in 1..=options.active_tenants {
+        let phase_offset = match options.tenant_arrival_phase {
+            TenantArrivalPhase::Synchronized => 0,
+            TenantArrivalPhase::Staggered => {
+                phase_offset_nanos(tenant_number, options.active_tenants, rate).unwrap_or(0)
+            }
+        };
+        for client_number in 0..options.client_count {
+            let mut lane_digest = Sha256::new();
+            lane_digest.update((tenant_number as u64).to_be_bytes());
+            lane_digest.update((client_number as u64).to_be_bytes());
+            let mut operation_number = client_number as u64;
+            let mut write_ordinal = 0_u64;
+            let mut mutation_ordinal = 0_u64;
+            loop {
+                let Some(deadline_nanos) =
+                    nominal_deadline_offset_nanos(operation_number, rate, phase_offset)
+                else {
+                    break;
+                };
+                if u128::from(deadline_nanos) >= duration_nanos {
+                    break;
+                }
+                let selector = operation_number.wrapping_mul(37) % 100;
+                let profile = options.profile.weights();
+                let operation_kind = if selector < u64::from(profile[0]) {
+                    0_u8
+                } else if selector < u64::from(profile[0] + profile[1]) {
+                    1_u8
+                } else {
+                    2_u8
+                };
+                let width = if operation_kind == 2 {
+                    options.width.for_operation(write_ordinal.wrapping_mul(37)) as u64
+                } else {
+                    0
+                };
+                lane_digest.update(operation_number.to_be_bytes());
+                lane_digest.update(deadline_nanos.to_be_bytes());
+                lane_digest.update([operation_kind]);
+                lane_digest.update(width.to_be_bytes());
+                if operation_kind == 2 {
+                    lane_digest.update(mutation_ordinal.to_be_bytes());
+                    write_ordinal = write_ordinal.saturating_add(1);
+                    mutation_ordinal = mutation_ordinal.saturating_add(width);
+                }
+                operation_number = operation_number.saturating_add(options.client_count as u64);
+            }
+            digest.update(lane_digest.finalize());
+        }
+    }
+    format!("{:x}", digest.finalize())
 }
 
 fn operation_latency_json(counters: &Counters) -> Value {
@@ -1722,6 +1804,10 @@ mod tests {
         let first = deterministic_fingerprints(&options, "fixed-total");
         let second = deterministic_fingerprints(&options, "fixed-total");
         assert_eq!(first, second);
+        assert_eq!(
+            first["ordered_request_schedule_sha256"],
+            second["ordered_request_schedule_sha256"]
+        );
         let changed = Options {
             profile: Profile::Mixed,
             ..options
@@ -1855,6 +1941,10 @@ mod tests {
         assert_ne!(
             synchronized["schedule_fingerprint"],
             staggered["schedule_fingerprint"]
+        );
+        assert_ne!(
+            synchronized["ordered_request_schedule_sha256"],
+            staggered["ordered_request_schedule_sha256"]
         );
         assert!(
             staggered["schedule_identity"].as_str().unwrap().contains(
