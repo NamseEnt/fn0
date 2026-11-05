@@ -1,0 +1,10 @@
+{
+  "database_allocated_bytes": 30709760,
+  "database_preserved": true,
+  "ended_unix_seconds": 1793855527.2576838,
+  "process_log_sha256": "384021d8ffb33c7ac2ba5e3de05338958c19c3d84e896c61f516fe6837b454d9",
+  "reason": "smoke command failed with exit 1",
+  "report_sha256": "436301c265fffd9d1b608e33a8de97a13ffeae9ef6739fa88e23233ed16c8f21",
+  "started_unix_seconds": 1793855214.7766144,
+  "status": "failed"
+}

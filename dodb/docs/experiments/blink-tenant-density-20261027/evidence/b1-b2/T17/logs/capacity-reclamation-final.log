@@ -1,0 +1,41 @@
+2026-11-05T05:34:31Z
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159123906560 122020573184 37103333376  77% /bench/zfs/db
+3810751488	/bench/zfs/db/product-build/t17-eb433fa35/source/target
+3810543104	/bench/zfs/db/product-build/t17-eb433fa35/target
+removed_regenerable_path=/bench/zfs/db/product-build/t17-eb433fa35/source/target bytes=3810751488 reason=compiled Cargo target; verified_binaries=/bench/zfs/db/product-build/t17-f75679e88/artifacts/release-f75679e88 and prior artifact directory preserved
+removed_regenerable_path=/bench/zfs/db/product-build/t17-eb433fa35/target bytes=3810543104 reason=duplicate Cargo target cache
+2026-11-05T05:34:37Z
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159123673088 115880042496 43243630592  73% /bench/zfs/db
+2026-11-05T05:39:37Z
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159123451904 114362380288 44761071616  72% /bench/zfs/db
+2195173888	/bench/zfs/db/product-build/t17-f75679e88/source/dodb
+2a75bab6d64d0b5b3005c2d70d07dea722182e70b57952ad78ec9c5394b4269e  /bench/zfs/db/product-build/t17-f75679e88/artifacts/dodb-source-f75679e88.bundle
+removed_regenerable_path=/bench/zfs/db/product-build/t17-f75679e88/source/dodb bytes=2195173888 reason=duplicate clean source checkout; source commit preserved in verified Git bundle under artifacts and local pushed worktree
+2026-11-05T05:39:55Z
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159123243008 112032391168 47090851840  71% /bench/zfs/db
+2026-11-05T05:40:48Z
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159123230720 111984320512 47138910208  71% /bench/zfs/db
+2638760448	/bench/zfs/db/product-build/t17-eb433fa35/source
+2a75bab6d64d0b5b3005c2d70d07dea722182e70b57952ad78ec9c5394b4269e  /bench/zfs/db/product-build/t17-f75679e88/artifacts/dodb-source-f75679e88.bundle
+removed_regenerable_path=/bench/zfs/db/product-build/t17-eb433fa35/source bytes=2647719424 reason=clean build checkout; source revisions fe86e4cb5 and f75679e88 preserved in verified complete Git bundle and pushed repository
+2026-11-05T05:41:02Z
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159123058688 110465794048 48657264640  70% /bench/zfs/db
+rocksdb_source_commit=abeebd9630f11bd08c28b7bd43c7bdfc62050654
+rocksdb_archive_sha256_before=9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5  /bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+rocksdb_generated_inventory_sha256=8aaa61e073a081ed07a440eb0d2740a66e4a9ac5683441057bfece8ccd835dc8  /bench/zfs/db/product-build/t17-f75679e88/artifacts/rocksdb-generated-cache-removal.tsv
+2026-11-05T05:43:07Z
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159123046400 109168947200 49954099200  69% /bench/zfs/db
+200330240	/bench/zfs/db/product-build/t16-b17880d5/smoke/paging-retry/data
+2026-11-05T05:44:09Z
+initial_non_sudo_removal=failed reason=Permission_denied; path=/bench/zfs/db/product-build/t16-b17880d5/smoke/paging-retry/data; allocated_bytes_before=200330240
+resolved_with_sudo=true removed_path=/bench/zfs/db/product-build/t16-b17880d5/smoke/paging-retry/data allocated_bytes_before=200330240; preserved_all_T16_logs_reports_source_and_binaries=true
+2026-11-05T05:45:01Z
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159123095552 107869433856 51253661696  68% /bench/zfs/db

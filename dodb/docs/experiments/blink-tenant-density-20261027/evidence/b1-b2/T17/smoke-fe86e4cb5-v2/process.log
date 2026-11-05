@@ -1,0 +1,17 @@
+{"timestamp_unix_ns":1793855220798305301,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"command_received_shutdown"}
+{"timestamp_unix_ns":1793855220798458823,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"final_property_capture_start"}
+{"timestamp_unix_ns":1793855220803321265,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"final_property_capture_end"}
+{"timestamp_unix_ns":1793855220803460986,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"async_server_shutdown_start"}
+{"timestamp_unix_ns":1793855220883355595,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"async_server_shutdown_end"}
+{"timestamp_unix_ns":1793855220883517196,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"final_checkpoint_metrics_capture_start"}
+{"timestamp_unix_ns":1793855220883694958,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"final_checkpoint_metrics_capture_end"}
+{"timestamp_unix_ns":1793855220883817479,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"server_drop_start"}
+{"timestamp_unix_ns":1793855220884002600,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"server_drop_end"}
+{"timestamp_unix_ns":1793855220884128962,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"backend_drop_start"}
+{"timestamp_unix_ns":1793855220884318683,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"backend_drop_end"}
+{"timestamp_unix_ns":1793855220884504645,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"health_report_write_start"}
+{"timestamp_unix_ns":1793855220885222131,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"health_report_write_end"}
+{"timestamp_unix_ns":1793855220885409573,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"async_run_return_success"}
+{"timestamp_unix_ns":1793855220885538334,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"runtime_destruction_start"}
+{"timestamp_unix_ns":1793855220885957017,"process_id":2889014,"process_start_time_ticks":311688986,"source_revision":"fe86e4cb515d3ba361f59234d3d54734540ea62a","stage":"runtime_destruction_end"}
+Error: Custom { kind: Other, error: "warm-up workload was not operationally valid" }

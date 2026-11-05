@@ -1,6 +1,6 @@
 # T17 Readiness and Capacity Results
 
-Status: preflight incomplete; workload execution not started. No T17 workload cell was launched. The earlier readiness record omitted a harness and recipe prerequisite and incorrectly labeled the unmeasured adoption decision as evidence insufficient. T17 adoption has not been evaluated.
+Status: matrix frozen and fresh preflight passed; formal execution is about to start with zero T17 workload cells completed. The earlier readiness record omitted a harness and recipe prerequisite and incorrectly labeled the unmeasured adoption decision as evidence insufficient. T17 adoption remains not evaluated until the exact first screening cell is recorded.
 
 ## T16 completion
 
@@ -10,7 +10,7 @@ T16 is complete at implementation source `0d7c59a3092c79632590e5faffaec9adcf629a
 
 The corrected peak estimate is `32 GiB + 5 GiB + 10 GiB = 47 GiB`, where 32 GiB is the single active backend's disk cap including checkpoint/scratch overlap, 5 GiB covers reports/manifests and one preserved failed cell, and 10 GiB is the minimum ZFS reserve. The exact threshold is 50,465,865,728 bytes.
 
-The initial free space was 11,463,950,336 bytes. After the recorded database and regenerable-data cleanup, the settled `/bench/zfs/db` availability was 51,941,564,416 bytes, 1,475,698,688 bytes above the 47 GiB launch threshold. The mandatory reserve remains included in that gate. Host `MemAvailable` was 6,566,248 KiB. No workload processes or task cgroups were active. ARC maximum was unset and ARC size was 4.5 GiB; the frozen per-repetition ARC/page-cache procedure had not been applied because execution did not start.
+The initial free space was 11,463,950,336 bytes. After the recorded database and regenerable-data cleanup, final preflight availability was 51,568,455,680 bytes, 1,102,589,952 bytes above the exact 47 GiB launch threshold. The mandatory 10 GiB reserve remains included in that gate. At 2026-11-05 05:48:10 UTC, `MemAvailable` was 8,560,888 KiB; no workload process, T17 cgroup, run directory, or cgroup base was present. Cgroup v2 and the memory controller were available. ARC maximum was unset and ARC size was 2,087,831,488 bytes; the frozen per-repetition procedure sets the maximum to 2 GiB before each run. The raw preflight, including binary and native hashes, is preserved in `logs/final-preflight-host-state-f75679e88.log`.
 
 ## Cleanup and preservation
 
@@ -22,14 +22,20 @@ The following pre-existing database data and regenerable build data were removed
 - Replaced four clean duplicate `source/dodb` checkouts at commits `0d7c59a3092c79632590e5faffaec9adcf629a10`, `85c0ffac08dce0328be8193d6a8a4a657034dec4`, `18679ccff1dfd62844c6681dcbd97d8a3a8e8338`, and `f2b5ecceee537d84b0c2b0f799288f09a98bf0e8` with `/bench/zfs/db/product-build/t16-b17880d5/artifacts/dodb-source-snapshots-20261105.bundle`. Bundle SHA-256: `5ecf0e6787cdc53de41751e56bface57e88c7b077e9544279b73ecda7814ad7e`.
 - Preserved `/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target` as `target-preserved-20261105.tar.zst` before deleting the regenerable expanded target. Archive SHA-256: `b1654a6693392509ecb9ea7e802fe234f26865e2a0119a51fd4a8532772b1b00`.
 - The pinned native archive remains at `/bench/zfs/db/product-build/rocksdb-source/librocksdb.a`, SHA-256 `9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5`.
+- Removed two duplicate Cargo target caches at `/bench/zfs/db/product-build/t17-eb433fa35/source/target` and `/bench/zfs/db/product-build/t17-eb433fa35/target`; pre-clean allocations were 3,810,751,488 and 3,810,543,104 bytes. New and previous T17 binaries were copied to separate immutable release directories and hash-verified first.
+- Removed the duplicate clean source checkouts at `/bench/zfs/db/product-build/t17-f75679e88/source/dodb` and `/bench/zfs/db/product-build/t17-eb433fa35/source`; the complete Git bundle at `/bench/zfs/db/product-build/t17-f75679e88/artifacts/dodb-source-f75679e88.bundle` preserves both source revisions and verifies cleanly. Bundle SHA-256: `2a75bab6d64d0b5b3005c2d70d07dea722182e70b57952ad78ec9c5394b4269e`.
+- Removed 976 generated RocksDB `.o` and `.d` files (1,229,537,280 allocated bytes; 1,199,111,681 logical bytes) from the pinned source checkout after recording every path in `logs/rocksdb-generated-cache-removal.tsv`. The source files and pinned `librocksdb.a` were retained; its SHA-256 matched before and after cleanup.
+- Removed the existing T16 smoke database at `/bench/zfs/db/product-build/t16-b17880d5/smoke/paging-retry/data` (200,330,240 allocated bytes). The initial unprivileged removal was denied; retry with noninteractive `sudo` removed the exact path. T16 logs, reports, source snapshots, binaries, and native artifacts remain.
 
 All cleanup attempts and settled capacity readings are preserved in `logs/`. Historical T16 reports remain unchanged; this receipt records the later OCI storage reclamation.
 
 ## Frozen execution readiness
 
-The T17 code and artifact identities match the frozen matrix: generator, scheduler, and argument-parser hashes are respectively `7a04a2e32212ce312293dcadd4428148c484ab5da933b295bd05c34271ede837`, `b108d33e05a4c444530f14076a3533bd57906bad6e282756a7fefeddd2b6d032`, and `dc3200451d8fb446b97ba56e115d45ac7d7f603bbf442c582c04a7806a3b8c51`. The preserved worker and harness hashes match the frozen values, and the pinned native archive hash matches.
+The frozen matrix and runner implement and validate five-minute SLO windows, two-window stopping, 30-minute recovery/reopen load, checkpoint-cycle extensions through 120 measured minutes, long-reader retention and B-link checkpoint overlap, and six complete stress recipes. Each stress recipe has a canonical per-scenario SHA-256 recorded in the matrix, controller command, binary manifest, and paired-input identity. The runner pairs seed, ordered schedule, and scenario hashes across backends and retains failed cells. Validation passed with 35 OCI Rust tests, 7 Python controller tests, and scoped Rust formatting.
 
-The frozen worker does not expose a recovery-phase workload duration, rolling five-minute latency/error windows, dynamic duration extension based on checkpoint-cycle count, or a long-reader retention control. It performs one measurement epoch followed by full-population and reopen oracles; the reopen phase is an oracle, not a 30-minute workload. Its reports therefore cannot verify all frozen SLO and stop conditions. The frozen matrix also names five accepted-population stress cases without freezing their complete per-case input recipes and acceptance fingerprints. No existing T17 controller or reducer resolves these gaps. Running the available single-epoch worker would produce a partial, non-comparable result and would violate the frozen acceptance rules. These are preparation defects, not T17 adoption evidence.
+The new source commit is `f75679e88618ebc018a61158e6b02acb5dd574e3`; the clean source is preserved in the verified bundle. Rust/Cargo are 1.97.1, target is `aarch64-unknown-linux-gnu`, linker is `/usr/bin/gcc` 11.5.0, and the only enabled feature is `blink-demand-paging`. New workload and memory-worker SHA-256 values are `7356e1b06e1f25354a3d194d04beb52f77f819328c9ee1753982cf663785969a` and `fb3fe085aa88f34238c8a7f0f1040fbe208ebc2a57b99f09a602a6f30fd7ab72`. The previous T16 fixed binaries and pinned RocksDB archive retain their original hashes. Full build provenance and log hashes are in `logs/build-f75679e88/artifact-manifest.json`.
+
+A full 1,048,576-row smoke at the frozen offered rate and resource limits failed during seed setup with `overloaded: paged source root admission is paused during source collection`. Its report and failed database are preserved at `smoke-f75679e88-full-seed/` and on the OCI host. This did not reach warm-up, measurement, recovery, SLO, or performance comparison. The formal runner will start with `n=1`, `synchronized-arrival`, repetition 0, `blink-paged`; if it records the same operational failure, the frozen first-failure stop rule ends the matrix without launching later backends or cells.
 
 ## Adoption status
 
@@ -37,6 +43,4 @@ Adoption decision for the T17 target condition: **not evaluated**. T16 correctne
 
 ## Readiness correction
 
-This record's prior evidence_insufficient value described the missing readiness evidence as an adoption result. That was incorrect: an unstarted experiment cannot support an adoption outcome. The matrix is reopened for an authorized revision that implements its stated phases and gates without lowering them. T16 remains complete; its earlier capacity snapshot remains historical. The prior cleanup receipt and all existing logs and binaries remain preserved.
-
-The T17 matrix and runner must be revised, validated, and re-frozen before execution. The 47 GiB capacity gate, 10 GiB reserve, and existing stop criteria remain in force and must be rechecked after the build and other prerequisites.
+This record's prior evidence_insufficient value described missing readiness evidence as an adoption result. That was incorrect: an unstarted experiment cannot support an adoption outcome. The corrected value was `not_evaluated`. T16 remains complete; its earlier capacity snapshot remains historical. The T17 matrix is now frozen and the fresh 47 GiB/10 GiB capacity and host preflight have passed. Formal execution has not yet begun; no adoption conclusion is drawn from preparation or smoke evidence.

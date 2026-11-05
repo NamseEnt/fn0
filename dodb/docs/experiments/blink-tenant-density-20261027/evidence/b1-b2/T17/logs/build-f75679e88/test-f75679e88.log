@@ -1,0 +1,49 @@
+   Compiling dodb-core v0.1.0 (/bench/zfs/db/product-build/t17-f75679e88/source/dodb/dodb/crates/dodb-core)
+   Compiling dodb-rocksdb v0.1.0 (/bench/zfs/db/product-build/t17-f75679e88/source/dodb/dodb/crates/dodb-rocksdb)
+   Compiling dodb-service v0.1.0 (/bench/zfs/db/product-build/t17-f75679e88/source/dodb/dodb/crates/dodb-service)
+   Compiling dodb-protocol v0.1.0 (/bench/zfs/db/product-build/t17-f75679e88/source/dodb/dodb/crates/dodb-protocol)
+   Compiling dodb-storage v0.1.0 (/bench/zfs/db/product-build/t17-f75679e88/source/dodb/dodb/crates/dodb-storage)
+   Compiling dodb-client v0.1.0 (/bench/zfs/db/product-build/t17-f75679e88/source/dodb/dodb/crates/dodb-client)
+   Compiling dodb-server v0.1.0 (/bench/zfs/db/product-build/t17-f75679e88/source/dodb/dodb/crates/dodb-server)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2m 15s
+     Running unittests src/bin/tenant_density_workload.rs (/bench/zfs/db/product-build/t17-eb433fa35/source/target/release/deps/tenant_density_workload-b48abacd57c9479c)
+
+running 35 tests
+test config::tests::fixed_total_allows_sixteen_lanes_with_minimum_seed_rows ... ok
+test config::tests::demand_paging_requires_candidate_feature_and_durable_bases ... ok
+test config::tests::frozen_t17_population_size_is_within_the_supported_seed_limit ... ok
+test config::tests::mixed_widths_follow_fixed_eighty_fifteen_five_schedule ... ok
+test config::tests::page_cache_preconditioning_requires_the_frozen_five_minute_warmup ... ok
+test config::tests::parses_512_all_active_tenants_and_supported_value_sizes ... ok
+test config::tests::incomplete_memory_enforcement_fails_before_database_creation ... ok
+test config::tests::rejects_partial_query_partition ... ok
+test config::tests::rejects_unknown_duplicate_and_incompatible_configuration ... ok
+test config::tests::requires_a_rate_for_fixed_per_tenant_and_rejects_rate_for_fixed_total ... ok
+test config::tests::service_memory_admission_reserves_whole_request_budgets ... ok
+test config::tests::shared_route_requires_explicit_resources_and_preserves_old_defaults ... ok
+test config::tests::tenant_arrival_phase_defaults_to_synchronized_and_staggered_requires_fixed_per_tenant ... ok
+test resources::tests::hardlinked_file_allocation_is_counted_once_and_symlinks_are_rejected ... ok
+test resources::tests::measurement_summary_excludes_setup_and_reused_pids_and_keeps_unknown_pss ... ok
+test resources::tests::short_offer_reports_boundary_only_sampling ... ok
+test resources::tests::missing_data_directory_is_not_reported_as_zero_bytes ... ok
+test scheduler::tests::fingerprints_are_deterministic_and_include_schedule_inputs ... ok
+test scheduler::tests::b226_synchronized_fingerprints_remain_compatible_and_staggered_changes_only_schedule ... ok
+test scheduler::tests::fixed_total_drain_timeout_cancels_and_reaps_service_futures ... ok
+test scheduler::tests::fixed_total_runs_concurrent_lanes_and_timeout_marks_mutation_uncertain ... ok
+test scheduler::tests::growing_mutation_keys_advance_by_reserved_lane_width ... ok
+test scheduler::tests::per_tenant_clients_own_disjoint_fixed_and_growing_mutation_ranges ... ok
+test scheduler::tests::service_memory_admission_reserves_each_request_budget ... ok
+test scheduler::tests::single_tenant_phase_keeps_the_synchronized_deadline ... ok
+test scheduler::tests::tenant_phase_offsets_use_checked_rational_nanosecond_rounding ... ok
+test scheduler::tests::whole_period_has_equal_counts_and_nonintegral_window_uses_deadline_inclusion ... ok
+test scheduler::tests::write_schedule_keeps_profile_width_condition_and_delete_selectors_independent ... ok
+test tests::effective_configuration_marks_fixed_total_phase_as_not_applicable ... ok
+test tests::long_reader_gate_requires_duration_and_backend_specific_overlap ... ok
+test tests::recovery_and_checkpoint_extensions_use_valid_pressure_epochs ... ok
+test tests::slo_window_score_enforces_latency_and_rejection_thresholds ... ok
+test workload_failure::tests::failed_or_unreached_workload_is_reported_as_unavailable ... ok
+test workload_failure::tests::successful_workload_is_reported_as_available_but_unvalidated ... ok
+test scheduler::tests::fixed_per_tenant_accounts_queue_drops_and_scheduled_latency ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+

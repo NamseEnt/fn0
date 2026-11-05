@@ -1,7 +1,7 @@
 {
   "task_id": "T17",
   "scope": "Frozen B-link and shared-resource TransactionDB comparison readiness, capacity reclamation, and adoption decision",
-  "status": "preflight_incomplete_execution_not_started",
+  "status": "preflight_passed_execution_not_started",
   "matrix": "dodb/docs/experiments/blink-tenant-density-20261027/T17-FROZEN-MATRIX.md",
   "reviewer_authorization": {
     "reviewer": "Namse, DODB storage maintainer",
@@ -9,13 +9,15 @@
     "authorization": "Conditional T17 execution approval after space and all other prerequisites pass"
   },
   "source_identity": {
-    "implementation_commit": "0d7c59a3092c79632590e5faffaec9adcf629a10",
-    "worktree_commit_at_review": "a0a05d53c6e507fbd69d440c488e95ce7b29b62f",
+    "implementation_commit": "f75679e88618ebc018a61158e6b02acb5dd574e3",
+    "worktree_commit_at_review": "bf79aca0e",
     "generator_sha256": "7a04a2e32212ce312293dcadd4428148c484ab5da933b295bd05c34271ede837",
     "scheduler_sha256": "b108d33e05a4c444530f14076a3533bd57906bad6e282756a7fefeddd2b6d032",
     "argument_parser_sha256": "dc3200451d8fb446b97ba56e115d45ac7d7f603bbf442c582c04a7806a3b8c51",
     "build_source_tree_clean": true,
-    "current_worktree_has_preexisting_untracked_paths": true
+    "current_worktree_has_preexisting_untracked_paths": true,
+    "controller_sha256": "1232f3832e77d4e3590be7ea18b2c7372ada5c2764fc3833cbf94913d40d7589",
+    "stress_recipe_sha256": "5c2773034216a942486197a64400c70d8ac20fc22e78ac381ec39aba4a2b3bab"
   },
   "capacity_gate": {
     "host": "opc@217.142.246.204",
@@ -27,28 +29,47 @@
     },
     "required_free_bytes": 50465865728,
     "initial_free_bytes": 11463950336,
-    "final_free_bytes": 51941564416,
-    "headroom_over_gate_bytes": 1475698688,
+    "final_free_bytes": 51568455680,
+    "headroom_over_gate_bytes": 1102589952,
     "status": "passed"
   },
   "preflight": {
-    "timestamp_utc": "2026-11-05T02:03:17Z",
+    "timestamp_utc": "2026-11-05T05:48:10Z",
     "mem_total_kib": 11159744,
-    "mem_available_kib": 6566248,
+    "mem_available_kib": 8560888,
+    "swap_free_kib": 3774900,
     "arc_max_bytes": 0,
-    "arc_size": "4.5 GiB",
+    "arc_size_bytes": 2087831488,
     "cgroup_version": "v2",
-    "cgroup_controllers": ["cpuset", "cpu", "io", "memory", "hugetlb", "pids", "rdma", "misc"],
+    "cgroup_controllers": [
+      "cpuset",
+      "cpu",
+      "io",
+      "memory",
+      "hugetlb",
+      "pids",
+      "rdma",
+      "misc"
+    ],
     "tenant_cgroups_present": 0,
     "workload_processes_present": 0,
-    "raw_log": "logs/final-preflight-host-state.log"
+    "run_directory_present": false,
+    "cgroup_base_present": false,
+    "raw_log": "logs/final-preflight-host-state-f75679e88.log",
+    "raw_log_sha256": "d09bd9fc950ae1eb1839a1d6f2f015121c8dc8a64f814c3a7343a78b5c86d86a"
   },
   "preserved_runtime_identity": {
     "rocksdb_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
     "librocksdb_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5",
     "worker_sha256": "e7f2bd38baf417fe567030c1deeb1ed024029414b9a387fdfd235b13f621c5cc",
     "harness_sha256": "8222cd31df4bdab41cc0cd81221c1c50d83359dfeef464bba74f5c5847b6ee1c",
-    "rechecked_after_cleanup": true
+    "rechecked_after_cleanup": true,
+    "new_source_commit": "f75679e88618ebc018a61158e6b02acb5dd574e3",
+    "new_workload_sha256": "7356e1b06e1f25354a3d194d04beb52f77f819328c9ee1753982cf663785969a",
+    "new_worker_sha256": "fb3fe085aa88f34238c8a7f0f1040fbe208ebc2a57b99f09a602a6f30fd7ab72",
+    "source_bundle_sha256": "2a75bab6d64d0b5b3005c2d70d07dea722182e70b57952ad78ec9c5394b4269e",
+    "previous_t16_worker_sha256": "e7f2bd38baf417fe567030c1deeb1ed024029414b9a387fdfd235b13f621c5cc",
+    "previous_t16_harness_sha256": "8222cd31df4bdab41cc0cd81221c1c50d83359dfeef464bba74f5c5847b6ee1c"
   },
   "cleanup": {
     "tenant_density_database_roots_removed": 1824,
@@ -74,7 +95,19 @@
       "path": "/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target-preserved-20261105.tar.zst",
       "sha256": "b1654a6693392509ecb9ea7e802fe234f26865e2a0119a51fd4a8532772b1b00"
     },
-    "logs_directory": "logs/"
+    "logs_directory": "logs/",
+    "additional_regenerable_paths_removed": [
+      "/bench/zfs/db/product-build/t17-eb433fa35/source/target",
+      "/bench/zfs/db/product-build/t17-eb433fa35/target",
+      "/bench/zfs/db/product-build/t17-f75679e88/source/dodb",
+      "/bench/zfs/db/product-build/t17-eb433fa35/source",
+      "976 generated RocksDB .o/.d files, with exact inventory in logs/rocksdb-generated-cache-removal.tsv",
+      "/bench/zfs/db/product-build/t16-b17880d5/smoke/paging-retry/data"
+    ],
+    "t17_source_bundle": {
+      "path": "/bench/zfs/db/product-build/t17-f75679e88/artifacts/dodb-source-f75679e88.bundle",
+      "sha256": "2a75bab6d64d0b5b3005c2d70d07dea722182e70b57952ad78ec9c5394b4269e"
+    }
   },
   "acceptance_mapping": [
     {
@@ -85,17 +118,17 @@
     {
       "criterion": "47 GiB capacity threshold and 10 GiB reserve",
       "status": "passed",
-      "evidence": "logs/final-preflight-host-state.log"
+      "evidence": "logs/final-preflight-host-state-f75679e88.log"
     },
     {
       "criterion": "Frozen native and binary identities preserved and rechecked",
       "status": "passed",
-      "evidence": "logs/final-preflight-host-state.log"
+      "evidence": "logs/final-preflight-host-state-f75679e88.log and logs/build-f75679e88/artifact-manifest.json"
     },
     {
-      "criterion": "Full matrix runner can measure all frozen phases, windows, stop conditions, and stress cases",
-      "status": "blocked",
-      "evidence": "RESULTS.md; source files tenant_density_workload.rs and support/tenant_density/config.rs"
+      "criterion": "Five-minute SLO windows, recovery load, checkpoint-cycle extension, long-reader retention, and six fixed stress recipes",
+      "status": "passed_validation",
+      "evidence": "RESULTS.md and source commit f75679e88618ebc018a61158e6b02acb5dd574e3"
     },
     {
       "criterion": "T17 correctness, operational completeness, SLO, resource acceptance, and comparative performance",
@@ -106,13 +139,14 @@
   "readiness_correction": {
     "prior_adoption_decision_was": "evidence_insufficient",
     "corrected_adoption_decision": "not_evaluated",
-    "reason": "No T17 workload cell had started; missing harness phases and stress recipes are preparation gaps, not adoption evidence.",
-    "matrix_reopened_for_revision": true
+    "reason": "No T17 workload cell had started; missing harness phases and stress recipes were preparation gaps, not adoption evidence.",
+    "matrix_reopened_for_revision": true,
+    "matrix_refrozen_after_validation": true
   },
   "adoption_decision": "not_evaluated",
   "workload_cells_started": 0,
   "defaults_changed": false,
   "production_deployment": false,
   "issue_126_closed": false,
-  "next_task": "Implement and validate the authorized harness and matrix revision, re-freeze the matrix, then repeat the 47 GiB capacity and execution preflight."
+  "next_task": "Repeat the final 47 GiB capacity and host preflight immediately before launching the first frozen n=1 screening cell."
 }

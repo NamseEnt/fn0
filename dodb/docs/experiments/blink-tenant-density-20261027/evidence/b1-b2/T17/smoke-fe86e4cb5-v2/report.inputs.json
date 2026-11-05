@@ -1,0 +1,46 @@
+{
+  "host_cache_controls": {
+    "drop_page_cache_before_warmup": true,
+    "warmup_duration_ms": 300000,
+    "zfs_arc_max_bytes": 2147483648
+  },
+  "measurement": {
+    "input_fingerprint": "fnv1a64:6a2c2a76947fdbf6",
+    "input_identity": "seed=20261027;registered=1;active=1;idle=0;rows=256;value_bytes=512",
+    "ordered_request_schedule_sha256": "5a346fc5c19953b9aaa6fa6149e6e7990d1993241a72947c793e8cb72ade6daa",
+    "schedule_fingerprint": "fnv1a64:da907263e1a0155e",
+    "schedule_identity": "hash=fnv1a64;topology=fixed-per-tenant;profile=read-heavy;width=Mixed;mutation_key_mode=fixed;mutation_key_epoch=0;clients=8;queue_bound=8;max_in_flight=8;service_memory_admission_bytes=6442450944;rate=Some(250);duration=Some(300000);operations=None;fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
+    "scope": "SHA-256 covers every intended ordered tenant/client arrival and derived operation kind and width; observed fingerprints describe the realized prefix"
+  },
+  "measurement_maximum_extension": {
+    "duration_ms": 7200000,
+    "fingerprint": {
+      "input_fingerprint": "fnv1a64:6a2c2a76947fdbf6",
+      "input_identity": "seed=20261027;registered=1;active=1;idle=0;rows=256;value_bytes=512",
+      "ordered_request_schedule_sha256": "eaad5928c11376e80c5c5159f695a2cdb5c47e31bb06c88ae87704442400221c",
+      "schedule_fingerprint": "fnv1a64:5d64f0b94efdc062",
+      "schedule_identity": "hash=fnv1a64;topology=fixed-per-tenant;profile=read-heavy;width=Mixed;mutation_key_mode=fixed;mutation_key_epoch=0;clients=8;queue_bound=8;max_in_flight=8;service_memory_admission_bytes=6442450944;rate=Some(250);duration=Some(7200000);operations=None;fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
+      "scope": "SHA-256 covers every intended ordered tenant/client arrival and derived operation kind and width; observed fingerprints describe the realized prefix"
+    }
+  },
+  "recovery": {
+    "input_fingerprint": "fnv1a64:6a2c2a76947fdbf6",
+    "input_identity": "seed=20261027;registered=1;active=1;idle=0;rows=256;value_bytes=512",
+    "ordered_request_schedule_sha256": "773af388846dfc17472cdd1363e509ef152deb3b756274cc319d0e208b81f0a7",
+    "schedule_fingerprint": "fnv1a64:872b5605e60c2201",
+    "schedule_identity": "hash=fnv1a64;topology=fixed-per-tenant;profile=read-heavy;width=Mixed;mutation_key_mode=fixed;mutation_key_epoch=1000;clients=8;queue_bound=8;max_in_flight=8;service_memory_admission_bytes=6442450944;rate=Some(250);duration=Some(300000);operations=None;fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
+    "scope": "SHA-256 covers every intended ordered tenant/client arrival and derived operation kind and width; observed fingerprints describe the realized prefix"
+  },
+  "seed_manifest_sha256": "6a5d17fdc968e8404326d23187e8a97389fd0a242c4c44f669d3f8758ffafe65",
+  "source_revision": "fe86e4cb515d3ba361f59234d3d54734540ea62a",
+  "status": "written_before_workload_phases",
+  "topology": "fixed-per-tenant",
+  "warmup": {
+    "input_fingerprint": "fnv1a64:6a2c2a76947fdbf6",
+    "input_identity": "seed=20261027;registered=1;active=1;idle=0;rows=256;value_bytes=512",
+    "ordered_request_schedule_sha256": "d55a600a3872c3c4845f63bca17b8aa8390163b46f8cacfb6f5546b25302496b",
+    "schedule_fingerprint": "fnv1a64:2e58613d185a3248",
+    "schedule_identity": "hash=fnv1a64;topology=fixed-per-tenant;profile=read-heavy;width=Mixed;mutation_key_mode=growing;mutation_key_epoch=5000;clients=8;queue_bound=8;max_in_flight=8;service_memory_admission_bytes=6442450944;rate=Some(250);duration=Some(300000);operations=None;fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
+    "scope": "SHA-256 covers every intended ordered tenant/client arrival and derived operation kind and width; observed fingerprints describe the realized prefix"
+  }
+}

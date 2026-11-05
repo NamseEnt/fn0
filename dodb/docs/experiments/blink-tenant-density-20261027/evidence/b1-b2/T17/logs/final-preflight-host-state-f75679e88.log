@@ -1,0 +1,20 @@
+timestamp_utc=2026-11-05T05:48:10Z
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159122984960 107554529280 51568455680  68% /bench/zfs/db
+MemTotal:       11159744 kB
+MemAvailable:    8560888 kB
+SwapFree:        3774900 kB
+arc_max=0
+arc_size_bytes=2087831488
+cgroup_fs=cgroup2fs
+cgroup_controllers=cpuset cpu io memory hugetlb pids rdma misc
+active_t17_cgroups=none
+active_workload_processes=none
+run_directory_absent=yes
+cgroup_base_absent=yes
+7356e1b06e1f25354a3d194d04beb52f77f819328c9ee1753982cf663785969a  /bench/zfs/db/product-build/t17-f75679e88/artifacts/release-f75679e88/tenant_density_workload
+fb3fe085aa88f34238c8a7f0f1040fbe208ebc2a57b99f09a602a6f30fd7ab72  /bench/zfs/db/product-build/t17-f75679e88/artifacts/release-f75679e88/memory_diagnostic_worker
+2a75bab6d64d0b5b3005c2d70d07dea722182e70b57952ad78ec9c5394b4269e  /bench/zfs/db/product-build/t17-f75679e88/artifacts/dodb-source-f75679e88.bundle
+9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5  /bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+8222cd31df4bdab41cc0cd81221c1c50d83359dfeef464bba74f5c5847b6ee1c  /bench/zfs/db/product-build/t16-b17880d5/artifacts/release/tenant_density_workload
+e7f2bd38baf417fe567030c1deeb1ed024029414b9a387fdfd235b13f621c5cc  /bench/zfs/db/product-build/t16-b17880d5/artifacts/release/memory_diagnostic_worker

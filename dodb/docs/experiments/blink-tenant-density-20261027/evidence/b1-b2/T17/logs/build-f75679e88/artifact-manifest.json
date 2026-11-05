@@ -1,0 +1,39 @@
+{
+  "source": {
+    "commit": "f75679e88618ebc018a61158e6b02acb5dd574e3",
+    "clean": true,
+    "git_bundle_remote_path": "/bench/zfs/db/product-build/t17-f75679e88/artifacts/dodb-source-f75679e88.bundle",
+    "git_bundle_sha256": "2a75bab6d64d0b5b3005c2d70d07dea722182e70b57952ad78ec9c5394b4269e"
+  },
+  "build": {
+    "host": "opc@217.142.246.204",
+    "target": "aarch64-unknown-linux-gnu",
+    "rustc": "1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "1.97.1 (c980f4866 2026-06-30)",
+    "linker": "/usr/bin/gcc 11.5.0 20240719 (Red Hat 11.5.0-14.0.1)",
+    "linker_target": "aarch64-redhat-linux",
+    "features": ["blink-demand-paging"],
+    "commands": [
+      "cargo test --release --features blink-demand-paging -p dodb-rocksdb --bin tenant_density_workload",
+      "cargo build --release --features blink-demand-paging -p dodb-rocksdb --bin tenant_density_workload --bin memory_diagnostic_worker"
+    ],
+    "test_log_sha256": "673c2bb1b84e65746ce4bee26a2229fcde260fc339d2dcf479b2271a718b48ac",
+    "build_log_sha256": "25bd6582a6b92164c2b4744af01dc779c6addc54a0d9fc9544eb7f0c8213e62c",
+    "source_status_log_sha256": "3671eaaa40d0008681b68eb28e4c6d0198cf51b79f9f4c7a9728b68ae7b6c9ef"
+  },
+  "binaries": {
+    "remote_directory": "/bench/zfs/db/product-build/t17-f75679e88/artifacts/release-f75679e88",
+    "tenant_density_workload_sha256": "7356e1b06e1f25354a3d194d04beb52f77f819328c9ee1753982cf663785969a",
+    "memory_diagnostic_worker_sha256": "fb3fe085aa88f34238c8a7f0f1040fbe208ebc2a57b99f09a602a6f30fd7ab72",
+    "executable_mode": "0555"
+  },
+  "native_dependency": {
+    "rocksdb_commit": "abeebd9630f11bd08c28b7bd43c7bdfc62050654",
+    "archive_path": "/bench/zfs/db/product-build/rocksdb-source/librocksdb.a",
+    "archive_sha256": "9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5"
+  },
+  "controller_sha256": "1232f3832e77d4e3590be7ea18b2c7372ada5c2764fc3833cbf94913d40d7589",
+  "test_controller_sha256": "e83a67f8451a7bee5262194a165a0ec87524250c42c797be3d01eff63536dcfe",
+  "stress_recipe_sha256": "5c2773034216a942486197a64400c70d8ac20fc22e78ac381ec39aba4a2b3bab",
+  "smoke_controller_sha256": "656edd26b41706279accece02674e9f50bf08b50b9e531eecfae8e684b0a6ded"
+}
