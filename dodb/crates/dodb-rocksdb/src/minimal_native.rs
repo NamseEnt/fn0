@@ -111,7 +111,7 @@ impl MinimalNativeService {
             .get(&tenant)
             .map(|entry| Arc::clone(entry.value()))
             .ok_or_else(|| Error::invalid_request("reader retention tenant is not open"))?;
-        let iterator = tenant_database.handle.iterator(&[USER_KEY_PREFIX])?;
+        let iterator = tenant_database.iterator(&[USER_KEY_PREFIX])?;
         Ok(MinimalNativeReaderSnapshot {
             _iterator: iterator,
         })
