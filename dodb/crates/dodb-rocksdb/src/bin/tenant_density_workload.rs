@@ -222,6 +222,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     recovery_options.duration_ms = Some(options.recovery_duration_ms);
     recovery_options.operation_count = None;
     recovery_options.mutation_key_epoch = options.mutation_key_epoch.saturating_add(1_000);
+    let mut maximum_measurement_options = options.clone();
+    maximum_measurement_options.duration_ms = Some(7_200_000);
+    maximum_measurement_options.operation_count = None;
+    let maximum_extension_fingerprint =
+        scheduler::deterministic_fingerprints(&maximum_measurement_options, options.topology.as_str());
     let schedule_manifest_path = report_path.with_extension("inputs.json");
     let schedule_manifest = json!({
         "status": "written_before_workload_phases",
@@ -232,12 +237,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "measurement": scheduler::deterministic_fingerprints(&options, options.topology.as_str()),
         "measurement_maximum_extension": {
             "duration_ms": 7_200_000,
-            "fingerprint": {
-                let mut maximum_measurement_options = options.clone();
-                maximum_measurement_options.duration_ms = Some(7_200_000);
-                maximum_measurement_options.operation_count = None;
-                scheduler::deterministic_fingerprints(&maximum_measurement_options, options.topology.as_str())
-            }
+            "fingerprint": maximum_extension_fingerprint
         },
         "recovery": scheduler::deterministic_fingerprints(&recovery_options, options.topology.as_str()),
     });
