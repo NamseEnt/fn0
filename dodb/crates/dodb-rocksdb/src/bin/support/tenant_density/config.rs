@@ -520,11 +520,11 @@ impl Options {
             (None, None) => return Err("one of duration or operation count is required".to_owned()),
         }
         if self.initial_rows < 256
-            || self.initial_rows > 1_000_000
+            || self.initial_rows > 1_048_576
             || !self.initial_rows.is_multiple_of(256)
         {
             return Err(
-                "initial rows must be a multiple of 256 between 256 and 1000000 per tenant"
+                "initial rows must be a multiple of 256 between 256 and 1048576 per tenant"
                     .to_owned(),
             );
         }
@@ -851,6 +851,20 @@ mod tests {
         let options = Options::parse(&argument_values).unwrap();
         assert_eq!(options.client_count, 16);
         assert_eq!(options.initial_rows, 256);
+    }
+
+    #[test]
+    fn frozen_t17_population_size_is_within_the_supported_seed_limit() {
+        let (_directory, mut argument_values) = arguments(&[]);
+        let initial_rows_position = argument_values
+            .iter()
+            .position(|argument| argument == "--initial-rows")
+            .unwrap();
+        argument_values[initial_rows_position + 1] = "1048576".to_owned();
+        assert_eq!(
+            Options::parse(&argument_values).unwrap().initial_rows,
+            1_048_576
+        );
     }
 
     #[test]
