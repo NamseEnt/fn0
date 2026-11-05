@@ -1,0 +1,20 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+preserved_frozen_artifacts_before_cleanup
+8222cd31df4bdab41cc0cd81221c1c50d83359dfeef464bba74f5c5847b6ee1c  /bench/zfs/db/product-build/t16-b17880d5/artifacts/release/tenant_density_workload
+e7f2bd38baf417fe567030c1deeb1ed024029414b9a387fdfd235b13f621c5cc  /bench/zfs/db/product-build/t16-b17880d5/artifacts/release/memory_diagnostic_worker
+9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5  /bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+5969090048	/bench/zfs/db/tenant-density-build-cache-20261029/target
+removed_regenerable_cache	/bench/zfs/db/tenant-density-build-cache-20261029/target
+1877350400	/bench/zfs/db/product-build/t16-b17880d5/target-release
+removed_regenerable_cache	/bench/zfs/db/product-build/t16-b17880d5/target-release
+capacity_after_cache_cleanup
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159123476480 121817628672 37305847808  77% /bench/zfs/db
+NAME           USED  AVAIL  REFER  MOUNTPOINT
+dodbbench/db   113G  34.8G   113G  /bench/zfs/db
+preserved_frozen_artifacts_after_cleanup
+8222cd31df4bdab41cc0cd81221c1c50d83359dfeef464bba74f5c5847b6ee1c  /bench/zfs/db/product-build/t16-b17880d5/artifacts/release/tenant_density_workload
+e7f2bd38baf417fe567030c1deeb1ed024029414b9a387fdfd235b13f621c5cc  /bench/zfs/db/product-build/t16-b17880d5/artifacts/release/memory_diagnostic_worker
+9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5  /bench/zfs/db/product-build/rocksdb-source/librocksdb.a

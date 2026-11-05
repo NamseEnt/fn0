@@ -1,0 +1,13 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+4442071552	/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target
+/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target-preserved-20261105.tar.zst: 4350832640 bytes 
+b1654a6693392509ecb9ea7e802fe234f26865e2a0119a51fd4a8532772b1b00  /bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target-preserved-20261105.tar.zst
+1427595866 /bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target-preserved-20261105.tar.zst
+removed_regenerable_target_after_archive_verification	/bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target
+capacity_after_target_archive
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159121891328 111622418432 47499472896  71% /bench/zfs/db
+NAME           USED  AVAIL  REFER  MOUNTPOINT
+dodbbench/db   104G  44.2G   104G  /bench/zfs/db

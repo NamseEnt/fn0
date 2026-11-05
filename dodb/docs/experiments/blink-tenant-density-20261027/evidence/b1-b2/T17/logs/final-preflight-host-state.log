@@ -1,0 +1,491 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+2026-11-05T02:03:17Z
+Linux instance-20260923-1013 6.12.0-206.104.4.4.el9uek.aarch64 #2 SMP Wed Sep 16 22:26:42 PDT 2026 aarch64 aarch64 aarch64 GNU/Linux
+MemTotal:       11159744 kB
+MemAvailable:    6566248 kB
+zfs_arc_max=0
+
+------------------------------------------------------------------------
+ZFS Subsystem Report                            Thu Nov 05 02:03:17 2026
+Linux 6.12.0-206.104.4.4.el9uek.aarch64                         2.2.11-1
+Machine: instance-20260923-1013 (aarch64)                       2.2.11-1
+
+ARC status:                                                      HEALTHY
+        Memory throttle count:                                         0
+
+ARC size (current):                                    84.8 %    4.5 GiB
+        Target size (adaptive):                       100.0 %    5.3 GiB
+        Min size (hard limit):                          6.2 %  340.6 MiB
+        Max size (high water):                           16:1    5.3 GiB
+        Anonymous data size:                            0.0 %    0 Bytes
+        Anonymous metadata size:                        0.0 %    0 Bytes
+        MFU data target:                               34.7 %    1.3 GiB
+        MFU data size:                                 85.5 %    3.3 GiB
+        MFU ghost data size:                                   600.1 MiB
+        MFU metadata target:                           42.9 %    1.7 GiB
+        MFU metadata size:                             14.0 %  550.0 MiB
+        MFU ghost metadata size:                               586.7 MiB
+        MRU data target:                               18.2 %  716.9 MiB
+        MRU data size:                                  0.0 %    0 Bytes
+        MRU ghost data size:                                     0 Bytes
+        MRU metadata target:                            4.1 %  163.2 MiB
+        MRU metadata size:                              0.5 %   19.4 MiB
+        MRU ghost metadata size:                               226.0 MiB
+        Uncached data size:                             0.0 %    0 Bytes
+        Uncached metadata size:                         0.0 %    0 Bytes
+        Bonus size:                                     0.4 %   18.2 MiB
+        Dnode cache target:                            10.0 %  544.9 MiB
+        Dnode cache size:                              11.9 %   65.1 MiB
+        Dbuf size:                                      0.8 %   36.3 MiB
+        Header size:                                   11.9 %  548.7 MiB
+        L2 header size:                                 0.0 %    0 Bytes
+        ABD chunk waste size:                           0.2 %   11.2 MiB
+
+ARC hash breakdown:
+        Elements max:                                               2.9M
+        Elements current:                              83.2 %       2.4M
+        Collisions:                                               311.4M
+        Chain max:                                                    11
+        Chains:                                                   662.0k
+
+ARC misc:
+        Deleted:                                                  143.9M
+        Mutex misses:                                              45.6k
+        Eviction skips:                                           420.4k
+        Eviction skips due to L2 writes:                               0
+        L2 cached evictions:                                     0 Bytes
+        L2 eligible evictions:                                 758.2 GiB
+        L2 eligible MFU evictions:                     46.8 %  354.6 GiB
+        L2 eligible MRU evictions:                     53.2 %  403.5 GiB
+        L2 ineligible evictions:                                 9.3 GiB
+
+ARC total accesses:                                                 3.1G
+        Total hits:                                    97.4 %       3.0G
+        Total I/O hits:                                 0.5 %      15.8M
+        Total misses:                                   2.0 %      62.9M
+
+ARC demand data accesses:                              40.6 %       1.3G
+        Demand data hits:                              98.2 %       1.2G
+        Demand data I/O hits:                           0.6 %       7.8M
+        Demand data misses:                             1.2 %      14.5M
+
+ARC demand metadata accesses:                          54.0 %       1.7G
+        Demand metadata hits:                          99.7 %       1.7G
+        Demand metadata I/O hits:                       0.2 %       2.9M
+        Demand metadata misses:                         0.1 %       1.5M
+
+ARC prefetch data accesses:                             5.0 %     154.9M
+        Prefetch data hits:                            69.3 %     107.4M
+        Prefetch data I/O hits:                         0.9 %       1.3M
+        Prefetch data misses:                          29.8 %      46.2M
+
+ARC prefetch metadata accesses:                         0.3 %       9.8M
+        Prefetch metadata hits:                        54.7 %       5.4M
+        Prefetch metadata I/O hits:                    38.3 %       3.8M
+        Prefetch metadata misses:                       7.0 %     688.1k
+
+ARC predictive prefetches:                            100.0 %     164.8M
+        Demand hits after predictive:                  78.5 %     129.3M
+        Demand I/O hits after predictive:               5.0 %       8.2M
+        Never demanded after predictive:               16.6 %      27.3M
+
+ARC prescient prefetches:                               0.0 %          0
+        Demand hits after prescient:                      n/a          0
+        Demand I/O hits after prescient:                  n/a          0
+        Never demanded after prescient:                   n/a          0
+
+ARC states hits of all accesses:
+        Most frequently used (MFU):                    86.0 %       2.7G
+        Most recently used (MRU):                      11.4 %     352.4M
+        Most frequently used (MFU) ghost:               0.3 %      10.1M
+        Most recently used (MRU) ghost:                 0.2 %       7.5M
+        Uncached:                                       0.0 %          0
+
+DMU predictive prefetcher calls:                                  679.8M
+        Stream hits:                                   62.7 %     426.2M
+        Hits ahead of stream:                           7.9 %      53.6M
+        Hits behind stream:                            11.1 %      75.2M
+        Stream misses:                                 18.4 %     124.8M
+        Streams limit reached:                         60.0 %      74.8M
+        Stream strides:                                             6.4M
+        Prefetches issued                                          52.5M
+
+L2ARC not detected, skipping section
+
+Solaris Porting Layer (SPL):
+        spl_hostid                                                     0
+        spl_hostid_path                                      /etc/hostid
+        spl_kmem_alloc_max                                       1048576
+        spl_kmem_alloc_warn                                        65536
+        spl_kmem_cache_kmem_threads                                    4
+        spl_kmem_cache_magazine_size                                   0
+        spl_kmem_cache_max_size                                       32
+        spl_kmem_cache_obj_per_slab                                    8
+        spl_kmem_cache_slab_limit                                  16384
+        spl_max_show_tasks                                           512
+        spl_panic_halt                                                 0
+        spl_schedule_hrtimeout_slack_us                                0
+        spl_taskq_kick                                                 0
+        spl_taskq_thread_bind                                          0
+        spl_taskq_thread_dynamic                                       1
+        spl_taskq_thread_priority                                      1
+        spl_taskq_thread_sequential                                    4
+        spl_taskq_thread_timeout_ms                                 5000
+
+Tunables:
+        brt_zap_default_bs                                            12
+        brt_zap_default_ibs                                           12
+        brt_zap_prefetch                                               1
+        dbuf_cache_hiwater_pct                                        10
+        dbuf_cache_lowater_pct                                        10
+        dbuf_cache_max_bytes                        18446744073709551615
+        dbuf_cache_shift                                               5
+        dbuf_metadata_cache_max_bytes               18446744073709551615
+        dbuf_metadata_cache_shift                                      6
+        dbuf_mutex_cache_shift                                         0
+        ddt_zap_default_bs                                            15
+        ddt_zap_default_ibs                                           15
+        dmu_object_alloc_chunk_shift                                   7
+        dmu_prefetch_max                                       134217728
+        icp_aes_impl                             cycle [fastest] generic
+        icp_gcm_impl                             cycle [fastest] generic
+        ignore_hole_birth                                              1
+        l2arc_exclude_special                                          0
+        l2arc_feed_again                                               1
+        l2arc_feed_min_ms                                            200
+        l2arc_feed_secs                                                1
+        l2arc_headroom                                                 8
+        l2arc_headroom_boost                                         200
+        l2arc_meta_percent                                            33
+        l2arc_mfuonly                                                  0
+        l2arc_noprefetch                                               1
+        l2arc_norw                                                     0
+        l2arc_rebuild_blocks_min_l2size                       1073741824
+        l2arc_rebuild_enabled                                          1
+        l2arc_trim_ahead                                               0
+        l2arc_write_boost                                       33554432
+        l2arc_write_max                                         33554432
+        metaslab_aliquot                                         1048576
+        metaslab_bias_enabled                                          1
+        metaslab_debug_load                                            0
+        metaslab_debug_unload                                          0
+        metaslab_df_max_search                                  16777216
+        metaslab_df_use_largest_segment                                0
+        metaslab_force_ganging                                  16777217
+        metaslab_force_ganging_pct                                     3
+        metaslab_fragmentation_factor_enabled                          1
+        metaslab_lba_weighting_enabled                                 1
+        metaslab_preload_enabled                                       1
+        metaslab_preload_limit                                        10
+        metaslab_preload_pct                                          50
+        metaslab_unload_delay                                         32
+        metaslab_unload_delay_ms                                  600000
+        send_holes_without_birth_time                                  1
+        spa_asize_inflation                                           24
+        spa_config_path                             /etc/zfs/zpool.cache
+        spa_load_print_vdev_tree                                       0
+        spa_load_verify_data                                           1
+        spa_load_verify_metadata                                       1
+        spa_load_verify_shift                                          4
+        spa_slop_shift                                                 5
+        spa_upgrade_errlog_limit                                       0
+        vdev_file_logical_ashift                                       9
+        vdev_file_physical_ashift                                      9
+        vdev_removal_max_span                                      32768
+        vdev_validate_skip                                             0
+        zap_iterate_prefetch                                           1
+        zap_micro_max_size                                        131072
+        zfetch_hole_shift                                              2
+        zfetch_max_distance                                     67108864
+        zfetch_max_idistance                                    67108864
+        zfetch_max_reorder                                      16777216
+        zfetch_max_sec_reap                                            2
+        zfetch_max_streams                                             8
+        zfetch_min_distance                                      4194304
+        zfetch_min_sec_reap                                            1
+        zfs_abd_scatter_enabled                                        1
+        zfs_abd_scatter_max_order                                      9
+        zfs_abd_scatter_min_size                                    1536
+        zfs_admin_snapshot                                             0
+        zfs_allow_redacted_dataset_mount                               0
+        zfs_arc_average_blocksize                                   8192
+        zfs_arc_dnode_limit                                            0
+        zfs_arc_dnode_limit_percent                                   10
+        zfs_arc_dnode_reduce_percent                                  10
+        zfs_arc_evict_batch_limit                                     10
+        zfs_arc_eviction_pct                                         200
+        zfs_arc_grow_retry                                             0
+        zfs_arc_lotsfree_percent                                      10
+        zfs_arc_max                                                    0
+        zfs_arc_meta_balance                                         500
+        zfs_arc_min                                                    0
+        zfs_arc_min_prefetch_ms                                        0
+        zfs_arc_min_prescient_prefetch_ms                              0
+        zfs_arc_pc_percent                                             0
+        zfs_arc_prune_task_threads                                     1
+        zfs_arc_shrink_shift                                           0
+        zfs_arc_shrinker_limit                                     10000
+        zfs_arc_shrinker_seeks                                         2
+        zfs_arc_sys_free                                               0
+        zfs_async_block_max_blocks                  18446744073709551615
+        zfs_autoimport_disable                                         1
+        zfs_bclone_enabled                                             0
+        zfs_bclone_wait_dirty                                          0
+        zfs_blake3_impl                          cycle [fastest] generic
+        zfs_btree_verify_intensity                                     0
+        zfs_checksum_events_per_second                                20
+        zfs_commit_timeout_pct                                        10
+        zfs_compressed_arc_enabled                                     1
+        zfs_condense_indirect_commit_entry_delay_ms                    0
+        zfs_condense_indirect_obsolete_pct                            25
+        zfs_condense_indirect_vdevs_enable                             1
+        zfs_condense_max_obsolete_bytes                       1073741824
+        zfs_condense_min_mapping_bytes                            131072
+        zfs_dbgmsg_enable                                              1
+        zfs_dbgmsg_maxsize                                       4194304
+        zfs_dbuf_state_index                                           0
+        zfs_ddt_data_is_special                                        1
+        zfs_deadman_checktime_ms                                   60000
+        zfs_deadman_enabled                                            1
+        zfs_deadman_events_per_second                                  1
+        zfs_deadman_failmode                                        wait
+        zfs_deadman_synctime_ms                                   600000
+        zfs_deadman_ziotime_ms                                    300000
+        zfs_dedup_prefetch                                             0
+        zfs_default_bs                                                 9
+        zfs_default_ibs                                               17
+        zfs_delay_min_dirty_percent                                   60
+        zfs_delay_scale                                           500000
+        zfs_delete_blocks                                          20480
+        zfs_dirty_data_max                                    1142757785
+        zfs_dirty_data_max_max                                2856894464
+        zfs_dirty_data_max_max_percent                                25
+        zfs_dirty_data_max_percent                                    10
+        zfs_dirty_data_sync_percent                                   20
+        zfs_disable_ivset_guid_check                                   0
+        zfs_dmu_offset_next_sync                                       1
+        zfs_embedded_slog_min_ms                                      64
+        zfs_expire_snapshot                                          300
+        zfs_fallocate_reserve_percent                                110
+        zfs_flags                                                      0
+        zfs_fletcher_4_impl    [fastest] scalar superscalar superscalar4
+        zfs_free_bpobj_enabled                                         1
+        zfs_free_leak_on_eio                                           0
+        zfs_free_min_time_ms                                        1000
+        zfs_history_output_max                                   1048576
+        zfs_immediate_write_sz                                     32768
+        zfs_initialize_chunk_size                                1048576
+        zfs_initialize_value                        16045690984833335022
+        zfs_keep_log_spacemaps_at_export                               0
+        zfs_key_max_salt_uses                                  400000000
+        zfs_livelist_condense_new_alloc                                0
+        zfs_livelist_condense_sync_cancel                              0
+        zfs_livelist_condense_sync_pause                               0
+        zfs_livelist_condense_zthr_cancel                              0
+        zfs_livelist_condense_zthr_pause                               0
+        zfs_livelist_max_entries                                  500000
+        zfs_livelist_min_percent_shared                               75
+        zfs_lua_max_instrlimit                                 100000000
+        zfs_lua_max_memlimit                                   104857600
+        zfs_max_async_dedup_frees                                 100000
+        zfs_max_dataset_nesting                                       50
+        zfs_max_log_walking                                            5
+        zfs_max_logsm_summary_length                                  10
+        zfs_max_missing_tvds                                           0
+        zfs_max_nvlist_src_size                                        0
+        zfs_max_recordsize                                      16777216
+        zfs_metaslab_find_max_tries                                  100
+        zfs_metaslab_fragmentation_threshold                          70
+        zfs_metaslab_max_size_cache_sec                             3600
+        zfs_metaslab_mem_limit                                        25
+        zfs_metaslab_segment_weight_enabled                            1
+        zfs_metaslab_switch_threshold                                  2
+        zfs_metaslab_try_hard_before_gang                              0
+        zfs_mg_fragmentation_threshold                                95
+        zfs_mg_noalloc_threshold                                       0
+        zfs_min_metaslabs_to_flush                                     1
+        zfs_multihost_fail_intervals                                  10
+        zfs_multihost_history                                          0
+        zfs_multihost_import_intervals                                20
+        zfs_multihost_interval                                      1000
+        zfs_multilist_num_sublists                                     0
+        zfs_no_scrub_io                                                0
+        zfs_no_scrub_prefetch                                          0
+        zfs_nocacheflush                                               0
+        zfs_nopwrite_enabled                                           1
+        zfs_object_mutex_size                                         64
+        zfs_obsolete_min_time_ms                                     500
+        zfs_override_estimate_recordsize                               0
+        zfs_pd_bytes_max                                        52428800
+        zfs_per_txg_dirty_frees_percent                               30
+        zfs_prefetch_disable                                           0
+        zfs_read_history                                               0
+        zfs_read_history_hits                                          0
+        zfs_rebuild_max_segment                                  1048576
+        zfs_rebuild_scrub_enabled                                      1
+        zfs_rebuild_vdev_limit                                  67108864
+        zfs_reconstruct_indirect_combinations_max                   4096
+        zfs_recover                                                    0
+        zfs_recv_best_effort_corrective                                0
+        zfs_recv_queue_ff                                             20
+        zfs_recv_queue_length                                   16777216
+        zfs_recv_write_batch_size                                1048576
+        zfs_removal_ignore_errors                                      0
+        zfs_removal_suspend_progress                                   0
+        zfs_remove_max_segment                                  16777216
+        zfs_resilver_disable_defer                                     0
+        zfs_resilver_min_time_ms                                    3000
+        zfs_scan_blkstats                                              0
+        zfs_scan_checkpoint_intval                                  7200
+        zfs_scan_fill_weight                                           3
+        zfs_scan_ignore_errors                                         0
+        zfs_scan_issue_strategy                                        0
+        zfs_scan_legacy                                                0
+        zfs_scan_max_ext_gap                                     2097152
+        zfs_scan_mem_lim_fact                                         20
+        zfs_scan_mem_lim_soft_fact                                    20
+        zfs_scan_report_txgs                                           0
+        zfs_scan_strict_mem_lim                                        0
+        zfs_scan_suspend_progress                                      0
+        zfs_scan_vdev_limit                                     16777216
+        zfs_scrub_error_blocks_per_txg                              4096
+        zfs_scrub_min_time_ms                                       1000
+        zfs_send_corrupt_data                                          0
+        zfs_send_no_prefetch_queue_ff                                 20
+        zfs_send_no_prefetch_queue_length                        1048576
+        zfs_send_queue_ff                                             20
+        zfs_send_queue_length                                   16777216
+        zfs_send_unmodified_spill_blocks                               1
+        zfs_sha256_impl                    cycle [fastest] generic armv7
+        zfs_sha512_impl                    cycle [fastest] generic armv7
+        zfs_slow_io_events_per_second                                 20
+        zfs_snapshot_history_enabled                                   1
+        zfs_spa_discard_memory_limit                            16777216
+        zfs_special_class_metadata_reserve_pct                        25
+        zfs_sync_pass_deferred_free                                    2
+        zfs_sync_pass_dont_compress                                    8
+        zfs_sync_pass_rewrite                                          2
+        zfs_sync_taskq_batch_pct                                      75
+        zfs_traverse_indirect_prefetch_limit                          32
+        zfs_trim_extent_bytes_max                              134217728
+        zfs_trim_extent_bytes_min                                  32768
+        zfs_trim_metaslab_skip                                         0
+        zfs_trim_queue_limit                                          10
+        zfs_trim_txg_batch                                            32
+        zfs_txg_history                                              100
+        zfs_txg_timeout                                                5
+        zfs_unflushed_log_block_max                               131072
+        zfs_unflushed_log_block_min                                 1000
+        zfs_unflushed_log_block_pct                                  400
+        zfs_unflushed_log_txg_max                                   1000
+        zfs_unflushed_max_mem_amt                             1073741824
+        zfs_unflushed_max_mem_ppm                                   1000
+        zfs_unlink_suspend_progress                                    0
+        zfs_user_indirect_is_special                                   1
+        zfs_vdev_aggregation_limit                               1048576
+        zfs_vdev_aggregation_limit_non_rotating                   131072
+        zfs_vdev_async_read_max_active                                 3
+        zfs_vdev_async_read_min_active                                 1
+        zfs_vdev_async_write_active_max_dirty_percent                 60
+        zfs_vdev_async_write_active_min_dirty_percent                 30
+        zfs_vdev_async_write_max_active                               10
+        zfs_vdev_async_write_min_active                                2
+        zfs_vdev_def_queue_depth                                      32
+        zfs_vdev_default_ms_count                                    200
+        zfs_vdev_default_ms_shift                                     29
+        zfs_vdev_disk_classic                                          0
+        zfs_vdev_disk_max_segs                                         0
+        zfs_vdev_failfast_mask                                         1
+        zfs_vdev_initializing_max_active                               1
+        zfs_vdev_initializing_min_active                               1
+        zfs_vdev_max_active                                         1000
+        zfs_vdev_max_auto_ashift                                      14
+        zfs_vdev_max_ms_shift                                         34
+        zfs_vdev_min_auto_ashift                                       9
+        zfs_vdev_min_ms_count                                         16
+        zfs_vdev_mirror_non_rotating_inc                               0
+        zfs_vdev_mirror_non_rotating_seek_inc                          1
+        zfs_vdev_mirror_rotating_inc                                   0
+        zfs_vdev_mirror_rotating_seek_inc                              5
+        zfs_vdev_mirror_rotating_seek_offset                     1048576
+        zfs_vdev_ms_count_limit                                   131072
+        zfs_vdev_nia_credit                                            5
+        zfs_vdev_nia_delay                                             5
+        zfs_vdev_open_timeout_ms                                    1000
+        zfs_vdev_queue_depth_pct                                    1000
+        zfs_vdev_raidz_impl              cycle [fastest] original scalar
+        zfs_vdev_read_gap_limit                                    32768
+        zfs_vdev_rebuild_max_active                                    3
+        zfs_vdev_rebuild_min_active                                    1
+        zfs_vdev_removal_max_active                                    2
+        zfs_vdev_removal_min_active                                    1
+        zfs_vdev_scheduler                                        unused
+        zfs_vdev_scrub_max_active                                      3
+        zfs_vdev_scrub_min_active                                      1
+        zfs_vdev_sync_read_max_active                                 10
+        zfs_vdev_sync_read_min_active                                 10
+        zfs_vdev_sync_write_max_active                                10
+        zfs_vdev_sync_write_min_active                                10
+        zfs_vdev_trim_max_active                                       2
+        zfs_vdev_trim_min_active                                       1
+        zfs_vdev_write_gap_limit                                    4096
+        zfs_vnops_read_chunk_size                                1048576
+        zfs_wrlog_data_max                                    2285515570
+        zfs_xattr_compat                                               0
+        zfs_zevent_len_max                                           512
+        zfs_zevent_retain_expire_secs                                900
+        zfs_zevent_retain_max                                       2000
+        zfs_zil_clean_taskq_maxalloc                             1048576
+        zfs_zil_clean_taskq_minalloc                                1024
+        zfs_zil_clean_taskq_nthr_pct                                 100
+        zfs_zil_saxattr                                                1
+        zil_maxblocksize                                          131072
+        zil_maxcopied                                               7680
+        zil_nocacheflush                                               0
+        zil_replay_disable                                             0
+        zil_slog_bulk                                           67108864
+        zio_deadman_log_all                                            0
+        zio_dva_throttle_enabled                                       1
+        zio_requeue_io_start_cut_in_line                               1
+        zio_slow_io_ms                                             30000
+        zio_taskq_batch_pct                                           80
+        zio_taskq_batch_tpq                                            0
+        zio_taskq_read                         fixed,1,8 null scale null
+        zio_taskq_write                  batch fixed,1,5 scale fixed,1,5
+        zstd_abort_size                                           131072
+        zstd_earlyabort_pass                                           1
+        zvol_blk_mq_blocks_per_thread                                  8
+        zvol_blk_mq_queue_depth                                      128
+        zvol_enforce_quotas                                            1
+        zvol_inhibit_dev                                               0
+        zvol_major                                                   230
+        zvol_max_discard_blocks                                    16384
+        zvol_num_taskqs                                                0
+        zvol_open_timeout_ms                                        1000
+        zvol_prefetch_bytes                                       131072
+        zvol_request_sync                                              0
+        zvol_threads                                                   0
+        zvol_use_blk_mq                                                0
+        zvol_volmode                                                   1
+
+ZIL committed transactions:                                       464.9M
+        Commit requests:                                           30.7M
+        Flushes to stable storage:                                 30.7M
+        Transactions to SLOG storage pool:            0 Bytes          0
+        Transactions to non-SLOG storage pool:      478.1 GiB      32.3M
+
+cgroup_fs=cgroup2fs
+controllers=cpuset cpu io memory hugetlb pids rdma misc
+tenant_cgroups=0
+workload_processes=0
+Filesystem        1B-blocks         Used   Available Use% Mounted on
+dodbbench/db   159121559552 107179995136 51941564416  68% /bench/zfs/db
+NAME           USED  AVAIL  REFER  MOUNTPOINT
+dodbbench/db  99.8G  48.4G  99.8G  /bench/zfs/db
+8222cd31df4bdab41cc0cd81221c1c50d83359dfeef464bba74f5c5847b6ee1c  /bench/zfs/db/product-build/t16-b17880d5/artifacts/release/tenant_density_workload
+e7f2bd38baf417fe567030c1deeb1ed024029414b9a387fdfd235b13f621c5cc  /bench/zfs/db/product-build/t16-b17880d5/artifacts/release/memory_diagnostic_worker
+9e6f7ea77ba2a9b2285b0d85ff90b00925688ab09a1c8e14def3f10f0deca2a5  /bench/zfs/db/product-build/rocksdb-source/librocksdb.a
+5ecf0e6787cdc53de41751e56bface57e88c7b077e9544279b73ecda7814ad7e  /bench/zfs/db/product-build/t16-b17880d5/artifacts/dodb-source-snapshots-20261105.bundle
+b1654a6693392509ecb9ea7e802fe234f26865e2a0119a51fd4a8532772b1b00  /bench/zfs/db/dodb-rocksdb-r1b3a-551471d5/target-preserved-20261105.tar.zst
