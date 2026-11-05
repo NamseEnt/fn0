@@ -12,6 +12,8 @@ mod scheduler;
 mod workload_failure;
 
 use std::collections::BTreeMap;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -210,6 +212,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let seed_manifest_sha256 = seed_population(&setup_service, &options).await?;
     setup_worker.shutdown().map_err(std::io::Error::other)?;
     let filesystem_after_setup = filesystem_snapshot(&options.data_dir);
+
+    let mut warmup_options = options.clone();
+    warmup_options.duration_ms = Some(options.warmup_duration_ms);
+    warmup_options.operation_count = None;
+    warmup_options.mutation_key_mode = config::MutationKeyMode::Growing;
+    warmup_options.mutation_key_epoch = 5_000;
+    let mut recovery_options = options.clone();
+    recovery_options.duration_ms = Some(options.recovery_duration_ms);
+    recovery_options.operation_count = None;
+    recovery_options.mutation_key_epoch = options.mutation_key_epoch.saturating_add(1_000);
+    let schedule_manifest_path = report_path.with_extension("inputs.json");
+    let schedule_manifest = json!({
+        "status": "written_before_workload_phases",
+        "seed_manifest_sha256": seed_manifest_sha256.clone(),
+        "source_revision": source_revision.clone(),
+        "topology": options.topology.as_str(),
+        "warmup": scheduler::deterministic_fingerprints(&warmup_options, options.topology.as_str()),
+        "measurement": scheduler::deterministic_fingerprints(&options, options.topology.as_str()),
+        "measurement_maximum_extension": {
+            "duration_ms": 7_200_000,
+            "fingerprint": {
+                let mut maximum_measurement_options = options.clone();
+                maximum_measurement_options.duration_ms = Some(7_200_000);
+                maximum_measurement_options.operation_count = None;
+                scheduler::deterministic_fingerprints(&maximum_measurement_options, options.topology.as_str())
+            }
+        },
+        "recovery": scheduler::deterministic_fingerprints(&recovery_options, options.topology.as_str()),
+    });
+    let mut schedule_manifest_file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&schedule_manifest_path)?;
+    schedule_manifest_file.write_all(&serde_json::to_vec_pretty(&schedule_manifest)?)?;
 
     let measurement_worker = spawn_worker(&session, &worker_path, &options, pressure_monitor.as_ref(), "measurement").await?;
     let service = RemoteDodbService::new(measurement_worker.connection().clone());
@@ -531,6 +567,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "after_reopen_oracle_worker_shutdown": reopened_filesystem_after
         },
         "workload": workload,
+        "pre_execution_inputs_manifest": schedule_manifest_path,
         "post_measurement_full_population_oracle": oracle,
         "reopened_full_population_oracle": reopened_oracle,
         "memory_diagnostic": diagnostic,

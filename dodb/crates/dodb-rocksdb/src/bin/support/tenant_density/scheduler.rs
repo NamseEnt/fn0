@@ -1503,7 +1503,7 @@ fn workload_value(options: &Options, operation_number: u64) -> Vec<u8> {
     value
 }
 
-fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
+pub fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
     let input_identity = format!(
         "seed={};registered={};active={};idle={};rows={};value_bytes={}",
         options.seed,
@@ -1514,7 +1514,7 @@ fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
         options.value_bytes
     );
     let mut schedule_identity = format!(
-        "hash=fnv1a64;topology={topology};profile={};width={:?};mutation_key_mode={};mutation_key_epoch={};clients={};queue_bound={};max_in_flight={};rate={:?};duration={:?};operations={:?};fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
+        "hash=sha256-ordered-lanes-v1;topology={topology};profile={};width={:?};mutation_key_mode={};mutation_key_epoch={};clients={};queue_bound={};max_in_flight={};rate={:?};duration={:?};slo_window_ms={:?};long_reader_retention_ms={};operations={:?};fixed_per_tenant_client=operation_number mod clients;fixed_lane=client_number*16;growing_lane=client_number*1000000+epoch*1000000000;selector=op*37+client_offset mod 100;write_width_selector=write_ordinal*37 mod 100;conditional=even_write_ordinal;delete=mutation_ordinal mod 10",
         options.profile.as_str(),
         options.width,
         options.mutation_key_mode.as_str(),
@@ -1524,6 +1524,8 @@ fn deterministic_fingerprints(options: &Options, topology: &str) -> Value {
         options.max_in_flight,
         options.per_tenant_rate,
         options.duration_ms,
+        options.slo_window_ms,
+        options.long_reader_retention_ms,
         options.operation_count
     );
     if options.tenant_arrival_phase == TenantArrivalPhase::Staggered {
@@ -1554,6 +1556,8 @@ fn ordered_request_schedule_sha256(options: &Options, topology: &str) -> String 
     digest.update(options.profile.weights());
     digest.update(options.duration_ms.unwrap_or(0).to_be_bytes());
     digest.update(options.per_tenant_rate.unwrap_or(0).to_be_bytes());
+    digest.update(options.slo_window_ms.unwrap_or(0).to_be_bytes());
+    digest.update(options.long_reader_retention_ms.to_be_bytes());
     digest.update(options.mutation_key_mode.as_str().as_bytes());
     digest.update(options.mutation_key_epoch.to_be_bytes());
     if topology != "fixed-per-tenant"
