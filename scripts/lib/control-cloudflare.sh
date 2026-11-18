@@ -34,7 +34,18 @@ __cf_call() {
     -H "Authorization: Bearer ${token}"
     -H "Content-Type: application/json")
   [[ -n "$body" ]] && args+=(--data "$body")
-  curl "${args[@]}"
+  local response_code retry_delay
+  for retry_delay in 0 1 2 4 8; do
+    if [[ "$retry_delay" != 0 ]]; then
+      sleep "$retry_delay"
+    fi
+    response_code="$(curl "${args[@]}")" || return 1
+    if [[ "$response_code" != 401 ]] ||
+      ! jq -e 'any(.errors[]?; .code == 10000)' /tmp/__cf_resp.body >/dev/null 2>&1; then
+      break
+    fi
+  done
+  printf '%s' "$response_code"
 }
 
 # Deliberately excludes "already in use": Cloudflare answers that when a
