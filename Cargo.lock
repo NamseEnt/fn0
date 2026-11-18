@@ -2432,7 +2432,7 @@ dependencies = [
 
 [[package]]
 name = "fn0-deploy"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "anyhow",
  "arboard",
@@ -2674,7 +2674,7 @@ dependencies = [
 
 [[package]]
 name = "forte-cli"
-version = "0.6.13"
+version = "0.6.14"
 dependencies = [
  "anyhow",
  "assert_cmd",

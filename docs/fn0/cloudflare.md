@@ -104,8 +104,9 @@ API Tokens per account. To shift new projects to the account quota:
 New `forte cloud init` runs then mint the worker R2, frontend R2, and
 zone-scoped cache purge credentials as **Account API Tokens**. Ten new
 projects use 31 long-lived Account API Tokens, including the broker's
-account-token minter. The broker still uses its one User API Token and
-temporarily issues User API Tokens for provisioning.
+account-token minter. Project provisioning and teardown also issue their
+temporary tokens under the account quota. The broker keeps its User API
+Token for broker setup and maintenance.
 
 Existing projects continue to use their original credentials.
 `forte destroy` looks for the project's credentials in both namespaces when

@@ -509,13 +509,15 @@ function teardownProjectRoutes({
       ]),
     ),
   deleteBucketResponds = () => jsonResponse(cf({})),
+  provisioningPath = "/user/tokens",
+  provisioningBearer = "Bearer setup-token",
 } = {}) {
   return [
     controlAuthorizes(OWNER_GITHUB_ID),
-    route("POST", "/user/tokens", "Bearer setup-token", () =>
+    route("POST", provisioningPath, provisioningBearer, () =>
       jsonResponse(cf({ id: "prov-id", value: "prov-token" })),
     ),
-    route("DELETE", "/user/tokens/prov-id", "Bearer setup-token", () => jsonResponse(cf({}))),
+    route("DELETE", `${provisioningPath}/prov-id`, provisioningBearer, () => jsonResponse(cf({}))),
     route("GET", `/zones/${TEARDOWN_ZONE_ID}/dns_records`, "Bearer prov-token", dnsRecordsResponds),
     route("DELETE", `/zones/${TEARDOWN_ZONE_ID}/dns_records/cname-id`, "Bearer prov-token", () =>
       jsonResponse(cf({})),
@@ -728,10 +730,10 @@ function projectProvisionRoutes(runtimePath, runtimeBearer, rejectPurge = false)
   ]);
   return [
     controlAuthorizes(OWNER_GITHUB_ID),
-    route("POST", "/user/tokens", "Bearer setup-token", ({ body }) =>
+    route("POST", runtimePath, runtimeBearer, ({ body }) =>
       body.expires_on ? jsonResponse(cf({ id: "provisioning-id", value: "provisioning-token" })) : null,
     ),
-    route("DELETE", "/user/tokens/provisioning-id", "Bearer setup-token", () => jsonResponse(cf({}))),
+    route("DELETE", `${runtimePath}/provisioning-id`, runtimeBearer, () => jsonResponse(cf({}))),
     route("GET", `/zones/${TEST_ZONE}`, "Bearer provisioning-token", () =>
       jsonResponse(cf({ name: "example.com" })),
     ),
@@ -770,7 +772,7 @@ test("provisions account-owned credentials without expanding their bucket or zon
   assert.equal(provisioned.frontend_asset_access_key_id, CREDENTIAL_IDS.frontend_asset);
   assert.equal(provisioned.purge_token, `value-for-${CREDENTIAL_IDS.purge}`);
 
-  const runtimeCalls = calls.filter((call) => call.pathname === ACCOUNT_TOKEN_PATH);
+  const runtimeCalls = calls.filter((call) => call.pathname === ACCOUNT_TOKEN_PATH && !call.body.expires_on);
   assert.equal(runtimeCalls.length, 3);
   const [workerMint, assetMint, purgeMint] = runtimeCalls;
   const bucketKey = (name) => `com.cloudflare.edge.r2.bucket.${ACCOUNT_ID}_default_fn0-${TEST_PROJECT}-${name}`;
@@ -784,7 +786,8 @@ test("provisions account-owned credentials without expanding their bucket or zon
     resources: { [`com.cloudflare.api.account.zone.${TEST_ZONE}`]: "*" },
     permission_groups: [{ id: "e17beae8b8cb423a99b1730f21238bed" }],
   }]);
-  assert.equal(calls.filter((call) => call.pathname === "/user/tokens").length, 1);
+  assert.equal(calls.filter((call) => call.pathname.startsWith("/user/tokens")).length, 0);
+  assert.ok(calls.some((call) => call.pathname === `${ACCOUNT_TOKEN_PATH}/provisioning-id`));
 });
 
 test("provisions legacy user credentials when the account minter is absent", async () => {
@@ -814,9 +817,9 @@ test("rolls back partially minted account credentials without falling back to us
   assert.deepEqual(
     calls.filter((call) => call.method === "DELETE").map((call) => call.pathname),
     [`${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.worker}`,
-      `${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.frontend_asset}`, "/user/tokens/provisioning-id"],
+      `${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.frontend_asset}`, `${ACCOUNT_TOKEN_PATH}/provisioning-id`],
   );
-  assert.equal(calls.filter((call) => call.pathname === "/user/tokens").length, 1);
+  assert.equal(calls.filter((call) => call.pathname.startsWith("/user/tokens")).length, 0);
 });
 
 test("revokes account credentials by ID and tolerates an already missing token", async () => {
@@ -845,7 +848,7 @@ test("revokes account credentials by ID and tolerates an already missing token",
 
 test("teardown revokes both token types and leaves tokens for other projects alone", async () => {
   const { calls, result } = await withStubbedFetch([
-    ...teardownProjectRoutes(),
+    ...teardownProjectRoutes({ provisioningPath: ACCOUNT_TOKEN_PATH, provisioningBearer: ACCOUNT_MINTER }),
     route("GET", ACCOUNT_TOKEN_PATH, ACCOUNT_MINTER, ({ searchParams }) =>
       jsonResponse(cf(searchParams.get("page") === "1"
         ? Array.from({ length: 50 }, () => ({
@@ -858,11 +861,41 @@ test("teardown revokes both token types and leaves tokens for other projects alo
   ], () => worker.fetch(teardownRequest(), makeEnv({ FN0_ACCOUNT_TOKEN_MINTER: "account-minter" })));
   assert.equal(result.status, 200);
   assert.deepEqual(
-    calls.filter((call) => call.pathname === ACCOUNT_TOKEN_PATH).map((call) => call.searchParams.get("page")),
+    calls.filter((call) => call.method === "GET" && call.pathname === ACCOUNT_TOKEN_PATH).map((call) => call.searchParams.get("page")),
     ["1", "2"],
   );
   const deletes = calls.filter((call) => call.method === "DELETE").map((call) => call.pathname);
   assert.ok(deletes.includes(`${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.worker}`));
   assert.ok(deletes.includes(`/user/tokens/${"w".repeat(32)}`));
   assert.ok(!deletes.includes(`${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.frontend_asset}`));
+});
+
+test("discovers zones at the user token limit and retries a fresh account token", async () => {
+  let zoneRequests = 0;
+  const { calls, result } = await withStubbedFetch([
+    controlAuthorizes(OWNER_GITHUB_ID),
+    route("POST", ACCOUNT_TOKEN_PATH, ACCOUNT_MINTER, ({ body }) => {
+      assert.ok(body.expires_on);
+      assert.deepEqual(body.policies[0].resources, {
+        [`com.cloudflare.api.account.${ACCOUNT_ID}`]: { "com.cloudflare.api.account.zone.*": "*" },
+      });
+      return jsonResponse(cf({ id: "reader-id", value: "reader-token" }));
+    }),
+    route("GET", "/zones", "Bearer reader-token", ({ searchParams }) => {
+      assert.equal(searchParams.get("name"), "example.com");
+      assert.equal(searchParams.get("account.id"), ACCOUNT_ID);
+      zoneRequests += 1;
+      return zoneRequests === 1
+        ? jsonResponse(cfError("Authentication error", 10000), 401)
+        : jsonResponse(cf([{ id: TEST_ZONE, name: "example.com", account: { id: ACCOUNT_ID } }]));
+    }),
+    route("DELETE", `${ACCOUNT_TOKEN_PATH}/reader-id`, ACCOUNT_MINTER, () => jsonResponse(cf({}))),
+  ], () => worker.fetch(
+    makeRequest("/v1/resolve-zone", { zone_name: "example.com" }),
+    makeEnv({ FN0_ACCOUNT_TOKEN_MINTER: "account-minter" }),
+  ));
+  assert.equal(result.status, 200);
+  assert.equal((await result.json()).zone_id, TEST_ZONE);
+  assert.equal(zoneRequests, 2);
+  assert.ok(!calls.some((call) => call.pathname.startsWith("/user/tokens")));
 });

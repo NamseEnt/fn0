@@ -167,8 +167,20 @@ async function cloudflareRequest(setupToken, method, path, body) {
   if (body !== undefined) {
     requestOptions.body = JSON.stringify(body);
   }
-  const response = await fetch(`${API_BASE}${path}`, requestOptions);
-  const payload = await response.json().catch(() => null);
+  let response;
+  let payload;
+  for (const delay of [0, 400, 1000, 2000]) {
+    if (delay) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+    response = await fetch(`${API_BASE}${path}`, requestOptions);
+    payload = await response.json().catch(() => null);
+    const isAuthenticationError =
+      Array.isArray(payload?.errors) && payload.errors.some((error) => error.code === 10000);
+    if (response.status !== 401 || !isAuthenticationError) {
+      break;
+    }
+  }
   if (!response.ok || !payload?.success) {
     const errors = Array.isArray(payload?.errors)
       ? payload.errors
@@ -212,10 +224,10 @@ async function revokeBestEffort(setupToken, tokenId, operation, tokenPath) {
   }
 }
 
-async function withProvisioning(setupToken, accountId, zoneId, purpose, callback) {
+async function withProvisioning(namespace, accountId, zoneId, purpose, callback) {
   const expiresOn = expiresOnMinutesFromNow(PROVISIONING_TOKEN_MINUTES);
   const provisioning = await mintToken(
-    setupToken,
+    namespace.bearer,
     `fn0 setup (${purpose})`,
     [
       {
@@ -236,11 +248,12 @@ async function withProvisioning(setupToken, accountId, zoneId, purpose, callback
       },
     ],
     expiresOn,
+    namespace.path,
   );
   try {
     return await callback(provisioning.value);
   } finally {
-    await revokeBestEffort(setupToken, provisioning.id, purpose);
+    await revokeBestEffort(namespace.bearer, provisioning.id, purpose, namespace.path);
   }
 }
 
@@ -315,23 +328,27 @@ async function setupToken(env) {
   return ensureString(token, "SETUP_TOKEN");
 }
 
-async function resolveZone(setupToken, accountId, body) {
+async function resolveZone(namespace, accountId, body) {
   const zoneName = ensureHostname(ensureString(body.zone_name, "zone_name"));
   const expiresOn = expiresOnMinutesFromNow(PROVISIONING_TOKEN_MINUTES);
   const reader = await mintToken(
-    setupToken,
+    namespace.bearer,
     "fn0 setup (zone discovery)",
     [
       {
         effect: "allow",
-        resources: { "com.cloudflare.api.account.*": "*" },
+        resources: namespace.accountOwned
+          ? { [accountResource(accountId)]: { "com.cloudflare.api.account.zone.*": "*" } }
+          : { "com.cloudflare.api.account.*": "*" },
         permission_groups: [{ id: permissionIds.zoneRead }],
       },
     ],
     expiresOn,
+    namespace.path,
   );
   try {
-    const zones = await cloudflareRequest(reader.value, "GET", "/zones?per_page=200");
+    const query = new URLSearchParams({ name: zoneName, "account.id": accountId, per_page: 200 });
+    const zones = await cloudflareRequest(reader.value, "GET", `/zones?${query}`);
     const matches = (zones ?? []).filter(
       (zone) => zone.name === zoneName && zone.account?.id === accountId,
     );
@@ -349,7 +366,7 @@ async function resolveZone(setupToken, accountId, body) {
       account_name: matches[0].account.name ?? "",
     };
   } finally {
-    await revokeBestEffort(setupToken, reader.id, "zone discovery");
+    await revokeBestEffort(namespace.bearer, reader.id, "zone discovery", namespace.path);
   }
 }
 
@@ -489,11 +506,11 @@ async function ensureWebsockets(token, zoneId) {
   await cloudflareRequest(token, "PATCH", `/zones/${zoneId}/settings/websockets`, { value: "on" });
 }
 
-async function ensureWebsocketsForProject(setupToken, accountId, body) {
+async function ensureWebsocketsForProject(namespace, accountId, body) {
   const projectId = ensureProjectId(ensureString(body.project_id, "project_id"));
   const zoneId = ensureZoneId(ensureString(body.zone_id, "zone_id"));
   return withProvisioning(
-    setupToken,
+    namespace,
     accountId,
     zoneId,
     `WebSockets ${projectId}`,
@@ -604,7 +621,7 @@ async function provisionProject(setupToken, accountId, env, body) {
   const appOrigin = ensureAppOrigin(ensureString(body.app_origin, "app_origin"), appHostname);
   const buckets = bucketNames(projectId);
   const result = await withProvisioning(
-    setupToken,
+    namespace,
     accountId,
     zoneId,
     projectId,
@@ -882,12 +899,12 @@ async function destroyBroker(setupToken, accountId, env) {
   return { ok: true };
 }
 
-async function issueOriginCertificate(setupToken, accountId, body) {
+async function issueOriginCertificate(namespace, accountId, body) {
   const zoneId = ensureZoneId(ensureString(body.zone_id, "zone_id"));
   const hostname = ensureHostname(ensureString(body.hostname, "hostname"));
   const csr = ensureString(body.csr, "csr");
   return withProvisioning(
-    setupToken,
+    namespace,
     accountId,
     zoneId,
     "origin certificate",
@@ -959,7 +976,7 @@ async function ensureAppDnsRecord(token, zoneId, appHostname, originHostname, re
   }
 }
 
-async function finalizeDomain(setupToken, accountId, body) {
+async function finalizeDomain(namespace, accountId, body) {
   const projectId = ensureProjectId(ensureString(body.project_id, "project_id"));
   const zoneId = ensureZoneId(ensureString(body.zone_id, "zone_id"));
   const zoneName = ensureHostname(ensureString(body.zone_name, "zone_name"));
@@ -971,7 +988,7 @@ async function finalizeDomain(setupToken, accountId, body) {
   const appOrigin = `https://${appHostname}`;
   const buckets = bucketNames(projectId);
   return withProvisioning(
-    setupToken,
+    namespace,
     accountId,
     zoneId,
     `domain ${appHostname}`,
@@ -1135,7 +1152,8 @@ async function teardownProject(setupToken, accountId, env, body) {
   const notes = [];
   const pending = [];
 
-  await withProvisioning(setupToken, accountId, zoneId, `teardown ${projectId}`, async (token) => {
+  const namespace = projectTokenNamespace(env, setupToken, accountId);
+  await withProvisioning(namespace, accountId, zoneId, `teardown ${projectId}`, async (token) => {
     const dnsNote = await deleteAppDnsRecord(token, zoneId, appHostname, originHostname);
     if (dnsNote) {
       notes.push(dnsNote);
@@ -1163,8 +1181,8 @@ async function teardownProject(setupToken, accountId, env, body) {
     }
   });
 
-  if (env.FN0_ACCOUNT_TOKEN_MINTER !== undefined) {
-    await revokeProjectCredentialsByName(projectTokenNamespace(env, setupToken, accountId), projectId);
+  if (namespace.accountOwned) {
+    await revokeProjectCredentialsByName(namespace, projectId);
   }
   await revokeProjectCredentialsByName(
     projectTokenNamespace(env, setupToken, accountId, false),
@@ -1202,10 +1220,11 @@ async function handleRequest(request, env) {
   }
   const accountId = ensureString(env.ACCOUNT_ID, "ACCOUNT_ID");
   const setupTokenValue = await setupToken(env);
+  const namespace = () => projectTokenNamespace(env, setupTokenValue, accountId);
 
   if (route === "/v1/resolve-zone") {
     return withAuthorizedRequest(request, env, "resolve_zone", body, async () =>
-      jsonResponse(await resolveZone(setupTokenValue, accountId, body)),
+      jsonResponse(await resolveZone(namespace(), accountId, body)),
     );
   }
   if (route === "/v1/provision-project") {
@@ -1215,17 +1234,17 @@ async function handleRequest(request, env) {
   }
   if (route === "/v1/ensure-websockets") {
     return withAuthorizedRequest(request, env, "ensure_websockets", body, async () =>
-      jsonResponse(await ensureWebsocketsForProject(setupTokenValue, accountId, body)),
+      jsonResponse(await ensureWebsocketsForProject(namespace(), accountId, body)),
     );
   }
   if (route === "/v1/issue-origin-certificate") {
     return withAuthorizedRequest(request, env, "issue_origin_certificate", body, async () =>
-      jsonResponse(await issueOriginCertificate(setupTokenValue, accountId, body)),
+      jsonResponse(await issueOriginCertificate(namespace(), accountId, body)),
     );
   }
   if (route === "/v1/finalize-domain") {
     return withAuthorizedRequest(request, env, "finalize_domain", body, async () =>
-      jsonResponse(await finalizeDomain(setupTokenValue, accountId, body)),
+      jsonResponse(await finalizeDomain(namespace(), accountId, body)),
     );
   }
   if (route === "/v1/revoke-project-credentials") {
