@@ -134,7 +134,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo package -p forte-cli --no-verify
+          cargo package -p forte-cli -p fn0-deploy --no-verify --locked
           package_file=$(find target/package -mindepth 1 -maxdepth 1 -type f -name 'forte-cli-*.crate' -print -quit)
           package_root=$(mktemp -d)
           tar -xzf "$package_file" -C "$package_root"
