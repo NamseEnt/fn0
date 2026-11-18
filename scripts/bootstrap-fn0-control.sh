@@ -136,13 +136,19 @@ if [[ -z "$cf_zone_name" ]]; then
   exit 1
 fi
 
-read -r provisioning_token_id provisioning_token < <(mint_provisioning_token \
-  "$cf_user_token" "$cf_account_id" "$cf_zone_id" "$CONTROL_PROJECT_ID")
-if [[ -z "${provisioning_token_id:-}" || -z "${provisioning_token:-}" ]]; then
-  echo "could not mint a provisioning token; check that cloudflareUserApiToken has User -> API Tokens -> Edit" >&2
+cf_account_minter="$(cd "${REPO_ROOT}/infra/cloud" && pulumi config get cloudflare:apiToken)"
+cf_provisioning_token_path="/accounts/${cf_account_id}/tokens"
+if [[ -z "$cf_account_minter" ]]; then
+  echo "missing Cloudflare account token issuer (cloudflare:apiToken)" >&2
   exit 1
 fi
-trap 'control_db_close; revoke_provisioning_token "$cf_user_token" "$provisioning_token_id"; rm -rf "$work_dir"' EXIT
+read -r provisioning_token_id provisioning_token < <(mint_provisioning_token \
+  "$cf_account_minter" "$cf_account_id" "$cf_zone_id" "$CONTROL_PROJECT_ID" "$cf_provisioning_token_path")
+if [[ -z "${provisioning_token_id:-}" || -z "${provisioning_token:-}" ]]; then
+  echo "could not mint an account-owned provisioning token" >&2
+  exit 1
+fi
+trap 'control_db_close; revoke_provisioning_token "$cf_account_minter" "$provisioning_token_id" "$cf_provisioning_token_path"; rm -rf "$work_dir"' EXIT
 
 provision_control_cloudflare \
   "$cf_account_id" "$provisioning_token" "$cf_zone_id" "$cf_zone_name" "$CONTROL_PROJECT_ID" "$CONTROL_CUSTOM_DOMAIN"

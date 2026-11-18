@@ -355,7 +355,7 @@ impl ObjectStorageHijack {
                     .credentials
                     .presign(R2Presign {
                         path: raw_path,
-                        method: method,
+                        method,
                         expires,
                         content_type: None,
                         content_length,

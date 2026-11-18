@@ -174,7 +174,7 @@ ensure_smart_tiered_cache() {
 # tokens. Cloudflare grants a new token any permission the owning *user* holds,
 # not merely what the creating token holds — which is what makes the split work.
 mint_provisioning_token() {
-  local user_token="$1" account_id="$2" zone_id="$3" purpose="$4"
+  local minter="$1" account_id="$2" zone_id="$3" purpose="$4" token_path="${5:-/user/tokens}"
   local expires body code
   expires="$(python3 -c "import datetime; print((datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=${FN0_PROVISIONING_TOKEN_MINUTES:-15})).strftime('%Y-%m-%dT%H:%M:%SZ'))")"
   body="$(jq -nc \
@@ -201,16 +201,16 @@ mint_provisioning_token() {
          ]}
       ]
     }')"
-  code=$(__cf_call POST "/user/tokens" "$user_token" "$body")
+  code=$(__cf_call POST "$token_path" "$minter" "$body")
   __cf_expect "$code" "mint provisioning token (${purpose})" || return 1
   jq -r '"\(.result.id) \(.result.value)"' < /tmp/__cf_resp.body
 }
 
 # revoke_provisioning_token <user_token> <token_id>
 revoke_provisioning_token() {
-  local user_token="$1" token_id="$2"
+  local minter="$1" token_id="$2" token_path="${3:-/user/tokens}"
   local code
-  code=$(__cf_call DELETE "/user/tokens/${token_id}" "$user_token")
+  code=$(__cf_call DELETE "${token_path}/${token_id}" "$minter")
   if [[ ! "$code" =~ ^2 ]]; then
     echo "warning: could not revoke provisioning token ${token_id} (status=${code}); it expires by itself" >&2
   fi
