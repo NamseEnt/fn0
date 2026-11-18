@@ -188,25 +188,25 @@ function expiresOnMinutesFromNow(minutes) {
   return new Date(Date.now() + minutes * 60_000).toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-async function mintToken(setupToken, name, policies, expiresOn) {
+async function mintToken(setupToken, name, policies, expiresOn, tokenPath = "/user/tokens") {
   const body = { name, policies };
   if (expiresOn) {
     body.expires_on = expiresOn;
   }
-  const result = await cloudflareRequest(setupToken, "POST", "/user/tokens", body);
+  const result = await cloudflareRequest(setupToken, "POST", tokenPath, body);
   if (!result?.id || !result?.value) {
     throw new Error(`Cloudflare did not return the ${name} token`);
   }
   return { id: result.id, value: result.value };
 }
 
-async function revokeToken(setupToken, tokenId) {
-  await cloudflareRequest(setupToken, "DELETE", `/user/tokens/${encodeURIComponent(tokenId)}`);
+async function revokeToken(setupToken, tokenId, tokenPath = "/user/tokens") {
+  await cloudflareRequest(setupToken, "DELETE", `${tokenPath}/${encodeURIComponent(tokenId)}`);
 }
 
-async function revokeBestEffort(setupToken, tokenId, operation) {
+async function revokeBestEffort(setupToken, tokenId, operation, tokenPath) {
   try {
-    await revokeToken(setupToken, tokenId);
+    await revokeToken(setupToken, tokenId, tokenPath);
   } catch (error) {
     console.error(`${operation} token cleanup failed`, error instanceof Error ? error.message : error);
   }
@@ -523,38 +523,59 @@ async function sha256Hex(value) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function mintProjectCredentials(setupToken, accountId, zoneId, projectId, buckets) {
-  const mintedTokenIds = [];
+function projectTokenNamespace(
+  env,
+  userToken,
+  accountId,
+  accountOwned = env.FN0_ACCOUNT_TOKEN_MINTER !== undefined,
+) {
+  if (!accountOwned) {
+    return { bearer: userToken, path: "/user/tokens", accountOwned };
+  }
+  return {
+    bearer: ensureString(env.FN0_ACCOUNT_TOKEN_MINTER, "FN0_ACCOUNT_TOKEN_MINTER"),
+    path: `/accounts/${accountId}/tokens`,
+    accountOwned,
+  };
+}
+
+const projectCredentialNames = {
+  worker: "worker",
+  frontend_asset: "frontend assets",
+  purge: "cache purge",
+};
+
+function projectTokenName(projectId, purpose) {
+  return `fn0 ${projectCredentialNames[purpose]} (${projectId})`;
+}
+
+async function mintProjectCredentials(namespace, accountId, zoneId, projectId, buckets) {
+  const mintedTokenIds = {};
+  const mint = async (purpose, policies) => {
+    const token = await mintToken(
+      namespace.bearer,
+      projectTokenName(projectId, purpose),
+      policies,
+      undefined,
+      namespace.path,
+    );
+    mintedTokenIds[purpose] = token.id;
+    return token;
+  };
   try {
-    const workerToken = await mintToken(
-      setupToken,
-      `fn0 worker (${projectId})`,
-      [
-        bucketScope(accountId, [
-          buckets.privateObjectStorageBucket,
-          buckets.publicObjectStorageBucket,
-        ]),
-      ],
-    );
-    mintedTokenIds.push(workerToken.id);
-    const assetToken = await mintToken(
-      setupToken,
-      `fn0 frontend assets (${projectId})`,
-      [bucketScope(accountId, [buckets.frontendAssetBucket])],
-    );
-    mintedTokenIds.push(assetToken.id);
-    const purgeToken = await mintToken(
-      setupToken,
-      `fn0 cache purge (${projectId})`,
-      [
-        {
-          effect: "allow",
-          resources: { [zoneResource(zoneId)]: "*" },
-          permission_groups: [{ id: permissionIds.cachePurge }],
-        },
-      ],
-    );
-    mintedTokenIds.push(purgeToken.id);
+    const workerToken = await mint("worker", [
+      bucketScope(accountId, [buckets.privateObjectStorageBucket, buckets.publicObjectStorageBucket]),
+    ]);
+    const assetToken = await mint("frontend_asset", [
+      bucketScope(accountId, [buckets.frontendAssetBucket]),
+    ]);
+    const purgeToken = await mint("purge", [
+      {
+        effect: "allow",
+        resources: { [zoneResource(zoneId)]: "*" },
+        permission_groups: [{ id: permissionIds.cachePurge }],
+      },
+    ]);
     return {
       worker_access_key_id: workerToken.id,
       worker_secret: await sha256Hex(workerToken.value),
@@ -562,16 +583,21 @@ async function mintProjectCredentials(setupToken, accountId, zoneId, projectId, 
       frontend_asset_secret: await sha256Hex(assetToken.value),
       purge_token: purgeToken.value,
       minted_token_ids: mintedTokenIds,
+      account_owned_tokens: namespace.accountOwned,
     };
   } catch (error) {
-    for (const tokenId of mintedTokenIds) {
-      await revokeBestEffort(setupToken, tokenId, "project credential");
+    for (const tokenId of Object.values(mintedTokenIds)) {
+      await revokeBestEffort(namespace.bearer, tokenId, "project credential", namespace.path);
     }
     throw error;
   }
 }
 
-async function provisionProject(setupToken, accountId, body) {
+async function provisionProject(setupToken, accountId, env, body) {
+  const namespace = projectTokenNamespace(env, setupToken, accountId);
+  if (namespace.accountOwned && body.accept_account_owned_tokens !== true) {
+    throw new Error("update the Forte CLI before provisioning account-owned project tokens");
+  }
   const projectId = ensureProjectId(ensureString(body.project_id, "project_id"));
   const zoneId = ensureZoneId(ensureString(body.zone_id, "zone_id"));
   const appHostname = ensureHostname(ensureString(body.app_hostname, "app_hostname"));
@@ -610,7 +636,7 @@ async function provisionProject(setupToken, accountId, body) {
       await ensureTieredCache(provisioningToken, zoneId);
       await ensureWebsockets(provisioningToken, zoneId);
       const credentials = await mintProjectCredentials(
-        setupToken,
+        namespace,
         accountId,
         zoneId,
         projectId,
@@ -623,12 +649,7 @@ async function provisionProject(setupToken, accountId, body) {
         private_object_storage_bucket: buckets.privateObjectStorageBucket,
         public_object_storage_bucket: buckets.publicObjectStorageBucket,
         frontend_asset_bucket: buckets.frontendAssetBucket,
-        worker_access_key_id: credentials.worker_access_key_id,
-        worker_secret: credentials.worker_secret,
-        frontend_asset_access_key_id: credentials.frontend_asset_access_key_id,
-        frontend_asset_secret: credentials.frontend_asset_secret,
-        purge_token: credentials.purge_token,
-        minted_token_ids: credentials.minted_token_ids,
+        ...credentials,
       };
     },
   );
@@ -642,26 +663,42 @@ function ensureTokenId(tokenId, fieldName) {
   return tokenId;
 }
 
-async function revokeProjectCredentials(setupToken, body) {
+async function revokeProjectCredentials(setupToken, accountId, env, body) {
   const projectId = ensureProjectId(ensureString(body.project_id, "project_id"));
-  const credentialNames = [
-    ["worker", ensureTokenId(body.worker, "worker")],
-    ["frontend assets", ensureTokenId(body.frontend_asset, "frontend_asset")],
-    ["cache purge", ensureTokenId(body.purge, "purge")],
-  ];
-  const expectedNames = new Set(credentialNames.map(([purpose]) => `fn0 ${purpose} (${projectId})`));
-  for (const [purpose, tokenId] of credentialNames) {
-    const token = await cloudflareRequest(
-      setupToken,
-      "GET",
-      `/user/tokens/${encodeURIComponent(tokenId)}`,
-    );
-    if (!expectedNames.has(token?.name) || token.name !== `fn0 ${purpose} (${projectId})`) {
-      throw new Error(`refusing to revoke an unexpected ${purpose} token`);
-    }
+  if (body.account_owned_tokens !== undefined && typeof body.account_owned_tokens !== "boolean") {
+    throw new Error("invalid account_owned_tokens");
   }
-  for (const [, tokenId] of credentialNames) {
-    await revokeToken(setupToken, tokenId);
+  const namespace = projectTokenNamespace(
+    env,
+    setupToken,
+    accountId,
+    body.account_owned_tokens ?? false,
+  );
+  const tokensToRevoke = [];
+  for (const [purpose, description] of Object.entries(projectCredentialNames)) {
+    const tokenId = ensureTokenId(body[purpose], purpose);
+    let token;
+    try {
+      token = await cloudflareRequest(namespace.bearer, "GET", `${namespace.path}/${tokenId}`);
+    } catch (error) {
+      if (isNotFound(error)) {
+        continue;
+      }
+      throw error;
+    }
+    if (token?.name !== projectTokenName(projectId, purpose)) {
+      throw new Error(`refusing to revoke an unexpected ${description} token`);
+    }
+    tokensToRevoke.push(tokenId);
+  }
+  for (const tokenId of tokensToRevoke) {
+    try {
+      await revokeToken(namespace.bearer, tokenId, namespace.path);
+    } catch (error) {
+      if (!isNotFound(error)) {
+        throw error;
+      }
+    }
   }
   return { ok: true };
 }
@@ -1017,34 +1054,35 @@ async function deleteOriginCertificates(token, zoneId, appHostname) {
   }
 }
 
-async function revokeProjectCredentialsByName(setupToken, projectId) {
+async function revokeProjectCredentialsByName(namespace, projectId) {
   const wanted = new Map(
-    ["worker", "frontend assets", "cache purge"].map((purpose) => [
-      `fn0 ${purpose} (${projectId})`,
-      purpose,
+    Object.entries(projectCredentialNames).map(([purpose, description]) => [
+      projectTokenName(projectId, purpose),
+      description,
     ]),
   );
-  const seen = [];
-  for (let page = 1; page <= 20; page += 1) {
-    const batch =
-      (await cloudflareRequest(setupToken, "GET", `/user/tokens?per_page=50&page=${page}`)) ?? [];
-    seen.push(...batch);
+  const matching = [];
+  for (let page = 1; ; page += 1) {
+    const batch = (await cloudflareRequest(
+      namespace.bearer,
+      "GET",
+      `${namespace.path}?per_page=50&page=${page}`,
+    )) ?? [];
+    matching.push(...batch.filter((token) => wanted.has(token.name)));
     if (batch.length < 50) {
       break;
     }
   }
-  for (const token of seen) {
-    if (wanted.has(token.name)) {
-      try {
-        await revokeToken(setupToken, token.id);
-      } catch (error) {
-        if (!isNotFound(error)) {
-          throw new Error(
-            `${wanted.get(token.name)} token cleanup failed: ${
-              error instanceof Error ? error.message : error
-            }`,
-          );
-        }
+  for (const token of matching) {
+    try {
+      await revokeToken(namespace.bearer, token.id, namespace.path);
+    } catch (error) {
+      if (!isNotFound(error)) {
+        throw new Error(
+          `${wanted.get(token.name)} token cleanup failed: ${
+            error instanceof Error ? error.message : error
+          }`,
+        );
       }
     }
   }
@@ -1080,7 +1118,7 @@ async function deleteBucketShell(token, accountId, bucketName) {
   return `left bucket ${bucketName}: still not empty (teardown is still clearing it) — re-run once it finishes`;
 }
 
-async function teardownProject(setupToken, accountId, body) {
+async function teardownProject(setupToken, accountId, env, body) {
   const projectId = ensureProjectId(ensureString(body.project_id, "project_id"));
   const zoneId = ensureZoneId(ensureString(body.zone_id, "zone_id"));
   const zoneName = ensureHostname(ensureString(body.zone_name, "zone_name"));
@@ -1125,7 +1163,13 @@ async function teardownProject(setupToken, accountId, body) {
     }
   });
 
-  await revokeProjectCredentialsByName(setupToken, projectId);
+  if (env.FN0_ACCOUNT_TOKEN_MINTER !== undefined) {
+    await revokeProjectCredentialsByName(projectTokenNamespace(env, setupToken, accountId), projectId);
+  }
+  await revokeProjectCredentialsByName(
+    projectTokenNamespace(env, setupToken, accountId, false),
+    projectId,
+  );
 
   return { ok: true, notes, pending };
 }
@@ -1166,7 +1210,7 @@ async function handleRequest(request, env) {
   }
   if (route === "/v1/provision-project") {
     return withAuthorizedRequest(request, env, "provision_project", body, async () =>
-      jsonResponse(await provisionProject(setupTokenValue, accountId, body)),
+      jsonResponse(await provisionProject(setupTokenValue, accountId, env, body)),
     );
   }
   if (route === "/v1/ensure-websockets") {
@@ -1186,7 +1230,7 @@ async function handleRequest(request, env) {
   }
   if (route === "/v1/revoke-project-credentials") {
     return withAuthorizedRequest(request, env, "revoke_project_credentials", body, async () =>
-      jsonResponse(await revokeProjectCredentials(setupTokenValue, body)),
+      jsonResponse(await revokeProjectCredentials(setupTokenValue, accountId, env, body)),
     );
   }
   if (route === "/v1/rotate-token") {
@@ -1206,7 +1250,7 @@ async function handleRequest(request, env) {
   }
   if (route === "/v1/teardown-project") {
     return withAuthorizedRequest(request, env, "teardown_project", body, async () =>
-      jsonResponse(await teardownProject(setupTokenValue, accountId, body)),
+      jsonResponse(await teardownProject(setupTokenValue, accountId, env, body)),
     );
   }
 }

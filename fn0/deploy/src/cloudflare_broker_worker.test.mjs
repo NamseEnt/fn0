@@ -44,7 +44,7 @@ function makeFetchStub(routes) {
     const pathname = parsedUrl.pathname.startsWith(CLOUDFLARE_API_PATH_PREFIX)
       ? parsedUrl.pathname.slice(CLOUDFLARE_API_PATH_PREFIX.length)
       : parsedUrl.pathname;
-    const request = { hostname: parsedUrl.hostname, pathname, method, authorization, body };
+    const request = { hostname: parsedUrl.hostname, pathname, searchParams: parsedUrl.searchParams, method, authorization, body };
     calls.push(request);
     for (const route of routes) {
       const response = route(request);
@@ -698,4 +698,171 @@ test("teardown-project reports a bucket that is still not empty", async () => {
   assert.equal(pending.length, 3);
   assert.ok(pending.every((note) => /not empty/.test(note)));
   assert.ok(calls.some((call) => call.method === "DELETE" && call.pathname === "/certificates/cert-id"));
+});
+
+const ACCOUNT_TOKEN_PATH = `/accounts/${ACCOUNT_ID}/tokens`;
+const ACCOUNT_MINTER = "Bearer account-minter";
+const TEST_PROJECT = "abcd1234";
+const TEST_ZONE = "c".repeat(32);
+const CREDENTIAL_IDS = {
+  worker: "a".repeat(32),
+  frontend_asset: "b".repeat(32),
+  purge: "d".repeat(32),
+};
+
+function provisioningRequest(acceptAccountOwned = true) {
+  return makeRequest("/v1/provision-project", {
+    project_id: TEST_PROJECT,
+    zone_id: TEST_ZONE,
+    app_origin: "https://app.example.com",
+    app_hostname: "app.example.com",
+    accept_account_owned_tokens: acceptAccountOwned,
+  });
+}
+
+function projectProvisionRoutes(runtimePath, runtimeBearer, rejectPurge = false) {
+  const runtimeIds = new Map([
+    [`fn0 worker (${TEST_PROJECT})`, CREDENTIAL_IDS.worker],
+    [`fn0 frontend assets (${TEST_PROJECT})`, CREDENTIAL_IDS.frontend_asset],
+    [`fn0 cache purge (${TEST_PROJECT})`, CREDENTIAL_IDS.purge],
+  ]);
+  return [
+    controlAuthorizes(OWNER_GITHUB_ID),
+    route("POST", "/user/tokens", "Bearer setup-token", ({ body }) =>
+      body.expires_on ? jsonResponse(cf({ id: "provisioning-id", value: "provisioning-token" })) : null,
+    ),
+    route("DELETE", "/user/tokens/provisioning-id", "Bearer setup-token", () => jsonResponse(cf({}))),
+    route("GET", `/zones/${TEST_ZONE}`, "Bearer provisioning-token", () =>
+      jsonResponse(cf({ name: "example.com" })),
+    ),
+    route("POST", runtimePath, runtimeBearer, ({ body }) => {
+      const id = runtimeIds.get(body.name);
+      if (!id || body.expires_on) return null;
+      if (rejectPurge && id === CREDENTIAL_IDS.purge) {
+        return jsonResponse(cfError("permission denied"), 403);
+      }
+      return jsonResponse(cf({ id, value: `value-for-${id}` }));
+    }),
+    (request) =>
+      request.method === "DELETE" &&
+      request.authorization === runtimeBearer &&
+      [...runtimeIds.values()].some((id) => request.pathname === `${runtimePath}/${id}`)
+        ? jsonResponse(cf({}))
+        : null,
+    (request) =>
+      request.hostname === "api.cloudflare.com" && request.authorization === "Bearer provisioning-token"
+        ? jsonResponse(cf({}))
+        : null,
+  ];
+}
+
+test("provisions account-owned credentials without expanding their bucket or zone scopes", async () => {
+  const { calls, result } = await withStubbedFetch(
+    projectProvisionRoutes(ACCOUNT_TOKEN_PATH, ACCOUNT_MINTER),
+    () => worker.fetch(provisioningRequest(), makeEnv({ FN0_ACCOUNT_TOKEN_MINTER: "account-minter" })),
+  );
+  assert.equal(result.status, 200);
+  const provisioned = await result.json();
+  assert.equal(provisioned.account_owned_tokens, true);
+  assert.deepEqual(provisioned.minted_token_ids, CREDENTIAL_IDS);
+  assert.equal(provisioned.worker_access_key_id, CREDENTIAL_IDS.worker);
+  assert.match(provisioned.worker_secret, /^[0-9a-f]{64}$/);
+  assert.equal(provisioned.frontend_asset_access_key_id, CREDENTIAL_IDS.frontend_asset);
+  assert.equal(provisioned.purge_token, `value-for-${CREDENTIAL_IDS.purge}`);
+
+  const runtimeCalls = calls.filter((call) => call.pathname === ACCOUNT_TOKEN_PATH);
+  assert.equal(runtimeCalls.length, 3);
+  const [workerMint, assetMint, purgeMint] = runtimeCalls;
+  const bucketKey = (name) => `com.cloudflare.edge.r2.bucket.${ACCOUNT_ID}_default_fn0-${TEST_PROJECT}-${name}`;
+  assert.deepEqual(workerMint.body.policies[0].resources, {
+    [bucketKey("private-object-storage")]: "*",
+    [bucketKey("public-object-storage")]: "*",
+  });
+  assert.deepEqual(assetMint.body.policies[0].resources, { [bucketKey("frontend-asset")]: "*" });
+  assert.deepEqual(purgeMint.body.policies, [{
+    effect: "allow",
+    resources: { [`com.cloudflare.api.account.zone.${TEST_ZONE}`]: "*" },
+    permission_groups: [{ id: "e17beae8b8cb423a99b1730f21238bed" }],
+  }]);
+  assert.equal(calls.filter((call) => call.pathname === "/user/tokens").length, 1);
+});
+
+test("provisions legacy user credentials when the account minter is absent", async () => {
+  const { result } = await withStubbedFetch(projectProvisionRoutes("/user/tokens", "Bearer setup-token"), () =>
+    worker.fetch(provisioningRequest(false), makeEnv()),
+  );
+  assert.equal(result.status, 200);
+  const body = await result.json();
+  assert.equal(body.account_owned_tokens, false);
+  assert.deepEqual(body.minted_token_ids, CREDENTIAL_IDS);
+});
+
+test("requires a client that can clean up account tokens before creating resources", async () => {
+  const { calls, result } = await withStubbedFetch([controlAuthorizes(OWNER_GITHUB_ID)], () =>
+    worker.fetch(provisioningRequest(false), makeEnv({ FN0_ACCOUNT_TOKEN_MINTER: "account-minter" })),
+  );
+  assert.match((await result.json()).error, /update the Forte CLI/);
+  assert.deepEqual(calls.map((call) => call.pathname), ["/__forte_action/cloudflare_broker_authorize"]);
+});
+
+test("rolls back partially minted account credentials without falling back to user tokens", async () => {
+  const { calls, result } = await withStubbedFetch(
+    projectProvisionRoutes(ACCOUNT_TOKEN_PATH, ACCOUNT_MINTER, true),
+    () => worker.fetch(provisioningRequest(), makeEnv({ FN0_ACCOUNT_TOKEN_MINTER: "account-minter" })),
+  );
+  assert.equal(result.status, 500);
+  assert.deepEqual(
+    calls.filter((call) => call.method === "DELETE").map((call) => call.pathname),
+    [`${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.worker}`,
+      `${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.frontend_asset}`, "/user/tokens/provisioning-id"],
+  );
+  assert.equal(calls.filter((call) => call.pathname === "/user/tokens").length, 1);
+});
+
+test("revokes account credentials by ID and tolerates an already missing token", async () => {
+  const request = makeRequest("/v1/revoke-project-credentials", {
+    project_id: TEST_PROJECT,
+    ...CREDENTIAL_IDS,
+    account_owned_tokens: true,
+  });
+  const { calls, result } = await withStubbedFetch([
+    controlAuthorizes(OWNER_GITHUB_ID),
+    route("GET", `${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.worker}`, ACCOUNT_MINTER, () =>
+      jsonResponse(cf({ name: `fn0 worker (${TEST_PROJECT})` }))),
+    route("GET", `${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.frontend_asset}`, ACCOUNT_MINTER, () =>
+      jsonResponse(cfError("token not found"), 404)),
+    route("GET", `${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.purge}`, ACCOUNT_MINTER, () =>
+      jsonResponse(cf({ name: `fn0 cache purge (${TEST_PROJECT})` }))),
+    route("DELETE", `${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.worker}`, ACCOUNT_MINTER, () => jsonResponse(cf({}))),
+    route("DELETE", `${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.purge}`, ACCOUNT_MINTER, () => jsonResponse(cf({}))),
+  ], () => worker.fetch(request, makeEnv({ FN0_ACCOUNT_TOKEN_MINTER: "account-minter" })));
+  assert.equal(result.status, 200);
+  assert.deepEqual(calls.filter((call) => call.method === "DELETE").map((call) => call.pathname), [
+    `${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.worker}`,
+    `${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.purge}`,
+  ]);
+});
+
+test("teardown revokes both token types and leaves tokens for other projects alone", async () => {
+  const { calls, result } = await withStubbedFetch([
+    ...teardownProjectRoutes(),
+    route("GET", ACCOUNT_TOKEN_PATH, ACCOUNT_MINTER, ({ searchParams }) =>
+      jsonResponse(cf(searchParams.get("page") === "1"
+        ? Array.from({ length: 50 }, () => ({
+            id: CREDENTIAL_IDS.frontend_asset,
+            name: "fn0 frontend assets (other123)",
+          }))
+        : [{ id: CREDENTIAL_IDS.worker, name: `fn0 worker (${TEARDOWN_PROJECT_ID})` }])),
+    ),
+    route("DELETE", `${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.worker}`, ACCOUNT_MINTER, () => jsonResponse(cf({}))),
+  ], () => worker.fetch(teardownRequest(), makeEnv({ FN0_ACCOUNT_TOKEN_MINTER: "account-minter" })));
+  assert.equal(result.status, 200);
+  assert.deepEqual(
+    calls.filter((call) => call.pathname === ACCOUNT_TOKEN_PATH).map((call) => call.searchParams.get("page")),
+    ["1", "2"],
+  );
+  const deletes = calls.filter((call) => call.method === "DELETE").map((call) => call.pathname);
+  assert.ok(deletes.includes(`${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.worker}`));
+  assert.ok(deletes.includes(`/user/tokens/${"w".repeat(32)}`));
+  assert.ok(!deletes.includes(`${ACCOUNT_TOKEN_PATH}/${CREDENTIAL_IDS.frontend_asset}`));
 });

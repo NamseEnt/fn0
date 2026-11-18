@@ -123,8 +123,7 @@ pub async fn init(
             println!("  provisioning your Cloudflare account through the setup broker...");
             let resources = provision_and_connect(&setup).await?;
             print_resources(&resources);
-            println!("  minted two bucket-scoped R2 tokens and a purge-only token");
-            println!("  connected");
+            println!("  connected scoped storage and cache purge credentials");
         }
         CloudflareConnection::Connected { .. } => {
             println!("  Cloudflare account already connected");

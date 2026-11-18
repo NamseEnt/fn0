@@ -115,6 +115,7 @@ pub struct MintedCredentialIds {
     pub worker: String,
     pub frontend_asset: String,
     pub purge: String,
+    pub account_owned_tokens: bool,
 }
 
 pub struct IssuedCertificate {

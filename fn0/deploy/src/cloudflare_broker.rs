@@ -82,13 +82,38 @@ struct BrokerProvisionResponse {
     frontend_asset_secret: String,
     purge_token: String,
     minted_token_ids: MintedCredentialIdsResponse,
+    #[serde(default)]
+    account_owned_tokens: bool,
 }
 
 #[derive(Debug, Deserialize)]
-struct MintedCredentialIdsResponse {
-    worker: String,
-    frontend_asset: String,
-    purge: String,
+#[serde(untagged)]
+enum MintedCredentialIdsResponse {
+    Named {
+        worker: String,
+        frontend_asset: String,
+        purge: String,
+    },
+    Ordered([String; 3]),
+}
+
+impl MintedCredentialIdsResponse {
+    fn into_ids(self, account_owned_tokens: bool) -> MintedCredentialIds {
+        let (worker, frontend_asset, purge) = match self {
+            Self::Named {
+                worker,
+                frontend_asset,
+                purge,
+            }
+            | Self::Ordered([worker, frontend_asset, purge]) => (worker, frontend_asset, purge),
+        };
+        MintedCredentialIds {
+            worker,
+            frontend_asset,
+            purge,
+            account_owned_tokens,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -97,6 +122,7 @@ struct ProvisionProjectInput<'a> {
     zone_id: &'a str,
     app_origin: &'a str,
     app_hostname: &'a str,
+    accept_account_owned_tokens: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -134,6 +160,7 @@ struct RevokeProjectCredentialsInput<'a> {
     worker: &'a str,
     frontend_asset: &'a str,
     purge: &'a str,
+    account_owned_tokens: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -393,6 +420,7 @@ impl BrokerClient {
                     zone_id,
                     app_origin,
                     app_hostname,
+                    accept_account_owned_tokens: true,
                 },
                 true,
             )
@@ -413,11 +441,9 @@ impl BrokerClient {
                 frontend_asset_secret: response.frontend_asset_secret,
                 purge_token: response.purge_token,
             },
-            minted: MintedCredentialIds {
-                worker: response.minted_token_ids.worker,
-                frontend_asset: response.minted_token_ids.frontend_asset,
-                purge: response.minted_token_ids.purge,
-            },
+            minted: response
+                .minted_token_ids
+                .into_ids(response.account_owned_tokens),
         })
     }
 
@@ -505,6 +531,7 @@ impl BrokerClient {
                 worker: &ids.worker,
                 frontend_asset: &ids.frontend_asset,
                 purge: &ids.purge,
+                account_owned_tokens: ids.account_owned_tokens,
             },
         )
         .await
@@ -950,6 +977,7 @@ async fn upload_worker(
     let metadata = serde_json::json!({
         "main_module": "index.mjs",
         "compatibility_date": WORKER_COMPATIBILITY_DATE,
+        "keep_bindings": ["secret_text", "secret_key"],
         "bindings": [
             {
                 "type": "secrets_store_secret",
@@ -1184,6 +1212,82 @@ mod tests {
             control_token: "control-token".to_string(),
             account_id: ACCOUNT_ID.to_string(),
         }
+    }
+
+    #[tokio::test]
+    async fn provisions_account_tokens_and_revokes_them_in_the_same_namespace() {
+        install_crypto_provider();
+        let broker = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/provision-project"))
+            .and(body_json(json!({
+                "project_id": "abcd1234",
+                "zone_id": "zone",
+                "app_origin": "https://app.example.com",
+                "app_hostname": "app.example.com",
+                "accept_account_owned_tokens": true
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "zone_name": "example.com",
+                "frontend_asset_hostname": "assets.example.com",
+                "public_object_storage_hostname": "public.example.com",
+                "private_object_storage_bucket": "private",
+                "public_object_storage_bucket": "public",
+                "frontend_asset_bucket": "assets",
+                "worker_access_key_id": "worker-id",
+                "worker_secret": "worker-secret",
+                "frontend_asset_access_key_id": "asset-id",
+                "frontend_asset_secret": "asset-secret",
+                "purge_token": "purge-token",
+                "minted_token_ids": {
+                    "worker": "worker-id",
+                    "frontend_asset": "asset-id",
+                    "purge": "purge-id"
+                },
+                "account_owned_tokens": true
+            })))
+            .expect(1)
+            .mount(&broker)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/v1/revoke-project-credentials"))
+            .and(body_json(json!({
+                "project_id": "abcd1234",
+                "worker": "worker-id",
+                "frontend_asset": "asset-id",
+                "purge": "purge-id",
+                "account_owned_tokens": true
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "ok": true })))
+            .expect(1)
+            .mount(&broker)
+            .await;
+        let client = broker_client_for_test(broker.uri());
+        let project = client
+            .provision_project(
+                "abcd1234",
+                "zone",
+                "https://app.example.com",
+                "app.example.com",
+            )
+            .await
+            .unwrap();
+        assert!(project.minted.account_owned_tokens);
+        client
+            .revoke_project_credentials("abcd1234", &project.minted)
+            .await
+            .unwrap();
+    }
+
+    #[test]
+    fn accepts_legacy_ordered_credentials() {
+        let ids: super::MintedCredentialIdsResponse =
+            serde_json::from_value(json!(["worker-id", "asset-id", "purge-id"])).unwrap();
+        let result = ids.into_ids(false);
+        assert_eq!(result.worker, "worker-id");
+        assert_eq!(result.frontend_asset, "asset-id");
+        assert_eq!(result.purge, "purge-id");
+        assert!(!result.account_owned_tokens);
     }
 
     async fn mount_verify(cloudflare: &MockServer, status: &str) {
@@ -1480,6 +1584,9 @@ mod tests {
         Mock::given(method("PUT"))
             .and(path(
                 "/accounts/0123456789abcdef0123456789abcdef/workers/scripts/fn0-broker",
+            ))
+            .and(body_string_contains(
+                r#""keep_bindings":["secret_text","secret_key"]"#,
             ))
             .respond_with(ResponseTemplate::new(200).set_body_json(envelope(json!({}))))
             .mount(&cloudflare)

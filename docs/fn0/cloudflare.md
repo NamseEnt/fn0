@@ -88,6 +88,38 @@ clear` removes it without replacing it; `forte cloud destroy` removes the
 whole broker, token included. See [`forte cloud`](../forte/cli.md#forte-cloud-login)
 for all three.
 
+### Use Account API Tokens for new projects
+
+Cloudflare's default limits are 50 User API Tokens per user and 500 Account
+API Tokens per account. To shift new projects to the account quota:
+
+1. Install or republish the `fn0-broker` Worker with the updated Forte CLI. For
+   an existing broker, `forte cloud rotate` republishes it.
+2. In **Manage Account → Account API Tokens**, create an account-owned token
+   with **Account API Tokens → Edit** on this account. It must be able to list
+   and revoke the account tokens it manages.
+3. In **Workers & Pages → fn0-broker → Settings → Variables and Secrets**, add
+   that token as a secret named `FN0_ACCOUNT_TOKEN_MINTER` and deploy the change.
+
+New `forte cloud init` runs then mint the worker R2, frontend R2, and
+zone-scoped cache purge credentials as **Account API Tokens**. Ten new
+projects use 31 long-lived Account API Tokens, including the broker's
+account-token minter. The broker still uses its one User API Token and
+temporarily issues User API Tokens for provisioning.
+
+Existing projects continue to use their original credentials.
+`forte destroy` looks for the project's credentials in both namespaces when
+the account-token minter is configured. Keep the secret available for cleanup
+and make sure any replacement can revoke the previous minter's project tokens.
+If the secret is removed, restore it before destroying account-token projects.
+Republishing the Worker retains the secret. Destroying the broker removes the
+Worker and its secret. The account-token minter itself stays in Cloudflare
+until you revoke it from the account's API Tokens page.
+Without the secret, new projects use User API Tokens.
+
+[Cloudflare token quotas](https://developers.cloudflare.com/fundamentals/api/reference/limits/) ·
+[Cloudflare account-owned tokens](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
+
 ## AI-assisted setup
 
 `forte cloud login --setup-token-from-clipboard` and `forte cloud rotate
