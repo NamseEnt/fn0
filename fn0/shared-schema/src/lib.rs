@@ -32,22 +32,16 @@ pub struct WorkerProjectManifest {
     pub storage: Option<WorkerProjectStorage>,
 }
 
-/// One R2 token as it travels to the worker: the key id in the clear, the
-/// secret only as KMS ciphertext, so a leaked manifest row is not a usable
-/// credential.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct WorkerR2Credential {
     pub access_key_id: String,
     pub secret_ciphertext: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub broker_url: Option<String>,
 }
 
 /// Where one project's objects live, as the worker sees it.
 ///
-/// One credential, scoped to exactly the three buckets named here. The
-/// frontend-asset bucket is deliberately outside it: nothing in the worker
-/// serves assets — the CDN does, straight off the bucket — so a fleet-wide
-/// credential able to rewrite a deployed frontend would be reach with no use
-/// for it.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct WorkerProjectStorage {
     pub account_id: String,

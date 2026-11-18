@@ -17,7 +17,7 @@ use fn0::{
     ObjectStorageResolver, PrivateObjectStorageTarget, PublicStorageResolver, PublicStorageTarget,
     R2Credentials,
 };
-use fn0_shared_schema::{WorkerProjectStorage, WorkerR2Credential};
+use fn0_shared_schema::WorkerProjectStorage;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -55,7 +55,7 @@ impl ManifestStorageResolver {
             {
                 continue;
             }
-            match self.build(storage).await {
+            match self.build(project_id, storage).await {
                 Ok(targets) => {
                     self.projects.insert((*project_id).clone(), targets);
                 }
@@ -81,16 +81,40 @@ impl ManifestStorageResolver {
             .retain(|ciphertext, _| live_ciphertexts.contains(ciphertext.as_str()));
     }
 
-    async fn build(&self, storage: &WorkerProjectStorage) -> anyhow::Result<ProjectTargets> {
-        let credentials = self.credentials(storage, &storage.credential).await?;
+    async fn build(
+        &self,
+        project_id: &str,
+        storage: &WorkerProjectStorage,
+    ) -> anyhow::Result<ProjectTargets> {
+        let credential = &storage.credential;
+        let secret = self.secret(&credential.secret_ciphertext).await?;
+        let credentials_for = |bucket: &str| {
+            if let Some(broker_url) = &credential.broker_url {
+                R2Credentials::for_broker(
+                    &storage.account_id,
+                    storage.region.clone(),
+                    broker_url,
+                    project_id,
+                    bucket,
+                    &secret,
+                )
+            } else {
+                R2Credentials::for_account(
+                    &storage.account_id,
+                    storage.region.clone(),
+                    credential.access_key_id.clone(),
+                    secret.clone(),
+                )
+            }
+        };
         Ok(ProjectTargets {
             config_version: storage.config_version,
             private_object_storage: Arc::new(PrivateObjectStorageTarget {
-                credentials: credentials.clone(),
+                credentials: credentials_for(&storage.private_object_storage_bucket),
                 bucket: storage.private_object_storage_bucket.clone(),
             }),
             public_object_storage: Arc::new(PublicStorageTarget {
-                credentials,
+                credentials: credentials_for(&storage.public_object_storage_bucket),
                 bucket: storage.public_object_storage_bucket.clone(),
                 base_url: storage
                     .public_object_storage_base_url
@@ -98,19 +122,6 @@ impl ManifestStorageResolver {
                     .to_string(),
             }),
         })
-    }
-
-    async fn credentials(
-        &self,
-        storage: &WorkerProjectStorage,
-        credential: &WorkerR2Credential,
-    ) -> anyhow::Result<R2Credentials> {
-        Ok(R2Credentials::for_account(
-            &storage.account_id,
-            storage.region.clone(),
-            credential.access_key_id.clone(),
-            self.secret(&credential.secret_ciphertext).await?,
-        ))
     }
 
     async fn secret(&self, ciphertext: &str) -> anyhow::Result<String> {

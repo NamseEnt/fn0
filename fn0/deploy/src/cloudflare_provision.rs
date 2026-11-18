@@ -109,6 +109,7 @@ pub struct ConnectCredentials {
     pub frontend_asset_access_key_id: String,
     pub frontend_asset_secret: String,
     pub purge_token: String,
+    pub runtime_broker_url: Option<String>,
 }
 
 pub struct MintedCredentialIds {

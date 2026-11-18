@@ -11,14 +11,97 @@
 //! machine with a token fn0 never receives. What is left here is object access
 //! to three buckets, split across two credentials, and cache purge on one zone.
 
-use crate::common::cloudflare::CloudflareClient;
+use crate::common::cloudflare::{CachePurgeFile, CloudflareClient};
+use crate::common::r2_runtime::{RuntimeGrant, SessionCache};
 use crate::common::vault;
 use crate::docs::*;
 use forte_sdk::*;
 
+#[derive(Clone)]
 pub struct R2Keys {
     pub access_key_id: String,
     pub secret_access_key: String,
+    pub session_token: Option<String>,
+}
+
+#[derive(Clone)]
+pub enum R2KeySource {
+    Fixed(R2Keys),
+    Runtime(SessionCache),
+}
+
+impl R2KeySource {
+    pub fn new(
+        broker_url: Option<&str>,
+        project_id: &str,
+        access_key_id: String,
+        secret: String,
+    ) -> anyhow::Result<Self> {
+        Ok(match broker_url {
+            Some(url) => Self::Runtime(RuntimeGrant::new(url, project_id, secret)?.storage()),
+            None => Self::Fixed(R2Keys {
+                access_key_id,
+                secret_access_key: secret,
+                session_token: None,
+            }),
+        })
+    }
+
+    pub async fn for_bucket(&self, bucket: &str, validity: i64) -> anyhow::Result<R2Keys> {
+        match self {
+            Self::Fixed(keys) => Ok(keys.clone()),
+            Self::Runtime(provider) => {
+                let session = provider.lease(bucket, validity).await?;
+                Ok(R2Keys {
+                    access_key_id: session.access_key_id,
+                    secret_access_key: session.secret_access_key,
+                    session_token: Some(session.session_token),
+                })
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum ProjectPurge {
+    Fixed(CloudflareClient),
+    Runtime(RuntimeGrant),
+}
+
+impl ProjectPurge {
+    pub fn new(
+        broker_url: Option<&str>,
+        project_id: &str,
+        token: String,
+        account_id: String,
+        zone_id: String,
+    ) -> anyhow::Result<Self> {
+        Ok(match broker_url {
+            Some(url) => Self::Runtime(RuntimeGrant::new(url, project_id, token)?),
+            None => Self::Fixed(CloudflareClient::for_zone(token, account_id, zone_id)),
+        })
+    }
+
+    pub async fn verify_token(&self) -> anyhow::Result<()> {
+        match self {
+            Self::Fixed(client) => client.verify_token().await.map(|_| ()),
+            Self::Runtime(grant) => grant.verify_purge().await,
+        }
+    }
+
+    pub async fn purge_cache_urls(&self, files: &[CachePurgeFile]) -> anyhow::Result<()> {
+        match self {
+            Self::Fixed(client) => client.purge_cache_urls(files).await,
+            Self::Runtime(grant) => grant.purge_files(files).await,
+        }
+    }
+
+    pub async fn purge_cache_tags(&self, tags: &[&str]) -> anyhow::Result<()> {
+        match self {
+            Self::Fixed(client) => client.purge_cache_tags(tags).await,
+            Self::Runtime(grant) => grant.purge_tags(tags).await,
+        }
+    }
 }
 
 /// Everything an operation needs to reach one project's objects.
@@ -33,8 +116,9 @@ pub struct ProjectStorage {
     pub private_object_storage_bucket: String,
     pub public_object_storage_bucket: String,
     pub frontend_asset_bucket: String,
-    pub worker_keys: R2Keys,
-    pub frontend_asset_keys: R2Keys,
+    pub worker_keys: R2KeySource,
+    pub frontend_asset_keys: R2KeySource,
+    purge: ProjectPurge,
     pub connection: Connection,
 }
 
@@ -44,7 +128,6 @@ pub struct Connection {
     pub frontend_asset_hostname: String,
     pub public_object_storage_hostname: String,
     /// Cache purge on `zone_id` only.
-    pub purge_token: String,
     pub config_version: u64,
 }
 
@@ -92,38 +175,44 @@ impl ProjectStorage {
         .await?;
         let purge_token = decrypt(config.purge_token_ciphertext, "purge token").await?;
 
+        let broker_url = config.runtime_broker_url.as_deref();
+        let purge = ProjectPurge::new(
+            broker_url,
+            &config.project_id,
+            purge_token,
+            config.account_id.clone(),
+            config.zone_id.clone(),
+        )?;
         Ok(Self {
             account_id: config.account_id,
             private_object_storage_bucket: config.private_object_storage_bucket,
             public_object_storage_bucket: config.public_object_storage_bucket,
             frontend_asset_bucket: config.frontend_asset_bucket,
-            worker_keys: R2Keys {
-                access_key_id: config.worker_access_key_id,
-                secret_access_key: worker_secret,
-            },
-            frontend_asset_keys: R2Keys {
-                access_key_id: config.frontend_asset_access_key_id,
-                secret_access_key: frontend_asset_secret,
-            },
+            worker_keys: R2KeySource::new(
+                broker_url,
+                &config.project_id,
+                config.worker_access_key_id,
+                worker_secret,
+            )?,
+            frontend_asset_keys: R2KeySource::new(
+                broker_url,
+                &config.project_id,
+                config.frontend_asset_access_key_id,
+                frontend_asset_secret,
+            )?,
+            purge,
             connection: Connection {
                 zone_id: config.zone_id,
                 zone_name: config.zone_name,
                 frontend_asset_hostname: config.frontend_asset_hostname,
                 public_object_storage_hostname: config.public_object_storage_hostname,
-                purge_token,
                 config_version: config.config_version,
             },
         })
     }
 
-    /// A client that can purge this project's zone and nothing else. The
-    /// Cloudflare API refuses this token for every other call, R2 included.
-    pub fn purge_client(&self) -> CloudflareClient {
-        CloudflareClient::for_zone(
-            self.connection.purge_token.clone(),
-            self.account_id.clone(),
-            self.connection.zone_id.clone(),
-        )
+    pub fn purge_client(&self) -> ProjectPurge {
+        self.purge.clone()
     }
 
     /// Where a project's deployed frontend assets are fetched from, which the
@@ -144,6 +233,7 @@ pub fn worker_storage_for(config: &ProjectCloudflareConfigDoc) -> WorkerProjectS
         credential: WorkerR2Credential {
             access_key_id: config.worker_access_key_id.clone(),
             secret_ciphertext: config.worker_secret_ciphertext.clone(),
+            broker_url: config.runtime_broker_url.clone(),
         },
         private_object_storage_bucket: config.private_object_storage_bucket.clone(),
         public_object_storage_bucket: config.public_object_storage_bucket.clone(),

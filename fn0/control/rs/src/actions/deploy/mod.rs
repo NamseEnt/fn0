@@ -1,6 +1,8 @@
 use crate::common::auth;
 use crate::common::aws_sign;
 use crate::common::byoc::ProjectStorage;
+use crate::common::byoc::R2KeySource;
+use crate::common::r2_runtime::AssetPresign;
 use crate::docs::*;
 use crate::quota;
 use forte_sdk::*;
@@ -174,33 +176,67 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     let static_uploads = if req.body.files.is_empty() {
         Vec::new()
     } else {
-        let now_dt = forte_sdk::now();
         let cache_control = req
             .body
             .supports_static_asset_cache_control
             .then_some(STATIC_ASSET_CACHE_CONTROL);
+        let asset_bucket = &storage.frontend_asset_bucket;
+        let urls = match &storage.frontend_asset_keys {
+            R2KeySource::Fixed(keys) => {
+                let now_dt = forte_sdk::now();
+                req.body
+                    .files
+                    .iter()
+                    .map(|file| {
+                        let key = format!("{code_version}/{}", file.path);
+                        aws_sign::r2_presign_put(aws_sign::R2PresignArgs {
+                            account_id: &storage.account_id,
+                            bucket: asset_bucket,
+                            region: "auto",
+                            key: &key,
+                            access_key_id: &keys.access_key_id,
+                            secret_access_key: &keys.secret_access_key,
+                            expires_seconds: 600,
+                            now: now_dt,
+                            content_length: Some(file.size),
+                            cache_control,
+                        })
+                    })
+                    .collect()
+            }
+            R2KeySource::Runtime(broker) => {
+                let requests: Vec<_> = req
+                    .body
+                    .files
+                    .iter()
+                    .map(|file| AssetPresign {
+                        key: format!("{code_version}/{}", file.path),
+                        method: "PUT",
+                        expires_seconds: 600,
+                        content_length: file.size.to_string(),
+                        cache_assets: cache_control.is_some(),
+                    })
+                    .collect();
+                match broker
+                    .presign_assets(&storage.account_id, asset_bucket, &requests)
+                    .await
+                {
+                    Ok(urls) => urls,
+                    Err(error) => {
+                        tracing::error!(%error, "deploy broker could not presign assets");
+                        return Output::InternalError;
+                    }
+                }
+            }
+        };
         req.body
             .files
             .iter()
-            .map(|f| {
-                let key = format!("{}/{}", code_version, f.path);
-                let url = aws_sign::r2_presign_put(aws_sign::R2PresignArgs {
-                    account_id: &storage.account_id,
-                    bucket: &storage.frontend_asset_bucket,
-                    region: "auto",
-                    key: &key,
-                    access_key_id: &storage.frontend_asset_keys.access_key_id,
-                    secret_access_key: &storage.frontend_asset_keys.secret_access_key,
-                    expires_seconds: 600,
-                    now: now_dt,
-                    content_length: Some(f.size),
-                    cache_control,
-                });
-                StaticUpload {
-                    path: f.path.clone(),
-                    presigned_url: url,
-                    cache_control: cache_control.unwrap_or_default().to_string(),
-                }
+            .zip(urls)
+            .map(|(file, url)| StaticUpload {
+                path: file.path.clone(),
+                presigned_url: url,
+                cache_control: cache_control.unwrap_or_default().to_string(),
             })
             .collect()
     };

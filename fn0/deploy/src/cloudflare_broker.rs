@@ -81,9 +81,11 @@ struct BrokerProvisionResponse {
     frontend_asset_access_key_id: String,
     frontend_asset_secret: String,
     purge_token: String,
-    minted_token_ids: MintedCredentialIdsResponse,
+    minted_token_ids: Option<MintedCredentialIdsResponse>,
     #[serde(default)]
     account_owned_tokens: bool,
+    #[serde(default)]
+    runtime_sessions: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -123,6 +125,8 @@ struct ProvisionProjectInput<'a> {
     app_origin: &'a str,
     app_hostname: &'a str,
     accept_account_owned_tokens: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    accept_runtime_sessions: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -411,6 +415,7 @@ impl BrokerClient {
         zone_id: &str,
         app_origin: &str,
         app_hostname: &str,
+        runtime_sessions: bool,
     ) -> Result<BrokerProvisioned> {
         let response: BrokerProvisionResponse = self
             .post_json(
@@ -421,10 +426,25 @@ impl BrokerClient {
                     app_origin,
                     app_hostname,
                     accept_account_owned_tokens: true,
+                    accept_runtime_sessions: runtime_sessions.then_some(true),
                 },
                 true,
             )
             .await?;
+        let minted = response
+            .minted_token_ids
+            .map(|ids| ids.into_ids(response.account_owned_tokens));
+        if response.runtime_sessions != runtime_sessions {
+            if let Some(ids) = &minted {
+                self.revoke_project_credentials(project_id, ids).await?;
+            }
+            return Err(anyhow!(
+                "the broker did not return the requested credential mode"
+            ));
+        }
+        if !runtime_sessions && minted.is_none() {
+            return Err(anyhow!("the broker did not return legacy credential ids"));
+        }
         Ok(BrokerProvisioned {
             resources: ProvisionedResources {
                 zone_name: response.zone_name,
@@ -440,10 +460,9 @@ impl BrokerClient {
                 frontend_asset_access_key_id: response.frontend_asset_access_key_id,
                 frontend_asset_secret: response.frontend_asset_secret,
                 purge_token: response.purge_token,
+                runtime_broker_url: response.runtime_sessions.then(|| self.base_url.clone()),
             },
-            minted: response
-                .minted_token_ids
-                .into_ids(response.account_owned_tokens),
+            minted,
         })
     }
 
@@ -631,7 +650,7 @@ impl BrokerClient {
 pub struct BrokerProvisioned {
     pub resources: ProvisionedResources,
     pub credentials: ConnectCredentials,
-    pub minted: MintedCredentialIds,
+    pub minted: Option<MintedCredentialIds>,
 }
 
 /// Confirms the token is live and returns its own Cloudflare token id, which
@@ -965,6 +984,42 @@ async fn ensure_setup_secret(
     Ok(())
 }
 
+async fn broker_has_runtime_namespace(
+    client: &reqwest::Client,
+    cloudflare_api_base: &str,
+    account_id: &str,
+    token: &str,
+) -> Result<bool> {
+    #[derive(Deserialize)]
+    struct Binding {
+        name: String,
+    }
+
+    #[derive(Deserialize)]
+    struct Settings {
+        bindings: Vec<Binding>,
+    }
+
+    let response = client
+        .get(format!(
+            "{cloudflare_api_base}/accounts/{account_id}/workers/scripts/{BROKER_SCRIPT_NAME}/settings"
+        ))
+        .bearer_auth(token)
+        .send()
+        .await?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(false);
+    }
+    let settings: CloudflareEnvelope<Settings> = response.error_for_status()?.json().await?;
+    let settings = settings
+        .result
+        .ok_or_else(|| anyhow!("Cloudflare did not return broker settings"))?;
+    Ok(settings
+        .bindings
+        .iter()
+        .any(|binding| binding.name == "RUNTIME_PROJECTS"))
+}
+
 async fn upload_worker(
     client: &reqwest::Client,
     cloudflare_api_base: &str,
@@ -974,7 +1029,10 @@ async fn upload_worker(
     store_id: &str,
     owner_github_id: i64,
 ) -> Result<()> {
-    let metadata = serde_json::json!({
+    let installed_namespace =
+        broker_has_runtime_namespace(client, cloudflare_api_base, account_id, token).await?;
+    let enable_runtime = std::env::var("FORTE_EXPERIMENTAL_R2_SESSIONS").as_deref() == Ok("1");
+    let mut metadata = serde_json::json!({
         "main_module": "index.mjs",
         "compatibility_date": WORKER_COMPATIBILITY_DATE,
         "keep_bindings": ["secret_text", "secret_key"],
@@ -1007,6 +1065,22 @@ async fn upload_worker(
             },
         ],
     });
+    if installed_namespace || enable_runtime {
+        metadata["bindings"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "type": "durable_object_namespace",
+                "name": "RUNTIME_PROJECTS",
+                "class_name": "RuntimeProject",
+            }));
+        if !installed_namespace {
+            metadata["migrations"] = serde_json::json!({
+                "new_tag": "runtime-projects-v1",
+                "new_sqlite_classes": ["RuntimeProject"],
+            });
+        }
+    }
     let metadata_part = Part::text(metadata.to_string()).mime_str("application/json")?;
     // "+module", not plain "application/javascript": Cloudflare parses a part
     // without it as the old service-worker script format and chokes on this
@@ -1269,12 +1343,14 @@ mod tests {
                 "zone",
                 "https://app.example.com",
                 "app.example.com",
+                false,
             )
             .await
             .unwrap();
-        assert!(project.minted.account_owned_tokens);
+        let minted = project.minted.unwrap();
+        assert!(minted.account_owned_tokens);
         client
-            .revoke_project_credentials("abcd1234", &project.minted)
+            .revoke_project_credentials("abcd1234", &minted)
             .await
             .unwrap();
     }

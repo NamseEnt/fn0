@@ -175,6 +175,25 @@ fn r2_host(bucket: &str, account_id: &str) -> String {
     format!("{bucket}.{account_id}.r2.cloudflarestorage.com")
 }
 
+fn r2_signed_headers(
+    host: &str,
+    amz_date: &str,
+    session_token: Option<&str>,
+) -> (String, &'static str) {
+    let mut headers =
+        format!("host:{host}\nx-amz-content-sha256:{EMPTY_PAYLOAD_HASH}\nx-amz-date:{amz_date}\n");
+    match session_token {
+        Some(session) => {
+            headers.push_str(&format!("x-amz-security-token:{session}\n"));
+            (
+                headers,
+                "host;x-amz-content-sha256;x-amz-date;x-amz-security-token",
+            )
+        }
+        None => (headers, "host;x-amz-content-sha256;x-amz-date"),
+    }
+}
+
 pub struct R2ObjectRef<'a> {
     pub account_id: &'a str,
     pub bucket: &'a str,
@@ -182,6 +201,7 @@ pub struct R2ObjectRef<'a> {
     pub key: &'a str,
     pub access_key_id: &'a str,
     pub secret_access_key: &'a str,
+    pub session_token: Option<&'a str>,
     pub now: DateTime,
 }
 
@@ -193,9 +213,8 @@ pub async fn r2_delete_object(args: R2ObjectRef<'_>) -> anyhow::Result<()> {
     let credential_scope = format!("{date}/{}/s3/aws4_request", args.region);
     let credential = format!("{}/{credential_scope}", args.access_key_id);
 
-    let canonical_headers =
-        format!("host:{host}\nx-amz-content-sha256:{EMPTY_PAYLOAD_HASH}\nx-amz-date:{amz_date}\n");
-    let signed_headers = "host;x-amz-content-sha256;x-amz-date";
+    let (canonical_headers, signed_headers) =
+        r2_signed_headers(&host, &amz_date, args.session_token);
     let canonical_request = format!(
         "DELETE\n{canonical_uri}\n\n{canonical_headers}\n{signed_headers}\n{EMPTY_PAYLOAD_HASH}",
     );
@@ -210,17 +229,21 @@ pub async fn r2_delete_object(args: R2ObjectRef<'_>) -> anyhow::Result<()> {
     );
 
     let url = format!("https://{host}{canonical_uri}");
-    let request = http::Request::builder()
+    let mut request = http::Request::builder()
         .method("DELETE")
         .uri(&url)
         .header("Authorization", auth)
         .header("x-amz-content-sha256", EMPTY_PAYLOAD_HASH)
-        .header("x-amz-date", amz_date)
-        .body(Vec::<u8>::new())?;
+        .header("x-amz-date", amz_date);
+    if let Some(session_token) = args.session_token {
+        request = request.header("x-amz-security-token", session_token);
+    }
+    let request = request.body(Vec::<u8>::new())?;
 
     let resp = http::Client::new().send(request).await?;
     let status = resp.status();
     if !status.is_success() {
+        anyhow::ensure!(args.session_token.is_none(), "r2 delete {status}");
         let body = resp.into_body().bytes().await?;
         anyhow::bail!("r2 delete {}: {}", status, String::from_utf8_lossy(&body));
     }
@@ -235,6 +258,7 @@ pub struct R2ListArgs<'a> {
     pub continuation_token: Option<&'a str>,
     pub access_key_id: &'a str,
     pub secret_access_key: &'a str,
+    pub session_token: Option<&'a str>,
     pub now: DateTime,
 }
 
@@ -270,9 +294,8 @@ pub async fn r2_list_objects(args: R2ListArgs<'_>) -> anyhow::Result<R2ListPage>
         .collect::<Vec<_>>()
         .join("&");
 
-    let canonical_headers =
-        format!("host:{host}\nx-amz-content-sha256:{EMPTY_PAYLOAD_HASH}\nx-amz-date:{amz_date}\n");
-    let signed_headers = "host;x-amz-content-sha256;x-amz-date";
+    let (canonical_headers, signed_headers) =
+        r2_signed_headers(&host, &amz_date, args.session_token);
     let canonical_request = format!(
         "GET\n/\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{EMPTY_PAYLOAD_HASH}",
     );
@@ -287,18 +310,22 @@ pub async fn r2_list_objects(args: R2ListArgs<'_>) -> anyhow::Result<R2ListPage>
     );
 
     let url = format!("https://{host}/?{canonical_query}");
-    let request = http::Request::builder()
+    let mut request = http::Request::builder()
         .method("GET")
         .uri(&url)
         .header("Authorization", auth)
         .header("x-amz-content-sha256", EMPTY_PAYLOAD_HASH)
-        .header("x-amz-date", amz_date)
-        .body(Vec::<u8>::new())?;
+        .header("x-amz-date", amz_date);
+    if let Some(session_token) = args.session_token {
+        request = request.header("x-amz-security-token", session_token);
+    }
+    let request = request.body(Vec::<u8>::new())?;
 
     let resp = http::Client::new().send(request).await?;
     let status = resp.status();
     let body = resp.into_body().bytes_limited(usize::MAX).await?;
     if !status.is_success() {
+        anyhow::ensure!(args.session_token.is_none(), "r2 list {status}");
         anyhow::bail!("r2 list {}: {}", status, String::from_utf8_lossy(&body));
     }
     parse_list_objects_xml(&String::from_utf8_lossy(&body))

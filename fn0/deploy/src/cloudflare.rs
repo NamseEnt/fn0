@@ -54,6 +54,8 @@ struct ConnectInput<'a> {
     frontend_asset_access_key_id: &'a str,
     frontend_asset_secret: &'a str,
     purge_token: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    runtime_broker_url: Option<&'a str>,
 }
 
 #[derive(Deserialize)]
@@ -84,6 +86,7 @@ pub async fn provision_and_connect(setup: &CloudSetup<'_>) -> Result<Provisioned
             setup.zone_id,
             &setup.app_origin(),
             setup.domain,
+            std::env::var("FORTE_EXPERIMENTAL_R2_SESSIONS").as_deref() == Ok("1"),
         )
         .await?;
 
@@ -93,10 +96,11 @@ pub async fn provision_and_connect(setup: &CloudSetup<'_>) -> Result<Provisioned
         // credentials never expire, so leaving them would hand the account a
         // live R2 read-write pair for every failed attempt.
         Err(ConnectFailure::Rejected(error)) => {
-            if let Err(cleanup_error) = setup
-                .broker
-                .revoke_project_credentials(setup.project_id, &provisioned.minted)
-                .await
+            if let Some(minted) = &provisioned.minted
+                && let Err(cleanup_error) = setup
+                    .broker
+                    .revoke_project_credentials(setup.project_id, minted)
+                    .await
             {
                 eprintln!(
                     "warning: could not revoke credentials after fn0 rejected them: {cleanup_error}"
@@ -108,14 +112,14 @@ pub async fn provision_and_connect(setup: &CloudSetup<'_>) -> Result<Provisioned
         // could break a connection that did succeed; naming them lets the user
         // decide.
         Err(ConnectFailure::Indeterminate(error)) => {
-            eprintln!(
-                "warning: could not tell whether fn0 stored the credentials. If it did not, \
-                 revoke these in the Cloudflare dashboard: worker {}, frontend assets {}, \
-                 cache purge {}.",
-                provisioned.minted.worker,
-                provisioned.minted.frontend_asset,
-                provisioned.minted.purge
-            );
+            if let Some(minted) = provisioned.minted {
+                eprintln!(
+                    "warning: could not tell whether fn0 stored the credentials. If it did not, \
+                     revoke these in the Cloudflare dashboard: worker {}, frontend assets {}, \
+                     cache purge {}.",
+                    minted.worker, minted.frontend_asset, minted.purge
+                );
+            }
             Err(error)
         }
     }
@@ -163,6 +167,7 @@ async fn send_connect(
                 frontend_asset_access_key_id: &credentials.frontend_asset_access_key_id,
                 frontend_asset_secret: &credentials.frontend_asset_secret,
                 purge_token: &credentials.purge_token,
+                runtime_broker_url: credentials.runtime_broker_url.as_deref(),
             })
             .send()
             .await?

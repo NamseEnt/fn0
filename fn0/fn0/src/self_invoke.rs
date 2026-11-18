@@ -767,13 +767,16 @@ fn object_storage_send(
                     return Ok((resp, io));
                 }
             }
-            let url = match hijack.presign(
-                &request,
-                &project_id,
-                presign.method,
-                presign.expires_secs,
-                presign.content_length,
-            ) {
+            let url = match hijack
+                .presign(
+                    request.uri().path(),
+                    &project_id,
+                    presign.method,
+                    presign.expires_secs,
+                    presign.content_length,
+                )
+                .await
+            {
                 Ok(url) => url,
                 Err(ec) => return Err(ec.into()),
             };
@@ -797,17 +800,38 @@ fn object_storage_send(
         }
 
         let mut request = request;
-        if let Err(e) = hijack.sign_r2(&mut request, &project_id) {
+        if let Err(e) = hijack.sign_r2(&mut request, &project_id).await {
             return Err(e.into());
         }
         let send_start = std::time::Instant::now();
+        let uses_session = request.headers().contains_key("x-amz-security-token");
         let (res, send_io) = default_send_request(request, with_default_timeouts(options)).await?;
         telemetry::stage_duration("hijack_object_storage", send_start.elapsed());
-        let res = res.map(BodyExt::boxed_unsync);
+        let res = storage_response(res, uses_session)?;
         let send_io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
             Box::new(send_io);
         Ok((res, send_io))
     })
+}
+
+fn storage_response<B>(
+    mut response: http::Response<B>,
+    uses_session: bool,
+) -> Result<http::Response<UnsyncBoxBody<Bytes, ErrorCode>>, ErrorCode>
+where
+    B: http_body::Body<Data = Bytes, Error = ErrorCode> + Send + 'static,
+{
+    if uses_session {
+        if !response.status().is_success() {
+            return text_response(
+                response.status().as_u16(),
+                "R2 request rejected".to_string(),
+            );
+        }
+        response.headers_mut().remove("x-amz-security-token");
+        response.headers_mut().remove("authorization");
+    }
+    Ok(response.map(BodyExt::boxed_unsync))
 }
 
 fn public_storage_send(
@@ -834,13 +858,16 @@ fn public_storage_send(
         }
 
         if let Some(presign) = public_presign_request(&request) {
-            let url = match hijack.presign_put(
-                &request,
-                &project_id,
-                &presign.content_type,
-                presign.expires_secs,
-                presign.content_length,
-            ) {
+            let url = match hijack
+                .presign_put(
+                    request.uri().path(),
+                    &project_id,
+                    &presign.content_type,
+                    presign.expires_secs,
+                    presign.content_length,
+                )
+                .await
+            {
                 Ok(url) => url,
                 Err(ec) => return Err(ec.into()),
             };
@@ -875,10 +902,11 @@ fn public_storage_send(
             return Ok((resp, io));
         }
 
-        if let Err(e) = hijack.sign(&mut request, &project_id) {
+        if let Err(e) = hijack.sign(&mut request, &project_id).await {
             return Err(e.into());
         }
         let send_start = std::time::Instant::now();
+        let uses_session = request.headers().contains_key("x-amz-security-token");
         let (res, send_io) = default_send_request(request, with_default_timeouts(options)).await?;
         telemetry::stage_duration("hijack_public_storage", send_start.elapsed());
 
@@ -888,7 +916,7 @@ fn public_storage_send(
             enqueue_public_object_purge(queue_hijack.as_deref(), &hijack, &project_id, url).await;
         }
 
-        let res = res.map(BodyExt::boxed_unsync);
+        let res = storage_response(res, uses_session)?;
         let send_io: Box<dyn Future<Output = std::result::Result<(), ErrorCode>> + Send> =
             Box::new(send_io);
         Ok((res, send_io))
@@ -1258,6 +1286,25 @@ mod tests {
         atomic::{AtomicUsize, Ordering},
     };
     use tokio::sync::mpsc;
+
+    #[tokio::test]
+    async fn storage_rejections_hide_session_authentication_details() {
+        let response = http::Response::builder()
+            .status(403)
+            .header("x-amz-security-token", "session-material")
+            .body(
+                Full::new(Bytes::from_static(b"canonical request: session-material"))
+                    .map_err(|never| match never {}),
+            )
+            .unwrap();
+        let response = super::storage_response(response, true).unwrap();
+        assert_eq!(response.status(), 403);
+        assert!(!response.headers().contains_key("x-amz-security-token"));
+        assert_eq!(
+            response.into_body().collect().await.unwrap().to_bytes(),
+            Bytes::from_static(b"R2 request rejected"),
+        );
+    }
 
     struct TrackingDocDbService {
         calls: Arc<AtomicUsize>,

@@ -37,6 +37,7 @@ impl CachePurgeFile {
     }
 }
 
+#[derive(Clone)]
 pub struct CloudflareClient {
     api_token: String,
     account_id: String,

@@ -10,7 +10,8 @@
 
 use crate::presign_gate::PresignGate;
 use crate::storage_target::{
-    ObjectStorageResolver, PrivateObjectStorageTarget, R2Credentials, StaticResolver,
+    ObjectStorageResolver, PrivateObjectStorageTarget, R2Credentials, R2Presign, R2SigningKeys,
+    StaticResolver,
 };
 use bytes::Bytes;
 use chrono::Utc;
@@ -146,7 +147,7 @@ impl ObjectStorageHijack {
     }
 
     /// Rewrites an unsigned S3 request in place into a signed R2 request.
-    pub(crate) fn sign_r2(
+    pub(crate) async fn sign_r2(
         &self,
         req: &mut HijackRequest,
         project_id: &str,
@@ -157,12 +158,13 @@ impl ObjectStorageHijack {
             )));
         };
         let target = resolve(resolver.as_ref(), project_id)?;
-        let R2Credentials {
-            endpoint_host,
-            region,
+        let endpoint_host = &target.credentials.endpoint_host;
+        let region = &target.credentials.region;
+        let R2SigningKeys {
             access_key_id,
             secret_access_key,
-        } = &target.credentials;
+            session_token,
+        } = target.credentials.lease(0).await?;
 
         let bucket = &target.bucket;
         let method = req.method().to_string();
@@ -188,7 +190,11 @@ impl ObjectStorageHijack {
         let canonical_headers = format!(
             "host:{endpoint_host}\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{amz_date}\n"
         );
-        let signed_headers = "host;x-amz-content-sha256;x-amz-date";
+        let (canonical_headers, signed_headers) = signed_session_headers(
+            canonical_headers,
+            "host;x-amz-content-sha256;x-amz-date",
+            session_token.as_deref(),
+        );
         let canonical_request = format!(
             "{method}\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
         );
@@ -198,7 +204,7 @@ impl ObjectStorageHijack {
             "AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{}",
             sha256_hex(canonical_request.as_bytes())
         );
-        let key = signing_key(secret_access_key, &date, region, "s3");
+        let key = signing_key(&secret_access_key, &date, region, "s3");
         let signature = hex_encode(&hmac_sha256(&key, string_to_sign.as_bytes()));
         let authorization = format!(
             "AWS4-HMAC-SHA256 Credential={access_key_id}/{credential_scope}, \
@@ -231,6 +237,7 @@ impl ObjectStorageHijack {
             HeaderName::from_static("x-amz-content-sha256"),
             HeaderValue::from_static("UNSIGNED-PAYLOAD"),
         );
+        set_session_header(headers, session_token.as_deref())?;
         headers.insert(
             AUTHORIZATION,
             HeaderValue::from_str(&authorization).map_err(|_| ErrorCode::HttpRequestDenied)?,
@@ -326,15 +333,14 @@ impl ObjectStorageHijack {
     /// Mints a presigned URL for the object at the request path, without
     /// sending anything upstream. R2 returns a SigV4 query-signed URL; the
     /// local backend returns a `forte dev` server URL.
-    pub(crate) fn presign(
+    pub(crate) async fn presign(
         &self,
-        req: &HijackRequest,
+        raw_path: &str,
         project_id: &str,
         method: &str,
         expires_secs: u64,
         content_length: Option<u64>,
     ) -> Result<String, ErrorCode> {
-        let raw_path = req.uri().path();
         match &self.backend {
             Backend::LocalFs { dev_base_url, .. } => Ok(format!(
                 "{}/__fn0_object_storage{raw_path}",
@@ -342,19 +348,30 @@ impl ObjectStorageHijack {
             )),
             Backend::R2 { resolver } => {
                 let target = resolve(resolver.as_ref(), project_id)?;
-                let R2Credentials {
-                    endpoint_host,
-                    region,
-                    access_key_id,
-                    secret_access_key,
-                } = &target.credentials;
+                let endpoint_host = &target.credentials.endpoint_host;
+                let region = &target.credentials.region;
+                let expires = expires_secs.clamp(1, PRESIGN_MAX_EXPIRES_SECS);
+                if let Some(url) = target
+                    .credentials
+                    .presign(R2Presign {
+                        path: raw_path,
+                        method: method,
+                        expires,
+                        content_type: None,
+                        content_length,
+                    })
+                    .await?
+                {
+                    return Ok(url);
+                }
+                let access_key_id = &target.credentials.access_key_id;
+                let secret_access_key = &target.credentials.secret_access_key;
                 let bucket = &target.bucket;
                 let canonical_uri = if raw_path == "/" {
                     format!("/{bucket}")
                 } else {
                     format!("/{bucket}{raw_path}")
                 };
-                let expires = expires_secs.clamp(1, PRESIGN_MAX_EXPIRES_SECS);
                 let now = Utc::now();
                 let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
                 let date = now.format("%Y%m%d").to_string();
@@ -578,6 +595,34 @@ fn parse_query(query: Option<&str>) -> HashMap<String, String> {
         map.insert(key.to_string(), value.to_string());
     }
     map
+}
+
+pub(crate) fn signed_session_headers(
+    mut headers: String,
+    names: &str,
+    session: Option<&str>,
+) -> (String, String) {
+    match session {
+        Some(token) => {
+            headers.push_str(&format!("x-amz-security-token:{token}\n"));
+            (headers, format!("{names};x-amz-security-token"))
+        }
+        None => (headers, names.to_string()),
+    }
+}
+
+pub(crate) fn set_session_header(
+    headers: &mut hyper::HeaderMap,
+    session: Option<&str>,
+) -> Result<(), ErrorCode> {
+    headers.remove("x-amz-security-token");
+    if let Some(token) = session {
+        headers.insert(
+            "x-amz-security-token",
+            HeaderValue::from_str(token).map_err(|_| ErrorCode::HttpRequestDenied)?,
+        );
+    }
+    Ok(())
 }
 
 pub(crate) fn canonical_query_string(query: Option<&str>) -> String {

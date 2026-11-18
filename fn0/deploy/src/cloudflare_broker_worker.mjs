@@ -29,7 +29,7 @@ const permissionIds = {
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
   });
 }
 
@@ -610,8 +610,334 @@ async function mintProjectCredentials(namespace, accountId, zoneId, projectId, b
   }
 }
 
+const RUNTIME_SESSION_SECONDS = 15 * 60;
+
+function runtimeConfigured(env) {
+  return env.FN0_R2_PARENT_TOKEN !== undefined && env.RUNTIME_PROJECTS !== undefined;
+}
+
+function projectStub(env, projectId) {
+  return env.RUNTIME_PROJECTS.get(env.RUNTIME_PROJECTS.idFromName(projectId));
+}
+
+async function projectState(env, projectId, action, body) {
+  return projectStub(env, projectId).fetch(`https://runtime.internal/${action}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+function newGrant() {
+  return [...crypto.getRandomValues(new Uint8Array(32))]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function grantMatches(expected, supplied) {
+  if (typeof supplied !== "string" || supplied.length !== 64) return false;
+  let difference = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    difference |= expected.charCodeAt(index) ^ supplied.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
+export class RuntimeProject {
+  constructor(state, env) {
+    this.storage = state.storage;
+    this.env = env;
+    this.sessions = new Map();
+  }
+
+  async session(bucket, validity) {
+    const cached = this.sessions.get(bucket);
+    const deadline = Math.floor(Date.now() / 1000) + validity + 60;
+    if (cached?.pending) return cached.pending;
+    if (cached?.value.expires_at > deadline) return cached.value;
+
+    const accountId = ensureString(this.env.ACCOUNT_ID, "ACCOUNT_ID");
+    const pending = mintRuntimeSession(this.env, accountId, bucket);
+    const entry = { pending };
+    this.sessions.set(bucket, entry);
+    try {
+      const value = await pending;
+      if (this.sessions.get(bucket) === entry) this.sessions.set(bucket, { value });
+      return value;
+    } catch (error) {
+      if (this.sessions.get(bucket) === entry) this.sessions.delete(bucket);
+      throw error;
+    }
+  }
+
+  async fetch(request) {
+    const action = new URL(request.url).pathname;
+    const body = await request.json();
+    if (action === "/revoke") {
+      await this.storage.delete("project");
+      this.sessions.clear();
+      return jsonResponse({ ok: true });
+    }
+    if (action === "/register") {
+      return this.storage.transaction(async (transaction) => {
+        const existing = await transaction.get("project");
+        if (existing) {
+          if (existing.zoneId !== body.zoneId) {
+            return errorResponse("runtime project belongs to a different zone", 409);
+          }
+          return jsonResponse(existing.grants);
+        }
+        const grants = { worker: newGrant(), assets: newGrant(), purge: newGrant() };
+        await transaction.put("project", { ...body, grants });
+        return jsonResponse(grants);
+      });
+    }
+    if (action === "/domain") {
+      return this.storage.transaction(async (transaction) => {
+        const project = await transaction.get("project");
+        if (project && project.zoneId === body.zoneId) {
+          await transaction.put("project", { ...project, appHostname: body.appHostname });
+        }
+        return jsonResponse({ ok: true });
+      });
+    }
+    const project = await this.storage.get("project");
+    if (!project) return errorResponse("runtime grant rejected", 403);
+    if (action === "/session" || action === "/presign") {
+      const buckets = bucketNames(project.projectId);
+      const isWorker = grantMatches(project.grants.worker, body.grant);
+      let role;
+      if (body.bucket === buckets.privateObjectStorageBucket && isWorker) role = "private";
+      if (body.bucket === buckets.publicObjectStorageBucket && isWorker) role = "public";
+      if (body.bucket === buckets.frontendAssetBucket && grantMatches(project.grants.assets, body.grant)) {
+        role = "asset";
+      }
+      if (!role) return errorResponse("runtime grant rejected", 403);
+      if (action === "/presign") {
+        const accountId = ensureString(this.env.ACCOUNT_ID, "ACCOUNT_ID");
+        return jsonResponse(await presignRuntimeObjects(this.env, accountId, body.bucket, role, body.entries));
+      }
+      return jsonResponse(await this.session(body.bucket, body.validity));
+    }
+    if (action === "/purge" && grantMatches(project.grants.purge, body.grant)) {
+      return jsonResponse({
+        zone_id: project.zoneId,
+        hostnames: [project.appHostname, project.assetHostname, project.publicHostname],
+      });
+    }
+    return errorResponse("runtime grant rejected", 403);
+  }
+}
+
+let parentCache;
+async function parentR2Credentials(env, accountId) {
+  const bearer = ensureString(env.FN0_R2_PARENT_TOKEN, "FN0_R2_PARENT_TOKEN");
+  if (parentCache?.bearer === bearer && parentCache.accountId === accountId) {
+    return parentCache.credentials;
+  }
+  const credentials = (async () => {
+    const verified = await cloudflareRequest(bearer, "GET", `/accounts/${accountId}/tokens/verify`);
+    if (verified?.status !== "active") throw new Error("R2 parent token is inactive");
+    return {
+      accessKeyId: ensureTokenId(verified.id, "R2 parent token id"),
+      secretAccessKey: await sha256Hex(bearer),
+    };
+  })();
+  parentCache = { bearer, accountId, credentials };
+  try {
+    return await credentials;
+  } catch (error) {
+    if (parentCache?.credentials === credentials) parentCache = undefined;
+    throw error;
+  }
+}
+
+async function mintRuntimeSession(env, accountId, bucket) {
+  const { accessKeyId: parentAccessKeyId } = await parentR2Credentials(env, accountId);
+  const expiresAt = Math.floor(Date.now() / 1000) + RUNTIME_SESSION_SECONDS;
+  const result = await cloudflareRequest(
+    env.FN0_R2_PARENT_TOKEN, "POST", `/accounts/${accountId}/r2/temp-access-credentials`,
+    { bucket, parentAccessKeyId, permission: "object-read-write", ttlSeconds: RUNTIME_SESSION_SECONDS },
+  );
+  return {
+    access_key_id: ensureString(result?.accessKeyId, "temporary access key"),
+    secret_access_key: ensureString(result?.secretAccessKey, "temporary secret key"),
+    session_token: ensureString(result?.sessionToken, "temporary session token"),
+    expires_at: expiresAt,
+  };
+}
+
+const utf8 = new TextEncoder();
+
+function uriEncode(value) {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (character) =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
+async function hmacKey(bytes) {
+  return crypto.subtle.importKey("raw", bytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+}
+
+async function signingKey(secret, date) {
+  let key = await hmacKey(utf8.encode(`AWS4${secret}`));
+  for (const component of [date, "auto", "s3", "aws4_request"]) {
+    key = await hmacKey(await crypto.subtle.sign("HMAC", key, utf8.encode(component)));
+  }
+  return key;
+}
+
+function presignInput(entry, role, host) {
+  if (!entry || (entry.method !== "PUT" && !(entry.method === "GET" && role === "private"))) {
+    throw new Error("invalid R2 presign method");
+  }
+  const expires = entry.expires_seconds;
+  if (!Number.isInteger(expires) || expires < 1 || expires > (role === "asset" ? 600 : 300)) {
+    throw new Error("invalid R2 presign expiry");
+  }
+  const suppliedKey = ensureString(entry.key, "R2 object key");
+  const objectKey = entry.encoded_path === true
+    ? decodeURIComponent(suppliedKey.replace(role === "public" ? /^\/+/ : /^\//, ""))
+    : suppliedKey;
+  if (!objectKey || utf8.encode(objectKey).length > 1024 ||
+      objectKey.split("/").some((part) => part === "." || part === "..")) {
+    throw new Error("invalid R2 presign object key");
+  }
+  const headers = { host };
+  if (entry.content_length !== undefined && entry.content_length !== null) {
+    if (typeof entry.content_length !== "string" || !/^\d{1,20}$/.test(entry.content_length)) {
+      throw new Error("invalid R2 presign content length");
+    }
+    headers["content-length"] = entry.content_length;
+  }
+  if (role === "public") {
+    const contentType = ensureString(entry.content_type, "R2 public object content type");
+    if (!/^[\x20-\x7e]{1,255}$/.test(contentType) || contentType !== contentType.trim()) {
+      throw new Error("invalid R2 presign content type");
+    }
+    headers["content-type"] = contentType;
+    headers["cache-control"] = "public, max-age=0, s-maxage=31536000";
+  }
+  if (role === "asset" && entry.cache_assets === true) {
+    headers["cache-control"] = "public, max-age=31536000, immutable";
+  }
+  return { path: `/${objectKey.split("/").map(uriEncode).join("/")}`, headers, method: entry.method, expires };
+}
+
+async function presignRuntimeObjects(env, accountId, bucket, role, entries) {
+  if (!Array.isArray(entries) || entries.length === 0 || entries.length > (role === "asset" ? 80 : 1)) {
+    throw new Error("invalid R2 presign batch size");
+  }
+  const host = `${bucket}.${accountId}.r2.cloudflarestorage.com`;
+  const inputs = entries.map((entry) => presignInput(entry, role, host));
+  const parent = await parentR2Credentials(env, accountId);
+  const timestamp = new Date().toISOString().replace(/[-:]|\.\d{3}/g, "");
+  const date = timestamp.slice(0, 8);
+  const scope = `${date}/auto/s3/aws4_request`;
+  const key = await signingKey(parent.secretAccessKey, date);
+  const urls = await Promise.all(inputs.map(async ({ path, headers, method, expires }) => {
+    const names = Object.keys(headers).sort();
+    const signedHeaders = names.join(";");
+    const canonicalHeaders = names.map((name) => `${name}:${headers[name]}\n`).join("");
+    const query = Object.entries({
+      "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+      "X-Amz-Credential": `${parent.accessKeyId}/${scope}`,
+      "X-Amz-Date": timestamp,
+      "X-Amz-Expires": expires.toString(),
+      "X-Amz-SignedHeaders": signedHeaders,
+    }).sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([name, value]) => `${name}=${uriEncode(value)}`).join("&");
+    const canonical = [method, path, query, canonicalHeaders, signedHeaders, "UNSIGNED-PAYLOAD"].join("\n");
+    const message = ["AWS4-HMAC-SHA256", timestamp, scope, await sha256Hex(canonical)].join("\n");
+    const signed = new Uint8Array(await crypto.subtle.sign("HMAC", key, utf8.encode(message)));
+    const signature = [...signed].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `https://${host}${path}?${query}&X-Amz-Signature=${signature}`;
+  }));
+  return { urls };
+}
+
+function validatePurgeFiles(files, hostnames) {
+  if (!Array.isArray(files) || files.length === 0 || files.length > 100) {
+    throw new Error("invalid cache purge files");
+  }
+  return files.map((file) => {
+    const value = typeof file === "string" ? file : file?.url;
+    const url = new URL(ensureString(value, "cache purge URL"));
+    if (url.protocol !== "https:" || url.port || url.username || url.password ||
+        url.hash || !hostnames.includes(url.hostname)) {
+      throw new Error("cache purge URL does not belong to this project");
+    }
+    const headers = file?.headers;
+    return headers === undefined
+      ? { url: value }
+      : { url: value, headers: { Origin: ensureString(headers.Origin, "cache purge origin") } };
+  });
+}
+
+async function runtimeRequest(request, env, route, body) {
+  if (!runtimeConfigured(env)) return errorResponse("runtime broker unavailable", 404);
+  const authorization = request.headers.get("authorization") ?? "";
+  if (!/^Bearer [a-f0-9]{64}$/.test(authorization)) return errorResponse("runtime grant rejected", 403);
+  const grant = authorization.slice("Bearer ".length);
+  const projectId = ensureProjectId(ensureString(body.project_id, "project_id"));
+  if (route === "/v1/runtime/presign") {
+    const bucket = ensureString(body.bucket, "bucket");
+    return projectState(env, projectId, "presign", { bucket, grant, entries: body.entries });
+  }
+  if (route === "/v1/runtime/session") {
+    const bucket = ensureString(body.bucket, "bucket");
+    const validity = body.validity_seconds ?? 0;
+    if (!Number.isInteger(validity) || validity < 0 || validity > 600) {
+      return errorResponse("invalid credential validity", 400);
+    }
+    return projectState(env, projectId, "session", { bucket, grant, validity });
+  }
+  const allowed = await projectState(env, projectId, "purge", { grant });
+  if (!allowed.ok) return allowed;
+  const policy = await allowed.json();
+  if (route === "/v1/runtime/verify-purge") return jsonResponse({ ok: true });
+  let purge;
+  if (body.tags !== undefined) {
+    const projectTag = `fn0-project-${projectId}`;
+    if (body.files !== undefined || !Array.isArray(body.tags) ||
+        body.tags.length !== 1 || body.tags[0] !== projectTag) {
+      return errorResponse("cache purge tag does not belong to this project", 403);
+    }
+    purge = { tags: [projectTag] };
+  } else {
+    purge = { files: validatePurgeFiles(body.files, policy.hostnames) };
+  }
+  await cloudflareRequest(
+    env.FN0_R2_PARENT_TOKEN, "POST", `/zones/${policy.zone_id}/purge_cache`, purge,
+  );
+  return jsonResponse({ ok: true });
+}
+
+async function runtimeProjectCredentials(env, accountId, zoneId, zoneName, projectId, appHostname, buckets) {
+  await parentR2Credentials(env, accountId);
+  const response = await projectState(env, projectId, "register", {
+    projectId,
+    zoneId,
+    appHostname,
+    assetHostname: `${buckets.frontendAssetBucket}.${zoneName}`,
+    publicHostname: `${buckets.publicObjectStorageBucket}.${zoneName}`,
+  });
+  if (!response.ok) throw new Error("could not register project runtime grants");
+  const grants = await response.json();
+  return {
+    runtime_sessions: true,
+    worker_access_key_id: "",
+    worker_secret: grants.worker,
+    frontend_asset_access_key_id: "",
+    frontend_asset_secret: grants.assets,
+    purge_token: grants.purge,
+  };
+}
+
 async function provisionProject(setupToken, accountId, env, body) {
   const namespace = projectTokenNamespace(env, setupToken, accountId);
+  if (body.accept_runtime_sessions === true && (!runtimeConfigured(env) || !namespace.accountOwned)) {
+    throw new Error("runtime sessions require account token issuance, the R2 parent token, and the runtime project binding");
+  }
   if (namespace.accountOwned && body.accept_account_owned_tokens !== true) {
     throw new Error("update the Forte CLI before provisioning account-owned project tokens");
   }
@@ -652,13 +978,9 @@ async function provisionProject(setupToken, accountId, env, body) {
       await ensureCacheRule(provisioningToken, zoneId, zoneName, appHostname, null);
       await ensureTieredCache(provisioningToken, zoneId);
       await ensureWebsockets(provisioningToken, zoneId);
-      const credentials = await mintProjectCredentials(
-        namespace,
-        accountId,
-        zoneId,
-        projectId,
-        buckets,
-      );
+      const credentials = body.accept_runtime_sessions === true
+        ? await runtimeProjectCredentials(env, accountId, zoneId, zoneName, projectId, appHostname, buckets)
+        : await mintProjectCredentials(namespace, accountId, zoneId, projectId, buckets);
       return {
         zone_name: zoneName,
         frontend_asset_hostname: `${buckets.frontendAssetBucket}.${zoneName}`,
@@ -976,7 +1298,7 @@ async function ensureAppDnsRecord(token, zoneId, appHostname, originHostname, re
   }
 }
 
-async function finalizeDomain(namespace, accountId, body) {
+async function finalizeDomain(namespace, accountId, env, body) {
   const projectId = ensureProjectId(ensureString(body.project_id, "project_id"));
   const zoneId = ensureZoneId(ensureString(body.zone_id, "zone_id"));
   const zoneName = ensureHostname(ensureString(body.zone_name, "zone_name"));
@@ -987,7 +1309,7 @@ async function finalizeDomain(namespace, accountId, body) {
     : null;
   const appOrigin = `https://${appHostname}`;
   const buckets = bucketNames(projectId);
-  return withProvisioning(
+  const result = await withProvisioning(
     namespace,
     accountId,
     zoneId,
@@ -1012,6 +1334,11 @@ async function finalizeDomain(namespace, accountId, body) {
       return { ok: true };
     },
   );
+  if (runtimeConfigured(env)) {
+    const updated = await projectState(env, projectId, "domain", { zoneId, appHostname });
+    if (!updated.ok) throw new Error("could not update project runtime domains");
+  }
+  return result;
 }
 
 async function deleteAppDnsRecord(token, zoneId, appHostname, originHostname) {
@@ -1181,6 +1508,10 @@ async function teardownProject(setupToken, accountId, env, body) {
     }
   });
 
+  if (env.RUNTIME_PROJECTS) {
+    const revoked = await projectState(env, projectId, "revoke", {});
+    if (!revoked.ok) throw new Error("could not revoke project runtime grants");
+  }
   if (namespace.accountOwned) {
     await revokeProjectCredentialsByName(namespace, projectId);
   }
@@ -1198,6 +1529,12 @@ async function handleRequest(request, env) {
   }
   const body = await readBody(request);
   const route = new URL(request.url).pathname;
+  if (
+    route === "/v1/runtime/session" || route === "/v1/runtime/presign" ||
+    route === "/v1/runtime/purge" || route === "/v1/runtime/verify-purge"
+  ) {
+    return runtimeRequest(request, env, route, body);
+  }
   const operationByRoute = {
     "/v1/resolve-zone": "resolve_zone",
     "/v1/provision-project": "provision_project",
@@ -1244,7 +1581,7 @@ async function handleRequest(request, env) {
   }
   if (route === "/v1/finalize-domain") {
     return withAuthorizedRequest(request, env, "finalize_domain", body, async () =>
-      jsonResponse(await finalizeDomain(namespace(), accountId, body)),
+      jsonResponse(await finalizeDomain(namespace(), accountId, env, body)),
     );
   }
   if (route === "/v1/revoke-project-credentials") {

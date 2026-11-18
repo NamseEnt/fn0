@@ -293,6 +293,8 @@ pub struct ProjectCloudflareConfigDoc {
     /// a public object write purges its edge copy, and that happens on a
     /// request rather than on the user's machine.
     pub purge_token_ciphertext: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_broker_url: Option<String>,
     pub state: CloudflareConnectionState,
     pub checked_at: DateTime,
     /// Bumped on every credential or bucket change so workers can skip

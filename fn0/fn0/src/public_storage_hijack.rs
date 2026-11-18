@@ -15,10 +15,11 @@ use std::sync::Arc;
 
 use crate::object_storage_hijack::{
     ObjectStorageHijack, PRESIGN_MAX_EXPIRES_SECS, canonical_query_string, hex_encode, hmac_sha256,
-    sha256_hex, signing_key, uri_encode_query,
+    set_session_header, sha256_hex, signed_session_headers, signing_key, uri_encode_query,
 };
 use crate::storage_target::{
-    PublicStorageResolver, PublicStorageTarget, R2Credentials, StaticResolver,
+    PublicStorageResolver, PublicStorageTarget, R2Credentials, R2Presign, R2SigningKeys,
+    StaticResolver,
 };
 use bytes::Bytes;
 use chrono::Utc;
@@ -228,9 +229,9 @@ impl PublicStorageHijack {
     /// an upload that does not send exactly these values. Letting the uploader
     /// pick its own `max-age` would seed browser copies that no purge can reach,
     /// which is the one failure this whole design refuses to allow.
-    pub(crate) fn presign_put(
+    pub(crate) async fn presign_put(
         &self,
-        req: &HijackRequest,
+        raw_path: &str,
         project_id: &str,
         content_type: &str,
         expires_secs: u64,
@@ -242,14 +243,25 @@ impl PublicStorageHijack {
             )));
         };
         let target = resolve(resolver.as_ref(), project_id)?;
-        let R2Credentials {
-            endpoint_host,
-            region,
-            access_key_id,
-            secret_access_key,
-        } = &target.credentials;
-        let canonical_uri = object_path(&target.bucket, req.uri().path());
+        let endpoint_host = &target.credentials.endpoint_host;
+        let region = &target.credentials.region;
+        let canonical_uri = object_path(&target.bucket, raw_path);
         let expires = expires_secs.clamp(1, PRESIGN_MAX_EXPIRES_SECS);
+        if let Some(url) = target
+            .credentials
+            .presign(R2Presign {
+                path: raw_path,
+                method: "PUT",
+                expires,
+                content_type: Some(content_type),
+                content_length,
+            })
+            .await?
+        {
+            return Ok(url);
+        }
+        let access_key_id = &target.credentials.access_key_id;
+        let secret_access_key = &target.credentials.secret_access_key;
         let now = Utc::now();
         let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
         let date = now.format("%Y%m%d").to_string();
@@ -315,19 +327,24 @@ impl PublicStorageHijack {
 
     /// Rewrites an unsigned S3 request in place into a signed R2 request against
     /// the shared static bucket, stamping the platform's cache policy.
-    pub(crate) fn sign(&self, req: &mut HijackRequest, project_id: &str) -> Result<(), ErrorCode> {
+    pub(crate) async fn sign(
+        &self,
+        req: &mut HijackRequest,
+        project_id: &str,
+    ) -> Result<(), ErrorCode> {
         let Backend::R2 { resolver } = &self.backend else {
             return Err(ErrorCode::InternalError(Some(
                 "sign called on local backend".to_string(),
             )));
         };
         let target = resolve(resolver.as_ref(), project_id)?;
-        let R2Credentials {
-            endpoint_host,
-            region,
+        let endpoint_host = &target.credentials.endpoint_host;
+        let region = &target.credentials.region;
+        let R2SigningKeys {
             access_key_id,
             secret_access_key,
-        } = &target.credentials;
+            session_token,
+        } = target.credentials.lease(0).await?;
         let method = req.method().to_string();
         let path_and_query = req
             .uri()
@@ -369,6 +386,8 @@ impl PublicStorageHijack {
             )
         };
 
+        let (canonical_headers, signed_headers) =
+            signed_session_headers(canonical_headers, signed_headers, session_token.as_deref());
         let canonical_request = format!(
             "{method}\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
         );
@@ -377,7 +396,7 @@ impl PublicStorageHijack {
             "AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n{}",
             sha256_hex(canonical_request.as_bytes())
         );
-        let key = signing_key(secret_access_key, &date, region, "s3");
+        let key = signing_key(&secret_access_key, &date, region, "s3");
         let signature = hex_encode(&hmac_sha256(&key, string_to_sign.as_bytes()));
         let authorization = format!(
             "AWS4-HMAC-SHA256 Credential={}/{credential_scope}, \
@@ -411,6 +430,7 @@ impl PublicStorageHijack {
             HeaderName::from_static("x-amz-content-sha256"),
             HeaderValue::from_static("UNSIGNED-PAYLOAD"),
         );
+        set_session_header(headers, session_token.as_deref())?;
         headers.insert(
             AUTHORIZATION,
             HeaderValue::from_str(&authorization).map_err(|_| ErrorCode::HttpRequestDenied)?,
@@ -450,12 +470,13 @@ mod tests {
     use super::*;
     use http_body_util::{BodyExt, Full};
 
-    #[test]
-    fn presigned_put_pins_the_cache_policy_into_the_signature() {
+    #[tokio::test]
+    async fn presigned_put_pins_the_cache_policy_into_the_signature() {
         let hijack = hijack();
         let req = request(hyper::Method::GET, "https://host/clips/intro.mp4");
         let url = hijack
-            .presign_put(&req, "proj1", "video/mp4", 300, None)
+            .presign_put(req.uri().path(), "proj1", "video/mp4", 300, None)
+            .await
             .unwrap();
 
         // Both headers must be signed, or an uploader could pick a browser-
@@ -465,12 +486,13 @@ mod tests {
         assert!(url.contains("/fn0-proj1-public-object-storage/clips/intro.mp4?"));
     }
 
-    #[test]
-    fn presigned_put_expiry_is_clamped() {
+    #[tokio::test]
+    async fn presigned_put_expiry_is_clamped() {
         let hijack = hijack();
         let req = request(hyper::Method::GET, "https://host/clips/intro.mp4");
         let url = hijack
-            .presign_put(&req, "proj1", "video/mp4", 86_400, None)
+            .presign_put(req.uri().path(), "proj1", "video/mp4", 86_400, None)
+            .await
             .unwrap();
         assert!(url.contains(&format!("X-Amz-Expires={PRESIGN_MAX_EXPIRES_SECS}")));
     }
@@ -500,13 +522,13 @@ mod tests {
             .unwrap()
     }
 
-    #[test]
-    fn a_guests_key_is_the_whole_key() {
+    #[tokio::test]
+    async fn a_guests_key_is_the_whole_key() {
         let mut req = request(
             hyper::Method::PUT,
             "http://fn0-public-storage.fn0.dev/clips/a.mp4",
         );
-        hijack().sign(&mut req, "proj1").unwrap();
+        hijack().sign(&mut req, "proj1").await.unwrap();
         assert_eq!(
             req.uri().path(),
             "/fn0-proj1-public-object-storage/clips/a.mp4"
@@ -514,41 +536,41 @@ mod tests {
         assert_eq!(req.uri().host(), Some("acct.r2.cloudflarestorage.com"));
     }
 
-    #[test]
-    fn stamps_cache_control_on_writes() {
+    #[tokio::test]
+    async fn stamps_cache_control_on_writes() {
         let mut req = request(
             hyper::Method::PUT,
             "http://fn0-public-storage.fn0.dev/a.txt",
         );
-        hijack().sign(&mut req, "proj1").unwrap();
+        hijack().sign(&mut req, "proj1").await.unwrap();
         assert_eq!(
             req.headers().get(CACHE_CONTROL).unwrap(),
             "public, max-age=0, s-maxage=31536000"
         );
     }
 
-    #[test]
-    fn guest_cannot_choose_its_own_cache_policy() {
+    #[tokio::test]
+    async fn guest_cannot_choose_its_own_cache_policy() {
         let mut req = request(
             hyper::Method::PUT,
             "http://fn0-public-storage.fn0.dev/a.txt",
         );
         req.headers_mut()
             .insert(CACHE_CONTROL, HeaderValue::from_static("max-age=31536000"));
-        hijack().sign(&mut req, "proj1").unwrap();
+        hijack().sign(&mut req, "proj1").await.unwrap();
         assert_eq!(
             req.headers().get(CACHE_CONTROL).unwrap(),
             "public, max-age=0, s-maxage=31536000"
         );
     }
 
-    #[test]
-    fn reads_carry_no_cache_header() {
+    #[tokio::test]
+    async fn reads_carry_no_cache_header() {
         let mut req = request(
             hyper::Method::GET,
             "http://fn0-public-storage.fn0.dev/a.txt",
         );
-        hijack().sign(&mut req, "proj1").unwrap();
+        hijack().sign(&mut req, "proj1").await.unwrap();
         assert!(req.headers().get(CACHE_CONTROL).is_none());
     }
 
@@ -582,8 +604,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn each_project_signs_against_its_own_account_and_bucket() {
+    #[tokio::test]
+    async fn each_project_signs_against_its_own_account_and_bucket() {
         struct PerProject;
         impl PublicStorageResolver for PerProject {
             fn resolve(&self, project_id: &str) -> Option<Arc<PublicStorageTarget>> {
@@ -609,7 +631,7 @@ mod tests {
             hyper::Method::PUT,
             "http://fn0-public-storage.fn0.dev/a.txt",
         );
-        hijack.sign(&mut first, "one").unwrap();
+        hijack.sign(&mut first, "one").await.unwrap();
         assert_eq!(
             first.uri().host(),
             Some("acct-one.r2.cloudflarestorage.com")
@@ -620,7 +642,7 @@ mod tests {
             hyper::Method::PUT,
             "http://fn0-public-storage.fn0.dev/a.txt",
         );
-        hijack.sign(&mut second, "two").unwrap();
+        hijack.sign(&mut second, "two").await.unwrap();
         assert_eq!(
             second.uri().host(),
             Some("acct-two.r2.cloudflarestorage.com")
@@ -633,8 +655,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn an_unconfigured_project_cannot_write_public_objects() {
+    #[tokio::test]
+    async fn an_unconfigured_project_cannot_write_public_objects() {
         struct NoTarget;
         impl PublicStorageResolver for NoTarget {
             fn resolve(&self, _project_id: &str) -> Option<Arc<PublicStorageTarget>> {
@@ -650,17 +672,17 @@ mod tests {
             hyper::Method::PUT,
             "http://fn0-public-storage.fn0.dev/a.txt",
         );
-        assert!(hijack.sign(&mut req, "proj1").is_err());
+        assert!(hijack.sign(&mut req, "proj1").await.is_err());
         assert!(hijack.public_base_url_for("proj1").is_none());
     }
 
-    #[test]
-    fn a_traversing_key_cannot_leave_the_projects_bucket() {
+    #[tokio::test]
+    async fn a_traversing_key_cannot_leave_the_projects_bucket() {
         let mut req = request(
             hyper::Method::PUT,
             "http://fn0-public-storage.fn0.dev/../fn0-proj2-public-object-storage/x",
         );
-        hijack().sign(&mut req, "proj1").unwrap();
+        hijack().sign(&mut req, "proj1").await.unwrap();
         assert!(
             req.uri()
                 .path()

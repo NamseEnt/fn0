@@ -21,7 +21,8 @@
 use crate::common::auth;
 use crate::common::aws_sign;
 use crate::common::byoc;
-use crate::common::cloudflare::{CachePurgeFile, CloudflareClient};
+use crate::common::byoc::{ProjectPurge, R2KeySource};
+use crate::common::cloudflare::CachePurgeFile;
 use crate::common::vault;
 use crate::docs::*;
 use forte_sdk::*;
@@ -77,6 +78,8 @@ pub struct Input {
     /// Sent whole, because purging needs a bearer token rather than a hash.
     /// Scoped to cache purge on `zone_id` and nothing else.
     pub purge_token: String,
+    #[serde(default)]
+    pub runtime_broker_url: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -139,11 +142,63 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     // Purge is probed for real: an unpurgeable zone is the one failure that is
     // silent at write time and only surfaces as an object an
     // `s-maxage=31536000` holds for a year.
-    let purge_client = CloudflareClient::for_zone(
-        req.body.purge_token.clone(),
-        req.body.account_id.clone(),
-        req.body.zone_id.clone(),
-    );
+    let broker_url = req.body.runtime_broker_url.as_deref();
+    let project_id = &req.body.project_id;
+    if broker_url.is_some() {
+        let is_cloudflare_id =
+            |value: &str| value.len() == 32 && value.bytes().all(|byte| byte.is_ascii_hexdigit());
+        let valid_buckets = [
+            (
+                &req.body.private_object_storage_bucket,
+                "private-object-storage",
+            ),
+            (
+                &req.body.public_object_storage_bucket,
+                "public-object-storage",
+            ),
+            (&req.body.frontend_asset_bucket, "frontend-asset"),
+        ]
+        .into_iter()
+        .all(|(name, suffix)| *name == format!("fn0-{project_id}-{suffix}"));
+        if !valid_buckets
+            || !is_cloudflare_id(&req.body.account_id)
+            || !is_cloudflare_id(&req.body.zone_id)
+        {
+            return Output::CredentialRejected {
+                reason:
+                    "runtime project bucket names and Cloudflare IDs must match broker provisioning"
+                        .to_string(),
+            };
+        }
+    }
+    let (purge_client, worker_keys, asset_keys) = match (
+        ProjectPurge::new(
+            broker_url,
+            project_id,
+            req.body.purge_token.clone(),
+            req.body.account_id.clone(),
+            req.body.zone_id.clone(),
+        ),
+        R2KeySource::new(
+            broker_url,
+            project_id,
+            req.body.worker_access_key_id.clone(),
+            req.body.worker_secret.clone(),
+        ),
+        R2KeySource::new(
+            broker_url,
+            project_id,
+            req.body.frontend_asset_access_key_id.clone(),
+            req.body.frontend_asset_secret.clone(),
+        ),
+    ) {
+        (Ok(purge), Ok(worker), Ok(assets)) => (purge, worker, assets),
+        (Err(error), ..) | (_, Err(error), _) | (.., Err(error)) => {
+            return Output::CredentialRejected {
+                reason: error.to_string(),
+            };
+        }
+    };
     let probe_url = format!(
         "https://{}/__fn0_connect_probe",
         req.body.frontend_asset_hostname
@@ -164,33 +219,23 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     // credential is proved only against the buckets it is meant to open, so a
     // pair swapped between the two tokens is caught here rather than becoming a
     // worker that can rewrite a deployed frontend.
-    let probes: [(&str, &str, &str); 3] = [
-        (
-            &req.body.private_object_storage_bucket,
-            &req.body.worker_access_key_id,
-            &req.body.worker_secret,
-        ),
-        (
-            &req.body.public_object_storage_bucket,
-            &req.body.worker_access_key_id,
-            &req.body.worker_secret,
-        ),
-        (
-            &req.body.frontend_asset_bucket,
-            &req.body.frontend_asset_access_key_id,
-            &req.body.frontend_asset_secret,
-        ),
+    let probes = [
+        (&req.body.private_object_storage_bucket, &worker_keys),
+        (&req.body.public_object_storage_bucket, &worker_keys),
+        (&req.body.frontend_asset_bucket, &asset_keys),
     ];
-    for (bucket, access_key_id, secret_access_key) in probes {
+    for (bucket, source) in probes {
         if let Err(error) = prove(|| async {
+            let keys = source.for_bucket(bucket, 0).await?;
             aws_sign::r2_list_objects(aws_sign::R2ListArgs {
                 account_id: &req.body.account_id,
                 bucket,
                 region: "auto",
                 prefix: "",
                 continuation_token: None,
-                access_key_id,
-                secret_access_key,
+                access_key_id: &keys.access_key_id,
+                secret_access_key: &keys.secret_access_key,
+                session_token: keys.session_token.as_deref(),
                 now: forte_sdk::now(),
             })
             .await
@@ -235,6 +280,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         frontend_asset_access_key_id: req.body.frontend_asset_access_key_id.clone(),
         frontend_asset_secret_ciphertext,
         purge_token_ciphertext,
+        runtime_broker_url: req.body.runtime_broker_url.clone(),
         state: CloudflareConnectionState::Ok,
         checked_at: forte_sdk::now(),
         config_version: 1,

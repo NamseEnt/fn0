@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import worker from "./cloudflare_broker_worker.mjs";
+import worker, { RuntimeProject } from "./cloudflare_broker_worker.mjs";
 
 const ACCOUNT_ID = "0123456789abcdef0123456789abcdef";
 const OWNER_GITHUB_ID = 42;
@@ -898,4 +898,203 @@ test("discovers zones at the user token limit and retries a fresh account token"
   assert.equal((await result.json()).zone_id, TEST_ZONE);
   assert.equal(zoneRequests, 2);
   assert.ok(!calls.some((call) => call.pathname.startsWith("/user/tokens")));
+});
+
+function runtimeEnvironment() {
+  const projects = new Map();
+  const env = makeEnv({
+    FN0_ACCOUNT_TOKEN_MINTER: "account-minter",
+    FN0_R2_PARENT_TOKEN: "shared-parent",
+    RUNTIME_PROJECTS: {
+      idFromName: (name) => name,
+      get: (projectId) => {
+        if (!projects.has(projectId)) {
+          const entries = new Map();
+          const storage = {
+            get: async (key) => entries.get(key),
+            put: async (key, value) => entries.set(key, value),
+            delete: async (key) => entries.delete(key),
+            transaction: async (callback) => callback(storage),
+          };
+          projects.set(projectId, new RuntimeProject({ storage }, env));
+        }
+        return {
+          fetch: (url, init) => projects.get(projectId).fetch(new Request(url, init)),
+        };
+      },
+    },
+  });
+  return env;
+}
+
+function projectBucket(projectId, type) {
+  return `fn0-${projectId}-${type}`;
+}
+
+function registerRuntime(env, projectId, appHostname = "app.example.com") {
+  const assetHostname = `${projectBucket(projectId, "frontend-asset")}.example.com`;
+  const publicHostname = `${projectBucket(projectId, "public-object-storage")}.example.com`;
+  return env.RUNTIME_PROJECTS.get(projectId).fetch("https://runtime.internal/register", {
+    method: "POST",
+    body: JSON.stringify({ projectId, zoneId: TEST_ZONE, appHostname, assetHostname, publicHostname }),
+  });
+}
+
+function runtimeCall(env, action, grant, data) {
+  return worker.fetch(makeRequest(
+    `/v1/runtime/${action}`,
+    data,
+    defaultHeaders({ authorization: `Bearer ${grant}` }),
+  ), env);
+}
+
+test("provisioning runtime mode creates grants and no long-lived Cloudflare tokens", async () => {
+  const env = runtimeEnvironment();
+  const { calls, result } = await withStubbedFetch([
+    route("GET", `${ACCOUNT_TOKEN_PATH}/verify`, "Bearer shared-parent", () =>
+      jsonResponse(cf({ id: "e".repeat(32), status: "active" })),
+    ),
+    ...projectProvisionRoutes(ACCOUNT_TOKEN_PATH, ACCOUNT_MINTER),
+  ], () => worker.fetch(makeRequest("/v1/provision-project", {
+    project_id: TEST_PROJECT,
+    zone_id: TEST_ZONE,
+    app_origin: "https://app.example.com",
+    app_hostname: "app.example.com",
+    accept_account_owned_tokens: true,
+    accept_runtime_sessions: true,
+  }), env));
+  assert.equal(result.status, 200);
+  const provisioned = await result.json();
+  assert.equal(provisioned.runtime_sessions, true);
+  assert.equal(provisioned.minted_token_ids, undefined);
+  assert.match(provisioned.worker_secret, /^[a-f0-9]{64}$/);
+  assert.equal(new Set([provisioned.worker_secret, provisioned.frontend_asset_secret, provisioned.purge_token]).size, 3);
+  const tokenMints = calls.filter((call) => call.method === "POST" && call.pathname.endsWith("/tokens"));
+  assert.equal(tokenMints.length, 1);
+  assert.ok(tokenMints[0].body.expires_on);
+  assert.ok(calls.some((call) => call.method === "DELETE" && call.pathname.endsWith("/provisioning-id")));
+});
+
+test("runtime grants are isolated by project, bucket, and purge destination", async () => {
+  const env = runtimeEnvironment();
+  const grants = await (await registerRuntime(env, TEST_PROJECT)).json();
+  const other = "other123";
+  await registerRuntime(env, other, "other.example.com");
+  const project_id = TEST_PROJECT;
+  const privateBucket = projectBucket(project_id, "private-object-storage");
+  const assetBucket = projectBucket(project_id, "frontend-asset");
+  const purgeFile = "https://app.example.com/path";
+  const { calls } = await withStubbedFetch([
+    route("GET", `${ACCOUNT_TOKEN_PATH}/verify`, "Bearer shared-parent", () =>
+      jsonResponse(cf({ id: "e".repeat(32), status: "active" })),
+    ),
+    route("POST", `/accounts/${ACCOUNT_ID}/r2/temp-access-credentials`, "Bearer shared-parent", ({ body }) => {
+      assert.deepEqual(body, {
+        bucket: body.bucket,
+        parentAccessKeyId: "e".repeat(32),
+        permission: "object-read-write",
+        ttlSeconds: 900,
+      });
+      return jsonResponse(cf({
+        accessKeyId: "e".repeat(32),
+        secretAccessKey: `isolated-secret:${body.bucket}`,
+        sessionToken: `opaque-session:${body.bucket}`,
+      }));
+    }),
+    route("POST", `/zones/${TEST_ZONE}/purge_cache`, "Bearer shared-parent", () => jsonResponse(cf({}))),
+  ], async () => {
+    assert.equal((await runtimeCall(env, "session", grants.worker, { project_id, bucket: assetBucket })).status, 403);
+    assert.equal((await runtimeCall(env, "session", grants.assets, { project_id, bucket: privateBucket })).status, 403);
+    assert.equal((await runtimeCall(env, "session", grants.worker, { project_id: other, bucket: projectBucket(other, "private-object-storage") })).status, 403);
+    assert.equal((await runtimeCall(env, "purge", grants.worker, { project_id, files: [purgeFile] })).status, 403);
+
+    for (const [grant, bucket] of [[grants.worker, privateBucket], [grants.assets, assetBucket]]) {
+      const reply = await runtimeCall(env, "session", grant, { project_id, bucket });
+      assert.equal(reply.status, 200);
+      const payload = await reply.json();
+      assert.equal(payload.access_key_id, "e".repeat(32));
+      assert.equal(payload.secret_access_key, `isolated-secret:${bucket}`);
+      assert.equal(payload.session_token, `opaque-session:${bucket}`);
+      assert.ok(payload.expires_at >= Math.floor(Date.now() / 1000) + 895);
+      const cached = await runtimeCall(env, "session", grant, { project_id, bucket, validity_seconds: 300 });
+      assert.deepEqual(await cached.json(), payload);
+    }
+
+    assert.equal((await runtimeCall(env, "purge", grants.purge, { project_id, files: [purgeFile] })).status, 200);
+    assert.equal((await runtimeCall(env, "purge", grants.purge, { project_id, tags: [`fn0-project-${project_id}`] })).status, 200);
+    assert.equal((await runtimeCall(env, "purge", grants.purge, { project_id, tags: [`fn0-project-${other}`] })).status, 403);
+    const forged = await runtimeCall(env, "purge", grants.purge, {
+      project_id, files: [purgeFile, "https://other.example.com/path"],
+    });
+    assert.match((await forged.json()).error, /does not belong/);
+    await env.RUNTIME_PROJECTS.get(project_id).fetch("https://runtime.internal/revoke", {
+      method: "POST",
+      body: "{}",
+    });
+    assert.equal((await runtimeCall(env, "session", grants.worker, { project_id, bucket: privateBucket })).status, 403);
+    assert.equal((await runtimeCall(env, "verify-purge", grants.purge, { project_id })).status, 403);
+  });
+  const sessions = calls.filter((call) => call.pathname.endsWith("/r2/temp-access-credentials"));
+  assert.deepEqual(sessions.map((call) => call.body.bucket), [privateBucket, assetBucket]);
+  const purges = calls.filter((call) => call.pathname.endsWith("/purge_cache"));
+  assert.deepEqual(purges.map((call) => call.body), [
+    { files: [{ url: purgeFile }] },
+    { tags: [`fn0-project-${project_id}`] },
+  ]);
+});
+
+test("client-facing presigned URLs use parent signatures with object and role constraints", async () => {
+  const env = runtimeEnvironment();
+  const grants = await (await registerRuntime(env, TEST_PROJECT)).json();
+  const project_id = TEST_PROJECT;
+  const privateBucket = projectBucket(project_id, "private-object-storage");
+  const publicBucket = projectBucket(project_id, "public-object-storage");
+  const assetBucket = projectBucket(project_id, "frontend-asset");
+  const { calls } = await withStubbedFetch([
+    route("GET", `${ACCOUNT_TOKEN_PATH}/verify`, "Bearer shared-parent", () =>
+      jsonResponse(cf({ id: "e".repeat(32), status: "active" })),
+    ),
+  ], async () => {
+    const getEntry = { method: "GET", key: "/hello%20world.txt", encoded_path: true, expires_seconds: 120 };
+    const privateReply = await runtimeCall(env, "presign", grants.worker, {
+      project_id, bucket: privateBucket, entries: [getEntry],
+    });
+    assert.equal(privateReply.status, 200);
+    const [privateUrl] = (await privateReply.json()).urls;
+    const parsed = new URL(privateUrl);
+    assert.equal(parsed.hostname, `${privateBucket}.${ACCOUNT_ID}.r2.cloudflarestorage.com`);
+    assert.equal(parsed.pathname, "/hello%20world.txt");
+    assert.ok(parsed.searchParams.get("X-Amz-Credential").startsWith("e".repeat(32) + "/"));
+    assert.equal(parsed.searchParams.get("X-Amz-Security-Token"), null);
+    assert.equal(parsed.searchParams.get("X-Amz-Expires"), "120");
+
+    const uploadEntry = {
+      method: "PUT", key: "upload.text", expires_seconds: 240,
+      content_type: "text/plain", content_length: "13",
+    };
+    const publicReply = await runtimeCall(env, "presign", grants.worker, {
+      project_id, bucket: publicBucket, entries: [uploadEntry],
+    });
+    assert.equal(publicReply.status, 200);
+    const [publicUrl] = (await publicReply.json()).urls;
+    assert.equal(new URL(publicUrl).searchParams.get("X-Amz-SignedHeaders"), "cache-control;content-length;content-type;host");
+    const assetReply = await runtimeCall(env, "presign", grants.assets, {
+      project_id, bucket: assetBucket, entries: [
+        { ...uploadEntry, cache_assets: true },
+        { ...uploadEntry, cache_assets: true, key: "another-file.txt" },
+      ],
+    });
+    assert.equal(assetReply.status, 200);
+    assert.equal((await assetReply.json()).urls.length, 2);
+    assert.equal((await runtimeCall(env, "presign", grants.worker, {
+      project_id, bucket: assetBucket, entries: [uploadEntry],
+    })).status, 403);
+    assert.equal((await runtimeCall(env, "presign", grants.assets, {
+      project_id, bucket: assetBucket, entries: [getEntry],
+    })).ok, false);
+    assert.equal((await runtimeCall(env, "presign", grants.worker, {
+      project_id, bucket: privateBucket, entries: [{ ...getEntry, key: "/%2e%2e/another" }],
+    })).ok, false);
+  });
+  assert.equal(calls.filter((call) => call.pathname.endsWith("/temp-access-credentials")).length, 0);
 });

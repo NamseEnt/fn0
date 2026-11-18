@@ -8,6 +8,7 @@ pub mod db_backend;
 pub mod docs_site;
 pub mod github;
 pub mod project_name;
+pub mod r2_runtime;
 pub mod r2_store;
 pub mod signy_tenant;
 pub mod telemetry_policy_metrics;

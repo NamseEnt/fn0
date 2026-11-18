@@ -121,6 +121,46 @@ Without the secret, new projects use User API Tokens.
 [Cloudflare token quotas](https://developers.cloudflare.com/fundamentals/api/reference/limits/) ·
 [Cloudflare account-owned tokens](https://developers.cloudflare.com/fundamentals/api/get-started/account-owned-tokens/)
 
+### Pilot shared R2 sessions
+
+The runtime-session pilot issues zero long-lived Cloudflare API tokens per new
+project. The broker holds an account-level R2 parent credential and performs
+purges itself. It stores three revocable project grants in a Durable Object.
+The worker grant can request sessions for public and private objects, the
+asset grant can request sessions for frontend assets, and the purge grant
+allows only that project's hostnames and cache tag. Existing projects keep
+their original credentials.
+
+1. Use pilot builds of Forte CLI, the fn0 control plane, and every fn0 worker
+   serving the test project.
+2. For a broker on a test account, run `FORTE_EXPERIMENTAL_R2_SESSIONS=1 forte
+   cloud login` or `FORTE_EXPERIMENTAL_R2_SESSIONS=1 forte cloud rotate` with
+   the usual zone or project flags. The broker upload installs its SQLite
+   Durable Object binding. Later broker uploads keep that binding.
+3. Configure `FN0_ACCOUNT_TOKEN_MINTER` as above. Add a Worker secret named
+   `FN0_R2_PARENT_TOKEN` containing an account-owned token with **Workers R2
+   Storage → Write** on the account and **Cache → Purge** on the pilot zones.
+   Keep the parent credential in the broker. Its grants and signed sessions
+   contain no bearer value for the Cloudflare API.
+4. For a new local test project, run
+   `FORTE_EXPERIMENTAL_R2_SESSIONS=1 forte cloud init` with the regular flags.
+   Deploy and destroy it with the pilot builds. Without the flag, project
+   initialization uses the established credential mode.
+
+The broker obtains 15-minute sessions from Cloudflare's Temporary
+Credentials API and reuses a valid session per bucket for server-side
+requests. Workers refresh before expiry. For presigned URLs, the broker
+instead signs the requested method, object, expiration, and applicable
+headers with its internal parent credential. Client-facing URLs carry a
+signature and no reusable session token.
+
+Teardown revokes the project grants after control drains storage.
+Previously issued sessions and URLs remain valid until they expire.
+If an account-owned token has both sets of permissions, both Worker secret
+bindings can reference it.
+
+[Cloudflare R2 temporary credentials](https://developers.cloudflare.com/r2/api/s3/temporary-credentials/)
+
 ## AI-assisted setup
 
 `forte cloud login --setup-token-from-clipboard` and `forte cloud rotate
