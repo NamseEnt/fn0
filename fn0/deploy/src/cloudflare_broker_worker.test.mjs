@@ -948,7 +948,7 @@ function runtimeCall(env, action, grant, data) {
   ), env);
 }
 
-test("provisioning runtime mode creates grants and no long-lived Cloudflare tokens", async () => {
+test("default provisioning creates grants and no long-lived Cloudflare tokens when configured", async () => {
   const env = runtimeEnvironment();
   const { calls, result } = await withStubbedFetch([
     route("GET", `${ACCOUNT_TOKEN_PATH}/verify`, "Bearer shared-parent", () =>
@@ -962,6 +962,7 @@ test("provisioning runtime mode creates grants and no long-lived Cloudflare toke
     app_hostname: "app.example.com",
     accept_account_owned_tokens: true,
     accept_runtime_sessions: true,
+    allow_legacy_credentials: true,
   }), env));
   assert.equal(result.status, 200);
   const provisioned = await result.json();
@@ -973,6 +974,42 @@ test("provisioning runtime mode creates grants and no long-lived Cloudflare toke
   assert.equal(tokenMints.length, 1);
   assert.ok(tokenMints[0].body.expires_on);
   assert.ok(calls.some((call) => call.method === "DELETE" && call.pathname.endsWith("/provisioning-id")));
+});
+
+test("default provisioning without the R2 parent uses the configured account minter", async () => {
+  const env = runtimeEnvironment();
+  delete env.FN0_R2_PARENT_TOKEN;
+  const { result } = await withStubbedFetch(projectProvisionRoutes(ACCOUNT_TOKEN_PATH, ACCOUNT_MINTER),
+    () => worker.fetch(makeRequest("/v1/provision-project", {
+      project_id: TEST_PROJECT,
+      zone_id: TEST_ZONE,
+      app_origin: "https://app.example.com",
+      app_hostname: "app.example.com",
+      accept_account_owned_tokens: true,
+      accept_runtime_sessions: true,
+      allow_legacy_credentials: true,
+    }), env));
+  assert.equal(result.status, 200);
+  const provisioned = await result.json();
+  assert.equal(provisioned.runtime_sessions, undefined);
+  assert.equal(provisioned.account_owned_tokens, true);
+  assert.deepEqual(provisioned.minted_token_ids, CREDENTIAL_IDS);
+});
+
+test("explicit runtime requests still fail before provisioning if the parent is missing", async () => {
+  const env = runtimeEnvironment();
+  delete env.FN0_R2_PARENT_TOKEN;
+  const { calls, result } = await withStubbedFetch([controlAuthorizes(OWNER_GITHUB_ID)],
+    () => worker.fetch(makeRequest("/v1/provision-project", {
+      project_id: TEST_PROJECT,
+      zone_id: TEST_ZONE,
+      app_origin: "https://app.example.com",
+      app_hostname: "app.example.com",
+      accept_account_owned_tokens: true,
+      accept_runtime_sessions: true,
+    }), env));
+  assert.match((await result.json()).error, /require account token issuance/);
+  assert.deepEqual(calls.map((call) => call.pathname), ["/__forte_action/cloudflare_broker_authorize"]);
 });
 
 test("runtime grants are isolated by project, bucket, and purge destination", async () => {

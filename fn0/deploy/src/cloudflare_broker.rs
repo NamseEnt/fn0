@@ -127,6 +127,8 @@ struct ProvisionProjectInput<'a> {
     accept_account_owned_tokens: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     accept_runtime_sessions: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    allow_legacy_credentials: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -417,32 +419,61 @@ impl BrokerClient {
         app_hostname: &str,
         runtime_sessions: bool,
     ) -> Result<BrokerProvisioned> {
+        self.provision_project_with_options(ProvisionProjectInput {
+            project_id,
+            zone_id,
+            app_origin,
+            app_hostname,
+            accept_account_owned_tokens: true,
+            accept_runtime_sessions: runtime_sessions.then_some(true),
+            allow_legacy_credentials: None,
+        })
+        .await
+    }
+
+    pub(crate) async fn provision_project_with_shared_credentials(
+        &self,
+        project_id: &str,
+        zone_id: &str,
+        app_origin: &str,
+        app_hostname: &str,
+    ) -> Result<BrokerProvisioned> {
+        self.provision_project_with_options(ProvisionProjectInput {
+            project_id,
+            zone_id,
+            app_origin,
+            app_hostname,
+            accept_account_owned_tokens: true,
+            accept_runtime_sessions: Some(true),
+            allow_legacy_credentials: Some(true),
+        })
+        .await
+    }
+
+    async fn provision_project_with_options(
+        &self,
+        input: ProvisionProjectInput<'_>,
+    ) -> Result<BrokerProvisioned> {
         let response: BrokerProvisionResponse = self
-            .post_json(
-                "/v1/provision-project",
-                &ProvisionProjectInput {
-                    project_id,
-                    zone_id,
-                    app_origin,
-                    app_hostname,
-                    accept_account_owned_tokens: true,
-                    accept_runtime_sessions: runtime_sessions.then_some(true),
-                },
-                true,
-            )
+            .post_json("/v1/provision-project", &input, true)
             .await?;
         let minted = response
             .minted_token_ids
             .map(|ids| ids.into_ids(response.account_owned_tokens));
-        if response.runtime_sessions != runtime_sessions {
+        let runtime_requested = input.accept_runtime_sessions == Some(true);
+        let legacy_allowed = input.allow_legacy_credentials == Some(true);
+        if (response.runtime_sessions != runtime_requested && !legacy_allowed)
+            || (response.runtime_sessions && minted.is_some())
+        {
             if let Some(ids) = &minted {
-                self.revoke_project_credentials(project_id, ids).await?;
+                self.revoke_project_credentials(input.project_id, ids)
+                    .await?;
             }
             return Err(anyhow!(
                 "the broker did not return the requested credential mode"
             ));
         }
-        if !runtime_sessions && minted.is_none() {
+        if !response.runtime_sessions && minted.is_none() {
             return Err(anyhow!("the broker did not return legacy credential ids"));
         }
         Ok(BrokerProvisioned {
@@ -1031,7 +1062,6 @@ async fn upload_worker(
 ) -> Result<()> {
     let installed_namespace =
         broker_has_runtime_namespace(client, cloudflare_api_base, account_id, token).await?;
-    let enable_runtime = std::env::var("FORTE_EXPERIMENTAL_R2_SESSIONS").as_deref() == Ok("1");
     let mut metadata = serde_json::json!({
         "main_module": "index.mjs",
         "compatibility_date": WORKER_COMPATIBILITY_DATE,
@@ -1063,23 +1093,18 @@ async fn upload_worker(
                 "name": "OWNER_GITHUB_ID",
                 "text": owner_github_id.to_string(),
             },
-        ],
-    });
-    if installed_namespace || enable_runtime {
-        metadata["bindings"]
-            .as_array_mut()
-            .unwrap()
-            .push(serde_json::json!({
+            {
                 "type": "durable_object_namespace",
                 "name": "RUNTIME_PROJECTS",
                 "class_name": "RuntimeProject",
-            }));
-        if !installed_namespace {
-            metadata["migrations"] = serde_json::json!({
-                "new_tag": "runtime-projects-v1",
-                "new_sqlite_classes": ["RuntimeProject"],
-            });
-        }
+            },
+        ],
+    });
+    if !installed_namespace {
+        metadata["migrations"] = serde_json::json!({
+            "new_tag": "runtime-projects-v1",
+            "new_sqlite_classes": ["RuntimeProject"],
+        });
     }
     let metadata_part = Part::text(metadata.to_string()).mime_str("application/json")?;
     // "+module", not plain "application/javascript": Cloudflare parses a part
@@ -1299,7 +1324,9 @@ mod tests {
                 "zone_id": "zone",
                 "app_origin": "https://app.example.com",
                 "app_hostname": "app.example.com",
-                "accept_account_owned_tokens": true
+                "accept_account_owned_tokens": true,
+                "accept_runtime_sessions": true,
+                "allow_legacy_credentials": true
             })))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "zone_name": "example.com",
@@ -1338,16 +1365,16 @@ mod tests {
             .await;
         let client = broker_client_for_test(broker.uri());
         let project = client
-            .provision_project(
+            .provision_project_with_shared_credentials(
                 "abcd1234",
                 "zone",
                 "https://app.example.com",
                 "app.example.com",
-                false,
             )
             .await
             .unwrap();
         let minted = project.minted.unwrap();
+        assert!(project.credentials.runtime_broker_url.is_none());
         assert!(minted.account_owned_tokens);
         client
             .revoke_project_credentials("abcd1234", &minted)
@@ -1664,6 +1691,8 @@ mod tests {
             .and(body_string_contains(
                 r#""keep_bindings":["secret_text","secret_key"]"#,
             ))
+            .and(body_string_contains(r#""name":"RUNTIME_PROJECTS""#))
+            .and(body_string_contains(r#""new_tag":"runtime-projects-v1""#))
             .respond_with(ResponseTemplate::new(200).set_body_json(envelope(json!({}))))
             .mount(&cloudflare)
             .await;

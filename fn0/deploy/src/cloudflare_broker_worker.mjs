@@ -935,7 +935,9 @@ async function runtimeProjectCredentials(env, accountId, zoneId, zoneName, proje
 
 async function provisionProject(setupToken, accountId, env, body) {
   const namespace = projectTokenNamespace(env, setupToken, accountId);
-  if (body.accept_runtime_sessions === true && (!runtimeConfigured(env) || !namespace.accountOwned)) {
+  const runtimeRequested = body.accept_runtime_sessions === true;
+  const useRuntime = runtimeRequested && runtimeConfigured(env) && namespace.accountOwned;
+  if (runtimeRequested && !useRuntime && body.allow_legacy_credentials !== true) {
     throw new Error("runtime sessions require account token issuance, the R2 parent token, and the runtime project binding");
   }
   if (namespace.accountOwned && body.accept_account_owned_tokens !== true) {
@@ -978,7 +980,7 @@ async function provisionProject(setupToken, accountId, env, body) {
       await ensureCacheRule(provisioningToken, zoneId, zoneName, appHostname, null);
       await ensureTieredCache(provisioningToken, zoneId);
       await ensureWebsockets(provisioningToken, zoneId);
-      const credentials = body.accept_runtime_sessions === true
+      const credentials = useRuntime
         ? await runtimeProjectCredentials(env, accountId, zoneId, zoneName, projectId, appHostname, buckets)
         : await mintProjectCredentials(namespace, accountId, zoneId, projectId, buckets);
       return {

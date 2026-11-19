@@ -76,17 +76,14 @@ enum Connect {
     },
 }
 
-/// The convenient path: one `API Tokens -> Edit` token. Provisions the account,
-/// mints the three credentials fn0 keeps, and hands them over.
 pub async fn provision_and_connect(setup: &CloudSetup<'_>) -> Result<ProvisionedResources> {
     let provisioned = setup
         .broker
-        .provision_project(
+        .provision_project_with_shared_credentials(
             setup.project_id,
             setup.zone_id,
             &setup.app_origin(),
             setup.domain,
-            std::env::var("FORTE_EXPERIMENTAL_R2_SESSIONS").as_deref() == Ok("1"),
         )
         .await?;
 
