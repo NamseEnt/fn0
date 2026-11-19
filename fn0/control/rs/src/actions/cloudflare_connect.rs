@@ -26,8 +26,10 @@ use crate::common::cloudflare::CachePurgeFile;
 use crate::common::vault;
 use crate::docs::*;
 use forte_sdk::*;
+use futures::future::{Either, select};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
+use std::pin::pin;
 use std::time::Duration;
 
 /// Cloudflare answers 401 on both cache purge and the R2 data plane for about
@@ -41,19 +43,27 @@ use std::time::Duration;
 /// minutes old and must not pay for the managed path's freshly minted ones.
 const PROBE_ATTEMPTS: usize = 10;
 const PROBE_RETRY_INTERVAL: Duration = Duration::from_millis(750);
+const PROBE_BUDGET: Duration = Duration::from_secs(10);
 
-async fn prove<Probe, Fut>(probe: Probe) -> anyhow::Result<()>
+async fn prove<Probe, Fut>(remaining: Duration, attempts: usize, probe: Probe) -> anyhow::Result<()>
 where
     Probe: Fn() -> Fut,
     Fut: Future<Output = anyhow::Result<()>>,
 {
-    for _ in 1..PROBE_ATTEMPTS {
-        if probe().await.is_ok() {
-            return Ok(());
+    anyhow::ensure!(!remaining.is_zero(), "credential verification timed out");
+    let verify = async {
+        for _ in 1..attempts {
+            if probe().await.is_ok() {
+                return Ok(());
+            }
+            time_wasi::sleep(PROBE_RETRY_INTERVAL).await;
         }
-        time_wasi::sleep(PROBE_RETRY_INTERVAL).await;
+        probe().await
+    };
+    match select(pin!(verify), pin!(time_wasi::sleep(remaining))).await {
+        Either::Left((result, _)) => result,
+        Either::Right(_) => anyhow::bail!("credential verification timed out"),
     }
-    probe().await
 }
 
 #[derive(Deserialize)]
@@ -104,6 +114,8 @@ pub enum Output {
 }
 
 pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
+    let started_at = time_wasi::Instant::now();
+    let remaining_probe_time = || PROBE_BUDGET.saturating_sub(started_at.elapsed());
     let Some(user) = auth::bearer_user(req.headers).await else {
         return Output::NotLoggedIn;
     };
@@ -204,12 +216,24 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         req.body.frontend_asset_hostname
     );
     let probe_file = CachePurgeFile::from_url(probe_url, None);
-    if let Err(error) =
-        prove(|| purge_client.purge_cache_urls(std::slice::from_ref(&probe_file))).await
+    let (purge_attempts, purge_credential) = if broker_url.is_some() {
+        (1, "the broker's FN0_R2_PARENT_TOKEN")
+    } else {
+        (PROBE_ATTEMPTS, "the project purge token")
+    };
+    if let Err(error) = prove(remaining_probe_time(), purge_attempts, || {
+        purge_client.purge_cache_urls(std::slice::from_ref(&probe_file))
+    })
+    .await
     {
         tracing::warn!(%error, "cloudflare_connect purge probe failed");
+        let zone_name = &req.body.zone_name;
+        let zone_id = &req.body.zone_id;
         return Output::CredentialRejected {
-            reason: format!("the purge token cannot purge this zone: {error}"),
+            reason: format!(
+                "Could not verify cache purge for Cloudflare zone {zone_name} ({zone_id}): {error}. \
+                 Ensure {purge_credential} has Cache Purge permission for this zone, then retry forte cloud init."
+            ),
         };
     }
 
@@ -225,7 +249,7 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
         (&req.body.frontend_asset_bucket, &asset_keys),
     ];
     for (bucket, source) in probes {
-        if let Err(error) = prove(|| async {
+        if let Err(error) = prove(remaining_probe_time(), PROBE_ATTEMPTS, || async {
             let keys = source.for_bucket(bucket, 0).await?;
             aws_sign::r2_list_objects(aws_sign::R2ListArgs {
                 account_id: &req.body.account_id,
@@ -306,4 +330,43 @@ pub async fn handler(req: ForteRequest<'_, Input>) -> Output {
     }
 
     Output::Ok
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prove;
+    use forte_sdk::runtime::block_on;
+    use std::cell::Cell;
+    use std::future::ready;
+    use std::time::Duration;
+
+    #[test]
+    fn a_single_attempt_returns_the_rejection() {
+        block_on(async {
+            let calls = Cell::new(0);
+            let error = prove(Duration::from_secs(1), 1, || {
+                calls.set(calls.get() + 1);
+                ready(Err(anyhow::anyhow!("purge denied")))
+            })
+            .await
+            .unwrap_err();
+            assert_eq!(calls.get(), 1);
+            assert_eq!(error.to_string(), "purge denied");
+        });
+    }
+
+    #[test]
+    fn an_exhausted_budget_skips_the_probe() {
+        block_on(async {
+            let called = Cell::new(false);
+            let error = prove(Duration::ZERO, 1, || {
+                called.set(true);
+                ready(Ok(()))
+            })
+            .await
+            .unwrap_err();
+            assert!(!called.get());
+            assert_eq!(error.to_string(), "credential verification timed out");
+        });
+    }
 }

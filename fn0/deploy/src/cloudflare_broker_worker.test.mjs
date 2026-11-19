@@ -948,22 +948,28 @@ function runtimeCall(env, action, grant, data) {
   ), env);
 }
 
+function sharedProvisioningRequest(projectId, zoneId, zoneName) {
+  const hostname = `app.${zoneName}`;
+  return makeRequest("/v1/provision-project", {
+    project_id: projectId,
+    zone_id: zoneId,
+    app_origin: `https://${hostname}`,
+    app_hostname: hostname,
+    accept_account_owned_tokens: true,
+    accept_runtime_sessions: true,
+    allow_legacy_credentials: true,
+  });
+}
+
 test("default provisioning creates grants and no long-lived Cloudflare tokens when configured", async () => {
   const env = runtimeEnvironment();
   const { calls, result } = await withStubbedFetch([
     route("GET", `${ACCOUNT_TOKEN_PATH}/verify`, "Bearer shared-parent", () =>
       jsonResponse(cf({ id: "e".repeat(32), status: "active" })),
     ),
+    route("POST", `/zones/${TEST_ZONE}/purge_cache`, "Bearer shared-parent", () => jsonResponse(cf({}))),
     ...projectProvisionRoutes(ACCOUNT_TOKEN_PATH, ACCOUNT_MINTER),
-  ], () => worker.fetch(makeRequest("/v1/provision-project", {
-    project_id: TEST_PROJECT,
-    zone_id: TEST_ZONE,
-    app_origin: "https://app.example.com",
-    app_hostname: "app.example.com",
-    accept_account_owned_tokens: true,
-    accept_runtime_sessions: true,
-    allow_legacy_credentials: true,
-  }), env));
+  ], () => worker.fetch(sharedProvisioningRequest(TEST_PROJECT, TEST_ZONE, "example.com"), env));
   assert.equal(result.status, 200);
   const provisioned = await result.json();
   assert.equal(provisioned.runtime_sessions, true);
@@ -974,6 +980,96 @@ test("default provisioning creates grants and no long-lived Cloudflare tokens wh
   assert.equal(tokenMints.length, 1);
   assert.ok(tokenMints[0].body.expires_on);
   assert.ok(calls.some((call) => call.method === "DELETE" && call.pathname.endsWith("/provisioning-id")));
+});
+
+test("shared provisioning requires Cache Purge on the selected zone of the account", async () => {
+  const env = runtimeEnvironment();
+  const secondZone = "f".repeat(32);
+  const secondProject = "other123";
+  const authorizedZones = new Set([TEST_ZONE]);
+  const zoneNames = new Map([[TEST_ZONE, "example.com"], [secondZone, "example.net"]]);
+  const bucketTypes = ["private-object-storage", "public-object-storage", "frontend-asset"];
+  const sessionPath = `/accounts/${ACCOUNT_ID}/r2/temp-access-credentials`;
+  const routes = [
+    route("POST", sessionPath, "Bearer shared-parent", ({ body }) =>
+      jsonResponse(cf({
+        accessKeyId: "e".repeat(32),
+        secretAccessKey: "session-secret",
+        sessionToken: `session:${body.bucket}`,
+      })),
+    ),
+    route("GET", `${ACCOUNT_TOKEN_PATH}/verify`, "Bearer shared-parent", () =>
+      jsonResponse(cf({ id: "e".repeat(32), status: "active" })),
+    ),
+    ...[...zoneNames].flatMap(([zoneId, name]) => [
+      route("GET", `/zones/${zoneId}`, "Bearer provisioning-token", () =>
+        jsonResponse(cf({ name, account: { id: ACCOUNT_ID } })),
+      ),
+      route("POST", `/zones/${zoneId}/purge_cache`, "Bearer shared-parent", () =>
+        authorizedZones.has(zoneId)
+          ? jsonResponse(cf({}))
+          : jsonResponse(cfError("Authentication error", 10000), 401),
+      ),
+    ]),
+    ...projectProvisionRoutes(ACCOUNT_TOKEN_PATH, ACCOUNT_MINTER),
+  ];
+  const provision = (project, zone) =>
+    worker.fetch(sharedProvisioningRequest(project, zone, zoneNames.get(zone)), env);
+
+  const first = await withStubbedFetch(routes, () => provision(TEST_PROJECT, TEST_ZONE));
+  assert.equal(first.result.status, 200);
+  assert.equal((await first.result.json()).runtime_sessions, true);
+  const rejected = await withStubbedFetch(routes, () => provision(secondProject, secondZone));
+  assert.equal(rejected.result.ok, false);
+  const { error } = await rejected.result.json();
+  assert.ok(error.includes(`Cloudflare zone example.net (${secondZone})`));
+  assert.match(error, /FN0_R2_PARENT_TOKEN has Cache Purge permission for this zone/);
+  assert.match(error, /Authentication error \(10000\)/);
+  assert.deepEqual(rejected.calls.filter(({ hostname }) => hostname === "api.cloudflare.com")
+    .map(({ method, pathname }) => [method, pathname]), [
+    ["POST", ACCOUNT_TOKEN_PATH],
+    ["GET", `/zones/${secondZone}`],
+    ["POST", `/zones/${secondZone}/purge_cache`],
+    ["DELETE", `${ACCOUNT_TOKEN_PATH}/provisioning-id`],
+  ]);
+
+  authorizedZones.add(secondZone);
+  const authorized = await withStubbedFetch(routes, async () => {
+    const response = await provision(secondProject, secondZone);
+    assert.equal(response.status, 200);
+    const project = await response.json();
+    assert.equal(project.zone_name, "example.net");
+    assert.equal(project.runtime_sessions, true);
+    assert.equal(project.minted_token_ids, undefined);
+    const purge = await runtimeCall(env, "purge", project.purge_token, {
+      project_id: secondProject,
+      files: [`https://${project.frontend_asset_hostname}/__fn0_connect_probe`],
+    });
+    assert.equal(purge.status, 200);
+    for (const type of bucketTypes) {
+      const bucket = projectBucket(secondProject, type);
+      const grant = type === "frontend-asset" ? project.frontend_asset_secret : project.worker_secret;
+      const session = await runtimeCall(env, "session", grant, { project_id: secondProject, bucket });
+      assert.equal(session.status, 200);
+      assert.equal((await session.json()).session_token, `session:${bucket}`);
+    }
+    return project;
+  });
+  const createdBuckets = ({ calls }) => calls
+    .filter(({ method, pathname }) => method === "POST" && pathname === `/accounts/${ACCOUNT_ID}/r2/buckets`)
+    .map(({ body }) => body.name);
+  assert.deepEqual(createdBuckets(first), bucketTypes.map((type) => projectBucket(TEST_PROJECT, type)));
+  assert.deepEqual(createdBuckets(authorized), bucketTypes.map((type) => projectBucket(secondProject, type)));
+  const sessions = authorized.calls.filter(({ pathname }) => pathname === sessionPath);
+  assert.deepEqual(sessions.map(({ body }) => body.bucket), createdBuckets(authorized));
+  const purgeCalls = authorized.calls.filter(({ pathname }) => pathname.endsWith("/purge_cache"));
+  assert.deepEqual(purgeCalls.map(({ pathname, body }) => [pathname, body.files]), [
+    [`/zones/${secondZone}/purge_cache`, [{ url: `https://example.net/__fn0_connect_probe/${secondProject}` }]],
+    [`/zones/${secondZone}/purge_cache`, [{ url: `https://${authorized.result.frontend_asset_hostname}/__fn0_connect_probe` }]],
+  ]);
+  const tokens = authorized.calls.filter(({ method, pathname }) => method === "POST" && pathname.endsWith("/tokens"));
+  assert.equal(tokens.length, 1);
+  assert.ok(tokens[0].body.expires_on);
 });
 
 test("default provisioning without the R2 parent uses the configured account minter", async () => {

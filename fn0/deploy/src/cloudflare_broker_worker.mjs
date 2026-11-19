@@ -156,9 +156,17 @@ function bucketResource(accountId, bucketName) {
   return `com.cloudflare.edge.r2.bucket.${accountId}_default_${bucketName}`;
 }
 
-async function cloudflareRequest(setupToken, method, path, body) {
+class CloudflareRequestError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function cloudflareRequest(setupToken, method, path, body, { retryAuthentication = true, signal } = {}) {
   const requestOptions = {
     method,
+    signal,
     headers: {
       Authorization: `Bearer ${setupToken}`,
       "content-type": "application/json",
@@ -169,7 +177,7 @@ async function cloudflareRequest(setupToken, method, path, body) {
   }
   let response;
   let payload;
-  for (const delay of [0, 400, 1000, 2000]) {
+  for (const delay of retryAuthentication ? [0, 400, 1000, 2000] : [0]) {
     if (delay) {
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
@@ -187,7 +195,7 @@ async function cloudflareRequest(setupToken, method, path, body) {
           .map((error) => `${error.message ?? "unknown error"} (${error.code ?? "?"})`)
           .join("; ")
       : "no detail";
-    throw new Error(`Cloudflare ${method} ${path} failed (${response.status}): ${errors}`);
+    throw new CloudflareRequestError(`Cloudflare ${method} ${path} failed (${response.status}): ${errors}`, response.status);
   }
   return payload.result;
 }
@@ -933,6 +941,26 @@ async function runtimeProjectCredentials(env, accountId, zoneId, zoneName, proje
   };
 }
 
+async function probeSharedPurge(env, zoneId, zoneName, projectId) {
+  const zone = `Cloudflare zone ${zoneName} (${zoneId})`;
+  const signal = AbortSignal.timeout(5000);
+  try {
+    await cloudflareRequest(
+      env.FN0_R2_PARENT_TOKEN, "POST", `/zones/${zoneId}/purge_cache`,
+      { files: [{ url: `https://${zoneName}/__fn0_connect_probe/${projectId}` }] },
+      { retryAuthentication: false, signal },
+    );
+  } catch (error) {
+    if (error instanceof CloudflareRequestError && (error.status === 401 || error.status === 403)) {
+      throw new Error(
+        `Cache purge was denied for ${zone}. Ensure the broker's FN0_R2_PARENT_TOKEN has Cache Purge permission for this zone, then retry forte cloud init. ${error.message}`,
+      );
+    }
+    const detail = signal.aborted ? "the Cloudflare request timed out" : error.message;
+    throw new Error(`Could not verify cache purge for ${zone}: ${detail}`);
+  }
+}
+
 async function provisionProject(setupToken, accountId, env, body) {
   const namespace = projectTokenNamespace(env, setupToken, accountId);
   const runtimeRequested = body.accept_runtime_sessions === true;
@@ -959,6 +987,10 @@ async function provisionProject(setupToken, accountId, env, body) {
       if (!appHostname.endsWith(`.${zoneName}`)) {
         throw new Error("app hostname does not belong to the selected zone");
       }
+      const assetHostname = `${buckets.frontendAssetBucket}.${zoneName}`;
+      if (useRuntime) {
+        await probeSharedPurge(env, zoneId, zoneName, projectId);
+      }
       for (const bucketName of Object.values(buckets)) {
         await createBucket(provisioningToken, accountId, bucketName);
         await putCors(provisioningToken, accountId, bucketName, appOrigin);
@@ -967,7 +999,7 @@ async function provisionProject(setupToken, accountId, env, body) {
         provisioningToken,
         accountId,
         buckets.frontendAssetBucket,
-        `${buckets.frontendAssetBucket}.${zoneName}`,
+        assetHostname,
         zoneId,
       );
       await attachCustomDomain(
@@ -985,7 +1017,7 @@ async function provisionProject(setupToken, accountId, env, body) {
         : await mintProjectCredentials(namespace, accountId, zoneId, projectId, buckets);
       return {
         zone_name: zoneName,
-        frontend_asset_hostname: `${buckets.frontendAssetBucket}.${zoneName}`,
+        frontend_asset_hostname: assetHostname,
         public_object_storage_hostname: `${buckets.publicObjectStorageBucket}.${zoneName}`,
         private_object_storage_bucket: buckets.privateObjectStorageBucket,
         public_object_storage_bucket: buckets.publicObjectStorageBucket,
