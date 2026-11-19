@@ -194,13 +194,17 @@ impl SessionCache {
                 sessions.insert(bucket.to_string(), session.clone());
                 Ok(session)
             }
-            _ if let Some(cached) = sessions.get(bucket)
-                && cached.expires_at > deadline() + 5 =>
-            {
-                Ok(cached.clone())
+            result => {
+                if let Some(cached) = sessions
+                    .get(bucket)
+                    .filter(|cached| cached.expires_at > deadline() + 5)
+                {
+                    return Ok(cached.clone());
+                }
+                result.and_then(|_| {
+                    anyhow::bail!("runtime broker returned an incomplete or expiring session")
+                })
             }
-            Ok(_) => anyhow::bail!("runtime broker returned an incomplete or expiring session"),
-            Err(error) => Err(error),
         }
     }
 }
