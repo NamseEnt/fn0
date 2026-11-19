@@ -18,6 +18,7 @@ const InputSchema = z.object({
     frontendAssetAccessKeyId: z.string(),
     frontendAssetSecret: z.string(),
     purgeToken: z.string(),
+    runtimeBrokerUrl: z.string().optional(),
   });
 
 const OutputSchema = z.discriminatedUnion("t", [
