@@ -61,7 +61,8 @@ if [[ "$CONTROL_DB_BACKEND" == turso && "$mode" == apply ]]; then
 fi
 
 work_dir="$(mktemp -d)"
-trap 'rm -rf "$work_dir"' EXIT
+trap 'control_db_close; rm -rf "$work_dir"' EXIT
+control_db_open
 curl_args=(--connect-timeout 10 --max-time 30 --retry 2 --retry-delay 1 --retry-all-errors)
 
 db_pipeline() {

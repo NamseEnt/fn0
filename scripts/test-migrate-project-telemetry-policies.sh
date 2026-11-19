@@ -42,7 +42,16 @@ control_db_init() {
   CONTROL_DB_TOKEN="token"
 }
 
+control_db_open() {
+  TEST_CONTROL_DB_OPEN=1
+}
+
+control_db_close() {
+  unset TEST_CONTROL_DB_OPEN
+}
+
 control_db_scan() {
+  [[ "${TEST_CONTROL_DB_OPEN:-}" == 1 ]] || return 1
   local after_pk="$1" after_sk="$2" limit="$3" has_cursor="$4"
   printf 'scan %s %s %s %s\n' "$has_cursor" "$after_pk" "$after_sk" "$limit" >>"$TEST_CALL_LOG"
   jq -c --arg after_pk "$after_pk" --arg after_sk "$after_sk" --argjson limit "$limit" --arg has_cursor "$has_cursor" '{documents:(sort_by(.pk,.sk) | map(select($has_cursor != "true" or .pk > $after_pk or (.pk == $after_pk and .sk > $after_sk))) | .[:$limit])}' "$TEST_DOCUMENTS"
